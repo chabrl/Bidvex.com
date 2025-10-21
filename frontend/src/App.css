@@ -1,34 +1,88 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+.gradient-bg {
+  background: linear-gradient(135deg, #F05A4F 0%, #30C7B5 100%);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
+.gradient-text {
+  background: linear-gradient(135deg, #F05A4F 0%, #30C7B5 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
+.gradient-button {
+  background: linear-gradient(135deg, #F05A4F 0%, #30C7B5 100%);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.App-link {
-    color: #61dafb;
+.gradient-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(240, 90, 79, 0.3);
 }
 
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+.gradient-button:active {
+  transform: translateY(0);
+}
+
+.card-hover {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.1);
+}
+
+.glassmorphism {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.dark .glassmorphism {
+  background: rgba(30, 30, 30, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.auction-badge {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.scroll-smooth {
+  scroll-behavior: smooth;
+}
+
+.image-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 0.5rem;
+}
+
+.countdown-timer {
+  font-variant-numeric: tabular-nums;
+}
+
+.bid-animation {
+  animation: bidPulse 0.5s ease-in-out;
+}
+
+@keyframes bidPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
