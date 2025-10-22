@@ -1057,9 +1057,21 @@ async def mark_notification_read(notification_id: str, current_user: User = Depe
 
 @api_router.post("/promotions")
 async def create_promotion(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
+    listing_id = data.get("listing_id")
+    if not listing_id:
+        raise HTTPException(status_code=400, detail="listing_id is required")
+    
+    # Verify listing exists and belongs to user
+    listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    
+    if listing["seller_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to promote this listing")
+    
     promotion = {
         "id": str(uuid.uuid4()),
-        "listing_id": data.get("listing_id"),
+        "listing_id": listing_id,
         "seller_id": current_user.id,
         "promotion_type": data.get("promotion_type"),
         "price": data.get("price"),
@@ -1068,7 +1080,7 @@ async def create_promotion(data: Dict[str, Any], current_user: User = Depends(ge
         "targeting": data.get("targeting", {}),
         "impressions": 0,
         "clicks": 0,
-        "status": "active",
+        "status": "pending",
         "payment_status": "pending",
         "created_at": datetime.now(timezone.utc).isoformat()
     }
