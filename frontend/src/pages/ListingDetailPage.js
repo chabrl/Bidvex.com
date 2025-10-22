@@ -197,6 +197,29 @@ const ListingDetailPage = () => {
               </div>
             </div>
 
+            {user && listing.seller_id === user.id && !listing.is_promoted && (
+              <Card className="glassmorphism border-2 border-primary/20">
+                <CardContent className="p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-lg mb-2">Boost Your Listing</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Increase visibility and reach more potential buyers with promoted placement
+                      </p>
+                      <Button 
+                        className="gradient-button text-white border-0"
+                        onClick={() => setShowPromotionModal(true)}
+                        data-testid="promote-listing-btn"
+                      >
+                        <TrendingUp className="mr-2 h-4 w-4" />
+                        Promote This Listing
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {!isAuctionEnded && user && listing.seller_id !== user.id && (
               <Card className="glassmorphism">
                 <CardContent className="p-6 space-y-4">
