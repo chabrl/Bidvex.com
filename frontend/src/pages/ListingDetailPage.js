@@ -218,6 +218,16 @@ const ListingDetailPage = () => {
                     </Button>
                   </form>
 
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => navigate(`/messages?seller=${listing.seller_id}&listing=${listing.id}`)}
+                    data-testid="message-seller-btn"
+                  >
+                    <MessageCircle className="mr-2 h-4 w-4" />
+                    Message Seller
+                  </Button>
+
                   {listing.buy_now_price && (
                     <>
                       <div className="relative">
