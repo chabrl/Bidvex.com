@@ -67,6 +67,10 @@ const ProfileSettingsPage = () => {
     }
   };
 
+  const handleAvatarUpdate = async (avatarDataUrl) => {
+    await axios.put(`${API}/profile`, { picture: avatarDataUrl });
+  };
+
   const handleDeletePaymentMethod = async (methodId) => {
     if (window.confirm('Are you sure you want to delete this payment method?')) {
       try {
