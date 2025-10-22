@@ -94,6 +94,9 @@ const App = () => {
           <Route path="/payment/success" element={
             <ProtectedRoute><PaymentSuccessPage /></ProtectedRoute>
           } />
+          <Route path="/settings" element={
+            <ProtectedRoute><ProfileSettingsPage /></ProtectedRoute>
+          } />
         </Routes>
         <Toaster position="top-right" />
       </div>
