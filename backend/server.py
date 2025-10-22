@@ -591,10 +591,62 @@ async def stripe_webhook(request: Request):
             transaction = await db.payment_transactions.find_one({"session_id": webhook_response.session_id})
             if transaction and transaction.get("listing_id"):
                 await db.listings.update_one({"id": transaction["listing_id"]}, {"$set": {"status": "sold"}})
+            # Handle promotion payment
+            if transaction and transaction.get("promotion_id"):
+                await db.promotions.update_one({"id": transaction["promotion_id"]}, {"$set": {"status": "active", "payment_status": "paid"}})
+                promotion = await db.promotions.find_one({"id": transaction["promotion_id"]})
+                if promotion and promotion.get("listing_id"):
+                    await db.listings.update_one({"id": promotion["listing_id"]}, {"$set": {"is_promoted": True}})
         return {"status": "success"}
     except Exception as e:
         logger.error(f"Webhook error: {str(e)}")
         raise HTTPException(status_code=400, detail="Webhook error")
+
+@api_router.post("/payments/promote")
+async def create_promotion_checkout(request: Request, data: Dict[str, Any], current_user: User = Depends(get_current_user)):
+    promotion_id = data.get("promotion_id")
+    amount = data.get("amount")
+    
+    if not promotion_id or not amount:
+        raise HTTPException(status_code=400, detail="Missing promotion_id or amount")
+    
+    promotion = await db.promotions.find_one({"id": promotion_id}, {"_id": 0})
+    if not promotion:
+        raise HTTPException(status_code=404, detail="Promotion not found")
+    
+    if promotion["seller_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    host_url = str(request.base_url)
+    success_url = f"{data.get('origin_url')}/listing/{promotion['listing_id']}?promoted=true"
+    cancel_url = f"{data.get('origin_url')}/listing/{promotion['listing_id']}"
+    webhook_url = f"{host_url}api/webhook/stripe"
+    
+    stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
+    checkout_request = CheckoutSessionRequest(
+        amount=amount, 
+        currency="usd", 
+        success_url=success_url, 
+        cancel_url=cancel_url,
+        metadata={"user_id": current_user.id, "promotion_id": promotion_id, "listing_id": promotion["listing_id"]}
+    )
+    
+    session: CheckoutSessionResponse = await stripe_checkout.create_checkout_session(checkout_request)
+    
+    transaction = PaymentTransaction(
+        session_id=session.session_id, 
+        user_id=current_user.id, 
+        listing_id=promotion["listing_id"],
+        amount=amount, 
+        currency="usd", 
+        payment_status="pending", 
+        metadata={"promotion_id": promotion_id, **checkout_request.metadata}
+    )
+    trans_dict = transaction.model_dump()
+    trans_dict["created_at"] = trans_dict["created_at"].isoformat()
+    await db.payment_transactions.insert_one(trans_dict)
+    
+    return {"url": session.url, "session_id": session.session_id}
 
 @app.websocket("/ws/listings/{listing_id}")
 async def websocket_endpoint(websocket: WebSocket, listing_id: str):
