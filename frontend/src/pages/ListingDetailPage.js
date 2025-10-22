@@ -116,6 +116,14 @@ const ListingDetailPage = () => {
 
   const auctionEndDate = new Date(listing.auction_end_date);
   const isAuctionEnded = new Date() > auctionEndDate;
+  
+  // Debug logging for promote button visibility
+  console.log('=== Promote Button Debug ===');
+  console.log('User:', user);
+  console.log('Listing seller_id:', listing.seller_id);
+  console.log('User matches seller?', user && listing.seller_id === user.id);
+  console.log('Is promoted?', listing.is_promoted);
+  console.log('Should show promote button?', user && listing.seller_id === user.id && !listing.is_promoted);
 
   return (
     <div className="min-h-screen py-8 px-4" data-testid="listing-detail-page">
