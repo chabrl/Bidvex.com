@@ -111,15 +111,18 @@ user_problem_statement: |
 backend:
   - task: "Promotion Payment Endpoint"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Added POST /api/payments/promote endpoint for Stripe payment processing of promoted listings. Updated webhook handler to activate promotions and set is_promoted flag on successful payment."
+      - working: true
+        agent: "testing"
+        comment: "✅ All promotion payment endpoints working correctly. Fixed MongoDB ObjectId serialization issue in POST /api/promotions. Fixed webhook logic to properly read promotion_id from metadata. Tested: 1) POST /api/promotions creates promotion with pending status, 2) POST /api/payments/promote creates Stripe checkout session, 3) GET /api/promotions/my returns user promotions, 4) Authorization validation works correctly. Webhook logic updated to activate promotions on successful payment."
 
 frontend:
   - task: "Message Seller Button"
