@@ -99,6 +99,9 @@ const App = () => {
           <Route path="/settings" element={
             <ProtectedRoute><ProfileSettingsPage /></ProtectedRoute>
           } />
+          <Route path="/affiliate" element={
+            <ProtectedRoute><AffiliateDashboard /></ProtectedRoute>
+          } />
         </Routes>
         <Footer />
         <Toaster position="top-right" />
