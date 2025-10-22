@@ -169,6 +169,39 @@ class PaymentTransaction(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+class PaymentMethodCreate(BaseModel):
+    payment_method_id: str
+
+class PaymentMethodResponse(BaseModel):
+    id: str
+    user_id: str
+    stripe_payment_method_id: str
+    card_brand: str
+    last4: str
+    exp_month: int
+    exp_year: int
+    is_verified: bool
+    is_default: bool
+
+class ProfileUpdate(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    company_name: Optional[str] = None
+    tax_number: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    language: Optional[str] = None
+    picture: Optional[str] = None
+
+class LocationSearchParams(BaseModel):
+    latitude: float
+    longitude: float
+    radius_km: float = 50.0
+    category: Optional[str] = None
+    min_price: Optional[float] = None
+    max_price: Optional[float] = None
+
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
