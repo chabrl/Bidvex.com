@@ -92,17 +92,45 @@ const MarketplacePage = () => {
         <div className="mb-8">
           <h1 className="text-3xl md:text-4xl font-bold mb-4">{t('marketplace.title')}</h1>
           
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
-              <Input
-                placeholder={t('marketplace.search')}
-                value={filters.search}
-                onChange={(e) => handleFilterChange('search', e.target.value)}
-                className="pl-10"
-                data-testid="search-input"
-              />
+          <div className="flex flex-col gap-4 mb-6">
+            <div className="flex gap-2">
+              <Button
+                variant={!showLocationSearch ? "default" : "outline"}
+                onClick={() => setShowLocationSearch(false)}
+                data-testid="search-by-text-btn"
+              >
+                <Search className="mr-2 h-4 w-4" />
+                Text Search
+              </Button>
+              <Button
+                variant={showLocationSearch ? "default" : "outline"}
+                onClick={() => setShowLocationSearch(true)}
+                data-testid="search-by-location-btn"
+              >
+                <MapPin className="mr-2 h-4 w-4" />
+                Location Search
+              </Button>
+              {locationParams && (
+                <Button variant="ghost" onClick={clearLocationSearch} size="sm">
+                  Clear Location Filter
+                </Button>
+              )}
             </div>
+
+            {showLocationSearch ? (
+              <LocationSearchMap onLocationSearch={handleLocationSearch} />
+            ) : (
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
+                  <Input
+                    placeholder={t('marketplace.search')}
+                    value={filters.search}
+                    onChange={(e) => handleFilterChange('search', e.target.value)}
+                    className="pl-10"
+                    data-testid="search-input"
+                  />
+                </div>
             
             <select
               value={filters.category}
