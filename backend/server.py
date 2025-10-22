@@ -1069,11 +1069,13 @@ async def create_promotion(data: Dict[str, Any], current_user: User = Depends(ge
         "impressions": 0,
         "clicks": 0,
         "status": "active",
+        "payment_status": "pending",
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.promotions.insert_one(promotion)
-    await db.listings.update_one({"id": data.get("listing_id")}, {"$set": {"is_promoted": True}})
-    return promotion
+    # Return a copy without MongoDB's _id field
+    promotion_response = promotion.copy()
+    return promotion_response
 
 @api_router.get("/promotions/my")
 async def get_my_promotions(current_user: User = Depends(get_current_user)):
