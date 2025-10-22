@@ -25,7 +25,6 @@ const MessagesPage = () => {
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef(null);
   const wsRef = useRef(null);
-  const hasAutoSelectedRef = useRef(false);
 
   useEffect(() => {
     if (user && token) {
@@ -41,43 +40,62 @@ const MessagesPage = () => {
 
   // Auto-select conversation when redirected from "Message Seller" button
   useEffect(() => {
-    if (conversations.length > 0 && !hasAutoSelectedRef.current) {
+    const handleAutoSelection = async () => {
       const sellerId = searchParams.get('seller');
       const listingId = searchParams.get('listing');
       
-      if (sellerId) {
+      if (sellerId && user && !loading) {
+        console.log('Auto-selecting conversation with seller:', sellerId);
+        
+        // Wait for conversations to load
+        if (conversations.length === 0) {
+          return; // Wait for conversations to load first
+        }
+        
         // Find existing conversation with this seller
         const existingConvo = conversations.find(convo => 
           convo.participants && convo.participants.includes(sellerId)
         );
         
         if (existingConvo) {
+          console.log('Found existing conversation:', existingConvo.id);
           setSelectedConversation(existingConvo);
-          hasAutoSelectedRef.current = true;
-        } else if (listingId) {
+        } else {
           // Create new conversation if it doesn't exist
-          startNewConversation(sellerId, listingId);
-          hasAutoSelectedRef.current = true;
+          console.log('Creating new conversation with seller:', sellerId);
+          await startNewConversation(sellerId, listingId);
         }
       }
-    }
-  }, [conversations, searchParams]);
+    };
+    
+    handleAutoSelection();
+  }, [conversations, searchParams, user, loading]);
 
   const startNewConversation = async (sellerId, listingId) => {
     try {
       // Send an initial message to create the conversation
-      const response = await axios.post(`${API}/messages`, {
+      await axios.post(`${API}/messages`, {
         receiver_id: sellerId,
         content: `Hi, I'm interested in your listing.`,
         listing_id: listingId
       });
       
       // Refresh conversations to get the new one
-      await fetchConversations();
-      toast.success('Conversation started!');
+      const response = await axios.get(`${API}/conversations`);
+      setConversations(response.data);
+      
+      // Find and select the newly created conversation
+      const newConvo = response.data.find(convo => 
+        convo.participants && convo.participants.includes(sellerId)
+      );
+      
+      if (newConvo) {
+        setSelectedConversation(newConvo);
+        toast.success('Conversation started!');
+      }
     } catch (error) {
       console.error('Failed to start conversation:', error);
-      toast.error('Failed to start conversation');
+      toast.error(error.response?.data?.detail || 'Failed to start conversation');
     }
   };
 
