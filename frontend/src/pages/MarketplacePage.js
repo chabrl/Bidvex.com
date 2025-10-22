@@ -47,17 +47,39 @@ const MarketplacePage = () => {
   const fetchListings = async () => {
     try {
       setLoading(true);
-      const params = Object.entries(filters)
-        .filter(([_, value]) => value !== '')
-        .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
       
-      const response = await axios.get(`${API}/listings`, { params });
-      setListings(response.data);
+      if (locationParams) {
+        // Use location-based search
+        const response = await axios.post(`${API}/listings/search/location`, {
+          ...locationParams,
+          category: filters.category || null,
+          min_price: filters.min_price ? parseFloat(filters.min_price) : null,
+          max_price: filters.max_price ? parseFloat(filters.max_price) : null,
+        });
+        setListings(response.data);
+      } else {
+        // Use regular search
+        const params = Object.entries(filters)
+          .filter(([_, value]) => value !== '')
+          .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
+        
+        const response = await axios.get(`${API}/listings`, { params });
+        setListings(response.data);
+      }
     } catch (error) {
       console.error('Failed to fetch listings:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleLocationSearch = (params) => {
+    setLocationParams(params);
+    setShowLocationSearch(false);
+  };
+
+  const clearLocationSearch = () => {
+    setLocationParams(null);
   };
 
   const handleFilterChange = (key, value) => {
