@@ -99,6 +99,7 @@ const App = () => {
             <ProtectedRoute><ProfileSettingsPage /></ProtectedRoute>
           } />
         </Routes>
+        <Footer />
         <Toaster position="top-right" />
       </div>
     </BrowserRouter>
