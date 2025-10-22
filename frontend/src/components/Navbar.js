@@ -55,6 +55,13 @@ const Navbar = () => {
           </div>
 
           <div className="flex items-center space-x-2">
+            {user && (
+              <Link to="/messages" data-testid="messages-link">
+                <Button variant="ghost" size="icon">
+                  <MessageCircle className="h-5 w-5" />
+                </Button>
+              </Link>
+            )}
             <Button variant="ghost" size="icon" onClick={toggleTheme} data-testid="theme-toggle-btn">
               {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
             </Button>
