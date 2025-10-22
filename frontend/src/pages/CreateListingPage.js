@@ -264,15 +264,23 @@ const CreateListingPage = () => {
 
               <div className="space-y-2">
                 <Label>Images</Label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImageUpload}
+                  className="hidden"
+                  id="image-upload"
+                />
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={handleImageUrl}
+                  onClick={() => document.getElementById('image-upload').click()}
                   className="w-full"
                   data-testid="add-image-btn"
                 >
                   <Upload className="mr-2 h-4 w-4" />
-                  Add Image URL
+                  Upload Images from Device
                 </Button>
                 {formData.images.length > 0 && (
                   <div className="grid grid-cols-3 gap-2 mt-2">
