@@ -14,6 +14,7 @@ import BuyerDashboard from './pages/BuyerDashboard';
 import CreateListingPage from './pages/CreateListingPage';
 import PaymentSuccessPage from './pages/PaymentSuccessPage';
 import ProfileSettingsPage from './pages/ProfileSettingsPage';
+import AffiliateDashboard from './pages/AffiliateDashboard';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
