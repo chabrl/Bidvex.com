@@ -950,6 +950,123 @@ async def websocket_messages(websocket: WebSocket, user_id: str):
     except WebSocketDisconnect:
         manager.disconnect_user(user_id)
 
+@api_router.get("/admin/users")
+async def admin_get_users(current_user: User = Depends(get_current_user), limit: int = 100, skip: int = 0):
+    if not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    users = await db.users.find({}, {"_id": 0, "password": 0}).skip(skip).limit(limit).to_list(limit)
+    return users
+
+@api_router.put("/admin/users/{user_id}/status")
+async def admin_update_user_status(user_id: str, data: Dict[str, str], current_user: User = Depends(get_current_user)):
+    if not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    await db.users.update_one({"id": user_id}, {"$set": {"status": data.get("status")}})
+    return {"message": "User status updated"}
+
+@api_router.get("/admin/reports")
+async def admin_get_reports(current_user: User = Depends(get_current_user)):
+    if not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    reports = await db.reports.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return reports
+
+@api_router.post("/notifications")
+async def create_notification(data: Dict[str, Any]):
+    notification = {
+        "id": str(uuid.uuid4()),
+        "user_id": data.get("user_id"),
+        "type": data.get("type"),
+        "title": data.get("title"),
+        "content": data.get("content"),
+        "link": data.get("link"),
+        "is_read": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.notifications.insert_one(notification)
+    await manager.send_to_user(data.get("user_id"), {"type": "notification", "data": notification})
+    return notification
+
+@api_router.get("/notifications")
+async def get_notifications(current_user: User = Depends(get_current_user), limit: int = 50):
+    notifications = await db.notifications.find(
+        {"user_id": current_user.id},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    return notifications
+
+@api_router.put("/notifications/{notification_id}/read")
+async def mark_notification_read(notification_id: str, current_user: User = Depends(get_current_user)):
+    await db.notifications.update_one(
+        {"id": notification_id, "user_id": current_user.id},
+        {"$set": {"is_read": True}}
+    )
+    return {"message": "Notification marked as read"}
+
+@api_router.post("/promotions")
+async def create_promotion(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
+    promotion = {
+        "id": str(uuid.uuid4()),
+        "listing_id": data.get("listing_id"),
+        "seller_id": current_user.id,
+        "promotion_type": data.get("promotion_type"),
+        "price": data.get("price"),
+        "start_date": datetime.now(timezone.utc).isoformat(),
+        "end_date": data.get("end_date"),
+        "targeting": data.get("targeting", {}),
+        "impressions": 0,
+        "clicks": 0,
+        "status": "active",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.promotions.insert_one(promotion)
+    await db.listings.update_one({"id": data.get("listing_id")}, {"$set": {"is_promoted": True}})
+    return promotion
+
+@api_router.get("/promotions/my")
+async def get_my_promotions(current_user: User = Depends(get_current_user)):
+    promotions = await db.promotions.find(
+        {"seller_id": current_user.id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    return promotions
+
+@api_router.get("/stats/top-sellers")
+async def get_top_sellers(limit: int = 10):
+    pipeline = [
+        {"$match": {"status": "sold"}},
+        {"$group": {"_id": "$seller_id", "total_sales": {"$sum": "$current_price"}, "count": {"$sum": 1}}},
+        {"$sort": {"total_sales": -1}},
+        {"$limit": limit}
+    ]
+    results = await db.listings.aggregate(pipeline).to_list(limit)
+    
+    sellers = []
+    for result in results:
+        user = await db.users.find_one({"id": result["_id"]}, {"_id": 0, "password": 0})
+        if user:
+            sellers.append({
+                "user": user,
+                "total_sales": result["total_sales"],
+                "items_sold": result["count"]
+            })
+    return sellers
+
+@api_router.get("/stats/hot-items")
+async def get_hot_items(limit: int = 10):
+    listings = await db.listings.find(
+        {"status": "active"},
+        {"_id": 0}
+    ).sort("views", -1).limit(limit).to_list(limit)
+    
+    for listing in listings:
+        if isinstance(listing.get("created_at"), str):
+            listing["created_at"] = datetime.fromisoformat(listing["created_at"])
+        if isinstance(listing.get("auction_end_date"), str):
+            listing["auction_end_date"] = datetime.fromisoformat(listing["auction_end_date"])
+    
+    return [Listing(**listing) for listing in listings]
+
 @api_router.get("/")
 async def root():
     return {"message": "Bazario API v1.0"}
