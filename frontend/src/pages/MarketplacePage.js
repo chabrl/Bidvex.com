@@ -157,6 +157,8 @@ const MarketplacePage = () => {
               <option value="current_price">{t('marketplace.priceLow')}</option>
               <option value="-current_price">{t('marketplace.priceHigh')}</option>
             </select>
+              </div>
+            )}
           </div>
         </div>
 
