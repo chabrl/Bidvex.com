@@ -11,7 +11,8 @@ import { Separator } from '../components/ui/separator';
 import { toast } from 'sonner';
 import Countdown from 'react-countdown';
 import confetti from 'canvas-confetti';
-import { Clock, MapPin, Eye, User, DollarSign, MessageCircle } from 'lucide-react';
+import { Clock, MapPin, Eye, User, DollarSign, MessageCircle, TrendingUp } from 'lucide-react';
+import PromotionManagerModal from '../components/PromotionManagerModal';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
