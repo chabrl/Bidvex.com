@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -15,6 +16,7 @@ const WS_URL = process.env.REACT_APP_BACKEND_URL.replace('/api', '').replace('ht
 
 const MessagesPage = () => {
   const { user, token } = useAuth();
+  const [searchParams] = useSearchParams();
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -23,6 +25,7 @@ const MessagesPage = () => {
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef(null);
   const wsRef = useRef(null);
+  const hasAutoSelectedRef = useRef(false);
 
   useEffect(() => {
     if (user && token) {
@@ -35,6 +38,48 @@ const MessagesPage = () => {
       }
     };
   }, [user, token]);
+
+  // Auto-select conversation when redirected from "Message Seller" button
+  useEffect(() => {
+    if (conversations.length > 0 && !hasAutoSelectedRef.current) {
+      const sellerId = searchParams.get('seller');
+      const listingId = searchParams.get('listing');
+      
+      if (sellerId) {
+        // Find existing conversation with this seller
+        const existingConvo = conversations.find(convo => 
+          convo.participants && convo.participants.includes(sellerId)
+        );
+        
+        if (existingConvo) {
+          setSelectedConversation(existingConvo);
+          hasAutoSelectedRef.current = true;
+        } else if (listingId) {
+          // Create new conversation if it doesn't exist
+          startNewConversation(sellerId, listingId);
+          hasAutoSelectedRef.current = true;
+        }
+      }
+    }
+  }, [conversations, searchParams]);
+
+  const startNewConversation = async (sellerId, listingId) => {
+    try {
+      // Send an initial message to create the conversation
+      const response = await axios.post(`${API}/messages`, {
+        receiver_id: sellerId,
+        content: `Hi, I'm interested in your listing.`,
+        listing_id: listingId
+      });
+      
+      // Refresh conversations to get the new one
+      await fetchConversations();
+      toast.success('Conversation started!');
+    } catch (error) {
+      console.error('Failed to start conversation:', error);
+      toast.error('Failed to start conversation');
+    }
+  };
 
   useEffect(() => {
     if (selectedConversation) {
