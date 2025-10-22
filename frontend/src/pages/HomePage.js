@@ -13,6 +13,31 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const HomePage = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [topSellers, setTopSellers] = useState([]);
+  const [hotItems, setHotItems] = useState([]);
+
+  useEffect(() => {
+    fetchTopSellers();
+    fetchHotItems();
+  }, []);
+
+  const fetchTopSellers = async () => {
+    try {
+      const response = await axios.get(`${API}/stats/top-sellers?limit=3`);
+      setTopSellers(response.data);
+    } catch (error) {
+      console.error('Failed to fetch top sellers:', error);
+    }
+  };
+
+  const fetchHotItems = async () => {
+    try {
+      const response = await axios.get(`${API}/stats/hot-items?limit=6`);
+      setHotItems(response.data);
+    } catch (error) {
+      console.error('Failed to fetch hot items:', error);
+    }
+  };
 
   return (
     <div className="min-h-screen" data-testid="home-page">
