@@ -346,6 +346,13 @@ const ListingDetailPage = () => {
           </div>
         </div>
       </div>
+
+      <PromotionManagerModal
+        open={showPromotionModal}
+        onClose={() => setShowPromotionModal(false)}
+        listingId={listing?.id}
+        listingTitle={listing?.title}
+      />
     </div>
   );
 };
