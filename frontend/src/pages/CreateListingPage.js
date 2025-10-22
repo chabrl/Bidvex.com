@@ -55,14 +55,22 @@ const CreateListingPage = () => {
     setFormData({ ...formData, [name]: value });
   };
 
-  const handleImageUrl = () => {
-    const url = prompt('Enter image URL:');
-    if (url) {
-      setFormData({
-        ...formData,
-        images: [...formData.images, url]
-      });
-    }
+  const handleImageUpload = (e) => {
+    const files = Array.from(e.target.files);
+    files.forEach(file => {
+      if (file.size > 5000000) {
+        toast.error('Image size should be less than 5MB');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        setFormData(prev => ({
+          ...prev,
+          images: [...prev.images, reader.result]
+        }));
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const removeImage = (index) => {
