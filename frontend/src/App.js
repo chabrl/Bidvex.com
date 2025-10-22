@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from './contexts/AuthContext';
 import { Toaster } from './components/ui/sonner';
 import Navbar from './components/Navbar';
+import Footer from './components/Footer';
 import HomePage from './pages/HomePage';
 import MarketplacePage from './pages/MarketplacePage';
 import ListingDetailPage from './pages/ListingDetailPage';
