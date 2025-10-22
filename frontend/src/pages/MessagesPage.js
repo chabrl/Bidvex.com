@@ -44,32 +44,34 @@ const MessagesPage = () => {
       const sellerId = searchParams.get('seller');
       const listingId = searchParams.get('listing');
       
-      if (sellerId && user && !loading) {
-        console.log('Auto-selecting conversation with seller:', sellerId);
-        
-        // Wait for conversations to load
-        if (conversations.length === 0) {
-          return; // Wait for conversations to load first
-        }
-        
-        // Find existing conversation with this seller
-        const existingConvo = conversations.find(convo => 
-          convo.participants && convo.participants.includes(sellerId)
-        );
-        
-        if (existingConvo) {
-          console.log('Found existing conversation:', existingConvo.id);
-          setSelectedConversation(existingConvo);
-        } else {
-          // Create new conversation if it doesn't exist
-          console.log('Creating new conversation with seller:', sellerId);
-          await startNewConversation(sellerId, listingId);
-        }
+      if (!sellerId || !user || loading) {
+        return;
+      }
+      
+      console.log('Auto-selecting conversation with seller:', sellerId);
+      console.log('Loaded conversations:', conversations.length);
+      
+      // Find existing conversation with this seller
+      const existingConvo = conversations.find(convo => 
+        convo.participants && convo.participants.includes(sellerId)
+      );
+      
+      if (existingConvo) {
+        console.log('Found existing conversation:', existingConvo.id);
+        setSelectedConversation(existingConvo);
+      } else if (!loading && conversations.length === 0) {
+        // No conversations exist yet, create new one
+        console.log('No conversations exist. Creating new conversation with seller:', sellerId);
+        await startNewConversation(sellerId, listingId);
+      } else if (!loading) {
+        // Conversations loaded but none with this seller
+        console.log('No conversation with this seller. Creating new one.');
+        await startNewConversation(sellerId, listingId);
       }
     };
     
     handleAutoSelection();
-  }, [conversations, searchParams, user, loading]);
+  }, [conversations, loading, searchParams, user]);
 
   const startNewConversation = async (sellerId, listingId) => {
     try {
