@@ -104,6 +104,12 @@ const App = () => {
           <Route path="/affiliate" element={
             <ProtectedRoute><AffiliateDashboard /></ProtectedRoute>
           } />
+          <Route path="/messages" element={
+            <ProtectedRoute><MessagesPage /></ProtectedRoute>
+          } />
+          <Route path="/create-multi-item-listing" element={
+            <ProtectedRoute><CreateMultiItemListing /></ProtectedRoute>
+          } />
         </Routes>
         <Footer />
         <Toaster position="top-right" />
