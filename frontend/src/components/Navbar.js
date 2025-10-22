@@ -97,6 +97,11 @@ const Navbar = () => {
                     {t('nav.buyerDashboard')}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate('/settings')} data-testid="settings-link">
+                    <User className="mr-2 h-4 w-4" />
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} data-testid="logout-btn">
                     <LogOut className="mr-2 h-4 w-4" />
                     {t('nav.logout')}
