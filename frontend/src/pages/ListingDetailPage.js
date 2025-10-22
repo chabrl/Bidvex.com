@@ -26,6 +26,7 @@ const ListingDetailPage = () => {
   const [bids, setBids] = useState([]);
   const [bidAmount, setBidAmount] = useState('');
   const [loading, setLoading] = useState(true);
+  const [showPromotionModal, setShowPromotionModal] = useState(false);
 
   useEffect(() => {
     fetchListing();
