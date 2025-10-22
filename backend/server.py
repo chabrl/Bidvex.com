@@ -663,6 +663,58 @@ async def search_by_location(params: LocationSearchParams):
 async def get_google_maps_key():
     return {"api_key": google_maps_key}
 
+@api_router.get("/affiliate/stats")
+async def get_affiliate_stats(current_user: User = Depends(get_current_user)):
+    referrals = await db.referrals.find({"affiliate_id": current_user.id}, {"_id": 0}).to_list(1000)
+    
+    total_referrals = len(referrals)
+    active_referrals = len([r for r in referrals if r.get("status") == "active"])
+    
+    earnings = await db.affiliate_earnings.find({"affiliate_id": current_user.id}, {"_id": 0}).to_list(1000)
+    total_earnings = sum(e.get("commission_amount", 0) for e in earnings)
+    pending_earnings = sum(e.get("commission_amount", 0) for e in earnings if e.get("status") == "pending")
+    paid_earnings = sum(e.get("commission_amount", 0) for e in earnings if e.get("status") == "paid")
+    
+    return {
+        "affiliate_code": current_user.affiliate_code,
+        "referral_link": f"https://bazario-auction.preview.emergentagent.com/auth?ref={current_user.affiliate_code}",
+        "total_referrals": total_referrals,
+        "active_referrals": active_referrals,
+        "total_earnings": total_earnings,
+        "pending_earnings": pending_earnings,
+        "paid_earnings": paid_earnings,
+        "earnings_history": earnings,
+        "referrals": referrals
+    }
+
+@api_router.post("/affiliate/withdraw")
+async def request_withdrawal(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
+    amount = data.get("amount")
+    method = data.get("method", "bank_transfer")
+    
+    earnings = await db.affiliate_earnings.find({
+        "affiliate_id": current_user.id,
+        "status": "pending"
+    }).to_list(1000)
+    
+    available = sum(e.get("commission_amount", 0) for e in earnings)
+    
+    if amount > available:
+        raise HTTPException(status_code=400, detail="Insufficient balance")
+    
+    withdrawal_request = {
+        "id": str(uuid.uuid4()),
+        "user_id": current_user.id,
+        "amount": amount,
+        "method": method,
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.withdrawal_requests.insert_one(withdrawal_request)
+    
+    return {"message": "Withdrawal request submitted", "request_id": withdrawal_request["id"]}
+
 @api_router.get("/")
 async def root():
     return {"message": "Bazario API v1.0"}
