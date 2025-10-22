@@ -130,6 +130,8 @@ class Listing(BaseModel):
     location: str
     city: str
     region: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     auction_end_date: datetime
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     status: str = "active"
