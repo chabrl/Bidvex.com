@@ -21,10 +21,13 @@ export const AuthProvider = ({ children }) => {
 
   const fetchUser = async () => {
     try {
+      console.log('Fetching user with token:', token ? 'exists' : 'missing');
       const response = await axios.get(`${API}/auth/me`);
+      console.log('User fetched successfully:', response.data);
       setUser(response.data);
     } catch (error) {
       console.error('Failed to fetch user:', error);
+      console.error('Error response:', error.response?.data);
       logout();
     } finally {
       setLoading(false);
