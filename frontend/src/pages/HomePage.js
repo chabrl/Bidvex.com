@@ -1,8 +1,14 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { Button } from '../components/ui/button';
-import { ArrowRight, Gavel, TrendingUp, Shield, Users } from 'lucide-react';
+import { Card, CardContent } from '../components/ui/card';
+import { Badge } from '../components/ui/badge';
+import { ArrowRight, Gavel, TrendingUp, Shield, Users, Award, Flame } from 'lucide-react';
+import Countdown from 'react-countdown';
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const HomePage = () => {
   const { t } = useTranslation();
