@@ -334,6 +334,7 @@ async def create_listing(listing_data: ListingCreate, current_user: User = Depen
         starting_price=listing_data.starting_price, current_price=listing_data.starting_price,
         buy_now_price=listing_data.buy_now_price, images=listing_data.images,
         location=listing_data.location, city=listing_data.city, region=listing_data.region,
+        latitude=listing_data.latitude, longitude=listing_data.longitude,
         auction_end_date=listing_data.auction_end_date
     )
     listing_dict = listing.model_dump()
