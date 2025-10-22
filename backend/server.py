@@ -111,6 +111,8 @@ class ListingCreate(BaseModel):
     location: str
     city: str
     region: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     auction_end_date: datetime
 
 class Listing(BaseModel):
