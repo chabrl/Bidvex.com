@@ -101,6 +101,10 @@ const Navbar = () => {
                     <User className="mr-2 h-4 w-4" />
                     Settings
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/affiliate')} data-testid="affiliate-link">
+                    <DollarSign className="mr-2 h-4 w-4" />
+                    Affiliate Program
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} data-testid="logout-btn">
                     <LogOut className="mr-2 h-4 w-4" />
