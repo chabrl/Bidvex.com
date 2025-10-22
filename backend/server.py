@@ -547,6 +547,117 @@ async def websocket_endpoint(websocket: WebSocket, listing_id: str):
     except WebSocketDisconnect:
         manager.disconnect(websocket, listing_id)
 
+@api_router.post("/payment-methods")
+async def add_payment_method(data: PaymentMethodCreate, current_user: User = Depends(get_current_user)):
+    try:
+        payment_method = stripe.PaymentMethod.retrieve(data.payment_method_id)
+        stripe.PaymentMethod.attach(data.payment_method_id, customer=current_user.id)
+        
+        intent = stripe.PaymentIntent.create(
+            amount=100,
+            currency='usd',
+            payment_method=data.payment_method_id,
+            customer=current_user.id,
+            confirm=True,
+            return_url='https://bazario-auction.preview.emergentagent.com'
+        )
+        
+        is_verified = intent.status == 'succeeded' or intent.status == 'requires_capture'
+        
+        pm_doc = {
+            "id": str(uuid.uuid4()),
+            "user_id": current_user.id,
+            "stripe_payment_method_id": data.payment_method_id,
+            "card_brand": payment_method.card.brand,
+            "last4": payment_method.card.last4,
+            "exp_month": payment_method.card.exp_month,
+            "exp_year": payment_method.card.exp_year,
+            "is_verified": is_verified,
+            "is_default": False,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        await db.payment_methods.insert_one(pm_doc)
+        
+        if is_verified:
+            stripe.PaymentIntent.cancel(intent.id)
+        
+        return PaymentMethodResponse(**pm_doc)
+    except Exception as e:
+        logger.error(f"Payment method error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/payment-methods")
+async def get_payment_methods(current_user: User = Depends(get_current_user)):
+    methods = await db.payment_methods.find({"user_id": current_user.id}, {"_id": 0}).to_list(100)
+    return methods
+
+@api_router.delete("/payment-methods/{method_id}")
+async def delete_payment_method(method_id: str, current_user: User = Depends(get_current_user)):
+    method = await db.payment_methods.find_one({"id": method_id, "user_id": current_user.id})
+    if not method:
+        raise HTTPException(status_code=404, detail="Payment method not found")
+    
+    try:
+        stripe.PaymentMethod.detach(method["stripe_payment_method_id"])
+    except:
+        pass
+    
+    await db.payment_methods.delete_one({"id": method_id})
+    return {"message": "Payment method deleted"}
+
+@api_router.put("/profile")
+async def update_profile(updates: ProfileUpdate, current_user: User = Depends(get_current_user)):
+    update_data = {k: v for k, v in updates.model_dump().items() if v is not None}
+    if update_data:
+        await db.users.update_one({"id": current_user.id}, {"$set": update_data})
+    updated_user = await db.users.find_one({"id": current_user.id}, {"_id": 0, "password": 0})
+    return updated_user
+
+@api_router.post("/listings/search/location")
+async def search_by_location(params: LocationSearchParams):
+    query = {"status": "active"}
+    
+    if params.category:
+        query["category"] = params.category
+    if params.min_price is not None:
+        query["current_price"] = {"$gte": params.min_price}
+    if params.max_price is not None:
+        if "current_price" in query:
+            query["current_price"]["$lte"] = params.max_price
+        else:
+            query["current_price"] = {"$lte": params.max_price}
+    
+    if params.latitude and params.longitude:
+        radius_in_radians = params.radius_km / 6371.0
+        query["$or"] = [
+            {
+                "latitude": {
+                    "$gte": params.latitude - radius_in_radians * 57.2958,
+                    "$lte": params.latitude + radius_in_radians * 57.2958
+                },
+                "longitude": {
+                    "$gte": params.longitude - radius_in_radians * 57.2958,
+                    "$lte": params.longitude + radius_in_radians * 57.2958
+                }
+            },
+            {"latitude": None}
+        ]
+    
+    listings = await db.listings.find(query, {"_id": 0}).limit(50).to_list(50)
+    
+    for listing in listings:
+        if isinstance(listing.get("created_at"), str):
+            listing["created_at"] = datetime.fromisoformat(listing["created_at"])
+        if isinstance(listing.get("auction_end_date"), str):
+            listing["auction_end_date"] = datetime.fromisoformat(listing["auction_end_date"])
+    
+    return [Listing(**listing) for listing in listings]
+
+@api_router.get("/config/google-maps-key")
+async def get_google_maps_key():
+    return {"api_key": google_maps_key}
+
 @api_router.get("/")
 async def root():
     return {"message": "Bazario API v1.0"}
