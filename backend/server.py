@@ -592,9 +592,10 @@ async def stripe_webhook(request: Request):
             if transaction and transaction.get("listing_id"):
                 await db.listings.update_one({"id": transaction["listing_id"]}, {"$set": {"status": "sold"}})
             # Handle promotion payment
-            if transaction and transaction.get("promotion_id"):
-                await db.promotions.update_one({"id": transaction["promotion_id"]}, {"$set": {"status": "active", "payment_status": "paid"}})
-                promotion = await db.promotions.find_one({"id": transaction["promotion_id"]})
+            if transaction and transaction.get("metadata") and transaction["metadata"].get("promotion_id"):
+                promotion_id = transaction["metadata"]["promotion_id"]
+                await db.promotions.update_one({"id": promotion_id}, {"$set": {"status": "active", "payment_status": "paid"}})
+                promotion = await db.promotions.find_one({"id": promotion_id})
                 if promotion and promotion.get("listing_id"):
                     await db.listings.update_one({"id": promotion["listing_id"]}, {"$set": {"is_promoted": True}})
         return {"status": "success"}
