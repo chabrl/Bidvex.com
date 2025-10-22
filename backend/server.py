@@ -1069,25 +1069,43 @@ async def create_promotion(data: Dict[str, Any], current_user: User = Depends(ge
     if listing["seller_id"] != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to promote this listing")
     
-    promotion = {
-        "id": str(uuid.uuid4()),
+    promotion_id = str(uuid.uuid4())
+    current_time = datetime.now(timezone.utc).isoformat()
+    
+    promotion_doc = {
+        "id": promotion_id,
         "listing_id": listing_id,
         "seller_id": current_user.id,
         "promotion_type": data.get("promotion_type"),
         "price": data.get("price"),
-        "start_date": datetime.now(timezone.utc).isoformat(),
+        "start_date": current_time,
         "end_date": data.get("end_date"),
         "targeting": data.get("targeting", {}),
         "impressions": 0,
         "clicks": 0,
         "status": "pending",
         "payment_status": "pending",
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "created_at": current_time
     }
-    await db.promotions.insert_one(promotion)
-    # Return a copy without MongoDB's _id field
-    promotion_response = promotion.copy()
-    return promotion_response
+    
+    await db.promotions.insert_one(promotion_doc)
+    
+    # Return a clean response without MongoDB fields
+    return {
+        "id": promotion_id,
+        "listing_id": listing_id,
+        "seller_id": current_user.id,
+        "promotion_type": data.get("promotion_type"),
+        "price": data.get("price"),
+        "start_date": current_time,
+        "end_date": data.get("end_date"),
+        "targeting": data.get("targeting", {}),
+        "impressions": 0,
+        "clicks": 0,
+        "status": "pending",
+        "payment_status": "pending",
+        "created_at": current_time
+    }
 
 @api_router.get("/promotions/my")
 async def get_my_promotions(current_user: User = Depends(get_current_user)):
