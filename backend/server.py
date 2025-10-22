@@ -769,6 +769,187 @@ async def request_withdrawal(data: Dict[str, Any], current_user: User = Depends(
     
     return {"message": "Withdrawal request submitted", "request_id": withdrawal_request["id"]}
 
+@api_router.post("/messages")
+async def send_message(msg: MessageCreate, current_user: User = Depends(get_current_user)):
+    conversation_id = "_".join(sorted([current_user.id, msg.receiver_id]))
+    
+    message = Message(
+        conversation_id=conversation_id,
+        sender_id=current_user.id,
+        receiver_id=msg.receiver_id,
+        listing_id=msg.listing_id,
+        content=msg.content
+    )
+    
+    msg_dict = message.model_dump()
+    msg_dict["created_at"] = msg_dict["created_at"].isoformat()
+    await db.messages.insert_one(msg_dict)
+    
+    await db.conversations.update_one(
+        {"id": conversation_id},
+        {
+            "$set": {
+                "last_message": msg.content,
+                "last_message_at": datetime.now(timezone.utc).isoformat()
+            },
+            "$setOnInsert": {
+                "id": conversation_id,
+                "participants": [current_user.id, msg.receiver_id],
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+        },
+        upsert=True
+    )
+    
+    await manager.send_to_user(msg.receiver_id, {
+        "type": "new_message",
+        "message": msg_dict
+    })
+    
+    return message
+
+@api_router.get("/conversations")
+async def get_conversations(current_user: User = Depends(get_current_user)):
+    convos = await db.conversations.find(
+        {"participants": current_user.id},
+        {"_id": 0}
+    ).sort("last_message_at", -1).to_list(100)
+    
+    for convo in convos:
+        other_user_id = [p for p in convo["participants"] if p != current_user.id][0]
+        user = await db.users.find_one({"id": other_user_id}, {"_id": 0, "password": 0, "name": 1, "picture": 1})
+        convo["other_user"] = user
+        
+        unread = await db.messages.count_documents({
+            "conversation_id": convo["id"],
+            "receiver_id": current_user.id,
+            "is_read": False
+        })
+        convo["unread_count"] = unread
+    
+    return convos
+
+@api_router.get("/messages/{conversation_id}")
+async def get_messages(conversation_id: str, current_user: User = Depends(get_current_user), limit: int = 50):
+    messages = await db.messages.find(
+        {"conversation_id": conversation_id},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    
+    await db.messages.update_many(
+        {"conversation_id": conversation_id, "receiver_id": current_user.id},
+        {"$set": {"is_read": True}}
+    )
+    
+    for msg in messages:
+        if isinstance(msg.get("created_at"), str):
+            msg["created_at"] = datetime.fromisoformat(msg["created_at"])
+    
+    return [Message(**msg) for msg in reversed(messages)]
+
+@api_router.post("/multi-item-listings")
+async def create_multi_item_listing(listing_data: MultiItemListingCreate, current_user: User = Depends(get_current_user)):
+    if current_user.account_type != "business":
+        raise HTTPException(status_code=403, detail="Only business accounts can create multi-item listings")
+    
+    listing = MultiItemListing(
+        seller_id=current_user.id,
+        title=listing_data.title,
+        description=listing_data.description,
+        category=listing_data.category,
+        location=listing_data.location,
+        city=listing_data.city,
+        region=listing_data.region,
+        auction_end_date=listing_data.auction_end_date,
+        lots=[lot.model_dump() for lot in listing_data.lots],
+        total_lots=len(listing_data.lots)
+    )
+    
+    listing_dict = listing.model_dump()
+    listing_dict["auction_end_date"] = listing_dict["auction_end_date"].isoformat()
+    listing_dict["created_at"] = listing_dict["created_at"].isoformat()
+    
+    await db.multi_item_listings.insert_one(listing_dict)
+    
+    return listing
+
+@api_router.get("/multi-item-listings")
+async def get_multi_item_listings(limit: int = 50, skip: int = 0):
+    listings = await db.multi_item_listings.find(
+        {"status": "active"},
+        {"_id": 0}
+    ).skip(skip).limit(limit).to_list(limit)
+    
+    for listing in listings:
+        if isinstance(listing.get("created_at"), str):
+            listing["created_at"] = datetime.fromisoformat(listing["created_at"])
+        if isinstance(listing.get("auction_end_date"), str):
+            listing["auction_end_date"] = datetime.fromisoformat(listing["auction_end_date"])
+    
+    return [MultiItemListing(**listing) for listing in listings]
+
+@api_router.get("/multi-item-listings/{listing_id}")
+async def get_multi_item_listing(listing_id: str):
+    listing = await db.multi_item_listings.find_one({"id": listing_id}, {"_id": 0})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    
+    if isinstance(listing.get("created_at"), str):
+        listing["created_at"] = datetime.fromisoformat(listing["created_at"])
+    if isinstance(listing.get("auction_end_date"), str):
+        listing["auction_end_date"] = datetime.fromisoformat(listing["auction_end_date"])
+    
+    return MultiItemListing(**listing)
+
+@api_router.post("/multi-item-listings/{listing_id}/lots/{lot_number}/bid")
+async def bid_on_lot(listing_id: str, lot_number: int, data: Dict[str, float], current_user: User = Depends(get_current_user)):
+    listing = await db.multi_item_listings.find_one({"id": listing_id})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    
+    if listing["seller_id"] == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot bid on your own listing")
+    
+    amount = data.get("amount")
+    lots = listing["lots"]
+    
+    lot_index = next((i for i, lot in enumerate(lots) if lot["lot_number"] == lot_number), None)
+    if lot_index is None:
+        raise HTTPException(status_code=404, detail="Lot not found")
+    
+    if amount <= lots[lot_index]["current_price"]:
+        raise HTTPException(status_code=400, detail="Bid must be higher than current price")
+    
+    lots[lot_index]["current_price"] = amount
+    
+    await db.multi_item_listings.update_one(
+        {"id": listing_id},
+        {"$set": {"lots": lots}}
+    )
+    
+    bid = {
+        "id": str(uuid.uuid4()),
+        "listing_id": listing_id,
+        "lot_number": lot_number,
+        "bidder_id": current_user.id,
+        "amount": amount,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.lot_bids.insert_one(bid)
+    
+    return {"message": "Bid placed successfully", "bid": bid}
+
+@app.websocket("/ws/messages/{user_id}")
+async def websocket_messages(websocket: WebSocket, user_id: str):
+    await manager.connect_user(websocket, user_id)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            await asyncio.sleep(0.1)
+    except WebSocketDisconnect:
+        manager.disconnect_user(user_id)
+
 @api_router.get("/")
 async def root():
     return {"message": "Bazario API v1.0"}
