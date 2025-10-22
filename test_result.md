@@ -181,7 +181,6 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Promotion Payment Endpoint"
     - "Message Seller Button"
     - "Promotion Manager Modal Component"
     - "Promote Listing Button on Listing Detail"
