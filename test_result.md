@@ -101,3 +101,92 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: |
+  Implement three new features for the Bazario auction platform:
+  1. Message Seller Button - Add button on listing detail page that redirects to messages with seller pre-selected (authenticated users only)
+  2. Promote Listing Feature - Add promotion button after listing creation with modal for budget, targeting, duration, preview, and Stripe payment
+  3. Enhanced Footer - Redesign footer with social media links, navigation categories (Marketplace, Sell, Buy, Resources), legal links, company info, language selector, and copyright
+
+backend:
+  - task: "Promotion Payment Endpoint"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added POST /api/payments/promote endpoint for Stripe payment processing of promoted listings. Updated webhook handler to activate promotions and set is_promoted flag on successful payment."
+
+frontend:
+  - task: "Message Seller Button"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/ListingDetailPage.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Message Seller button already existed on ListingDetailPage (line 221-229). Verified it redirects to MessagesPage with seller pre-selected via URL params."
+
+  - task: "Promotion Manager Modal Component"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/components/PromotionManagerModal.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Created PromotionManagerModal with three tiers (Basic $9.99/7d, Standard $24.99/14d, Premium $49.99/30d). Includes targeting options (location, age range, interests), promotion preview, and Stripe payment integration via /api/payments/promote."
+
+  - task: "Promote Listing Button on Listing Detail"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/ListingDetailPage.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added Promote Listing button shown only to listing owner if listing is not already promoted. Button opens PromotionManagerModal with listing details pre-filled."
+
+  - task: "Enhanced Footer Component"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/components/Footer.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Redesigned footer with 4 main categories (Marketplace, Sell, Buy, Resources), Company and Legal sections, social media links (Facebook, Twitter, Instagram, LinkedIn, YouTube) with provided URLs, language toggle (EN/FR), and copyright '© Bazario 2025. All rights reserved.'"
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 0
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Promotion Payment Endpoint"
+    - "Message Seller Button"
+    - "Promotion Manager Modal Component"
+    - "Promote Listing Button on Listing Detail"
+    - "Enhanced Footer Component"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "Implemented all 3 requested features: 1) Message Seller button (already existed, verified working), 2) Promotion Manager Modal with 3 tiers, targeting options, and Stripe payment integration, 3) Enhanced footer with all requested sections. Ready for backend and frontend testing."
