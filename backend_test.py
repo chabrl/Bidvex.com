@@ -157,7 +157,8 @@ class BazarioAPITester:
                     assert data["seller_id"] == self.user_id
                     assert data["promotion_type"] == "standard"
                     assert data["price"] == 24.99
-                    assert data["status"] == "active"
+                    assert data["status"] == "pending"
+                    assert data["payment_status"] == "pending"
                     assert "id" in data
                     
                     print(f"✅ Promotion created successfully: {self.test_promotion_id}")
