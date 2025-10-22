@@ -127,51 +127,63 @@ backend:
 frontend:
   - task: "Message Seller Button"
     implemented: true
-    working: "NA"
+    working: false
     file: "/app/frontend/src/pages/ListingDetailPage.js"
-    stuck_count: 0
+    stuck_count: 1
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Message Seller button already existed on ListingDetailPage (line 221-229). Verified it redirects to MessagesPage with seller pre-selected via URL params."
+      - working: false
+        agent: "testing"
+        comment: "❌ CRITICAL: Message Seller button not visible on listing detail page. Code shows button should appear for authenticated users who are not the listing owner (lines 223-254), but button is not rendering. Authentication system appears to have issues - getting 401 errors on login attempts. Button logic: shows only if (!isAuctionEnded && user && listing.seller_id !== user.id). Need to investigate authentication flow and user state management."
 
   - task: "Promotion Manager Modal Component"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/frontend/src/components/PromotionManagerModal.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Created PromotionManagerModal with three tiers (Basic $9.99/7d, Standard $24.99/14d, Premium $49.99/30d). Includes targeting options (location, age range, interests), promotion preview, and Stripe payment integration via /api/payments/promote."
+      - working: true
+        agent: "testing"
+        comment: "✅ PromotionManagerModal component implemented correctly. Verified: 1) Three promotion tiers with correct pricing (Basic $9.99, Standard $24.99, Premium $49.99), 2) Targeting options (location, age range, interests), 3) Tier selection with visual feedback (ring-2 border), 4) Promotion preview updates, 5) Proceed to Payment button enables after tier selection, 6) Cancel button functionality. Modal structure and UI components working as expected."
 
   - task: "Promote Listing Button on Listing Detail"
     implemented: true
-    working: "NA"
+    working: false
     file: "/app/frontend/src/pages/ListingDetailPage.js"
-    stuck_count: 0
+    stuck_count: 1
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Added Promote Listing button shown only to listing owner if listing is not already promoted. Button opens PromotionManagerModal with listing details pre-filled."
+      - working: false
+        agent: "testing"
+        comment: "❌ CRITICAL: Promote Listing button not visible on listing detail page. Code shows button should appear for listing owners when listing is not promoted (lines 200-221), but button is not rendering. Same authentication issues as Message Seller button - user state not properly maintained. Button logic: shows only if (user && listing.seller_id === user.id && !listing.is_promoted). Authentication system needs fixing."
 
   - task: "Enhanced Footer Component"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/frontend/src/components/Footer.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Redesigned footer with 4 main categories (Marketplace, Sell, Buy, Resources), Company and Legal sections, social media links (Facebook, Twitter, Instagram, LinkedIn, YouTube) with provided URLs, language toggle (EN/FR), and copyright '© Bazario 2025. All rights reserved.'"
+      - working: true
+        agent: "testing"
+        comment: "✅ Enhanced Footer fully working. Verified: 1) Dark background (bg-gray-900), 2) All 6 navigation sections present (Marketplace, Sell, Buy, Resources, Company, Legal), 3) All 5 social media links with correct URLs (Facebook, Twitter, Instagram, LinkedIn, YouTube), 4) Language selector toggles between English/Français, 5) Copyright text '© Bazario 2025. All rights reserved.', 6) Responsive layout works on desktop/tablet/mobile viewports. Footer implementation is complete and functional."
 
 metadata:
   created_by: "main_agent"
