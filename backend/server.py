@@ -23,9 +23,13 @@ mongo_url = os.environ['MONGO_URL']
 db_name = os.environ['DB_NAME']
 jwt_secret = os.environ['JWT_SECRET']
 stripe_api_key = os.environ['STRIPE_API_KEY']
+google_maps_key = os.environ.get('GOOGLE_MAPS_API_KEY', '')
 
 client = AsyncIOMotorClient(mongo_url)
 db = client[db_name]
+
+import stripe
+stripe.api_key = stripe_api_key
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer(auto_error=False)
