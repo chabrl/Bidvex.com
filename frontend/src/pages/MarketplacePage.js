@@ -27,6 +27,8 @@ const MarketplacePage = () => {
     sort: '-created_at',
   });
   const [loading, setLoading] = useState(true);
+  const [showLocationSearch, setShowLocationSearch] = useState(false);
+  const [locationParams, setLocationParams] = useState(null);
 
   useEffect(() => {
     fetchCategories();
