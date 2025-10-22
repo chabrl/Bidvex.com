@@ -162,6 +162,59 @@ class Category(BaseModel):
 class SessionCreate(BaseModel):
     session_id: str
 
+class MessageCreate(BaseModel):
+    receiver_id: str
+    content: str
+    listing_id: Optional[str] = None
+
+class Message(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    conversation_id: str
+    sender_id: str
+    receiver_id: str
+    listing_id: Optional[str] = None
+    content: str
+    is_read: bool = False
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class Lot(BaseModel):
+    lot_number: int
+    title: str
+    description: str
+    quantity: int
+    starting_price: float
+    current_price: float
+    condition: str
+    images: List[str] = []
+
+class MultiItemListingCreate(BaseModel):
+    title: str
+    description: str
+    category: str
+    location: str
+    city: str
+    region: str
+    auction_end_date: datetime
+    lots: List[Lot]
+
+class MultiItemListing(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    seller_id: str
+    title: str
+    description: str
+    category: str
+    location: str
+    city: str
+    region: str
+    auction_end_date: datetime
+    lots: List[Lot]
+    status: str = "active"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    total_lots: int = 0
+    views: int = 0
+
 class PaymentTransaction(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
