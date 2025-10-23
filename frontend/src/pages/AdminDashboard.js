@@ -149,15 +149,19 @@ const AdminDashboard = () => {
 
         {/* Tabs for Different Admin Sections */}
         <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-8 h-auto">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="moderation">Moderation</TabsTrigger>
-            <TabsTrigger value="users">Users</TabsTrigger>
-            <TabsTrigger value="promotions">Promotions</TabsTrigger>
-            <TabsTrigger value="categories">Categories</TabsTrigger>
-            <TabsTrigger value="auctions">Auctions</TabsTrigger>
-            <TabsTrigger value="affiliates">Affiliates</TabsTrigger>
-            <TabsTrigger value="transactions">Transactions</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-6 lg:grid-cols-12 h-auto gap-1">
+            <TabsTrigger value="overview" className="text-xs">Overview</TabsTrigger>
+            <TabsTrigger value="users" className="text-xs">Users</TabsTrigger>
+            <TabsTrigger value="moderation" className="text-xs">Listings</TabsTrigger>
+            <TabsTrigger value="lots" className="text-xs">Lots</TabsTrigger>
+            <TabsTrigger value="promotions" className="text-xs">Promotions</TabsTrigger>
+            <TabsTrigger value="categories" className="text-xs">Categories</TabsTrigger>
+            <TabsTrigger value="auctions" className="text-xs">Auctions</TabsTrigger>
+            <TabsTrigger value="affiliates" className="text-xs">Affiliates</TabsTrigger>
+            <TabsTrigger value="reports" className="text-xs">Reports</TabsTrigger>
+            <TabsTrigger value="analytics" className="text-xs">Analytics</TabsTrigger>
+            <TabsTrigger value="messages" className="text-xs">Messages</TabsTrigger>
+            <TabsTrigger value="logs" className="text-xs">Logs</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
