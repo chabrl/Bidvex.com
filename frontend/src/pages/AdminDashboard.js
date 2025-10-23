@@ -325,6 +325,11 @@ const AdminDashboard = () => {
             </Card>
           </TabsContent>
 
+          {/* Announcements Tab - under Overview */}
+          <TabsContent value="announcements">
+            <AnnouncementManager />
+          </TabsContent>
+
           {/* Transactions Tab */}
           <TabsContent value="transactions" className="space-y-4">
             <Card>
