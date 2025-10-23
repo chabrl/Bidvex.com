@@ -19,6 +19,7 @@ import AffiliateDashboard from './pages/AffiliateDashboard';
 import MessagesPage from './pages/MessagesPage';
 import CreateMultiItemListing from './pages/CreateMultiItemListing';
 import LotsMarketplacePage from './pages/LotsMarketplacePage';
+import AdminDashboard from './pages/AdminDashboard';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
