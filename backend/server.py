@@ -1024,6 +1024,55 @@ async def admin_get_reports(current_user: User = Depends(get_current_user)):
     reports = await db.reports.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
     return reports
 
+@api_router.get("/admin/listings/pending")
+async def admin_get_pending_listings(current_user: User = Depends(get_current_user)):
+    if not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    listings = await db.listings.find({"status": "pending"}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return [Listing(**listing) for listing in listings]
+
+@api_router.put("/admin/listings/{listing_id}/moderate")
+async def admin_moderate_listing(listing_id: str, data: Dict[str, str], current_user: User = Depends(get_current_user)):
+    if not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    action = data.get("action")
+    if action == "approve":
+        await db.listings.update_one({"id": listing_id}, {"$set": {"status": "active"}})
+    elif action == "reject":
+        await db.listings.update_one({"id": listing_id}, {"$set": {"status": "rejected"}})
+    elif action == "remove":
+        await db.listings.delete_one({"id": listing_id})
+    else:
+        raise HTTPException(status_code=400, detail="Invalid action")
+    
+    return {"message": f"Listing {action}d successfully"}
+
+@api_router.get("/admin/transactions")
+async def admin_get_transactions(current_user: User = Depends(get_current_user), limit: int = 50):
+    if not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    transactions = await db.payment_transactions.find({}, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    return transactions
+
+@api_router.get("/admin/analytics")
+async def admin_get_analytics(current_user: User = Depends(get_current_user)):
+    if not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    active_listings = await db.listings.count_documents({"status": "active"})
+    total_users = await db.users.count_documents({})
+    
+    # Calculate total revenue from paid transactions
+    paid_transactions = await db.payment_transactions.find({"payment_status": "paid"}, {"_id": 0, "amount": 1}).to_list(1000)
+    total_revenue = sum([tx.get("amount", 0) for tx in paid_transactions])
+    
+    return {
+        "active_listings": active_listings,
+        "total_users": total_users,
+        "total_revenue": total_revenue
+    }
+
 @api_router.post("/notifications")
 async def create_notification(data: Dict[str, Any]):
     notification = {
