@@ -185,6 +185,18 @@ const AdminDashboard = () => {
                 </CardContent>
               </Card>
             </div>
+            <Card>
+              <CardHeader><CardTitle>Quick Actions</CardTitle></CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <Button variant="outline" onClick={() => document.querySelector('[value=\"users\"]').click()}>Manage Users</Button>
+                  <Button variant="outline" onClick={() => document.querySelector('[value=\"promotions\"]').click()}>Create Promotion</Button>
+                  <Button variant="outline" onClick={() => document.querySelector('[value=\"analytics\"]').click()}>View Analytics</Button>
+                  <Button variant="outline" className="gradient-button text-white border-0" onClick={() => setShowCreate(true)}>New Announcement</Button>
+                </div>
+              </CardContent>
+            </Card>
+            <AnnouncementManager />
           </TabsContent>
 
           {/* Promotions Tab */}
