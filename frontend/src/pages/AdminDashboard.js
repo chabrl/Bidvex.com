@@ -6,7 +6,11 @@ import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { toast } from 'sonner';
-import { Users, Flag, TrendingUp, Activity, Package, DollarSign, CheckCircle, XCircle, Eye, Search } from 'lucide-react';
+import { Users, Flag, TrendingUp, Activity, Package, DollarSign, CheckCircle, XCircle, Eye, Search, FolderOpen, Gavel } from 'lucide-react';
+import PromotionManager from './admin/PromotionManager';
+import CategoryManager from './admin/CategoryManager';
+import AuctionControl from './admin/AuctionControl';
+import AffiliateManager from './admin/AffiliateManager';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
