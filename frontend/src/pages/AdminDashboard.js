@@ -207,6 +207,36 @@ const AdminDashboard = () => {
             <AffiliateManager />
           </TabsContent>
 
+          {/* Enhanced Users Tab */}
+          <TabsContent value="users">
+            <EnhancedUserManager />
+          </TabsContent>
+
+          {/* Lots Moderation Tab */}
+          <TabsContent value="lots">
+            <LotsModeration />
+          </TabsContent>
+
+          {/* Reports Tab */}
+          <TabsContent value="reports">
+            <ReportManager />
+          </TabsContent>
+
+          {/* Analytics Tab */}
+          <TabsContent value="analytics">
+            <AnalyticsDashboard />
+          </TabsContent>
+
+          {/* Messaging Oversight Tab */}
+          <TabsContent value="messages">
+            <MessagingOversight />
+          </TabsContent>
+
+          {/* Admin Logs Tab */}
+          <TabsContent value="logs">
+            <AdminLogs />
+          </TabsContent>
+
           {/* Listing Moderation Tab */}
           <TabsContent value="moderation" className="space-y-4">
             <Card>
