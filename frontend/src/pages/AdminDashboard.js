@@ -3,15 +3,21 @@ import axios from 'axios';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
+import { Input } from '../components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { toast } from 'sonner';
-import { Users, Flag, TrendingUp, Activity } from 'lucide-react';
+import { Users, Flag, TrendingUp, Activity, Package, DollarSign, CheckCircle, XCircle, Eye, Search } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
   const [reports, setReports] = useState([]);
+  const [listings, setListings] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [analytics, setAnalytics] = useState({});
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -19,14 +25,21 @@ const AdminDashboard = () => {
 
   const fetchData = async () => {
     try {
-      const [usersRes, reportsRes] = await Promise.all([
+      const [usersRes, reportsRes, listingsRes, transactionsRes, analyticsRes] = await Promise.all([
         axios.get(`${API}/admin/users`),
-        axios.get(`${API}/admin/reports`)
+        axios.get(`${API}/admin/reports`),
+        axios.get(`${API}/admin/listings/pending`),
+        axios.get(`${API}/admin/transactions`),
+        axios.get(`${API}/admin/analytics`)
       ]);
       setUsers(usersRes.data);
       setReports(reportsRes.data);
+      setListings(listingsRes.data);
+      setTransactions(transactionsRes.data);
+      setAnalytics(analyticsRes.data);
     } catch (error) {
-      toast.error('Failed to load admin data');
+      console.error('Failed to load admin data:', error);
+      toast.error(error.response?.data?.detail || 'Failed to load admin data');
     } finally {
       setLoading(false);
     }
@@ -41,6 +54,21 @@ const AdminDashboard = () => {
       toast.error('Failed to update user');
     }
   };
+
+  const handleListingAction = async (listingId, action) => {
+    try {
+      await axios.put(`${API}/admin/listings/${listingId}/moderate`, { action });
+      toast.success(`Listing ${action}d successfully`);
+      fetchData();
+    } catch (error) {
+      toast.error(`Failed to ${action} listing`);
+    }
+  };
+
+  const filteredUsers = users.filter(user => 
+    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div></div>;
