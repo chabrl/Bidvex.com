@@ -67,6 +67,14 @@ const HomePage = () => {
               <Button 
                 variant="outline" 
                 className="text-lg px-8 py-6 rounded-full border-2"
+                onClick={() => navigate('/lots')}
+                data-testid="browse-lots-btn"
+              >
+                {t('hero.browseLots', 'Browse Lots')}
+              </Button>
+              <Button 
+                variant="outline" 
+                className="text-lg px-8 py-6 rounded-full border-2"
                 onClick={() => navigate('/create-listing')}
                 data-testid="start-selling-btn"
               >
