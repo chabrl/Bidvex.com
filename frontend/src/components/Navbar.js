@@ -45,6 +45,11 @@ const Navbar = () => {
                 {t('nav.marketplace')}
               </Button>
             </Link>
+            <Link to="/lots" data-testid="nav-lots-link">
+              <Button variant="ghost" className="text-sm font-medium">
+                {t('nav.lots', 'Lots Auction')}
+              </Button>
+            </Link>
             {user && user.account_type === 'business' && (
               <Link to="/create-multi-item-listing" data-testid="nav-multi-sell-link">
                 <Button variant="ghost" className="text-sm font-medium">
