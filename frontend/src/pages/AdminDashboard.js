@@ -141,13 +141,40 @@ const AdminDashboard = () => {
         </div>
 
         {/* Tabs for Different Admin Sections */}
-        <Tabs defaultValue="moderation" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="moderation">Listing Moderation</TabsTrigger>
-            <TabsTrigger value="users">User Management</TabsTrigger>
+        <Tabs defaultValue="overview" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-8 h-auto">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="moderation">Moderation</TabsTrigger>
+            <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="promotions">Promotions</TabsTrigger>
+            <TabsTrigger value="categories">Categories</TabsTrigger>
+            <TabsTrigger value="auctions">Auctions</TabsTrigger>
+            <TabsTrigger value="affiliates">Affiliates</TabsTrigger>
             <TabsTrigger value="transactions">Transactions</TabsTrigger>
-            <TabsTrigger value="reports">Reports</TabsTrigger>
           </TabsList>
+
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader><CardTitle>Quick Stats</CardTitle></CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex justify-between"><span>Total Users:</span><span className="font-bold">{users.length}</span></div>
+                  <div className="flex justify-between"><span>Active Listings:</span><span className="font-bold">{analytics.active_listings || 0}</span></div>
+                  <div className="flex justify-between"><span>Total Revenue:</span><span className="font-bold">${analytics.total_revenue?.toFixed(2) || '0.00'}</span></div>
+                  <div className="flex justify-between"><span>Pending Moderation:</span><span className="font-bold">{listings.length}</span></div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader><CardTitle>Recent Activity</CardTitle></CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">Latest transactions: {transactions.length}</p>
+                  <p className="text-sm text-muted-foreground">New reports: {reports.length}</p>
+                  <p className="text-sm text-muted-foreground">Platform status: Operational</p>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
 
           {/* Listing Moderation Tab */}
           <TabsContent value="moderation" className="space-y-4">
