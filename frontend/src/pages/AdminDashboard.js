@@ -11,6 +11,13 @@ import PromotionManager from './admin/PromotionManager';
 import CategoryManager from './admin/CategoryManager';
 import AuctionControl from './admin/AuctionControl';
 import AffiliateManager from './admin/AffiliateManager';
+import EnhancedUserManager from './admin/EnhancedUserManager';
+import LotsModeration from './admin/LotsModeration';
+import ReportManager from './admin/ReportManager';
+import AnalyticsDashboard from './admin/AnalyticsDashboard';
+import MessagingOversight from './admin/MessagingOversight';
+import AdminLogs from './admin/AdminLogs';
+import AnnouncementManager from './admin/AnnouncementManager';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
