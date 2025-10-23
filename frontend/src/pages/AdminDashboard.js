@@ -77,55 +77,223 @@ const AdminDashboard = () => {
   return (
     <div className="min-h-screen py-8 px-4">
       <div className="max-w-7xl mx-auto space-y-8">
-        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card><CardContent className="p-6"><div className="flex items-center gap-4"><Users className="h-8 w-8 text-blue-600" /><div><p className="text-2xl font-bold">{users.length}</p><p className="text-sm text-muted-foreground">Total Users</p></div></div></CardContent></Card>
-          <Card><CardContent className="p-6"><div className="flex items-center gap-4"><Flag className="h-8 w-8 text-red-600" /><div><p className="text-2xl font-bold">{reports.length}</p><p className="text-sm text-muted-foreground">Reports</p></div></div></CardContent></Card>
-          <Card><CardContent className="p-6"><div className="flex items-center gap-4"><TrendingUp className="h-8 w-8 text-green-600" /><div><p className="text-2xl font-bold">$0</p><p className="text-sm text-muted-foreground">Revenue</p></div></div></CardContent></Card>
-          <Card><CardContent className="p-6"><div className="flex items-center gap-4"><Activity className="h-8 w-8 text-purple-600" /><div><p className="text-2xl font-bold">0</p><p className="text-sm text-muted-foreground">Active Auctions</p></div></div></CardContent></Card>
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold gradient-text">Bazario Admin Panel</h1>
+            <p className="text-muted-foreground mt-1">Platform Management & Moderation</p>
+          </div>
+          <Badge className="gradient-bg text-white border-0">Admin Access</Badge>
         </div>
 
-        <Card>
-          <CardHeader><CardTitle>User Management</CardTitle></CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {users.slice(0, 20).map(user => (
-                <div key={user.id} className="flex justify-between items-center p-4 border rounded-lg">
-                  <div>
-                    <p className="font-semibold">{user.name}</p>
-                    <p className="text-sm text-muted-foreground">{user.email}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Badge>{user.account_type}</Badge>
-                    <Button size="sm" variant="outline" onClick={() => handleUserStatus(user.id, 'suspended')}>Suspend</Button>
-                  </div>
+        {/* Analytics KPIs */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Card className="glassmorphism">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <Users className="h-8 w-8 text-blue-600" />
+                <div>
+                  <p className="text-2xl font-bold">{users.length}</p>
+                  <p className="text-sm text-muted-foreground">Total Users</p>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle>Recent Reports</CardTitle></CardHeader>
-          <CardContent>
-            {reports.length > 0 ? (
-              <div className="space-y-2">
-                {reports.slice(0, 10).map(report => (
-                  <div key={report.id} className="flex justify-between items-center p-4 border rounded-lg">
-                    <div>
-                      <p className="font-semibold">{report.category}</p>
-                      <p className="text-sm text-muted-foreground">{report.description}</p>
-                    </div>
-                    <Badge>{report.status}</Badge>
-                  </div>
-                ))}
               </div>
-            ) : (
-              <p className="text-center text-muted-foreground py-8">No reports</p>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+          
+          <Card className="glassmorphism">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <Package className="h-8 w-8 text-purple-600" />
+                <div>
+                  <p className="text-2xl font-bold">{analytics.active_listings || 0}</p>
+                  <p className="text-sm text-muted-foreground">Active Listings</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="glassmorphism">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <DollarSign className="h-8 w-8 text-green-600" />
+                <div>
+                  <p className="text-2xl font-bold">${analytics.total_revenue?.toFixed(2) || '0.00'}</p>
+                  <p className="text-sm text-muted-foreground">Total Revenue</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="glassmorphism">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <Flag className="h-8 w-8 text-red-600" />
+                <div>
+                  <p className="text-2xl font-bold">{listings.length}</p>
+                  <p className="text-sm text-muted-foreground">Pending Moderation</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Tabs for Different Admin Sections */}
+        <Tabs defaultValue="moderation" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="moderation">Listing Moderation</TabsTrigger>
+            <TabsTrigger value="users">User Management</TabsTrigger>
+            <TabsTrigger value="transactions">Transactions</TabsTrigger>
+            <TabsTrigger value="reports">Reports</TabsTrigger>
+          </TabsList>
+
+          {/* Listing Moderation Tab */}
+          <TabsContent value="moderation" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Pending Listings
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {listings.length > 0 ? (
+                  <div className="space-y-4">
+                    {listings.map(listing => (
+                      <div key={listing.id} className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-4 border rounded-lg">
+                        <div className="flex-1">
+                          <p className="font-semibold">{listing.title}</p>
+                          <p className="text-sm text-muted-foreground line-clamp-2">{listing.description}</p>
+                          <div className="flex gap-2 mt-2">
+                            <Badge variant="outline">{listing.category}</Badge>
+                            <Badge variant="outline">${listing.starting_price}</Badge>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" onClick={() => window.open(`/listing/${listing.id}`, '_blank')}>
+                            <Eye className="h-4 w-4 mr-1" /> View
+                          </Button>
+                          <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => handleListingAction(listing.id, 'approve')}>
+                            <CheckCircle className="h-4 w-4 mr-1" /> Approve
+                          </Button>
+                          <Button size="sm" variant="destructive" onClick={() => handleListingAction(listing.id, 'reject')}>
+                            <XCircle className="h-4 w-4 mr-1" /> Reject
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center text-muted-foreground py-8">No pending listings</p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* User Management Tab */}
+          <TabsContent value="users" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  User Management
+                </CardTitle>
+                <div className="relative mt-4">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    placeholder="Search users by name or email..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {filteredUsers.slice(0, 20).map(user => (
+                    <div key={user.id} className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-4 border rounded-lg">
+                      <div className="flex-1">
+                        <p className="font-semibold">{user.name}</p>
+                        <p className="text-sm text-muted-foreground">{user.email}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Badge>{user.account_type}</Badge>
+                        {user.status === 'suspended' ? (
+                          <Button size="sm" variant="outline" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => handleUserStatus(user.id, 'active')}>
+                            Activate
+                          </Button>
+                        ) : (
+                          <Button size="sm" variant="destructive" onClick={() => handleUserStatus(user.id, 'suspended')}>
+                            Suspend
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Transactions Tab */}
+          <TabsContent value="transactions" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5" />
+                  Recent Transactions
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {transactions.length > 0 ? (
+                  <div className="space-y-2">
+                    {transactions.map(tx => (
+                      <div key={tx.session_id} className="flex justify-between items-center p-4 border rounded-lg">
+                        <div>
+                          <p className="font-semibold">${tx.amount} {tx.currency.toUpperCase()}</p>
+                          <p className="text-sm text-muted-foreground">Session: {tx.session_id.substring(0, 20)}...</p>
+                          <p className="text-xs text-muted-foreground">{new Date(tx.created_at).toLocaleString()}</p>
+                        </div>
+                        <Badge className={tx.payment_status === 'paid' ? 'bg-green-600 text-white' : 'bg-yellow-600 text-white'}>
+                          {tx.payment_status}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center text-muted-foreground py-8">No transactions yet</p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Reports Tab */}
+          <TabsContent value="reports" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Flag className="h-5 w-5" />
+                  User Reports
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {reports.length > 0 ? (
+                  <div className="space-y-2">
+                    {reports.slice(0, 10).map(report => (
+                      <div key={report.id} className="flex justify-between items-center p-4 border rounded-lg">
+                        <div>
+                          <p className="font-semibold">{report.category}</p>
+                          <p className="text-sm text-muted-foreground">{report.description}</p>
+                        </div>
+                        <Badge>{report.status}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center text-muted-foreground py-8">No reports</p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
