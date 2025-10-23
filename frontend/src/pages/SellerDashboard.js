@@ -65,14 +65,26 @@ const SellerDashboard = () => {
               Commission: {user.account_type === 'business' ? '4.5%' : '5%'}
             </p>
           </div>
-          <Button
-            className="gradient-button text-white border-0"
-            onClick={() => navigate('/create-listing')}
-            data-testid="create-listing-btn"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            {t('dashboard.seller.createListing')}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              className="gradient-button text-white border-0"
+              onClick={() => navigate('/create-listing')}
+              data-testid="create-listing-btn"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              {t('dashboard.seller.createListing')}
+            </Button>
+            {user.account_type === 'business' && (
+              <Button
+                variant="outline"
+                onClick={() => navigate('/create-multi-item-listing')}
+                data-testid="create-lot-btn"
+              >
+                <Package className="mr-2 h-4 w-4" />
+                {t('dashboard.seller.createLot', 'Create Lot')}
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
