@@ -176,6 +176,26 @@ const AdminDashboard = () => {
             </div>
           </TabsContent>
 
+          {/* Promotions Tab */}
+          <TabsContent value="promotions">
+            <PromotionManager />
+          </TabsContent>
+
+          {/* Categories Tab */}
+          <TabsContent value="categories">
+            <CategoryManager />
+          </TabsContent>
+
+          {/* Auctions Tab */}
+          <TabsContent value="auctions">
+            <AuctionControl />
+          </TabsContent>
+
+          {/* Affiliates Tab */}
+          <TabsContent value="affiliates">
+            <AffiliateManager />
+          </TabsContent>
+
           {/* Listing Moderation Tab */}
           <TabsContent value="moderation" className="space-y-4">
             <Card>
