@@ -114,6 +114,9 @@ const App = () => {
           <Route path="/create-multi-item-listing" element={
             <ProtectedRoute><CreateMultiItemListing /></ProtectedRoute>
           } />
+          <Route path="/admin" element={
+            <ProtectedRoute><AdminDashboard /></ProtectedRoute>
+          } />
         </Routes>
         <Footer />
         <AIAssistant />
