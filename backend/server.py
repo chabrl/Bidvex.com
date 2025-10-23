@@ -1246,6 +1246,239 @@ async def admin_approve_payout(payout_id: str, current_user: User = Depends(get_
     await db.payout_requests.update_one({"id": payout_id}, {"$set": {"status": "approved"}})
     return {"message": "Payout approved"}
 
+# ============================================
+# SPRINT 2: MODERATION & ANALYTICS ENDPOINTS
+# ============================================
+
+# ENHANCED USER MANAGEMENT
+@api_router.get("/admin/users/filter")
+async def admin_filter_users(account_type: str = None, current_user: User = Depends(get_current_user)):
+    if not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    query = {}
+    if account_type:
+        query["account_type"] = account_type
+    
+    users = await db.users.find(query, {"_id": 0, "password": 0}).to_list(200)
+    return users
+
+@api_router.put("/admin/users/{user_id}/verify")
+async def admin_verify_user(user_id: str, data: Dict[str, bool], current_user: User = Depends(get_current_user)):
+    if not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    is_verified = data.get("is_verified", False)
+    await db.users.update_one({"id": user_id}, {"$set": {"verified": is_verified, "verified_at": datetime.now(timezone.utc).isoformat()}})
+    return {"message": f"User {'verified' if is_verified else 'unverified'}"}
+
+@api_router.get("/admin/analytics/users")
+async def admin_user_analytics(current_user: User = Depends(get_current_user)):
+    if not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    personal_users = await db.users.count_documents({"account_type": "personal"})
+    business_users = await db.users.count_documents({"account_type": "business"})
+    
+    return {
+        "personal": personal_users,
+        "business": business_users,
+        "total": personal_users + business_users
+    }
+
+# LOTS AUCTION MODERATION
+@api_router.get("/admin/lots/pending")
+async def admin_get_pending_lots(current_user: User = Depends(get_current_user)):
+    if not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    lots = await db.multi_item_listings.find({"status": "pending"}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return lots
+
+@api_router.put("/admin/lots/{lot_id}/moderate")
+async def admin_moderate_lot(lot_id: str, data: Dict[str, str], current_user: User = Depends(get_current_user)):
+    if not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    action = data.get("action")
+    if action == "approve":
+        await db.multi_item_listings.update_one({"id": lot_id}, {"$set": {"status": "active"}})
+    elif action == "reject":
+        await db.multi_item_listings.update_one({"id": lot_id}, {"$set": {"status": "rejected"}})
+    else:
+        raise HTTPException(status_code=400, detail="Invalid action")
+    
+    return {"message": f"Lot {action}d successfully"}
+
+# REPORT ENHANCEMENTS
+@api_router.put("/admin/reports/{report_id}/update")
+async def admin_update_report(report_id: str, data: Dict[str, Any], current_user: User = Depends(get_current_user)):
+    if not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    update_data = {}
+    if "status" in data:
+        update_data["status"] = data["status"]
+    if "admin_notes" in data:
+        update_data["admin_notes"] = data["admin_notes"]
+    if "assigned_to" in data:
+        update_data["assigned_to"] = data["assigned_to"]
+    if "resolution" in data:
+        update_data["resolution"] = data["resolution"]
+    
+    await db.reports.update_one({"id": report_id}, {"$set": update_data})
+    return {"message": "Report updated"}
+
+@api_router.get("/admin/reports/filter")
+async def admin_filter_reports(category: str = None, severity: str = None, status: str = None, current_user: User = Depends(get_current_user)):
+    if not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    query = {}
+    if category:
+        query["category"] = category
+    if severity:
+        query["severity"] = severity
+    if status:
+        query["status"] = status
+    
+    reports = await db.reports.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return reports
+
+# ADVANCED ANALYTICS
+@api_router.get("/admin/analytics/revenue")
+async def admin_revenue_analytics(current_user: User = Depends(get_current_user)):
+    if not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Get transactions from last 30 days grouped by date
+    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    transactions = await db.payment_transactions.find(
+        {"payment_status": "paid", "created_at": {"$gte": thirty_days_ago.isoformat()}},
+        {"_id": 0, "amount": 1, "created_at": 1}
+    ).to_list(1000)
+    
+    # Group by date
+    daily_revenue = {}
+    for tx in transactions:
+        date = tx["created_at"][:10]
+        daily_revenue[date] = daily_revenue.get(date, 0) + tx.get("amount", 0)
+    
+    return [{"date": date, "revenue": revenue} for date, revenue in sorted(daily_revenue.items())]
+
+@api_router.get("/admin/analytics/listings")
+async def admin_listing_analytics(current_user: User = Depends(get_current_user)):
+    if not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    active = await db.listings.count_documents({"status": "active"})
+    sold = await db.listings.count_documents({"status": "sold"})
+    pending = await db.listings.count_documents({"status": "pending"})
+    cancelled = await db.listings.count_documents({"status": "cancelled"})
+    
+    return {
+        "active": active,
+        "sold": sold,
+        "pending": pending,
+        "cancelled": cancelled
+    }
+
+# ============================================
+# SPRINT 3: ADVANCED FEATURES ENDPOINTS
+# ============================================
+
+# MESSAGING OVERSIGHT
+@api_router.get("/admin/messages/flagged")
+async def admin_get_flagged_messages(current_user: User = Depends(get_current_user)):
+    if not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    messages = await db.messages.find({"flagged": True}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return messages
+
+@api_router.delete("/admin/messages/{message_id}")
+async def admin_delete_message(message_id: str, current_user: User = Depends(get_current_user)):
+    if not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    await db.messages.delete_one({"id": message_id})
+    return {"message": "Message deleted"}
+
+@api_router.put("/admin/users/{user_id}/messaging")
+async def admin_suspend_messaging(user_id: str, data: Dict[str, bool], current_user: User = Depends(get_current_user)):
+    if not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    messaging_suspended = data.get("suspended", False)
+    await db.users.update_one({"id": user_id}, {"$set": {"messaging_suspended": messaging_suspended}})
+    return {"message": f"Messaging {'suspended' if messaging_suspended else 'restored'}"}
+
+# ADMIN ACTION LOGS
+@api_router.post("/admin/logs")
+async def admin_create_log(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
+    if not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    log = {
+        "id": str(uuid.uuid4()),
+        "admin_id": current_user.id,
+        "admin_email": current_user.email,
+        "action": data.get("action"),
+        "target_type": data.get("target_type"),
+        "target_id": data.get("target_id"),
+        "details": data.get("details", ""),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.admin_logs.insert_one(log)
+    return log
+
+@api_router.get("/admin/logs")
+async def admin_get_logs(action_type: str = None, limit: int = 100, current_user: User = Depends(get_current_user)):
+    if not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    query = {}
+    if action_type:
+        query["action"] = action_type
+    
+    logs = await db.admin_logs.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    return logs
+
+# PLATFORM ANNOUNCEMENTS
+@api_router.get("/admin/announcements")
+async def admin_get_announcements(current_user: User = Depends(get_current_user)):
+    if not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    announcements = await db.announcements.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return announcements
+
+@api_router.post("/admin/announcements")
+async def admin_create_announcement(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
+    if not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    announcement = {
+        "id": str(uuid.uuid4()),
+        "title": data.get("title"),
+        "message": data.get("message"),
+        "target_audience": data.get("target_audience", "all"),
+        "status": "active",
+        "scheduled_for": data.get("scheduled_for"),
+        "created_by": current_user.id,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.announcements.insert_one(announcement)
+    return announcement
+
+@api_router.delete("/admin/announcements/{announcement_id}")
+async def admin_delete_announcement(announcement_id: str, current_user: User = Depends(get_current_user)):
+    if not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    await db.announcements.delete_one({"id": announcement_id})
+    return {"message": "Announcement deleted"}
+
 @api_router.post("/notifications")
 async def create_notification(data: Dict[str, Any]):
     notification = {
