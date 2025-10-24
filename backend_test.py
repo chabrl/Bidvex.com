@@ -11,7 +11,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = "https://bazario-mvp.preview.emergentagent.com/api"
+BASE_URL = "https://bid-bazaar-4.preview.emergentagent.com/api"
 TEST_USER_EMAIL = "promotion.tester@bazario.com"
 TEST_USER_PASSWORD = "PromotionTest123!"
 TEST_USER_NAME = "Promotion Tester"
@@ -183,7 +183,7 @@ class BazarioAPITester:
             payment_data = {
                 "promotion_id": self.test_promotion_id,
                 "amount": 24.99,
-                "origin_url": "https://bazario-mvp.preview.emergentagent.com"
+                "origin_url": "https://bid-bazaar-4.preview.emergentagent.com"
             }
             
             async with self.session.post(
@@ -261,7 +261,7 @@ class BazarioAPITester:
         try:
             payment_data = {
                 "amount": 24.99,
-                "origin_url": "https://bazario-mvp.preview.emergentagent.com"
+                "origin_url": "https://bid-bazaar-4.preview.emergentagent.com"
             }
             
             async with self.session.post(
@@ -282,7 +282,7 @@ class BazarioAPITester:
         try:
             payment_data = {
                 "promotion_id": self.test_promotion_id,
-                "origin_url": "https://bazario-mvp.preview.emergentagent.com"
+                "origin_url": "https://bid-bazaar-4.preview.emergentagent.com"
             }
             
             async with self.session.post(
@@ -304,7 +304,7 @@ class BazarioAPITester:
             payment_data = {
                 "promotion_id": "non-existent-promotion-id",
                 "amount": 24.99,
-                "origin_url": "https://bazario-mvp.preview.emergentagent.com"
+                "origin_url": "https://bid-bazaar-4.preview.emergentagent.com"
             }
             
             async with self.session.post(
