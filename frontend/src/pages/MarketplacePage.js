@@ -9,6 +9,7 @@ import { Badge } from '../components/ui/badge';
 import { Search, Filter, Clock, MapPin } from 'lucide-react';
 import Countdown from 'react-countdown';
 import LocationSearchMap from '../components/LocationSearchMap';
+import WatchlistButton from '../components/WatchlistButton';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
