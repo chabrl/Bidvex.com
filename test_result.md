@@ -103,10 +103,14 @@
 #====================================================================================================
 
 user_problem_statement: |
-  Implement three new features for the Bazario auction platform:
-  1. Message Seller Button - Add button on listing detail page that redirects to messages with seller pre-selected (authenticated users only)
-  2. Promote Listing Feature - Add promotion button after listing creation with modal for budget, targeting, duration, preview, and Stripe payment
-  3. Enhanced Footer - Redesign footer with social media links, navigation categories (Marketplace, Sell, Buy, Resources), legal links, company info, language selector, and copyright
+  Session 1 UX Overhaul - Fix two critical issues:
+  1. Mobile Bottom Navigation - Watchlist and Profile buttons redirect to blank pages (routing issue)
+  2. "My Bids" Dashboard UX - Tab system and bid cards need UX improvements:
+     - Larger, color-coded status badges
+     - Clear bid comparison layout
+     - Countdown timer repositioned top-right
+     - Full-width action buttons on mobile
+     - Complete empty state for Watching tab
 
 backend:
   - task: "Promotion Payment Endpoint"
