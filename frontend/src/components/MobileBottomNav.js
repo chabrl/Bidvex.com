@@ -12,7 +12,7 @@ const MobileBottomNav = () => {
     { icon: Home, label: 'Home', path: '/', key: 'home' },
     { icon: Search, label: 'Search', path: '/marketplace', key: 'search' },
     { icon: Plus, label: 'Sell', path: '/create-listing', key: 'sell', requireAuth: true },
-    { icon: Heart, label: 'Watchlist', path: '/buyer/dashboard', key: 'watchlist', requireAuth: true },
+    { icon: Heart, label: 'Watchlist', path: '/watchlist', key: 'watchlist', requireAuth: true },
     { icon: User, label: 'Profile', path: '/settings', key: 'profile', dynamicPath: true }
   ];
 
