@@ -24,15 +24,23 @@ const MobileBottomNav = () => {
   };
 
   const handleNavigation = (item) => {
-    console.log('Navigation clicked:', item.key, 'User:', user);
-    if (item.key === 'profile') {
-      // Handle profile navigation dynamically
-      const profilePath = user ? '/settings' : '/auth';
-      console.log('Profile navigation - Path:', profilePath);
-      navigate(profilePath);
-    } else {
-      console.log('Standard navigation - Path:', item.path);
-      navigate(item.path);
+    console.log('[MobileNav] Click detected:', item.key);
+    console.log('[MobileNav] User state:', user ? 'logged in' : 'not logged in');
+    
+    try {
+      if (item.key === 'profile') {
+        // Handle profile navigation dynamically
+        const profilePath = user ? '/settings' : '/auth';
+        console.log('[MobileNav] Profile path:', profilePath);
+        console.log('[MobileNav] Attempting navigation...');
+        navigate(profilePath);
+        console.log('[MobileNav] Navigate called');
+      } else {
+        console.log('[MobileNav] Standard navigation to:', item.path);
+        navigate(item.path);
+      }
+    } catch (error) {
+      console.error('[MobileNav] Navigation error:', error);
     }
   };
 
