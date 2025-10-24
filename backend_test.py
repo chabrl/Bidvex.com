@@ -162,53 +162,55 @@ class BazarioWatchlistTester:
             print(f"❌ Error creating test listings: {str(e)}")
             return False
             
-    async def test_create_promotion(self) -> bool:
-        """Test POST /api/promotions endpoint"""
-        print("\n🧪 Testing POST /api/promotions...")
+    async def test_add_to_watchlist(self) -> bool:
+        """Test POST /api/watchlist/add endpoint"""
+        print("\n🧪 Testing POST /api/watchlist/add...")
         
         try:
-            promotion_data = {
-                "listing_id": self.test_listing_id,
-                "promotion_type": "standard",
-                "price": 24.99,
-                "end_date": (datetime.now(timezone.utc) + timedelta(days=14)).isoformat(),
-                "targeting": {
-                    "location": "Toronto",
-                    "age_range": "25-45",
-                    "interests": ["fashion", "watches", "luxury"]
-                }
-            }
+            # Test adding valid listing to watchlist
+            listing_id = self.test_listing_ids[0]
             
             async with self.session.post(
-                f"{BASE_URL}/promotions",
-                json=promotion_data,
+                f"{BASE_URL}/watchlist/add",
+                json={"listing_id": listing_id},
                 headers=self.get_auth_headers()
             ) as response:
                 if response.status == 200:
                     data = await response.json()
-                    self.test_promotion_id = data["id"]
                     
-                    # Verify promotion data
-                    assert data["listing_id"] == self.test_listing_id
-                    assert data["seller_id"] == self.user_id
-                    assert data["promotion_type"] == "standard"
-                    assert data["price"] == 24.99
-                    assert data["status"] == "pending"
-                    assert data["payment_status"] == "pending"
-                    assert "id" in data
+                    # Verify response structure
+                    assert "message" in data
+                    assert "success" in data
+                    assert data["success"] is True
+                    assert data["message"] == "Added to watchlist"
                     
-                    print(f"✅ Promotion created successfully: {self.test_promotion_id}")
-                    print(f"   - Status: {data['status']}")
-                    print(f"   - Price: ${data['price']}")
-                    print(f"   - Type: {data['promotion_type']}")
+                    print(f"✅ Successfully added listing to watchlist: {listing_id}")
+                    print(f"   - Message: {data['message']}")
+                    
+                    # Test adding duplicate listing (should return already_added)
+                    async with self.session.post(
+                        f"{BASE_URL}/watchlist/add",
+                        json={"listing_id": listing_id},
+                        headers=self.get_auth_headers()
+                    ) as dup_response:
+                        if dup_response.status == 200:
+                            dup_data = await dup_response.json()
+                            assert "already_added" in dup_data
+                            assert dup_data["already_added"] is True
+                            assert dup_data["message"] == "Already in watchlist"
+                            print(f"✅ Correctly handled duplicate addition")
+                        else:
+                            print(f"❌ Failed duplicate test: {dup_response.status}")
+                            return False
+                    
                     return True
                 else:
-                    print(f"❌ Failed to create promotion: {response.status}")
+                    print(f"❌ Failed to add to watchlist: {response.status}")
                     text = await response.text()
                     print(f"Response: {text}")
                     return False
         except Exception as e:
-            print(f"❌ Error testing promotion creation: {str(e)}")
+            print(f"❌ Error testing add to watchlist: {str(e)}")
             return False
             
     async def test_promotion_payment_endpoint(self) -> bool:
