@@ -188,15 +188,18 @@ frontend:
 
   - task: "My Bids Dashboard - Countdown Timer Positioning"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/frontend/src/pages/BuyerDashboard.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Verified countdown timer is positioned top-right across all tabs with Clock icon, shadow-lg, and urgent state animation (red pulsing when < 1 hour remaining). Timer display format: 'Xd Xh Xm'."
+      - working: true
+        agent: "testing"
+        comment: "✅ Countdown timer positioning verified. Code shows proper top-right positioning (absolute top-3 right-3), Clock icon integration, shadow-lg styling, and urgency state with red background and animate-pulse when < 1 hour. Timer format correctly displays 'Xd Xh Xm' using react-countdown component."
 
   - task: "My Bids Dashboard - Full-Width Action Buttons"
     implemented: true
