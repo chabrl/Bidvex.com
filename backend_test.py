@@ -88,42 +88,78 @@ class BazarioWatchlistTester:
         """Get authorization headers"""
         return {"Authorization": f"Bearer {self.auth_token}"}
         
-    async def create_test_listing(self) -> bool:
-        """Create a test listing for promotion testing"""
+    async def create_test_listings(self) -> bool:
+        """Create multiple test listings for watchlist testing"""
         try:
-            listing_data = {
-                "title": "Premium Vintage Watch for Promotion Testing",
-                "description": "A beautiful vintage watch perfect for testing promotion features. High-quality timepiece with leather strap.",
-                "category": "Fashion",
-                "condition": "excellent",
-                "starting_price": 299.99,
-                "buy_now_price": 499.99,
-                "images": ["https://example.com/watch1.jpg", "https://example.com/watch2.jpg"],
-                "location": "Downtown Toronto",
-                "city": "Toronto",
-                "region": "Ontario",
-                "latitude": 43.6532,
-                "longitude": -79.3832,
-                "auction_end_date": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
-            }
+            listings_data = [
+                {
+                    "title": "Vintage Rolex Submariner - Collector's Dream",
+                    "description": "Authentic vintage Rolex Submariner from 1970s. Excellent condition with original box and papers.",
+                    "category": "Watches",
+                    "condition": "excellent",
+                    "starting_price": 8500.00,
+                    "buy_now_price": 12000.00,
+                    "images": ["https://example.com/rolex1.jpg", "https://example.com/rolex2.jpg"],
+                    "location": "Downtown Vancouver",
+                    "city": "Vancouver",
+                    "region": "British Columbia",
+                    "latitude": 49.2827,
+                    "longitude": -123.1207,
+                    "auction_end_date": (datetime.now(timezone.utc) + timedelta(days=5)).isoformat()
+                },
+                {
+                    "title": "MacBook Pro 16-inch M2 Max - Like New",
+                    "description": "Barely used MacBook Pro with M2 Max chip, 32GB RAM, 1TB SSD. Perfect for professionals.",
+                    "category": "Electronics",
+                    "condition": "like_new",
+                    "starting_price": 2800.00,
+                    "buy_now_price": 3200.00,
+                    "images": ["https://example.com/macbook1.jpg", "https://example.com/macbook2.jpg"],
+                    "location": "Midtown Toronto",
+                    "city": "Toronto",
+                    "region": "Ontario",
+                    "latitude": 43.6532,
+                    "longitude": -79.3832,
+                    "auction_end_date": (datetime.now(timezone.utc) + timedelta(days=3)).isoformat()
+                },
+                {
+                    "title": "Antique Persian Rug - Hand Woven Masterpiece",
+                    "description": "Beautiful hand-woven Persian rug from the 1920s. Excellent condition with vibrant colors.",
+                    "category": "Home & Garden",
+                    "condition": "good",
+                    "starting_price": 1200.00,
+                    "buy_now_price": 2500.00,
+                    "images": ["https://example.com/rug1.jpg", "https://example.com/rug2.jpg"],
+                    "location": "Old Montreal",
+                    "city": "Montreal",
+                    "region": "Quebec",
+                    "latitude": 45.5017,
+                    "longitude": -73.5673,
+                    "auction_end_date": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+                }
+            ]
             
-            async with self.session.post(
-                f"{BASE_URL}/listings", 
-                json=listing_data,
-                headers=self.get_auth_headers()
-            ) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    self.test_listing_id = data["id"]
-                    print(f"✅ Test listing created successfully: {self.test_listing_id}")
-                    return True
-                else:
-                    print(f"❌ Failed to create listing: {response.status}")
-                    text = await response.text()
-                    print(f"Response: {text}")
-                    return False
+            for i, listing_data in enumerate(listings_data):
+                async with self.session.post(
+                    f"{BASE_URL}/listings", 
+                    json=listing_data,
+                    headers=self.get_auth_headers()
+                ) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        self.test_listing_ids.append(data["id"])
+                        print(f"✅ Test listing {i+1} created successfully: {data['id']}")
+                    else:
+                        print(f"❌ Failed to create listing {i+1}: {response.status}")
+                        text = await response.text()
+                        print(f"Response: {text}")
+                        return False
+            
+            print(f"✅ All {len(self.test_listing_ids)} test listings created successfully")
+            return True
+            
         except Exception as e:
-            print(f"❌ Error creating listing: {str(e)}")
+            print(f"❌ Error creating test listings: {str(e)}")
             return False
             
     async def test_create_promotion(self) -> bool:
