@@ -201,49 +201,76 @@ const ListingCard = ({ listing }) => {
       onClick={() => navigate(`/listing/${listing.id}`)}
       data-testid={`listing-card-${listing.id}`}
     >
-      <div className="relative h-48 overflow-hidden bg-gray-100">
+      <div className="relative h-56 md:h-48 overflow-hidden bg-gray-100">
         {listing.images && listing.images.length > 0 ? (
           <img
             src={listing.images[0]}
             alt={listing.title}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-accent/10">
             <span className="text-4xl">📦</span>
           </div>
         )}
-        {listing.is_promoted && (
-          <Badge className="absolute top-2 right-2 gradient-bg text-white border-0">
-            Featured
-          </Badge>
-        )}
+        <div className="absolute top-2 right-2 flex flex-col gap-1">
+          {listing.is_promoted && (
+            <Badge className="gradient-bg text-white border-0">
+              Featured
+            </Badge>
+          )}
+          {listing.buy_now_price && (
+            <Badge className="bg-green-600 text-white border-0">
+              Buy Now
+            </Badge>
+          )}
+        </div>
+        <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-black/60 backdrop-blur-sm px-2 py-1 rounded-md">
+          <MapPin className="h-3 w-3 text-white" />
+          <span className="text-xs text-white font-medium">{listing.city}, {listing.region}</span>
+        </div>
       </div>
       
       <CardContent className="p-4">
-        <h3 className="font-semibold text-lg mb-2 line-clamp-1">{listing.title}</h3>
-        <div className="space-y-1 text-sm text-muted-foreground">
-          <p>{listing.city}, {listing.region}</p>
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            <Countdown
-              date={auctionEndDate}
-              renderer={({ days, hours, minutes, completed }) => (
-                <span className={`font-medium ${completed ? 'text-red-500' : 'text-primary'}`}>
-                  {completed ? t('marketplace.ended') : `${days}d ${hours}h ${minutes}m`}
-                </span>
-              )}
-            />
+        <h3 className="font-semibold text-lg mb-2 line-clamp-2">{listing.title}</h3>
+        
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white text-xs font-bold">
+              {listing.seller_name?.charAt(0) || 'S'}
+            </div>
+            <span className="text-xs">{listing.seller_name || 'Seller'}</span>
+            {listing.seller_verified && (
+              <Badge className="h-4 px-1 text-[10px] bg-blue-600 text-white border-0">✓</Badge>
+            )}
           </div>
+          <Badge variant="outline" className="text-xs">{listing.bid_count} bids</Badge>
+        </div>
+
+        <div className="flex items-center gap-2 mb-3 p-2 bg-accent/10 rounded-md">
+          <Clock className="h-4 w-4 text-primary" />
+          <Countdown
+            date={auctionEndDate}
+            renderer={({ days, hours, minutes, completed }) => (
+              <span className={`text-sm font-semibold ${completed ? 'text-red-500' : 'text-primary'}`}>
+                {completed ? t('marketplace.ended') : `${days}d ${hours}h ${minutes}m left`}
+              </span>
+            )}
+          />
         </div>
       </CardContent>
       
-      <CardFooter className="p-4 pt-0 flex justify-between items-center">
+      <CardFooter className="p-4 pt-0 flex justify-between items-center border-t">
         <div>
           <p className="text-xs text-muted-foreground">{t('marketplace.currentBid')}</p>
-          <p className="text-xl font-bold gradient-text">${listing.current_price.toFixed(2)}</p>
+          <p className="text-2xl font-bold gradient-text">${listing.current_price.toFixed(2)}</p>
+          {listing.buy_now_price && (
+            <p className="text-xs text-green-600">Buy Now: ${listing.buy_now_price.toFixed(2)}</p>
+          )}
         </div>
-        <Badge variant="outline">{listing.bid_count} {t('marketplace.bids')}</Badge>
+        <Button size="sm" className="gradient-button text-white border-0">
+          {t('marketplace.viewDetails', 'View')}
+        </Button>
       </CardFooter>
     </Card>
   );
