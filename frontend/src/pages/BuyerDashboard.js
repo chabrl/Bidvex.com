@@ -96,18 +96,18 @@ const BuyerDashboard = () => {
                       const isUrgent = timeLeft > 0 && timeLeft < 3600000; // Less than 1 hour
 
                       return (
-                        <Card key={bid.id} className={`overflow-hidden ${isWinning ? 'border-2 border-green-500' : 'border-2 border-gray-200'}`}>
-                          {/* Status Badge - Top Left */}
+                        <Card key={bid.id} className={`overflow-hidden ${isWinning ? 'border-2 border-green-500' : 'border-2 border-gray-200 dark:border-gray-700'}`}>
+                          {/* Status Badge - Top Left - Larger & More Prominent */}
                           <div className="relative">
                             <div className="absolute top-3 left-3 z-10">
                               {isWinning ? (
-                                <Badge className="bg-green-600 text-white border-0 text-sm px-3 py-1.5">
-                                  <TrendingUp className="h-4 w-4 mr-1" />
+                                <Badge className="bg-green-600 text-white border-0 text-base px-4 py-2 font-bold shadow-lg">
+                                  <TrendingUp className="h-5 w-5 mr-1.5" />
                                   WINNING
                                 </Badge>
                               ) : (
-                                <Badge variant="destructive" className="text-sm px-3 py-1.5">
-                                  <TrendingDown className="h-4 w-4 mr-1" />
+                                <Badge className="bg-red-600 text-white border-0 text-base px-4 py-2 font-bold shadow-lg">
+                                  <TrendingDown className="h-5 w-5 mr-1.5" />
                                   OUTBID
                                 </Badge>
                               )}
@@ -116,7 +116,8 @@ const BuyerDashboard = () => {
                             {/* Countdown - Top Right */}
                             {auctionEndDate && !isEnded && (
                               <div className="absolute top-3 right-3 z-10">
-                                <Badge className={`${isUrgent ? 'bg-red-600 animate-pulse' : 'bg-blue-600'} text-white border-0 text-sm px-3 py-1.5`}>
+                                <Badge className={`${isUrgent ? 'bg-red-600 animate-pulse' : 'bg-blue-600'} text-white border-0 text-sm px-3 py-1.5 shadow-lg`}>
+                                  <Clock className="h-4 w-4 mr-1" />
                                   <Countdown
                                     date={auctionEndDate}
                                     renderer={({ days, hours, minutes }) => (
@@ -141,22 +142,22 @@ const BuyerDashboard = () => {
                           <CardContent className="p-4 space-y-4">
                             <h3 className="font-bold text-xl line-clamp-2">{listing?.title || 'Listing'}</h3>
 
-                            {/* Bid Comparison - Clear Layout */}
-                            <div className="grid grid-cols-2 gap-3 p-3 bg-accent/10 rounded-lg">
+                            {/* Bid Comparison - Clear Layout with Better Visual Hierarchy */}
+                            <div className={`grid grid-cols-2 gap-4 p-4 rounded-lg ${isWinning ? 'bg-green-50 dark:bg-green-950/30' : 'bg-red-50 dark:bg-red-950/30'}`}>
                               <div>
-                                <p className="text-xs text-muted-foreground uppercase mb-1">Your Bid</p>
-                                <p className="text-xl font-bold">${bid.amount.toFixed(2)}</p>
+                                <p className="text-xs text-muted-foreground uppercase mb-1 font-semibold">Your Bid</p>
+                                <p className="text-2xl font-bold">${bid.amount.toFixed(2)}</p>
                               </div>
                               <div>
-                                <p className="text-xs text-muted-foreground uppercase mb-1">Current Price</p>
-                                <p className="text-xl font-bold gradient-text">${listing?.current_price.toFixed(2)}</p>
+                                <p className="text-xs text-muted-foreground uppercase mb-1 font-semibold">Current Price</p>
+                                <p className={`text-2xl font-bold ${isWinning ? 'text-green-600' : 'text-red-600'}`}>${listing?.current_price.toFixed(2)}</p>
                               </div>
                             </div>
 
                             {/* Additional Info */}
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <Badge variant="outline">{listing?.bid_count || 0} bids</Badge>
-                              {isEnded && <Badge variant="outline">Auction Ended</Badge>}
+                              {isEnded && <Badge variant="destructive">Auction Ended</Badge>}
                             </div>
                           </CardContent>
 
