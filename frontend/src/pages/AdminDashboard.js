@@ -18,6 +18,7 @@ import AnalyticsDashboard from './admin/AnalyticsDashboard';
 import MessagingOversight from './admin/MessagingOversight';
 import AdminLogs from './admin/AdminLogs';
 import AnnouncementManager from './admin/AnnouncementManager';
+import TrustSafetyDashboard from './admin/TrustSafetyDashboard';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
