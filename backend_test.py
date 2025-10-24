@@ -331,8 +331,7 @@ class BazarioWatchlistTester:
                     
                     # Test removing non-existent item
                     async with self.session.post(
-                        f"{BASE_URL}/watchlist/remove",
-                        json={"listing_id": listing_id},
+                        f"{BASE_URL}/watchlist/remove?listing_id={listing_id}",
                         headers=self.get_auth_headers()
                     ) as not_found_response:
                         if not_found_response.status == 200:
