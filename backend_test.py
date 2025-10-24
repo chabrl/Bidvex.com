@@ -362,8 +362,7 @@ class BazarioWatchlistTester:
             # First add a couple items to watchlist
             for listing_id in self.test_listing_ids[1:3]:
                 async with self.session.post(
-                    f"{BASE_URL}/watchlist/add",
-                    json={"listing_id": listing_id},
+                    f"{BASE_URL}/watchlist/add?listing_id={listing_id}",
                     headers=self.get_auth_headers()
                 ) as add_response:
                     if add_response.status != 200:
