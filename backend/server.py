@@ -1968,6 +1968,117 @@ async def get_my_promotions(current_user: User = Depends(get_current_user)):
     ).sort("created_at", -1).to_list(100)
     return promotions
 
+
+# Watchlist Endpoints
+@api_router.post("/watchlist/add")
+async def add_to_watchlist(listing_id: str, current_user: User = Depends(get_current_user)):
+    """Add a listing to user's watchlist"""
+    try:
+        # Check if listing exists
+        listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
+        if not listing:
+            raise HTTPException(status_code=404, detail="Listing not found")
+        
+        # Check if already in watchlist
+        existing = await db.watchlist.find_one({
+            "user_id": current_user.id,
+            "listing_id": listing_id
+        })
+        
+        if existing:
+            return {"message": "Already in watchlist", "already_added": True}
+        
+        # Add to watchlist
+        watchlist_item = {
+            "id": str(uuid.uuid4()),
+            "user_id": current_user.id,
+            "listing_id": listing_id,
+            "added_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        await db.watchlist.insert_one(watchlist_item)
+        return {"message": "Added to watchlist", "success": True}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding to watchlist: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to add to watchlist")
+
+@api_router.post("/watchlist/remove")
+async def remove_from_watchlist(listing_id: str, current_user: User = Depends(get_current_user)):
+    """Remove a listing from user's watchlist"""
+    try:
+        result = await db.watchlist.delete_one({
+            "user_id": current_user.id,
+            "listing_id": listing_id
+        })
+        
+        if result.deleted_count == 0:
+            return {"message": "Item not in watchlist", "success": False}
+        
+        return {"message": "Removed from watchlist", "success": True}
+        
+    except Exception as e:
+        logger.error(f"Error removing from watchlist: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to remove from watchlist")
+
+@api_router.get("/watchlist")
+async def get_watchlist(current_user: User = Depends(get_current_user)):
+    """Get user's watchlist with listing details"""
+    try:
+        # Get all watchlist items for user
+        watchlist_items = await db.watchlist.find(
+            {"user_id": current_user.id},
+            {"_id": 0}
+        ).sort("added_at", -1).to_list(100)
+        
+        if not watchlist_items:
+            return []
+        
+        # Get listing IDs
+        listing_ids = [item["listing_id"] for item in watchlist_items]
+        
+        # Fetch listing details
+        listings = await db.listings.find(
+            {"id": {"$in": listing_ids}, "status": {"$ne": "deleted"}},
+            {"_id": 0}
+        ).to_list(100)
+        
+        # Create a map of listing_id to listing for quick lookup
+        listings_map = {listing["id"]: listing for listing in listings}
+        
+        # Combine watchlist items with listing details
+        result = []
+        for item in watchlist_items:
+            listing = listings_map.get(item["listing_id"])
+            if listing:
+                result.append({
+                    **listing,
+                    "watchlist_added_at": item["added_at"]
+                })
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error fetching watchlist: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch watchlist")
+
+@api_router.get("/watchlist/check/{listing_id}")
+async def check_watchlist_status(listing_id: str, current_user: User = Depends(get_current_user)):
+    """Check if a listing is in user's watchlist"""
+    try:
+        exists = await db.watchlist.find_one({
+            "user_id": current_user.id,
+            "listing_id": listing_id
+        })
+        
+        return {"in_watchlist": exists is not None}
+        
+    except Exception as e:
+        logger.error(f"Error checking watchlist status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to check watchlist status")
+
 @api_router.get("/stats/top-sellers")
 async def get_top_sellers(limit: int = 10):
     pipeline = [
