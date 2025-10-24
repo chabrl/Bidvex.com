@@ -150,8 +150,9 @@ const AdminDashboard = () => {
 
         {/* Tabs for Different Admin Sections */}
         <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-6 lg:grid-cols-12 h-auto gap-1">
+          <TabsList className="grid w-full grid-cols-6 lg:grid-cols-13 h-auto gap-1">
             <TabsTrigger value="overview" className="text-xs">Overview</TabsTrigger>
+            <TabsTrigger value="trust-safety" className="text-xs bg-blue-600 text-white">Trust & Safety</TabsTrigger>
             <TabsTrigger value="users" className="text-xs">Users</TabsTrigger>
             <TabsTrigger value="moderation" className="text-xs">Listings</TabsTrigger>
             <TabsTrigger value="lots" className="text-xs">Lots</TabsTrigger>
