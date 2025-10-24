@@ -34,7 +34,7 @@ class BazarioWatchlistTester:
             await self.session.close()
             
     async def register_test_user(self) -> bool:
-        """Register a test user for testing"""
+        """Register a test user for watchlist testing"""
         try:
             user_data = {
                 "email": TEST_USER_EMAIL,
