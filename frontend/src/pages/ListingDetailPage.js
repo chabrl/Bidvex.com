@@ -158,11 +158,15 @@ const ListingDetailPage = () => {
 
           <div className="space-y-6">
             <div>
-              <div className="flex items-start justify-between mb-2">
-                <h1 className="text-3xl font-bold" data-testid="listing-title">{listing.title}</h1>
-                {listing.is_promoted && (
-                  <Badge className="gradient-bg text-white border-0">Featured</Badge>
-                )}
+              <div className="flex items-start justify-between gap-4 mb-2">
+                <h1 className="text-3xl font-bold flex-1" data-testid="listing-title">{listing.title}</h1>
+                <div className="flex items-center gap-3">
+                  {/* Watchlist Button */}
+                  <WatchlistButton listingId={listing.id} size="large" showLabel={true} />
+                  {listing.is_promoted && (
+                    <Badge className="gradient-bg text-white border-0">Featured</Badge>
+                  )}
+                </div>
               </div>
               
               <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
