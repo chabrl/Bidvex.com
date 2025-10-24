@@ -521,7 +521,7 @@ class BazarioWatchlistTester:
 
 async def main():
     """Main test runner"""
-    tester = BazarioAPITester()
+    tester = BazarioWatchlistTester()
     success = await tester.run_all_tests()
     return success
 
