@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { DollarSign, Gavel, Trophy, Heart, TrendingUp, TrendingDown, Eye } from 'lucide-react';
+import { DollarSign, Gavel, Trophy, Heart, TrendingUp, TrendingDown, Eye, AlertTriangle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import Countdown from 'react-countdown';
 
