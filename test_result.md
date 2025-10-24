@@ -103,14 +103,13 @@
 #====================================================================================================
 
 user_problem_statement: |
-  Session 1 UX Overhaul - Fix two critical issues:
-  1. Mobile Bottom Navigation - Watchlist and Profile buttons redirect to blank pages (routing issue)
-  2. "My Bids" Dashboard UX - Tab system and bid cards need UX improvements:
-     - Larger, color-coded status badges
-     - Clear bid comparison layout
-     - Countdown timer repositioned top-right
-     - Full-width action buttons on mobile
-     - Complete empty state for Watching tab
+  Implement full watchlist functionality for Bazario auction platform:
+  1. Heart icon toggle on listing cards (Marketplace, HomePage) and Listing Detail Page
+  2. Backend API endpoints (add, remove, get watchlist, check status)
+  3. Watchlist page at /watchlist route (protected, displays saved items)
+  4. Buyer Dashboard "Watching" tab integration (sync with watchlist data)
+  5. Visual feedback: toast notifications + heart icon animation
+  6. Authentication required: redirect to /auth if not logged in
 
 backend:
   - task: "No backend changes required"
