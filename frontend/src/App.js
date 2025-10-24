@@ -92,6 +92,9 @@ const App = () => {
           <Route path="/lots" element={<LotsMarketplacePage />} />
           <Route path="/listing/:id" element={<ListingDetailPage />} />
           <Route path="/auth" element={<AuthPage />} />
+          <Route path="/watchlist" element={
+            <ProtectedRoute><WatchlistPage /></ProtectedRoute>
+          } />
           <Route path="/seller/dashboard" element={
             <ProtectedRoute><SellerDashboard /></ProtectedRoute>
           } />
