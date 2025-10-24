@@ -13,6 +13,7 @@ import Countdown from 'react-countdown';
 import confetti from 'canvas-confetti';
 import { Clock, MapPin, Eye, User, DollarSign, MessageCircle, TrendingUp } from 'lucide-react';
 import PromotionManagerModal from '../components/PromotionManagerModal';
+import WatchlistButton from '../components/WatchlistButton';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
