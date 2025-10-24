@@ -248,3 +248,5 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: "Fixed Session 1 UX issues: 1) Corrected MobileBottomNav routing (Watchlist → /buyer/dashboard, Profile → /settings), 2) Added missing CardFooter import to BuyerDashboard, 3) Enhanced status badges with larger size, bold font, prominent colors, and shadows, 4) Improved bid comparison layout with better spacing and color-coded backgrounds, 5) Verified countdown timer positioning (top-right with urgency indicators), 6) Made all action buttons full-width on mobile, 7) Redesigned Watching tab with enhanced cards and rich empty state. Ready for frontend testing."
+  - agent: "testing"
+    message: "CRITICAL ISSUE FOUND: Profile button in mobile navigation is not working - it stays on the same page instead of navigating to /auth for unauthenticated users. This is a high-priority routing bug that needs immediate attention. All other UX improvements (dashboard enhancements, status badges, bid comparison layout, countdown timers, action buttons, watching tab) are implemented correctly and working as expected. The authentication flow works properly for protected routes."
