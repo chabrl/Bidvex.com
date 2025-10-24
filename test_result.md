@@ -203,15 +203,18 @@ frontend:
 
   - task: "My Bids Dashboard - Full-Width Action Buttons"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/frontend/src/pages/BuyerDashboard.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Updated all CardFooter sections with flex-col sm:flex-row and w-full sm:flex-1 classes to ensure action buttons are full-width on mobile and side-by-side on larger screens. Applied across All, Winning, Losing, and Watching tabs."
+      - working: true
+        agent: "testing"
+        comment: "✅ Full-width action buttons implemented correctly. Code review confirms all CardFooter sections use flex-col sm:flex-row layout with w-full sm:flex-1 classes for responsive behavior. Buttons are full-width on mobile and side-by-side on desktop across all tabs (All, Winning, Losing, Watching)."
 
   - task: "My Bids Dashboard - Watching Tab Enhanced"
     implemented: true
