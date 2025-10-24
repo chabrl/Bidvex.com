@@ -308,74 +308,149 @@ class BazarioWatchlistTester:
             print(f"❌ Error testing get watchlist: {str(e)}")
             return False
             
+    async def test_remove_from_watchlist(self) -> bool:
+        """Test POST /api/watchlist/remove endpoint"""
+        print("\n🧪 Testing POST /api/watchlist/remove...")
+        
+        try:
+            # Test removing existing watchlist item
+            listing_id = self.test_listing_ids[0]
+            
+            async with self.session.post(
+                f"{BASE_URL}/watchlist/remove",
+                json={"listing_id": listing_id},
+                headers=self.get_auth_headers()
+            ) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    
+                    # Verify response structure
+                    assert "message" in data
+                    assert "success" in data
+                    assert data["success"] is True
+                    assert data["message"] == "Removed from watchlist"
+                    
+                    print(f"✅ Successfully removed listing from watchlist: {listing_id}")
+                    
+                    # Test removing non-existent item
+                    async with self.session.post(
+                        f"{BASE_URL}/watchlist/remove",
+                        json={"listing_id": listing_id},
+                        headers=self.get_auth_headers()
+                    ) as not_found_response:
+                        if not_found_response.status == 200:
+                            not_found_data = await not_found_response.json()
+                            assert "success" in not_found_data
+                            assert not_found_data["success"] is False
+                            assert not_found_data["message"] == "Item not in watchlist"
+                            print(f"✅ Correctly handled removal of non-existent item")
+                        else:
+                            print(f"❌ Failed non-existent removal test: {not_found_response.status}")
+                            return False
+                    
+                    return True
+                else:
+                    print(f"❌ Failed to remove from watchlist: {response.status}")
+                    text = await response.text()
+                    print(f"Response: {text}")
+                    return False
+        except Exception as e:
+            print(f"❌ Error testing remove from watchlist: {str(e)}")
+            return False
+    
+    async def test_buyer_dashboard_watchlist(self) -> bool:
+        """Test GET /api/dashboard/buyer includes watchlist data"""
+        print("\n🧪 Testing GET /api/dashboard/buyer (watchlist integration)...")
+        
+        try:
+            # First add a couple items to watchlist
+            for listing_id in self.test_listing_ids[1:3]:
+                async with self.session.post(
+                    f"{BASE_URL}/watchlist/add",
+                    json={"listing_id": listing_id},
+                    headers=self.get_auth_headers()
+                ) as add_response:
+                    if add_response.status != 200:
+                        print(f"❌ Failed to add listing {listing_id} to watchlist for dashboard test")
+                        return False
+            
+            # Now test dashboard endpoint
+            async with self.session.get(
+                f"{BASE_URL}/dashboard/buyer",
+                headers=self.get_auth_headers()
+            ) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    
+                    # Verify watchlist field exists
+                    assert "watchlist" in data, "Dashboard should include watchlist field"
+                    assert isinstance(data["watchlist"], list), "Watchlist should be a list"
+                    
+                    # Should have the items we added
+                    assert len(data["watchlist"]) >= 2, "Dashboard watchlist should contain added items"
+                    
+                    # Verify watchlist items have proper structure
+                    for item in data["watchlist"]:
+                        assert "id" in item
+                        assert "title" in item
+                        assert "current_price" in item
+                    
+                    print(f"✅ Dashboard includes watchlist data successfully")
+                    print(f"   - Watchlist items: {len(data['watchlist'])}")
+                    return True
+                else:
+                    print(f"❌ Failed to get buyer dashboard: {response.status}")
+                    text = await response.text()
+                    print(f"Response: {text}")
+                    return False
+        except Exception as e:
+            print(f"❌ Error testing buyer dashboard watchlist: {str(e)}")
+            return False
+    
     async def test_authorization_validation(self) -> bool:
         """Test authorization and validation scenarios"""
         print("\n🧪 Testing authorization and validation...")
         
         success = True
         
-        # Test 1: Missing promotion_id in payment request
+        # Test 1: Adding non-existent listing to watchlist
         try:
-            payment_data = {
-                "amount": 24.99,
-                "origin_url": "https://bid-bazaar-4.preview.emergentagent.com"
-            }
-            
             async with self.session.post(
-                f"{BASE_URL}/payments/promote",
-                json=payment_data,
-                headers=self.get_auth_headers()
-            ) as response:
-                if response.status == 400:
-                    print("✅ Correctly rejected payment request with missing promotion_id")
-                else:
-                    print(f"❌ Should have rejected missing promotion_id, got: {response.status}")
-                    success = False
-        except Exception as e:
-            print(f"❌ Error testing missing promotion_id: {str(e)}")
-            success = False
-            
-        # Test 2: Missing amount in payment request
-        try:
-            payment_data = {
-                "promotion_id": self.test_promotion_id,
-                "origin_url": "https://bid-bazaar-4.preview.emergentagent.com"
-            }
-            
-            async with self.session.post(
-                f"{BASE_URL}/payments/promote",
-                json=payment_data,
-                headers=self.get_auth_headers()
-            ) as response:
-                if response.status == 400:
-                    print("✅ Correctly rejected payment request with missing amount")
-                else:
-                    print(f"❌ Should have rejected missing amount, got: {response.status}")
-                    success = False
-        except Exception as e:
-            print(f"❌ Error testing missing amount: {str(e)}")
-            success = False
-            
-        # Test 3: Non-existent promotion_id
-        try:
-            payment_data = {
-                "promotion_id": "non-existent-promotion-id",
-                "amount": 24.99,
-                "origin_url": "https://bid-bazaar-4.preview.emergentagent.com"
-            }
-            
-            async with self.session.post(
-                f"{BASE_URL}/payments/promote",
-                json=payment_data,
+                f"{BASE_URL}/watchlist/add",
+                json={"listing_id": "non-existent-listing-id"},
                 headers=self.get_auth_headers()
             ) as response:
                 if response.status == 404:
-                    print("✅ Correctly rejected payment for non-existent promotion")
+                    print("✅ Correctly rejected adding non-existent listing")
                 else:
-                    print(f"❌ Should have rejected non-existent promotion, got: {response.status}")
+                    print(f"❌ Should have rejected non-existent listing, got: {response.status}")
                     success = False
         except Exception as e:
-            print(f"❌ Error testing non-existent promotion: {str(e)}")
+            print(f"❌ Error testing non-existent listing: {str(e)}")
+            success = False
+            
+        # Test 2: Unauthorized access (no auth token)
+        try:
+            async with self.session.get(f"{BASE_URL}/watchlist") as response:
+                if response.status == 401:
+                    print("✅ Correctly rejected unauthorized watchlist access")
+                else:
+                    print(f"❌ Should have rejected unauthorized access, got: {response.status}")
+                    success = False
+        except Exception as e:
+            print(f"❌ Error testing unauthorized access: {str(e)}")
+            success = False
+            
+        # Test 3: Check status without auth
+        try:
+            async with self.session.get(f"{BASE_URL}/watchlist/check/{self.test_listing_ids[0]}") as response:
+                if response.status == 401:
+                    print("✅ Correctly rejected unauthorized status check")
+                else:
+                    print(f"❌ Should have rejected unauthorized status check, got: {response.status}")
+                    success = False
+        except Exception as e:
+            print(f"❌ Error testing unauthorized status check: {str(e)}")
             success = False
             
         return success
