@@ -411,8 +411,7 @@ class BazarioWatchlistTester:
         # Test 1: Adding non-existent listing to watchlist
         try:
             async with self.session.post(
-                f"{BASE_URL}/watchlist/add",
-                json={"listing_id": "non-existent-listing-id"},
+                f"{BASE_URL}/watchlist/add?listing_id=non-existent-listing-id",
                 headers=self.get_auth_headers()
             ) as response:
                 if response.status == 404:
