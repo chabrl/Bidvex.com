@@ -214,6 +214,17 @@ const ListingCard = ({ listing }) => {
             <span className="text-4xl">📦</span>
           </div>
         )}
+        
+        {/* Watchlist Button - Top Left */}
+        <div 
+          className="absolute top-2 left-2 z-10"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="bg-white dark:bg-gray-900 rounded-full p-2 shadow-lg hover:scale-110 transition-transform">
+            <WatchlistButton listingId={listing.id} size="small" />
+          </div>
+        </div>
+
         <div className="absolute top-2 right-2 flex flex-col gap-1">
           {listing.is_promoted && (
             <Badge className="gradient-bg text-white border-0">
