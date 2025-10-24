@@ -128,15 +128,18 @@ backend:
 frontend:
   - task: "Mobile Bottom Navigation - Fix Routing"
     implemented: true
-    working: "NA"
+    working: false
     file: "/app/frontend/src/components/MobileBottomNav.js"
-    stuck_count: 0
+    stuck_count: 1
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Fixed routing mismatches in MobileBottomNav. Changed Watchlist path from '/buyer-dashboard' to '/buyer/dashboard' and Profile path from '/profile-settings' to '/settings' to match actual routes in App.js. This should resolve blank page issues."
+      - working: false
+        agent: "testing"
+        comment: "CRITICAL ISSUE: Profile button is not navigating when clicked - stays on same page instead of going to /auth for unauthenticated users. Watchlist and Sell buttons correctly hidden for unauthenticated users (requireAuth: true). Authentication flow works correctly - protected routes redirect to /auth as expected. Mobile navigation shows 3/5 items for unauthenticated users which is correct behavior."
 
   - task: "My Bids Dashboard - Add Missing Import"
     implemented: true
