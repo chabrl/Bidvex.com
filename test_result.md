@@ -218,13 +218,13 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Message Seller Button"
-    - "Promote Listing Button on Listing Detail"
-  stuck_tasks:
-    - "Message Seller Button"
-    - "Promote Listing Button on Listing Detail"
+    - "Mobile Bottom Navigation - Fix Routing"
+    - "My Bids Dashboard - Enhanced Status Badges"
+    - "My Bids Dashboard - Improved Bid Comparison Layout"
+    - "My Bids Dashboard - Watching Tab Enhanced"
+  stuck_tasks: []
   test_all: false
-  test_priority: "stuck_first"
+  test_priority: "high_first"
 
 agent_communication:
   - agent: "main"
