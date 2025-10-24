@@ -456,8 +456,8 @@ class BazarioWatchlistTester:
         return success
         
     async def run_all_tests(self):
-        """Run all promotion payment tests"""
-        print("🚀 Starting Bazario Promotion Payment API Tests")
+        """Run all watchlist API tests"""
+        print("🚀 Starting Bazario Watchlist API Tests")
         print("=" * 60)
         
         await self.setup_session()
@@ -468,15 +468,17 @@ class BazarioWatchlistTester:
                 print("❌ Failed to setup test user")
                 return False
                 
-            if not await self.create_test_listing():
-                print("❌ Failed to create test listing")
+            if not await self.create_test_listings():
+                print("❌ Failed to create test listings")
                 return False
             
-            # Run tests
+            # Run tests in specific order for proper flow
             tests = [
-                ("Create Promotion", self.test_create_promotion),
-                ("Promotion Payment Endpoint", self.test_promotion_payment_endpoint),
-                ("Get My Promotions", self.test_get_my_promotions),
+                ("Add to Watchlist", self.test_add_to_watchlist),
+                ("Check Watchlist Status", self.test_check_watchlist_status),
+                ("Get Watchlist", self.test_get_watchlist),
+                ("Buyer Dashboard Integration", self.test_buyer_dashboard_watchlist),
+                ("Remove from Watchlist", self.test_remove_from_watchlist),
                 ("Authorization & Validation", self.test_authorization_validation)
             ]
             
@@ -485,13 +487,15 @@ class BazarioWatchlistTester:
                 try:
                     result = await test_func()
                     results.append((test_name, result))
+                    self.test_results[test_name] = result
                 except Exception as e:
                     print(f"❌ {test_name} failed with exception: {str(e)}")
                     results.append((test_name, False))
+                    self.test_results[test_name] = False
             
             # Print summary
             print("\n" + "=" * 60)
-            print("📊 TEST RESULTS SUMMARY")
+            print("📊 WATCHLIST API TEST RESULTS SUMMARY")
             print("=" * 60)
             
             passed = 0
@@ -506,7 +510,7 @@ class BazarioWatchlistTester:
             print(f"\nOverall: {passed}/{total} tests passed")
             
             if passed == total:
-                print("🎉 All promotion payment tests PASSED!")
+                print("🎉 All watchlist API tests PASSED!")
                 return True
             else:
                 print("⚠️  Some tests FAILED - check implementation")
