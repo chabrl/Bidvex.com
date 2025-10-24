@@ -315,8 +315,7 @@ class BazarioWatchlistTester:
             listing_id = self.test_listing_ids[0]
             
             async with self.session.post(
-                f"{BASE_URL}/watchlist/remove",
-                json={"listing_id": listing_id},
+                f"{BASE_URL}/watchlist/remove?listing_id={listing_id}",
                 headers=self.get_auth_headers()
             ) as response:
                 if response.status == 200:
