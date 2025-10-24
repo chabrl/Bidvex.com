@@ -288,32 +288,58 @@ const BuyerDashboard = () => {
                       return listing && listing.current_price > bid.amount;
                     }).map((bid) => {
                       const listing = dashboard.listings.find(l => l.id === bid.listing_id);
+                      const auctionEndDate = listing ? new Date(listing.auction_end_date) : null;
+                      const isEnded = auctionEndDate && new Date() > auctionEndDate;
+                      const timeLeft = auctionEndDate ? auctionEndDate - new Date() : 0;
+                      const isUrgent = timeLeft > 0 && timeLeft < 3600000;
+
                       return (
-                        <Card key={bid.id} className="border-2 border-red-500 overflow-hidden">
+                        <Card key={bid.id} className="border-2 border-red-500 overflow-hidden shadow-lg">
                           <div className="relative h-32 bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950 dark:to-red-900 flex items-center justify-center">
-                            <Badge className="absolute top-3 left-3 bg-red-600 text-white text-sm px-3 py-1.5">
-                              <TrendingDown className="h-4 w-4 mr-1" />
+                            <Badge className="absolute top-3 left-3 bg-red-600 text-white text-base px-4 py-2 font-bold shadow-lg">
+                              <TrendingDown className="h-5 w-5 mr-1.5" />
                               OUTBID
                             </Badge>
+                            {auctionEndDate && !isEnded && (
+                              <Badge className={`absolute top-3 right-3 ${isUrgent ? 'bg-red-600 animate-pulse' : 'bg-blue-600'} text-white text-sm px-3 py-1.5 shadow-lg`}>
+                                <Clock className="h-4 w-4 mr-1" />
+                                <Countdown
+                                  date={auctionEndDate}
+                                  renderer={({ days, hours, minutes }) => (
+                                    <span className="font-bold">{days}d {hours}h {minutes}m</span>
+                                  )}
+                                />
+                              </Badge>
+                            )}
                             <AlertTriangle className="h-16 w-16 text-red-600 opacity-20" />
                           </div>
                           <CardContent className="p-4 space-y-3">
                             <h3 className="font-bold text-lg">{listing?.title}</h3>
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-2 gap-4">
                               <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                                <p className="text-xs text-muted-foreground uppercase mb-1">Your Bid</p>
-                                <p className="text-lg font-bold">${bid.amount.toFixed(2)}</p>
+                                <p className="text-xs text-muted-foreground uppercase mb-1 font-semibold">Your Bid</p>
+                                <p className="text-xl font-bold">${bid.amount.toFixed(2)}</p>
                               </div>
                               <div className="p-3 bg-red-50 dark:bg-red-950 rounded-lg">
-                                <p className="text-xs text-muted-foreground uppercase mb-1">Current Bid</p>
-                                <p className="text-lg font-bold text-red-600">${listing?.current_price.toFixed(2)}</p>
+                                <p className="text-xs text-muted-foreground uppercase mb-1 font-semibold">Current Bid</p>
+                                <p className="text-xl font-bold text-red-600">${listing?.current_price.toFixed(2)}</p>
                               </div>
                             </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline">{listing?.bid_count || 0} bids</Badge>
+                              {isEnded && <Badge variant="destructive">Auction Ended</Badge>}
+                            </div>
                           </CardContent>
-                          <CardFooter className="p-4 pt-0">
-                            <Button className="w-full gradient-button text-white border-0 font-semibold" onClick={() => navigate(`/listing/${bid.listing_id}`)}>
-                              Place Higher Bid Now
-                            </Button>
+                          <CardFooter className="p-4 pt-0 flex-col sm:flex-row gap-2">
+                            {!isEnded ? (
+                              <Button className="w-full gradient-button text-white border-0 font-semibold" onClick={() => navigate(`/listing/${bid.listing_id}`)}>
+                                Place Higher Bid Now
+                              </Button>
+                            ) : (
+                              <Button className="w-full" variant="outline" onClick={() => navigate(`/listing/${bid.listing_id}`)}>
+                                View Listing
+                              </Button>
+                            )}
                           </CardFooter>
                         </Card>
                       );
