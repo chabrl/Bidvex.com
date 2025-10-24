@@ -126,65 +126,89 @@ backend:
         comment: "Session 1 UX fixes are frontend-only changes. No backend modifications needed."
 
 frontend:
-  - task: "Message Seller Button"
+  - task: "Mobile Bottom Navigation - Fix Routing"
     implemented: true
-    working: false
-    file: "/app/frontend/src/pages/ListingDetailPage.js"
-    stuck_count: 1
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Message Seller button already existed on ListingDetailPage (line 221-229). Verified it redirects to MessagesPage with seller pre-selected via URL params."
-      - working: false
-        agent: "testing"
-        comment: "❌ CRITICAL: Message Seller button not visible on listing detail page. Code shows button should appear for authenticated users who are not the listing owner (lines 223-254), but button is not rendering. Authentication system appears to have issues - getting 401 errors on login attempts. Button logic: shows only if (!isAuctionEnded && user && listing.seller_id !== user.id). Need to investigate authentication flow and user state management."
-
-  - task: "Promotion Manager Modal Component"
-    implemented: true
-    working: true
-    file: "/app/frontend/src/components/PromotionManagerModal.js"
+    working: "NA"
+    file: "/app/frontend/src/components/MobileBottomNav.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Created PromotionManagerModal with three tiers (Basic $9.99/7d, Standard $24.99/14d, Premium $49.99/30d). Includes targeting options (location, age range, interests), promotion preview, and Stripe payment integration via /api/payments/promote."
-      - working: true
-        agent: "testing"
-        comment: "✅ PromotionManagerModal component implemented correctly. Verified: 1) Three promotion tiers with correct pricing (Basic $9.99, Standard $24.99, Premium $49.99), 2) Targeting options (location, age range, interests), 3) Tier selection with visual feedback (ring-2 border), 4) Promotion preview updates, 5) Proceed to Payment button enables after tier selection, 6) Cancel button functionality. Modal structure and UI components working as expected."
+        comment: "Fixed routing mismatches in MobileBottomNav. Changed Watchlist path from '/buyer-dashboard' to '/buyer/dashboard' and Profile path from '/profile-settings' to '/settings' to match actual routes in App.js. This should resolve blank page issues."
 
-  - task: "Promote Listing Button on Listing Detail"
+  - task: "My Bids Dashboard - Add Missing Import"
     implemented: true
-    working: false
-    file: "/app/frontend/src/pages/ListingDetailPage.js"
-    stuck_count: 1
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Added Promote Listing button shown only to listing owner if listing is not already promoted. Button opens PromotionManagerModal with listing details pre-filled."
-      - working: false
-        agent: "testing"
-        comment: "❌ CRITICAL: Promote Listing button not visible on listing detail page. Code shows button should appear for listing owners when listing is not promoted (lines 200-221), but button is not rendering. Same authentication issues as Message Seller button - user state not properly maintained. Button logic: shows only if (user && listing.seller_id === user.id && !listing.is_promoted). Authentication system needs fixing."
-
-  - task: "Enhanced Footer Component"
-    implemented: true
-    working: true
-    file: "/app/frontend/src/components/Footer.js"
+    working: "NA"
+    file: "/app/frontend/src/pages/BuyerDashboard.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Redesigned footer with 4 main categories (Marketplace, Sell, Buy, Resources), Company and Legal sections, social media links (Facebook, Twitter, Instagram, LinkedIn, YouTube) with provided URLs, language toggle (EN/FR), and copyright '© Bazario 2025. All rights reserved.'"
-      - working: true
-        agent: "testing"
-        comment: "✅ Enhanced Footer fully working. Verified: 1) Dark background (bg-gray-900), 2) All 6 navigation sections present (Marketplace, Sell, Buy, Resources, Company, Legal), 3) All 5 social media links with correct URLs (Facebook, Twitter, Instagram, LinkedIn, YouTube), 4) Language selector toggles between English/Français, 5) Copyright text '© Bazario 2025. All rights reserved.', 6) Responsive layout works on desktop/tablet/mobile viewports. Footer implementation is complete and functional."
+        comment: "Added missing CardFooter import to BuyerDashboard.js. This was causing rendering issues with action buttons in bid cards."
+
+  - task: "My Bids Dashboard - Enhanced Status Badges"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/BuyerDashboard.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Enhanced status badges across all tabs (All, Winning, Losing) with larger size (text-base, px-4 py-2), bold font, prominent colors (bg-green-600 for winning, bg-red-600 for outbid), shadow-lg, and larger icons (h-5 w-5). Added color-coded borders to cards (border-green-500 for winning, border-red-500 for losing)."
+
+  - task: "My Bids Dashboard - Improved Bid Comparison Layout"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/BuyerDashboard.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Improved bid comparison layout in All Bids tab with larger text (text-2xl for prices), better spacing (gap-4, p-4), context-aware background colors (green for winning, red for losing), color-coded current price display, and font-semibold labels. Layout now provides clear visual hierarchy."
+
+  - task: "My Bids Dashboard - Countdown Timer Positioning"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/BuyerDashboard.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Verified countdown timer is positioned top-right across all tabs with Clock icon, shadow-lg, and urgent state animation (red pulsing when < 1 hour remaining). Timer display format: 'Xd Xh Xm'."
+
+  - task: "My Bids Dashboard - Full-Width Action Buttons"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/BuyerDashboard.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Updated all CardFooter sections with flex-col sm:flex-row and w-full sm:flex-1 classes to ensure action buttons are full-width on mobile and side-by-side on larger screens. Applied across All, Winning, Losing, and Watching tabs."
+
+  - task: "My Bids Dashboard - Watching Tab Enhanced"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/BuyerDashboard.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Completely redesigned Watching tab with enhanced card layout (image, countdown timer, badges, current bid display, full-width action buttons). Added rich empty state with gradient heart icon, descriptive text, and Browse Marketplace button. Cards now show auction status, bid count, and urgency indicators."
 
 metadata:
   created_by: "main_agent"
