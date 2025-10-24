@@ -532,10 +532,22 @@ async def get_buyer_dashboard(current_user: User = Depends(get_current_user)):
     bids = await db.bids.find({"bidder_id": current_user.id}, {"_id": 0}).to_list(1000)
     listing_ids = list(set(bid["listing_id"] for bid in bids))
     listings = await db.listings.find({"id": {"$in": listing_ids}}, {"_id": 0}).to_list(1000)
+    
+    # Fetch watchlist items
+    watchlist_items = await db.watchlist.find({"user_id": current_user.id}, {"_id": 0}).to_list(100)
+    watchlist_listing_ids = [item["listing_id"] for item in watchlist_items]
+    watchlist_listings = await db.listings.find(
+        {"id": {"$in": watchlist_listing_ids}, "status": {"$ne": "deleted"}},
+        {"_id": 0}
+    ).to_list(100)
+    
     return {
         "total_bids": len(bids),
         "active_bids": len([b for b in bids if any(l["status"] == "active" for l in listings if l["id"] == b["listing_id"])]),
-        "won_items": len([l for l in listings if l["status"] == "sold"]), "bids": bids, "listings": listings
+        "won_items": len([l for l in listings if l["status"] == "sold"]),
+        "bids": bids,
+        "listings": listings,
+        "watchlist": watchlist_listings
     }
 
 @api_router.post("/payments/checkout")
