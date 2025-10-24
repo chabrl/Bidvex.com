@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Backend API Testing for Bazario Promotion Payment Features
-Tests the newly implemented promotion payment endpoints and related functionality.
+Backend API Testing for Bazario Watchlist Features
+Tests the complete watchlist functionality including add, remove, get, check status endpoints.
 """
 
 import asyncio
@@ -12,9 +12,9 @@ from typing import Dict, Any, Optional
 
 # Configuration
 BASE_URL = "https://bid-bazaar-4.preview.emergentagent.com/api"
-TEST_USER_EMAIL = "promotion.tester@bazario.com"
-TEST_USER_PASSWORD = "PromotionTest123!"
-TEST_USER_NAME = "Promotion Tester"
+TEST_USER_EMAIL = "watchlist.tester@bazario.com"
+TEST_USER_PASSWORD = "WatchlistTest123!"
+TEST_USER_NAME = "Watchlist Tester"
 
 class BazarioAPITester:
     def __init__(self):
