@@ -24,11 +24,14 @@ const MobileBottomNav = () => {
   };
 
   const handleNavigation = (item) => {
+    console.log('Navigation clicked:', item.key, 'User:', user);
     if (item.key === 'profile') {
       // Handle profile navigation dynamically
       const profilePath = user ? '/settings' : '/auth';
+      console.log('Profile navigation - Path:', profilePath);
       navigate(profilePath);
     } else {
+      console.log('Standard navigation - Path:', item.path);
       navigate(item.path);
     }
   };
