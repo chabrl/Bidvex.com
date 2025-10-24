@@ -12,8 +12,8 @@ const MobileBottomNav = () => {
     { icon: Home, label: 'Home', path: '/', key: 'home' },
     { icon: Search, label: 'Search', path: '/marketplace', key: 'search' },
     { icon: Plus, label: 'Sell', path: '/create-listing', key: 'sell', requireAuth: true },
-    { icon: Heart, label: 'Watchlist', path: '/buyer-dashboard', key: 'watchlist', requireAuth: true },
-    { icon: User, label: 'Profile', path: user ? '/profile-settings' : '/auth', key: 'profile' }
+    { icon: Heart, label: 'Watchlist', path: '/buyer/dashboard', key: 'watchlist', requireAuth: true },
+    { icon: User, label: 'Profile', path: user ? '/settings' : '/auth', key: 'profile' }
   ];
 
   const isActive = (path) => {
