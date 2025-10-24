@@ -260,13 +260,13 @@ class BazarioWatchlistTester:
             print(f"❌ Error testing watchlist status check: {str(e)}")
             return False
             
-    async def test_get_my_promotions(self) -> bool:
-        """Test GET /api/promotions/my endpoint"""
-        print("\n🧪 Testing GET /api/promotions/my...")
+    async def test_get_watchlist(self) -> bool:
+        """Test GET /api/watchlist endpoint"""
+        print("\n🧪 Testing GET /api/watchlist...")
         
         try:
             async with self.session.get(
-                f"{BASE_URL}/promotions/my",
+                f"{BASE_URL}/watchlist",
                 headers=self.get_auth_headers()
             ) as response:
                 if response.status == 200:
@@ -275,28 +275,37 @@ class BazarioWatchlistTester:
                     # Verify response is a list
                     assert isinstance(data, list)
                     
-                    # Find our test promotion
-                    test_promotion = None
-                    for promotion in data:
-                        if promotion["id"] == self.test_promotion_id:
-                            test_promotion = promotion
+                    # Should have at least one item (the one we added)
+                    assert len(data) >= 1, "Watchlist should contain at least one item"
+                    
+                    # Find our test listing
+                    test_listing = None
+                    for item in data:
+                        if item["id"] == self.test_listing_ids[0]:
+                            test_listing = item
                             break
                     
-                    assert test_promotion is not None, "Test promotion not found in user's promotions"
-                    assert test_promotion["seller_id"] == self.user_id
-                    assert test_promotion["listing_id"] == self.test_listing_id
+                    assert test_listing is not None, "Test listing not found in watchlist"
                     
-                    print(f"✅ My promotions retrieved successfully")
-                    print(f"   - Total promotions: {len(data)}")
-                    print(f"   - Test promotion found: {test_promotion['id']}")
+                    # Verify listing details are included
+                    assert "id" in test_listing
+                    assert "title" in test_listing
+                    assert "description" in test_listing
+                    assert "current_price" in test_listing
+                    assert "watchlist_added_at" in test_listing
+                    
+                    print(f"✅ Watchlist retrieved successfully")
+                    print(f"   - Total items: {len(data)}")
+                    print(f"   - Test listing found: {test_listing['title']}")
+                    print(f"   - Added at: {test_listing['watchlist_added_at']}")
                     return True
                 else:
-                    print(f"❌ Failed to get my promotions: {response.status}")
+                    print(f"❌ Failed to get watchlist: {response.status}")
                     text = await response.text()
                     print(f"Response: {text}")
                     return False
         except Exception as e:
-            print(f"❌ Error testing my promotions: {str(e)}")
+            print(f"❌ Error testing get watchlist: {str(e)}")
             return False
             
     async def test_authorization_validation(self) -> bool:
