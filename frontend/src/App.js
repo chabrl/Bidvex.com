@@ -21,6 +21,7 @@ import MessagesPage from './pages/MessagesPage';
 import CreateMultiItemListing from './pages/CreateMultiItemListing';
 import LotsMarketplacePage from './pages/LotsMarketplacePage';
 import AdminDashboard from './pages/AdminDashboard';
+import WatchlistPage from './pages/WatchlistPage';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
