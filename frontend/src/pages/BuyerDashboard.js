@@ -313,33 +313,91 @@ const BuyerDashboard = () => {
               <TabsContent value="watching">
                 {dashboard?.watchlist && dashboard.watchlist.length > 0 ? (
                   <div className="space-y-4">
-                    {dashboard.watchlist.map((listing) => (
-                      <div key={listing.id} className="p-4 border rounded-lg hover:bg-accent/10 transition-colors">
-                        <div className="flex gap-4">
-                          <div className="w-20 h-20 rounded-lg overflow-hidden bg-gray-100">
-                            {listing.images?.[0] ? (
-                              <img src={listing.images[0]} alt={listing.title} className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">📦</div>
+                    {dashboard.watchlist.map((listing) => {
+                      const auctionEndDate = listing.auction_end_date ? new Date(listing.auction_end_date) : null;
+                      const isEnded = auctionEndDate && new Date() > auctionEndDate;
+                      const timeLeft = auctionEndDate ? auctionEndDate - new Date() : 0;
+                      const isUrgent = timeLeft > 0 && timeLeft < 3600000;
+
+                      return (
+                        <Card key={listing.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                          {/* Countdown - Top Right */}
+                          {auctionEndDate && !isEnded && (
+                            <div className="relative">
+                              <div className="absolute top-3 right-3 z-10">
+                                <Badge className={`${isUrgent ? 'bg-red-600 animate-pulse' : 'bg-blue-600'} text-white border-0 text-sm px-3 py-1.5`}>
+                                  <Clock className="h-4 w-4 mr-1" />
+                                  <Countdown
+                                    date={auctionEndDate}
+                                    renderer={({ days, hours, minutes }) => (
+                                      <span className="font-bold">{days}d {hours}h {minutes}m</span>
+                                    )}
+                                  />
+                                </Badge>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="flex flex-col sm:flex-row gap-4 p-4">
+                            <div className="w-full sm:w-32 h-32 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                              {listing.images?.[0] ? (
+                                <img src={listing.images[0]} alt={listing.title} className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-4xl">📦</div>
+                              )}
+                            </div>
+                            <div className="flex-1 space-y-3">
+                              <h3 className="font-bold text-lg line-clamp-2">{listing.title}</h3>
+                              <div className="flex flex-wrap gap-2 items-center">
+                                <Badge variant="outline" className="text-sm">
+                                  <Eye className="h-3 w-3 mr-1" />
+                                  Watching
+                                </Badge>
+                                <Badge variant="outline" className="text-sm">{listing.bid_count || 0} bids</Badge>
+                                {isEnded && <Badge variant="destructive" className="text-sm">Auction Ended</Badge>}
+                              </div>
+                              <div className="p-3 bg-accent/10 rounded-lg">
+                                <p className="text-xs text-muted-foreground uppercase mb-1">Current Bid</p>
+                                <p className="text-2xl font-bold gradient-text">${listing.current_price.toFixed(2)}</p>
+                              </div>
+                            </div>
+                          </div>
+                          <CardFooter className="p-4 pt-0 gap-2 flex-col sm:flex-row">
+                            <Button 
+                              variant="outline" 
+                              className="w-full sm:flex-1"
+                              onClick={() => navigate(`/listing/${listing.id}`)}
+                            >
+                              View Details
+                            </Button>
+                            {!isEnded && (
+                              <Button 
+                                className="w-full sm:flex-1 gradient-button text-white border-0 font-semibold"
+                                onClick={() => navigate(`/listing/${listing.id}`)}
+                              >
+                                Place Bid
+                              </Button>
                             )}
-                          </div>
-                          <div className="flex-1">
-                            <h3 className="font-semibold mb-1">{listing.title}</h3>
-                            <p className="text-sm text-muted-foreground">Current Bid: <strong className="gradient-text">${listing.current_price.toFixed(2)}</strong></p>
-                          </div>
-                          <Button size="sm" variant="outline" onClick={() => navigate(`/listing/${listing.id}`)}>
-                            <Eye className="h-4 w-4 mr-1" />
-                            View
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                          </CardFooter>
+                        </Card>
+                      );
+                    })}
                   </div>
                 ) : (
-                  <div className="text-center py-12">
-                    <Heart className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-                    <p className="text-muted-foreground">No watchlist items yet</p>
-                  </div>
+                  <Card className="p-12">
+                    <div className="text-center space-y-4">
+                      <div className="w-20 h-20 mx-auto bg-gradient-to-br from-pink-100 to-red-50 dark:from-pink-950 dark:to-red-900 rounded-full flex items-center justify-center">
+                        <Heart className="h-10 w-10 text-pink-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-semibold mb-2">No Items in Watchlist</h3>
+                        <p className="text-muted-foreground">Save items to your watchlist to track them easily!</p>
+                      </div>
+                      <Button className="gradient-button text-white border-0" onClick={() => navigate('/marketplace')}>
+                        Browse Marketplace
+                      </Button>
+                    </div>
+                  </Card>
                 )}
               </TabsContent>
             </Tabs>
