@@ -212,26 +212,46 @@ const BuyerDashboard = () => {
                       return listing && listing.current_price === bid.amount;
                     }).map((bid) => {
                       const listing = dashboard.listings.find(l => l.id === bid.listing_id);
+                      const auctionEndDate = listing ? new Date(listing.auction_end_date) : null;
+                      const isEnded = auctionEndDate && new Date() > auctionEndDate;
+                      const timeLeft = auctionEndDate ? auctionEndDate - new Date() : 0;
+                      const isUrgent = timeLeft > 0 && timeLeft < 3600000;
+
                       return (
-                        <Card key={bid.id} className="border-2 border-green-500 overflow-hidden">
+                        <Card key={bid.id} className="border-2 border-green-500 overflow-hidden shadow-lg">
                           <div className="relative h-32 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 flex items-center justify-center">
-                            <Badge className="absolute top-3 left-3 bg-green-600 text-white text-sm px-3 py-1.5">
-                              <Trophy className="h-4 w-4 mr-1" />
+                            <Badge className="absolute top-3 left-3 bg-green-600 text-white text-base px-4 py-2 font-bold shadow-lg">
+                              <Trophy className="h-5 w-5 mr-1.5" />
                               WINNING
                             </Badge>
+                            {auctionEndDate && !isEnded && (
+                              <Badge className={`absolute top-3 right-3 ${isUrgent ? 'bg-red-600 animate-pulse' : 'bg-blue-600'} text-white text-sm px-3 py-1.5 shadow-lg`}>
+                                <Clock className="h-4 w-4 mr-1" />
+                                <Countdown
+                                  date={auctionEndDate}
+                                  renderer={({ days, hours, minutes }) => (
+                                    <span className="font-bold">{days}d {hours}h {minutes}m</span>
+                                  )}
+                                />
+                              </Badge>
+                            )}
                             <TrendingUp className="h-16 w-16 text-green-600 opacity-20" />
                           </div>
                           <CardContent className="p-4 space-y-3">
                             <h3 className="font-bold text-lg">{listing?.title}</h3>
-                            <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950 rounded-lg">
+                            <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-950 rounded-lg">
                               <div>
-                                <p className="text-xs text-muted-foreground uppercase">Your Winning Bid</p>
-                                <p className="text-2xl font-bold text-green-600">${bid.amount.toFixed(2)}</p>
+                                <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">Your Winning Bid</p>
+                                <p className="text-3xl font-bold text-green-600">${bid.amount.toFixed(2)}</p>
                               </div>
                             </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline">{listing?.bid_count || 0} bids</Badge>
+                              {isEnded && <Badge className="bg-green-600 text-white">Won!</Badge>}
+                            </div>
                           </CardContent>
-                          <CardFooter className="p-4 pt-0">
-                            <Button className="w-full" variant="outline" onClick={() => navigate(`/listing/${bid.listing_id}`)}>
+                          <CardFooter className="p-4 pt-0 flex-col sm:flex-row gap-2">
+                            <Button className="w-full sm:flex-1" variant="outline" onClick={() => navigate(`/listing/${bid.listing_id}`)}>
                               View Listing Details
                             </Button>
                           </CardFooter>
@@ -249,6 +269,9 @@ const BuyerDashboard = () => {
                         <h3 className="text-xl font-semibold mb-2">No Winning Bids Yet</h3>
                         <p className="text-muted-foreground">Keep bidding to win amazing items!</p>
                       </div>
+                      <Button className="gradient-button text-white border-0" onClick={() => navigate('/marketplace')}>
+                        Browse Marketplace
+                      </Button>
                     </div>
                   </Card>
                 )}
