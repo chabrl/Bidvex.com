@@ -122,6 +122,7 @@ const App = () => {
         <Footer />
         <AIAssistant />
         <Toaster position="top-right" />
+        <MobileBottomNav />
       </div>
     </BrowserRouter>
   );
