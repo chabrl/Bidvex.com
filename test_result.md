@@ -125,113 +125,77 @@ backend:
         comment: "Implemented 4 watchlist endpoints: POST /api/watchlist/add (add listing to watchlist with duplicate check), POST /api/watchlist/remove (remove listing from watchlist), GET /api/watchlist (get user's watchlist with listing details), GET /api/watchlist/check/{listing_id} (check if listing is in watchlist). Database: watchlist collection stores user_id, listing_id, added_at. Updated GET /api/dashboard/buyer to include watchlist data for BuyerDashboard integration."
 
 frontend:
-  - task: "Mobile Bottom Navigation - Fix Routing"
+  - task: "WatchlistButton Component"
     implemented: true
-    working: true
+    working: "NA"
+    file: "/app/frontend/src/components/WatchlistButton.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Created reusable WatchlistButton component with heart icon toggle, authentication check (redirects to /auth if not logged in), API integration (add/remove/check watchlist status), toast notifications ('Added to Watchlist' with ❤️, 'Removed from Watchlist' with 💔), smooth animations (pulse, scale, fill effect), and size variants (small, default, large) with optional label."
+
+  - task: "WatchlistPage - Dedicated Route"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/WatchlistPage.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Created WatchlistPage component at /watchlist route (protected route in App.js). Features: displays all saved items in responsive grid, enhanced card layout with images, countdown timers (top-left), watchlist button (top-right), status badges (auction ended, featured), current bid display, bid count, category tags, full-width action buttons ('Place Bid' or 'View Details'), rich empty state with gradient heart icon and 'Browse Marketplace' CTA."
+
+  - task: "Marketplace Page - Heart Icons"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/MarketplacePage.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added WatchlistButton to all listing cards on MarketplacePage. Heart icon positioned top-left corner with white/dark background circle, shadow, and hover scale effect. Icon size: small. Includes stopPropagation to prevent card click when toggling watchlist."
+
+  - task: "Listing Detail Page - Heart Icon"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/ListingDetailPage.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added WatchlistButton to ListingDetailPage header, positioned next to title with 'Save/Saved' label. Icon size: large with showLabel={true}. Provides prominent watchlist access on detail view."
+
+  - task: "Buyer Dashboard - Watching Tab Integration"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/BuyerDashboard.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Updated BuyerDashboard to fetch and display watchlist data in 'Watching' tab (already enhanced in Session 1). Backend dashboard endpoint now returns watchlist array. Tab displays saved items with same data as /watchlist page."
+
+  - task: "Mobile Bottom Nav - Watchlist Route Update"
+    implemented: true
+    working: "NA"
     file: "/app/frontend/src/components/MobileBottomNav.js"
-    stuck_count: 1
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Fixed routing mismatches in MobileBottomNav. Changed Watchlist path from '/buyer-dashboard' to '/buyer/dashboard' and Profile path from '/profile-settings' to '/settings' to match actual routes in App.js. This should resolve blank page issues."
-      - working: false
-        agent: "testing"
-        comment: "CRITICAL ISSUE: Profile button is not navigating when clicked - stays on same page instead of going to /auth for unauthenticated users. Watchlist and Sell buttons correctly hidden for unauthenticated users (requireAuth: true). Authentication flow works correctly - protected routes redirect to /auth as expected. Mobile navigation shows 3/5 items for unauthenticated users which is correct behavior."
-      - working: true
-        agent: "testing"
-        comment: "✅ RESOLVED: Profile button navigation now working correctly using JavaScript .click() method. All mobile navigation buttons tested successfully: Home → /, Search → /marketplace, Profile → /auth (unauthenticated). Watchlist and Sell buttons correctly hidden for unauthenticated users. The Playwright force=True click was being blocked by the 'Made with Emergent' badge, but the actual functionality works perfectly via JavaScript click. Mobile navigation shows 3/5 items for unauthenticated users as expected."
-
-  - task: "My Bids Dashboard - Add Missing Import"
-    implemented: true
-    working: true
-    file: "/app/frontend/src/pages/BuyerDashboard.js"
     stuck_count: 0
-    priority: "high"
-    needs_retesting: false
+    priority: "medium"
+    needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Added missing CardFooter import to BuyerDashboard.js. This was causing rendering issues with action buttons in bid cards."
-      - working: true
-        agent: "testing"
-        comment: "✅ CardFooter import working correctly. Dashboard loads successfully and requires authentication as expected. All protected routes (/buyer/dashboard, /settings) correctly redirect to /auth for unauthenticated users."
-
-  - task: "My Bids Dashboard - Enhanced Status Badges"
-    implemented: true
-    working: true
-    file: "/app/frontend/src/pages/BuyerDashboard.js"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Enhanced status badges across all tabs (All, Winning, Losing) with larger size (text-base, px-4 py-2), bold font, prominent colors (bg-green-600 for winning, bg-red-600 for outbid), shadow-lg, and larger icons (h-5 w-5). Added color-coded borders to cards (border-green-500 for winning, border-red-500 for losing)."
-      - working: true
-        agent: "testing"
-        comment: "✅ Enhanced status badges implemented correctly. Code review shows proper styling with text-base, px-4 py-2, font-bold, bg-green-600/bg-red-600 colors, shadow-lg, and h-5 w-5 icons. Color-coded card borders (border-green-500/border-red-500) are properly implemented. Dashboard structure and tab system working as expected."
-
-  - task: "My Bids Dashboard - Improved Bid Comparison Layout"
-    implemented: true
-    working: true
-    file: "/app/frontend/src/pages/BuyerDashboard.js"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Improved bid comparison layout in All Bids tab with larger text (text-2xl for prices), better spacing (gap-4, p-4), context-aware background colors (green for winning, red for losing), color-coded current price display, and font-semibold labels. Layout now provides clear visual hierarchy."
-      - working: true
-        agent: "testing"
-        comment: "✅ Bid comparison layout improvements verified. Code shows text-2xl for prices, proper grid layout with gap-4 and p-4 spacing, context-aware backgrounds (bg-green-50/bg-red-50), color-coded price displays (text-green-600/text-red-600), and font-semibold labels. Visual hierarchy is clear and well-implemented."
-
-  - task: "My Bids Dashboard - Countdown Timer Positioning"
-    implemented: true
-    working: true
-    file: "/app/frontend/src/pages/BuyerDashboard.js"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Verified countdown timer is positioned top-right across all tabs with Clock icon, shadow-lg, and urgent state animation (red pulsing when < 1 hour remaining). Timer display format: 'Xd Xh Xm'."
-      - working: true
-        agent: "testing"
-        comment: "✅ Countdown timer positioning verified. Code shows proper top-right positioning (absolute top-3 right-3), Clock icon integration, shadow-lg styling, and urgency state with red background and animate-pulse when < 1 hour. Timer format correctly displays 'Xd Xh Xm' using react-countdown component."
-
-  - task: "My Bids Dashboard - Full-Width Action Buttons"
-    implemented: true
-    working: true
-    file: "/app/frontend/src/pages/BuyerDashboard.js"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Updated all CardFooter sections with flex-col sm:flex-row and w-full sm:flex-1 classes to ensure action buttons are full-width on mobile and side-by-side on larger screens. Applied across All, Winning, Losing, and Watching tabs."
-      - working: true
-        agent: "testing"
-        comment: "✅ Full-width action buttons implemented correctly. Code review confirms all CardFooter sections use flex-col sm:flex-row layout with w-full sm:flex-1 classes for responsive behavior. Buttons are full-width on mobile and side-by-side on desktop across all tabs (All, Winning, Losing, Watching)."
-
-  - task: "My Bids Dashboard - Watching Tab Enhanced"
-    implemented: true
-    working: true
-    file: "/app/frontend/src/pages/BuyerDashboard.js"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Completely redesigned Watching tab with enhanced card layout (image, countdown timer, badges, current bid display, full-width action buttons). Added rich empty state with gradient heart icon, descriptive text, and Browse Marketplace button. Cards now show auction status, bid count, and urgency indicators."
-      - working: true
-        agent: "testing"
-        comment: "✅ Watching tab enhancements verified. Code shows enhanced card layout with image display, countdown timers, Eye icon badges, current bid display, and responsive action buttons. Rich empty state implemented with gradient heart icon (bg-gradient-to-br from-pink-100), descriptive text, and Browse Marketplace button. All features properly implemented."
+        comment: "Updated MobileBottomNav watchlist button path from '/buyer/dashboard' to '/watchlist' to navigate to dedicated watchlist page. Button remains auth-protected (hidden for non-logged-in users)."
 
 metadata:
   created_by: "main_agent"
