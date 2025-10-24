@@ -201,6 +201,11 @@ const AdminDashboard = () => {
             <AnnouncementManager />
           </TabsContent>
 
+          {/* Trust & Safety Tab */}
+          <TabsContent value="trust-safety">
+            <TrustSafetyDashboard />
+          </TabsContent>
+
           {/* Promotions Tab */}
           <TabsContent value="promotions">
             <PromotionManager />
