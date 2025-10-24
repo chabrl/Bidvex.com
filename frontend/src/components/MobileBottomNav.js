@@ -13,7 +13,7 @@ const MobileBottomNav = () => {
     { icon: Search, label: 'Search', path: '/marketplace', key: 'search' },
     { icon: Plus, label: 'Sell', path: '/create-listing', key: 'sell', requireAuth: true },
     { icon: Heart, label: 'Watchlist', path: '/buyer/dashboard', key: 'watchlist', requireAuth: true },
-    { icon: User, label: 'Profile', path: user ? '/settings' : '/auth', key: 'profile' }
+    { icon: User, label: 'Profile', path: '/settings', key: 'profile', dynamicPath: true }
   ];
 
   const isActive = (path) => {
@@ -21,6 +21,16 @@ const MobileBottomNav = () => {
       return location.pathname === '/';
     }
     return location.pathname.startsWith(path);
+  };
+
+  const handleNavigation = (item) => {
+    if (item.key === 'profile') {
+      // Handle profile navigation dynamically
+      const profilePath = user ? '/settings' : '/auth';
+      navigate(profilePath);
+    } else {
+      navigate(item.path);
+    }
   };
 
   return (
@@ -36,7 +46,7 @@ const MobileBottomNav = () => {
           return (
             <button
               key={item.key}
-              onClick={() => navigate(item.path)}
+              onClick={() => handleNavigation(item)}
               className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
                 active
                   ? 'text-primary'
