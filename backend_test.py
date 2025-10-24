@@ -16,13 +16,13 @@ TEST_USER_EMAIL = "watchlist.tester@bazario.com"
 TEST_USER_PASSWORD = "WatchlistTest123!"
 TEST_USER_NAME = "Watchlist Tester"
 
-class BazarioAPITester:
+class BazarioWatchlistTester:
     def __init__(self):
         self.session = None
         self.auth_token = None
         self.user_id = None
-        self.test_listing_id = None
-        self.test_promotion_id = None
+        self.test_listing_ids = []
+        self.test_results = {}
         
     async def setup_session(self):
         """Initialize HTTP session"""
