@@ -5,8 +5,10 @@ import axios from 'axios';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
-import { DollarSign, Gavel, Trophy, Heart } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { DollarSign, Gavel, Trophy, Heart, TrendingUp, TrendingDown, Eye } from 'lucide-react';
 import { toast } from 'sonner';
+import Countdown from 'react-countdown';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
