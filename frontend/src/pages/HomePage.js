@@ -7,6 +7,7 @@ import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { ArrowRight, Gavel, TrendingUp, Shield, Users, Award, Flame } from 'lucide-react';
 import Countdown from 'react-countdown';
+import HeroBanner from '../components/HeroBanner';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -41,49 +42,8 @@ const HomePage = () => {
 
   return (
     <div className="min-h-screen" data-testid="home-page">
-      <section className="relative py-20 md:py-32 px-4 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10 pointer-events-none"></div>
-        
-        <div className="max-w-7xl mx-auto relative">
-          <div className="text-center space-y-8 max-w-4xl mx-auto">
-            <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold leading-tight" data-testid="hero-title">
-              {t('hero.title')}
-            </h1>
-            <p className="text-xl sm:text-2xl text-muted-foreground font-medium">
-              {t('hero.subtitle')}
-            </p>
-            <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto">
-              {t('hero.description')}
-            </p>
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-4">
-              <Button 
-                className="gradient-button text-white border-0 text-lg px-8 py-6 rounded-full"
-                onClick={() => navigate('/marketplace')}
-                data-testid="explore-auctions-btn"
-              >
-                {t('hero.cta')} <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-              <Button 
-                variant="outline" 
-                className="text-lg px-8 py-6 rounded-full border-2"
-                onClick={() => navigate('/lots')}
-                data-testid="browse-lots-btn"
-              >
-                {t('hero.browseLots', 'Browse Lots')}
-              </Button>
-              <Button 
-                variant="outline" 
-                className="text-lg px-8 py-6 rounded-full border-2"
-                onClick={() => navigate('/create-listing')}
-                data-testid="start-selling-btn"
-              >
-                {t('hero.sellNow')}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Enhanced Hero Banner */}
+      <HeroBanner />
 
       <section className="py-20 px-4 bg-white/50 dark:bg-gray-800/50">
         <div className="max-w-7xl mx-auto">
