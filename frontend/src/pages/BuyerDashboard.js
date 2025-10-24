@@ -201,49 +201,113 @@ const BuyerDashboard = () => {
               </TabsContent>
 
               <TabsContent value="winning">
-                <div className="space-y-4">
-                  {dashboard?.bids?.filter(bid => {
-                    const listing = dashboard.listings.find(l => l.id === bid.listing_id);
-                    return listing && listing.current_price === bid.amount;
-                  }).map((bid) => {
-                    const listing = dashboard.listings.find(l => l.id === bid.listing_id);
-                    return (
-                      <div key={bid.id} className="p-4 border-2 border-green-200 rounded-lg bg-green-50 dark:bg-green-950">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge className="bg-green-600 text-white">WINNING</Badge>
-                          <h3 className="font-semibold">{listing?.title}</h3>
-                        </div>
-                        <p className="text-sm text-muted-foreground">Your bid: <strong>${bid.amount.toFixed(2)}</strong></p>
-                        <Button size="sm" className="mt-2" variant="outline" onClick={() => navigate(`/listing/${bid.listing_id}`)}>
-                          View Listing
-                        </Button>
+                {dashboard?.bids?.filter(bid => {
+                  const listing = dashboard.listings.find(l => l.id === bid.listing_id);
+                  return listing && listing.current_price === bid.amount;
+                }).length > 0 ? (
+                  <div className="space-y-4">
+                    {dashboard.bids.filter(bid => {
+                      const listing = dashboard.listings.find(l => l.id === bid.listing_id);
+                      return listing && listing.current_price === bid.amount;
+                    }).map((bid) => {
+                      const listing = dashboard.listings.find(l => l.id === bid.listing_id);
+                      return (
+                        <Card key={bid.id} className="border-2 border-green-500 overflow-hidden">
+                          <div className="relative h-32 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 flex items-center justify-center">
+                            <Badge className="absolute top-3 left-3 bg-green-600 text-white text-sm px-3 py-1.5">
+                              <Trophy className="h-4 w-4 mr-1" />
+                              WINNING
+                            </Badge>
+                            <TrendingUp className="h-16 w-16 text-green-600 opacity-20" />
+                          </div>
+                          <CardContent className="p-4 space-y-3">
+                            <h3 className="font-bold text-lg">{listing?.title}</h3>
+                            <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950 rounded-lg">
+                              <div>
+                                <p className="text-xs text-muted-foreground uppercase">Your Winning Bid</p>
+                                <p className="text-2xl font-bold text-green-600">${bid.amount.toFixed(2)}</p>
+                              </div>
+                            </div>
+                          </CardContent>
+                          <CardFooter className="p-4 pt-0">
+                            <Button className="w-full" variant="outline" onClick={() => navigate(`/listing/${bid.listing_id}`)}>
+                              View Listing Details
+                            </Button>
+                          </CardFooter>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <Card className="p-12">
+                    <div className="text-center space-y-4">
+                      <div className="w-20 h-20 mx-auto bg-gradient-to-br from-green-100 to-green-50 dark:from-green-950 dark:to-green-900 rounded-full flex items-center justify-center">
+                        <Trophy className="h-10 w-10 text-green-600" />
                       </div>
-                    );
-                  }) || <p className="text-center text-muted-foreground py-8">No winning bids yet</p>}
-                </div>
+                      <div>
+                        <h3 className="text-xl font-semibold mb-2">No Winning Bids Yet</h3>
+                        <p className="text-muted-foreground">Keep bidding to win amazing items!</p>
+                      </div>
+                    </div>
+                  </Card>
+                )}
               </TabsContent>
 
               <TabsContent value="losing">
-                <div className="space-y-4">
-                  {dashboard?.bids?.filter(bid => {
-                    const listing = dashboard.listings.find(l => l.id === bid.listing_id);
-                    return listing && listing.current_price > bid.amount;
-                  }).map((bid) => {
-                    const listing = dashboard.listings.find(l => l.id === bid.listing_id);
-                    return (
-                      <div key={bid.id} className="p-4 border-2 border-red-200 rounded-lg bg-red-50 dark:bg-red-950">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge variant="destructive">OUTBID</Badge>
-                          <h3 className="font-semibold">{listing?.title}</h3>
-                        </div>
-                        <p className="text-sm text-muted-foreground">Your bid: ${bid.amount.toFixed(2)} | Current: <strong>${listing?.current_price.toFixed(2)}</strong></p>
-                        <Button size="sm" className="mt-2 gradient-button text-white border-0" onClick={() => navigate(`/listing/${bid.listing_id}`)}>
-                          Place Higher Bid
-                        </Button>
+                {dashboard?.bids?.filter(bid => {
+                  const listing = dashboard.listings.find(l => l.id === bid.listing_id);
+                  return listing && listing.current_price > bid.amount;
+                }).length > 0 ? (
+                  <div className="space-y-4">
+                    {dashboard.bids.filter(bid => {
+                      const listing = dashboard.listings.find(l => l.id === bid.listing_id);
+                      return listing && listing.current_price > bid.amount;
+                    }).map((bid) => {
+                      const listing = dashboard.listings.find(l => l.id === bid.listing_id);
+                      return (
+                        <Card key={bid.id} className="border-2 border-red-500 overflow-hidden">
+                          <div className="relative h-32 bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950 dark:to-red-900 flex items-center justify-center">
+                            <Badge className="absolute top-3 left-3 bg-red-600 text-white text-sm px-3 py-1.5">
+                              <TrendingDown className="h-4 w-4 mr-1" />
+                              OUTBID
+                            </Badge>
+                            <AlertTriangle className="h-16 w-16 text-red-600 opacity-20" />
+                          </div>
+                          <CardContent className="p-4 space-y-3">
+                            <h3 className="font-bold text-lg">{listing?.title}</h3>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                                <p className="text-xs text-muted-foreground uppercase mb-1">Your Bid</p>
+                                <p className="text-lg font-bold">${bid.amount.toFixed(2)}</p>
+                              </div>
+                              <div className="p-3 bg-red-50 dark:bg-red-950 rounded-lg">
+                                <p className="text-xs text-muted-foreground uppercase mb-1">Current Bid</p>
+                                <p className="text-lg font-bold text-red-600">${listing?.current_price.toFixed(2)}</p>
+                              </div>
+                            </div>
+                          </CardContent>
+                          <CardFooter className="p-4 pt-0">
+                            <Button className="w-full gradient-button text-white border-0 font-semibold" onClick={() => navigate(`/listing/${bid.listing_id}`)}>
+                              Place Higher Bid Now
+                            </Button>
+                          </CardFooter>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <Card className="p-12">
+                    <div className="text-center space-y-4">
+                      <div className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-100 to-blue-50 dark:from-blue-950 dark:to-blue-900 rounded-full flex items-center justify-center">
+                        <TrendingUp className="h-10 w-10 text-blue-600" />
                       </div>
-                    );
-                  }) || <p className="text-center text-muted-foreground py-8">No losing bids</p>}
-                </div>
+                      <div>
+                        <h3 className="text-xl font-semibold mb-2">All Your Bids Are Leading!</h3>
+                        <p className="text-muted-foreground">Great job! Keep an eye on your auctions.</p>
+                      </div>
+                    </div>
+                  </Card>
+                )}
               </TabsContent>
 
               <TabsContent value="watching">
