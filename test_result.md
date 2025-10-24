@@ -112,17 +112,17 @@ user_problem_statement: |
   6. Authentication required: redirect to /auth if not logged in
 
 backend:
-  - task: "No backend changes required"
+  - task: "Watchlist API Endpoints"
     implemented: true
     working: "NA"
-    file: "N/A"
+    file: "/app/backend/server.py"
     stuck_count: 0
-    priority: "low"
-    needs_retesting: false
+    priority: "high"
+    needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Session 1 UX fixes are frontend-only changes. No backend modifications needed."
+        comment: "Implemented 4 watchlist endpoints: POST /api/watchlist/add (add listing to watchlist with duplicate check), POST /api/watchlist/remove (remove listing from watchlist), GET /api/watchlist (get user's watchlist with listing details), GET /api/watchlist/check/{listing_id} (check if listing is in watchlist). Database: watchlist collection stores user_id, listing_id, added_at. Updated GET /api/dashboard/buyer to include watchlist data for BuyerDashboard integration."
 
 frontend:
   - task: "Mobile Bottom Navigation - Fix Routing"
