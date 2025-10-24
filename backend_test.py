@@ -213,41 +213,51 @@ class BazarioWatchlistTester:
             print(f"❌ Error testing add to watchlist: {str(e)}")
             return False
             
-    async def test_promotion_payment_endpoint(self) -> bool:
-        """Test POST /api/payments/promote endpoint"""
-        print("\n🧪 Testing POST /api/payments/promote...")
+    async def test_check_watchlist_status(self) -> bool:
+        """Test GET /api/watchlist/check/{listing_id} endpoint"""
+        print("\n🧪 Testing GET /api/watchlist/check/{listing_id}...")
         
         try:
-            payment_data = {
-                "promotion_id": self.test_promotion_id,
-                "amount": 24.99,
-                "origin_url": "https://bid-bazaar-4.preview.emergentagent.com"
-            }
+            # Test checking listing that IS in watchlist
+            listing_in_watchlist = self.test_listing_ids[0]
             
-            async with self.session.post(
-                f"{BASE_URL}/payments/promote",
-                json=payment_data,
+            async with self.session.get(
+                f"{BASE_URL}/watchlist/check/{listing_in_watchlist}",
                 headers=self.get_auth_headers()
             ) as response:
                 if response.status == 200:
                     data = await response.json()
                     
                     # Verify response structure
-                    assert "url" in data
-                    assert "session_id" in data
-                    assert data["url"].startswith("https://checkout.stripe.com")
+                    assert "in_watchlist" in data
+                    assert data["in_watchlist"] is True
                     
-                    print(f"✅ Promotion payment checkout created successfully")
-                    print(f"   - Session ID: {data['session_id']}")
-                    print(f"   - Checkout URL: {data['url'][:50]}...")
+                    print(f"✅ Correctly identified listing in watchlist: {listing_in_watchlist}")
+                    
+                    # Test checking listing that is NOT in watchlist
+                    listing_not_in_watchlist = self.test_listing_ids[1]
+                    
+                    async with self.session.get(
+                        f"{BASE_URL}/watchlist/check/{listing_not_in_watchlist}",
+                        headers=self.get_auth_headers()
+                    ) as not_in_response:
+                        if not_in_response.status == 200:
+                            not_in_data = await not_in_response.json()
+                            assert "in_watchlist" in not_in_data
+                            assert not_in_data["in_watchlist"] is False
+                            print(f"✅ Correctly identified listing NOT in watchlist: {listing_not_in_watchlist}")
+                        else:
+                            print(f"❌ Failed to check non-watchlist item: {not_in_response.status}")
+                            return False
+                    
                     return True
                 else:
-                    print(f"❌ Failed to create promotion payment: {response.status}")
+                    print(f"❌ Failed to check watchlist status: {response.status}")
                     text = await response.text()
                     print(f"Response: {text}")
                     return False
         except Exception as e:
-            print(f"❌ Error testing promotion payment: {str(e)}")
+            print(f"❌ Error testing watchlist status check: {str(e)}")
             return False
             
     async def test_get_my_promotions(self) -> bool:
