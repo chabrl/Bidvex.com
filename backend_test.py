@@ -188,8 +188,7 @@ class BazarioWatchlistTester:
                     
                     # Test adding duplicate listing (should return already_added)
                     async with self.session.post(
-                        f"{BASE_URL}/watchlist/add",
-                        json={"listing_id": listing_id},
+                        f"{BASE_URL}/watchlist/add?listing_id={listing_id}",
                         headers=self.get_auth_headers()
                     ) as dup_response:
                         if dup_response.status == 200:
