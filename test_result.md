@@ -205,7 +205,12 @@ metadata:
 
 test_plan:
   current_focus:
-    - "All Session 1 UX fixes completed and verified"
+    - "Watchlist API Endpoints"
+    - "WatchlistButton Component"
+    - "WatchlistPage - Dedicated Route"
+    - "Marketplace Page - Heart Icons"
+    - "Listing Detail Page - Heart Icon"
+    - "Buyer Dashboard - Watching Tab Integration"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
