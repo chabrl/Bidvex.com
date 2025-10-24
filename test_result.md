@@ -240,10 +240,8 @@ metadata:
 test_plan:
   current_focus:
     - "Mobile Bottom Navigation - Fix Routing"
-    - "My Bids Dashboard - Enhanced Status Badges"
-    - "My Bids Dashboard - Improved Bid Comparison Layout"
-    - "My Bids Dashboard - Watching Tab Enhanced"
-  stuck_tasks: []
+  stuck_tasks:
+    - "Mobile Bottom Navigation - Fix Routing"
   test_all: false
   test_priority: "high_first"
 
