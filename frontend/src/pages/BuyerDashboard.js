@@ -92,69 +92,111 @@ const BuyerDashboard = () => {
                       const isWinning = listing && listing.current_price === bid.amount;
                       const auctionEndDate = listing ? new Date(listing.auction_end_date) : null;
                       const isEnded = auctionEndDate && new Date() > auctionEndDate;
+                      const timeLeft = auctionEndDate ? auctionEndDate - new Date() : 0;
+                      const isUrgent = timeLeft > 0 && timeLeft < 3600000; // Less than 1 hour
 
                       return (
-                        <div key={bid.id} className="p-4 border rounded-lg hover:bg-accent/10 transition-colors">
-                          <div className="flex gap-4">
-                            <div className="w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
-                              {listing?.images?.[0] ? (
-                                <img src={listing.images[0]} alt={listing.title} className="w-full h-full object-cover" />
+                        <Card key={bid.id} className={`overflow-hidden ${isWinning ? 'border-2 border-green-500' : 'border-2 border-gray-200'}`}>
+                          {/* Status Badge - Top Left */}
+                          <div className="relative">
+                            <div className="absolute top-3 left-3 z-10">
+                              {isWinning ? (
+                                <Badge className="bg-green-600 text-white border-0 text-sm px-3 py-1.5">
+                                  <TrendingUp className="h-4 w-4 mr-1" />
+                                  WINNING
+                                </Badge>
                               ) : (
-                                <div className="w-full h-full flex items-center justify-center">📦</div>
+                                <Badge variant="destructive" className="text-sm px-3 py-1.5">
+                                  <TrendingDown className="h-4 w-4 mr-1" />
+                                  OUTBID
+                                </Badge>
                               )}
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-semibold text-lg mb-1 truncate">{listing?.title || 'Listing'}</h3>
-                              <div className="flex flex-wrap items-center gap-2 mb-2">
-                                {isWinning ? (
-                                  <Badge className="bg-green-600 text-white border-0">
-                                    <TrendingUp className="h-3 w-3 mr-1" />
-                                    You're Winning!
-                                  </Badge>
-                                ) : (
-                                  <Badge variant="destructive">
-                                    <TrendingDown className="h-3 w-3 mr-1" />
-                                    Outbid
-                                  </Badge>
-                                )}
-                                {isEnded && <Badge variant="outline">Ended</Badge>}
-                              </div>
-                              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                <span>Your Bid: <strong className="text-foreground">${bid.amount.toFixed(2)}</strong></span>
-                                <span>Current: <strong className="text-foreground gradient-text">${listing?.current_price.toFixed(2)}</strong></span>
-                                {auctionEndDate && !isEnded && (
+
+                            {/* Countdown - Top Right */}
+                            {auctionEndDate && !isEnded && (
+                              <div className="absolute top-3 right-3 z-10">
+                                <Badge className={`${isUrgent ? 'bg-red-600 animate-pulse' : 'bg-blue-600'} text-white border-0 text-sm px-3 py-1.5`}>
                                   <Countdown
                                     date={auctionEndDate}
                                     renderer={({ days, hours, minutes }) => (
-                                      <span className="text-primary font-medium">{days}d {hours}h {minutes}m</span>
+                                      <span className="font-bold">{days}d {hours}h {minutes}m</span>
                                     )}
                                   />
-                                )}
+                                </Badge>
                               </div>
-                            </div>
-                            <div className="flex flex-col gap-2">
-                              <Button size="sm" variant="outline" onClick={() => navigate(`/listing/${bid.listing_id}`)}>
-                                View Listing
-                              </Button>
-                              {!isWinning && !isEnded && (
-                                <Button size="sm" className="gradient-button text-white border-0" onClick={() => navigate(`/listing/${bid.listing_id}`)}>
-                                  Place Higher Bid
-                                </Button>
+                            )}
+
+                            {/* Image */}
+                            <div className="w-full h-48 bg-gray-100">
+                              {listing?.images?.[0] ? (
+                                <img src={listing.images[0]} alt={listing.title} className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-6xl">📦</div>
                               )}
                             </div>
                           </div>
-                        </div>
+
+                          {/* Content Section */}
+                          <CardContent className="p-4 space-y-4">
+                            <h3 className="font-bold text-xl line-clamp-2">{listing?.title || 'Listing'}</h3>
+
+                            {/* Bid Comparison - Clear Layout */}
+                            <div className="grid grid-cols-2 gap-3 p-3 bg-accent/10 rounded-lg">
+                              <div>
+                                <p className="text-xs text-muted-foreground uppercase mb-1">Your Bid</p>
+                                <p className="text-xl font-bold">${bid.amount.toFixed(2)}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-muted-foreground uppercase mb-1">Current Price</p>
+                                <p className="text-xl font-bold gradient-text">${listing?.current_price.toFixed(2)}</p>
+                              </div>
+                            </div>
+
+                            {/* Additional Info */}
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Badge variant="outline">{listing?.bid_count || 0} bids</Badge>
+                              {isEnded && <Badge variant="outline">Auction Ended</Badge>}
+                            </div>
+                          </CardContent>
+
+                          {/* Action Buttons - Full Width on Mobile */}
+                          <CardFooter className="p-4 pt-0 gap-2 flex-col sm:flex-row">
+                            <Button 
+                              variant="outline" 
+                              className="w-full sm:flex-1" 
+                              onClick={() => navigate(`/listing/${bid.listing_id}`)}
+                            >
+                              View Listing
+                            </Button>
+                            {!isWinning && !isEnded && (
+                              <Button 
+                                className="w-full sm:flex-1 gradient-button text-white border-0 font-semibold" 
+                                onClick={() => navigate(`/listing/${bid.listing_id}`)}
+                              >
+                                Place Higher Bid
+                              </Button>
+                            )}
+                          </CardFooter>
+                        </Card>
                       );
                     })}
                   </div>
                 ) : (
-                  <div className="text-center py-12">
-                    <Gavel className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-                    <p className="text-muted-foreground">No bids yet. Start bidding on auctions!</p>
-                    <Button className="mt-4 gradient-button text-white border-0" onClick={() => navigate('/marketplace')}>
-                      Browse Marketplace
-                    </Button>
-                  </div>
+                  <Card className="p-12">
+                    <div className="text-center space-y-4">
+                      <div className="w-20 h-20 mx-auto bg-gradient-to-br from-primary/10 to-accent/10 rounded-full flex items-center justify-center">
+                        <Gavel className="h-10 w-10 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-semibold mb-2">No Active Bids</h3>
+                        <p className="text-muted-foreground">Start bidding on auctions to see them here!</p>
+                      </div>
+                      <Button className="gradient-button text-white border-0" onClick={() => navigate('/marketplace')}>
+                        Browse Marketplace
+                      </Button>
+                    </div>
+                  </Card>
                 )}
               </TabsContent>
 
