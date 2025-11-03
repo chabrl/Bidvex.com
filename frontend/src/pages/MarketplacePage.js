@@ -221,11 +221,103 @@ const MarketplacePage = () => {
   );
 };
 
-const ListingCard = ({ listing }) => {
+const ListingCard = ({ listing, viewMode = 'grid' }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const auctionEndDate = new Date(listing.auction_end_date);
 
+  if (viewMode === 'list') {
+    // List View Layout
+    return (
+      <Card
+        className="card-hover cursor-pointer glassmorphism overflow-hidden flex flex-col md:flex-row"
+        onClick={() => navigate(`/listing/${listing.id}`)}
+        data-testid={`listing-card-${listing.id}`}
+      >
+        {/* Image */}
+        <div className="relative w-full md:w-64 h-48 md:h-auto bg-gray-100 flex-shrink-0">
+          {listing.images && listing.images.length > 0 ? (
+            <img
+              src={listing.images[0]}
+              alt={listing.title}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-accent/10">
+              <span className="text-4xl">📦</span>
+            </div>
+          )}
+          
+          {/* Watchlist Button */}
+          <div 
+            className="absolute top-2 left-2 z-10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-white dark:bg-gray-900 rounded-full p-2 shadow-lg">
+              <WatchlistButton listingId={listing.id} size="small" />
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 p-4 flex flex-col">
+          <div className="flex items-start justify-between mb-2">
+            <div className="flex-1">
+              <h3 className="font-semibold text-xl mb-2">{listing.title}</h3>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white text-xs font-bold">
+                  {listing.seller_name?.charAt(0) || 'S'}
+                </div>
+                <span className="text-sm">{listing.seller_name || 'Seller'}</span>
+                {listing.seller_verified && (
+                  <Badge className="h-4 px-1 text-[10px] bg-blue-600 text-white border-0">✓</Badge>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {listing.is_promoted && (
+                <Badge className="gradient-bg text-white border-0">Featured</Badge>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 mb-3 flex-wrap">
+            <div className="flex items-center gap-2 p-2 bg-accent/10 rounded-md">
+              <Clock className="h-4 w-4 text-primary" />
+              <Countdown
+                date={auctionEndDate}
+                renderer={({ days, hours, minutes, completed }) => (
+                  <span className={`text-sm font-semibold ${completed ? 'text-red-500' : 'text-primary'}`}>
+                    {completed ? t('marketplace.ended') : `${days}d ${hours}h ${minutes}m left`}
+                  </span>
+                )}
+              />
+            </div>
+            <div className="flex items-center gap-1">
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">{listing.city}, {listing.region}</span>
+            </div>
+            <Badge variant="outline" className="text-sm">{listing.bid_count} bids</Badge>
+          </div>
+
+          <div className="flex items-center justify-between mt-auto pt-3 border-t">
+            <div>
+              <p className="text-xs text-muted-foreground">{t('marketplace.currentBid')}</p>
+              <p className="text-3xl font-bold gradient-text">${listing.current_price.toFixed(2)}</p>
+              {listing.buy_now_price && (
+                <p className="text-sm text-green-600 font-semibold">Buy Now: ${listing.buy_now_price.toFixed(2)}</p>
+              )}
+            </div>
+            <Button className="gradient-button text-white border-0 px-8">
+              {t('marketplace.viewDetails', 'View Details')}
+            </Button>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  // Grid View Layout (Original)
   return (
     <Card
       className="card-hover cursor-pointer glassmorphism overflow-hidden"
