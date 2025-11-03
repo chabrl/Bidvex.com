@@ -6,7 +6,7 @@ import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardFooter } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
-import { Search, Filter, Clock, MapPin } from 'lucide-react';
+import { Search, Filter, Clock, MapPin, Grid3x3, List } from 'lucide-react';
 import Countdown from 'react-countdown';
 import LocationSearchMap from '../components/LocationSearchMap';
 import WatchlistButton from '../components/WatchlistButton';
@@ -18,6 +18,7 @@ const MarketplacePage = () => {
   const navigate = useNavigate();
   const [listings, setListings] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
   const [filters, setFilters] = useState({
     search: '',
     category: '',
