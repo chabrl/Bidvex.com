@@ -86,6 +86,118 @@
   }
   50% {
     transform: scale(1.05);
+
+
+/* BidVex Modal & Dropdown Enhancements */
+[data-radix-dialog-overlay] {
+  background: rgba(0, 86, 166, 0.2);
+  backdrop-filter: blur(4px);
+}
+
+[data-radix-dialog-content] {
+  border: 2px solid rgba(0, 155, 255, 0.1);
+  box-shadow: 0 10px 40px rgba(0, 155, 255, 0.25);
+}
+
+[data-radix-select-trigger],
+[data-radix-dropdown-trigger] {
+  border-color: rgba(0, 155, 255, 0.3);
+}
+
+[data-radix-select-trigger]:hover,
+[data-radix-dropdown-trigger]:hover {
+  border-color: #009BFF;
+  box-shadow: 0 0 0 2px rgba(0, 155, 255, 0.1);
+}
+
+[data-radix-select-content],
+[data-radix-dropdown-content] {
+  border: 1px solid rgba(0, 155, 255, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 155, 255, 0.15);
+}
+
+[data-radix-select-item]:focus,
+[data-radix-dropdown-item]:focus {
+  background: rgba(0, 155, 255, 0.1);
+  color: #0056A6;
+}
+
+/* BidVex Toggle Switches */
+[data-radix-switch-thumb] {
+  background: linear-gradient(90deg, #009BFF 0%, #0056A6 100%);
+}
+
+/* BidVex Feature Icons */
+.feature-icon {
+  color: #009BFF;
+  transition: all 0.3s ease;
+}
+
+.feature-icon:hover {
+  color: #0056A6;
+  transform: scale(1.1);
+}
+
+/* BidVex Input Focus States */
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: #009BFF;
+  box-shadow: 0 0 0 3px rgba(0, 155, 255, 0.1);
+  outline: none;
+}
+
+/* BidVex Tab Active State */
+[role="tab"][data-state="active"] {
+  border-bottom: 2px solid #009BFF;
+  color: #0056A6;
+}
+
+/* BidVex Checkbox & Radio */
+input[type="checkbox"]:checked,
+input[type="radio"]:checked {
+  background: linear-gradient(90deg, #009BFF 0%, #0056A6 100%);
+  border-color: #0056A6;
+}
+
+/* BidVex Progress Bar */
+progress::-webkit-progress-value {
+  background: linear-gradient(90deg, #009BFF 0%, #0056A6 100%);
+}
+
+progress::-moz-progress-bar {
+  background: linear-gradient(90deg, #009BFF 0%, #0056A6 100%);
+}
+
+/* BidVex Link Hover */
+a:hover:not(.gradient-button):not([class*="nav"]) {
+  color: #009BFF;
+}
+
+/* BidVex Accent Highlights */
+.accent-highlight {
+  background: rgba(0, 155, 255, 0.1);
+  border-left: 3px solid #009BFF;
+  padding: 1rem;
+}
+
+/* BidVex Loading Spinner */
+@keyframes bidvex-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.bidvex-spinner {
+  border: 3px solid rgba(0, 155, 255, 0.2);
+  border-top-color: #009BFF;
+  border-radius: 50%;
+  animation: bidvex-spin 1s linear infinite;
+}
+
   }
   100% {
     transform: scale(1);
