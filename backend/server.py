@@ -2091,6 +2091,90 @@ async def check_watchlist_status(listing_id: str, current_user: User = Depends(g
         logger.error(f"Error checking watchlist status: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to check watchlist status")
 
+
+# Recently Viewed Tracking Endpoints
+@api_router.post("/tracking/view/{listing_id}")
+async def track_listing_view(listing_id: str, current_user: User = Depends(get_current_user)):
+    """Track a listing view for logged-in users"""
+    try:
+        # Check if listing exists
+        listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
+        if not listing:
+            raise HTTPException(status_code=404, detail="Listing not found")
+        
+        # Check if already viewed recently (within last 24 hours)
+        recent_view = await db.recently_viewed.find_one({
+            "user_id": current_user.id,
+            "listing_id": listing_id
+        })
+        
+        current_time = datetime.now(timezone.utc).isoformat()
+        
+        if recent_view:
+            # Update timestamp
+            await db.recently_viewed.update_one(
+                {"user_id": current_user.id, "listing_id": listing_id},
+                {"$set": {"viewed_at": current_time}}
+            )
+        else:
+            # Add new view record
+            view_record = {
+                "id": str(uuid.uuid4()),
+                "user_id": current_user.id,
+                "listing_id": listing_id,
+                "viewed_at": current_time
+            }
+            await db.recently_viewed.insert_one(view_record)
+        
+        return {"message": "View tracked", "success": True}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error tracking view: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to track view")
+
+@api_router.get("/tracking/recently-viewed")
+async def get_recently_viewed(limit: int = 10, current_user: User = Depends(get_current_user)):
+    """Get user's recently viewed listings"""
+    try:
+        # Get recently viewed records
+        viewed_records = await db.recently_viewed.find(
+            {"user_id": current_user.id},
+            {"_id": 0}
+        ).sort("viewed_at", -1).limit(limit).to_list(limit)
+        
+        if not viewed_records:
+            return []
+        
+        # Get listing IDs
+        listing_ids = [record["listing_id"] for record in viewed_records]
+        
+        # Fetch listing details
+        listings = await db.listings.find(
+            {"id": {"$in": listing_ids}, "status": {"$ne": "deleted"}},
+            {"_id": 0}
+        ).to_list(limit)
+        
+        # Create a map for quick lookup
+        listings_map = {listing["id"]: listing for listing in listings}
+        
+        # Return listings in the order they were viewed
+        result = []
+        for record in viewed_records:
+            listing = listings_map.get(record["listing_id"])
+            if listing:
+                result.append({
+                    **listing,
+                    "viewed_at": record["viewed_at"]
+                })
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error fetching recently viewed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch recently viewed")
+
 @api_router.get("/stats/top-sellers")
 async def get_top_sellers(limit: int = 10):
     pipeline = [
