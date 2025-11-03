@@ -27,11 +27,12 @@ const Navbar = () => {
     <nav className="sticky top-0 z-50 glassmorphism shadow-sm" data-testid="main-navbar">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          <Link to="/" className="flex items-center space-x-2 group" data-testid="nav-logo">
-            <div className="gradient-bg w-10 h-10 rounded-xl flex items-center justify-center transform group-hover:rotate-6 transition-transform">
-              <span className="text-white font-bold text-xl">B</span>
-            </div>
-            <span className="text-2xl font-bold gradient-text">Bazario</span>
+          <Link to="/" className="flex items-center space-x-3 group" data-testid="nav-logo">
+            <img 
+              src="/bidvex-logo.png" 
+              alt="BidVex" 
+              className="h-10 w-auto transform group-hover:scale-105 transition-transform"
+            />
           </Link>
 
           <div className="hidden md:flex items-center space-x-1">
