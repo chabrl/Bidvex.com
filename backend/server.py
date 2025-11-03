@@ -2166,6 +2166,51 @@ async def get_recently_viewed(limit: int = 10, current_user: User = Depends(get_
             if listing:
                 result.append({
                     **listing,
+
+
+# Carousel Data Endpoints
+@api_router.get("/carousel/ending-soon")
+async def get_ending_soon_listings(limit: int = 12):
+    """Get listings ending soon (within next 24 hours)"""
+    try:
+        current_time = datetime.now(timezone.utc)
+        twenty_four_hours_later = current_time + timedelta(hours=24)
+        
+        listings = await db.listings.find(
+            {
+                "status": "active",
+                "auction_end_date": {
+                    "$gte": current_time.isoformat(),
+                    "$lte": twenty_four_hours_later.isoformat()
+                }
+            },
+            {"_id": 0}
+        ).sort("auction_end_date", 1).limit(limit).to_list(limit)
+        
+        return listings
+        
+    except Exception as e:
+        logger.error(f"Error fetching ending soon listings: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch ending soon listings")
+
+@api_router.get("/carousel/featured")
+async def get_featured_listings(limit: int = 12):
+    """Get featured/promoted listings"""
+    try:
+        listings = await db.listings.find(
+            {
+                "status": "active",
+                "is_promoted": True
+            },
+            {"_id": 0}
+        ).sort("created_at", -1).limit(limit).to_list(limit)
+        
+        return listings
+        
+    except Exception as e:
+        logger.error(f"Error fetching featured listings: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch featured listings")
+
                     "viewed_at": record["viewed_at"]
                 })
         
