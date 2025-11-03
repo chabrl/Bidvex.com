@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
@@ -8,23 +9,33 @@ import { Badge } from '../components/ui/badge';
 import { ArrowRight, Gavel, TrendingUp, Shield, Users, Award, Flame } from 'lucide-react';
 import Countdown from 'react-countdown';
 import HeroBanner from '../components/HeroBanner';
+import AuctionCarousel from '../components/AuctionCarousel';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const HomePage = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [topSellers, setTopSellers] = useState([]);
   const [hotItems, setHotItems] = useState([]);
+  const [endingSoon, setEndingSoon] = useState([]);
+  const [featured, setFeatured] = useState([]);
+  const [recentlyViewed, setRecentlyViewed] = useState([]);
 
   useEffect(() => {
     fetchTopSellers();
     fetchHotItems();
-  }, []);
+    fetchEndingSoon();
+    fetchFeatured();
+    if (user) {
+      fetchRecentlyViewed();
+    }
+  }, [user]);
 
   const fetchTopSellers = async () => {
     try {
-      const response = await axios.get(`${API}/stats/top-sellers?limit=3`);
+      const response = await axios.get(`${API}/stats/top-sellers?limit=8`);
       setTopSellers(response.data);
     } catch (error) {
       console.error('Failed to fetch top sellers:', error);
@@ -37,6 +48,33 @@ const HomePage = () => {
       setHotItems(response.data);
     } catch (error) {
       console.error('Failed to fetch hot items:', error);
+    }
+  };
+
+  const fetchEndingSoon = async () => {
+    try {
+      const response = await axios.get(`${API}/carousel/ending-soon?limit=12`);
+      setEndingSoon(response.data);
+    } catch (error) {
+      console.error('Failed to fetch ending soon:', error);
+    }
+  };
+
+  const fetchFeatured = async () => {
+    try {
+      const response = await axios.get(`${API}/carousel/featured?limit=12`);
+      setFeatured(response.data);
+    } catch (error) {
+      console.error('Failed to fetch featured:', error);
+    }
+  };
+
+  const fetchRecentlyViewed = async () => {
+    try {
+      const response = await axios.get(`${API}/tracking/recently-viewed?limit=12`);
+      setRecentlyViewed(response.data);
+    } catch (error) {
+      console.error('Failed to fetch recently viewed:', error);
     }
   };
 
