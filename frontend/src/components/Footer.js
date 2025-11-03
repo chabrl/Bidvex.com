@@ -35,7 +35,7 @@ const Footer = () => {
         {/* Copyright & Language Selector */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-6 border-t border-gray-800">
           <p className="text-sm text-center md:text-left">
-            © {new Date().getFullYear()} Bazario. All rights reserved.
+            © {new Date().getFullYear()} BidVex. All rights reserved.
           </p>
           <button
             onClick={toggleLanguage}
