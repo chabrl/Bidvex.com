@@ -239,7 +239,7 @@ const AffiliateDashboard = () => {
             <div className="space-y-3">
               <Step number="1" title="Share Your Link" description="Share your unique referral link with friends and followers" />
               <Step number="2" title="They Sign Up" description="When someone signs up using your link, they become your referral" />
-              <Step number="3" title="Earn Commission" description="You earn 3% commission on every sale they make on Bazario" />
+              <Step number="3" title="Earn Commission" description="You earn 3% commission on every sale they make on BidVex" />
               <Step number="4" title="Get Paid" description="Withdraw your earnings via bank transfer or use as bidding credits" />
             </div>
           </CardContent>
