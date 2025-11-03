@@ -156,7 +156,7 @@ const HowItWorksPage = () => {
             </div>
             <h3 className="text-2xl font-bold">Video Tutorials Coming Soon</h3>
             <p className="text-muted-foreground">
-              We're creating detailed video guides to help you get the most out of Bazario. 
+              We're creating detailed video guides to help you get the most out of BidVex. 
               Check back soon for step-by-step tutorials!
             </p>
             <Button 
