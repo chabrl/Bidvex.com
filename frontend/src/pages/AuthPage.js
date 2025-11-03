@@ -61,11 +61,19 @@ const AuthPage = () => {
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-12" data-testid="auth-page">
       <Card className="w-full max-w-md glassmorphism">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">
+        <CardHeader className="space-y-4">
+          {/* BidVex Icon */}
+          <div className="flex justify-center">
+            <img 
+              src="/bidvex-icon.png" 
+              alt="BidVex" 
+              className="h-16 w-16"
+            />
+          </div>
+          <CardTitle className="text-2xl font-bold text-center">
             {isLogin ? t('auth.welcomeBack') : t('auth.createAccount')}
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-center">
             {isLogin ? 'Sign in to your account' : 'Create a new account to start bidding'}
           </CardDescription>
         </CardHeader>
