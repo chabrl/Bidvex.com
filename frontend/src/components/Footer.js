@@ -51,32 +51,3 @@ const Footer = () => {
 };
 
 export default Footer;
-            <a href="https://linkedin.com/company/bazario" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors" aria-label="LinkedIn">
-              <Linkedin className="h-5 w-5" />
-            </a>
-            <a href="https://youtube.com/@bazario" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors" aria-label="YouTube">
-              <Youtube className="h-5 w-5" />
-            </a>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-sm">Language:</span>
-            <button 
-              onClick={toggleLanguage}
-              className="px-3 py-1 rounded-md bg-gray-800 hover:bg-gray-700 transition-colors text-sm font-medium"
-            >
-              {i18n.language === 'en' ? 'English' : 'Français'}
-            </button>
-          </div>
-        </div>
-
-        {/* Copyright */}
-        <div className="text-center text-sm text-gray-500 pt-6 border-t border-gray-800">
-          © Bazario 2025. All rights reserved.
-        </div>
-      </div>
-    </footer>
-  );
-};
-
-export default Footer;
