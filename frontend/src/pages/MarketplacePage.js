@@ -92,7 +92,33 @@ const MarketplacePage = () => {
     <div className="min-h-screen py-8 px-4" data-testid="marketplace-page">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold mb-4">{t('marketplace.title')}</h1>
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-3xl md:text-4xl font-bold">{t('marketplace.title')}</h1>
+            
+            {/* Grid/List Toggle */}
+            <div className="flex gap-2 bg-muted rounded-lg p-1">
+              <Button
+                variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('grid')}
+                className="gap-2"
+                title="Grid View"
+              >
+                <Grid3x3 className="h-4 w-4" />
+                <span className="hidden sm:inline">Grid</span>
+              </Button>
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('list')}
+                className="gap-2"
+                title="List View"
+              >
+                <List className="h-4 w-4" />
+                <span className="hidden sm:inline">List</span>
+              </Button>
+            </div>
+          </div>
           
           <div className="flex flex-col gap-4 mb-6">
             <div className="flex gap-2">
