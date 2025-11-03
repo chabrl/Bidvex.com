@@ -72,15 +72,36 @@
 /* BidVex Brand Utilities */
 @layer utilities {
   .gradient-button {
-    @apply bg-gradient-to-r from-[#009BFF] to-[#0056A6] hover:from-[#0056A6] hover:to-[#009BFF] transition-all duration-300;
+    background: linear-gradient(90deg, #009BFF 0%, #0056A6 100%);
+    color: #FFFFFF;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 20px;
+    font-weight: 600;
+    box-shadow: 0 2px 6px rgba(0, 91, 187, 0.3);
+    transition: all 0.3s ease;
+  }
+  
+  .gradient-button:hover {
+    background: linear-gradient(90deg, #0056A6 0%, #009BFF 100%);
+    box-shadow: 0 4px 12px rgba(0, 91, 187, 0.4);
+    transform: translateY(-1px);
+  }
+  
+  .gradient-button:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 3px rgba(0, 91, 187, 0.3);
   }
   
   .gradient-text {
-    @apply bg-gradient-to-r from-[#009BFF] to-[#0056A6] bg-clip-text text-transparent;
+    background: linear-gradient(90deg, #009BFF 0%, #0056A6 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
   }
   
   .gradient-bg {
-    @apply bg-gradient-to-r from-[#009BFF] to-[#0056A6];
+    background: linear-gradient(90deg, #009BFF 0%, #0056A6 100%);
   }
   
   .bidvex-shadow {
@@ -91,4 +112,5 @@
     box-shadow: 0 10px 40px rgba(0, 155, 255, 0.25);
   }
 }
+
 
