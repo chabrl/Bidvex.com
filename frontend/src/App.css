@@ -27,13 +27,14 @@
   box-shadow: 0 1px 3px rgba(0, 91, 187, 0.3);
 }
 
+/* BidVex Card Effects */
 .card-hover {
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .card-hover:hover {
   transform: translateY(-5px);
-  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 15px 40px rgba(0, 155, 255, 0.15);
 }
 
 .glassmorphism {
