@@ -83,6 +83,66 @@ const HomePage = () => {
       {/* Enhanced Hero Banner */}
       <HeroBanner />
 
+      {/* Carousel Sections */}
+      <div className="space-y-16 py-12">
+        {/* Ending Soon Carousel */}
+        {endingSoon.length > 0 && (
+          <section className="px-4">
+            <div className="max-w-7xl mx-auto">
+              <AuctionCarousel 
+                title="⏰ Ending Soon" 
+                items={endingSoon}
+                type="auction"
+              />
+            </div>
+          </section>
+        )}
+
+        {/* Featured Auctions Carousel */}
+        {featured.length > 0 && (
+          <section className="px-4 bg-gradient-to-br from-primary/5 to-accent/5 py-12">
+            <div className="max-w-7xl mx-auto">
+              <AuctionCarousel 
+                title="✨ Featured Auctions" 
+                items={featured}
+                type="auction"
+              />
+            </div>
+          </section>
+        )}
+
+        {/* Recently Viewed Carousel - Only for logged-in users */}
+        {user && recentlyViewed.length > 0 && (
+          <section className="px-4">
+            <div className="max-w-7xl mx-auto">
+              <AuctionCarousel 
+                title="👁️ Recently Viewed" 
+                items={recentlyViewed}
+                type="auction"
+              />
+            </div>
+          </section>
+        )}
+
+        {/* Top Sellers Carousel */}
+        {topSellers.length > 0 && (
+          <section className="px-4 bg-gradient-to-br from-accent/5 to-primary/5 py-12">
+            <div className="max-w-7xl mx-auto">
+              <AuctionCarousel 
+                title="🏆 Top Sellers" 
+                items={topSellers.map(seller => ({
+                  id: seller._id,
+                  seller_name: seller.user?.name || 'Seller',
+                  count: seller.items_sold,
+                  total_sales: seller.total_sales
+                }))}
+                type="seller"
+              />
+            </div>
+          </section>
+        )}
+      </div>
+
       <section className="py-20 px-4 bg-white/50 dark:bg-gray-800/50">
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
