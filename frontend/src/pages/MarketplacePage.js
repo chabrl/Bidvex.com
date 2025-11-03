@@ -207,9 +207,12 @@ const MarketplacePage = () => {
             <p className="text-lg text-muted-foreground">No listings found</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className={viewMode === 'grid' ? 
+            "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" : 
+            "flex flex-col gap-4"
+          }>
             {listings.map((listing) => (
-              <ListingCard key={listing.id} listing={listing} />
+              <ListingCard key={listing.id} listing={listing} viewMode={viewMode} />
             ))}
           </div>
         )}
