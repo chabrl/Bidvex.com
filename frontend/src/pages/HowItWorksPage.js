@@ -71,7 +71,7 @@ const HowItWorksPage = () => {
             Start Bidding in <span className="gradient-text">5 Simple Steps</span>
           </h1>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            Whether you're buying or selling, Bazario makes online auctions simple, secure, and exciting
+            Whether you're buying or selling, BidVex makes online auctions simple, secure, and exciting
           </p>
         </div>
 
