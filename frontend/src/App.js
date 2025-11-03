@@ -22,6 +22,7 @@ import CreateMultiItemListing from './pages/CreateMultiItemListing';
 import LotsMarketplacePage from './pages/LotsMarketplacePage';
 import AdminDashboard from './pages/AdminDashboard';
 import WatchlistPage from './pages/WatchlistPage';
+import HowItWorksPage from './pages/HowItWorksPage';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
