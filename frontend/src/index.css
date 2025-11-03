@@ -67,3 +67,28 @@
   --input: 0 0% 20%;
   --ring: 205 100% 50%;
 }
+
+
+/* BidVex Brand Utilities */
+@layer utilities {
+  .gradient-button {
+    @apply bg-gradient-to-r from-[#009BFF] to-[#0056A6] hover:from-[#0056A6] hover:to-[#009BFF] transition-all duration-300;
+  }
+  
+  .gradient-text {
+    @apply bg-gradient-to-r from-[#009BFF] to-[#0056A6] bg-clip-text text-transparent;
+  }
+  
+  .gradient-bg {
+    @apply bg-gradient-to-r from-[#009BFF] to-[#0056A6];
+  }
+  
+  .bidvex-shadow {
+    box-shadow: 0 4px 20px rgba(0, 155, 255, 0.15);
+  }
+  
+  .bidvex-shadow-lg {
+    box-shadow: 0 10px 40px rgba(0, 155, 255, 0.25);
+  }
+}
+
