@@ -54,7 +54,7 @@ const AIAssistant = () => {
       {isOpen && (
         <Card className="fixed bottom-6 right-6 w-96 h-[500px] shadow-2xl z-50 flex flex-col">
           <div className="p-4 border-b flex justify-between items-center gradient-bg text-white">
-            <h3 className="font-semibold">Bazario AI Assistant</h3>
+            <h3 className="font-semibold">BidVex AI Assistant</h3>
             <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="text-white hover:bg-white/20">
               <X className="h-4 w-4" />
             </Button>
