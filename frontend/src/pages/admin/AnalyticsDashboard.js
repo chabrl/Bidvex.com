@@ -41,7 +41,7 @@ const AnalyticsDashboard = () => {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `bazario-analytics-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `bidvex-analytics-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     toast.success('Analytics exported to CSV');
   };
