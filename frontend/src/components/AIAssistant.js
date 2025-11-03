@@ -7,7 +7,7 @@ import { X, MessageCircle, Send } from 'lucide-react';
 const AIAssistant = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Hi! I am your Bazario AI assistant. How can I help you today?' }
+    { role: 'assistant', content: 'Hi! I am your BidVex AI assistant. How can I help you today?' }
   ]);
   const [input, setInput] = useState('');
 
