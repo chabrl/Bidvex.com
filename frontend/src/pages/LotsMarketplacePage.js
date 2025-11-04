@@ -158,12 +158,70 @@ const LotsMarketplacePage = () => {
             </p>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
             {listings.map((listing) => {
               const auctionEndDate = new Date(listing.auction_end_date);
               const isEnded = new Date() > auctionEndDate;
               const totalStarting = getTotalStartingPrice(listing.lots);
               const totalCurrent = getTotalCurrentPrice(listing.lots);
+
+              if (viewMode === 'list') {
+                return (
+                  <Card
+                    key={listing.id}
+                    className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer glassmorphism"
+                    onClick={() => navigate(`/lots/${listing.id}`)}
+                    data-testid={`lot-card-${listing.id}`}
+                  >
+                    <div className="flex flex-col md:flex-row">
+                      <div className="w-full md:w-1/3 aspect-video md:aspect-square bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center relative">
+                        <Layers className="h-16 w-16 text-primary opacity-50" />
+                        <Badge className="absolute top-2 right-2 gradient-bg text-white border-0">
+                          <Package className="mr-1 h-3 w-3" />
+                          {listing.total_lots} {t('lotsMarketplace.items', 'Items')}
+                        </Badge>
+                      </div>
+                      
+                      <div className="flex-1 p-6">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <h3 className="text-xl font-bold mb-2">{listing.title}</h3>
+                            <p className="text-muted-foreground text-sm line-clamp-2 mb-3">{listing.description}</p>
+                          </div>
+                          <Badge variant={isEnded ? 'secondary' : 'default'} className="ml-2">
+                            {isEnded ? t('lotsMarketplace.ended', 'Ended') : t('lotsMarketplace.active', 'Active')}
+                          </Badge>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <div>
+                            <p className="text-xs text-muted-foreground">{t('lotsMarketplace.location', 'Location')}</p>
+                            <p className="text-sm font-medium">{listing.city}, {listing.region}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">{t('lotsMarketplace.totalBid', 'Current Bid')}</p>
+                            <p className="text-lg font-bold gradient-text">${totalCurrent.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">{t('lotsMarketplace.totalValue', 'Starting Value')}</p>
+                            <p className="text-sm font-medium">${totalStarting.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">{t('lotsMarketplace.endsIn', 'Ends In')}</p>
+                            {!isEnded ? (
+                              <p className="text-sm font-medium">
+                                <Countdown date={auctionEndDate} />
+                              </p>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">{t('lotsMarketplace.auctionEnded', 'Auction Ended')}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                );
+              }
 
               return (
                 <Card
