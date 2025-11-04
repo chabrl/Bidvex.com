@@ -10,6 +10,7 @@ import { Search, Filter, Clock, MapPin, Grid3x3, List } from 'lucide-react';
 import Countdown from 'react-countdown';
 import LocationSearchMap from '../components/LocationSearchMap';
 import WatchlistButton from '../components/WatchlistButton';
+import SocialShare from '../components/SocialShare';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
