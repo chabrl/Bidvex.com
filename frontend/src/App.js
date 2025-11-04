@@ -20,6 +20,7 @@ import AffiliateDashboard from './pages/AffiliateDashboard';
 import MessagesPage from './pages/MessagesPage';
 import CreateMultiItemListing from './pages/CreateMultiItemListing';
 import LotsMarketplacePage from './pages/LotsMarketplacePage';
+import MultiItemListingDetailPage from './pages/MultiItemListingDetailPage';
 import AdminDashboard from './pages/AdminDashboard';
 import WatchlistPage from './pages/WatchlistPage';
 import HowItWorksPage from './pages/HowItWorksPage';
