@@ -121,6 +121,25 @@ const LotsMarketplacePage = () => {
               <option value="created_at">{t('marketplace.oldest', 'Oldest First')}</option>
               <option value="auction_end_date">{t('marketplace.endingSoon', 'Ending Soon')}</option>
             </select>
+
+            <div className="flex gap-2">
+              <Button
+                variant={viewMode === 'grid' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleViewModeChange('grid')}
+                className={viewMode === 'grid' ? 'gradient-button text-white' : ''}
+              >
+                <GridIcon className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleViewModeChange('list')}
+                className={viewMode === 'list' ? 'gradient-button text-white' : ''}
+              >
+                <ListIcon className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
 
