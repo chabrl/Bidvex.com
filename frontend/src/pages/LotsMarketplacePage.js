@@ -58,6 +58,11 @@ const LotsMarketplacePage = () => {
     setFilters({ ...filters, [key]: value });
   };
 
+  const handleViewModeChange = (mode) => {
+    setViewMode(mode);
+    localStorage.setItem('lotsViewMode', mode);
+  };
+
   const getTotalStartingPrice = (lots) => {
     return lots.reduce((sum, lot) => sum + lot.starting_price, 0);
   };
