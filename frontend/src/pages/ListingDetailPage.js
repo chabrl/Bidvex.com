@@ -14,6 +14,7 @@ import confetti from 'canvas-confetti';
 import { Clock, MapPin, Eye, User, DollarSign, MessageCircle, TrendingUp } from 'lucide-react';
 import PromotionManagerModal from '../components/PromotionManagerModal';
 import WatchlistButton from '../components/WatchlistButton';
+import SocialShare from '../components/SocialShare';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
