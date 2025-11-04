@@ -47,6 +47,7 @@
     "input-otp": "^1.4.2",
     "lucide-react": "^0.507.0",
     "next-themes": "^0.4.6",
+    "papaparse": "^5.5.3",
     "react": "^19.0.0",
     "react-avatar-editor": "^13.0.2",
     "react-countdown": "^2.3.6",
