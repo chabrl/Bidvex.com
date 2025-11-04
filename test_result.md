@@ -130,77 +130,77 @@ backend:
         comment: "Backend endpoints already exist for multi-item listings: POST /api/multi-item-listings (create listing), GET /api/multi-item-listings (list all), GET /api/multi-item-listings/{listing_id} (get details). No backend changes needed for Phase 3 wizard - using existing endpoints."
 
 frontend:
-  - task: "WatchlistButton Component"
+  - task: "Multi-Lot Wizard - Step-by-Step UI"
     implemented: true
     working: "NA"
-    file: "/app/frontend/src/components/WatchlistButton.js"
+    file: "/app/frontend/src/pages/CreateMultiItemListing.js"
     stuck_count: 0
     priority: "high"
     needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Created reusable WatchlistButton component with heart icon toggle, authentication check (redirects to /auth if not logged in), API integration (add/remove/check watchlist status), toast notifications ('Added to Watchlist' with ❤️, 'Removed from Watchlist' with 💔), smooth animations (pulse, scale, fill effect), and size variants (small, default, large) with optional label."
+        comment: "Completely refactored CreateMultiItemListing.js into 3-step wizard: Step 1 (Basic Auction Details: title, description, category, location, end date), Step 2 (Add Lots: manual entry, CSV upload, bulk images), Step 3 (Review & Submit: summary stats, preview table, edit buttons). Added step indicator with visual progress (checkmarks for completed steps, gradient for active step), navigation buttons (Back/Next/Submit), per-step validation."
 
-  - task: "WatchlistPage - Dedicated Route"
+  - task: "CSV Bulk Upload Feature"
     implemented: true
     working: "NA"
-    file: "/app/frontend/src/pages/WatchlistPage.js"
+    file: "/app/frontend/src/pages/CreateMultiItemListing.js"
     stuck_count: 0
     priority: "high"
     needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Created WatchlistPage component at /watchlist route (protected route in App.js). Features: displays all saved items in responsive grid, enhanced card layout with images, countdown timers (top-left), watchlist button (top-right), status badges (auction ended, featured), current bid display, bid count, category tags, full-width action buttons ('Place Bid' or 'View Details'), rich empty state with gradient heart icon and 'Browse Marketplace' CTA."
+        comment: "Integrated PapaParse library for CSV parsing. CSV upload interface in Step 2 with upload method tabs (Manual Entry, CSV Upload, Bulk Images). Parses CSV with columns: title, description, quantity, starting_bid, image_urls. Enforces 500-lot soft limit (truncates and shows warning). Auto-populates lots array from CSV data. Created sample test CSV at /app/test-data/sample-lots.csv with 10 estate sale furniture items."
 
-  - task: "Marketplace Page - Heart Icons"
+  - task: "Bulk Image Drag & Drop with Auto-Matching"
     implemented: true
     working: "NA"
-    file: "/app/frontend/src/pages/MarketplacePage.js"
+    file: "/app/frontend/src/pages/CreateMultiItemListing.js"
     stuck_count: 0
     priority: "high"
     needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Added WatchlistButton to all listing cards on MarketplacePage. Heart icon positioned top-left corner with white/dark background circle, shadow, and hover scale effect. Icon size: small. Includes stopPropagation to prevent card click when toggling watchlist."
+        comment: "Integrated react-dropzone for drag & drop. Bulk image upload zone in Step 2 with file type validation (.jpg, .png, .webp), 5MB size limit per image. Auto-match algorithm compares image filenames to lot titles (exact match, substring match, alphanumeric-only comparison). Manual assignment dropdown for unmatched images. Visual feedback: matched images show checkmark + lot number, unmatched show assignment dropdown on hover."
 
-  - task: "Listing Detail Page - Heart Icon"
+  - task: "Lot Validation Rules"
     implemented: true
     working: "NA"
-    file: "/app/frontend/src/pages/ListingDetailPage.js"
+    file: "/app/frontend/src/pages/CreateMultiItemListing.js"
     stuck_count: 0
     priority: "high"
     needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Added WatchlistButton to ListingDetailPage header, positioned next to title with 'Save/Saved' label. Icon size: large with showLabel={true}. Provides prominent watchlist access on detail view."
+        comment: "Implemented real-time validation for all lots: Starting Bid (1-10,000 CAD with inline error), Description (20-500 chars with character counter, red/green color feedback), Quantity (positive integer, no decimals), Image URLs (implicit validation in dropzone). Validation runs on field change. Step 2 navigation blocked until all lots pass validation. Error messages display inline below each field."
 
-  - task: "Buyer Dashboard - Watching Tab Integration"
+  - task: "500-Lot Soft Limit with Warnings"
     implemented: true
     working: "NA"
-    file: "/app/frontend/src/pages/BuyerDashboard.js"
+    file: "/app/frontend/src/pages/CreateMultiItemListing.js"
     stuck_count: 0
     priority: "medium"
     needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Updated BuyerDashboard to fetch and display watchlist data in 'Watching' tab (already enhanced in Session 1). Backend dashboard endpoint now returns watchlist array. Tab displays saved items with same data as /watchlist page."
+        comment: "Lot counter displays '{count}/500' in Step 2 header. Warning badge appears at 450+ lots (amber color, 'Approaching 500-lot limit'). Error badge at 500 lots (red color, '500-lot limit reached'). 'Add Another Lot' button disabled at 500 lots. CSV uploads truncate to 500 lots with toast error message. Navigation validates lot count before proceeding."
 
-  - task: "Mobile Bottom Nav - Watchlist Route Update"
+  - task: "Review & Submit Page (Step 3)"
     implemented: true
     working: "NA"
-    file: "/app/frontend/src/components/MobileBottomNav.js"
+    file: "/app/frontend/src/pages/CreateMultiItemListing.js"
     stuck_count: 0
-    priority: "medium"
+    priority: "high"
     needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Updated MobileBottomNav watchlist button path from '/buyer/dashboard' to '/watchlist' to navigate to dedicated watchlist page. Button remains auth-protected (hidden for non-logged-in users)."
+        comment: "Step 3 displays comprehensive review: Summary card with 4 metrics (Total Lots, Total Items, Total Starting Value, Total Images) in gradient blue card. Auction details card with edit button to jump back to Step 1. Lots preview table (scrollable) with columns: #, Title, Qty, Starting Bid, Condition, Images, edit button to jump to Step 2. Final 'Create Listing' button submits to existing backend endpoint."
 
 metadata:
   created_by: "main_agent"
