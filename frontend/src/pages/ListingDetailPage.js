@@ -164,6 +164,14 @@ const ListingDetailPage = () => {
                 <div className="flex items-center gap-3">
                   {/* Watchlist Button */}
                   <WatchlistButton listingId={listing.id} size="large" showLabel={true} />
+                  
+                  {/* Social Share Button */}
+                  <SocialShare 
+                    title={listing.title}
+                    url={window.location.href}
+                    description={`Check out this auction on BidVex: ${listing.title} - Current bid: $${listing.current_price}`}
+                  />
+                  
                   {listing.is_promoted && (
                     <Badge className="gradient-bg text-white border-0">Featured</Badge>
                   )}
