@@ -549,17 +549,34 @@ const ListingCard = ({ listing, viewMode = 'grid' }) => {
         </div>
       </CardContent>
       
-      <CardFooter className="p-4 pt-0 flex justify-between items-center border-t">
-        <div>
+      <CardFooter className="p-4 pt-0 flex justify-between items-center border-t gap-2">
+        <div className="flex-1">
           <p className="text-xs text-muted-foreground">{t('marketplace.currentBid')}</p>
           <p className="text-2xl font-bold gradient-text">${listing.current_price.toFixed(2)}</p>
           {listing.buy_now_price && (
             <p className="text-xs text-green-600">Buy Now: ${listing.buy_now_price.toFixed(2)}</p>
           )}
         </div>
-        <Button size="sm" className="gradient-button text-white border-0">
-          {t('marketplace.viewDetails', 'View')}
-        </Button>
+        <div className="flex flex-col gap-2">
+          <div onClick={(e) => e.stopPropagation()}>
+            <SocialShare 
+              title={listing.title}
+              url={`${window.location.origin}/listing/${listing.id}`}
+              description={`Check out this auction on BidVex: ${listing.title}`}
+              className="w-full"
+            />
+          </div>
+          <Button 
+            size="sm" 
+            className="gradient-button text-white border-0 w-full"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/listing/${listing.id}`);
+            }}
+          >
+            {t('marketplace.viewDetails', 'View')}
+          </Button>
+        </div>
       </CardFooter>
     </Card>
   );
