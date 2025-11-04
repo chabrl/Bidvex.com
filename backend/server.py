@@ -2256,16 +2256,6 @@ async def get_recently_sold(limit: int = 12):
         logger.error(f"Error fetching recently sold: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch recently sold")
 
-
-                    "viewed_at": record["viewed_at"]
-                })
-        
-        return result
-        
-    except Exception as e:
-        logger.error(f"Error fetching recently viewed: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to fetch recently viewed")
-
 @api_router.get("/stats/top-sellers")
 async def get_top_sellers(limit: int = 10):
     pipeline = [
