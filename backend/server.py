@@ -2166,7 +2166,14 @@ async def get_recently_viewed(limit: int = 10, current_user: User = Depends(get_
             if listing:
                 result.append({
                     **listing,
-
+                    "viewed_at": record["viewed_at"]
+                })
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error fetching recently viewed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch recently viewed")
 
 # Carousel Data Endpoints
 @api_router.get("/carousel/ending-soon")
