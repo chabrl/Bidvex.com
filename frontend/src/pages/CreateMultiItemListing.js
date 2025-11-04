@@ -1,0 +1,909 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import axios from 'axios';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Textarea } from '../components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { toast } from 'sonner';
+import { 
+  Plus, Trash2, Upload, Loader2, ChevronLeft, ChevronRight, 
+  FileText, Image as ImageIcon, CheckCircle, AlertCircle, Edit2 
+} from 'lucide-react';
+import Papa from 'papaparse';
+import { useDropzone } from 'react-dropzone';
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+const CreateMultiItemListing = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
+  
+  // Step 1: Basic Info
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    category: '',
+    location: '',
+    city: '',
+    region: '',
+    auction_end_date: '',
+  });
+
+  // Step 2: Lots
+  const [lots, setLots] = useState([{
+    lot_number: 1,
+    title: '',
+    description: '',
+    quantity: 1,
+    starting_price: '',
+    current_price: '',
+    condition: 'good',
+    images: []
+  }]);
+
+  const [uploadMethod, setUploadMethod] = useState('manual'); // 'manual', 'csv', 'images'
+  const [csvData, setCsvData] = useState(null);
+  const [bulkImages, setBulkImages] = useState([]);
+  const [validationErrors, setValidationErrors] = useState({});
+
+  useEffect(() => {
+    if (user && user.account_type !== 'business') {
+      toast.error('Only business accounts can create multi-item listings');
+      navigate('/dashboard');
+    }
+    fetchCategories();
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    setFormData(prev => ({ ...prev, auction_end_date: tomorrow.toISOString().slice(0, 16) }));
+  }, [user]);
+
+  const fetchCategories = async () => {
+    try {
+      const response = await axios.get(`${API}/categories`);
+      setCategories(response.data);
+    } catch (error) {
+      console.error('Failed to fetch categories:', error);
+    }
+  };
+
+  // Step 1 Handlers
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  // Step 2 - Manual Lot Entry
+  const handleLotChange = (index, field, value) => {
+    const updatedLots = [...lots];
+    updatedLots[index][field] = value;
+    setLots(updatedLots);
+    validateLot(index, updatedLots[index]);
+  };
+
+  const addLot = () => {
+    if (lots.length >= 500) {
+      toast.error('Maximum 500 lots allowed per listing');
+      return;
+    }
+    setLots([...lots, {
+      lot_number: lots.length + 1,
+      title: '',
+      description: '',
+      quantity: 1,
+      starting_price: '',
+      current_price: '',
+      condition: 'good',
+      images: []
+    }]);
+  };
+
+  const removeLot = (index) => {
+    const updatedLots = lots.filter((_, i) => i !== index);
+    updatedLots.forEach((lot, i) => { lot.lot_number = i + 1; });
+    setLots(updatedLots);
+  };
+
+  const handleLotImageUpload = (index, e) => {
+    const files = Array.from(e.target.files);
+    files.forEach(file => {
+      if (file.size > 5000000) {
+        toast.error('Image size should be less than 5MB');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const updatedLots = [...lots];
+        updatedLots[index].images = [...updatedLots[index].images, reader.result];
+        setLots(updatedLots);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeLotImage = (lotIndex, imageIndex) => {
+    const updatedLots = [...lots];
+    updatedLots[lotIndex].images = updatedLots[lotIndex].images.filter((_, i) => i !== imageIndex);
+    setLots(updatedLots);
+  };
+
+  // CSV Upload Handler
+  const handleCSVUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        const parsedLots = results.data.map((row, index) => {
+          const imageUrls = row.image_urls ? row.image_urls.split(',').map(url => url.trim()) : [];
+          return {
+            lot_number: index + 1,
+            title: row.title || '',
+            description: row.description || '',
+            quantity: parseInt(row.quantity) || 1,
+            starting_price: parseFloat(row.starting_bid) || '',
+            current_price: parseFloat(row.starting_bid) || '',
+            condition: 'good',
+            images: imageUrls
+          };
+        });
+
+        if (parsedLots.length > 500) {
+          toast.error(`CSV contains ${parsedLots.length} lots. Maximum 500 allowed.`);
+          setLots(parsedLots.slice(0, 500));
+        } else {
+          setLots(parsedLots);
+          toast.success(`Loaded ${parsedLots.length} lots from CSV`);
+        }
+        setCsvData(results.data);
+      },
+      error: (error) => {
+        toast.error('Failed to parse CSV: ' + error.message);
+      }
+    });
+  };
+
+  // Bulk Image Upload with Drag and Drop
+  const onDrop = (acceptedFiles) => {
+    const imageFiles = acceptedFiles.filter(file => 
+      file.type.startsWith('image/') && 
+      ['.jpg', '.jpeg', '.png', '.webp'].some(ext => file.name.toLowerCase().endsWith(ext))
+    );
+
+    if (imageFiles.length !== acceptedFiles.length) {
+      toast.error('Some files were rejected. Only .jpg, .png, .webp allowed');
+    }
+
+    imageFiles.forEach(file => {
+      if (file.size > 5000000) {
+        toast.error(`${file.name} is too large. Max 5MB per image.`);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        setBulkImages(prev => [...prev, { 
+          name: file.name, 
+          data: reader.result,
+          matched: false,
+          lotIndex: null
+        }]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/png': ['.png'],
+      'image/webp': ['.webp']
+    },
+    multiple: true
+  });
+
+  // Auto-match images to lots
+  const autoMatchImages = () => {
+    const updatedLots = [...lots];
+    let matchCount = 0;
+
+    bulkImages.forEach((img, imgIndex) => {
+      const fileName = img.name.toLowerCase().replace(/\.(jpg|jpeg|png|webp)$/i, '');
+      
+      // Try to find matching lot
+      const lotIndex = updatedLots.findIndex(lot => {
+        const lotTitle = lot.title.toLowerCase().trim();
+        // Match by exact title or by keyword extraction
+        return lotTitle === fileName || 
+               fileName.includes(lotTitle) || 
+               lotTitle.includes(fileName) ||
+               // Match patterns like "item1" to "Item 1"
+               fileName.replace(/[^a-z0-9]/g, '') === lotTitle.replace(/[^a-z0-9]/g, '');
+      });
+
+      if (lotIndex !== -1 && !updatedLots[lotIndex].images.includes(img.data)) {
+        updatedLots[lotIndex].images = [...updatedLots[lotIndex].images, img.data];
+        bulkImages[imgIndex].matched = true;
+        bulkImages[imgIndex].lotIndex = lotIndex;
+        matchCount++;
+      }
+    });
+
+    setLots(updatedLots);
+    setBulkImages([...bulkImages]);
+    toast.success(`Auto-matched ${matchCount} images to lots`);
+  };
+
+  // Manual image assignment
+  const assignImageToLot = (imageIndex, lotIndex) => {
+    const updatedLots = [...lots];
+    const image = bulkImages[imageIndex];
+    
+    if (!updatedLots[lotIndex].images.includes(image.data)) {
+      updatedLots[lotIndex].images = [...updatedLots[lotIndex].images, image.data];
+      bulkImages[imageIndex].matched = true;
+      bulkImages[imageIndex].lotIndex = lotIndex;
+      setLots(updatedLots);
+      setBulkImages([...bulkImages]);
+      toast.success('Image assigned');
+    }
+  };
+
+  // Validation
+  const validateLot = (index, lot) => {
+    const errors = {};
+    
+    if (lot.starting_price && (parseFloat(lot.starting_price) < 1 || parseFloat(lot.starting_price) > 10000)) {
+      errors.starting_price = 'Starting bid must be between 1 and 10,000 CAD';
+    }
+    
+    if (lot.description && (lot.description.length < 20 || lot.description.length > 500)) {
+      errors.description = 'Description must be 20-500 characters';
+    }
+    
+    if (lot.quantity && (!Number.isInteger(parseFloat(lot.quantity)) || parseFloat(lot.quantity) < 1)) {
+      errors.quantity = 'Quantity must be a positive integer';
+    }
+
+    setValidationErrors(prev => ({ ...prev, [index]: errors }));
+    return Object.keys(errors).length === 0;
+  };
+
+  const validateStep = (step) => {
+    if (step === 1) {
+      if (!formData.title || !formData.description || !formData.category || 
+          !formData.city || !formData.region || !formData.location || !formData.auction_end_date) {
+        toast.error('Please fill all required fields');
+        return false;
+      }
+      return true;
+    }
+    
+    if (step === 2) {
+      if (lots.length === 0) {
+        toast.error('Please add at least one lot');
+        return false;
+      }
+
+      // Validate all lots
+      let allValid = true;
+      lots.forEach((lot, index) => {
+        if (!validateLot(index, lot)) {
+          allValid = false;
+        }
+      });
+
+      if (!allValid) {
+        toast.error('Please fix validation errors in lots');
+        return false;
+      }
+
+      return true;
+    }
+
+    return true;
+  };
+
+  // Navigation
+  const goToNextStep = () => {
+    if (validateStep(currentStep)) {
+      if (currentStep === 2 && lots.length > 500) {
+        toast.error('Maximum 500 lots allowed');
+        return;
+      }
+      setCurrentStep(prev => Math.min(prev + 1, 3));
+    }
+  };
+
+  const goToPrevStep = () => {
+    setCurrentStep(prev => Math.max(prev - 1, 1));
+  };
+
+  // Submit
+  const handleSubmit = async () => {
+    if (!validateStep(2)) return;
+
+    setLoading(true);
+    const lotsData = lots.map(lot => ({
+      ...lot,
+      starting_price: parseFloat(lot.starting_price),
+      current_price: parseFloat(lot.starting_price),
+      quantity: parseInt(lot.quantity)
+    }));
+
+    try {
+      const payload = {
+        ...formData,
+        auction_end_date: new Date(formData.auction_end_date).toISOString(),
+        lots: lotsData
+      };
+      const response = await axios.post(`${API}/multi-item-listings`, payload);
+      toast.success('Multi-item listing created successfully!');
+      navigate(`/multi-item-listing/${response.data.id}`);
+    } catch (error) {
+      console.error('Failed:', error);
+      toast.error(error.response?.data?.detail || 'Failed to create listing');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Render Step Indicator
+  const StepIndicator = () => (
+    <div className="flex items-center justify-center mb-8">
+      {[1, 2, 3].map(step => (
+        <React.Fragment key={step}>
+          <div className={`flex items-center justify-center w-10 h-10 rounded-full font-semibold transition-all ${
+            step === currentStep 
+              ? 'bg-gradient-to-r from-[#009BFF] to-[#0056A6] text-white scale-110' 
+              : step < currentStep 
+                ? 'bg-green-500 text-white' 
+                : 'bg-gray-200 dark:bg-gray-700 text-gray-500'
+          }`}>
+            {step < currentStep ? <CheckCircle className="h-5 w-5" /> : step}
+          </div>
+          {step < 3 && (
+            <div className={`w-20 h-1 mx-2 ${
+              step < currentStep ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-700'
+            }`} />
+          )}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+
+  // Render steps
+  const renderStep1 = () => (
+    <div className="space-y-4">
+      <h3 className="text-xl font-semibold mb-4">Basic Auction Details</h3>
+      <div className="space-y-2">
+        <Label htmlFor="title">Listing Title *</Label>
+        <Input 
+          id="title" 
+          name="title" 
+          value={formData.title} 
+          onChange={handleChange} 
+          placeholder="e.g., Estate Sale - Furniture Collection"
+          required 
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="description">Description *</Label>
+        <Textarea 
+          id="description" 
+          name="description" 
+          value={formData.description} 
+          onChange={handleChange} 
+          rows={4} 
+          placeholder="Describe the overall auction..."
+          required 
+        />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="category">Category *</Label>
+          <select 
+            id="category" 
+            name="category" 
+            value={formData.category} 
+            onChange={handleChange} 
+            required 
+            className="w-full px-3 py-2 border border-input rounded-md bg-background"
+          >
+            <option value="">Select Category</option>
+            {categories.map(cat => (
+              <option key={cat.id} value={cat.name_en}>{cat.name_en}</option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="auction_end_date">Auction End Date *</Label>
+          <Input 
+            id="auction_end_date" 
+            name="auction_end_date" 
+            type="datetime-local" 
+            value={formData.auction_end_date} 
+            onChange={handleChange} 
+            required 
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="city">City *</Label>
+          <Input 
+            id="city" 
+            name="city" 
+            value={formData.city} 
+            onChange={handleChange} 
+            placeholder="e.g., Toronto"
+            required 
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="region">Region *</Label>
+          <Input 
+            id="region" 
+            name="region" 
+            value={formData.region} 
+            onChange={handleChange} 
+            placeholder="e.g., Ontario"
+            required 
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="location">Location Details *</Label>
+          <Input 
+            id="location" 
+            name="location" 
+            value={formData.location} 
+            onChange={handleChange} 
+            placeholder="e.g., 123 Main St"
+            required 
+          />
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderStep2 = () => (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h3 className="text-xl font-semibold">Add Lots ({lots.length}/500)</h3>
+        {lots.length >= 450 && lots.length < 500 && (
+          <div className="flex items-center text-amber-500">
+            <AlertCircle className="h-4 w-4 mr-1" />
+            <span className="text-sm">Approaching 500-lot limit</span>
+          </div>
+        )}
+        {lots.length >= 500 && (
+          <div className="flex items-center text-red-500">
+            <AlertCircle className="h-4 w-4 mr-1" />
+            <span className="text-sm font-semibold">500-lot limit reached</span>
+          </div>
+        )}
+      </div>
+
+      {/* Upload Method Selection */}
+      <Card className="border-2 border-dashed">
+        <CardContent className="pt-6">
+          <div className="flex flex-wrap gap-4 mb-4">
+            <Button
+              type="button"
+              variant={uploadMethod === 'manual' ? 'default' : 'outline'}
+              onClick={() => setUploadMethod('manual')}
+              className={uploadMethod === 'manual' ? 'gradient-button text-white' : ''}
+            >
+              <Edit2 className="mr-2 h-4 w-4" />
+              Manual Entry
+            </Button>
+            <Button
+              type="button"
+              variant={uploadMethod === 'csv' ? 'default' : 'outline'}
+              onClick={() => setUploadMethod('csv')}
+              className={uploadMethod === 'csv' ? 'gradient-button text-white' : ''}
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              CSV Upload
+            </Button>
+            <Button
+              type="button"
+              variant={uploadMethod === 'images' ? 'default' : 'outline'}
+              onClick={() => setUploadMethod('images')}
+              className={uploadMethod === 'images' ? 'gradient-button text-white' : ''}
+            >
+              <ImageIcon className="mr-2 h-4 w-4" />
+              Bulk Images
+            </Button>
+          </div>
+
+          {uploadMethod === 'csv' && (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Upload a CSV file with columns: <code>title, description, quantity, starting_bid, image_urls</code>
+              </p>
+              <input
+                type="file"
+                accept=".csv"
+                onChange={handleCSVUpload}
+                className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              />
+            </div>
+          )}
+
+          {uploadMethod === 'images' && (
+            <div className="space-y-4">
+              <div {...getRootProps()} className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                isDragActive ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/10' : 'border-gray-300'
+              }`}>
+                <input {...getInputProps()} />
+                <Upload className="mx-auto h-12 w-12 text-gray-400 mb-2" />
+                <p className="text-sm text-muted-foreground">
+                  {isDragActive ? 'Drop images here...' : 'Drag & drop images, or click to select'}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Supports .jpg, .png, .webp (max 5MB each)
+                </p>
+              </div>
+
+              {bulkImages.length > 0 && (
+                <>
+                  <Button type="button" onClick={autoMatchImages} variant="outline" className="w-full">
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Auto-Match Images to Lots
+                  </Button>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 max-h-64 overflow-y-auto">
+                    {bulkImages.map((img, idx) => (
+                      <div key={idx} className="relative group">
+                        <img src={img.data} alt={img.name} className="w-full h-24 object-cover rounded" />
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded p-1 flex flex-col justify-between">
+                          <p className="text-white text-xs truncate">{img.name}</p>
+                          {img.matched ? (
+                            <span className="text-green-400 text-xs">✓ Lot {img.lotIndex + 1}</span>
+                          ) : (
+                            <select
+                              onChange={(e) => assignImageToLot(idx, parseInt(e.target.value))}
+                              className="text-xs bg-white/90 rounded px-1"
+                            >
+                              <option value="">Assign...</option>
+                              {lots.map((lot, lotIdx) => (
+                                <option key={lotIdx} value={lotIdx}>Lot {lot.lot_number}</option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Lots List */}
+      <div className="space-y-4">
+        <Button 
+          type="button" 
+          onClick={addLot} 
+          variant="outline" 
+          className="w-full"
+          disabled={lots.length >= 500}
+        >
+          <Plus className="mr-2 h-4 w-4" /> Add Another Lot
+        </Button>
+
+        <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+          {lots.map((lot, index) => (
+            <Card key={index} className="border-2">
+              <CardContent className="pt-6 space-y-4">
+                <div className="flex justify-between items-start">
+                  <h4 className="font-semibold text-lg">Lot {lot.lot_number}</h4>
+                  {lots.length > 1 && (
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => removeLot(index)}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Title *</Label>
+                    <Input 
+                      value={lot.title} 
+                      onChange={(e) => handleLotChange(index, 'title', e.target.value)} 
+                      required 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Quantity *</Label>
+                    <Input 
+                      type="number" 
+                      min="1" 
+                      step="1"
+                      value={lot.quantity} 
+                      onChange={(e) => handleLotChange(index, 'quantity', e.target.value)} 
+                      required 
+                    />
+                    {validationErrors[index]?.quantity && (
+                      <p className="text-red-500 text-xs">{validationErrors[index].quantity}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Description * (20-500 characters)</Label>
+                  <Textarea 
+                    value={lot.description} 
+                    onChange={(e) => handleLotChange(index, 'description', e.target.value)} 
+                    rows={2} 
+                    required 
+                  />
+                  <div className="flex justify-between text-xs">
+                    <span className={
+                      lot.description.length < 20 || lot.description.length > 500 
+                        ? 'text-red-500' 
+                        : 'text-green-500'
+                    }>
+                      {lot.description.length} characters
+                    </span>
+                    {validationErrors[index]?.description && (
+                      <p className="text-red-500">{validationErrors[index].description}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Starting Bid (CAD) * (1-10,000)</Label>
+                    <Input 
+                      type="number" 
+                      step="0.01" 
+                      min="1"
+                      max="10000"
+                      value={lot.starting_price} 
+                      onChange={(e) => handleLotChange(index, 'starting_price', e.target.value)} 
+                      required 
+                    />
+                    {validationErrors[index]?.starting_price && (
+                      <p className="text-red-500 text-xs">{validationErrors[index].starting_price}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Condition</Label>
+                    <select 
+                      value={lot.condition} 
+                      onChange={(e) => handleLotChange(index, 'condition', e.target.value)} 
+                      className="w-full px-3 py-2 border border-input rounded-md bg-background"
+                    >
+                      <option value="new">New</option>
+                      <option value="like_new">Like New</option>
+                      <option value="good">Good</option>
+                      <option value="fair">Fair</option>
+                      <option value="poor">Poor</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Images</Label>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    multiple 
+                    onChange={(e) => handleLotImageUpload(index, e)} 
+                    className="hidden" 
+                    id={`lot-image-${index}`} 
+                  />
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => document.getElementById(`lot-image-${index}`).click()} 
+                    className="w-full"
+                  >
+                    <Upload className="mr-2 h-4 w-4" /> Upload Images
+                  </Button>
+                  {lot.images.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2 mt-2">
+                      {lot.images.map((img, imgIdx) => (
+                        <div key={imgIdx} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
+                          <img src={img} alt="" className="w-full h-full object-cover" />
+                          <button 
+                            type="button" 
+                            onClick={() => removeLotImage(index, imgIdx)} 
+                            className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 text-xs hover:bg-red-600"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderStep3 = () => (
+    <div className="space-y-6">
+      <h3 className="text-xl font-semibold">Review & Submit</h3>
+      
+      {/* Summary */}
+      <Card className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200">
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+            <div>
+              <p className="text-2xl font-bold text-blue-600">{lots.length}</p>
+              <p className="text-sm text-muted-foreground">Total Lots</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-blue-600">
+                {lots.reduce((sum, lot) => sum + parseInt(lot.quantity || 0), 0)}
+              </p>
+              <p className="text-sm text-muted-foreground">Total Items</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-blue-600">
+                ${lots.reduce((sum, lot) => sum + parseFloat(lot.starting_price || 0), 0).toFixed(2)}
+              </p>
+              <p className="text-sm text-muted-foreground">Total Starting Value</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-blue-600">
+                {lots.reduce((sum, lot) => sum + (lot.images?.length || 0), 0)}
+              </p>
+              <p className="text-sm text-muted-foreground">Total Images</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Auction Details Review */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            Auction Details
+            <Button type="button" variant="ghost" size="sm" onClick={() => setCurrentStep(1)}>
+              <Edit2 className="h-4 w-4 mr-1" /> Edit
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <div><strong>Title:</strong> {formData.title}</div>
+          <div><strong>Category:</strong> {formData.category}</div>
+          <div><strong>Location:</strong> {formData.city}, {formData.region}</div>
+          <div><strong>End Date:</strong> {new Date(formData.auction_end_date).toLocaleString()}</div>
+        </CardContent>
+      </Card>
+
+      {/* Lots Preview Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            Lots Preview
+            <Button type="button" variant="ghost" size="sm" onClick={() => setCurrentStep(2)}>
+              <Edit2 className="h-4 w-4 mr-1" /> Edit
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto max-h-96 overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted sticky top-0">
+                <tr>
+                  <th className="p-2 text-left">#</th>
+                  <th className="p-2 text-left">Title</th>
+                  <th className="p-2 text-left">Qty</th>
+                  <th className="p-2 text-left">Starting Bid</th>
+                  <th className="p-2 text-left">Condition</th>
+                  <th className="p-2 text-left">Images</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lots.map((lot, index) => (
+                  <tr key={index} className="border-t">
+                    <td className="p-2">{lot.lot_number}</td>
+                    <td className="p-2 font-medium">{lot.title}</td>
+                    <td className="p-2">{lot.quantity}</td>
+                    <td className="p-2">${parseFloat(lot.starting_price).toFixed(2)}</td>
+                    <td className="p-2 capitalize">{lot.condition.replace('_', ' ')}</td>
+                    <td className="p-2">{lot.images?.length || 0}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen py-8 px-4">
+      <div className="max-w-6xl mx-auto">
+        <Card className="glassmorphism">
+          <CardHeader>
+            <CardTitle className="text-3xl font-bold text-center">
+              Multi-Lot Listing Wizard
+            </CardTitle>
+            <p className="text-center text-muted-foreground">
+              Create a grouped auction with multiple lots
+            </p>
+          </CardHeader>
+          <CardContent>
+            <StepIndicator />
+
+            <div className="mb-8">
+              {currentStep === 1 && renderStep1()}
+              {currentStep === 2 && renderStep2()}
+              {currentStep === 3 && renderStep3()}
+            </div>
+
+            {/* Navigation Buttons */}
+            <div className="flex justify-between pt-6 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={goToPrevStep}
+                disabled={currentStep === 1 || loading}
+              >
+                <ChevronLeft className="mr-2 h-4 w-4" />
+                Back
+              </Button>
+
+              {currentStep < 3 ? (
+                <Button
+                  type="button"
+                  onClick={goToNextStep}
+                  className="gradient-button text-white border-0"
+                >
+                  Next
+                  <ChevronRight className="ml-2 h-4 w-4" />
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  onClick={handleSubmit}
+                  className="gradient-button text-white border-0"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      Create Listing
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+export default CreateMultiItemListing;
