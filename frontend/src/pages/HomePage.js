@@ -9,6 +9,7 @@ import { Badge } from '../components/ui/badge';
 import { ArrowRight, Gavel, TrendingUp, Shield, Users, Award, Flame } from 'lucide-react';
 import Countdown from 'react-countdown';
 import HeroBanner from '../components/HeroBanner';
+import HomepageBanner from '../components/HomepageBanner';
 import AuctionCarousel from '../components/AuctionCarousel';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -21,6 +22,8 @@ const HomePage = () => {
   const [hotItems, setHotItems] = useState([]);
   const [endingSoon, setEndingSoon] = useState([]);
   const [featured, setFeatured] = useState([]);
+  const [newListings, setNewListings] = useState([]);
+  const [recentlySold, setRecentlySold] = useState([]);
   const [recentlyViewed, setRecentlyViewed] = useState([]);
 
   useEffect(() => {
@@ -28,6 +31,8 @@ const HomePage = () => {
     fetchHotItems();
     fetchEndingSoon();
     fetchFeatured();
+    fetchNewListings();
+    fetchRecentlySold();
     if (user) {
       fetchRecentlyViewed();
     }
@@ -66,6 +71,24 @@ const HomePage = () => {
       setFeatured(response.data);
     } catch (error) {
       console.error('Failed to fetch featured:', error);
+    }
+  };
+
+  const fetchNewListings = async () => {
+    try {
+      const response = await axios.get(`${API}/carousel/new-listings?limit=12`);
+      setNewListings(response.data);
+    } catch (error) {
+      console.error('Failed to fetch new listings:', error);
+    }
+  };
+
+  const fetchRecentlySold = async () => {
+    try {
+      const response = await axios.get(`${API}/carousel/recently-sold?limit=12`);
+      setRecentlySold(response.data);
+    } catch (error) {
+      console.error('Failed to fetch recently sold:', error);
     }
   };
 
