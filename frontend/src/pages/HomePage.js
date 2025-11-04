@@ -106,6 +106,13 @@ const HomePage = () => {
       {/* Enhanced Hero Banner */}
       <HeroBanner />
 
+      {/* Homepage Banner Carousel */}
+      <div className="px-4">
+        <div className="max-w-7xl mx-auto">
+          <HomepageBanner />
+        </div>
+      </div>
+
       {/* Carousel Sections */}
       <div className="space-y-16 py-12">
         {/* Ending Soon Carousel */}
@@ -134,6 +141,32 @@ const HomePage = () => {
           </section>
         )}
 
+        {/* New Listings Carousel */}
+        {newListings.length > 0 && (
+          <section className="px-4">
+            <div className="max-w-7xl mx-auto">
+              <AuctionCarousel 
+                title="🆕 New Listings" 
+                items={newListings}
+                type="auction"
+              />
+            </div>
+          </section>
+        )}
+
+        {/* Recently Sold Carousel */}
+        {recentlySold.length > 0 && (
+          <section className="px-4 bg-gradient-to-br from-accent/5 to-primary/5 py-12">
+            <div className="max-w-7xl mx-auto">
+              <AuctionCarousel 
+                title="💰 Recently Sold" 
+                items={recentlySold}
+                type="auction"
+              />
+            </div>
+          </section>
+        )}
+
         {/* Recently Viewed Carousel - Only for logged-in users */}
         {user && recentlyViewed.length > 0 && (
           <section className="px-4">
@@ -152,10 +185,11 @@ const HomePage = () => {
           <section className="px-4 bg-gradient-to-br from-accent/5 to-primary/5 py-12">
             <div className="max-w-7xl mx-auto">
               <AuctionCarousel 
-                title="🏆 Top Sellers" 
+                title="🏆 Featured Sellers" 
                 items={topSellers.map(seller => ({
                   id: seller._id,
                   seller_name: seller.user?.name || 'Seller',
+                  seller_avatar: seller.user?.avatar || null,
                   count: seller.items_sold,
                   total_sales: seller.total_sales
                 }))}
