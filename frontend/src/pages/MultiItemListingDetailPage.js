@@ -24,6 +24,13 @@ const MultiItemListingDetailPage = () => {
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [bidAmounts, setBidAmounts] = useState({});
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem('lotViewMode') || 'grid');
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxImages, setLightboxImages] = useState([]);
+  const [photoIndex, setPhotoIndex] = useState(0);
+  const [showLotIndex, setShowLotIndex] = useState(false);
+  const [activeLotId, setActiveLotId] = useState(null);
+  const lotRefs = useRef({});
 
   useEffect(() => {
     fetchListing();
