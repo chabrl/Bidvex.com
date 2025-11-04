@@ -2211,6 +2211,45 @@ async def get_featured_listings(limit: int = 12):
         logger.error(f"Error fetching featured listings: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch featured listings")
 
+
+@api_router.get("/carousel/new-listings")
+async def get_new_listings(limit: int = 12):
+    """Get newest listings (created in last 7 days)"""
+    try:
+        seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
+        
+        listings = await db.listings.find(
+            {
+                "status": "active",
+                "created_at": {"$gte": seven_days_ago.isoformat()}
+            },
+            {"_id": 0}
+        ).sort("created_at", -1).limit(limit).to_list(limit)
+        
+        return listings
+        
+    except Exception as e:
+        logger.error(f"Error fetching new listings: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch new listings")
+
+@api_router.get("/carousel/recently-sold")
+async def get_recently_sold(limit: int = 12):
+    """Get recently sold items"""
+    try:
+        listings = await db.listings.find(
+            {
+                "status": "sold"
+            },
+            {"_id": 0}
+        ).sort("sold_at", -1).limit(limit).to_list(limit)
+        
+        return listings
+        
+    except Exception as e:
+        logger.error(f"Error fetching recently sold: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch recently sold")
+
+
                     "viewed_at": record["viewed_at"]
                 })
         
