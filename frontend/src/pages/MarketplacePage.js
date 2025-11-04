@@ -18,19 +18,40 @@ const MarketplacePage = () => {
   const navigate = useNavigate();
   const [listings, setListings] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
-  const [filters, setFilters] = useState({
-    search: '',
-    category: '',
-    city: '',
-    condition: '',
-    min_price: '',
-    max_price: '',
-    sort: '-created_at',
+  const [viewMode, setViewMode] = useState(() => {
+    return localStorage.getItem('bidvex_view_mode') || 'grid';
   });
+  
+  // Enhanced filters with session persistence
+  const [filters, setFilters] = useState(() => {
+    const saved = localStorage.getItem('bidvex_marketplace_filters');
+    return saved ? JSON.parse(saved) : {
+      search: '',
+      category: '',
+      city: '',
+      condition: '',
+      min_price: '',
+      max_price: '',
+      status: '', // New: 'active', 'upcoming', 'ended'
+      seller_rating: '', // New: min rating filter
+      location: '', // New: location filter
+      sort: '-created_at',
+    };
+  });
+  
   const [loading, setLoading] = useState(true);
   const [showLocationSearch, setShowLocationSearch] = useState(false);
   const [locationParams, setLocationParams] = useState(null);
+
+  // Save filters to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('bidvex_marketplace_filters', JSON.stringify(filters));
+  }, [filters]);
+
+  // Save view mode to localStorage
+  useEffect(() => {
+    localStorage.setItem('bidvex_view_mode', viewMode);
+  }, [viewMode]);
 
   useEffect(() => {
     fetchCategories();
