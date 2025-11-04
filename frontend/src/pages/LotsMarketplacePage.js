@@ -6,7 +6,7 @@ import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
-import { Search, Package, Clock, MapPin, Layers } from 'lucide-react';
+import { Search, Package, Clock, MapPin, Layers, Grid as GridIcon, List as ListIcon } from 'lucide-react';
 import Countdown from 'react-countdown';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -22,6 +22,7 @@ const LotsMarketplacePage = () => {
     sort: '-created_at',
   });
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem('lotsViewMode') || 'grid');
 
   useEffect(() => {
     fetchCategories();
