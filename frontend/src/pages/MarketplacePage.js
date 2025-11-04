@@ -169,7 +169,8 @@ const MarketplacePage = () => {
             {showLocationSearch ? (
               <LocationSearchMap onLocationSearch={handleLocationSearch} />
             ) : (
-              <div className="flex flex-col md:flex-row gap-4">
+              <div className="space-y-4">
+                {/* Search Bar */}
                 <div className="flex-1 relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
                   <Input
@@ -180,32 +181,149 @@ const MarketplacePage = () => {
                     data-testid="search-input"
                   />
                 </div>
-            
-            <select
-              value={filters.category}
-              onChange={(e) => handleFilterChange('category', e.target.value)}
-              className="px-4 py-2 border border-input rounded-md bg-background"
-              data-testid="category-filter"
-            >
-              <option value="">{t('marketplace.category')}: All</option>
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.name_en}>
-                  {cat.name_en}
-                </option>
-              ))}
-            </select>
 
-            <select
-              value={filters.sort}
-              onChange={(e) => handleFilterChange('sort', e.target.value)}
-              className="px-4 py-2 border border-input rounded-md bg-background"
-              data-testid="sort-filter"
-            >
-              <option value="-created_at">{t('marketplace.newest')}</option>
-              <option value="auction_end_date">{t('marketplace.ending')}</option>
-              <option value="current_price">{t('marketplace.priceLow')}</option>
-              <option value="-current_price">{t('marketplace.priceHigh')}</option>
-            </select>
+                {/* Filter Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {/* Category Filter */}
+                  <select
+                    value={filters.category}
+                    onChange={(e) => handleFilterChange('category', e.target.value)}
+                    className="px-4 py-2 border border-input rounded-md bg-background text-sm"
+                    data-testid="category-filter"
+                  >
+                    <option value="">Category: All</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.name_en}>
+                        {cat.name_en}
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* Status Filter */}
+                  <select
+                    value={filters.status}
+                    onChange={(e) => handleFilterChange('status', e.target.value)}
+                    className="px-4 py-2 border border-input rounded-md bg-background text-sm"
+                    data-testid="status-filter"
+                  >
+                    <option value="">Status: All</option>
+                    <option value="active">Live</option>
+                    <option value="upcoming">Upcoming</option>
+                    <option value="ended">Ended</option>
+                  </select>
+
+                  {/* Condition Filter */}
+                  <select
+                    value={filters.condition}
+                    onChange={(e) => handleFilterChange('condition', e.target.value)}
+                    className="px-4 py-2 border border-input rounded-md bg-background text-sm"
+                    data-testid="condition-filter"
+                  >
+                    <option value="">Condition: All</option>
+                    <option value="new">New</option>
+                    <option value="like-new">Like New</option>
+                    <option value="good">Good</option>
+                    <option value="fair">Fair</option>
+                    <option value="used">Used</option>
+                  </select>
+
+                  {/* Seller Rating Filter */}
+                  <select
+                    value={filters.seller_rating}
+                    onChange={(e) => handleFilterChange('seller_rating', e.target.value)}
+                    className="px-4 py-2 border border-input rounded-md bg-background text-sm"
+                    data-testid="rating-filter"
+                  >
+                    <option value="">Min Rating: All</option>
+                    <option value="4.5">4.5+ Stars</option>
+                    <option value="4.0">4.0+ Stars</option>
+                    <option value="3.5">3.5+ Stars</option>
+                    <option value="3.0">3.0+ Stars</option>
+                  </select>
+                </div>
+
+                {/* Price Range & Sort Row */}
+                <div className="flex flex-col md:flex-row gap-3">
+                  {/* Price Range */}
+                  <div className="flex gap-2 flex-1">
+                    <Input
+                      type="number"
+                      placeholder="Min Price"
+                      value={filters.min_price}
+                      onChange={(e) => handleFilterChange('min_price', e.target.value)}
+                      className="flex-1 text-sm"
+                      data-testid="min-price-input"
+                    />
+                    <span className="flex items-center text-muted-foreground">-</span>
+                    <Input
+                      type="number"
+                      placeholder="Max Price"
+                      value={filters.max_price}
+                      onChange={(e) => handleFilterChange('max_price', e.target.value)}
+                      className="flex-1 text-sm"
+                      data-testid="max-price-input"
+                    />
+                  </div>
+
+                  {/* Sort Dropdown */}
+                  <select
+                    value={filters.sort}
+                    onChange={(e) => handleFilterChange('sort', e.target.value)}
+                    className="px-4 py-2 border border-input rounded-md bg-background text-sm md:w-64"
+                    data-testid="sort-filter"
+                  >
+                    <option value="-created_at">Recently Added</option>
+                    <option value="auction_end_date">Ending Soon</option>
+                    <option value="-current_price">Highest Bid</option>
+                    <option value="current_price">Lowest Bid</option>
+                    <option value="-views">Most Viewed</option>
+                  </select>
+
+                  {/* Clear Filters Button */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setFilters({
+                        search: '',
+                        category: '',
+                        city: '',
+                        condition: '',
+                        min_price: '',
+                        max_price: '',
+                        status: '',
+                        seller_rating: '',
+                        location: '',
+                        sort: '-created_at',
+                      });
+                      localStorage.removeItem('bidvex_marketplace_filters');
+                    }}
+                    className="whitespace-nowrap"
+                  >
+                    Clear Filters
+                  </Button>
+                </div>
+
+                {/* Active Filters Display */}
+                {Object.entries(filters).some(([key, value]) => value && key !== 'sort') && (
+                  <div className="flex flex-wrap gap-2 items-center pt-2">
+                    <span className="text-sm text-muted-foreground">Active filters:</span>
+                    {Object.entries(filters).map(([key, value]) => {
+                      if (!value || key === 'sort') return null;
+                      return (
+                        <Badge key={key} variant="secondary" className="gap-1">
+                          {key.replace('_', ' ')}: {value}
+                          <button
+                            onClick={() => handleFilterChange(key, '')}
+                            className="ml-1 hover:text-destructive"
+                          >
+                            ×
+                          </button>
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>
