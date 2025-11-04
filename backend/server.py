@@ -496,13 +496,29 @@ async def place_bid(bid_data: BidCreate, current_user: User = Depends(get_curren
     await manager.broadcast(bid_data.listing_id, {"type": "new_bid", "bid": bid_dict, "current_price": bid_data.amount})
     return bid
 
-@api_router.get("/bids/listing/{listing_id}", response_model=List[Bid])
+@api_router.get("/bids/listing/{listing_id}")
 async def get_listing_bids(listing_id: str, limit: int = 20):
+    """Get bids for a listing with bidder information"""
     bids = await db.bids.find({"listing_id": listing_id}, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    
+    # Enrich bids with bidder information
+    enriched_bids = []
     for bid in bids:
+        # Get bidder user info
+        bidder = await db.users.find_one({"id": bid["bidder_id"]}, {"_id": 0, "name": 1, "picture": 1})
+        
+        # Format datetime
         if isinstance(bid.get("created_at"), str):
             bid["created_at"] = datetime.fromisoformat(bid["created_at"])
-    return [Bid(**bid) for bid in bids]
+        
+        enriched_bids.append({
+            **bid,
+            "bidder_name": bidder.get("name") if bidder else "Anonymous",
+            "bidder_avatar": bidder.get("picture") if bidder else None,
+            "created_at": bid["created_at"].isoformat() if isinstance(bid["created_at"], datetime) else bid["created_at"]
+        })
+    
+    return enriched_bids
 
 @api_router.get("/categories", response_model=List[Category])
 async def get_categories():
