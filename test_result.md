@@ -210,12 +210,12 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Watchlist API Endpoints"
-    - "WatchlistButton Component"
-    - "WatchlistPage - Dedicated Route"
-    - "Marketplace Page - Heart Icons"
-    - "Listing Detail Page - Heart Icon"
-    - "Buyer Dashboard - Watching Tab Integration"
+    - "Multi-Lot Wizard - Step-by-Step UI"
+    - "CSV Bulk Upload Feature"
+    - "Bulk Image Drag & Drop with Auto-Matching"
+    - "Lot Validation Rules"
+    - "500-Lot Soft Limit with Warnings"
+    - "Review & Submit Page (Step 3)"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
