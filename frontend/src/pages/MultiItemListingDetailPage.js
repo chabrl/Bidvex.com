@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
@@ -8,9 +8,12 @@ import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';
 import { 
   Package, Clock, MapPin, User, Calendar, 
-  ArrowLeft, Gavel, AlertCircle, TrendingUp 
+  ArrowLeft, Gavel, AlertCircle, TrendingUp,
+  Grid, List, ZoomIn, Menu, X, Flame
 } from 'lucide-react';
 import Countdown from 'react-countdown';
+import Lightbox from 'react-image-lightbox';
+import 'react-image-lightbox/style.css';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
