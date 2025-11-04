@@ -103,13 +103,18 @@
 #====================================================================================================
 
 user_problem_statement: |
-  Implement full watchlist functionality for Bazario auction platform:
-  1. Heart icon toggle on listing cards (Marketplace, HomePage) and Listing Detail Page
-  2. Backend API endpoints (add, remove, get watchlist, check status)
-  3. Watchlist page at /watchlist route (protected, displays saved items)
-  4. Buyer Dashboard "Watching" tab integration (sync with watchlist data)
-  5. Visual feedback: toast notifications + heart icon animation
-  6. Authentication required: redirect to /auth if not logged in
+  Phase 3: Enhance Multi-Lot Listing Wizard for BidVex platform:
+  1. Transform /create-multi-item-listing page into step-by-step wizard (3 steps: Basic Info → Add Lots → Review & Submit)
+  2. CSV bulk upload support with columns: title, description, quantity, starting_bid, image_urls
+  3. Bulk image drag-and-drop with automatic filename matching to lot titles
+  4. 500-lot soft limit with warnings
+  5. Validation rules:
+     - Starting Bid: 1-10,000 CAD
+     - Description: 20-500 characters
+     - Quantity: positive integer only
+     - Image URLs: .jpg, .png, .webp only
+  6. Manual image assignment in preview table for unmatched images
+  7. Preview & review page with summary statistics before submission
 
 backend:
   - task: "Watchlist API Endpoints"
