@@ -440,17 +440,32 @@ const ListingCard = ({ listing, viewMode = 'grid' }) => {
             <Badge variant="outline" className="text-sm">{listing.bid_count} bids</Badge>
           </div>
 
-          <div className="flex items-center justify-between mt-auto pt-3 border-t">
-            <div>
+          <div className="flex items-center justify-between mt-auto pt-3 border-t gap-3">
+            <div className="flex-1">
               <p className="text-xs text-muted-foreground">{t('marketplace.currentBid')}</p>
               <p className="text-3xl font-bold gradient-text">${listing.current_price.toFixed(2)}</p>
               {listing.buy_now_price && (
                 <p className="text-sm text-green-600 font-semibold">Buy Now: ${listing.buy_now_price.toFixed(2)}</p>
               )}
             </div>
-            <Button className="gradient-button text-white border-0 px-8">
-              {t('marketplace.viewDetails', 'View Details')}
-            </Button>
+            <div className="flex items-center gap-2">
+              <div onClick={(e) => e.stopPropagation()}>
+                <SocialShare 
+                  title={listing.title}
+                  url={`${window.location.origin}/listing/${listing.id}`}
+                  description={`Check out this auction on BidVex: ${listing.title}`}
+                />
+              </div>
+              <Button 
+                className="gradient-button text-white border-0 px-8"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/listing/${listing.id}`);
+                }}
+              >
+                {t('marketplace.viewDetails', 'View Details')}
+              </Button>
+            </div>
           </div>
         </div>
       </Card>
