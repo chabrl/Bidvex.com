@@ -240,12 +240,8 @@ const LotsMarketplacePage = () => {
                     data-testid={`lot-card-${listing.id}`}
                   >
                     <div className="flex flex-col md:flex-row">
-                      <div className="w-full md:w-1/3 aspect-video md:aspect-square bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center relative">
-                        <Layers className="h-16 w-16 text-primary opacity-50" />
-                        <Badge className="absolute top-2 right-2 gradient-bg text-white border-0">
-                          <Package className="mr-1 h-3 w-3" />
-                          {listing.total_lots} {t('lotsMarketplace.items', 'Items')}
-                        </Badge>
+                      <div className="w-full md:w-1/3 aspect-video md:aspect-square overflow-hidden">
+                        <ImageCarousel lots={listing.lots} totalLots={listing.total_lots} />
                       </div>
                       
                       <div className="flex-1 p-6">
