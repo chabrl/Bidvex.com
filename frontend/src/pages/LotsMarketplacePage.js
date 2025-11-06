@@ -291,7 +291,7 @@ const LotsMarketplacePage = () => {
               return (
                 <Card
                   key={listing.id}
-                  className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer glassmorphism"
+                  className="overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer glassmorphism flex flex-col h-full"
                   onClick={() => navigate(`/lots/${listing.id}`)}
                   data-testid={`lot-card-${listing.id}`}
                 >
@@ -299,58 +299,71 @@ const LotsMarketplacePage = () => {
                     <ImageCarousel lots={listing.lots} totalLots={listing.total_lots} />
                   </div>
                   
-                  <CardHeader>
-                    <CardTitle className="line-clamp-2">{listing.title}</CardTitle>
+                  <CardHeader className="pb-3">
+                    <CardTitle 
+                      className="line-clamp-2 min-h-[3.5rem] leading-tight"
+                      title={listing.title}
+                    >
+                      {listing.title}
+                    </CardTitle>
                   </CardHeader>
                   
-                  <CardContent className="space-y-3">
+                  <CardContent className="space-y-4 flex-grow">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <MapPin className="h-4 w-4" />
-                      <span>{listing.city}, {listing.region}</span>
+                      <MapPin className="h-4 w-4 flex-shrink-0" />
+                      <span className="truncate">{listing.city}, {listing.region}</span>
                     </div>
                     
-                    <div className="space-y-1">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">
-                          {t('lotsMarketplace.totalBid', 'Total Current Bid')}:
+                    {/* Enhanced Pricing Section */}
+                    <div className="space-y-3 bg-muted/30 rounded-lg p-3">
+                      {/* Current Bid */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground flex items-center gap-1">
+                          <span>💰</span>
+                          <span className="hidden sm:inline">Current</span>
                         </span>
-                        <span className="font-bold text-lg gradient-text">
+                        <span className="font-bold text-2xl text-green-700">
                           ${totalCurrent.toFixed(2)}
                         </span>
                       </div>
-                      <div className="flex justify-between items-center text-xs text-muted-foreground">
-                        <span>{t('lotsMarketplace.starting', 'Starting')}:</span>
-                        <span>${totalStarting.toFixed(2)}</span>
+                      
+                      {/* Divider */}
+                      <div className="border-t border-border/50"></div>
+                      
+                      {/* Starting Bid */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-500 flex items-center gap-1">
+                          <span>🏷️</span>
+                          <span className="hidden sm:inline">Start</span>
+                        </span>
+                        <span className="text-sm text-gray-500">
+                          ${totalStarting.toFixed(2)}
+                        </span>
                       </div>
                     </div>
                     
+                    {/* Countdown Timer */}
                     {!isEnded ? (
                       <div className="flex items-center gap-2 text-sm">
-                        <Clock className="h-4 w-4 text-primary" />
+                        <Clock className="h-4 w-4 text-primary flex-shrink-0" />
                         <Countdown
                           date={auctionEndDate}
                           renderer={({ days, hours, minutes, seconds, completed }) => (
                             <span className={`font-semibold ${completed ? 'text-red-500' : 'text-primary'}`}>
-                              {completed ? t('marketplace.ended', 'Ended') : `${days}d ${hours}h ${minutes}m ${seconds}s`}
+                              {completed ? t('marketplace.ended', 'Ended') : `${days}d ${hours}h ${minutes}m`}
                             </span>
                           )}
                         />
                       </div>
                     ) : (
-                      <Badge variant="destructive">
+                      <Badge variant="destructive" className="w-fit">
                         {t('marketplace.ended', 'Auction Ended')}
                       </Badge>
                     )}
-
-                    <div className="pt-2 border-t">
-                      <p className="text-xs text-muted-foreground line-clamp-2">
-                        {listing.description}
-                      </p>
-                    </div>
                   </CardContent>
                   
-                  <CardFooter>
-                    <Button className="w-full gradient-button text-white border-0">
+                  <CardFooter className="mt-auto">
+                    <Button className="w-full gradient-button text-white border-0 hover:scale-105 transition-transform">
                       {t('lotsMarketplace.viewLot', 'View Lot Details')}
                     </Button>
                   </CardFooter>
