@@ -204,6 +204,18 @@ frontend:
         agent: "main"
         comment: "Step 3 displays comprehensive review: Summary card with 4 metrics (Total Lots, Total Items, Total Starting Value, Total Images) in gradient blue card. Auction details card with edit button to jump back to Step 1. Lots preview table (scrollable) with columns: #, Title, Qty, Starting Bid, Condition, Images, edit button to jump to Step 2. Final 'Create Listing' button submits to existing backend endpoint."
 
+  - task: "Auto-Sliding Image Carousel on Lots Marketplace"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/pages/LotsMarketplacePage.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Implemented auto-sliding image carousel using Swiper.js library. Created ImageCarousel component that collects all images from all lots in a listing. Configured with autoplay (3s delay), pause on hover, continuous loop (when 3+ images), and smooth transitions. Replaced static gradient placeholders in both Grid and List view modes. Applied object-cover styling with aspect-video proportions. Carousel displays badge showing total lot count. Handles edge cases: shows placeholder when no images available, only enables loop mode for 3+ images to avoid Swiper warnings. Tested on desktop (1920x800), mobile (375x667), and verified auto-slide functionality in both Grid and List views. Responsive design working perfectly across all screen sizes."
+
 metadata:
   created_by: "main_agent"
   version: "1.0"
