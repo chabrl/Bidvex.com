@@ -40,6 +40,9 @@ const ImageCarousel = ({ lots, totalLots }) => {
     );
   }
 
+  // Only enable loop mode if there are 3 or more images
+  const shouldLoop = allImages.length >= 3;
+  
   return (
     <div className="w-full h-full relative">
       <Swiper
@@ -49,7 +52,7 @@ const ImageCarousel = ({ lots, totalLots }) => {
           disableOnInteraction: false,
           pauseOnMouseEnter: true,
         }}
-        loop={true}
+        loop={shouldLoop}
         speed={800}
         className="w-full h-full"
       >
