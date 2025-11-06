@@ -292,12 +292,8 @@ const LotsMarketplacePage = () => {
                   onClick={() => navigate(`/lots/${listing.id}`)}
                   data-testid={`lot-card-${listing.id}`}
                 >
-                  <div className="aspect-video bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center relative">
-                    <Layers className="h-16 w-16 text-primary opacity-50" />
-                    <Badge className="absolute top-2 right-2 gradient-bg text-white border-0">
-                      <Package className="mr-1 h-3 w-3" />
-                      {listing.total_lots} {t('lotsMarketplace.items', 'Items')}
-                    </Badge>
+                  <div className="aspect-video overflow-hidden">
+                    <ImageCarousel lots={listing.lots} totalLots={listing.total_lots} />
                   </div>
                   
                   <CardHeader>
