@@ -6,10 +6,11 @@ import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
-import { Search, Package, Clock, MapPin, Layers, Grid as GridIcon, List as ListIcon } from 'lucide-react';
+import { Search, Package, Clock, MapPin, Layers, Grid as GridIcon, List as ListIcon, Tag } from 'lucide-react';
 import Countdown from 'react-countdown';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay } from 'swiper/modules';
+import WatchlistButton from '../components/WatchlistButton';
 import 'swiper/css';
 import 'swiper/css/autoplay';
 
