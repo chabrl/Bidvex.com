@@ -434,61 +434,81 @@ const MultiItemListingDetailPage = () => {
         </div>
       </div>
 
-      {/* Floating FAB (Mobile) */}
-      <div className="lg:hidden fixed bottom-6 right-6 z-50">
+      {/* Floating FAB (Mobile) - Enhanced with pulse animation */}
+      <div className="lg:hidden fixed bottom-20 right-6 z-50">
         <Button
           size="lg"
           onClick={() => setShowLotIndex(!showLotIndex)}
-          className="gradient-button text-white border-0 shadow-lg rounded-full w-14 h-14 p-0"
+          className="gradient-button text-white border-0 shadow-lg rounded-full w-14 h-14 p-0 animate-pulse-subtle hover:scale-110 transition-transform duration-200"
+          style={{
+            animation: showLotIndex ? 'none' : 'pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) 3'
+          }}
         >
           {showLotIndex ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
         </Button>
       </div>
 
-      {/* Mobile Lot Index Overlay */}
+      {/* Mobile Lot Index Overlay - Enhanced with backdrop blur and smooth transitions */}
       {showLotIndex && (
         <div 
-          className="lg:hidden fixed inset-0 bg-black/50 z-40"
+          className="lg:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity duration-200"
           onClick={() => setShowLotIndex(false)}
+          style={{
+            animation: 'fadeIn 200ms ease-in-out'
+          }}
         >
           <div 
-            className="absolute bottom-0 left-0 right-0 bg-background rounded-t-2xl p-6 max-h-[70vh] overflow-y-auto"
+            className="absolute bottom-0 left-0 right-0 bg-background rounded-t-2xl shadow-2xl max-h-[70vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
+            style={{
+              animation: 'slideUp 200ms ease-out'
+            }}
           >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold">Lot Index</h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowLotIndex(false)}
-              >
-                <X className="h-5 w-5" />
-              </Button>
+            {/* Drag indicator */}
+            <div className="flex justify-center pt-3 pb-2">
+              <div className="w-12 h-1 bg-muted-foreground/30 rounded-full"></div>
             </div>
-            <div className="space-y-2">
-              {listing.lots.map((lot) => (
-                <div
-                  key={lot.lot_number}
-                  onClick={() => scrollToLot(lot.lot_number)}
-                  className={`p-3 rounded-lg cursor-pointer transition-all ${
-                    activeLotId === lot.lot_number
-                      ? 'bg-gradient-to-r from-[#009BFF] to-[#0056A6] text-white shadow-md'
-                      : 'bg-muted hover:bg-muted/80'
-                  }`}
+            
+            <div className="px-6 pb-6 overflow-y-auto" style={{ maxHeight: 'calc(70vh - 60px)' }}>
+              <div className="flex items-center justify-between mb-4 sticky top-0 bg-background py-2">
+                <h3 className="text-lg font-bold">Lot Index</h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowLotIndex(false)}
+                  className="hover:bg-muted"
                 >
-                  <div className="flex items-start justify-between mb-1">
-                    <p className="font-semibold text-sm">Lot #{lot.lot_number}</p>
-                    {hasActiveBids(lot) && (
-                      <Flame className="h-4 w-4 text-amber-400" />
-                    )}
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {listing.lots.map((lot) => (
+                  <div
+                    key={lot.lot_number}
+                    onClick={() => {
+                      scrollToLot(lot.lot_number);
+                      setShowLotIndex(false);
+                    }}
+                    className={`p-3 rounded-lg cursor-pointer transition-all duration-200 ${
+                      activeLotId === lot.lot_number
+                        ? 'bg-gradient-to-r from-[#009BFF] to-[#0056A6] text-white shadow-md'
+                        : 'bg-muted hover:bg-muted/80 hover:shadow-sm'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-1">
+                      <p className="font-semibold text-sm">Lot #{lot.lot_number}</p>
+                      {hasActiveBids(lot) && (
+                        <Flame className="h-4 w-4 text-amber-400" />
+                      )}
+                    </div>
+                    <p className="text-xs truncate mb-1">{lot.title}</p>
+                    <div className="flex items-center justify-between text-xs">
+                      <span>Qty: {lot.quantity}</span>
+                      <span className="font-semibold">${lot.current_price.toFixed(2)}</span>
+                    </div>
                   </div>
-                  <p className="text-xs truncate mb-1">{lot.title}</p>
-                  <div className="flex items-center justify-between text-xs">
-                    <span>Qty: {lot.quantity}</span>
-                    <span className="font-semibold">${lot.current_price.toFixed(2)}</span>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         </div>
