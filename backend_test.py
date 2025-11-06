@@ -11,7 +11,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = "https://bidvex-wizard.preview.emergentagent.com/api"
+BASE_URL = "https://lot-wizard.preview.emergentagent.com/api"
 TEST_USER_EMAIL = "watchlist.tester@bazario.com"
 TEST_USER_PASSWORD = "WatchlistTest123!"
 TEST_USER_NAME = "Watchlist Tester"
