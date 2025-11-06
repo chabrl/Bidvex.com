@@ -345,10 +345,17 @@ const LotsMarketplacePage = () => {
               return (
                 <Card
                   key={listing.id}
-                  className="overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer glassmorphism flex flex-col h-full"
+                  className="overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer glassmorphism flex flex-col h-full relative"
                   onClick={() => navigate(`/lots/${listing.id}`)}
                   data-testid={`lot-card-${listing.id}`}
                 >
+                  {/* Favorite Button - Absolute positioned on image */}
+                  <div className="absolute top-3 right-3 z-10" onClick={(e) => e.stopPropagation()}>
+                    <div className="bg-white/90 backdrop-blur-sm rounded-full p-2 shadow-md hover:bg-white transition-colors">
+                      <WatchlistButton listingId={listing.id} size="default" />
+                    </div>
+                  </div>
+
                   <div className="aspect-video overflow-hidden">
                     <ImageCarousel lots={listing.lots} totalLots={listing.total_lots} />
                   </div>
@@ -362,52 +369,46 @@ const LotsMarketplacePage = () => {
                     </CardTitle>
                   </CardHeader>
                   
-                  <CardContent className="space-y-4 flex-grow">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <MapPin className="h-4 w-4 flex-shrink-0" />
-                      <span className="truncate">{listing.city}, {listing.region}</span>
+                  <CardContent className="space-y-3 flex-grow">
+                    {/* Category */}
+                    <div className="flex items-center gap-2">
+                      <Tag className="h-4 w-4 text-primary flex-shrink-0" />
+                      <span className="text-sm font-medium text-primary truncate">
+                        {listing.category || 'General'}
+                      </span>
+                    </div>
+
+                    {/* Location */}
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <span className="text-sm text-muted-foreground truncate">
+                        {listing.city}, {listing.region}
+                      </span>
                     </div>
                     
-                    {/* Enhanced Pricing Section */}
-                    <div className="space-y-3 bg-muted/30 rounded-lg p-3">
-                      {/* Current Bid */}
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground flex items-center gap-1">
-                          <span>💰</span>
-                          <span className="hidden sm:inline">Current</span>
-                        </span>
-                        <span className="font-bold text-2xl text-green-700">
-                          ${totalCurrent.toFixed(2)}
-                        </span>
-                      </div>
-                      
-                      {/* Divider */}
-                      <div className="border-t border-border/50"></div>
-                      
-                      {/* Starting Bid */}
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-500 flex items-center gap-1">
-                          <span>🏷️</span>
-                          <span className="hidden sm:inline">Start</span>
-                        </span>
-                        <span className="text-sm text-gray-500">
-                          ${totalStarting.toFixed(2)}
-                        </span>
-                      </div>
+                    {/* Lot Count */}
+                    <div className="flex items-center gap-2">
+                      <Package className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <span className="text-sm text-muted-foreground">
+                        {listing.total_lots} {listing.total_lots === 1 ? 'Lot' : 'Lots'}
+                      </span>
                     </div>
                     
-                    {/* Countdown Timer */}
+                    {/* Time Remaining */}
                     {!isEnded ? (
-                      <div className="flex items-center gap-2 text-sm">
+                      <div className="flex items-center gap-2 pt-2 border-t">
                         <Clock className="h-4 w-4 text-primary flex-shrink-0" />
-                        <Countdown
-                          date={auctionEndDate}
-                          renderer={({ days, hours, minutes, seconds, completed }) => (
-                            <span className={`font-semibold ${completed ? 'text-red-500' : 'text-primary'}`}>
-                              {completed ? t('marketplace.ended', 'Ended') : `${days}d ${hours}h ${minutes}m`}
-                            </span>
-                          )}
-                        />
+                        <div className="flex flex-col">
+                          <span className="text-xs text-muted-foreground">Ends in</span>
+                          <Countdown
+                            date={auctionEndDate}
+                            renderer={({ days, hours, minutes, completed }) => (
+                              <span className={`font-semibold text-sm ${completed ? 'text-red-500' : 'text-primary'}`}>
+                                {completed ? t('marketplace.ended', 'Ended') : `${days}d ${hours}h ${minutes}m`}
+                              </span>
+                            )}
+                          />
+                        </div>
                       </div>
                     ) : (
                       <Badge variant="destructive" className="w-fit">
