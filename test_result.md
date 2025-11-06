@@ -103,18 +103,14 @@
 #====================================================================================================
 
 user_problem_statement: |
-  Phase 3: Enhance Multi-Lot Listing Wizard for BidVex platform:
-  1. Transform /create-multi-item-listing page into step-by-step wizard (3 steps: Basic Info → Add Lots → Review & Submit)
-  2. CSV bulk upload support with columns: title, description, quantity, starting_bid, image_urls
-  3. Bulk image drag-and-drop with automatic filename matching to lot titles
-  4. 500-lot soft limit with warnings
-  5. Validation rules:
-     - Starting Bid: 1-10,000 CAD
-     - Description: 20-500 characters
-     - Quantity: positive integer only
-     - Image URLs: .jpg, .png, .webp only
-  6. Manual image assignment in preview table for unmatched images
-  7. Preview & review page with summary statistics before submission
+  Current Enhancement: Auto-Sliding Image Carousel for Lots Marketplace
+  - Add auto-sliding image carousel to auction cards on LotsMarketplacePage.js
+  - Carousel should display all images from all lots in the listing
+  - Auto-slide every 3 seconds with continuous loop
+  - Pause on hover for better user control
+  - No navigation arrows or dots needed
+  - Use object-cover and aspect-video styling
+  - Responsive across all screen sizes (desktop, tablet, mobile)
 
 backend:
   - task: "Multi-Item Listings API (Existing)"
