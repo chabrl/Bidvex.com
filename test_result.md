@@ -103,19 +103,23 @@
 #====================================================================================================
 
 user_problem_statement: |
-  Phase 3: Auction Card Layout Enhancement for Lots Marketplace
-  - Improve card layout for longer titles and multi-line pricing
-  - Add tooltips for truncated titles (native title attribute)
-  - Use icons for pricing labels (💰 Current, 🏷️ Start)
-  - Remove descriptions from Grid View cards for cleaner look
-  - Enhanced pricing display:
-    * Current Bid: text-2xl font-bold text-green-700
-    * Starting Bid: text-sm text-gray-500
-    * Add spacing/divider between prices
-  - Consistent card heights using flexbox
-  - Responsive stats grid in List View (4 cols desktop, 2 cols tablet, stack mobile)
-  - Hide descriptions on tablet/mobile in List View
-  - Improve visual hierarchy and spacing
+  Phase 4: Metadata-Focused Auction Cards (Remove Pricing)
+  - Remove ALL pricing information from Lots Auction cards:
+    * No starting price display
+    * No current bid display
+    * No bid count display
+  - Display metadata instead:
+    * Category (e.g., Home & Garden, Restaurant Equipment) with Tag icon
+    * City/Location with MapPin icon
+    * Lot Count (number of items) with Package icon
+    * Time Remaining with Clock icon (e.g., "Ends in 2 days")
+  - Add Favorite Button functionality:
+    * Heart icon button on each card image (top-right)
+    * White backdrop-blur circular background
+    * Uses existing WatchlistButton component
+    * Positioned absolute on card image overlay
+  - Apply to both Grid View and List View
+  - Maintain responsive design across all breakpoints
 
 backend:
   - task: "Multi-Item Listings API (Existing)"
