@@ -15,6 +15,68 @@ import 'swiper/css/autoplay';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
+// Image Carousel Component
+const ImageCarousel = ({ lots, totalLots }) => {
+  const { t } = useTranslation();
+  
+  // Collect all images from all lots
+  const allImages = lots.reduce((images, lot) => {
+    if (lot.images && Array.isArray(lot.images)) {
+      return [...images, ...lot.images];
+    }
+    return images;
+  }, []);
+
+  // If no images, show placeholder
+  if (allImages.length === 0) {
+    return (
+      <div className="w-full h-full bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center relative">
+        <Layers className="h-16 w-16 text-primary opacity-50" />
+        <Badge className="absolute top-2 right-2 gradient-bg text-white border-0 z-10">
+          <Package className="mr-1 h-3 w-3" />
+          {totalLots} {t('lotsMarketplace.items', 'Items')}
+        </Badge>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full h-full relative">
+      <Swiper
+        modules={[Autoplay]}
+        autoplay={{
+          delay: 3000,
+          disableOnInteraction: false,
+          pauseOnMouseEnter: true,
+        }}
+        loop={true}
+        speed={800}
+        className="w-full h-full"
+      >
+        {allImages.map((image, index) => (
+          <SwiperSlide key={index}>
+            <div className="w-full h-full">
+              <img
+                src={image}
+                alt={`Lot item ${index + 1}`}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.parentElement.innerHTML = '<div class="w-full h-full bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center"><div class="text-primary opacity-50">Image unavailable</div></div>';
+                }}
+              />
+            </div>
+          </SwiperSlide>
+        ))}
+      </Swiper>
+      <Badge className="absolute top-2 right-2 gradient-bg text-white border-0 z-10">
+        <Package className="mr-1 h-3 w-3" />
+        {totalLots} {t('lotsMarketplace.items', 'Items')}
+      </Badge>
+    </div>
+  );
+};
+
 const LotsMarketplacePage = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
