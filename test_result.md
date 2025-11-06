@@ -103,14 +103,17 @@
 #====================================================================================================
 
 user_problem_statement: |
-  Current Enhancement: Auto-Sliding Image Carousel for Lots Marketplace
-  - Add auto-sliding image carousel to auction cards on LotsMarketplacePage.js
-  - Carousel should display all images from all lots in the listing
-  - Auto-slide every 3 seconds with continuous loop
-  - Pause on hover for better user control
-  - No navigation arrows or dots needed
-  - Use object-cover and aspect-video styling
-  - Responsive across all screen sizes (desktop, tablet, mobile)
+  Phase 2: Lot Index Sidebar Mobile Responsiveness Enhancement
+  - Improve mobile UX for Lot Index sidebar on MultiItemListingDetailPage
+  - Adjust FAB button position to avoid overlap with MobileBottomNav (bottom-20 instead of bottom-6)
+  - Add subtle pulse animation to FAB on first page load (3 cycles, 200ms duration)
+  - Implement backdrop blur effect on mobile drawer overlay
+  - Add smooth slide-up transition for drawer (200ms)
+  - Include drag indicator at top of drawer
+  - Auto-close drawer when lot is selected
+  - Ensure proper responsive breakpoints (lg: 1024px)
+  - Desktop: Show sticky sidebar, hide FAB
+  - Mobile/Tablet (<1024px): Hide sidebar, show FAB with drawer
 
 backend:
   - task: "Multi-Item Listings API (Existing)"
