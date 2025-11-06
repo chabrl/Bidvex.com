@@ -239,7 +239,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Auto-Sliding Image Carousel on Lots Marketplace"
+    - "Lot Index Sidebar Mobile Responsiveness"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
