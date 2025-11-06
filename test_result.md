@@ -269,7 +269,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Auction Card Layout Enhancement"
+    - "Metadata-Focused Cards (Pricing Removal)"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
