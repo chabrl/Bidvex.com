@@ -253,7 +253,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Lot Index Sidebar Mobile Responsiveness"
+    - "Auction Card Layout Enhancement"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
