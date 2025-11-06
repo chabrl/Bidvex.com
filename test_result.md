@@ -103,17 +103,19 @@
 #====================================================================================================
 
 user_problem_statement: |
-  Phase 2: Lot Index Sidebar Mobile Responsiveness Enhancement
-  - Improve mobile UX for Lot Index sidebar on MultiItemListingDetailPage
-  - Adjust FAB button position to avoid overlap with MobileBottomNav (bottom-20 instead of bottom-6)
-  - Add subtle pulse animation to FAB on first page load (3 cycles, 200ms duration)
-  - Implement backdrop blur effect on mobile drawer overlay
-  - Add smooth slide-up transition for drawer (200ms)
-  - Include drag indicator at top of drawer
-  - Auto-close drawer when lot is selected
-  - Ensure proper responsive breakpoints (lg: 1024px)
-  - Desktop: Show sticky sidebar, hide FAB
-  - Mobile/Tablet (<1024px): Hide sidebar, show FAB with drawer
+  Phase 3: Auction Card Layout Enhancement for Lots Marketplace
+  - Improve card layout for longer titles and multi-line pricing
+  - Add tooltips for truncated titles (native title attribute)
+  - Use icons for pricing labels (💰 Current, 🏷️ Start)
+  - Remove descriptions from Grid View cards for cleaner look
+  - Enhanced pricing display:
+    * Current Bid: text-2xl font-bold text-green-700
+    * Starting Bid: text-sm text-gray-500
+    * Add spacing/divider between prices
+  - Consistent card heights using flexbox
+  - Responsive stats grid in List View (4 cols desktop, 2 cols tablet, stack mobile)
+  - Hide descriptions on tablet/mobile in List View
+  - Improve visual hierarchy and spacing
 
 backend:
   - task: "Multi-Item Listings API (Existing)"
