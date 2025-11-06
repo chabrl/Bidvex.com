@@ -224,12 +224,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Multi-Lot Wizard - Step-by-Step UI"
-    - "CSV Bulk Upload Feature"
-    - "Bulk Image Drag & Drop with Auto-Matching"
-    - "Lot Validation Rules"
-    - "500-Lot Soft Limit with Warnings"
-    - "Review & Submit Page (Step 3)"
+    - "Auto-Sliding Image Carousel on Lots Marketplace"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
