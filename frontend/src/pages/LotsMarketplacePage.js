@@ -8,6 +8,10 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../compone
 import { Badge } from '../components/ui/badge';
 import { Search, Package, Clock, MapPin, Layers, Grid as GridIcon, List as ListIcon } from 'lucide-react';
 import Countdown from 'react-countdown';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Autoplay } from 'swiper/modules';
+import 'swiper/css';
+import 'swiper/css/autoplay';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
