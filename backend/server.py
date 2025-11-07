@@ -321,6 +321,10 @@ class Invoice(BaseModel):
     payment_date: Optional[datetime] = None
     payment_method: Optional[str] = None
     payment_proof_url: Optional[str] = None
+    # Email tracking
+    email_sent: bool = False
+    sent_timestamp: Optional[datetime] = None
+    recipient_email: Optional[str] = None
 
 class PaymentMethodCreate(BaseModel):
     payment_method_id: str
