@@ -438,7 +438,7 @@ class Phase5Tester:
                     print(f"\n  📧 Email Log Details:")
                     for i, email in enumerate(emails[:10], 1):  # Show first 10
                         print(f"\n     Email {i}:")
-                        print(f"       - Recipient: {email.get('recipient_email', 'N/A')}")
+                        print(f"       - Recipient: {email.get('recipient', 'N/A')}")
                         print(f"       - Subject: {email.get('subject', 'N/A')}")
                         print(f"       - Timestamp: {email.get('timestamp', 'N/A')}")
                         if 'attachments' in email:
@@ -448,15 +448,15 @@ class Phase5Tester:
                     
                     # Verify email logs have required fields
                     for email in emails:
-                        assert "recipient_email" in email, "Email log should have recipient_email"
+                        assert "recipient" in email, "Email log should have recipient"
                         assert "subject" in email, "Email log should have subject"
                         assert "timestamp" in email, "Email log should have timestamp"
                     
                     print(f"\n  ✅ All email logs have required fields")
                     
                     # Verify seller and buyer emails are present
-                    seller_emails = [e for e in emails if SELLER_EMAIL in e.get('recipient_email', '')]
-                    buyer_emails = [e for e in emails if BUYER1_EMAIL in e.get('recipient_email', '') or BUYER2_EMAIL in e.get('recipient_email', '')]
+                    seller_emails = [e for e in emails if SELLER_EMAIL in e.get('recipient', '')]
+                    buyer_emails = [e for e in emails if BUYER1_EMAIL in e.get('recipient', '') or BUYER2_EMAIL in e.get('recipient', '')]
                     
                     print(f"  ✅ Seller emails logged: {len(seller_emails)}")
                     print(f"  ✅ Buyer emails logged: {len(buyer_emails)}")
