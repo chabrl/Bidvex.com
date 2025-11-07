@@ -1,25 +1,31 @@
 <analysis>
-The AI engineer successfully transitioned from initial platform development to focused feature enhancements and bug fixes for the BidVex platform. Key achievements include a comprehensive Multi-Lot Listing Wizard with CSV bulk upload, image drag-and-drop, and robust validation. This was followed by resolving a critical issue blocking access to individual multi-lot auction detail pages by creating the missing frontend route and component. Subsequently, significant UI/UX improvements were implemented for multi-lot listings, including a Grid/List toggle, an Image Viewer with zoom/navigation, and a Lot Index sidebar. The current work addresses a mobile navigation deficiency and has just begun implementing an auto-sliding image carousel for auction cards on the Lots Marketplace page, following a new user request.
+The AI engineer successfully progressed through several major feature implementations for the BidVex platform. Initially, the focus was on enhancing the  with an auto-sliding image carousel using , including responsive adjustments and a loop fix. Subsequently, mobile responsiveness of the Lot Index sidebar on  was refined, implementing a pulse animation, backdrop blur, and improved drawer interactions. The auction card layout on the Lots page was then overhauled, removing descriptions from Grid View, adding pricing icons, and custom styling for clarity. This was followed by a significant pivot to a metadata-focused design, replacing all pricing with auction category, location, lot count, time, and a favorite button on the Lots page. The most complex phase involved implementing an Auction Preview Mode, requiring backend schema updates (, ), an  job for status transitions, and frontend UI for Coming Soon sections and disabled bidding on detail pages. A major debugging effort was needed due to  vs  discrepancies and an incorrect MongoDB database name. Finally, the AI engineer began developing a comprehensive invoice system using , starting with Buyer Lots Won Summary, then integrating the BidVex logo, and implementing the Payment Letter. The last task involved implementing all three Seller documents (Statement, Receipt, Commission Invoice), which was successfully completed. The trajectory concludes with the user correcting the seller commission rate to 5%, which is the immediate next action.
 </analysis>
 
 <product_requirements>
-The BidVex platform (formerly Bazario) is a modern, bilingual auction marketplace featuring responsive design, dark/light mode, PWA, SEO, and accessibility. Core functionality includes user management, real-time auctions, dashboards, affiliate programs, promotions, communication, AI support, Stripe payments, GDPR, and fraud prevention.
+The BidVex platform is a modern, bilingual auction marketplace with responsive design, PWA, SEO, and accessibility. It includes core functionalities like user management, real-time auctions, dashboards, affiliate programs, promotions, AI support, and Stripe payments.
 
-**Implemented features (highlights from trajectory):**
-*   **Multi-Lot Listing Wizard (Phase 3):** Enhanced  page with a 3-step wizard UI (Basic Details, Add Lots, Review & Submit). Features CSV bulk upload (title, description, quantity, starting\_bid, image\_urls), bulk image drag & drop with auto-matching by filename, manual assignment, and a soft limit of 500 lots. Validation rules implemented for starting bid (1-10,000 CAD), description (20-500 chars), quantity (positive integer), and image URLs (.jpg, .png, .webp).
-*   **Multi-Lot Auction Access:** Resolved an issue where individual multi-lot auction detail pages were inaccessible by creating a new  component and adding its corresponding route () in .
-*   **Multi-Lot UI Enhancements:**
-    *   **Grid/List Toggle:** Implemented for  (marketplace) and  (detail page) with persistence.
-    *   **Image Viewer:** Integrated  for lot images with zoom and navigation.
-    *   **Lot Index Navigation:** Sticky sidebar on desktop, floating FAB on mobile, displaying lot titles, quantities, and starting prices with scroll-to-section functionality.
-*   **Mobile Navigation:** Identified and began fixing missing links for Lots Auction and Create Multi-Item Listing in the  component, making the Sell button a menu.
-*   **Image Slider:** User requested an auto-sliding image carousel inside each auction card on the Lots Auction page.
+**Implemented Features include:**
+*   **Multi-Lot Listing Wizard:** A 3-step wizard with CSV bulk upload, image drag & drop, and validation for creating multi-lot auctions.
+*   **Multi-Lot Auction Access:** Creation of  and routing to access individual multi-lot auctions.
+*   **Multi-Lot UI Enhancements:** Grid/List toggle with persistence for marketplace/detail pages,  for image viewing with zoom/navigation, and a Lot Index sidebar with scroll-to-section.
+*   **Mobile Navigation Fixes:**  updated for Lots Auction and Sell menu access.
+*   **Auto-sliding Image Carousel:** Implemented on  auction cards using , with 3-second auto-slide, loop, and pause on hover.
+*   **Lot Index Sidebar Mobile Responsiveness:** Enhanced  sidebar with a pulse animation for the FAB, backdrop blur for the drawer, and responsive collapse behavior.
+*   **Auction Card Layout Refinement:** Improved  card layout with tooltips for truncated titles, icons for pricing (💰/🏷️), removal of descriptions from Grid View, and styled Current/Starting bids.
+*   **Metadata-Focused Auction Cards:** Removed all pricing information from  auction cards, replaced with Category, City, Lot Count, Time Remaining, and a Favorite Button.
+*   **Auction Preview Mode:** Added  status to multi-item listings, implemented  and an  job to transition auctions, and developed frontend Coming Soon sections with countdowns and disabled bidding on  and .
+*   **Invoice System:**
+    *   **Buyer Lots Won Summary PDF:** Generated using , matching Renaissance Bistro format, with buyer/auction details, lot breakdown, hammer total, buyer's premium (5%), GST (5%), QST (9.975%), and total due.
+    *   **BidVex Logo Integration:** Embedded  into all generated PDFs.
+    *   **Payment Letter PDF:** Generated with buyer/auction details, final total due, payment methods, deadline, and contact info.
+    *   **Seller Documents:** Implemented Seller Statement, Seller Receipt, and Commission Invoice PDFs, featuring seller/auction info, lot statuses, hammer prices, payouts, and commissions.
 </product_requirements>
 
 <key_technical_concepts>
-- **Backend:** FastAPI (Python), MongoDB, WebSockets, JWT, Stripe, Google Maps API, .
-- **Frontend:** React.js, Tailwind CSS, Shadcn UI, , , , , , .
-- **New Frontend Libraries:**  (for CSV parsing),  (for file uploads),  (for image viewing),  (for image carousels).
+- **Backend:** FastAPI (Python), MongoDB, WebSockets, JWT, Stripe, Google Maps API, ,  (for scheduled tasks),  (for PDF generation).
+- **Frontend:** React.js, Tailwind CSS, Shadcn UI, , , , , .
+- **New Frontend Libraries:** , , ,  (for image carousels).
 - **Authentication:** Email/password with JWT, Google OAuth.
 </key_technical_concepts>
 
@@ -27,20 +33,32 @@ The BidVex platform (formerly Bazario) is a modern, bilingual auction marketplac
 The application uses a Full-stack architecture with React (frontend), FastAPI (backend), and MongoDB (database).
 
 
--   : Core backend.
-    -   **Changes:** Backend endpoints for  (POST, GET by ID) support validation.
+-   : Core backend, handles API routes and database interactions.
+    -   **Changes:**  model updated with  and  (, ). POST and GET endpoints for  modified to handle status and filtering.  integrated to manage auction transitions. New models , ,  added. API endpoints created for generating , , , , and  PDFs.
+-   : (New file) Contains HTML templates for all generated PDFs (Lots Won Summary, Payment Letter, Seller Statement, Seller Receipt, Commission Invoice).
+    -   **Changes:** HTML structure and content for various invoice types, including dynamic data fields, styling, and a placeholder for the BidVex logo.
+-   : (New file) Stores the base64 encoded BidVex logo for embedding into PDF templates.
 -   : Central component for routing.
-    -   **Changes:** Added new route  for .
--   : Sticky mobile navigation.
-    -   **Changes:** Updated to include access to Lots Auction and a menu for Sell (single/multi-item listing).
--   : Multi-lot listing creation.
-    -   **Changes:** Replaced with a new step-by-step wizard UI, integrating  for CSV upload and  for bulk image upload, and implementing validation rules.
--   : Marketplace for multi-item listings.
-    -   **Changes:** Implemented Grid/List toggle functionality with persistence. Currently being updated to include an auto-sliding image carousel within auction cards using .
--   : New page for individual multi-item listing details.
-    -   **Changes:** Created to display details of a multi-item listing. Enhanced with Grid/List toggle, Image Viewer (using ), and Lot Index Navigation.
--   : New file.
-    -   **Summary:** Created as sample data for CSV upload testing.
+    -   **Changes:** Added route for .
+-   : Displays multi-item listings.
+    -   **Changes:** Integrated  for auto-sliding image carousels in auction cards. Implemented logic to fetch and display Coming Soon (upcoming) auctions above active ones, with distinct styling and disabled bidding. Refined auction card layout for long titles, multi-line pricing, removing descriptions, and adding metadata (category, location, lot count, time).
+-   : Displays details of an individual multi-item listing.
+    -   **Changes:** Enhanced Lot Index sidebar for mobile responsiveness (FAB animation, drawer blur). Added preview mode detection with a banner and disabled bidding functionality for upcoming auctions.
+-   : Global CSS file.
+    -   **Changes:** Added  for pulse animation on the mobile FAB button and drawer transitions.
+-   : BidVex logo file.
+    -   **Importance:** Used in base64 form for embedding in generated PDF documents.
+-   : Python dependencies.
+    -   **Changes:** Added , 
+-----
+
+WeasyPrint could not import some external libraries. Please carefully follow the installation steps before reporting an issue:
+https://doc.courtbouillon.org/weasyprint/stable/first_steps.html#installation
+https://doc.courtbouillon.org/weasyprint/stable/first_steps.html#troubleshooting 
+
+-----, and its dependencies (, , , , ).
+-   : Frontend dependencies.
+    -   **Changes:**  added as a dependency.
 </code_architecture>
 
 <pending_tasks>
@@ -56,20 +74,18 @@ The application uses a Full-stack architecture with React (frontend), FastAPI (b
 -   Dark/Light mode toggle activation.
 -   Fully implement mobile responsive lot index (FAB button) and ensure mobile navigation is robustly tested.
 -   Implement the Active Bids Highlight for lots.
--   Complete the auto-sliding image carousel integration for .
+-   Notify users when favorited upcoming auctions go live (future enhancement for Auction Preview Mode).
+-   Admin UI to create upcoming auctions with start dates.
+-   Automate invoice generation post-auction (currently manual trigger).
+-   Bilingual support for invoice system (currently English-only).
 </pending_tasks>
 
 <current_work>
-The AI engineer is currently implementing a user request to enhance the user experience on the . The immediate task is to add an **auto-sliding image carousel** inside each auction card on this page. This carousel should:
-*   Automatically rotate through the images of items included in that auction every few seconds.
-*   Loop continuously.
-*   Display one image at a time.
-*   Be responsive across screen sizes.
-*   Use  and  styling.
+The AI engineer has just completed the implementation of the comprehensive Seller Documents system, which includes three distinct PDF templates: Seller Statement, Seller Receipt, and Commission Invoice. These documents are generated using  and adhere to the established BidVex branding, including the integrated logo. API endpoints have been created for manual generation of these documents, and their content and formatting have been verified through analysis.
 
-The AI engineer has already installed , the chosen library for this functionality. The next step involves integrating this carousel into the existing auction card components within  to display multiple images per lot in an animated fashion. This work directly follows the recent UI/UX enhancements and the fix for mobile navigation issues, aiming to further improve visual engagement on the marketplace page.
+Immediately following the successful generation and verification of these documents, the user provided feedback, stating: the commission for the seller is 5% only. The AI engineer acknowledged this, confirming the need to update the commission rate to 5% for sellers and to update the model and regenerate the test documents with the correct commission. This precise task—adjusting the seller commission rate in the backend model and re-testing the document generation—is the immediate, pending work item. This requires modifying the relevant  or  model fields in  and then rerunning the test generation script for the seller documents.
 </current_work>
 
 <optional_next_step>
-Update  to integrate  for auto-sliding image carousels in auction cards.
+Update the seller commission rate to 5% in the backend model and regenerate seller documents for verification.
 </optional_next_step>
