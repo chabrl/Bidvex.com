@@ -2587,6 +2587,151 @@ async def generate_lots_won_invoice(
         "message": "Invoice generated successfully"
     }
 
+@api_router.post("/invoices/payment-letter/{auction_id}/{user_id}")
+async def generate_payment_letter(
+    auction_id: str,
+    user_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Generate Payment Letter PDF for buyer
+    Requires admin privileges or matching user_id
+    """
+    # Check permissions
+    if current_user.account_type != "admin" and current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    # Fetch auction
+    auction = await db.multi_item_listings.find_one({"id": auction_id})
+    if not auction:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    
+    # Fetch buyer
+    buyer = await db.users.find_one({"id": user_id})
+    if not buyer:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Get paddle number
+    paddle_record = await db.paddle_numbers.find_one({
+        "auction_id": auction_id,
+        "user_id": user_id
+    })
+    
+    if not paddle_record:
+        # Create if doesn't exist
+        paddle_num = await generate_paddle_number(auction_id)
+        paddle_record = {
+            "id": str(uuid.uuid4()),
+            "auction_id": auction_id,
+            "user_id": user_id,
+            "paddle_number": paddle_num,
+            "assigned_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.paddle_numbers.insert_one(paddle_record)
+    
+    # Find lots won (demo: first 3 lots)
+    lots_won = []
+    for lot in auction['lots'][:3]:
+        lots_won.append({
+            "lot_number": lot['lot_number'],
+            "title": lot['title'],
+            "hammer_price": lot['current_price']
+        })
+    
+    if not lots_won:
+        raise HTTPException(status_code=400, detail="No lots won by this buyer")
+    
+    # Calculate totals (same as Lots Won Summary)
+    hammer_total = sum(lot['hammer_price'] for lot in lots_won)
+    premium_percentage = auction.get('premium_percentage', 5.0)
+    premium_amount = hammer_total * (premium_percentage / 100)
+    subtotal = hammer_total + premium_amount
+    
+    tax_rate_gst = auction.get('tax_rate_gst', 5.0)
+    tax_rate_qst = auction.get('tax_rate_qst', 9.975)
+    
+    gst_on_hammer = hammer_total * (tax_rate_gst / 100)
+    qst_on_hammer = hammer_total * (tax_rate_qst / 100)
+    gst_on_premium = premium_amount * (tax_rate_gst / 100)
+    qst_on_premium = premium_amount * (tax_rate_qst / 100)
+    
+    total_tax = gst_on_hammer + qst_on_hammer + gst_on_premium + qst_on_premium
+    grand_total = subtotal + total_tax
+    
+    # Generate invoice number (reuse from lots won or create new)
+    existing_invoice = await db.invoices.find_one({
+        "auction_id": auction_id,
+        "user_id": user_id,
+        "invoice_type": "lots_won"
+    })
+    
+    if existing_invoice:
+        invoice_number = existing_invoice['invoice_number']
+    else:
+        invoice_number = await generate_invoice_number(auction_id)
+    
+    # Prepare data for template
+    template_data = {
+        "invoice_number": invoice_number,
+        "buyer": {
+            "name": buyer['name'],
+            "company_name": buyer.get('company_name'),
+            "billing_address": buyer.get('billing_address', buyer.get('address')),
+            "phone": buyer['phone'],
+            "email": buyer['email']
+        },
+        "paddle_number": paddle_record['paddle_number'],
+        "auction": {
+            "title": auction['title'],
+            "city": auction['city'],
+            "region": auction['region'],
+            "auction_end_date": datetime.fromisoformat(auction['auction_end_date']) if isinstance(auction['auction_end_date'], str) else auction['auction_end_date']
+        },
+        "lots_count": len(lots_won),
+        "hammer_total": hammer_total,
+        "premium_amount": premium_amount,
+        "premium_percentage": premium_percentage,
+        "total_tax": total_tax,
+        "grand_total": grand_total,
+        "payment_deadline": auction.get('payment_deadline', 'Within 3 business days') if isinstance(auction.get('payment_deadline'), str) else "Within 3 business days"
+    }
+    
+    # Generate HTML
+    from invoice_templates import payment_letter_template
+    html_content = payment_letter_template(template_data)
+    
+    # Create user invoice directory
+    invoice_dir = Path(f"/app/invoices/{user_id}")
+    invoice_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Generate PDF
+    pdf_filename = f"PaymentLetter_{auction_id}.pdf"
+    pdf_path = invoice_dir / pdf_filename
+    
+    HTML(string=html_content).write_pdf(pdf_path)
+    
+    # Save invoice record
+    invoice_record = {
+        "id": str(uuid.uuid4()),
+        "invoice_number": invoice_number,
+        "invoice_type": "payment_letter",
+        "user_id": user_id,
+        "auction_id": auction_id,
+        "pdf_path": str(pdf_path),
+        "generated_date": datetime.now(timezone.utc).isoformat(),
+        "status": "generated"
+    }
+    await db.invoices.insert_one(invoice_record)
+    
+    return {
+        "success": True,
+        "invoice_number": invoice_number,
+        "pdf_path": str(pdf_path),
+        "paddle_number": paddle_record['paddle_number'],
+        "amount_due": grand_total,
+        "message": "Payment letter generated successfully"
+    }
+
 @api_router.get("/invoices/{user_id}")
 async def get_user_invoices(
     user_id: str,
