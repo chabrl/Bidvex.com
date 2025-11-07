@@ -103,17 +103,15 @@
 #====================================================================================================
 
 user_problem_statement: |
-  Phase 5 (Part 1): Invoice System MVP - Buyer Lots Won Summary with Logo
-  Backend: WeasyPrint PDF generation, invoice models, paddle number system
-  Database: Added billing_address to User, premium/tax fields to MultiItemListing
-  Models: PaddleNumber, Invoice models for tracking
-  Template: HTML/CSS template matching Renaissance Bistro format with BidVex logo
-  Logo: Embedded as base64, 150px width, top-left header position
-  Calculations: Hammer total, 5% premium, GST/QST taxes on both amounts
-  Storage: /invoices/{user_id}/ directory structure
-  Invoice numbering: BV-{year}-{auction_id_short}-{sequence}
-  Paddle numbers: Auto-generated starting from 5051 per auction
-  Branding: BidVex logo (#009BFF blue theme) consistently applied
+  Phase 5 (Part 2): Payment Letter PDF Implementation
+  Template: Professional business letter format with BidVex branding
+  Content: Payment deadline, amount due, accepted methods (Visa, Mastercard, Interac)
+  Layout: Letter-style with recipient info, subject line, body paragraphs, closing
+  Features: Payment info box, warning notice, contact section, automated footer
+  Endpoint: POST /api/invoices/payment-letter/{auction_id}/{user_id}
+  Storage: /invoices/{user_id}/PaymentLetter_{auction_id}.pdf
+  Calculations: Reuses totals from Lots Won Summary for consistency
+  Styling: Same blue theme (#009BFF), logo integration, professional typography
 
 backend:
   - task: "Multi-Item Listings API (Existing)"
