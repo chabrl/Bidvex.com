@@ -126,6 +126,15 @@ const LotsMarketplacePage = () => {
     }
   };
 
+  const fetchUpcomingLots = async () => {
+    try {
+      const response = await axios.get(`${API}/multi-item-listings?status=upcoming`);
+      setUpcomingListings(response.data);
+    } catch (error) {
+      console.error('Failed to fetch upcoming lots:', error);
+    }
+  };
+
   const handleFilterChange = (key, value) => {
     setFilters({ ...filters, [key]: value });
   };
