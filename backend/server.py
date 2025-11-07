@@ -210,6 +210,7 @@ class MultiItemListing(BaseModel):
     city: str
     region: str
     auction_end_date: datetime
+    auction_start_date: Optional[datetime] = None
     lots: List[Lot]
     status: str = "active"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
