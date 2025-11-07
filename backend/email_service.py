@@ -76,7 +76,7 @@ class MockEmailService:
         self.sent_emails.append(email_log)
         
         # Log to database
-        if self.db:
+        if self.db is not None:
             await self.db.email_logs.insert_one(email_log)
         
         # Log to console
@@ -148,7 +148,7 @@ class MockEmailService:
         self.sent_emails.append(email_log)
         
         # Log to database
-        if self.db:
+        if self.db is not None:
             await self.db.email_logs.insert_one(email_log)
         
         # Log to console
@@ -287,7 +287,7 @@ support@bidvex.com
     
     async def get_sent_emails(self) -> List[Dict[str, Any]]:
         """Get list of all logged emails"""
-        if self.db:
+        if self.db is not None:
             emails = await self.db.email_logs.find({}, {"_id": 0}).to_list(100)
             return emails
         return self.sent_emails
