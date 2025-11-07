@@ -263,8 +263,17 @@ def lots_won_template(data: Dict[str, Any]) -> str:
         </div>
 
         <div class="payment-info">
-            <h3>PAYMENT INSTRUCTIONS</h3>
-            <p><strong>Payment Methods Accepted:</strong></p>
+            <h3>💳 PAYMENT INSTRUCTIONS - IMPORTANT</h3>
+            
+            <div style="background: #fff3cd; padding: 15px; margin: 15px 0; border-left: 4px solid #ffc107; border-radius: 3px;">
+                <p style="margin: 0 0 10px 0; font-weight: bold; color: #856404;">⚠️ Two-Part Payment Required:</p>
+                <p style="margin: 5px 0; font-size: 10pt; color: #856404;">
+                    1. <strong>To Seller:</strong> Pay ${hammer_total:.2f} CAD (Hammer Total) directly to the auction seller<br>
+                    2. <strong>To BidVex:</strong> Pay ${premium_amount + total_tax:.2f} CAD (Premium + Taxes) to BidVex
+                </p>
+            </div>
+            
+            <p><strong>Payment to BidVex (Premium + Taxes):</strong></p>
             <ul>
                 <li>Visa / Mastercard</li>
                 <li>Interac e-Transfer to: payments@bidvex.com</li>
