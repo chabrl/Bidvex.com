@@ -378,7 +378,27 @@ const MultiItemListingDetailPage = () => {
                         </div>
 
                         {/* Bidding Section */}
-                        {!auctionEnded && (
+                        {isPreviewMode && (
+                          <div className="bg-amber-50 dark:bg-amber-950 border border-amber-300 rounded-lg p-4 text-center mt-4">
+                            <Clock className="h-6 w-6 mx-auto text-amber-600 dark:text-amber-400 mb-2" />
+                            <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                              Bidding opens in{' '}
+                              {auctionStartDate && (
+                                <Countdown 
+                                  date={auctionStartDate}
+                                  renderer={({ days, hours, minutes, completed }) => (
+                                    <span>{completed ? 'moments' : `${days}d ${hours}h ${minutes}m`}</span>
+                                  )}
+                                />
+                              )}
+                            </p>
+                            <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                              You can preview details and favorite this auction now
+                            </p>
+                          </div>
+                        )}
+
+                        {!isPreviewMode && !auctionEnded && (
                           <div className="flex gap-2 mt-4">
                             <input
                               type="number"
@@ -399,7 +419,7 @@ const MultiItemListingDetailPage = () => {
                           </div>
                         )}
 
-                        {auctionEnded && (
+                        {auctionEnded && !isPreviewMode && (
                           <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 text-center">
                             <AlertCircle className="h-6 w-6 mx-auto text-muted-foreground mb-2" />
                             <p className="text-sm text-muted-foreground">Bidding has ended for this lot</p>
