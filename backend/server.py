@@ -316,6 +316,11 @@ class Invoice(BaseModel):
     pdf_path: str
     generated_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     status: str = "generated"  # 'generated', 'sent', 'viewed', 'paid'
+    # Payment tracking
+    payment_status: str = "pending"  # pending, paid, partial
+    payment_date: Optional[datetime] = None
+    payment_method: Optional[str] = None
+    payment_proof_url: Optional[str] = None
 
 class PaymentMethodCreate(BaseModel):
     payment_method_id: str
