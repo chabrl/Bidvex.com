@@ -85,6 +85,7 @@ const LotsMarketplacePage = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [listings, setListings] = useState([]);
+  const [upcomingListings, setUpcomingListings] = useState([]);
   const [categories, setCategories] = useState([]);
   const [filters, setFilters] = useState({
     search: '',
@@ -97,6 +98,7 @@ const LotsMarketplacePage = () => {
   useEffect(() => {
     fetchCategories();
     fetchLots();
+    fetchUpcomingLots();
   }, [filters]);
 
   const fetchCategories = async () => {
