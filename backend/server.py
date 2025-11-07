@@ -2468,11 +2468,15 @@ async def generate_invoice_number(auction_id: str) -> str:
 async def generate_lots_won_invoice(
     auction_id: str,
     user_id: str,
+    lang: str = "en",
     current_user: User = Depends(get_current_user)
 ):
     """
     Generate Buyer Lots Won Summary PDF
     Requires admin privileges or matching user_id
+    
+    Query Parameters:
+        lang: Language code ('en' or 'fr') - defaults to 'en'
     """
     # Check permissions (admin or own invoice)
     if current_user.account_type != "admin" and current_user.id != user_id:
