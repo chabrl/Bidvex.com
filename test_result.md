@@ -103,15 +103,16 @@
 #====================================================================================================
 
 user_problem_statement: |
-  Phase 5 (Part 2): Payment Letter PDF Implementation
-  Template: Professional business letter format with BidVex branding
-  Content: Payment deadline, amount due, accepted methods (Visa, Mastercard, Interac)
-  Layout: Letter-style with recipient info, subject line, body paragraphs, closing
-  Features: Payment info box, warning notice, contact section, automated footer
-  Endpoint: POST /api/invoices/payment-letter/{auction_id}/{user_id}
-  Storage: /invoices/{user_id}/PaymentLetter_{auction_id}.pdf
-  Calculations: Reuses totals from Lots Won Summary for consistency
-  Styling: Same blue theme (#009BFF), logo integration, professional typography
+  Phase 5 (Part 3): Seller Documents System - Complete Suite
+  Three PDF templates: Seller Statement, Seller Receipt, Commission Invoice
+  Templates: seller_statement_template, seller_receipt_template, commission_invoice_template
+  Endpoints: POST /api/invoices/seller-statement, seller-receipt, commission-invoice
+  Storage: /invoices/{seller_id}/ for all seller documents
+  Features: Lot sold/unsold status, buyer assignments, commission calculations, net payout
+  Seller Statement: Table of all lots with status badges, buyer paddle numbers, financial summary
+  Seller Receipt: Net payout breakdown with tax calculations on commission
+  Commission Invoice: BidVex to seller invoice with GST/QST, payment terms
+  Styling: Consistent BidVex branding, logo integration, professional layouts
 
 backend:
   - task: "Multi-Item Listings API (Existing)"
