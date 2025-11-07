@@ -2438,6 +2438,174 @@ app.add_middleware(
 async def shutdown_db_client():
     client.close()
 
+# ==================== INVOICE GENERATION ====================
+
+from weasyprint import HTML
+from invoice_templates import lots_won_template
+import os
+
+async def generate_paddle_number(auction_id: str) -> int:
+    """Generate next paddle number for auction (starts at 5051)"""
+    # Find highest paddle number for this auction
+    highest = await db.paddle_numbers.find(
+        {"auction_id": auction_id}
+    ).sort("paddle_number", -1).limit(1).to_list(1)
+    
+    if highest:
+        return highest[0]["paddle_number"] + 1
+    return 5051  # Starting paddle number
+
+async def generate_invoice_number(auction_id: str) -> str:
+    """Generate invoice number: BV-{year}-{auction_id_short}-{sequence}"""
+    year = datetime.now().year
+    auction_short = auction_id[:8]  # First 8 chars of UUID
+    
+    # Count existing invoices for this auction
+    count = await db.invoices.count_documents({"auction_id": auction_id})
+    sequence = count + 1
+    
+    return f"BV-{year}-{auction_short}-{sequence:04d}"
+
+@api_router.post("/invoices/lots-won/{auction_id}/{user_id}")
+async def generate_lots_won_invoice(
+    auction_id: str,
+    user_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Generate Buyer Lots Won Summary PDF
+    Requires admin privileges or matching user_id
+    """
+    # Check permissions (admin or own invoice)
+    if current_user.account_type != "admin" and current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    # Fetch auction
+    auction = await db.multi_item_listings.find_one({"id": auction_id})
+    if not auction:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    
+    # Fetch buyer
+    buyer = await db.users.find_one({"id": user_id})
+    if not buyer:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Get or create paddle number
+    paddle_record = await db.paddle_numbers.find_one({
+        "auction_id": auction_id,
+        "user_id": user_id
+    })
+    
+    if not paddle_record:
+        paddle_num = await generate_paddle_number(auction_id)
+        paddle_record = {
+            "id": str(uuid.uuid4()),
+            "auction_id": auction_id,
+            "user_id": user_id,
+            "paddle_number": paddle_num,
+            "assigned_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.paddle_numbers.insert_one(paddle_record)
+    
+    # Find lots won by this buyer
+    # For MVP, we'll use lots from the auction that have bids from this user
+    # In production, you'd track winning bids
+    
+    # For demo purposes, let's use first 3 lots as "won"
+    lots_won = []
+    for lot in auction['lots'][:3]:  # Demo: first 3 lots
+        lots_won.append({
+            "lot_number": lot['lot_number'],
+            "title": lot['title'],
+            "description": lot['description'],
+            "quantity": lot['quantity'],
+            "hammer_price": lot['current_price']  # Use current_price as hammer price
+        })
+    
+    if not lots_won:
+        raise HTTPException(status_code=400, detail="No lots won by this buyer")
+    
+    # Generate invoice number
+    invoice_number = await generate_invoice_number(auction_id)
+    
+    # Prepare data for template
+    template_data = {
+        "invoice_number": invoice_number,
+        "buyer": {
+            "name": buyer['name'],
+            "company_name": buyer.get('company_name'),
+            "billing_address": buyer.get('billing_address', buyer.get('address')),
+            "phone": buyer['phone'],
+            "email": buyer['email']
+        },
+        "paddle_number": paddle_record['paddle_number'],
+        "auction": {
+            "title": auction['title'],
+            "city": auction['city'],
+            "region": auction['region'],
+            "location": auction.get('location'),
+            "auction_end_date": datetime.fromisoformat(auction['auction_end_date']) if isinstance(auction['auction_end_date'], str) else auction['auction_end_date']
+        },
+        "lots": lots_won,
+        "premium_percentage": auction.get('premium_percentage', 5.0),
+        "tax_rate_gst": auction.get('tax_rate_gst', 5.0),
+        "tax_rate_qst": auction.get('tax_rate_qst', 9.975),
+        "payment_deadline": "Within 3 business days"
+    }
+    
+    # Generate HTML
+    html_content = lots_won_template(template_data)
+    
+    # Create user invoice directory
+    invoice_dir = Path(f"/app/invoices/{user_id}")
+    invoice_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Generate PDF
+    pdf_filename = f"LotsWon_{auction_id}_{int(datetime.now().timestamp())}.pdf"
+    pdf_path = invoice_dir / pdf_filename
+    
+    HTML(string=html_content).write_pdf(pdf_path)
+    
+    # Save invoice record to database
+    invoice_record = {
+        "id": str(uuid.uuid4()),
+        "invoice_number": invoice_number,
+        "invoice_type": "lots_won",
+        "user_id": user_id,
+        "auction_id": auction_id,
+        "pdf_path": str(pdf_path),
+        "generated_date": datetime.now(timezone.utc).isoformat(),
+        "status": "generated"
+    }
+    await db.invoices.insert_one(invoice_record)
+    
+    return {
+        "success": True,
+        "invoice_number": invoice_number,
+        "pdf_path": str(pdf_path),
+        "paddle_number": paddle_record['paddle_number'],
+        "message": "Invoice generated successfully"
+    }
+
+@api_router.get("/invoices/{user_id}")
+async def get_user_invoices(
+    user_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Get all invoices for a user"""
+    if current_user.account_type != "admin" and current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    invoices = await db.invoices.find({"user_id": user_id}, {"_id": 0}).to_list(100)
+    
+    for invoice in invoices:
+        if isinstance(invoice.get('generated_date'), str):
+            invoice['generated_date'] = datetime.fromisoformat(invoice['generated_date'])
+    
+    return invoices
+
+# ==================== END INVOICE GENERATION ====================
+
 @app.on_event("startup")
 async def seed_categories():
     existing_categories = await db.categories.count_documents({})
