@@ -1307,7 +1307,19 @@ def commission_invoice_template(data: Dict[str, Any]) -> str:
         </div>
 
         <div class="payment-terms">
-            <h3>⚠️ PAYMENT TERMS</h3>
+            <h3>{'📢 COMMISSION NOTICE' if commission_amount == 0 else '⚠️ PAYMENT TERMS'}</h3>
+            {f'''
+            <p style="margin: 5px 0; font-size: 11pt; color: #0066cc; font-weight: bold;">
+                No commission charged for this auction.
+            </p>
+            <p style="margin: 5px 0; font-size: 10pt;">
+                <strong>Net Payout:</strong> Your full hammer total of ${data['total_hammer']:.2f} CAD will be transferred within 5-7 business days.
+            </p>
+            <p style="margin: 15px 0 0 0; font-size: 9pt; color: #856404;">
+                BidVex is pleased to offer this auction with zero commission to sellers. 
+                You will receive 100% of the hammer value (before applicable buyer's premium, which is collected separately).
+            </p>
+            ''' if commission_amount == 0 else f'''
             <p style="margin: 5px 0; font-size: 10pt;">
                 <strong>Payment Method:</strong> This amount will be automatically deducted from your seller payout.
             </p>
@@ -1319,6 +1331,7 @@ def commission_invoice_template(data: Dict[str, Any]) -> str:
                 The commission and applicable taxes have been deducted from your gross hammer total, 
                 and your net payout will be transferred within 5-7 business days.
             </p>
+            '''}
         </div>
 
         <div class="footer">
