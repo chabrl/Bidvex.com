@@ -1004,6 +1004,8 @@ async def get_multi_item_listing(listing_id: str):
         listing["created_at"] = datetime.fromisoformat(listing["created_at"])
     if isinstance(listing.get("auction_end_date"), str):
         listing["auction_end_date"] = datetime.fromisoformat(listing["auction_end_date"])
+    if isinstance(listing.get("auction_start_date"), str):
+        listing["auction_start_date"] = datetime.fromisoformat(listing["auction_start_date"])
     
     return MultiItemListing(**listing)
 
