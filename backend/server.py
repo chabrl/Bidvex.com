@@ -291,6 +291,27 @@ class PaymentTransaction(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+class PaddleNumber(BaseModel):
+    """Paddle number assignment for buyer in specific auction"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    auction_id: str
+    user_id: str
+    paddle_number: int
+    assigned_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class Invoice(BaseModel):
+    """Invoice/document generation tracking"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    invoice_number: str  # BV-2025-AUC123-0001
+    invoice_type: str    # 'lots_won', 'payment_letter', 'seller_statement', etc.
+    user_id: str
+    auction_id: str
+    pdf_path: str
+    generated_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    status: str = "generated"  # 'generated', 'sent', 'viewed', 'paid'
+
 class PaymentMethodCreate(BaseModel):
     payment_method_id: str
 
