@@ -103,12 +103,15 @@
 #====================================================================================================
 
 user_problem_statement: |
-  Phase 4 (Complete): Auction Preview Mode - Full Implementation
-  Backend: status='upcoming', auction_start_date field, APScheduler transition job
-  Frontend: "Coming Soon" section on /lots page, preview cards with countdown, disabled bidding
-  Detail Page: Preview mode banner, bidding disabled message, lightbox and favorites enabled
-  Styling: Amber theme for preview cards, "Bidding Opens Soon" button, yellow countdown text
-  Responsive: 3-col desktop, 2-col tablet, 1-col mobile layouts working
+  Phase 5 (Part 1): Invoice System MVP - Buyer Lots Won Summary
+  Backend: WeasyPrint PDF generation, invoice models, paddle number system
+  Database: Added billing_address to User, premium/tax fields to MultiItemListing
+  Models: PaddleNumber, Invoice models for tracking
+  Template: HTML/CSS template matching Renaissance Bistro format
+  Calculations: Hammer total, 5% premium, GST/QST taxes on both amounts
+  Storage: /invoices/{user_id}/ directory structure
+  Invoice numbering: BV-{year}-{auction_id_short}-{sequence}
+  Paddle numbers: Auto-generated starting from 5051 per auction
 
 backend:
   - task: "Multi-Item Listings API (Existing)"
