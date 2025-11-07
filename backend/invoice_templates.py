@@ -199,22 +199,22 @@ def lots_won_template(data: Dict[str, Any], lang: str = "en") -> str:
         <div class="info-section">
             <div class="info-col">
                 <div class="info-box">
-                    <h3>BUYER INFORMATION</h3>
+                    <h3>{t('buyer_information', lang)}</h3>
                     <p><strong>{data['buyer']['name']}</strong></p>
                     {f"<p>{data['buyer']['company_name']}</p>" if data['buyer'].get('company_name') else ""}
                     <p>{data['buyer'].get('billing_address', data['buyer'].get('address', 'N/A'))}</p>
-                    <p>Phone: {data['buyer']['phone']}</p>
-                    <p>Email: {data['buyer']['email']}</p>
-                    <p><strong>Paddle #: {data['paddle_number']}</strong></p>
+                    <p>{t('phone', lang)}: {data['buyer']['phone']}</p>
+                    <p>{t('email', lang)}: {data['buyer']['email']}</p>
+                    <p><strong>{t('paddle_number', lang)}: {data['paddle_number']}</strong></p>
                 </div>
             </div>
             <div class="info-col">
                 <div class="info-box">
-                    <h3>AUCTION DETAILS</h3>
+                    <h3>{t('auction_details', lang)}</h3>
                     <p><strong>{data['auction']['title']}</strong></p>
-                    <p>Location: {data['auction']['city']}, {data['auction']['region']}</p>
-                    <p>End Date: {data['auction']['auction_end_date'].strftime('%B %d, %Y %I:%M %p')}</p>
-                    <p>Total Lots Won: {len(data['lots'])}</p>
+                    <p>{t('location', lang)}: {data['auction']['city']}, {data['auction']['region']}</p>
+                    <p>{t('end_date', lang)}: {data['auction']['auction_end_date'].strftime('%B %d, %Y %I:%M %p')}</p>
+                    <p>{t('total_lots_won', lang)}: {len(data['lots'])}</p>
                 </div>
             </div>
         </div>
