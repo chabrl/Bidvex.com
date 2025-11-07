@@ -357,3 +357,86 @@ agent_communication:
     message: "✅ METADATA-FOCUSED CARDS (PRICING REMOVAL) COMPLETE: Successfully transformed Lots Auction cards from pricing-focused to content discovery model. (1) Removed ALL Pricing: Eliminated starting price, current bid, bid count displays completely. (2) Added Metadata: Category with Tag icon (listing.category || 'General' in text-primary), Location with MapPin icon (city, region), Lot Count with Package icon (total_lots), Time Remaining with Clock icon (countdown or 'Ended' badge). (3) Favorite Button: Integrated WatchlistButton component, positioned absolute top-3 right-3 on card images, white/90 backdrop-blur-sm rounded-full container with padding and shadow, click event stopPropagation to prevent card navigation. (4) Both Views: Grid and List cards show identical metadata (Category, Location, Items, Time), responsive grid in List view (4 cols xl+, 2 cols sm-xl, 1 col mobile). (5) Testing: Desktop (1920px) grid shows 3 cards with favorite buttons visible, List view shows 4-column metadata grid, Mobile (375px) shows stacked layout. All metadata clearly visible, no pricing anywhere on page. Cards now emphasize auction content and location over financial details. Ready for user validation."
   - agent: "testing"
     message: "🎉 INVOICE SYSTEM TESTING COMPLETE - ZERO COMMISSION POLICY VERIFIED: All 6/6 invoice endpoint tests PASSED. ✅ CRITICAL BUG FIXED: Invoice endpoints were returning 404 because app.include_router(api_router) was called before invoice endpoints were defined. Moved router registration to after all endpoints (line 3002). Also fixed WeasyPrint dependency by installing libpangocairo-1.0-0. ✅ SELLER DOCUMENTS: (1) Seller Statement - commission rate 0% correctly displayed, no deductions shown. (2) Seller Receipt - net payout equals hammer total, commission/GST/QST all $0.00, 'No commission charged' notice present. (3) Commission Invoice - commission amount $0.00, total due $0.00, proper notice in payment terms. ✅ BUYER DOCUMENTS: (1) Lots Won Summary - payment separation clear ('To Seller' vs 'To BidVex'), paddle numbers auto-generated, premium 5% + taxes calculated correctly. (2) Payment Letter - two-part payment instructions clear, amounts properly separated. ✅ AUTHORIZATION: All endpoints properly secured (403 for unauthorized, 401 for unauthenticated, 404 for non-existent auctions). ✅ PDF GENERATION: All PDFs generated successfully at /app/invoices/{user_id}/ with proper filenames. Invoice records saved to database with correct metadata. Created comprehensive test suite at /app/invoice_test.py. Zero commission policy fully implemented and verified across all seller and buyer documents."
+backend:
+  - task: "Phase 5 Part 4: Bilingual Lots Won PDF"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ BILINGUAL LOTS WON PDF TESTED: POST /api/invoices/lots-won/{auction_id}/{user_id}?lang=fr working perfectly. English PDF (lang=en) generated successfully with invoice number BV-2025-8c8e3b57-0001, paddle number 5051, file size 1.38MB. French PDF (lang=fr) generated successfully with invoice number BV-2025-8c8e3b57-0002, paddle number 5052, file size 1.38MB. Different paddle numbers correctly assigned to different buyers. Both PDFs generated with proper structure including invoice_number, pdf_path, paddle_number, and success flag. Authorization working (admin or matching user_id required). Bilingual template integration working correctly."
+
+  - task: "Phase 5 Part 5: Auction Completion with Auto-Send"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ AUCTION COMPLETION ENDPOINT TESTED: POST /api/auctions/{auction_id}/complete?lang=en working perfectly. Generated 7 documents total: 3 seller documents (seller_statement, seller_receipt, commission_invoice) and 4 buyer documents (lots_won and payment_letter for 2 buyers). Sent 3 mock emails: 1 seller email with 3 PDF attachments, 2 buyer emails each with 2 PDF attachments. Email tracking updated correctly in invoice records (email_sent=true, sent_timestamp populated, recipient_email populated). Auction status updated to 'ended' successfully. Summary shows total_documents=7, total_emails=3, total_errors=0. All documents generated and emails sent without errors. Admin authorization required and working correctly."
+
+  - task: "Phase 5 Part 5: Email Logs Endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ EMAIL LOGS ENDPOINT TESTED: GET /api/email-logs working perfectly. Retrieved 6 email logs successfully. Email logs contain all required fields: recipient (email address), subject, timestamp, attachments (PDF paths), auction_title, and status. Seller emails logged with subject 'Your Auction Results - {auction_title}' and 3 PDF attachments. Buyer emails logged with subject 'Your Auction Invoice #{invoice_number} - Payment Required' and 2 PDF attachments each. Email logs stored in database correctly. Admin authorization required and working. All email metadata properly captured including timestamps and attachment paths."
+
+  - task: "Phase 5 Part 5: Invoice Email Tracking"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ INVOICE EMAIL TRACKING TESTED: GET /api/invoices/{user_id} working perfectly. Seller invoices (3 total for auction): all have email_sent=true, sent_timestamp populated (2025-11-07T17:41:25), recipient_email=seller.phase5@bazario.com. Buyer 1 invoices (3 total): all have email_sent=true with proper tracking. Buyer 2 invoices (3 total): all have email_sent=true with proper tracking. Email tracking fields correctly updated by auction completion endpoint. Invoice records properly linked to email logs. Authorization working (admin or matching user_id required)."
+
+  - task: "Email Service Bug Fix"
+    implemented: true
+    working: true
+    file: "/app/backend/email_service.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "testing"
+        comment: "❌ BUG FOUND: MockEmailService initialization failing with error 'Database objects do not implement truth value testing or bool()'. Root cause: Lines 79 and 151 in email_service.py using 'if self.db:' which doesn't work with Motor AsyncIOMotorDatabase objects. Motor database objects don't support boolean evaluation."
+      - working: true
+        agent: "testing"
+        comment: "✅ BUG FIXED: Changed 'if self.db:' to 'if self.db is not None:' on lines 79 and 151 in email_service.py. Backend restarted successfully. Email service now working correctly - emails being logged to database and console. All 3 emails sent successfully during auction completion (1 seller, 2 buyers). Email logs properly stored in database with all required fields."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Phase 5 Part 4: Bilingual Lots Won PDF"
+    - "Phase 5 Part 5: Auction Completion with Auto-Send"
+    - "Phase 5 Part 5: Email Logs Endpoint"
+    - "Phase 5 Part 5: Invoice Email Tracking"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "testing"
+    message: "🎉 PHASE 5 PART 4 & 5 TESTING COMPLETE - ALL TESTS PASSED (4/4): ✅ Bilingual Lots Won PDF: English and French PDFs generated successfully with proper translations, different paddle numbers for different buyers, file sizes ~1.38MB each. ✅ Auction Completion: 7 documents generated (3 seller, 4 buyer), 3 emails sent (1 seller with 3 attachments, 2 buyers with 2 attachments each), auction status updated to 'ended', zero errors. ✅ Email Logs: 6 emails logged to database with all required fields (recipient, subject, timestamp, attachments), proper email metadata captured. ✅ Invoice Email Tracking: All invoice records updated with email_sent=true, sent_timestamp, and recipient_email fields. 🐛 CRITICAL BUG FIXED: MockEmailService was failing due to Motor database boolean evaluation issue - changed 'if self.db:' to 'if self.db is not None:' in email_service.py lines 79 and 151. Backend restarted and all functionality working perfectly. Created comprehensive test suite at /app/phase5_test.py for regression testing. Ready for main agent to summarize and finish."
