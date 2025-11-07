@@ -273,11 +273,16 @@ class MultiItemListing(BaseModel):
     views: int = 0
     # Invoice configuration
     premium_percentage: float = 5.0  # Buyer's premium (5%)
-    commission_rate: float = 5.0      # Seller commission (5%)
+    commission_rate: float = 0.0      # Seller commission (0% - no commission charged)
     tax_rate_gst: float = 5.0         # GST (5%)
     tax_rate_qst: float = 9.975       # QST (9.975%)
     payment_deadline: Optional[datetime] = None
     pickup_locations: Optional[List[Dict[str, Any]]] = None  # [{address, hours, deadline}]
+    # Payment tracking fields
+    payment_status: str = "pending"   # pending, paid, partial
+    payment_date: Optional[datetime] = None
+    payment_method: Optional[str] = None  # e-transfer, bank transfer, cash, etc.
+    payment_proof_url: Optional[str] = None  # URL to payment receipt/proof
 
 class PaymentTransaction(BaseModel):
     model_config = ConfigDict(extra="ignore")
