@@ -970,9 +970,17 @@ async def create_multi_item_listing(listing_data: MultiItemListingCreate, curren
     return listing
 
 @api_router.get("/multi-item-listings")
-async def get_multi_item_listings(limit: int = 50, skip: int = 0):
+async def get_multi_item_listings(limit: int = 50, skip: int = 0, status: Optional[str] = None):
+    # Build query filter
+    query = {}
+    if status:
+        query["status"] = status
+    else:
+        # Default to active listings if no status specified
+        query["status"] = "active"
+    
     listings = await db.multi_item_listings.find(
-        {"status": "active"},
+        query,
         {"_id": 0}
     ).skip(skip).limit(limit).to_list(limit)
     
@@ -981,6 +989,8 @@ async def get_multi_item_listings(limit: int = 50, skip: int = 0):
             listing["created_at"] = datetime.fromisoformat(listing["created_at"])
         if isinstance(listing.get("auction_end_date"), str):
             listing["auction_end_date"] = datetime.fromisoformat(listing["auction_end_date"])
+        if isinstance(listing.get("auction_start_date"), str):
+            listing["auction_start_date"] = datetime.fromisoformat(listing["auction_start_date"])
     
     return [MultiItemListing(**listing) for listing in listings]
 
