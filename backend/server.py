@@ -145,6 +145,7 @@ class User(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     language: str = "en"
     affiliate_code: Optional[str] = None
+    billing_address: Optional[str] = None  # For invoicing
 
 class UserLogin(BaseModel):
     email: EmailStr
