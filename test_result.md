@@ -337,7 +337,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Metadata-Focused Cards (Pricing Removal)"
+    - "Invoice System - Zero Commission Policy"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
