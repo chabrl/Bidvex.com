@@ -60,10 +60,20 @@ def lots_won_template(data: Dict[str, Any]) -> str:
                 color: #333;
             }}
             .header {{
-                text-align: center;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
                 margin-bottom: 30px;
                 border-bottom: 3px solid #009BFF;
                 padding-bottom: 20px;
+            }}
+            .header-logo {{
+                width: 150px;
+                height: auto;
+            }}
+            .header-text {{
+                flex: 1;
+                text-align: center;
             }}
             .header h1 {{
                 color: #009BFF;
