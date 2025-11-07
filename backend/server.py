@@ -935,6 +935,15 @@ async def create_multi_item_listing(listing_data: MultiItemListingCreate, curren
     if current_user.account_type != "business":
         raise HTTPException(status_code=403, detail="Only business accounts can create multi-item listings")
     
+    # Determine status based on auction_start_date
+    now = datetime.now(timezone.utc)
+    status = "active"  # Default to active
+    
+    if listing_data.auction_start_date:
+        # If start date is in the future, set to upcoming
+        if listing_data.auction_start_date > now:
+            status = "upcoming"
+    
     listing = MultiItemListing(
         seller_id=current_user.id,
         title=listing_data.title,
@@ -944,13 +953,17 @@ async def create_multi_item_listing(listing_data: MultiItemListingCreate, curren
         city=listing_data.city,
         region=listing_data.region,
         auction_end_date=listing_data.auction_end_date,
+        auction_start_date=listing_data.auction_start_date,
         lots=[lot.model_dump() for lot in listing_data.lots],
-        total_lots=len(listing_data.lots)
+        total_lots=len(listing_data.lots),
+        status=status
     )
     
     listing_dict = listing.model_dump()
     listing_dict["auction_end_date"] = listing_dict["auction_end_date"].isoformat()
     listing_dict["created_at"] = listing_dict["created_at"].isoformat()
+    if listing_dict["auction_start_date"]:
+        listing_dict["auction_start_date"] = listing_dict["auction_start_date"].isoformat()
     
     await db.multi_item_listings.insert_one(listing_dict)
     
