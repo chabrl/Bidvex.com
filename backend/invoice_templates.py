@@ -176,9 +176,12 @@ def lots_won_template(data: Dict[str, Any]) -> str:
     </head>
     <body>
         <div class="header">
-            <h1>BidVex</h1>
-            <p>Online Auction Platform</p>
-            <p>www.bidvex.com | support@bidvex.com</p>
+            <img src="{BIDVEX_LOGO_BASE64}" alt="BidVex Logo" class="header-logo" />
+            <div class="header-text">
+                <h1>BidVex</h1>
+                <p>Online Auction Platform</p>
+                <p>www.bidvex.com | support@bidvex.com</p>
+            </div>
         </div>
 
         <div class="invoice-title">
