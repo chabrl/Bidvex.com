@@ -133,6 +133,81 @@ backend:
         agent: "testing"
         comment: "COMPREHENSIVE TESTING COMPLETED: All 7 multi-item listings API tests PASSED. ✅ POST /api/multi-item-listings: Successfully creates listings with business accounts, correctly rejects personal accounts (403) and unauthenticated requests (401). Validates lot data including price ranges (1-10,000 CAD), quantities (1-100), and description lengths (20-500 chars). ✅ GET /api/multi-item-listings: Successfully retrieves all active listings with proper structure. ✅ GET /api/multi-item-listings/{id}: Successfully retrieves specific listings with complete lot details, returns 404 for non-existent listings. Created 5 test listings (1 minimal, 1 bulk with 10 lots, 3 validation edge cases). All endpoints working perfectly for Phase 3 Multi-Lot Wizard backend requirements."
 
+  - task: "Invoice System - Seller Statement"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ SELLER STATEMENT ENDPOINT TESTED: POST /api/invoices/seller-statement/{auction_id}/{seller_id} working perfectly. Generates PDF with 0% commission rate correctly displayed. Authorization working (403 for unauthorized users, 401 for unauthenticated). PDF generated at /app/invoices/{seller_id}/SellerStatement_{auction_id}.pdf. Invoice record saved to database with proper metadata. Zero commission policy correctly implemented - no commission deductions shown in document."
+
+  - task: "Invoice System - Seller Receipt"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ SELLER RECEIPT ENDPOINT TESTED: POST /api/invoices/seller-receipt/{auction_id}/{seller_id} working perfectly. Net payout equals hammer total (no deductions) as expected with 0% commission. Receipt number generated correctly (RCPT-{auction_id}-{timestamp}). PDF generated successfully. Authorization working properly. Zero commission policy verified - commission, GST on commission, and QST on commission all show $0.00. 'No commission charged for this auction' notice present in document."
+
+  - task: "Invoice System - Commission Invoice"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ COMMISSION INVOICE ENDPOINT TESTED: POST /api/invoices/commission-invoice/{auction_id}/{seller_id} working perfectly. Commission amount correctly calculated as $0.00 with 0% commission rate. Invoice number generated in format BV-COMM-{year}-{auction_id}-{sequence}. PDF generated successfully. Total due is $0.00 as expected. 'No commission charged for this auction' notice present in payment terms. Authorization working correctly."
+
+  - task: "Invoice System - Buyer Lots Won Summary"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ BUYER LOTS WON SUMMARY TESTED: POST /api/invoices/lots-won/{auction_id}/{user_id} working perfectly. Paddle number auto-generated (starting at 5051). Invoice number generated in format BV-{year}-{auction_id}-{sequence}. PDF generated successfully with all lot details. Payment separation notice present showing 'To Seller: ${hammer_total}' and 'To BidVex: ${premium + taxes}'. Authorization working (403 for unauthorized, 401 for unauthenticated). Buyer premium (5%) and taxes (GST 5%, QST 9.975%) calculated correctly."
+
+  - task: "Invoice System - Payment Letter"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PAYMENT LETTER ENDPOINT TESTED: POST /api/invoices/payment-letter/{auction_id}/{user_id} working perfectly. Two-part payment instructions clearly separated. Amount due calculated correctly including hammer total, premium (5%), GST (5%), and QST (9.975%). PDF generated successfully. Reuses invoice number from lots won summary if exists. Authorization working properly. Payment deadline displayed correctly."
+
+  - task: "Invoice System - Router Registration Fix"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "testing"
+        comment: "❌ CRITICAL BUG FOUND: Invoice endpoints returning 404. Root cause: app.include_router(api_router) was called at line 2439, but invoice endpoints defined starting at line 2479 (AFTER router inclusion). This means invoice endpoints were never registered with the FastAPI app."
+      - working: true
+        agent: "testing"
+        comment: "✅ BUG FIXED: Moved app.include_router(api_router) from line 2439 to after line 3002 (after all invoice endpoints are defined). Also moved CORS middleware and shutdown event handler to proper location. Backend restarted successfully. All invoice endpoints now accessible and working perfectly. WeasyPrint dependency issue also resolved by installing libpangocairo-1.0-0."
+
 frontend:
   - task: "Multi-Lot Wizard - Step-by-Step UI"
     implemented: true
