@@ -1,15 +1,21 @@
 """
 Invoice HTML Templates for BidVex
+Supports bilingual rendering (English/French)
 """
 
 from datetime import datetime
 from typing import List, Dict, Any
 from logo_data import BIDVEX_LOGO_BASE64
+from invoice_translations import get_translation as t
 
-def lots_won_template(data: Dict[str, Any]) -> str:
+def lots_won_template(data: Dict[str, Any], lang: str = "en") -> str:
     """
     Generate HTML for Buyer Lots Won Summary PDF
     Matches Renaissance Bistro format
+    
+    Args:
+        data: Invoice data
+        lang: Language code ('en' or 'fr')
     """
     
     # Calculate totals
