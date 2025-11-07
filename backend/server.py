@@ -2934,7 +2934,7 @@ async def generate_commission_invoice(
     
     # Calculate totals
     total_hammer = sum(lot['current_price'] for lot in auction['lots'][:3])
-    commission_rate = auction.get('commission_rate', 15.0)
+    commission_rate = auction.get('commission_rate', 0.0)
     commission_amount = total_hammer * (commission_rate / 100)
     
     # Calculate net payout
