@@ -103,15 +103,17 @@
 #====================================================================================================
 
 user_problem_statement: |
-  Phase 5 (Part 1): Invoice System MVP - Buyer Lots Won Summary
+  Phase 5 (Part 1): Invoice System MVP - Buyer Lots Won Summary with Logo
   Backend: WeasyPrint PDF generation, invoice models, paddle number system
   Database: Added billing_address to User, premium/tax fields to MultiItemListing
   Models: PaddleNumber, Invoice models for tracking
-  Template: HTML/CSS template matching Renaissance Bistro format
+  Template: HTML/CSS template matching Renaissance Bistro format with BidVex logo
+  Logo: Embedded as base64, 150px width, top-left header position
   Calculations: Hammer total, 5% premium, GST/QST taxes on both amounts
   Storage: /invoices/{user_id}/ directory structure
   Invoice numbering: BV-{year}-{auction_id_short}-{sequence}
   Paddle numbers: Auto-generated starting from 5051 per auction
+  Branding: BidVex logo (#009BFF blue theme) consistently applied
 
 backend:
   - task: "Multi-Item Listings API (Existing)"
