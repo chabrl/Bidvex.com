@@ -1020,22 +1020,22 @@ def seller_receipt_template(data: Dict[str, Any]) -> str:
             
             <div class="calc-row">
                 <span>Commission ({commission_rate}%):</span>
-                <span style="color: #dc3545;">-${commission_amount:.2f}</span>
+                <span>-${commission_amount:.2f}</span>
             </div>
             
             <div class="calc-row">
                 <span>GST on Commission ({tax_rate_gst}%):</span>
-                <span style="color: #dc3545;">-${gst_on_commission:.2f}</span>
+                <span>-${gst_on_commission:.2f}</span>
             </div>
             
             <div class="calc-row">
                 <span>QST on Commission ({tax_rate_qst}%):</span>
-                <span style="color: #dc3545;">-${qst_on_commission:.2f}</span>
+                <span>-${qst_on_commission:.2f}</span>
             </div>
             
             <div class="calc-row subtotal">
                 <span>Total Deductions:</span>
-                <span style="color: #dc3545;">-${total_deductions:.2f}</span>
+                <span>-${total_deductions:.2f}</span>
             </div>
             
             <div class="calc-row total">
@@ -1043,6 +1043,8 @@ def seller_receipt_template(data: Dict[str, Any]) -> str:
                 <span>${net_payout:.2f} CAD</span>
             </div>
         </div>
+        
+        {f'<div style="background: #e7f3ff; padding: 15px; margin: 20px 0; border-left: 4px solid #009BFF; border-radius: 3px;"><p style="margin: 0; color: #0066cc; font-weight: bold;">📢 No commission charged for this auction</p></div>' if commission_rate == 0.0 else ''}
 
         <div class="payment-info">
             <h3>💳 PAYMENT INFORMATION</h3>
