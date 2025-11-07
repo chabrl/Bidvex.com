@@ -196,6 +196,7 @@ class MultiItemListingCreate(BaseModel):
     city: str
     region: str
     auction_end_date: datetime
+    auction_start_date: Optional[datetime] = None
     lots: List[Lot]
 
 class MultiItemListing(BaseModel):
