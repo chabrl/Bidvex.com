@@ -66,6 +66,58 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+# Scheduled job to transition upcoming auctions to active
+async def transition_upcoming_auctions():
+    """
+    Background task that runs every 5 minutes to check for upcoming auctions
+    whose start date has passed and transitions them to 'active' status.
+    """
+    try:
+        now = datetime.now(timezone.utc)
+        
+        # Find all upcoming auctions where start date has passed
+        upcoming_auctions = await db.multi_item_listings.find({
+            "status": "upcoming",
+            "auction_start_date": {"$lte": now.isoformat()}
+        }).to_list(100)
+        
+        transition_count = 0
+        for auction in upcoming_auctions:
+            # Update status to active
+            await db.multi_item_listings.update_one(
+                {"id": auction["id"]},
+                {"$set": {"status": "active"}}
+            )
+            transition_count += 1
+            logger.info(f"Transitioned auction {auction['id']} from upcoming to active")
+        
+        if transition_count > 0:
+            logger.info(f"✅ Transitioned {transition_count} upcoming auction(s) to active")
+        
+    except Exception as e:
+        logger.error(f"❌ Error in transition_upcoming_auctions: {str(e)}")
+
+# Initialize APScheduler
+scheduler = AsyncIOScheduler()
+scheduler.add_job(
+    transition_upcoming_auctions,
+    trigger=IntervalTrigger(minutes=5),
+    id='transition_upcoming_auctions',
+    name='Transition upcoming auctions to active',
+    replace_existing=True
+)
+
+# Start scheduler on app startup
+@app.on_event("startup")
+async def start_scheduler():
+    scheduler.start()
+    logger.info("🚀 APScheduler started - checking for upcoming auctions every 5 minutes")
+
+@app.on_event("shutdown")
+async def shutdown_scheduler():
+    scheduler.shutdown()
+    logger.info("🛑 APScheduler shut down")
+
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
