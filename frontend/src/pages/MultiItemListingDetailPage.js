@@ -158,13 +158,43 @@ const MultiItemListingDetailPage = () => {
     );
   }
 
+  const isPreviewMode = listing.status === 'upcoming';
   const auctionEnded = isAuctionEnded(listing.auction_end_date);
   const totalStartingValue = listing.lots.reduce((sum, lot) => sum + lot.starting_price, 0);
   const totalCurrentValue = listing.lots.reduce((sum, lot) => sum + lot.current_price, 0);
+  const auctionStartDate = listing.auction_start_date ? new Date(listing.auction_start_date) : null;
 
   return (
     <div className="min-h-screen py-8 px-4">
       <div className="max-w-7xl mx-auto">
+        {/* Preview Mode Banner */}
+        {isPreviewMode && (
+          <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-950 border-2 border-amber-500 rounded-lg">
+            <div className="flex items-center gap-3">
+              <Clock className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+              <div className="flex-1">
+                <h3 className="font-bold text-amber-900 dark:text-amber-100">
+                  Preview Mode - Auction Not Yet Live
+                </h3>
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  Bidding opens in{' '}
+                  {auctionStartDate && (
+                    <Countdown 
+                      date={auctionStartDate}
+                      renderer={({ days, hours, minutes, completed }) => (
+                        <span className="font-semibold">
+                          {completed ? 'moments' : `${days}d ${hours}h ${minutes}m`}
+                        </span>
+                      )}
+                    />
+                  )}
+                  . You can preview lots and favorite this auction.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex gap-6">
           {/* Main Content */}
           <div className="flex-1">
@@ -185,8 +215,11 @@ const MultiItemListingDetailPage = () => {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
                       <Package className="h-6 w-6 text-primary" />
-                      <Badge variant={auctionEnded ? "secondary" : "default"}>
-                        {auctionEnded ? 'Auction Ended' : 'Active Auction'}
+                      <Badge 
+                        variant={isPreviewMode ? "secondary" : auctionEnded ? "secondary" : "default"}
+                        className={isPreviewMode ? "bg-amber-500 text-white" : ""}
+                      >
+                        {isPreviewMode ? 'Coming Soon' : auctionEnded ? 'Auction Ended' : 'Active Auction'}
                       </Badge>
                       <Badge variant="outline">{listing.total_lots} Lots</Badge>
                     </div>
