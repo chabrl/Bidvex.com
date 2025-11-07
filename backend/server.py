@@ -2749,6 +2749,246 @@ async def get_user_invoices(
     
     return invoices
 
+@api_router.post("/invoices/seller-statement/{auction_id}/{seller_id}")
+async def generate_seller_statement(
+    auction_id: str,
+    seller_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Generate Seller Statement PDF"""
+    if current_user.account_type != "admin" and current_user.id != seller_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    auction = await db.multi_item_listings.find_one({"id": auction_id})
+    if not auction:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    
+    seller = await db.users.find_one({"id": seller_id})
+    if not seller:
+        raise HTTPException(status_code=404, detail="Seller not found")
+    
+    # Prepare lots with buyer info (demo: mark first 3 as sold)
+    lots_data = []
+    for i, lot in enumerate(auction['lots']):
+        lot_info = {
+            "lot_number": lot['lot_number'],
+            "title": lot['title'],
+            "description": lot['description'],
+            "status": "sold" if i < 3 else "unsold"
+        }
+        
+        if i < 3:  # Sold lots
+            lot_info["hammer_price"] = lot['current_price']
+            lot_info["buyer_name"] = "Test Buyer"
+            lot_info["paddle_number"] = 5051 + i
+        
+        lots_data.append(lot_info)
+    
+    from invoice_templates import seller_statement_template
+    template_data = {
+        "seller": {
+            "name": seller['name'],
+            "company_name": seller.get('company_name'),
+            "address": seller.get('address'),
+            "email": seller['email'],
+            "phone": seller['phone']
+        },
+        "auction": {
+            "title": auction['title'],
+            "city": auction['city'],
+            "region": auction['region'],
+            "auction_end_date": datetime.fromisoformat(auction['auction_end_date']) if isinstance(auction['auction_end_date'], str) else auction['auction_end_date']
+        },
+        "lots": lots_data,
+        "commission_rate": auction.get('commission_rate', 15.0)
+    }
+    
+    html_content = seller_statement_template(template_data)
+    
+    invoice_dir = Path(f"/app/invoices/{seller_id}")
+    invoice_dir.mkdir(parents=True, exist_ok=True)
+    
+    pdf_filename = f"SellerStatement_{auction_id}.pdf"
+    pdf_path = invoice_dir / pdf_filename
+    
+    HTML(string=html_content).write_pdf(pdf_path)
+    
+    invoice_record = {
+        "id": str(uuid.uuid4()),
+        "invoice_number": f"STMT-{auction_id[:8]}",
+        "invoice_type": "seller_statement",
+        "user_id": seller_id,
+        "auction_id": auction_id,
+        "pdf_path": str(pdf_path),
+        "generated_date": datetime.now(timezone.utc).isoformat(),
+        "status": "generated"
+    }
+    await db.invoices.insert_one(invoice_record)
+    
+    return {
+        "success": True,
+        "pdf_path": str(pdf_path),
+        "message": "Seller statement generated successfully"
+    }
+
+@api_router.post("/invoices/seller-receipt/{auction_id}/{seller_id}")
+async def generate_seller_receipt(
+    auction_id: str,
+    seller_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Generate Seller Receipt PDF"""
+    if current_user.account_type != "admin" and current_user.id != seller_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    auction = await db.multi_item_listings.find_one({"id": auction_id})
+    if not auction:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    
+    seller = await db.users.find_one({"id": seller_id})
+    if not seller:
+        raise HTTPException(status_code=404, detail="Seller not found")
+    
+    # Calculate totals (demo: first 3 lots sold)
+    total_hammer = sum(lot['current_price'] for lot in auction['lots'][:3])
+    
+    from invoice_templates import seller_receipt_template
+    template_data = {
+        "receipt_number": f"RCPT-{auction_id[:8]}-{int(datetime.now().timestamp())}",
+        "seller": {
+            "name": seller['name'],
+            "company_name": seller.get('company_name'),
+            "address": seller.get('address'),
+            "email": seller['email']
+        },
+        "auction": {
+            "title": auction['title'],
+            "auction_end_date": datetime.fromisoformat(auction['auction_end_date']) if isinstance(auction['auction_end_date'], str) else auction['auction_end_date']
+        },
+        "total_lots": len(auction['lots']),
+        "lots_sold": 3,
+        "total_hammer": total_hammer,
+        "commission_rate": auction.get('commission_rate', 15.0),
+        "tax_rate_gst": auction.get('tax_rate_gst', 5.0),
+        "tax_rate_qst": auction.get('tax_rate_qst', 9.975),
+        "payment_method": "Bank Transfer",
+        "payment_date": "Within 5-7 business days"
+    }
+    
+    html_content = seller_receipt_template(template_data)
+    
+    invoice_dir = Path(f"/app/invoices/{seller_id}")
+    invoice_dir.mkdir(parents=True, exist_ok=True)
+    
+    pdf_filename = f"SellerReceipt_{auction_id}.pdf"
+    pdf_path = invoice_dir / pdf_filename
+    
+    HTML(string=html_content).write_pdf(pdf_path)
+    
+    invoice_record = {
+        "id": str(uuid.uuid4()),
+        "invoice_number": template_data['receipt_number'],
+        "invoice_type": "seller_receipt",
+        "user_id": seller_id,
+        "auction_id": auction_id,
+        "pdf_path": str(pdf_path),
+        "generated_date": datetime.now(timezone.utc).isoformat(),
+        "status": "generated"
+    }
+    await db.invoices.insert_one(invoice_record)
+    
+    return {
+        "success": True,
+        "pdf_path": str(pdf_path),
+        "receipt_number": template_data['receipt_number'],
+        "message": "Seller receipt generated successfully"
+    }
+
+@api_router.post("/invoices/commission-invoice/{auction_id}/{seller_id}")
+async def generate_commission_invoice(
+    auction_id: str,
+    seller_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Generate Commission Invoice PDF (BidVex to Seller)"""
+    if current_user.account_type != "admin" and current_user.id != seller_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    auction = await db.multi_item_listings.find_one({"id": auction_id})
+    if not auction:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    
+    seller = await db.users.find_one({"id": seller_id})
+    if not seller:
+        raise HTTPException(status_code=404, detail="Seller not found")
+    
+    # Calculate totals
+    total_hammer = sum(lot['current_price'] for lot in auction['lots'][:3])
+    commission_rate = auction.get('commission_rate', 15.0)
+    commission_amount = total_hammer * (commission_rate / 100)
+    
+    # Calculate net payout
+    tax_rate_gst = auction.get('tax_rate_gst', 5.0)
+    tax_rate_qst = auction.get('tax_rate_qst', 9.975)
+    gst = commission_amount * (tax_rate_gst / 100)
+    qst = commission_amount * (tax_rate_qst / 100)
+    net_payout = total_hammer - commission_amount - gst - qst
+    
+    invoice_number = f"BV-COMM-{datetime.now().year}-{auction_id[:8]}-0001"
+    
+    from invoice_templates import commission_invoice_template
+    template_data = {
+        "invoice_number": invoice_number,
+        "seller": {
+            "name": seller['name'],
+            "company_name": seller.get('company_name'),
+            "address": seller.get('address'),
+            "email": seller['email'],
+            "phone": seller['phone']
+        },
+        "auction": {
+            "title": auction['title'],
+            "auction_end_date": datetime.fromisoformat(auction['auction_end_date']) if isinstance(auction['auction_end_date'], str) else auction['auction_end_date']
+        },
+        "total_hammer": total_hammer,
+        "lots_sold": 3,
+        "commission_rate": commission_rate,
+        "commission_amount": commission_amount,
+        "tax_rate_gst": tax_rate_gst,
+        "tax_rate_qst": tax_rate_qst,
+        "net_payout": net_payout,
+        "due_date": "Upon Receipt"
+    }
+    
+    html_content = commission_invoice_template(template_data)
+    
+    invoice_dir = Path(f"/app/invoices/{seller_id}")
+    invoice_dir.mkdir(parents=True, exist_ok=True)
+    
+    pdf_filename = f"CommissionInvoice_{auction_id}.pdf"
+    pdf_path = invoice_dir / pdf_filename
+    
+    HTML(string=html_content).write_pdf(pdf_path)
+    
+    invoice_record = {
+        "id": str(uuid.uuid4()),
+        "invoice_number": invoice_number,
+        "invoice_type": "commission_invoice",
+        "user_id": seller_id,
+        "auction_id": auction_id,
+        "pdf_path": str(pdf_path),
+        "generated_date": datetime.now(timezone.utc).isoformat(),
+        "status": "generated"
+    }
+    await db.invoices.insert_one(invoice_record)
+    
+    return {
+        "success": True,
+        "invoice_number": invoice_number,
+        "pdf_path": str(pdf_path),
+        "message": "Commission invoice generated successfully"
+    }
+
 # ==================== END INVOICE GENERATION ====================
 
 @app.on_event("startup")
