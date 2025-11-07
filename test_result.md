@@ -103,23 +103,15 @@
 #====================================================================================================
 
 user_problem_statement: |
-  Phase 4: Metadata-Focused Auction Cards (Remove Pricing)
-  - Remove ALL pricing information from Lots Auction cards:
-    * No starting price display
-    * No current bid display
-    * No bid count display
-  - Display metadata instead:
-    * Category (e.g., Home & Garden, Restaurant Equipment) with Tag icon
-    * City/Location with MapPin icon
-    * Lot Count (number of items) with Package icon
-    * Time Remaining with Clock icon (e.g., "Ends in 2 days")
-  - Add Favorite Button functionality:
-    * Heart icon button on each card image (top-right)
-    * White backdrop-blur circular background
-    * Uses existing WatchlistButton component
-    * Positioned absolute on card image overlay
-  - Apply to both Grid View and List View
-  - Maintain responsive design across all breakpoints
+  Phase 4 (Part 1): Auction Preview Mode - Backend Implementation
+  - Add status: 'upcoming' to multi_item_listings
+  - Add auction_start_date: Optional[DateTime] field to schema
+  - Update POST /api/multi-item-listings to accept auction_start_date and set status based on date
+  - Update GET /api/multi-item-listings to support filtering by status query parameter
+  - Install APScheduler for production-grade scheduled jobs
+  - Create scheduled job running every 5 minutes to transition auctions from 'upcoming' → 'active'
+  - Job checks auction_start_date <= now and updates status
+  - Create test data with 2 upcoming auctions (1 hour, 1 day start times)
 
 backend:
   - task: "Multi-Item Listings API (Existing)"
