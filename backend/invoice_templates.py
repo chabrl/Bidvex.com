@@ -492,7 +492,7 @@ def payment_letter_template(data: Dict[str, Any]) -> str:
             </p>
 
             <div class="highlight-box">
-                <h3>💰 Payment Information</h3>
+                <h3>💰 Total Payment Due</h3>
                 <p style="margin: 5px 0;">Invoice Number: <strong>{data['invoice_number']}</strong></p>
                 <p style="margin: 5px 0;">Your Paddle Number: <strong>{data['paddle_number']}</strong></p>
                 <p class="amount-due">${grand_total:.2f} CAD</p>
@@ -500,23 +500,34 @@ def payment_letter_template(data: Dict[str, Any]) -> str:
                     (Includes hammer price, {data['premium_percentage']}% buyer's premium, and applicable taxes)
                 </p>
             </div>
+            
+            <div class="important">
+                <strong>⚠️ IMPORTANT - Two-Part Payment Required:</strong>
+                <p style="margin: 10px 0 5px 0;">Your total payment is split into two parts:</p>
+                <ol style="margin: 5px 0; padding-left: 20px;">
+                    <li style="margin: 5px 0;"><strong>Payment to Seller:</strong> ${hammer_total:.2f} CAD (Hammer Total)<br>
+                        <span style="font-size: 9pt; color: #666;">Pay this amount directly to the auction seller</span>
+                    </li>
+                    <li style="margin: 5px 0;"><strong>Payment to BidVex:</strong> ${premium_amount + total_tax:.2f} CAD (Premium + Taxes)<br>
+                        <span style="font-size: 9pt; color: #666;">This covers BidVex's 5% buyer's premium and applicable taxes</span>
+                    </li>
+                </ol>
+            </div>
 
             <p>
-                To complete your purchase and arrange for pickup of your items, please submit payment 
+                To complete your purchase, please submit the <strong>BidVex portion (${premium_amount + total_tax:.2f} CAD)</strong> 
                 by <strong>{payment_deadline}</strong> using one of the following methods:
             </p>
 
             <div class="payment-methods">
-                <h4 style="color: #009BFF; margin-bottom: 10px;">Accepted Payment Methods:</h4>
+                <h4 style="color: #009BFF; margin-bottom: 10px;">Payment Methods for BidVex Portion:</h4>
                 <ul>
                     <li><strong>Credit Card:</strong> Visa or Mastercard</li>
-                    <li><strong>Interac e-Transfer:</strong> payments@bidvex.com</li>
+                    <li><strong>Interac e-Transfer:</strong> payments@bidvex.com (Reference: Invoice #{data['invoice_number']})</li>
                 </ul>
-            </div>
-
-            <div class="important">
-                <strong>⚠️ Important:</strong> Your items will be held for pickup once payment is received in full. 
-                Please arrange pickup within 7 days of payment to avoid storage fees.
+                <p style="font-size: 9pt; color: #666; margin-top: 10px;">
+                    Note: The seller will contact you separately regarding payment arrangements for the hammer total.
+                </p>
             </div>
 
             <p>
