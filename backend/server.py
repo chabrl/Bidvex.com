@@ -3001,6 +3001,234 @@ async def generate_commission_invoice(
         "message": "Commission invoice generated successfully"
     }
 
+
+# ==================== AUTO-SEND INVOICES ON AUCTION END ====================
+
+from email_service import MockEmailService
+
+@api_router.post("/auctions/{auction_id}/complete")
+async def complete_auction_and_send_documents(
+    auction_id: str,
+    lang: str = "en",
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Complete auction and automatically generate + send all documents
+    
+    Triggers when auction status changes to 'ended':
+    - Generates all buyer and seller documents
+    - Sends emails with PDF attachments (mock mode)
+    - Updates invoice records with email tracking
+    
+    Query Parameters:
+        lang: Language code for documents ('en' or 'fr')
+    
+    Requires admin privileges
+    """
+    if current_user.account_type != "admin":
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+    
+    # Fetch auction
+    auction = await db.multi_item_listings.find_one({"id": auction_id})
+    if not auction:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    
+    seller_id = auction['seller_id']
+    seller = await db.users.find_one({"id": seller_id})
+    if not seller:
+        raise HTTPException(status_code=404, detail="Seller not found")
+    
+    # Initialize mock email service
+    email_service = MockEmailService(db=db)
+    
+    results = {
+        "auction_id": auction_id,
+        "auction_title": auction['title'],
+        "documents_generated": [],
+        "emails_sent": [],
+        "errors": []
+    }
+    
+    # ===== SELLER DOCUMENTS =====
+    try:
+        # Calculate seller totals
+        total_hammer = sum(lot['current_price'] for lot in auction['lots'][:3])  # Demo: first 3 sold
+        lots_sold = 3
+        commission_rate = auction.get('commission_rate', 0.0)
+        commission_amount = total_hammer * (commission_rate / 100)
+        net_payout = total_hammer - commission_amount
+        
+        seller_pdf_paths = {}
+        
+        # 1. Generate Seller Statement
+        try:
+            statement_response = await generate_seller_statement(auction_id, seller_id, current_user)
+            seller_pdf_paths['statement'] = statement_response['pdf_path']
+            results['documents_generated'].append('seller_statement')
+        except Exception as e:
+            results['errors'].append(f"Seller Statement: {str(e)}")
+        
+        # 2. Generate Seller Receipt
+        try:
+            receipt_response = await generate_seller_receipt(auction_id, seller_id, current_user)
+            seller_pdf_paths['receipt'] = receipt_response['pdf_path']
+            results['documents_generated'].append('seller_receipt')
+        except Exception as e:
+            results['errors'].append(f"Seller Receipt: {str(e)}")
+        
+        # 3. Generate Commission Invoice
+        try:
+            commission_response = await generate_commission_invoice(auction_id, seller_id, current_user)
+            seller_pdf_paths['commission'] = commission_response['pdf_path']
+            results['documents_generated'].append('commission_invoice')
+        except Exception as e:
+            results['errors'].append(f"Commission Invoice: {str(e)}")
+        
+        # Send seller email (mock)
+        if seller_pdf_paths:
+            email_sent = await email_service.send_seller_documents_email(
+                recipient_email=seller['email'],
+                recipient_name=seller['name'],
+                auction_title=auction['title'],
+                total_hammer=total_hammer,
+                lots_sold=lots_sold,
+                net_payout=net_payout,
+                pdf_paths=seller_pdf_paths,
+                lang=lang
+            )
+            
+            if email_sent:
+                results['emails_sent'].append({
+                    "type": "seller_documents",
+                    "recipient": seller['email'],
+                    "documents": list(seller_pdf_paths.keys())
+                })
+                
+                # Update invoice records with email tracking
+                await db.invoices.update_many(
+                    {
+                        "auction_id": auction_id,
+                        "user_id": seller_id,
+                        "invoice_type": {"$in": ["seller_statement", "seller_receipt", "commission_invoice"]}
+                    },
+                    {
+                        "$set": {
+                            "email_sent": True,
+                            "sent_timestamp": datetime.now(timezone.utc).isoformat(),
+                            "recipient_email": seller['email']
+                        }
+                    }
+                )
+    
+    except Exception as e:
+        results['errors'].append(f"Seller documents error: {str(e)}")
+    
+    # ===== BUYER DOCUMENTS =====
+    # Find all buyers (paddle numbers assigned to this auction)
+    paddle_records = await db.paddle_numbers.find({"auction_id": auction_id}).to_list(100)
+    
+    for paddle_record in paddle_records:
+        buyer_id = paddle_record['user_id']
+        paddle_number = paddle_record['paddle_number']
+        
+        try:
+            buyer = await db.users.find_one({"id": buyer_id})
+            if not buyer:
+                continue
+            
+            buyer_pdf_paths = {}
+            
+            # 1. Generate Lots Won Summary
+            try:
+                lots_won_response = await generate_lots_won_invoice(auction_id, buyer_id, lang, current_user)
+                buyer_pdf_paths['lots_won'] = lots_won_response['pdf_path']
+                results['documents_generated'].append(f'lots_won_{buyer_id[:8]}')
+                total_due = lots_won_response.get('total_due', 0)
+                invoice_number = lots_won_response.get('invoice_number', 'N/A')
+            except Exception as e:
+                results['errors'].append(f"Lots Won (Buyer {buyer_id[:8]}): {str(e)}")
+                continue
+            
+            # 2. Generate Payment Letter
+            try:
+                payment_letter_response = await generate_payment_letter(auction_id, buyer_id, current_user)
+                buyer_pdf_paths['payment_letter'] = payment_letter_response['pdf_path']
+                results['documents_generated'].append(f'payment_letter_{buyer_id[:8]}')
+            except Exception as e:
+                results['errors'].append(f"Payment Letter (Buyer {buyer_id[:8]}): {str(e)}")
+            
+            # Send buyer email (mock)
+            if buyer_pdf_paths:
+                email_sent = await email_service.send_buyer_invoice_email(
+                    recipient_email=buyer['email'],
+                    recipient_name=buyer['name'],
+                    auction_title=auction['title'],
+                    invoice_number=invoice_number,
+                    total_due=total_due,
+                    paddle_number=paddle_number,
+                    pdf_paths=buyer_pdf_paths,
+                    lang=lang
+                )
+                
+                if email_sent:
+                    results['emails_sent'].append({
+                        "type": "buyer_invoice",
+                        "recipient": buyer['email'],
+                        "paddle_number": paddle_number,
+                        "documents": list(buyer_pdf_paths.keys())
+                    })
+                    
+                    # Update invoice records with email tracking
+                    await db.invoices.update_many(
+                        {
+                            "auction_id": auction_id,
+                            "user_id": buyer_id,
+                            "invoice_type": {"$in": ["lots_won", "payment_letter"]}
+                        },
+                        {
+                            "$set": {
+                                "email_sent": True,
+                                "sent_timestamp": datetime.now(timezone.utc).isoformat(),
+                                "recipient_email": buyer['email']
+                            }
+                        }
+                    )
+        
+        except Exception as e:
+            results['errors'].append(f"Buyer documents error (buyer {buyer_id[:8]}): {str(e)}")
+    
+    # Update auction status to 'ended'
+    await db.multi_item_listings.update_one(
+        {"id": auction_id},
+        {"$set": {"status": "ended"}}
+    )
+    
+    results['success'] = len(results['errors']) == 0
+    results['summary'] = {
+        "total_documents": len(results['documents_generated']),
+        "total_emails": len(results['emails_sent']),
+        "total_errors": len(results['errors'])
+    }
+    
+    return results
+
+@api_router.get("/email-logs")
+async def get_email_logs(
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get all email logs (mock emails sent)
+    Requires admin privileges
+    """
+    if current_user.account_type != "admin":
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+    
+    email_logs = await db.email_logs.find({}, {"_id": 0}).to_list(100)
+    return {
+        "total": len(email_logs),
+        "emails": email_logs
+    }
+
 # ==================== END INVOICE GENERATION ====================
 
 # Include API router after all endpoints are defined
