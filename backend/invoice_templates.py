@@ -845,14 +845,14 @@ def seller_statement_template(data: Dict[str, Any]) -> str:
 def seller_receipt_template(data: Dict[str, Any]) -> str:
     """
     Generate HTML for Seller Receipt PDF
-    Shows net payout calculation after commission and taxes
+    Shows net payout calculation (zero commission policy)
     """
     
     total_hammer = data['total_hammer']
-    commission_rate = data.get('commission_rate', 15.0)
+    commission_rate = data.get('commission_rate', 0.0)
     commission_amount = total_hammer * (commission_rate / 100)
     
-    # Tax on commission (GST/QST)
+    # Tax on commission (GST/QST) - will be 0 if commission is 0
     tax_rate_gst = data.get('tax_rate_gst', 5.0)
     tax_rate_qst = data.get('tax_rate_qst', 9.975)
     
