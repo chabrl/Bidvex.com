@@ -224,6 +224,187 @@ const LotsMarketplacePage = () => {
           </div>
         </div>
 
+        {/* Coming Soon Section */}
+        {upcomingListings.length > 0 && (
+          <div className="mb-12">
+            <div className="flex items-center gap-3 mb-6">
+              <Clock className="h-6 w-6 text-amber-500" />
+              <h2 className="text-2xl font-bold">
+                {t('lotsMarketplace.comingSoon', 'Coming Soon')}
+              </h2>
+            </div>
+            <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
+              {upcomingListings.map((listing) => {
+                const auctionStartDate = new Date(listing.auction_start_date);
+                
+                if (viewMode === 'list') {
+                  return (
+                    <Card
+                      key={listing.id}
+                      className="overflow-hidden hover:shadow-amber-200 hover:border-amber-300 transition-all duration-200 cursor-pointer glassmorphism relative border-amber-200"
+                      onClick={() => navigate(`/lots/${listing.id}`)}
+                      data-testid={`upcoming-lot-card-${listing.id}`}
+                    >
+                      <div className="flex flex-col md:flex-row">
+                        <div className="w-full md:w-1/3 aspect-video md:aspect-square overflow-hidden relative">
+                          <div className="absolute inset-0 bg-black/10 z-[5]"></div>
+                          <ImageCarousel lots={listing.lots} totalLots={listing.total_lots} />
+                          <div className="absolute top-3 right-3 z-10" onClick={(e) => e.stopPropagation()}>
+                            <div className="bg-white/90 backdrop-blur-sm rounded-full p-2 shadow-md hover:bg-white transition-colors">
+                              <WatchlistButton listingId={listing.id} size="default" />
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex-1 p-6">
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-xl font-bold mb-2 line-clamp-1" title={listing.title}>
+                                {listing.title}
+                              </h3>
+                              <p className="text-muted-foreground text-sm line-clamp-2 mb-3 hidden lg:block">
+                                {listing.description}
+                              </p>
+                            </div>
+                            <Badge className="ml-3 flex-shrink-0 bg-amber-500 hover:bg-amber-600 text-white">
+                              <Clock className="h-3 w-3 mr-1" />
+                              {t('lotsMarketplace.comingSoon', 'Coming Soon')}
+                            </Badge>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                            <div className="flex items-center gap-2">
+                              <Tag className="h-4 w-4 text-primary flex-shrink-0" />
+                              <div className="min-w-0">
+                                <p className="text-xs text-muted-foreground">Category</p>
+                                <p className="text-sm font-medium text-primary truncate">
+                                  {listing.category || 'General'}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                              <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                              <div className="min-w-0">
+                                <p className="text-xs text-muted-foreground">Location</p>
+                                <p className="text-sm font-medium truncate">
+                                  {listing.city}, {listing.region}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                              <Package className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                              <div>
+                                <p className="text-xs text-muted-foreground">Items</p>
+                                <p className="text-sm font-medium">
+                                  {listing.total_lots} {listing.total_lots === 1 ? 'Lot' : 'Lots'}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                              <div>
+                                <p className="text-xs text-muted-foreground">Starts In</p>
+                                <p className="text-sm font-semibold text-amber-600">
+                                  <Countdown 
+                                    date={auctionStartDate}
+                                    renderer={({ days, hours, minutes, completed }) => (
+                                      <span>
+                                        {completed ? 'Live Now!' : `${days}d ${hours}h ${minutes}m`}
+                                      </span>
+                                    )}
+                                  />
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                }
+
+                // Grid View for Upcoming
+                return (
+                  <Card
+                    key={listing.id}
+                    className="overflow-hidden hover:shadow-amber-200 hover:border-amber-300 transition-all duration-200 cursor-pointer glassmorphism flex flex-col h-full relative border-amber-200"
+                    onClick={() => navigate(`/lots/${listing.id}`)}
+                    data-testid={`upcoming-lot-card-${listing.id}`}
+                  >
+                    <div className="absolute top-3 right-3 z-10" onClick={(e) => e.stopPropagation()}>
+                      <div className="bg-white/90 backdrop-blur-sm rounded-full p-2 shadow-md hover:bg-white transition-colors">
+                        <WatchlistButton listingId={listing.id} size="default" />
+                      </div>
+                    </div>
+
+                    <div className="aspect-video overflow-hidden relative">
+                      <div className="absolute inset-0 bg-black/10 z-[5]"></div>
+                      <ImageCarousel lots={listing.lots} totalLots={listing.total_lots} />
+                    </div>
+                    
+                    <CardHeader className="pb-3">
+                      <CardTitle className="line-clamp-2 min-h-[3.5rem] leading-tight" title={listing.title}>
+                        {listing.title}
+                      </CardTitle>
+                    </CardHeader>
+                    
+                    <CardContent className="space-y-3 flex-grow">
+                      <div className="flex items-center gap-2">
+                        <Tag className="h-4 w-4 text-primary flex-shrink-0" />
+                        <span className="text-sm font-medium text-primary truncate">
+                          {listing.category || 'General'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <span className="text-sm text-muted-foreground truncate">
+                          {listing.city}, {listing.region}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <span className="text-sm text-muted-foreground">
+                          {listing.total_lots} {listing.total_lots === 1 ? 'Lot' : 'Lots'}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 pt-2 border-t">
+                        <Clock className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                        <div className="flex flex-col">
+                          <span className="text-xs text-muted-foreground">Starts in</span>
+                          <Countdown
+                            date={auctionStartDate}
+                            renderer={({ days, hours, minutes, completed }) => (
+                              <span className="font-semibold text-sm text-amber-600">
+                                {completed ? 'Live Now!' : `${days}d ${hours}h ${minutes}m`}
+                              </span>
+                            )}
+                          />
+                        </div>
+                      </div>
+                    </CardContent>
+                    
+                    <CardFooter className="mt-auto">
+                      <Button 
+                        className="w-full bg-amber-500 hover:bg-amber-600 text-white border-0 opacity-70 cursor-not-allowed"
+                        disabled
+                      >
+                        <Clock className="h-4 w-4 mr-2" />
+                        {t('lotsMarketplace.biddingOpensSoon', 'Bidding Opens Soon')}
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
