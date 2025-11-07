@@ -2878,7 +2878,7 @@ async def generate_seller_receipt(
         "total_lots": len(auction['lots']),
         "lots_sold": 3,
         "total_hammer": total_hammer,
-        "commission_rate": auction.get('commission_rate', 15.0),
+        "commission_rate": auction.get('commission_rate', 0.0),
         "tax_rate_gst": auction.get('tax_rate_gst', 5.0),
         "tax_rate_qst": auction.get('tax_rate_qst', 9.975),
         "payment_method": "Bank Transfer",
