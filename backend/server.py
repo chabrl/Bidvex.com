@@ -2810,7 +2810,7 @@ async def generate_seller_statement(
             "auction_end_date": datetime.fromisoformat(auction['auction_end_date']) if isinstance(auction['auction_end_date'], str) else auction['auction_end_date']
         },
         "lots": lots_data,
-        "commission_rate": auction.get('commission_rate', 15.0)
+        "commission_rate": auction.get('commission_rate', 0.0)
     }
     
     html_content = seller_statement_template(template_data)
