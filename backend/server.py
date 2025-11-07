@@ -2556,7 +2556,13 @@ async def generate_lots_won_invoice(
     }
     
     # Generate HTML
-    html_content = lots_won_template(template_data)
+    # Generate bilingual HTML
+    try:
+        from invoice_templates_bilingual import lots_won_template as lots_won_bilingual
+        html_content = lots_won_bilingual(template_data, lang=lang)
+    except ImportError:
+        # Fallback to original template if bilingual not available
+        html_content = lots_won_template(template_data)
     
     # Create user invoice directory
     invoice_dir = Path(f"/app/invoices/{user_id}")
