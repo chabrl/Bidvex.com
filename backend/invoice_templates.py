@@ -4,6 +4,7 @@ Invoice HTML Templates for BidVex
 
 from datetime import datetime
 from typing import List, Dict, Any
+from logo_data import BIDVEX_LOGO_BASE64
 
 def lots_won_template(data: Dict[str, Any]) -> str:
     """
