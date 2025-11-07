@@ -185,15 +185,15 @@ def lots_won_template(data: Dict[str, Any], lang: str = "en") -> str:
             <img src="{BIDVEX_LOGO_BASE64}" alt="BidVex Logo" class="header-logo" />
             <div class="header-text">
                 <h1>BidVex</h1>
-                <p>Online Auction Platform</p>
+                <p>{t('online_auction_platform', lang)}</p>
                 <p>www.bidvex.com | support@bidvex.com</p>
             </div>
         </div>
 
         <div class="invoice-title">
-            <h2>LOTS WON SUMMARY</h2>
-            <p>Invoice #: {data['invoice_number']}</p>
-            <p>Date: {datetime.now().strftime('%B %d, %Y')}</p>
+            <h2>{t('lots_won_summary', lang)}</h2>
+            <p>{t('invoice_number', lang)}: {data['invoice_number']}</p>
+            <p>{t('date', lang)}: {datetime.now().strftime('%B %d, %Y')}</p>
         </div>
 
         <div class="info-section">
