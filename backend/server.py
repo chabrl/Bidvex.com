@@ -1060,6 +1060,17 @@ async def create_multi_item_listing(listing_data: MultiItemListingCreate, curren
         if listing_data.auction_start_date > now:
             status = "upcoming"
     
+    # Auto-detect currency if not provided
+    currency = listing_data.currency
+    if not currency:
+        currency = detect_currency_from_location(
+            city=listing_data.city,
+            region=listing_data.region
+        )
+    
+    # Get tax rates based on currency
+    tax_rates = get_tax_rates_for_currency(currency)
+    
     listing = MultiItemListing(
         seller_id=current_user.id,
         title=listing_data.title,
@@ -1072,7 +1083,10 @@ async def create_multi_item_listing(listing_data: MultiItemListingCreate, curren
         auction_start_date=listing_data.auction_start_date,
         lots=[lot.model_dump() for lot in listing_data.lots],
         total_lots=len(listing_data.lots),
-        status=status
+        status=status,
+        currency=currency,
+        tax_rate_gst=tax_rates["tax_rate_gst"],
+        tax_rate_qst=tax_rates["tax_rate_qst"]
     )
     
     listing_dict = listing.model_dump()
