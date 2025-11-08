@@ -143,7 +143,9 @@ class User(BaseModel):
     bank_details: Optional[Dict[str, str]] = None
     picture: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    language: str = "en"
+    language: str = "en"  # Kept for backward compatibility
+    preferred_language: str = "en"  # en or fr
+    preferred_currency: str = "CAD"  # CAD or USD
     affiliate_code: Optional[str] = None
     billing_address: Optional[str] = None  # For invoicing
 
