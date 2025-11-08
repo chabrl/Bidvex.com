@@ -273,11 +273,12 @@ class MultiItemListing(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     total_lots: int = 0
     views: int = 0
+    currency: str = "CAD"  # CAD or USD
     # Invoice configuration
     premium_percentage: float = 5.0  # Buyer's premium (5%)
     commission_rate: float = 0.0      # Seller commission (0% - no commission charged)
-    tax_rate_gst: float = 5.0         # GST (5%)
-    tax_rate_qst: float = 9.975       # QST (9.975%)
+    tax_rate_gst: float = 5.0         # GST (5%) - CAD only
+    tax_rate_qst: float = 9.975       # QST (9.975%) - CAD only
     payment_deadline: Optional[datetime] = None
     pickup_locations: Optional[List[Dict[str, Any]]] = None  # [{address, hours, deadline}]
     # Payment tracking fields
