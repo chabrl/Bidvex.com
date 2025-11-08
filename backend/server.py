@@ -255,6 +255,7 @@ class MultiItemListingCreate(BaseModel):
     auction_end_date: datetime
     auction_start_date: Optional[datetime] = None
     lots: List[Lot]
+    currency: Optional[str] = None  # CAD or USD, auto-detected if not provided
 
 class MultiItemListing(BaseModel):
     model_config = ConfigDict(extra="ignore")
