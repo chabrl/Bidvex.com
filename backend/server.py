@@ -482,8 +482,17 @@ async def get_user(user_id: str):
 
 @api_router.put("/users/me")
 async def update_profile(updates: Dict[str, Any], current_user: User = Depends(get_current_user)):
-    allowed_fields = ["name", "phone", "address", "company_name", "tax_number", "bank_details", "language", "picture"]
+    allowed_fields = ["name", "phone", "address", "company_name", "tax_number", "bank_details", "language", "picture", "preferred_language", "preferred_currency"]
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
+    
+    # Validate language
+    if "preferred_language" in update_data and update_data["preferred_language"] not in ["en", "fr"]:
+        raise HTTPException(status_code=400, detail="Language must be 'en' or 'fr'")
+    
+    # Validate currency
+    if "preferred_currency" in update_data and update_data["preferred_currency"] not in ["CAD", "USD"]:
+        raise HTTPException(status_code=400, detail="Currency must be 'CAD' or 'USD'")
+    
     if update_data:
         await db.users.update_one({"id": current_user.id}, {"$set": update_data})
     return {"message": "Profile updated successfully"}
