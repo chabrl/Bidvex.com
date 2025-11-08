@@ -261,7 +261,7 @@ def lots_won_template(data: Dict[str, Any], lang: str = "en") -> str:
             </div>
             <div class="totals-row grand-total">
                 <span>{t('total_due', lang)}:</span>
-                <span>${grand_total:.2f} CAD</span>
+                <span>${grand_total:.2f} {data.get('currency', 'CAD')}</span>
             </div>
         </div>
 
