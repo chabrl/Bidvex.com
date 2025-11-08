@@ -2586,7 +2586,7 @@ async def generate_lots_won_invoice(
     Requires admin privileges or matching user_id
     
     Query Parameters:
-        lang: Language code ('en' or 'fr') - defaults to 'en'
+        lang: Language code ('en' or 'fr') - uses buyer's preference if not specified
     """
     # Check permissions (admin or own invoice)
     if current_user.account_type != "admin" and current_user.id != user_id:
@@ -2601,6 +2601,10 @@ async def generate_lots_won_invoice(
     buyer = await db.users.find_one({"id": user_id})
     if not buyer:
         raise HTTPException(status_code=404, detail="User not found")
+    
+    # Use buyer's preferred language if lang not specified
+    if lang == "en" and buyer.get("preferred_language"):
+        lang = buyer.get("preferred_language", "en")
     
     # Get or create paddle number
     paddle_record = await db.paddle_numbers.find_one({
