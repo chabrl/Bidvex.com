@@ -400,10 +400,16 @@ async def register(user_data: UserCreate):
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
     hashed_pwd = hash_password(user_data.password)
+    
+    # Auto-detect currency from address/location
+    detected_currency = detect_currency_from_location(region=user_data.address)
+    
     user = User(
         email=user_data.email, name=user_data.name, account_type=user_data.account_type,
         phone=user_data.phone, address=user_data.address, company_name=user_data.company_name,
-        tax_number=user_data.tax_number, bank_details=user_data.bank_details
+        tax_number=user_data.tax_number, bank_details=user_data.bank_details,
+        preferred_language="en",  # Default to English
+        preferred_currency=detected_currency  # Auto-detected
     )
     user_dict = user.model_dump()
     user_dict["password"] = hashed_pwd
