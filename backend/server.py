@@ -2666,7 +2666,8 @@ async def generate_lots_won_invoice(
         "premium_percentage": auction.get('premium_percentage', 5.0),
         "tax_rate_gst": auction.get('tax_rate_gst', 5.0),
         "tax_rate_qst": auction.get('tax_rate_qst', 9.975),
-        "payment_deadline": "Within 3 business days"
+        "payment_deadline": "Within 3 business days",
+        "currency": auction.get('currency', 'CAD')  # Include auction currency
     }
     
     # Generate HTML
