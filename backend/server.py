@@ -2449,6 +2449,79 @@ from weasyprint import HTML
 from invoice_templates import lots_won_template
 import os
 
+
+def detect_currency_from_location(city: str = None, region: str = None, country: str = None) -> str:
+    """
+    Detect currency based on user location
+    
+    Args:
+        city: City name
+        region: Region/state/province
+        country: Country name
+    
+    Returns:
+        'CAD' for Canada, 'USD' for United States, defaults to 'CAD'
+    """
+    # Check country first
+    if country:
+        country_lower = country.lower()
+        if 'united states' in country_lower or 'usa' in country_lower or 'us' == country_lower:
+            return 'USD'
+        if 'canada' in country_lower:
+            return 'CAD'
+    
+    # Check region for Canadian provinces
+    canadian_provinces = [
+        'alberta', 'british columbia', 'manitoba', 'new brunswick', 
+        'newfoundland', 'labrador', 'northwest territories', 'nova scotia',
+        'nunavut', 'ontario', 'prince edward island', 'quebec', 'saskatchewan', 'yukon',
+        'ab', 'bc', 'mb', 'nb', 'nl', 'nt', 'ns', 'nu', 'on', 'pe', 'qc', 'sk', 'yt'
+    ]
+    
+    # Check region for US states
+    us_states = [
+        'alabama', 'alaska', 'arizona', 'arkansas', 'california', 'colorado',
+        'connecticut', 'delaware', 'florida', 'georgia', 'hawaii', 'idaho',
+        'illinois', 'indiana', 'iowa', 'kansas', 'kentucky', 'louisiana',
+        'maine', 'maryland', 'massachusetts', 'michigan', 'minnesota', 'mississippi',
+        'missouri', 'montana', 'nebraska', 'nevada', 'new hampshire', 'new jersey',
+        'new mexico', 'new york', 'north carolina', 'north dakota', 'ohio', 'oklahoma',
+        'oregon', 'pennsylvania', 'rhode island', 'south carolina', 'south dakota',
+        'tennessee', 'texas', 'utah', 'vermont', 'virginia', 'washington',
+        'west virginia', 'wisconsin', 'wyoming'
+    ]
+    
+    if region:
+        region_lower = region.lower()
+        if any(province in region_lower for province in canadian_provinces):
+            return 'CAD'
+        if any(state in region_lower for state in us_states):
+            return 'USD'
+    
+    # Default to CAD
+    return 'CAD'
+
+def get_tax_rates_for_currency(currency: str) -> Dict[str, float]:
+    """
+    Get applicable tax rates based on currency
+    
+    Args:
+        currency: 'CAD' or 'USD'
+    
+    Returns:
+        Dict with tax_rate_gst and tax_rate_qst
+    """
+    if currency == 'CAD':
+        return {
+            "tax_rate_gst": 5.0,
+            "tax_rate_qst": 9.975
+        }
+    else:  # USD
+        return {
+            "tax_rate_gst": 0.0,
+            "tax_rate_qst": 0.0
+        }
+
 async def generate_paddle_number(auction_id: str) -> int:
     """Generate next paddle number for auction (starts at 5051)"""
     # Find highest paddle number for this auction
