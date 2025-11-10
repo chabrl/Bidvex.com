@@ -192,52 +192,88 @@ class BazarioCurrencyTester:
             return False
             
     async def test_profile_update_currency_lock(self) -> bool:
-        """Test POST /api/watchlist/add endpoint"""
-        print("\n🧪 Testing POST /api/watchlist/add...")
+        """Test PUT /api/users/me with currency lock enforcement"""
+        print("\n🧪 Testing PUT /api/users/me (Currency Lock Enforcement)...")
         
         try:
-            # Test adding valid listing to watchlist
-            listing_id = self.test_listing_ids[0]
+            # First, get current user info to check currency lock status
+            async with self.session.get(
+                f"{BASE_URL}/auth/me",
+                headers=self.get_auth_headers()
+            ) as response:
+                if response.status != 200:
+                    print("❌ Failed to get current user info")
+                    return False
+                
+                user_data = await response.json()
+                is_locked = user_data.get("currency_locked", False)
+                enforced_currency = user_data.get("enforced_currency")
+                
+                print(f"   - Current Currency Locked: {is_locked}")
+                print(f"   - Enforced Currency: {enforced_currency}")
             
-            async with self.session.post(
-                f"{BASE_URL}/watchlist/add?listing_id={listing_id}",
+            # Test 1: Try to update currency when locked (should fail with 403)
+            if is_locked:
+                # Try to change to different currency
+                new_currency = "USD" if enforced_currency == "CAD" else "CAD"
+                
+                async with self.session.put(
+                    f"{BASE_URL}/users/me",
+                    json={"preferred_currency": new_currency},
+                    headers=self.get_auth_headers()
+                ) as response:
+                    if response.status == 403:
+                        data = await response.json()
+                        
+                        # Verify error structure
+                        assert "detail" in data
+                        detail = data["detail"]
+                        assert "error" in detail
+                        assert detail["error"] == "currency_locked"
+                        assert "message" in detail
+                        assert "enforced_currency" in detail
+                        assert "appeal_link" in detail
+                        assert detail["appeal_link"] == "/api/currency-appeal"
+                        
+                        print(f"✅ Correctly blocked currency change when locked")
+                        print(f"   - Error Type: {detail['error']}")
+                        print(f"   - Message: {detail['message']}")
+                        print(f"   - Appeal Link: {detail['appeal_link']}")
+                        
+                    else:
+                        print(f"❌ Should have returned 403 for locked currency, got: {response.status}")
+                        text = await response.text()
+                        print(f"Response: {text}")
+                        return False
+            
+            # Test 2: Try to update currency to same value (should succeed)
+            async with self.session.put(
+                f"{BASE_URL}/users/me",
+                json={"preferred_currency": enforced_currency},
                 headers=self.get_auth_headers()
             ) as response:
                 if response.status == 200:
-                    data = await response.json()
-                    
-                    # Verify response structure
-                    assert "message" in data
-                    assert "success" in data
-                    assert data["success"] is True
-                    assert data["message"] == "Added to watchlist"
-                    
-                    print(f"✅ Successfully added listing to watchlist: {listing_id}")
-                    print(f"   - Message: {data['message']}")
-                    
-                    # Test adding duplicate listing (should return already_added)
-                    async with self.session.post(
-                        f"{BASE_URL}/watchlist/add?listing_id={listing_id}",
-                        headers=self.get_auth_headers()
-                    ) as dup_response:
-                        if dup_response.status == 200:
-                            dup_data = await dup_response.json()
-                            assert "already_added" in dup_data
-                            assert dup_data["already_added"] is True
-                            assert dup_data["message"] == "Already in watchlist"
-                            print(f"✅ Correctly handled duplicate addition")
-                        else:
-                            print(f"❌ Failed duplicate test: {dup_response.status}")
-                            return False
-                    
-                    return True
+                    print(f"✅ Successfully updated currency to same value: {enforced_currency}")
                 else:
-                    print(f"❌ Failed to add to watchlist: {response.status}")
-                    text = await response.text()
-                    print(f"Response: {text}")
+                    print(f"❌ Failed to update currency to same value: {response.status}")
                     return False
+            
+            # Test 3: Try to update other profile fields (should work)
+            async with self.session.put(
+                f"{BASE_URL}/users/me",
+                json={"name": "Updated Currency Tester"},
+                headers=self.get_auth_headers()
+            ) as response:
+                if response.status == 200:
+                    print(f"✅ Successfully updated other profile fields")
+                else:
+                    print(f"❌ Failed to update other profile fields: {response.status}")
+                    return False
+            
+            return True
+            
         except Exception as e:
-            print(f"❌ Error testing add to watchlist: {str(e)}")
+            print(f"❌ Error testing profile update currency lock: {str(e)}")
             return False
             
     async def test_check_watchlist_status(self) -> bool:
