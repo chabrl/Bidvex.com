@@ -193,6 +193,10 @@ const AdminDashboard = () => {
                 <AffiliateManager />
               </TabsContent>
 
+              <TabsContent value="currency-appeals">
+                <CurrencyAppealsManager />
+              </TabsContent>
+
               <TabsContent value="reports">
                 <ReportManager />
               </TabsContent>
