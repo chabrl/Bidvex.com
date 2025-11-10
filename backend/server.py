@@ -407,6 +407,61 @@ def create_access_token(data: dict) -> str:
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, jwt_secret, algorithm="HS256")
 
+# Increment logic helper functions
+def get_minimum_increment_tiered(current_bid: float) -> float:
+    """
+    Tiered increment schedule (Option A):
+    $0-$99.99 → $5
+    $100-$499.99 → $10
+    $500-$999.99 → $25
+    $1,000-$4,999.99 → $50
+    $5,000-$9,999.99 → $100
+    $10,000-$49,999.99 → $250
+    $50,000-$99,999.99 → $500
+    $100,000+ → $1,000
+    """
+    if current_bid < 100:
+        return 5
+    elif current_bid < 500:
+        return 10
+    elif current_bid < 1000:
+        return 25
+    elif current_bid < 5000:
+        return 50
+    elif current_bid < 10000:
+        return 100
+    elif current_bid < 50000:
+        return 250
+    elif current_bid < 100000:
+        return 500
+    else:
+        return 1000
+
+def get_minimum_increment_simplified(current_bid: float) -> float:
+    """
+    Simplified increment schedule (Option B):
+    $0-$100 → $1
+    $100-$1,000 → $5
+    $1,000-$10,000 → $25
+    $10,000+ → $100
+    """
+    if current_bid <= 100:
+        return 1
+    elif current_bid <= 1000:
+        return 5
+    elif current_bid <= 10000:
+        return 25
+    else:
+        return 100
+
+def get_minimum_increment(auction: dict, current_bid: float) -> float:
+    """Get minimum increment based on auction's increment_option"""
+    increment_option = auction.get("increment_option", "tiered")
+    if increment_option == "simplified":
+        return get_minimum_increment_simplified(current_bid)
+    else:
+        return get_minimum_increment_tiered(current_bid)
+
 async def get_current_user(request: Request, credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> User:
     token = None
     if "session_token" in request.cookies:
