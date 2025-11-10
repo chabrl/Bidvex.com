@@ -370,12 +370,15 @@ const LotsMarketplacePage = () => {
                     data-testid={`upcoming-lot-card-${listing.id}`}
                   >
                     <div className="absolute top-3 right-3 z-10" onClick={(e) => e.stopPropagation()}>
-                      <div className="bg-white/90 backdrop-blur-sm rounded-full p-2 shadow-md hover:bg-white transition-colors">
-                        <WatchlistButton listingId={listing.id} size="default" />
-                      </div>
+                      <WishlistHeartButton 
+                        auctionId={listing.id} 
+                        size="default"
+                        showCount={true}
+                        wishlistCount={listing.wishlist_count || 0}
+                      />
                     </div>
 
-                    <div className="aspect-video overflow-hidden relative">
+                    <div className="aspect-video overflow-hidden relative h-48">
                       <div className="absolute inset-0 bg-black/10 z-[5]"></div>
                       <ImageCarousel lots={listing.lots} totalLots={listing.total_lots} />
                     </div>
