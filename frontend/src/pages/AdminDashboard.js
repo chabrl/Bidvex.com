@@ -147,12 +147,12 @@ const AdminDashboard = () => {
         {/* Main Tabs */}
         <Tabs defaultValue="users" className="space-y-6">
           <TabsList className="grid w-full grid-cols-2 lg:grid-cols-6 gap-2">
-            <TabsTrigger value="users"><Users className="h-4 w-4 mr-2" />Users</TabsTrigger>
-            <TabsTrigger value="lots"><Package className="h-4 w-4 mr-2" />Lots</TabsTrigger>
-            <TabsTrigger value="auctions"><Gavel className="h-4 w-4 mr-2" />Auctions</TabsTrigger>
-            <TabsTrigger value="trust"><Shield className="h-4 w-4 mr-2" />Trust & Safety</TabsTrigger>
-            <TabsTrigger value="analytics"><TrendingUp className="h-4 w-4 mr-2" />Analytics</TabsTrigger>
-            <TabsTrigger value="settings"><Settings className="h-4 w-4 mr-2" />Settings</TabsTrigger>
+            <TabsTrigger value="users"><Users className="h-4 w-4 mr-2" />{t('admin.users')}</TabsTrigger>
+            <TabsTrigger value="lots"><Package className="h-4 w-4 mr-2" />{t('admin.lots')}</TabsTrigger>
+            <TabsTrigger value="auctions"><Gavel className="h-4 w-4 mr-2" />{t('admin.auctions')}</TabsTrigger>
+            <TabsTrigger value="trust"><Shield className="h-4 w-4 mr-2" />{t('admin.trustSafety')}</TabsTrigger>
+            <TabsTrigger value="analytics"><TrendingUp className="h-4 w-4 mr-2" />{t('admin.analytics')}</TabsTrigger>
+            <TabsTrigger value="settings"><Settings className="h-4 w-4 mr-2" />{t('admin.settings')}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="users">
