@@ -90,8 +90,28 @@ export const AuthProvider = ({ children }) => {
     delete axios.defaults.headers.common['Authorization'];
   };
 
+  const updateUserPreferences = async (preferences) => {
+    try {
+      const response = await axios.put(`${API}/users/me`, preferences);
+      
+      // Update local user state
+      const updatedResponse = await axios.get(`${API}/auth/me`);
+      setUser(updatedResponse.data);
+      
+      // Sync language with i18next if changed
+      if (preferences.preferred_language) {
+        i18n.changeLanguage(preferences.preferred_language);
+      }
+      
+      return updatedResponse.data;
+    } catch (error) {
+      console.error('Failed to update preferences:', error);
+      throw error;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, processGoogleSession, token }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, processGoogleSession, updateUserPreferences, token }}>
       {children}
     </AuthContext.Provider>
   );
