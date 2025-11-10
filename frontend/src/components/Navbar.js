@@ -126,6 +126,15 @@ const Navbar = () => {
                     {t('nav.buyerDashboard')}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
+                  {(user.role === 'admin' || user.role === 'superadmin' || user.account_type === 'admin' || user.email?.endsWith('@admin.bazario.com')) && (
+                    <>
+                      <DropdownMenuItem onClick={() => navigate('/admin')} data-testid="admin-dashboard-link" className="text-primary font-semibold">
+                        <Shield className="mr-2 h-4 w-4" />
+                        🛡️ Admin Panel
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
                   <DropdownMenuItem onClick={() => navigate('/settings')} data-testid="settings-link">
                     <User className="mr-2 h-4 w-4" />
                     Settings
