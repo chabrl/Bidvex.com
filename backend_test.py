@@ -498,7 +498,7 @@ class BazarioCurrencyTester:
             print(f"❌ Error testing geolocation integration: {str(e)}")
             return False
     
-    async def test_authorization_validation(self) -> bool:
+    async def test_authorization_and_validation(self) -> bool:
         """Test authorization and validation scenarios"""
         print("\n🧪 Testing authorization and validation...")
         
