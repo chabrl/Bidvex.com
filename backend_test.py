@@ -23,7 +23,9 @@ class BazarioCurrencyTester:
         self.session = None
         self.auth_token = None
         self.user_id = None
-        self.test_listing_ids = []
+        self.admin_token = None
+        self.admin_id = None
+        self.test_appeal_id = None
         self.test_results = {}
         
     async def setup_session(self):
