@@ -583,14 +583,17 @@ const LotsMarketplacePage = () => {
                   onClick={() => navigate(`/lots/${listing.id}`)}
                   data-testid={`lot-card-${listing.id}`}
                 >
-                  {/* Favorite Button - Absolute positioned on image */}
+                  {/* Wishlist Button - Absolute positioned on image */}
                   <div className="absolute top-3 right-3 z-10" onClick={(e) => e.stopPropagation()}>
-                    <div className="bg-white/90 backdrop-blur-sm rounded-full p-2 shadow-md hover:bg-white transition-colors">
-                      <WatchlistButton listingId={listing.id} size="default" />
-                    </div>
+                    <WishlistHeartButton 
+                      auctionId={listing.id} 
+                      size="default"
+                      showCount={true}
+                      wishlistCount={listing.wishlist_count || 0}
+                    />
                   </div>
 
-                  <div className="aspect-video overflow-hidden">
+                  <div className="aspect-video overflow-hidden h-48">
                     <ImageCarousel lots={listing.lots} totalLots={listing.total_lots} />
                   </div>
                   
