@@ -284,7 +284,9 @@ class MultiItemListing(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     total_lots: int = 0
     views: int = 0
+    wishlist_count: int = 0  # Total users who wishlisted this auction
     currency: str = "CAD"  # CAD or USD
+    increment_option: str = "tiered"  # tiered or simplified
     # Invoice configuration
     premium_percentage: float = 5.0  # Buyer's premium (5%)
     commission_rate: float = 0.0      # Seller commission (0% - no commission charged)
