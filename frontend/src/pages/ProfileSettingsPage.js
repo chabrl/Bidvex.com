@@ -62,10 +62,10 @@ const ProfileSettingsPage = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      await axios.put(`${API}/profile`, profileData);
-      toast.success('Profile updated successfully!');
+      await updateUserPreferences(profileData);
+      toast.success(t('profile.changesSaved'));
     } catch (error) {
-      toast.error('Failed to update profile');
+      toast.error(t('common.error'));
     } finally {
       setLoading(false);
     }
