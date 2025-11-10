@@ -337,7 +337,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Invoice System - Zero Commission Policy"
+    - "Bilingual Invoice Templates - Complete Testing"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
