@@ -9,13 +9,22 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 
 const Navbar = () => {
   const { t, i18n } = useTranslation();
-  const { user, logout } = useAuth();
+  const { user, logout, updateUserPreferences } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const changeLanguage = (lng) => {
+  const changeLanguage = async (lng) => {
     i18n.changeLanguage(lng);
+    
+    // Persist to database if user is logged in
+    if (user) {
+      try {
+        await updateUserPreferences({ preferred_language: lng });
+      } catch (error) {
+        console.error('Failed to save language preference:', error);
+      }
+    }
   };
 
   const handleLogout = async () => {
