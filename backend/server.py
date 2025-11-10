@@ -399,26 +399,54 @@ async def get_current_user(request: Request, credentials: Optional[HTTPAuthoriza
         raise HTTPException(status_code=401, detail="Invalid token")
 
 @api_router.post("/auth/register", response_model=TokenResponse)
-async def register(user_data: UserCreate):
+async def register(user_data: UserCreate, request: Request):
     existing = await db.users.find_one({"email": user_data.email})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
     hashed_pwd = hash_password(user_data.password)
     
-    # Auto-detect currency from address/location
-    detected_currency = detect_currency_from_location(region=user_data.address)
+    # Get geolocation and enforce currency
+    from geolocation_service import geolocation_service
+    client_ip = get_client_ip(request)
     
+    ip_location = await geolocation_service.get_location_from_ip(client_ip)
+    confidence_data = geolocation_service.calculate_location_confidence(
+        ip_location=ip_location,
+        billing_country=None,  # Not available at registration
+        shipping_country=None
+    )
+    enforcement_data = geolocation_service.determine_enforced_currency(
+        ip_location=ip_location,
+        confidence_data=confidence_data
+    )
+    
+    # Create user with enforced currency
     user = User(
         email=user_data.email, name=user_data.name, account_type=user_data.account_type,
         phone=user_data.phone, address=user_data.address, company_name=user_data.company_name,
         tax_number=user_data.tax_number, bank_details=user_data.bank_details,
-        preferred_language="en",  # Default to English
-        preferred_currency=detected_currency  # Auto-detected
+        preferred_language="en",
+        preferred_currency=enforcement_data['enforced_currency'],
+        enforced_currency=enforcement_data['enforced_currency'],
+        currency_locked=enforcement_data['currency_locked'],
+        location_confidence_score=confidence_data['confidence_score']
     )
     user_dict = user.model_dump()
     user_dict["password"] = hashed_pwd
     user_dict["created_at"] = user_dict["created_at"].isoformat()
     await db.users.insert_one(user_dict)
+    
+    # Audit log
+    await db.currency_audit_logs.insert_one({
+        "user_id": user.id,
+        "action": "registration",
+        "ip_address": client_ip,
+        "ip_location": ip_location,
+        "confidence_data": confidence_data,
+        "enforcement_data": enforcement_data,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    })
+    
     token = create_access_token({"sub": user.id})
     return TokenResponse(access_token=token, user=user)
 
