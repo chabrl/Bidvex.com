@@ -49,8 +49,8 @@ class BilingualInvoiceTester:
         try:
             # Try to use existing admin user
             login_data = {
-                "email": "charbel@admin.bazario.com",  # Using existing admin user
-                "password": "AdminTest123!"  # Admin password
+                "email": "seller@test.com",  # Using existing user
+                "password": "password123"  # Test password
             }
             
             async with self.session.post(f"{BASE_URL}/auth/login", json=login_data) as response:
