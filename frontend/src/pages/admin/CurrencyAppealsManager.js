@@ -103,17 +103,17 @@ const CurrencyAppealsManager = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Shield className="h-5 w-5" />
-            Currency Enforcement Appeals
+            {t('admin.appeals.title')}
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Review and manage user requests to change their enforced currency
+            {t('admin.appeals.description')}
           </p>
         </CardHeader>
         <CardContent>
           {appeals.length === 0 ? (
             <div className="text-center py-12">
               <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No currency appeals found</p>
+              <p className="text-muted-foreground">{t('admin.appeals.noAppeals')}</p>
             </div>
           ) : (
             <div className="space-y-4">
