@@ -61,8 +61,8 @@ const SellerDashboard = () => {
           <div>
             <h1 className="text-3xl font-bold mb-2">{t('dashboard.seller.title')}</h1>
             <p className="text-sm text-muted-foreground">
-              {user.account_type === 'business' ? 'Business Account' : 'Personal Account'} - 
-              Commission: {user.account_type === 'business' ? '4.5%' : '5%'}
+              {user.account_type === 'business' ? t('dashboard.seller.businessAccount') : t('dashboard.seller.personalAccount')} - 
+              {t('dashboard.seller.commissionRate')}: {user.account_type === 'business' ? '4.5%' : '5%'}
             </p>
           </div>
           <div className="flex gap-2">
