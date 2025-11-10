@@ -137,11 +137,11 @@ const Navbar = () => {
                   )}
                   <DropdownMenuItem onClick={() => navigate('/settings')} data-testid="settings-link">
                     <User className="mr-2 h-4 w-4" />
-                    Settings
+                    {t('admin.settings')}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/affiliate')} data-testid="affiliate-link">
                     <DollarSign className="mr-2 h-4 w-4" />
-                    Affiliate Program
+                    {t('nav.affiliateDashboard')}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} data-testid="logout-btn">
