@@ -471,6 +471,24 @@ const CreateMultiItemListing = () => {
           />
         </div>
       </div>
+      <div className="space-y-2">
+        <Label htmlFor="currency" className="flex items-center gap-2">
+          💱 Currency
+        </Label>
+        <select
+          id="currency"
+          name="currency"
+          value={formData.currency}
+          onChange={handleChange}
+          className="w-full px-3 py-2 border border-input rounded-md bg-background"
+        >
+          <option value="CAD">🇨🇦 CAD (Canadian Dollar)</option>
+          <option value="USD">🇺🇸 USD (US Dollar)</option>
+        </select>
+        <p className="text-sm text-muted-foreground">
+          All prices in this auction will be in {formData.currency}. {formData.currency === 'CAD' ? 'GST and QST taxes will apply.' : 'No GST/QST for USD auctions.'}
+        </p>
+      </div>
     </div>
   );
 
