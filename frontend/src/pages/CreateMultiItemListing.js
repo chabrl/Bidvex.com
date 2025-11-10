@@ -34,6 +34,7 @@ const CreateMultiItemListing = () => {
     region: '',
     auction_end_date: '',
     currency: user?.preferred_currency || 'CAD',
+    increment_option: 'tiered', // tiered or simplified
   });
 
   // Step 2: Lots
