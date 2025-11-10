@@ -191,7 +191,7 @@ class BazarioCurrencyTester:
             print(f"❌ Error testing user model fields: {str(e)}")
             return False
             
-    async def test_add_to_watchlist(self) -> bool:
+    async def test_profile_update_currency_lock(self) -> bool:
         """Test POST /api/watchlist/add endpoint"""
         print("\n🧪 Testing POST /api/watchlist/add...")
         
