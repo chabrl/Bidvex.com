@@ -84,12 +84,12 @@ class Phase6ComprehensiveTester:
             print(f"❌ Error setting up admin user: {str(e)}")
             return False
             
-    async def login_admin_user(self) -> bool:
+    async def login_admin_user(self, email=None, password=None) -> bool:
         """Login with admin credentials"""
         try:
             login_data = {
-                "email": ADMIN_EMAIL,
-                "password": ADMIN_PASSWORD
+                "email": email or PHASE6_ADMIN_EMAIL,
+                "password": password or PHASE6_ADMIN_PASSWORD
             }
             
             async with self.session.post(f"{BASE_URL}/auth/login", json=login_data) as response:
