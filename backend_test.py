@@ -348,7 +348,7 @@ class BazarioCurrencyTester:
             print(f"❌ Error testing currency appeal submission: {str(e)}")
             return False
             
-    async def test_get_watchlist(self) -> bool:
+    async def test_get_user_appeals(self) -> bool:
         """Test GET /api/watchlist endpoint"""
         print("\n🧪 Testing GET /api/watchlist...")
         
