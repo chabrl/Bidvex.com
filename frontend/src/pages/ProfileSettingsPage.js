@@ -123,7 +123,7 @@ const ProfileSettingsPage = () => {
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="name">Full Name</Label>
+                      <Label htmlFor="name">{t('profile.fullName')}</Label>
                       <Input
                         id="name"
                         value={profileData.name}
@@ -132,7 +132,7 @@ const ProfileSettingsPage = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="phone">Phone Number</Label>
+                      <Label htmlFor="phone">{t('profile.phoneNumber')}</Label>
                       <Input
                         id="phone"
                         type="tel"
@@ -144,7 +144,7 @@ const ProfileSettingsPage = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="address">Address</Label>
+                    <Label htmlFor="address">{t('profile.address')}</Label>
                     <Input
                       id="address"
                       value={profileData.address}
@@ -156,7 +156,7 @@ const ProfileSettingsPage = () => {
                   {user?.account_type === 'business' && (
                     <>
                       <div className="space-y-2">
-                        <Label htmlFor="company_name">Company Name</Label>
+                        <Label htmlFor="company_name">{t('profile.companyName')}</Label>
                         <Input
                           id="company_name"
                           value={profileData.company_name}
@@ -165,7 +165,7 @@ const ProfileSettingsPage = () => {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="tax_number">Tax Number</Label>
+                        <Label htmlFor="tax_number">{t('profile.taxNumber')}</Label>
                         <Input
                           id="tax_number"
                           value={profileData.tax_number}
