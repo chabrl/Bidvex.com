@@ -135,6 +135,7 @@ class User(BaseModel):
     email: EmailStr
     name: str
     account_type: str
+    role: Optional[str] = None  # admin, superadmin, or None for regular users
     phone: str
     phone_verified: bool = False
     address: Optional[str] = None
