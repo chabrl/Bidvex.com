@@ -521,9 +521,22 @@ async def update_profile(updates: Dict[str, Any], current_user: User = Depends(g
     if "preferred_language" in update_data and update_data["preferred_language"] not in ["en", "fr"]:
         raise HTTPException(status_code=400, detail="Language must be 'en' or 'fr'")
     
-    # Validate currency
-    if "preferred_currency" in update_data and update_data["preferred_currency"] not in ["CAD", "USD"]:
-        raise HTTPException(status_code=400, detail="Currency must be 'CAD' or 'USD'")
+    # Validate currency - check if locked
+    if "preferred_currency" in update_data:
+        if update_data["preferred_currency"] not in ["CAD", "USD"]:
+            raise HTTPException(status_code=400, detail="Currency must be 'CAD' or 'USD'")
+        
+        # Check if currency is locked
+        if current_user.currency_locked and update_data["preferred_currency"] != current_user.enforced_currency:
+            raise HTTPException(
+                status_code=403, 
+                detail={
+                    "error": "currency_locked",
+                    "message": "Currency is determined by your location to comply with local tax rules. If you're traveling or have moved, please submit an appeal.",
+                    "enforced_currency": current_user.enforced_currency,
+                    "appeal_link": "/api/currency-appeal"
+                }
+            )
     
     if update_data:
         await db.users.update_one({"id": current_user.id}, {"$set": update_data})
