@@ -212,16 +212,28 @@ class BazarioCurrencyTester:
                 print(f"   - Current Currency Locked: {is_locked}")
                 print(f"   - Enforced Currency: {enforced_currency}")
             
-            # Test 1: Try to update currency when locked (should fail with 403)
-            if is_locked:
-                # Try to change to different currency
-                new_currency = "USD" if enforced_currency == "CAD" else "CAD"
-                
-                async with self.session.put(
-                    f"{BASE_URL}/users/me",
-                    json={"preferred_currency": new_currency},
-                    headers=self.get_auth_headers()
-                ) as response:
+            # Test 1: Try to update currency to same value (should always succeed)
+            async with self.session.put(
+                f"{BASE_URL}/users/me",
+                json={"preferred_currency": enforced_currency},
+                headers=self.get_auth_headers()
+            ) as response:
+                if response.status == 200:
+                    print(f"✅ Successfully updated currency to same value: {enforced_currency}")
+                else:
+                    print(f"❌ Failed to update currency to same value: {response.status}")
+                    return False
+            
+            # Test 2: Try to update currency to different value (behavior depends on lock status)
+            different_currency = "CAD" if enforced_currency == "USD" else "USD"
+            
+            async with self.session.put(
+                f"{BASE_URL}/users/me",
+                json={"preferred_currency": different_currency},
+                headers=self.get_auth_headers()
+            ) as response:
+                if is_locked:
+                    # Should fail with 403 if locked
                     if response.status == 403:
                         data = await response.json()
                         
@@ -239,26 +251,29 @@ class BazarioCurrencyTester:
                         print(f"   - Error Type: {detail['error']}")
                         print(f"   - Message: {detail['message']}")
                         print(f"   - Appeal Link: {detail['appeal_link']}")
-                        
                     else:
                         print(f"❌ Should have returned 403 for locked currency, got: {response.status}")
                         text = await response.text()
                         print(f"Response: {text}")
                         return False
-            
-            # Test 2: Try to update currency to same value (should succeed)
-            async with self.session.put(
-                f"{BASE_URL}/users/me",
-                json={"preferred_currency": enforced_currency},
-                headers=self.get_auth_headers()
-            ) as response:
-                if response.status == 200:
-                    print(f"✅ Successfully updated currency to same value: {enforced_currency}")
                 else:
-                    print(f"❌ Failed to update currency to same value: {response.status}")
-                    return False
+                    # Should succeed if not locked
+                    if response.status == 200:
+                        print(f"✅ Successfully updated currency when not locked: {different_currency}")
+                        
+                        # Change it back for consistency
+                        async with self.session.put(
+                            f"{BASE_URL}/users/me",
+                            json={"preferred_currency": enforced_currency},
+                            headers=self.get_auth_headers()
+                        ) as restore_response:
+                            if restore_response.status != 200:
+                                print(f"⚠️  Failed to restore original currency")
+                    else:
+                        print(f"❌ Failed to update currency when not locked: {response.status}")
+                        return False
             
-            # Test 3: Try to update other profile fields (should work)
+            # Test 3: Try to update other profile fields (should always work)
             async with self.session.put(
                 f"{BASE_URL}/users/me",
                 json={"name": "Updated Currency Tester"},
@@ -268,6 +283,18 @@ class BazarioCurrencyTester:
                     print(f"✅ Successfully updated other profile fields")
                 else:
                     print(f"❌ Failed to update other profile fields: {response.status}")
+                    return False
+            
+            # Test 4: Test invalid currency validation
+            async with self.session.put(
+                f"{BASE_URL}/users/me",
+                json={"preferred_currency": "INVALID"},
+                headers=self.get_auth_headers()
+            ) as response:
+                if response.status == 400:
+                    print(f"✅ Correctly rejected invalid currency in profile update")
+                else:
+                    print(f"❌ Should have rejected invalid currency, got: {response.status}")
                     return False
             
             return True
