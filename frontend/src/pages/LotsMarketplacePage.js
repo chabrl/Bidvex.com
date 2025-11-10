@@ -11,6 +11,7 @@ import Countdown from 'react-countdown';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay } from 'swiper/modules';
 import WatchlistButton from '../components/WatchlistButton';
+import { getCurrencyIcon } from '../utils/currency';
 import 'swiper/css';
 import 'swiper/css/autoplay';
 
