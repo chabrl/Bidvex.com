@@ -198,6 +198,11 @@ const ProfileSettingsPage = () => {
                       <Label htmlFor="currency" className="flex items-center gap-2">
                         <DollarSign className="h-4 w-4" />
                         {t('profile.currency')}
+                        {user?.currency_locked && (
+                          <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                            🔒 Locked
+                          </span>
+                        )}
                       </Label>
                       <select
                         id="currency"
@@ -205,10 +210,27 @@ const ProfileSettingsPage = () => {
                         onChange={(e) => setProfileData({ ...profileData, preferred_currency: e.target.value })}
                         className="w-full px-3 py-2 border border-input rounded-md bg-background"
                         data-testid="currency-select"
+                        disabled={user?.currency_locked}
                       >
                         <option value="CAD">🇨🇦 {t('common.cad')}</option>
                         <option value="USD">🇺🇸 {t('common.usd')}</option>
                       </select>
+                      {user?.currency_locked && (
+                        <div className="text-sm p-3 bg-blue-50 border border-blue-200 rounded-md">
+                          <p className="text-blue-800 mb-2">
+                            💡 Currency is determined by your location to comply with local tax rules. 
+                            If you're traveling or have moved, you can request verification.
+                          </p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.location.href = '/currency-appeal'}
+                            className="text-blue-600 hover:text-blue-700"
+                          >
+                            Request Currency Change
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
 
