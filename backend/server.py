@@ -152,6 +152,12 @@ class User(BaseModel):
     location_confidence_score: Optional[int] = None  # 0-100
     affiliate_code: Optional[str] = None
     billing_address: Optional[str] = None  # For invoicing
+    # Premium subscription fields
+    subscription_tier: str = "free"  # free, premium, vip
+    subscription_status: str = "active"  # active, cancelled, expired
+    subscription_start_date: Optional[datetime] = None
+    subscription_end_date: Optional[datetime] = None
+    monster_bids_used: Dict[str, int] = Field(default_factory=dict)  # {auction_id: count}
 
 class UserLogin(BaseModel):
     email: EmailStr
