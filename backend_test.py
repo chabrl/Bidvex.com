@@ -282,7 +282,7 @@ class BazarioCurrencyTester:
         
         try:
             # Test submitting a valid appeal
-            appeal_data = {
+            appeal_params = {
                 "requested_currency": "USD",
                 "reason": "Relocated to United States for work",
                 "current_location": "New York, NY"
@@ -290,7 +290,7 @@ class BazarioCurrencyTester:
             
             async with self.session.post(
                 f"{BASE_URL}/currency-appeal",
-                json=appeal_data,
+                params=appeal_params,
                 headers=self.get_auth_headers()
             ) as response:
                 if response.status == 200:
