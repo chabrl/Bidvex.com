@@ -2475,6 +2475,16 @@ async def health():
 
 # ==================== INVOICE GENERATION ====================
 
+
+def generate_pdf_from_html(html_content: str, pdf_path: Path):
+    """Lazy import WeasyPrint and generate PDF"""
+    try:
+        from weasyprint import HTML
+        HTML(string=html_content).write_pdf(pdf_path)
+    except Exception as e:
+        logger.error(f"PDF generation error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {str(e)}")
+
 # WeasyPrint import moved to lazy loading to avoid startup issues
 from invoice_templates import lots_won_template
 import os
