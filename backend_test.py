@@ -632,7 +632,7 @@ class BazarioCurrencyTester:
 
 async def main():
     """Main test runner"""
-    tester = BazarioWatchlistTester()
+    tester = BazarioCurrencyTester()
     success = await tester.run_all_tests()
     return success
 
