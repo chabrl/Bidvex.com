@@ -474,6 +474,11 @@ const CreateMultiItemListing = () => {
       <div className="space-y-2">
         <Label htmlFor="currency" className="flex items-center gap-2">
           💱 Currency
+          {user?.currency_locked && (
+            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+              🔒 Location-based
+            </span>
+          )}
         </Label>
         <select
           id="currency"
@@ -481,12 +486,18 @@ const CreateMultiItemListing = () => {
           value={formData.currency}
           onChange={handleChange}
           className="w-full px-3 py-2 border border-input rounded-md bg-background"
+          disabled={user?.currency_locked}
         >
           <option value="CAD">🇨🇦 CAD (Canadian Dollar)</option>
           <option value="USD">🇺🇸 USD (US Dollar)</option>
         </select>
         <p className="text-sm text-muted-foreground">
           All prices in this auction will be in {formData.currency}. {formData.currency === 'CAD' ? 'GST and QST taxes will apply.' : 'No GST/QST for USD auctions.'}
+          {user?.currency_locked && (
+            <span className="block mt-2 text-blue-600">
+              💡 Currency is set based on your location for tax compliance.
+            </span>
+          )}
         </p>
       </div>
     </div>
