@@ -1277,13 +1277,38 @@ async def bid_on_lot(listing_id: str, lot_number: int, data: Dict[str, float], c
         raise HTTPException(status_code=400, detail="Cannot bid on your own listing")
     
     amount = data.get("amount")
+    bid_type = data.get("bid_type", "normal")  # normal, monster, auto
     lots = listing["lots"]
     
     lot_index = next((i for i, lot in enumerate(lots) if lot["lot_number"] == lot_number), None)
     if lot_index is None:
         raise HTTPException(status_code=404, detail="Lot not found")
     
-    if amount <= lots[lot_index]["current_price"]:
+    current_price = lots[lot_index]["current_price"]
+    
+    # Validate increment (skip for monster bids)
+    if bid_type == "normal":
+        min_increment = get_minimum_increment(listing, current_price)
+        if amount < current_price + min_increment:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Bid must be at least ${current_price + min_increment:.2f} (minimum increment: ${min_increment:.2f})"
+            )
+    elif bid_type == "monster":
+        # Validate monster bid eligibility
+        tier = current_user.subscription_tier
+        monster_bids_used = current_user.monster_bids_used.get(listing_id, 0)
+        
+        if tier == "free" and monster_bids_used >= 1:
+            raise HTTPException(
+                status_code=403,
+                detail="Free tier allows only 1 Monster Bid per auction"
+            )
+        
+        if amount <= current_price:
+            raise HTTPException(status_code=400, detail="Monster Bid must be higher than current price")
+    
+    if amount <= current_price:
         raise HTTPException(status_code=400, detail="Bid must be higher than current price")
     
     lots[lot_index]["current_price"] = amount
@@ -1299,12 +1324,26 @@ async def bid_on_lot(listing_id: str, lot_number: int, data: Dict[str, float], c
         "lot_number": lot_number,
         "bidder_id": current_user.id,
         "amount": amount,
+        "bid_type": bid_type,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
     await db.lot_bids.insert_one(bid)
     
-    return {"message": "Bid placed successfully", "bid": bid}
+    # Update monster bids used if applicable
+    if bid_type == "monster":
+        monster_bids_used_dict = current_user.monster_bids_used.copy()
+        monster_bids_used_dict[listing_id] = monster_bids_used_dict.get(listing_id, 0) + 1
+        await db.users.update_one(
+            {"id": current_user.id},
+            {"$set": {"monster_bids_used": monster_bids_used_dict}}
+        )
+    
+    return {
+        "message": "Bid placed successfully",
+        "bid": bid,
+        "minimum_next_bid": current_price + get_minimum_increment(listing, amount) if bid_type == "normal" else None
+    }
 
 @app.websocket("/ws/messages/{user_id}")
 async def websocket_messages(websocket: WebSocket, user_id: str):
