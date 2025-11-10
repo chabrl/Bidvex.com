@@ -51,31 +51,18 @@ class Phase6FinalValidator:
             print(f"❌ Super Admin auth error: {str(e)}")
             return False
         
-        # Regular Admin (@admin.bazario.com email)
+        # Regular Admin (@admin.bazario.com email) - use existing admin
         try:
-            login_data = {"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD}
+            # Use the existing phase6.admin@admin.bazario.com
+            login_data = {"email": "phase6.admin@admin.bazario.com", "password": "Phase6Admin123!"}
             async with self.session.post(f"{BASE_URL}/auth/login", json=login_data) as response:
                 if response.status == 200:
                     data = await response.json()
                     self.admin_token = data["access_token"]
                     print(f"✅ Admin authenticated")
                 else:
-                    # Try to register admin
-                    admin_data = {
-                        "email": ADMIN_EMAIL,
-                        "password": ADMIN_PASSWORD,
-                        "name": "Admin User",
-                        "account_type": "business",
-                        "phone": "+1234567890"
-                    }
-                    async with self.session.post(f"{BASE_URL}/auth/register", json=admin_data) as reg_response:
-                        if reg_response.status == 200:
-                            data = await reg_response.json()
-                            self.admin_token = data["access_token"]
-                            print(f"✅ Admin registered and authenticated")
-                        else:
-                            print(f"❌ Admin registration failed: {reg_response.status}")
-                            return False
+                    print(f"❌ Admin auth failed: {response.status}")
+                    return False
         except Exception as e:
             print(f"❌ Admin auth error: {str(e)}")
             return False
