@@ -3525,7 +3525,7 @@ async def review_currency_appeal(
     Returns:
         Success message
     """
-    if current_user.account_type != "admin":
+    if not current_user.email.endswith("@admin.bazario.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     if status not in ["approved", "rejected"]:
