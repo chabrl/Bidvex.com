@@ -146,6 +146,9 @@ class User(BaseModel):
     language: str = "en"  # Kept for backward compatibility
     preferred_language: str = "en"  # en or fr
     preferred_currency: str = "CAD"  # CAD or USD
+    enforced_currency: Optional[str] = None  # Currency enforced by location
+    currency_locked: bool = False  # Whether currency can be changed
+    location_confidence_score: Optional[int] = None  # 0-100
     affiliate_code: Optional[str] = None
     billing_address: Optional[str] = None  # For invoicing
 
