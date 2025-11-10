@@ -2565,6 +2565,27 @@ def get_tax_rates_for_currency(currency: str) -> Dict[str, float]:
             "tax_rate_qst": 0.0
         }
 
+def get_client_ip(request) -> str:
+    """
+    Extract client IP from request headers
+    Handles proxy/load balancer forwarding
+    """
+    # Check common proxy headers
+    forwarded = request.headers.get('X-Forwarded-For')
+    if forwarded:
+        # Take first IP in chain (original client)
+        return forwarded.split(',')[0].strip()
+    
+    real_ip = request.headers.get('X-Real-IP')
+    if real_ip:
+        return real_ip
+    
+    # Fallback to direct connection
+    if request.client:
+        return request.client.host
+    
+    return "127.0.0.1"
+
 async def generate_paddle_number(auction_id: str) -> int:
     """Generate next paddle number for auction (starts at 5051)"""
     # Find highest paddle number for this auction
