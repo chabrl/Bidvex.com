@@ -88,11 +88,15 @@ const BuyerDashboard = () => {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="all" className="space-y-4">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="all">All Bids</TabsTrigger>
                 <TabsTrigger value="winning" className="text-green-600">Winning</TabsTrigger>
                 <TabsTrigger value="losing" className="text-red-600">Losing</TabsTrigger>
                 <TabsTrigger value="watching">Watching</TabsTrigger>
+                <TabsTrigger value="wishlist">
+                  <Heart className="h-4 w-4 mr-1" />
+                  Wishlist ({wishlist.length})
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="all">
