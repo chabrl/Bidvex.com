@@ -9,10 +9,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Switch } from '../components/ui/switch';
 import { toast } from 'sonner';
-import { User, CreditCard, Bell, MapPin, Loader2, Plus, Trash2 } from 'lucide-react';
+import { User, CreditCard, Bell, MapPin, Loader2, Plus, Trash2, Globe, DollarSign } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import AvatarUpload from '../components/AvatarUpload';
+import { useTranslation } from 'react-i18next';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const stripePromise = loadStripe('pk_test_51QEYhKP5VxaDuxPQiPLqHBcPrU7VrDu0YnPRCd5RPBSH9QdPQmOTmDo5r9mglvLbJ0P3WfCqxZ5c6Wb8fh0xdvl800nZdMLCqZ');
