@@ -38,16 +38,16 @@ const AuthPage = () => {
     try {
       if (isLogin) {
         await login(formData.email, formData.password);
-        toast.success('Welcome back!');
+        toast.success(t('auth.welcomeMessage'));
       } else {
         await register(formData);
-        toast.success('Account created successfully!');
+        toast.success(t('auth.accountCreatedMessage'));
       }
       
       const from = location.state?.from?.pathname || '/marketplace';
       navigate(from, { replace: true });
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Authentication failed');
+      toast.error(error.response?.data?.detail || t('auth.authFailedMessage'));
     } finally {
       setLoading(false);
     }
