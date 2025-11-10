@@ -376,6 +376,8 @@ const resources = {
         support: 'Support',
         followUs: 'Follow Us',
         allRightsReserved: 'All rights reserved',
+        howItWorks: 'How It Works',
+        cookiePreferences: 'Cookie Preferences',
       },
 
       // How It Works
