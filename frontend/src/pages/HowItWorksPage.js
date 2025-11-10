@@ -98,17 +98,17 @@ const HowItWorksPage = () => {
         {/* CTA Section */}
         <div className="bg-gradient-to-br from-primary/10 via-purple-500/10 to-accent/10 rounded-2xl p-8 md:p-12 text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Ready to Start Your Bidding Journey?
+            {t('howItWorks.getStarted')}
           </h2>
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Join thousands of buyers and sellers in the most trusted auction marketplace
+            {t('howItWorks.joinCommunity')}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button 
               className="gradient-button text-white border-0 text-lg px-8 py-6 rounded-full group"
               onClick={() => navigate('/marketplace')}
             >
-              Browse Auctions
+              {t('howItWorks.browsePlatform')}
               <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </Button>
             <Button 
@@ -116,7 +116,7 @@ const HowItWorksPage = () => {
               className="text-lg px-8 py-6 rounded-full border-2"
               onClick={() => navigate('/create-listing')}
             >
-              Start Selling
+              {t('nav.sell')}
             </Button>
           </div>
         </div>
@@ -126,7 +126,7 @@ const HowItWorksPage = () => {
           <div className="text-center space-y-4">
             <HelpCircle className="h-12 w-12 mx-auto text-primary" />
             <h2 className="text-3xl md:text-4xl font-bold">
-              Frequently Asked Questions
+              {t('howItWorks.faqTitle')}
             </h2>
             <p className="text-lg text-muted-foreground">
               Got questions? We've got answers
