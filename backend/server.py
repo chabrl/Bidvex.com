@@ -2917,7 +2917,11 @@ async def generate_seller_statement(
         
         lots_data.append(lot_info)
     
-    from invoice_templates import seller_statement_template
+    # Use seller's preferred language if available
+    lang = seller.get('preferred_language', 'en')
+    currency = auction.get('currency', 'CAD')
+    
+    from invoice_templates_complete import seller_statement_template
     template_data = {
         "seller": {
             "name": seller['name'],
@@ -2933,10 +2937,12 @@ async def generate_seller_statement(
             "auction_end_date": datetime.fromisoformat(auction['auction_end_date']) if isinstance(auction['auction_end_date'], str) else auction['auction_end_date']
         },
         "lots": lots_data,
-        "commission_rate": auction.get('commission_rate', 0.0)
+        "commission_rate": auction.get('commission_rate', 0.0),
+        "currency": currency,
+        "statement_number": f"STMT-{auction_id[:8]}"
     }
     
-    html_content = seller_statement_template(template_data)
+    html_content = seller_statement_template(template_data, lang=lang)
     
     invoice_dir = Path(f"/app/invoices/{seller_id}")
     invoice_dir.mkdir(parents=True, exist_ok=True)
