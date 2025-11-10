@@ -176,18 +176,40 @@ const ProfileSettingsPage = () => {
                     </>
                   )}
 
-                  <div className="space-y-2">
-                    <Label htmlFor="language">Language</Label>
-                    <select
-                      id="language"
-                      value={profileData.language}
-                      onChange={(e) => setProfileData({ ...profileData, language: e.target.value })}
-                      className="w-full px-3 py-2 border border-input rounded-md bg-background"
-                      data-testid="language-select"
-                    >
-                      <option value="en">English</option>
-                      <option value="fr">Français</option>
-                    </select>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="language" className="flex items-center gap-2">
+                        <Globe className="h-4 w-4" />
+                        {t('profile.language')}
+                      </Label>
+                      <select
+                        id="language"
+                        value={profileData.preferred_language}
+                        onChange={(e) => setProfileData({ ...profileData, preferred_language: e.target.value })}
+                        className="w-full px-3 py-2 border border-input rounded-md bg-background"
+                        data-testid="language-select"
+                      >
+                        <option value="en">{t('profile.english')}</option>
+                        <option value="fr">{t('profile.french')}</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="currency" className="flex items-center gap-2">
+                        <DollarSign className="h-4 w-4" />
+                        {t('profile.currency')}
+                      </Label>
+                      <select
+                        id="currency"
+                        value={profileData.preferred_currency}
+                        onChange={(e) => setProfileData({ ...profileData, preferred_currency: e.target.value })}
+                        className="w-full px-3 py-2 border border-input rounded-md bg-background"
+                        data-testid="currency-select"
+                      >
+                        <option value="CAD">🇨🇦 {t('common.cad')}</option>
+                        <option value="USD">🇺🇸 {t('common.usd')}</option>
+                      </select>
+                    </div>
                   </div>
 
                   <Button
@@ -197,9 +219,9 @@ const ProfileSettingsPage = () => {
                     data-testid="save-profile-btn"
                   >
                     {loading ? (
-                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</>
+                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t('common.loading')}</>
                     ) : (
-                      'Save Changes'
+                      t('profile.saveChanges')
                     )}
                   </Button>
                 </form>
