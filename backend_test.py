@@ -566,30 +566,31 @@ class BazarioCurrencyTester:
         return success
         
     async def run_all_tests(self):
-        """Run all watchlist API tests"""
-        print("🚀 Starting Bazario Watchlist API Tests")
-        print("=" * 60)
+        """Run all currency enforcement API tests"""
+        print("🚀 Starting Bazario Currency Enforcement System Tests")
+        print("=" * 70)
         
         await self.setup_session()
         
         try:
-            # Setup test data
+            # Setup test users
             if not await self.register_test_user():
                 print("❌ Failed to setup test user")
                 return False
                 
-            if not await self.create_test_listings():
-                print("❌ Failed to create test listings")
+            if not await self.setup_admin_user():
+                print("❌ Failed to setup admin user")
                 return False
             
             # Run tests in specific order for proper flow
             tests = [
-                ("Add to Watchlist", self.test_add_to_watchlist),
-                ("Check Watchlist Status", self.test_check_watchlist_status),
-                ("Get Watchlist", self.test_get_watchlist),
-                ("Buyer Dashboard Integration", self.test_buyer_dashboard_watchlist),
-                ("Remove from Watchlist", self.test_remove_from_watchlist),
-                ("Authorization & Validation", self.test_authorization_validation)
+                ("User Model Fields", self.test_user_model_fields),
+                ("Profile Update Currency Lock", self.test_profile_update_currency_lock),
+                ("Submit Currency Appeal", self.test_submit_currency_appeal),
+                ("Get User Appeals", self.test_get_user_appeals),
+                ("Admin Review Appeal", self.test_admin_review_appeal),
+                ("Geolocation Integration", self.test_geolocation_integration),
+                ("Authorization & Validation", self.test_authorization_and_validation)
             ]
             
             results = []
@@ -604,9 +605,9 @@ class BazarioCurrencyTester:
                     self.test_results[test_name] = False
             
             # Print summary
-            print("\n" + "=" * 60)
-            print("📊 WATCHLIST API TEST RESULTS SUMMARY")
-            print("=" * 60)
+            print("\n" + "=" * 70)
+            print("📊 CURRENCY ENFORCEMENT SYSTEM TEST RESULTS SUMMARY")
+            print("=" * 70)
             
             passed = 0
             total = len(results)
@@ -620,7 +621,7 @@ class BazarioCurrencyTester:
             print(f"\nOverall: {passed}/{total} tests passed")
             
             if passed == total:
-                print("🎉 All watchlist API tests PASSED!")
+                print("🎉 All currency enforcement API tests PASSED!")
                 return True
             else:
                 print("⚠️  Some tests FAILED - check implementation")
