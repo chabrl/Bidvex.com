@@ -421,6 +421,18 @@ backend:
         agent: "testing"
         comment: "✅ BUG FIXED: Changed 'if self.db:' to 'if self.db is not None:' on lines 79 and 151 in email_service.py. Backend restarted successfully. Email service now working correctly - emails being logged to database and console. All 3 emails sent successfully during auction completion (1 seller, 2 buyers). Email logs properly stored in database with all required fields."
 
+  - task: "Currency Enforcement System"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ CURRENCY ENFORCEMENT SYSTEM TESTING COMPLETE - ALL SUCCESS CRITERIA MET (7/7 TESTS PASSED): ✅ User Model Fields: GET /api/auth/me includes enforced_currency, currency_locked, location_confidence_score fields with proper types and values. ✅ Profile Update Currency Lock: PUT /api/users/me correctly enforces currency restrictions - blocks changes when locked with proper 403 error structure including error type, message, enforced_currency, and appeal_link. Allows updates to same currency and other profile fields. ✅ Currency Appeal Endpoints: POST /api/currency-appeal validates request structure, rejects appeals when currency not locked (expected in container environment), validates currency values (CAD/USD only). GET /api/currency-appeals returns proper structure with appeals array. ✅ Admin Review Appeal: POST /api/admin/currency-appeals/{id}/review requires admin access (@admin.bazario.com email), validates status values (approved/rejected). Fixed admin authorization to be consistent with other endpoints. ✅ Geolocation Integration: Registration process integrates geolocation service, populates currency enforcement fields, creates audit logs in currency_audit_logs collection. Container environment correctly defaults to medium confidence with unlocked currency. ✅ Authorization & Validation: All endpoints properly secured with 401 for unauthenticated, 403 for unauthorized admin access, 400 for invalid data. Created comprehensive test suite at /app/backend_test.py covering all currency enforcement features."
+
 metadata:
   created_by: "main_agent"
   version: "1.0"
