@@ -38,7 +38,7 @@ class BazarioCurrencyTester:
             await self.session.close()
             
     async def register_test_user(self) -> bool:
-        """Register a test user for watchlist testing"""
+        """Register a test user for currency testing"""
         try:
             user_data = {
                 "email": TEST_USER_EMAIL,
@@ -55,12 +55,17 @@ class BazarioCurrencyTester:
                     self.auth_token = data["access_token"]
                     self.user_id = data["user"]["id"]
                     print(f"✅ Test user registered successfully: {self.user_id}")
+                    print(f"   - Enforced Currency: {data['user'].get('enforced_currency', 'N/A')}")
+                    print(f"   - Currency Locked: {data['user'].get('currency_locked', 'N/A')}")
+                    print(f"   - Location Confidence: {data['user'].get('location_confidence_score', 'N/A')}")
                     return True
                 elif response.status == 400:
                     # User might already exist, try login
                     return await self.login_test_user()
                 else:
                     print(f"❌ Failed to register user: {response.status}")
+                    text = await response.text()
+                    print(f"Response: {text}")
                     return False
         except Exception as e:
             print(f"❌ Error registering user: {str(e)}")
