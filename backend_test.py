@@ -148,6 +148,10 @@ class BazarioCurrencyTester:
         """Get authorization headers"""
         return {"Authorization": f"Bearer {self.auth_token}"}
         
+    def get_admin_headers(self) -> Dict[str, str]:
+        """Get admin authorization headers"""
+        return {"Authorization": f"Bearer {self.admin_token}"}
+        
     async def create_test_listings(self) -> bool:
         """Create multiple test listings for watchlist testing"""
         try:
