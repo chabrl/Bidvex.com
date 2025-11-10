@@ -342,7 +342,7 @@ class BilingualInvoiceTester:
                 
                 async with self.session.post(
                     f"{BASE_URL}/invoices/seller-statement/{auction['id']}/{seller['id']}",
-                    headers=self.get_auth_headers()
+                    headers=self.get_auth_headers(seller['token'])  # Use seller's own token
                 ) as response:
                     if response.status == 200:
                         data = await response.json()
