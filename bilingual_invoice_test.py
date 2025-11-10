@@ -52,7 +52,7 @@ class BilingualInvoiceTester:
                 "email": "bilingual.admin@bazario.com",
                 "password": "BilingualAdmin123!",
                 "name": "Bilingual Test Admin",
-                "account_type": "business",
+                "account_type": "admin",  # Set account type to admin
                 "phone": "+15551234567",
                 "address": "123 Admin Street, Admin City"
             }
