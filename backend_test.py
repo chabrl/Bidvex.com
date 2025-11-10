@@ -454,7 +454,7 @@ class BazarioCurrencyTester:
             print(f"❌ Error testing admin review appeal: {str(e)}")
             return False
     
-    async def test_buyer_dashboard_watchlist(self) -> bool:
+    async def test_geolocation_integration(self) -> bool:
         """Test GET /api/dashboard/buyer includes watchlist data"""
         print("\n🧪 Testing GET /api/dashboard/buyer (watchlist integration)...")
         
