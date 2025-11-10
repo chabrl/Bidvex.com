@@ -47,20 +47,43 @@ class BilingualInvoiceTester:
     async def get_admin_token(self) -> bool:
         """Get admin token for testing"""
         try:
-            # Try to use existing admin user
-            login_data = {
-                "email": "seller@test.com",  # Using existing user
-                "password": "password123"  # Test password
+            # Try to create a new admin user for testing
+            admin_data = {
+                "email": "bilingual.admin@bazario.com",
+                "password": "BilingualAdmin123!",
+                "name": "Bilingual Test Admin",
+                "account_type": "business",
+                "phone": "+15551234567",
+                "address": "123 Admin Street, Admin City"
             }
             
-            async with self.session.post(f"{BASE_URL}/auth/login", json=login_data) as response:
+            # Try to register admin user
+            async with self.session.post(f"{BASE_URL}/auth/register", json=admin_data) as response:
                 if response.status == 200:
                     data = await response.json()
                     self.admin_token = data["access_token"]
-                    print(f"✅ Admin token obtained successfully")
+                    print(f"✅ Admin user created and token obtained successfully")
                     return True
+                elif response.status == 400:
+                    # User might already exist, try login
+                    login_data = {
+                        "email": "bilingual.admin@bazario.com",
+                        "password": "BilingualAdmin123!"
+                    }
+                    
+                    async with self.session.post(f"{BASE_URL}/auth/login", json=login_data) as login_response:
+                        if login_response.status == 200:
+                            data = await login_response.json()
+                            self.admin_token = data["access_token"]
+                            print(f"✅ Admin token obtained via login")
+                            return True
+                        else:
+                            print(f"❌ Failed to login admin user: {login_response.status}")
+                            return False
                 else:
-                    print(f"❌ Failed to get admin token: {response.status}")
+                    print(f"❌ Failed to create admin user: {response.status}")
+                    text = await response.text()
+                    print(f"Response: {text}")
                     return False
         except Exception as e:
             print(f"❌ Error getting admin token: {str(e)}")
