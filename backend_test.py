@@ -152,7 +152,7 @@ class BazarioCurrencyTester:
         """Get admin authorization headers"""
         return {"Authorization": f"Bearer {self.admin_token}"}
         
-    async def create_test_listings(self) -> bool:
+    async def test_user_model_fields(self) -> bool:
         """Create multiple test listings for watchlist testing"""
         try:
             listings_data = [
