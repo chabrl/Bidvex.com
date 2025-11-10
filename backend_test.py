@@ -18,7 +18,7 @@ TEST_USER_NAME = "Currency Tester"
 ADMIN_EMAIL = "admin@admin.bazario.com"
 ADMIN_PASSWORD = "AdminTest123!"
 
-class BazarioWatchlistTester:
+class BazarioCurrencyTester:
     def __init__(self):
         self.session = None
         self.auth_token = None
