@@ -3658,6 +3658,278 @@ app.add_middleware(
     allow_methods=["*"], allow_headers=["*"],
 )
 
+# ==================== WISHLIST ENDPOINTS ====================
+
+@api_router.post("/wishlist")
+async def add_to_wishlist(auction_id: str, lot_id: Optional[str] = None, current_user: User = Depends(get_current_user)):
+    """Add auction or specific lot to user's wishlist"""
+    try:
+        # Check if already in wishlist
+        existing = await db.wishlist.find_one({
+            "user_id": current_user.id,
+            "auction_id": auction_id,
+            "lot_id": lot_id
+        })
+        
+        if existing:
+            return {"message": "Already in wishlist", "wishlist_id": existing["id"]}
+        
+        # Add to wishlist
+        wishlist_item = Wishlist(
+            user_id=current_user.id,
+            auction_id=auction_id,
+            lot_id=lot_id
+        )
+        await db.wishlist.insert_one(wishlist_item.model_dump())
+        
+        # Update auction wishlist count
+        await db.multi_item_listings.update_one(
+            {"id": auction_id},
+            {"$inc": {"wishlist_count": 1}}
+        )
+        
+        return {"message": "Added to wishlist", "wishlist_id": wishlist_item.id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.delete("/wishlist/{auction_id}")
+async def remove_from_wishlist(auction_id: str, current_user: User = Depends(get_current_user)):
+    """Remove auction from user's wishlist"""
+    try:
+        result = await db.wishlist.delete_one({
+            "user_id": current_user.id,
+            "auction_id": auction_id
+        })
+        
+        if result.deleted_count > 0:
+            # Update auction wishlist count
+            await db.multi_item_listings.update_one(
+                {"id": auction_id},
+                {"$inc": {"wishlist_count": -1}}
+            )
+            return {"message": "Removed from wishlist"}
+        else:
+            raise HTTPException(status_code=404, detail="Item not in wishlist")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/wishlist")
+async def get_user_wishlist(current_user: User = Depends(get_current_user)):
+    """Get user's wishlist with auction details"""
+    try:
+        wishlist_items = await db.wishlist.find({"user_id": current_user.id}).to_list(100)
+        
+        # Fetch auction details for each wishlist item
+        auction_ids = list(set([item["auction_id"] for item in wishlist_items]))
+        auctions = await db.multi_item_listings.find({"id": {"$in": auction_ids}}).to_list(100)
+        
+        # Map auctions by ID
+        auctions_map = {auction["id"]: auction for auction in auctions}
+        
+        # Combine wishlist with auction data
+        result = []
+        for item in wishlist_items:
+            auction = auctions_map.get(item["auction_id"])
+            if auction:
+                result.append({
+                    "wishlist_id": item["id"],
+                    "auction": auction,
+                    "lot_id": item.get("lot_id"),
+                    "added_at": item["created_at"]
+                })
+        
+        return {"wishlist": result, "total": len(result)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== PREMIUM BIDDING FEATURES ====================
+
+@api_router.post("/bids/monster")
+async def place_monster_bid(listing_id: str, amount: float, current_user: User = Depends(get_current_user)):
+    """Place a Monster Bid that overrides standard increments"""
+    try:
+        # Get listing
+        listing = await db.listings.find_one({"id": listing_id})
+        if not listing:
+            raise HTTPException(status_code=404, detail="Listing not found")
+        
+        # Check subscription tier
+        tier = current_user.subscription_tier
+        monster_bids_used = current_user.monster_bids_used.get(listing_id, 0)
+        
+        # Free tier: 1 monster bid per auction
+        if tier == "free" and monster_bids_used >= 1:
+            raise HTTPException(
+                status_code=403,
+                detail="Free tier allows only 1 Monster Bid per auction. Upgrade to Premium for unlimited Monster Bids."
+            )
+        
+        # Check if amount is higher than current bid
+        current_bid = listing.get("current_bid", listing.get("starting_price", 0))
+        if amount <= current_bid:
+            raise HTTPException(status_code=400, detail="Monster Bid must be higher than current bid")
+        
+        # Place the bid
+        bid = Bid(
+            listing_id=listing_id,
+            bidder_id=current_user.id,
+            amount=amount,
+            bid_type="monster"
+        )
+        await db.bids.insert_one(bid.model_dump())
+        
+        # Update listing
+        await db.listings.update_one(
+            {"id": listing_id},
+            {"$set": {"current_bid": amount, "highest_bidder": current_user.id}}
+        )
+        
+        # Update user's monster bids used
+        monster_bids_used_dict = current_user.monster_bids_used.copy()
+        monster_bids_used_dict[listing_id] = monster_bids_used + 1
+        await db.users.update_one(
+            {"id": current_user.id},
+            {"$set": {"monster_bids_used": monster_bids_used_dict}}
+        )
+        
+        # Broadcast to websocket
+        await manager.broadcast(listing_id, {
+            "type": "monster_bid",
+            "amount": amount,
+            "bidder": current_user.name
+        })
+        
+        return {
+            "message": "Monster Bid placed successfully!",
+            "bid_id": bid.id,
+            "remaining_monster_bids": 0 if tier == "free" else "unlimited"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/bids/auto-bid")
+async def setup_auto_bid(listing_id: str, max_bid: float, current_user: User = Depends(get_current_user)):
+    """Setup Auto-Bid Bot (Premium/VIP only)"""
+    try:
+        # Check subscription tier
+        if current_user.subscription_tier == "free":
+            raise HTTPException(
+                status_code=403,
+                detail="Auto-Bid Bot is a Premium feature. Upgrade to Premium or VIP to use this feature."
+            )
+        
+        # Get listing
+        listing = await db.listings.find_one({"id": listing_id})
+        if not listing:
+            raise HTTPException(status_code=404, detail="Listing not found")
+        
+        # Check if max_bid is valid
+        current_bid = listing.get("current_bid", listing.get("starting_price", 0))
+        if max_bid <= current_bid:
+            raise HTTPException(status_code=400, detail="Max bid must be higher than current bid")
+        
+        # Check if user already has auto-bid for this listing
+        existing = await db.auto_bids.find_one({
+            "user_id": current_user.id,
+            "listing_id": listing_id,
+            "is_active": True
+        })
+        
+        if existing:
+            # Update existing auto-bid
+            await db.auto_bids.update_one(
+                {"id": existing["id"]},
+                {"$set": {"max_bid": max_bid}}
+            )
+            return {"message": "Auto-Bid updated", "auto_bid_id": existing["id"]}
+        else:
+            # Create new auto-bid
+            auto_bid = AutoBid(
+                user_id=current_user.id,
+                listing_id=listing_id,
+                max_bid=max_bid
+            )
+            await db.auto_bids.insert_one(auto_bid.model_dump())
+            return {"message": "Auto-Bid activated", "auto_bid_id": auto_bid.id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.delete("/bids/auto-bid/{listing_id}")
+async def deactivate_auto_bid(listing_id: str, current_user: User = Depends(get_current_user)):
+    """Deactivate Auto-Bid Bot for a listing"""
+    try:
+        result = await db.auto_bids.update_one(
+            {"user_id": current_user.id, "listing_id": listing_id, "is_active": True},
+            {"$set": {"is_active": False}}
+        )
+        
+        if result.modified_count > 0:
+            return {"message": "Auto-Bid deactivated"}
+        else:
+            raise HTTPException(status_code=404, detail="No active Auto-Bid found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/bids/auto-bid")
+async def get_user_auto_bids(current_user: User = Depends(get_current_user)):
+    """Get user's active auto-bids"""
+    try:
+        auto_bids = await db.auto_bids.find({
+            "user_id": current_user.id,
+            "is_active": True
+        }).to_list(100)
+        
+        return {"auto_bids": auto_bids, "total": len(auto_bids)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== SUBSCRIPTION MANAGEMENT ====================
+
+@api_router.get("/subscription/status")
+async def get_subscription_status(current_user: User = Depends(get_current_user)):
+    """Get user's subscription status and features"""
+    tier = current_user.subscription_tier
+    
+    features = {
+        "free": {
+            "tier": "Free",
+            "monster_bids_per_auction": 1,
+            "auto_bid_bot": False,
+            "priority_notifications": False,
+            "early_access": False
+        },
+        "premium": {
+            "tier": "Premium",
+            "monster_bids_per_auction": "unlimited",
+            "auto_bid_bot": True,
+            "priority_notifications": True,
+            "early_access": False
+        },
+        "vip": {
+            "tier": "VIP",
+            "monster_bids_per_auction": "unlimited",
+            "auto_bid_bot": True,
+            "priority_notifications": True,
+            "early_access": True
+        }
+    }
+    
+    return {
+        "subscription_tier": tier,
+        "subscription_status": current_user.subscription_status,
+        "features": features.get(tier, features["free"]),
+        "subscription_start_date": current_user.subscription_start_date,
+        "subscription_end_date": current_user.subscription_end_date
+    }
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
