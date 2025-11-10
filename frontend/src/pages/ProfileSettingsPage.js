@@ -19,7 +19,8 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const stripePromise = loadStripe('pk_test_51QEYhKP5VxaDuxPQiPLqHBcPrU7VrDu0YnPRCd5RPBSH9QdPQmOTmDo5r9mglvLbJ0P3WfCqxZ5c6Wb8fh0xdvl800nZdMLCqZ');
 
 const ProfileSettingsPage = () => {
-  const { user } = useAuth();
+  const { user, updateUserPreferences } = useAuth();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [profileData, setProfileData] = useState({
     name: '',
@@ -27,7 +28,8 @@ const ProfileSettingsPage = () => {
     address: '',
     company_name: '',
     tax_number: '',
-    language: 'en',
+    preferred_language: 'en',
+    preferred_currency: 'CAD',
   });
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [showAddCard, setShowAddCard] = useState(false);
@@ -40,7 +42,8 @@ const ProfileSettingsPage = () => {
         address: user.address || '',
         company_name: user.company_name || '',
         tax_number: user.tax_number || '',
-        language: user.language || 'en',
+        preferred_language: user.preferred_language || 'en',
+        preferred_currency: user.preferred_currency || 'CAD',
       });
       fetchPaymentMethods();
     }
