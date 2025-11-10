@@ -2480,7 +2480,7 @@ def generate_pdf_from_html(html_content: str, pdf_path: Path):
     """Lazy import WeasyPrint and generate PDF"""
     try:
         from weasyprint import HTML
-        HTML(string=html_content).write_pdf(pdf_path)
+        generate_pdf_from_html(html_content, pdf_path)
     except Exception as e:
         logger.error(f"PDF generation error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"PDF generation failed: {str(e)}")
@@ -2697,7 +2697,7 @@ async def generate_lots_won_invoice(
     pdf_filename = f"LotsWon_{auction_id}_{int(datetime.now().timestamp())}.pdf"
     pdf_path = invoice_dir / pdf_filename
     
-    HTML(string=html_content).write_pdf(pdf_path)
+    generate_pdf_from_html(html_content, pdf_path)
     
     # Save invoice record to database
     invoice_record = {
@@ -2841,7 +2841,7 @@ async def generate_payment_letter(
     pdf_filename = f"PaymentLetter_{auction_id}.pdf"
     pdf_path = invoice_dir / pdf_filename
     
-    HTML(string=html_content).write_pdf(pdf_path)
+    generate_pdf_from_html(html_content, pdf_path)
     
     # Save invoice record
     invoice_record = {
@@ -2944,7 +2944,7 @@ async def generate_seller_statement(
     pdf_filename = f"SellerStatement_{auction_id}.pdf"
     pdf_path = invoice_dir / pdf_filename
     
-    HTML(string=html_content).write_pdf(pdf_path)
+    generate_pdf_from_html(html_content, pdf_path)
     
     invoice_record = {
         "id": str(uuid.uuid4()),
@@ -3016,7 +3016,7 @@ async def generate_seller_receipt(
     pdf_filename = f"SellerReceipt_{auction_id}.pdf"
     pdf_path = invoice_dir / pdf_filename
     
-    HTML(string=html_content).write_pdf(pdf_path)
+    generate_pdf_from_html(html_content, pdf_path)
     
     invoice_record = {
         "id": str(uuid.uuid4()),
@@ -3101,7 +3101,7 @@ async def generate_commission_invoice(
     pdf_filename = f"CommissionInvoice_{auction_id}.pdf"
     pdf_path = invoice_dir / pdf_filename
     
-    HTML(string=html_content).write_pdf(pdf_path)
+    generate_pdf_from_html(html_content, pdf_path)
     
     invoice_record = {
         "id": str(uuid.uuid4()),
