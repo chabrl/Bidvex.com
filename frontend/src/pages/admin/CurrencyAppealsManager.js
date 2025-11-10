@@ -6,6 +6,7 @@ import { Badge } from '../../components/ui/badge';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 import { 
   DollarSign, 
   CheckCircle, 
@@ -20,6 +21,7 @@ import {
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const CurrencyAppealsManager = () => {
+  const { t } = useTranslation();
   const [appeals, setAppeals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedAppeal, setSelectedAppeal] = useState(null);
