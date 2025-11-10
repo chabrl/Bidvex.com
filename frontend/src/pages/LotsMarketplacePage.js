@@ -94,6 +94,8 @@ const LotsMarketplacePage = () => {
   const [filters, setFilters] = useState({
     search: '',
     category: '',
+    currency: '',
+    region: '',
     sort: '-created_at',
   });
   const [loading, setLoading] = useState(true);
