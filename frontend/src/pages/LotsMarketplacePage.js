@@ -524,6 +524,17 @@ const LotsMarketplacePage = () => {
                               )}
                             </div>
                           </div>
+                          
+                          {/* Currency */}
+                          {listing.currency && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg flex-shrink-0">{getCurrencyIcon(listing.currency)}</span>
+                              <div>
+                                <p className="text-xs text-muted-foreground">Currency</p>
+                                <p className="text-sm font-medium">{listing.currency}</p>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
