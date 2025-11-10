@@ -130,7 +130,7 @@ const Navbar = () => {
                     <>
                       <DropdownMenuItem onClick={() => navigate('/admin')} data-testid="admin-dashboard-link" className="text-primary font-semibold">
                         <Shield className="mr-2 h-4 w-4" />
-                        🛡️ Admin Panel
+                        🛡️ {t('nav.adminPanel')}
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                     </>
