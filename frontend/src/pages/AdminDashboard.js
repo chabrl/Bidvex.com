@@ -178,14 +178,14 @@ const AdminDashboard = () => {
           <TabsContent value="settings" className="space-y-6">
             <Tabs defaultValue="categories" className="space-y-4">
               <TabsList>
-                <TabsTrigger value="categories">Categories</TabsTrigger>
-                <TabsTrigger value="promotions">Promotions</TabsTrigger>
-                <TabsTrigger value="affiliates">Affiliates</TabsTrigger>
-                <TabsTrigger value="currency-appeals"><DollarSign className="h-4 w-4 mr-1" />Currency Appeals</TabsTrigger>
-                <TabsTrigger value="reports">Reports</TabsTrigger>
-                <TabsTrigger value="messages">Messages</TabsTrigger>
-                <TabsTrigger value="announcements">Announcements</TabsTrigger>
-                <TabsTrigger value="logs">Logs</TabsTrigger>
+                <TabsTrigger value="categories">{t('admin.categories')}</TabsTrigger>
+                <TabsTrigger value="promotions">{t('admin.promotions')}</TabsTrigger>
+                <TabsTrigger value="affiliates">{t('admin.affiliates')}</TabsTrigger>
+                <TabsTrigger value="currency-appeals"><DollarSign className="h-4 w-4 mr-1" />{t('admin.currencyAppeals')}</TabsTrigger>
+                <TabsTrigger value="reports">{t('admin.reports')}</TabsTrigger>
+                <TabsTrigger value="messages">{t('admin.messaging')}</TabsTrigger>
+                <TabsTrigger value="announcements">{t('admin.announcements')}</TabsTrigger>
+                <TabsTrigger value="logs">{t('admin.logs')}</TabsTrigger>
               </TabsList>
 
               <TabsContent value="categories">
