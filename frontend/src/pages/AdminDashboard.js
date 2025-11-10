@@ -93,8 +93,8 @@ const AdminDashboard = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold gradient-text">BidVex Admin Panel</h1>
-            <p className="text-muted-foreground mt-2">Manage all aspects of your auction platform</p>
+            <h1 className="text-3xl font-bold gradient-text">{t('admin.title')}</h1>
+            <p className="text-muted-foreground mt-2">{t('admin.overview')}</p>
           </div>
           <Badge className="gradient-bg text-white border-0 text-lg px-6 py-2">
             {user.role === 'superadmin' ? 'Super Admin' : 'Admin'}
