@@ -93,6 +93,57 @@ class BazarioCurrencyTester:
             print(f"❌ Error logging in user: {str(e)}")
             return False
             
+    async def setup_admin_user(self) -> bool:
+        """Setup admin user for testing admin endpoints"""
+        try:
+            # Try to register admin user
+            admin_data = {
+                "email": ADMIN_EMAIL,
+                "password": ADMIN_PASSWORD,
+                "name": "Admin User",
+                "account_type": "admin",
+                "phone": "+1234567891"
+            }
+            
+            async with self.session.post(f"{BASE_URL}/auth/register", json=admin_data) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    self.admin_token = data["access_token"]
+                    self.admin_id = data["user"]["id"]
+                    print(f"✅ Admin user registered successfully: {self.admin_id}")
+                    return True
+                elif response.status == 400:
+                    # Admin might already exist, try login
+                    return await self.login_admin_user()
+                else:
+                    print(f"❌ Failed to register admin: {response.status}")
+                    return False
+        except Exception as e:
+            print(f"❌ Error setting up admin user: {str(e)}")
+            return False
+            
+    async def login_admin_user(self) -> bool:
+        """Login with admin credentials"""
+        try:
+            login_data = {
+                "email": ADMIN_EMAIL,
+                "password": ADMIN_PASSWORD
+            }
+            
+            async with self.session.post(f"{BASE_URL}/auth/login", json=login_data) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    self.admin_token = data["access_token"]
+                    self.admin_id = data["user"]["id"]
+                    print(f"✅ Admin user logged in successfully: {self.admin_id}")
+                    return True
+                else:
+                    print(f"❌ Failed to login admin: {response.status}")
+                    return False
+        except Exception as e:
+            print(f"❌ Error logging in admin: {str(e)}")
+            return False
+            
     def get_auth_headers(self) -> Dict[str, str]:
         """Get authorization headers"""
         return {"Authorization": f"Bearer {self.auth_token}"}
