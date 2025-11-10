@@ -455,51 +455,47 @@ class BazarioCurrencyTester:
             return False
     
     async def test_geolocation_integration(self) -> bool:
-        """Test GET /api/dashboard/buyer includes watchlist data"""
-        print("\n🧪 Testing GET /api/dashboard/buyer (watchlist integration)...")
+        """Test geolocation service integration during registration"""
+        print("\n🧪 Testing Geolocation Service Integration...")
         
         try:
-            # First add a couple items to watchlist
-            for listing_id in self.test_listing_ids[1:3]:
-                async with self.session.post(
-                    f"{BASE_URL}/watchlist/add?listing_id={listing_id}",
-                    headers=self.get_auth_headers()
-                ) as add_response:
-                    if add_response.status != 200:
-                        print(f"❌ Failed to add listing {listing_id} to watchlist for dashboard test")
-                        return False
+            # Register a new user to test geolocation integration
+            test_email = f"geo.test.{int(datetime.now().timestamp())}@bazario.com"
+            user_data = {
+                "email": test_email,
+                "password": "GeoTest123!",
+                "name": "Geo Test User",
+                "account_type": "personal",
+                "phone": "+1234567892"
+            }
             
-            # Now test dashboard endpoint
-            async with self.session.get(
-                f"{BASE_URL}/dashboard/buyer",
-                headers=self.get_auth_headers()
-            ) as response:
+            async with self.session.post(f"{BASE_URL}/auth/register", json=user_data) as response:
                 if response.status == 200:
                     data = await response.json()
+                    user = data["user"]
                     
-                    # Verify watchlist field exists
-                    assert "watchlist" in data, "Dashboard should include watchlist field"
-                    assert isinstance(data["watchlist"], list), "Watchlist should be a list"
+                    # Verify geolocation fields are populated
+                    assert "enforced_currency" in user
+                    assert "currency_locked" in user
+                    assert "location_confidence_score" in user
                     
-                    # Should have the items we added
-                    assert len(data["watchlist"]) >= 2, "Dashboard watchlist should contain added items"
+                    # In container environment, we expect default values
+                    print(f"✅ Geolocation integration working")
+                    print(f"   - Enforced Currency: {user['enforced_currency']}")
+                    print(f"   - Currency Locked: {user['currency_locked']}")
+                    print(f"   - Location Confidence Score: {user['location_confidence_score']}")
                     
-                    # Verify watchlist items have proper structure
-                    for item in data["watchlist"]:
-                        assert "id" in item
-                        assert "title" in item
-                        assert "current_price" in item
+                    # Check if audit log was created (we can't directly access it, but registration should succeed)
+                    print(f"✅ Registration completed successfully (audit log should be created)")
                     
-                    print(f"✅ Dashboard includes watchlist data successfully")
-                    print(f"   - Watchlist items: {len(data['watchlist'])}")
                     return True
                 else:
-                    print(f"❌ Failed to get buyer dashboard: {response.status}")
+                    print(f"❌ Failed to register user for geolocation test: {response.status}")
                     text = await response.text()
                     print(f"Response: {text}")
                     return False
         except Exception as e:
-            print(f"❌ Error testing buyer dashboard watchlist: {str(e)}")
+            print(f"❌ Error testing geolocation integration: {str(e)}")
             return False
     
     async def test_authorization_validation(self) -> bool:
