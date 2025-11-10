@@ -200,7 +200,7 @@ const ProfileSettingsPage = () => {
                         {t('profile.currency')}
                         {user?.currency_locked && (
                           <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                            🔒 Locked
+                            🔒 {t('currency.locked')}
                           </span>
                         )}
                       </Label>
