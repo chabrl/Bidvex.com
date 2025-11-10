@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Backend API Testing for Bazario Watchlist Features
-Tests the complete watchlist functionality including add, remove, get, check status endpoints.
+Backend API Testing for Bazario Currency Enforcement System
+Tests the complete currency enforcement functionality including appeals, profile updates, and geolocation.
 """
 
 import asyncio
@@ -12,9 +12,11 @@ from typing import Dict, Any, Optional
 
 # Configuration
 BASE_URL = "https://auction-preview.preview.emergentagent.com/api"
-TEST_USER_EMAIL = "watchlist.tester@bazario.com"
-TEST_USER_PASSWORD = "WatchlistTest123!"
-TEST_USER_NAME = "Watchlist Tester"
+TEST_USER_EMAIL = "currency.tester@bazario.com"
+TEST_USER_PASSWORD = "CurrencyTest123!"
+TEST_USER_NAME = "Currency Tester"
+ADMIN_EMAIL = "admin@admin.bazario.com"
+ADMIN_PASSWORD = "AdminTest123!"
 
 class BazarioWatchlistTester:
     def __init__(self):
