@@ -499,48 +499,68 @@ class BazarioCurrencyTester:
             return False
     
     async def test_authorization_and_validation(self) -> bool:
-        """Test authorization and validation scenarios"""
+        """Test authorization and validation scenarios for currency endpoints"""
         print("\n🧪 Testing authorization and validation...")
         
         success = True
         
-        # Test 1: Adding non-existent listing to watchlist
+        # Test 1: Unauthorized access to currency appeals
         try:
-            async with self.session.post(
-                f"{BASE_URL}/watchlist/add?listing_id=non-existent-listing-id",
-                headers=self.get_auth_headers()
-            ) as response:
-                if response.status == 404:
-                    print("✅ Correctly rejected adding non-existent listing")
-                else:
-                    print(f"❌ Should have rejected non-existent listing, got: {response.status}")
-                    success = False
-        except Exception as e:
-            print(f"❌ Error testing non-existent listing: {str(e)}")
-            success = False
-            
-        # Test 2: Unauthorized access (no auth token)
-        try:
-            async with self.session.get(f"{BASE_URL}/watchlist") as response:
+            async with self.session.get(f"{BASE_URL}/currency-appeals") as response:
                 if response.status == 401:
-                    print("✅ Correctly rejected unauthorized watchlist access")
+                    print("✅ Correctly rejected unauthorized appeals access")
                 else:
                     print(f"❌ Should have rejected unauthorized access, got: {response.status}")
                     success = False
         except Exception as e:
-            print(f"❌ Error testing unauthorized access: {str(e)}")
+            print(f"❌ Error testing unauthorized appeals access: {str(e)}")
             success = False
             
-        # Test 3: Check status without auth
+        # Test 2: Unauthorized appeal submission
         try:
-            async with self.session.get(f"{BASE_URL}/watchlist/check/{self.test_listing_ids[0]}") as response:
+            async with self.session.post(
+                f"{BASE_URL}/currency-appeal",
+                json={"requested_currency": "USD", "reason": "Test"}
+            ) as response:
                 if response.status == 401:
-                    print("✅ Correctly rejected unauthorized status check")
+                    print("✅ Correctly rejected unauthorized appeal submission")
                 else:
-                    print(f"❌ Should have rejected unauthorized status check, got: {response.status}")
+                    print(f"❌ Should have rejected unauthorized appeal submission, got: {response.status}")
                     success = False
         except Exception as e:
-            print(f"❌ Error testing unauthorized status check: {str(e)}")
+            print(f"❌ Error testing unauthorized appeal submission: {str(e)}")
+            success = False
+            
+        # Test 3: Non-admin access to admin endpoint
+        try:
+            async with self.session.post(
+                f"{BASE_URL}/admin/currency-appeals/fake-id/review",
+                json={"status": "approved"},
+                headers=self.get_auth_headers()  # Regular user token
+            ) as response:
+                if response.status == 403:
+                    print("✅ Correctly rejected non-admin access to admin endpoint")
+                else:
+                    print(f"❌ Should have rejected non-admin access, got: {response.status}")
+                    success = False
+        except Exception as e:
+            print(f"❌ Error testing non-admin access: {str(e)}")
+            success = False
+            
+        # Test 4: Invalid currency validation
+        try:
+            async with self.session.put(
+                f"{BASE_URL}/users/me",
+                json={"preferred_currency": "INVALID"},
+                headers=self.get_auth_headers()
+            ) as response:
+                if response.status == 400:
+                    print("✅ Correctly rejected invalid currency")
+                else:
+                    print(f"❌ Should have rejected invalid currency, got: {response.status}")
+                    success = False
+        except Exception as e:
+            print(f"❌ Error testing invalid currency: {str(e)}")
             success = False
             
         return success
