@@ -12,8 +12,8 @@ from datetime import datetime, timezone, timedelta
 
 # Configuration
 BASE_URL = "https://auction-platform-12.preview.emergentagent.com/api"
-ADMIN_EMAIL = "phase6.admin@admin.bazario.com"
-ADMIN_PASSWORD = "Phase6Admin123!"
+ADMIN_EMAIL = "super.admin@admin.bazario.com"
+ADMIN_PASSWORD = "SuperAdmin123!"
 USER_EMAIL = "phase6.user@bazario.com"
 USER_PASSWORD = "Phase6User123!"
 
