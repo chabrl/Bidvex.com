@@ -520,7 +520,7 @@ class BazarioCurrencyTester:
         try:
             async with self.session.post(
                 f"{BASE_URL}/currency-appeal",
-                json={"requested_currency": "USD", "reason": "Test"}
+                params={"requested_currency": "USD", "reason": "Test"}
             ) as response:
                 if response.status == 401:
                     print("✅ Correctly rejected unauthorized appeal submission")
