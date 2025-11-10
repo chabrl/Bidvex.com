@@ -2829,9 +2829,15 @@ async def generate_payment_letter(
         "payment_deadline": auction.get('payment_deadline', 'Within 3 business days') if isinstance(auction.get('payment_deadline'), str) else "Within 3 business days"
     }
     
-    # Generate HTML
-    from invoice_templates import payment_letter_template
-    html_content = payment_letter_template(template_data)
+    # Generate HTML using bilingual template
+    # Use buyer's preferred language if available
+    lang = buyer.get('preferred_language', 'en')
+    currency = auction.get('currency', 'CAD')
+    template_data['currency'] = currency
+    template_data['lots_count'] = len(lots_won)
+    
+    from invoice_templates_complete import payment_letter_template
+    html_content = payment_letter_template(template_data, lang=lang)
     
     # Create user invoice directory
     invoice_dir = Path(f"/app/invoices/{user_id}")
