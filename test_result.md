@@ -103,16 +103,17 @@
 #====================================================================================================
 
 user_problem_statement: |
-  Phase 5 (Part 3): Seller Documents System - Complete Suite
-  Three PDF templates: Seller Statement, Seller Receipt, Commission Invoice
-  Templates: seller_statement_template, seller_receipt_template, commission_invoice_template
-  Endpoints: POST /api/invoices/seller-statement, seller-receipt, commission-invoice
-  Storage: /invoices/{seller_id}/ for all seller documents
-  Features: Lot sold/unsold status, buyer assignments, commission calculations, net payout
-  Seller Statement: Table of all lots with status badges, buyer paddle numbers, financial summary
-  Seller Receipt: Net payout breakdown with tax calculations on commission
-  Commission Invoice: BidVex to seller invoice with GST/QST, payment terms
-  Styling: Consistent BidVex branding, logo integration, professional layouts
+  Phase 6: Launch Readiness Validation - Comprehensive Pre-Production Testing
+  
+  Complete validation of all systems before production deployment:
+  1. Security & Access: Admin authorization, bcrypt passwords, audit logging
+  2. Infrastructure: Backend health check, MongoDB integrity, service status, load testing
+  3. User Experience: Bilingual toggle (EN/FR), currency enforcement (CAD/USD), appeal workflow
+  4. Compliance: Tax logic (GST+QST for CAD, none for USD), geolocation privacy, bilingual messaging
+  5. Admin Panel: CurrencyAppealsManager functionality, all admin tabs working
+  6. E2E Scenarios: Registration → Currency lock → Appeal → Admin review
+  7. PDF Generation: Test all 4 invoice combinations (EN/CAD, EN/USD, FR/CAD, FR/USD)
+  8. Cross-browser/device: Chrome, Firefox, Safari, mobile responsiveness
 
 backend:
   - task: "Multi-Item Listings API (Existing)"
