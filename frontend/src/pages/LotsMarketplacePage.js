@@ -199,6 +199,31 @@ const LotsMarketplacePage = () => {
             </select>
 
             <select
+              value={filters.currency}
+              onChange={(e) => handleFilterChange('currency', e.target.value)}
+              className="px-4 py-2 border border-input rounded-md bg-background"
+              data-testid="currency-filter"
+            >
+              <option value="">Currency: All</option>
+              <option value="CAD">CAD</option>
+              <option value="USD">USD</option>
+            </select>
+
+            <select
+              value={filters.region}
+              onChange={(e) => handleFilterChange('region', e.target.value)}
+              className="px-4 py-2 border border-input rounded-md bg-background"
+              data-testid="region-filter"
+            >
+              <option value="">Region: All</option>
+              <option value="Ontario">Ontario</option>
+              <option value="Quebec">Quebec</option>
+              <option value="British Columbia">British Columbia</option>
+              <option value="Alberta">Alberta</option>
+              <option value="Other">Other</option>
+            </select>
+
+            <select
               value={filters.sort}
               onChange={(e) => handleFilterChange('sort', e.target.value)}
               className="px-4 py-2 border border-input rounded-md bg-background"
@@ -207,6 +232,7 @@ const LotsMarketplacePage = () => {
               <option value="-created_at">{t('marketplace.newest', 'Newest First')}</option>
               <option value="created_at">{t('marketplace.oldest', 'Oldest First')}</option>
               <option value="auction_end_date">{t('marketplace.endingSoon', 'Ending Soon')}</option>
+              <option value="-wishlist_count">Most Wishlisted</option>
             </select>
 
             <div className="flex gap-2">
