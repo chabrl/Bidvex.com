@@ -535,7 +535,7 @@ class BazarioCurrencyTester:
         try:
             async with self.session.post(
                 f"{BASE_URL}/admin/currency-appeals/fake-id/review",
-                json={"status": "approved"},
+                params={"status": "approved"},
                 headers=self.get_auth_headers()  # Regular user token
             ) as response:
                 if response.status == 403:
