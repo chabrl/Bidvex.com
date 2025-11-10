@@ -41,8 +41,13 @@ const AdminDashboard = () => {
       return;
     }
 
-    // Check if user has admin or superadmin role
-    if (user.role !== 'admin' && user.role !== 'superadmin') {
+    // Check if user has admin privileges (multiple checks for compatibility)
+    const isAdmin = user.role === 'admin' || 
+                    user.role === 'superadmin' || 
+                    user.account_type === 'admin' || 
+                    user.email?.endsWith('@admin.bazario.com');
+    
+    if (!isAdmin) {
       toast.error('You do not have permission to access this page');
       navigate('/');
       return;
