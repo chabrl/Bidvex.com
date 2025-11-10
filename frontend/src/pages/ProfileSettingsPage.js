@@ -90,21 +90,21 @@ const ProfileSettingsPage = () => {
   return (
     <div className="min-h-screen py-8 px-4" data-testid="profile-settings-page">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">Account Settings</h1>
+        <h1 className="text-3xl font-bold mb-8">{t('profile.accountSettings')}</h1>
 
         <Tabs defaultValue="profile" className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="profile" data-testid="profile-tab">
               <User className="mr-2 h-4 w-4" />
-              Profile
+              {t('profile.profileTab')}
             </TabsTrigger>
             <TabsTrigger value="payment" data-testid="payment-tab">
               <CreditCard className="mr-2 h-4 w-4" />
-              Payment Methods
+              {t('profile.paymentTab')}
             </TabsTrigger>
             <TabsTrigger value="notifications" data-testid="notifications-tab">
               <Bell className="mr-2 h-4 w-4" />
-              Notifications
+              {t('profile.notificationsTab')}
             </TabsTrigger>
           </TabsList>
 
