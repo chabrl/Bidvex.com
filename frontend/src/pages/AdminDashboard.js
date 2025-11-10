@@ -174,6 +174,7 @@ const AdminDashboard = () => {
                 <TabsTrigger value="categories">Categories</TabsTrigger>
                 <TabsTrigger value="promotions">Promotions</TabsTrigger>
                 <TabsTrigger value="affiliates">Affiliates</TabsTrigger>
+                <TabsTrigger value="currency-appeals"><DollarSign className="h-4 w-4 mr-1" />Currency Appeals</TabsTrigger>
                 <TabsTrigger value="reports">Reports</TabsTrigger>
                 <TabsTrigger value="messages">Messages</TabsTrigger>
                 <TabsTrigger value="announcements">Announcements</TabsTrigger>
