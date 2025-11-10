@@ -3308,20 +3308,6 @@ async def complete_auction_and_send_documents(
             if email_sent:
                 results['emails_sent'].append({
                     "type": "seller_documents",
-    """Currency enforcement appeal submission"""
-    model_config = ConfigDict(extra="ignore")
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    user_id: str
-    requested_currency: str  # CAD or USD
-    reason: str
-    proof_documents: Optional[List[str]] = None  # URLs to uploaded documents
-    current_location: Optional[str] = None
-    submitted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    status: str = "pending"  # pending, approved, rejected
-    admin_notes: Optional[str] = None
-    reviewed_at: Optional[datetime] = None
-
-@api_router.post("/currency-appeal")
 async def submit_currency_appeal(
     requested_currency: str,
     reason: str,
