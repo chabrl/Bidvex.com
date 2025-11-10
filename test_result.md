@@ -441,10 +441,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Phase 5 Part 4: Bilingual Lots Won PDF"
-    - "Phase 5 Part 5: Auction Completion with Auto-Send"
-    - "Phase 5 Part 5: Email Logs Endpoint"
-    - "Phase 5 Part 5: Invoice Email Tracking"
+    - "Currency Enforcement System"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
