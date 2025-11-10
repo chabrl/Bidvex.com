@@ -3930,6 +3930,47 @@ async def get_user_auto_bids(current_user: User = Depends(get_current_user)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# ==================== AUCTION INCREMENT ENDPOINTS ====================
+
+@api_router.get("/multi-item-listings/{listing_id}/increment-info")
+async def get_increment_info(listing_id: str):
+    """Get increment information for an auction"""
+    try:
+        listing = await db.multi_item_listings.find_one({"id": listing_id})
+        if not listing:
+            raise HTTPException(status_code=404, detail="Listing not found")
+        
+        increment_option = listing.get("increment_option", "tiered")
+        
+        # Get increment schedule
+        if increment_option == "simplified":
+            schedule = [
+                {"range": "$0-$100", "increment": "$1"},
+                {"range": "$100-$1,000", "increment": "$5"},
+                {"range": "$1,000-$10,000", "increment": "$25"},
+                {"range": "$10,000+", "increment": "$100"}
+            ]
+        else:
+            schedule = [
+                {"range": "$0-$99.99", "increment": "$5"},
+                {"range": "$100-$499.99", "increment": "$10"},
+                {"range": "$500-$999.99", "increment": "$25"},
+                {"range": "$1,000-$4,999.99", "increment": "$50"},
+                {"range": "$5,000-$9,999.99", "increment": "$100"},
+                {"range": "$10,000-$49,999.99", "increment": "$250"},
+                {"range": "$50,000-$99,999.99", "increment": "$500"},
+                {"range": "$100,000+", "increment": "$1,000"}
+            ]
+        
+        return {
+            "increment_option": increment_option,
+            "schedule": schedule
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ==================== SUBSCRIPTION MANAGEMENT ====================
 
 @api_router.get("/subscription/status")
