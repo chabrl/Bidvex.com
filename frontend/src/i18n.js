@@ -42,6 +42,11 @@ const resources = {
       auth: {
         welcomeBack: 'Welcome Back',
         createAccount: 'Create Your Account',
+        signInPrompt: 'Sign in to your account',
+        createAccountPrompt: 'Create a new account to start bidding',
+        welcomeMessage: 'Welcome back!',
+        accountCreatedMessage: 'Account created successfully!',
+        authFailedMessage: 'Authentication failed',
         email: 'Email',
         emailAddress: 'Email Address',
         password: 'Password',
