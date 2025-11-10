@@ -758,14 +758,16 @@ const resources = {
 
       // Footer
       footer: {
-        aboutUs: 'À Propos',
-        contactUs: 'Nous Contacter',
-        termsOfService: "Conditions d'Utilisation",
-        privacyPolicy: 'Politique de Confidentialité',
+        aboutUs: 'À propos',
+        contactUs: 'Contact',
+        termsOfService: 'Conditions d\'utilisation',
+        privacyPolicy: 'Confidentialité',
         faq: 'FAQ',
         support: 'Support',
-        followUs: 'Suivez-Nous',
+        followUs: 'Suivez-nous',
         allRightsReserved: 'Tous droits réservés',
+        howItWorks: 'Comment ça marche',
+        cookiePreferences: 'Préférences cookies',
       },
 
       // How It Works
