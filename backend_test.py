@@ -327,7 +327,7 @@ class BazarioCurrencyTester:
             # Test invalid currency
             async with self.session.post(
                 f"{BASE_URL}/currency-appeal",
-                json={
+                params={
                     "requested_currency": "EUR",  # Invalid currency
                     "reason": "Test invalid currency",
                     "current_location": "Paris, France"
