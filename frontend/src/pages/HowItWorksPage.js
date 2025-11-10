@@ -67,13 +67,13 @@ const HowItWorksPage = () => {
         {/* Header */}
         <div className="text-center space-y-4">
           <Badge className="mb-4 gradient-bg text-white border-0 text-lg px-6 py-2">
-            How It Works
+            {t('howItWorks.badge')}
           </Badge>
           <h1 className="text-4xl md:text-5xl font-bold">
-            Start Bidding in <span className="gradient-text">5 Simple Steps</span>
+            {t('howItWorks.mainTitle')} <span className="gradient-text">{t('howItWorks.simpleSteps')}</span>
           </h1>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            Whether you're buying or selling, BidVex makes online auctions simple, secure, and exciting
+            {t('howItWorks.subtitle')}
           </p>
         </div>
 
