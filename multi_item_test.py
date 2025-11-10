@@ -12,7 +12,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional, List
 
 # Configuration
-BASE_URL = "https://auction-preview.preview.emergentagent.com/api"
+BASE_URL = "https://auction-platform-12.preview.emergentagent.com/api"
 TEST_BUSINESS_EMAIL = "business.tester@bidvex.com"
 TEST_PERSONAL_EMAIL = "personal.tester@bidvex.com"
 TEST_PASSWORD = "MultiLotTest123!"
