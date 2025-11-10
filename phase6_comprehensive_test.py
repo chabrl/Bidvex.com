@@ -57,11 +57,11 @@ class Phase6ComprehensiveTester:
     async def setup_admin_user(self) -> bool:
         """Setup admin user for testing"""
         try:
-            # Try to register admin user first
+            # Try Phase 6 admin first
             admin_data = {
-                "email": ADMIN_EMAIL,
-                "password": ADMIN_PASSWORD,
-                "name": "Admin User",
+                "email": PHASE6_ADMIN_EMAIL,
+                "password": PHASE6_ADMIN_PASSWORD,
+                "name": "Phase 6 Admin",
                 "account_type": "business",
                 "phone": "+1234567890"
             }
@@ -71,14 +71,15 @@ class Phase6ComprehensiveTester:
                     data = await response.json()
                     self.admin_token = data["access_token"]
                     self.admin_id = data["user"]["id"]
-                    print(f"✅ Admin user registered: {self.admin_id}")
+                    print(f"✅ Phase 6 admin user registered: {self.admin_id}")
                     return True
                 elif response.status == 400:
                     # User already exists, try login
-                    return await self.login_admin_user()
+                    return await self.login_admin_user(PHASE6_ADMIN_EMAIL, PHASE6_ADMIN_PASSWORD)
                 else:
-                    print(f"❌ Failed to register admin: {response.status}")
-                    return False
+                    print(f"❌ Failed to register Phase 6 admin: {response.status}")
+                    # Try original admin credentials
+                    return await self.login_admin_user(ADMIN_EMAIL, ADMIN_PASSWORD)
         except Exception as e:
             print(f"❌ Error setting up admin user: {str(e)}")
             return False
