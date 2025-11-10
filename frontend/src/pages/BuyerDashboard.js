@@ -16,10 +16,12 @@ const BuyerDashboard = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [dashboard, setDashboard] = useState(null);
+  const [wishlist, setWishlist] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchDashboard();
+    fetchWishlist();
   }, []);
 
   const fetchDashboard = async () => {
@@ -31,6 +33,15 @@ const BuyerDashboard = () => {
       toast.error('Failed to load dashboard');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchWishlist = async () => {
+    try {
+      const response = await axios.get(`${API}/wishlist`);
+      setWishlist(response.data.wishlist || []);
+    } catch (error) {
+      console.error('Failed to fetch wishlist:', error);
     }
   };
 
