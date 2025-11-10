@@ -2475,7 +2475,7 @@ async def health():
 
 # ==================== INVOICE GENERATION ====================
 
-from weasyprint import HTML
+# WeasyPrint import moved to lazy loading to avoid startup issues
 from invoice_templates import lots_won_template
 import os
 
