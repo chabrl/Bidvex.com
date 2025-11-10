@@ -3080,7 +3080,11 @@ async def generate_commission_invoice(
     
     invoice_number = f"BV-COMM-{datetime.now().year}-{auction_id[:8]}-0001"
     
-    from invoice_templates import commission_invoice_template
+    # Use seller's preferred language if available
+    lang = seller.get('preferred_language', 'en')
+    currency = auction.get('currency', 'CAD')
+    
+    from invoice_templates_complete import commission_invoice_template
     template_data = {
         "invoice_number": invoice_number,
         "seller": {
@@ -3101,10 +3105,11 @@ async def generate_commission_invoice(
         "tax_rate_gst": tax_rate_gst,
         "tax_rate_qst": tax_rate_qst,
         "net_payout": net_payout,
-        "due_date": "Upon Receipt"
+        "due_date": "Upon Receipt",
+        "currency": currency
     }
     
-    html_content = commission_invoice_template(template_data)
+    html_content = commission_invoice_template(template_data, lang=lang)
     
     invoice_dir = Path(f"/app/invoices/{seller_id}")
     invoice_dir.mkdir(parents=True, exist_ok=True)
