@@ -1,61 +1,63 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Search, FileText, Gavel, CreditCard, Trophy, HelpCircle, ArrowRight } from 'lucide-react';
 
 const HowItWorksPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   const steps = [
     {
       icon: <Search className="h-12 w-12" />,
-      title: "1. Browse & Discover",
-      description: "Explore our marketplace to find unique items. Use filters to narrow down by category, price, location, and more."
+      title: t('howItWorks.step1Title'),
+      description: t('howItWorks.step1Desc')
     },
     {
       icon: <FileText className="h-12 w-12" />,
-      title: "2. Register & Verify",
-      description: "Create your free account and verify your email. Complete your profile to build trust with the community."
+      title: t('howItWorks.step2Title'),
+      description: t('howItWorks.step2Desc')
     },
     {
       icon: <Gavel className="h-12 w-12" />,
-      title: "3. Place Your Bid",
-      description: "Found something you like? Place a bid and watch the auction in real-time. You'll get instant notifications if you're outbid."
+      title: t('howItWorks.step3Title'),
+      description: t('howItWorks.step3Desc')
     },
     {
       icon: <Trophy className="h-12 w-12" />,
-      title: "4. Win & Celebrate",
-      description: "If you win, you'll receive an email confirmation. Complete your secure payment through our Stripe integration."
+      title: t('howItWorks.step4Title'),
+      description: t('howItWorks.step4Desc')
     },
     {
       icon: <CreditCard className="h-12 w-12" />,
-      title: "5. Secure Payment & Delivery",
-      description: "Complete payment securely and coordinate delivery with the seller. All transactions are protected by our buyer guarantee."
+      title: t('howItWorks.step5Title'),
+      description: t('howItWorks.step5Desc')
     }
   ];
 
   const faqs = [
     {
-      question: "How do I start bidding?",
-      answer: "First, create a free account and verify your email. Then browse our marketplace, find an item you like, and click 'Place Bid' to enter your bid amount. You'll be notified if someone outbids you."
+      question: t('howItWorks.faq1Q'),
+      answer: t('howItWorks.faq1A')
     },
     {
-      question: "Is my payment information secure?",
-      answer: "Absolutely! All payments are processed through Stripe, a leading payment processor trusted by millions. We never store your credit card information on our servers."
+      question: t('howItWorks.faq2Q'),
+      answer: t('howItWorks.faq2A')
     },
     {
-      question: "What happens if I win an auction?",
-      answer: "Congratulations! You'll receive an email confirmation and be directed to complete your payment. Once payment is confirmed, you can coordinate delivery or pickup with the seller through our messaging system."
+      question: t('howItWorks.faq3Q'),
+      answer: t('howItWorks.faq3A')
     },
     {
-      question: "Can I cancel my bid?",
-      answer: "Bids are binding commitments. Once placed, bids cannot be retracted. Please bid responsibly and make sure you're willing to complete the purchase if you win."
+      question: t('howItWorks.faq4Q'),
+      answer: t('howItWorks.faq4A')
     },
     {
-      question: "How do seller fees work?",
-      answer: "Sellers pay a small commission on successful sales. Personal accounts pay 5%, while business accounts pay 4.5%. This helps us maintain a secure, feature-rich platform for everyone."
+      question: t('howItWorks.faq5Q'),
+      answer: t('howItWorks.faq5A')
     }
   ];
 
