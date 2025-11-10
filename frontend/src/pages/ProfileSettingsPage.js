@@ -218,8 +218,7 @@ const ProfileSettingsPage = () => {
                       {user?.currency_locked && (
                         <div className="text-sm p-3 bg-blue-50 border border-blue-200 rounded-md">
                           <p className="text-blue-800 mb-2">
-                            💡 Currency is determined by your location to comply with local tax rules. 
-                            If you're traveling or have moved, you can request verification.
+                            💡 {t('currency.complianceMessage')}
                           </p>
                           <Button
                             variant="outline"
@@ -227,7 +226,7 @@ const ProfileSettingsPage = () => {
                             onClick={() => window.location.href = '/currency-appeal'}
                             className="text-blue-600 hover:text-blue-700"
                           >
-                            Request Currency Change
+                            {t('currency.requestChange')}
                           </Button>
                         </div>
                       )}
