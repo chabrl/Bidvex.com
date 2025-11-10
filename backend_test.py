@@ -399,14 +399,14 @@ class BazarioCurrencyTester:
                 return True
             
             # Test admin approval
-            review_data = {
+            review_params = {
                 "status": "approved",
                 "admin_notes": "Verified relocation documents"
             }
             
             async with self.session.post(
                 f"{BASE_URL}/admin/currency-appeals/{self.test_appeal_id}/review",
-                json=review_data,
+                params=review_params,
                 headers=self.get_admin_headers()
             ) as response:
                 if response.status == 200:
