@@ -111,8 +111,8 @@ const ProfileSettingsPage = () => {
           <TabsContent value="profile">
             <Card className="glassmorphism">
               <CardHeader>
-                <CardTitle>Personal Information</CardTitle>
-                <CardDescription>Update your profile details</CardDescription>
+                <CardTitle>{t('profile.personalInformation')}</CardTitle>
+                <CardDescription>{t('profile.updateDetails')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleProfileUpdate} className="space-y-6">
