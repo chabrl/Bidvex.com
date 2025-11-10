@@ -109,11 +109,11 @@ class Phase6ComprehensiveTester:
     async def setup_test_user(self) -> bool:
         """Setup test user for testing"""
         try:
-            # Try to register test user first
+            # Try to register Phase 6 test user first
             user_data = {
-                "email": TEST_USER_EMAIL,
-                "password": TEST_USER_PASSWORD,
-                "name": "Test User",
+                "email": PHASE6_USER_EMAIL,
+                "password": PHASE6_USER_PASSWORD,
+                "name": "Phase 6 Test User",
                 "account_type": "personal",
                 "phone": "+1234567891"
             }
@@ -123,14 +123,15 @@ class Phase6ComprehensiveTester:
                     data = await response.json()
                     self.test_user_token = data["access_token"]
                     self.test_user_id = data["user"]["id"]
-                    print(f"✅ Test user registered: {self.test_user_id}")
+                    print(f"✅ Phase 6 test user registered: {self.test_user_id}")
                     return True
                 elif response.status == 400:
                     # User already exists, try login
-                    return await self.login_test_user()
+                    return await self.login_test_user(PHASE6_USER_EMAIL, PHASE6_USER_PASSWORD)
                 else:
-                    print(f"❌ Failed to register test user: {response.status}")
-                    return False
+                    print(f"❌ Failed to register Phase 6 test user: {response.status}")
+                    # Try original test user
+                    return await self.login_test_user(TEST_USER_EMAIL, TEST_USER_PASSWORD)
         except Exception as e:
             print(f"❌ Error setting up test user: {str(e)}")
             return False
