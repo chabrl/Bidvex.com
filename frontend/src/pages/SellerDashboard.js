@@ -28,20 +28,20 @@ const SellerDashboard = () => {
       setDashboard(response.data);
     } catch (error) {
       console.error('Failed to fetch dashboard:', error);
-      toast.error('Failed to load dashboard');
+      toast.error(t('dashboard.seller.loadFailed'));
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeleteListing = async (listingId) => {
-    if (window.confirm('Are you sure you want to delete this listing?')) {
+    if (window.confirm(t('dashboard.seller.deleteListing'))) {
       try {
         await axios.delete(`${API}/listings/${listingId}`);
-        toast.success('Listing deleted successfully');
+        toast.success(t('dashboard.seller.listingDeleted'));
         fetchDashboard();
       } catch (error) {
-        toast.error('Failed to delete listing');
+        toast.error(t('dashboard.seller.deleteFailed'));
       }
     }
   };
