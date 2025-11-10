@@ -2991,7 +2991,11 @@ async def generate_seller_receipt(
     # Calculate totals (demo: first 3 lots sold)
     total_hammer = sum(lot['current_price'] for lot in auction['lots'][:3])
     
-    from invoice_templates import seller_receipt_template
+    # Use seller's preferred language if available
+    lang = seller.get('preferred_language', 'en')
+    currency = auction.get('currency', 'CAD')
+    
+    from invoice_templates_complete import seller_receipt_template
     template_data = {
         "receipt_number": f"RCPT-{auction_id[:8]}-{int(datetime.now().timestamp())}",
         "seller": {
@@ -3008,13 +3012,14 @@ async def generate_seller_receipt(
         "lots_sold": 3,
         "total_hammer": total_hammer,
         "commission_rate": auction.get('commission_rate', 0.0),
-        "tax_rate_gst": auction.get('tax_rate_gst', 5.0),
-        "tax_rate_qst": auction.get('tax_rate_qst', 9.975),
+        "tax_rate_gst": auction.get('tax_rate_gst', 0.0),
+        "tax_rate_qst": auction.get('tax_rate_qst', 0.0),
         "payment_method": "Bank Transfer",
-        "payment_date": "Within 5-7 business days"
+        "payment_date": "Within 5-7 business days",
+        "currency": currency
     }
     
-    html_content = seller_receipt_template(template_data)
+    html_content = seller_receipt_template(template_data, lang=lang)
     
     invoice_dir = Path(f"/app/invoices/{seller_id}")
     invoice_dir.mkdir(parents=True, exist_ok=True)
