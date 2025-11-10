@@ -76,13 +76,13 @@ const ProfileSettingsPage = () => {
   };
 
   const handleDeletePaymentMethod = async (methodId) => {
-    if (window.confirm('Are you sure you want to delete this payment method?')) {
+    if (window.confirm(t('payment.confirmDelete'))) {
       try {
         await axios.delete(`${API}/payment-methods/${methodId}`);
-        toast.success('Payment method deleted');
+        toast.success(t('payment.cardDeleted'));
         fetchPaymentMethods();
       } catch (error) {
-        toast.error('Failed to delete payment method');
+        toast.error(t('payment.cardDeleteFailed'));
       }
     }
   };
