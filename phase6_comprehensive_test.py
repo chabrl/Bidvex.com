@@ -27,6 +27,12 @@ ADMIN_PASSWORD = "admin123"
 TEST_USER_EMAIL = "test.user@bazario.com"
 TEST_USER_PASSWORD = "Test123!"
 
+# Fallback credentials for testing
+PHASE6_ADMIN_EMAIL = "phase6.admin@admin.bazario.com"
+PHASE6_ADMIN_PASSWORD = "Phase6Admin123!"
+PHASE6_USER_EMAIL = "phase6.user@bazario.com"
+PHASE6_USER_PASSWORD = "Phase6User123!"
+
 class Phase6ComprehensiveTester:
     def __init__(self):
         self.session = None
