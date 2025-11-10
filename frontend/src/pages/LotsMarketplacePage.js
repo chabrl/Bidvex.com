@@ -470,11 +470,14 @@ const LotsMarketplacePage = () => {
                     <div className="flex flex-col md:flex-row">
                       <div className="w-full md:w-1/3 aspect-video md:aspect-square overflow-hidden relative">
                         <ImageCarousel lots={listing.lots} totalLots={listing.total_lots} />
-                        {/* Favorite Button on Image */}
+                        {/* Wishlist Button on Image */}
                         <div className="absolute top-3 right-3 z-10" onClick={(e) => e.stopPropagation()}>
-                          <div className="bg-white/90 backdrop-blur-sm rounded-full p-2 shadow-md hover:bg-white transition-colors">
-                            <WatchlistButton listingId={listing.id} size="default" />
-                          </div>
+                          <WishlistHeartButton 
+                            auctionId={listing.id} 
+                            size="default"
+                            showCount={true}
+                            wishlistCount={listing.wishlist_count || 0}
+                          />
                         </div>
                       </div>
                       
