@@ -501,6 +501,51 @@ const CreateMultiItemListing = () => {
           )}
         </p>
       </div>
+      
+      {/* Bid Increment Option */}
+      <div className="space-y-2">
+        <Label htmlFor="increment_option" className="flex items-center gap-2">
+          📊 Bid Increment Schedule
+        </Label>
+        <select
+          id="increment_option"
+          name="increment_option"
+          value={formData.increment_option}
+          onChange={handleChange}
+          className="w-full px-3 py-2 border border-input rounded-md bg-background"
+        >
+          <option value="tiered">Option A: Tiered Schedule (Recommended)</option>
+          <option value="simplified">Option B: Simplified Schedule</option>
+        </select>
+        <div className="p-4 bg-gray-50 rounded-md border border-gray-200 text-sm">
+          {formData.increment_option === 'tiered' ? (
+            <div>
+              <p className="font-semibold mb-2">Tiered Schedule:</p>
+              <ul className="space-y-1 text-muted-foreground">
+                <li>• $0-$99.99 → $5 increment</li>
+                <li>• $100-$499.99 → $10 increment</li>
+                <li>• $500-$999.99 → $25 increment</li>
+                <li>• $1,000-$4,999.99 → $50 increment</li>
+                <li>• $5,000-$9,999.99 → $100 increment</li>
+                <li>• $10,000+ → Larger increments</li>
+              </ul>
+            </div>
+          ) : (
+            <div>
+              <p className="font-semibold mb-2">Simplified Schedule:</p>
+              <ul className="space-y-1 text-muted-foreground">
+                <li>• $0-$100 → $1 increment</li>
+                <li>• $100-$1,000 → $5 increment</li>
+                <li>• $1,000-$10,000 → $25 increment</li>
+                <li>• $10,000+ → $100 increment</li>
+              </ul>
+            </div>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          This determines the minimum bid increment buyers must follow. You can change this for each auction.
+        </p>
+      </div>
     </div>
   );
 
