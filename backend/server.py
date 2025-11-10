@@ -210,6 +210,7 @@ class Listing(BaseModel):
 class BidCreate(BaseModel):
     listing_id: str
     amount: float
+    bid_type: str = "normal"  # normal, monster, auto
 
 class Bid(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -217,6 +218,8 @@ class Bid(BaseModel):
     listing_id: str
     bidder_id: str
     amount: float
+    bid_type: str = "normal"  # normal, monster, auto
+    auto_bid_max: Optional[float] = None  # For auto-bid bot
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class Category(BaseModel):
