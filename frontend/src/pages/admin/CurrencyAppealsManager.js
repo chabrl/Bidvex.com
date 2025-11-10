@@ -41,7 +41,7 @@ const CurrencyAppealsManager = () => {
       setAppeals(response.data.appeals || []);
     } catch (error) {
       console.error('Failed to fetch appeals:', error);
-      toast.error('Failed to load currency appeals');
+      toast.error(t('admin.appeals.error'));
     } finally {
       setLoading(false);
     }
@@ -55,13 +55,14 @@ const CurrencyAppealsManager = () => {
         admin_notes: adminNotes
       });
       
-      toast.success(`Appeal ${status} successfully!`);
+      const message = status === 'approved' ? t('admin.appeals.approved') : t('admin.appeals.rejected');
+      toast.success(message);
       setSelectedAppeal(null);
       setAdminNotes('');
       fetchAllAppeals();
     } catch (error) {
       console.error('Failed to review appeal:', error);
-      toast.error(error.response?.data?.detail || 'Failed to review appeal');
+      toast.error(error.response?.data?.detail || t('admin.appeals.error'));
     } finally {
       setProcessing(false);
     }
