@@ -437,7 +437,7 @@ class BazarioCurrencyTester:
             # Test invalid status
             async with self.session.post(
                 f"{BASE_URL}/admin/currency-appeals/{self.test_appeal_id}/review",
-                json={"status": "invalid_status"},
+                params={"status": "invalid_status"},
                 headers=self.get_admin_headers()
             ) as response:
                 if response.status == 400:
