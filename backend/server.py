@@ -3308,11 +3308,6 @@ async def complete_auction_and_send_documents(
             if email_sent:
                 results['emails_sent'].append({
                     "type": "seller_documents",
-
-
-# ==================== CURRENCY APPEAL SYSTEM ====================
-
-class CurrencyAppeal(BaseModel):
     """Currency enforcement appeal submission"""
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
