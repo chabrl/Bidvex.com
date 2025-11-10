@@ -349,51 +349,43 @@ class BazarioCurrencyTester:
             return False
             
     async def test_get_user_appeals(self) -> bool:
-        """Test GET /api/watchlist endpoint"""
-        print("\n🧪 Testing GET /api/watchlist...")
+        """Test GET /api/currency-appeals endpoint"""
+        print("\n🧪 Testing GET /api/currency-appeals...")
         
         try:
             async with self.session.get(
-                f"{BASE_URL}/watchlist",
+                f"{BASE_URL}/currency-appeals",
                 headers=self.get_auth_headers()
             ) as response:
                 if response.status == 200:
                     data = await response.json()
                     
-                    # Verify response is a list
-                    assert isinstance(data, list)
+                    # Verify response structure
+                    assert "appeals" in data
+                    assert isinstance(data["appeals"], list)
                     
-                    # Should have at least one item (the one we added)
-                    assert len(data) >= 1, "Watchlist should contain at least one item"
+                    print(f"✅ Successfully retrieved user appeals")
+                    print(f"   - Total appeals: {len(data['appeals'])}")
                     
-                    # Find our test listing
-                    test_listing = None
-                    for item in data:
-                        if item["id"] == self.test_listing_ids[0]:
-                            test_listing = item
-                            break
+                    # If we have appeals, verify structure
+                    if len(data["appeals"]) > 0:
+                        appeal = data["appeals"][0]
+                        required_fields = ["id", "user_id", "requested_currency", "reason", "status", "submitted_at"]
+                        
+                        for field in required_fields:
+                            assert field in appeal, f"Missing field in appeal: {field}"
+                        
+                        print(f"   - Latest appeal status: {appeal['status']}")
+                        print(f"   - Requested currency: {appeal['requested_currency']}")
                     
-                    assert test_listing is not None, "Test listing not found in watchlist"
-                    
-                    # Verify listing details are included
-                    assert "id" in test_listing
-                    assert "title" in test_listing
-                    assert "description" in test_listing
-                    assert "current_price" in test_listing
-                    assert "watchlist_added_at" in test_listing
-                    
-                    print(f"✅ Watchlist retrieved successfully")
-                    print(f"   - Total items: {len(data)}")
-                    print(f"   - Test listing found: {test_listing['title']}")
-                    print(f"   - Added at: {test_listing['watchlist_added_at']}")
                     return True
                 else:
-                    print(f"❌ Failed to get watchlist: {response.status}")
+                    print(f"❌ Failed to get user appeals: {response.status}")
                     text = await response.text()
                     print(f"Response: {text}")
                     return False
         except Exception as e:
-            print(f"❌ Error testing get watchlist: {str(e)}")
+            print(f"❌ Error testing get user appeals: {str(e)}")
             return False
             
     async def test_remove_from_watchlist(self) -> bool:
