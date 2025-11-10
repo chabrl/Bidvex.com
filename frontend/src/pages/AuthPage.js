@@ -74,7 +74,7 @@ const AuthPage = () => {
             {isLogin ? t('auth.welcomeBack') : t('auth.createAccount')}
           </CardTitle>
           <CardDescription className="text-center">
-            {isLogin ? 'Sign in to your account' : 'Create a new account to start bidding'}
+            {isLogin ? t('auth.signInPrompt') : t('auth.createAccountPrompt')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
