@@ -106,6 +106,18 @@ export const AuthProvider = ({ children }) => {
       return updatedResponse.data;
     } catch (error) {
       console.error('Failed to update preferences:', error);
+      
+      // Check if currency is locked
+      if (error.response?.status === 403 && error.response?.data?.detail?.error === 'currency_locked') {
+        // Return the error details for UI to handle
+        throw {
+          currencyLocked: true,
+          message: error.response.data.detail.message,
+          enforcedCurrency: error.response.data.detail.enforced_currency,
+          appealLink: error.response.data.detail.appeal_link
+        };
+      }
+      
       throw error;
     }
   };
