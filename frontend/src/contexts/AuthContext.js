@@ -26,6 +26,11 @@ export const AuthProvider = ({ children }) => {
       const response = await axios.get(`${API}/auth/me`);
       console.log('User fetched successfully:', response.data);
       setUser(response.data);
+      
+      // Sync language preference with i18next
+      if (response.data.preferred_language) {
+        i18n.changeLanguage(response.data.preferred_language);
+      }
     } catch (error) {
       console.error('Failed to fetch user:', error);
       console.error('Error response:', error.response?.data);
