@@ -3440,6 +3440,132 @@ async def get_email_logs(
 # ==================== END INVOICE GENERATION ====================
 
 # Include API router after all endpoints are defined
+
+
+# ==================== CURRENCY APPEAL SYSTEM ====================
+
+class CurrencyAppeal(BaseModel):
+    """Currency enforcement appeal submission"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    requested_currency: str  # CAD or USD
+    reason: str
+    proof_documents: Optional[List[str]] = None  # URLs to uploaded documents
+    current_location: Optional[str] = None
+    submitted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    status: str = "pending"  # pending, approved, rejected
+    admin_notes: Optional[str] = None
+    reviewed_at: Optional[datetime] = None
+
+@api_router.post("/currency-appeal")
+async def submit_currency_appeal(
+    requested_currency: str,
+    reason: str,
+    proof_documents: Optional[List[str]] = None,
+    current_location: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Submit an appeal to change currency when it's locked
+    
+    Returns:
+        Success message with appeal ID
+    """
+    if requested_currency not in ["CAD", "USD"]:
+        raise HTTPException(status_code=400, detail="Currency must be 'CAD' or 'USD'")
+    
+    if not current_user.currency_locked:
+        raise HTTPException(status_code=400, detail="Currency is not locked, you can change it directly")
+    
+    appeal = CurrencyAppeal(
+        user_id=current_user.id,
+        requested_currency=requested_currency,
+        reason=reason,
+        proof_documents=proof_documents or [],
+        current_location=current_location
+    )
+    
+    appeal_dict = appeal.model_dump()
+    appeal_dict["submitted_at"] = appeal_dict["submitted_at"].isoformat()
+    
+    await db.currency_appeals.insert_one(appeal_dict)
+    
+    return {
+        "success": True,
+        "message": "Your appeal has been submitted and will be reviewed by our team within 24-48 hours.",
+        "appeal_id": appeal.id
+    }
+
+@api_router.get("/currency-appeals")
+async def get_user_appeals(current_user: User = Depends(get_current_user)):
+    """Get all appeals for current user"""
+    appeals = await db.currency_appeals.find(
+        {"user_id": current_user.id},
+        {"_id": 0}
+    ).sort("submitted_at", -1).to_list(10)
+    
+    return {"appeals": appeals}
+
+@api_router.post("/admin/currency-appeals/{appeal_id}/review")
+async def review_currency_appeal(
+    appeal_id: str,
+    status: str,
+    admin_notes: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Admin endpoint to review and approve/reject currency appeals
+    
+    Args:
+        appeal_id: The appeal ID to review
+        status: 'approved' or 'rejected'
+        admin_notes: Optional notes from admin
+        
+    Returns:
+        Success message
+    """
+    if current_user.account_type != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    if status not in ["approved", "rejected"]:
+        raise HTTPException(status_code=400, detail="Status must be 'approved' or 'rejected'")
+    
+    appeal = await db.currency_appeals.find_one({"id": appeal_id})
+    if not appeal:
+        raise HTTPException(status_code=404, detail="Appeal not found")
+    
+    # Update appeal status
+    await db.currency_appeals.update_one(
+        {"id": appeal_id},
+        {
+            "$set": {
+                "status": status,
+                "admin_notes": admin_notes,
+                "reviewed_at": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+    
+    # If approved, unlock currency and update user
+    if status == "approved":
+        await db.users.update_one(
+            {"id": appeal['user_id']},
+            {
+                "$set": {
+                    "preferred_currency": appeal['requested_currency'],
+                    "enforced_currency": appeal['requested_currency'],
+                    "currency_locked": False
+                }
+            }
+        )
+    
+    return {
+        "success": True,
+        "message": f"Appeal {status}",
+        "appeal_id": appeal_id
+    }
+
 app.include_router(api_router)
 
 app.add_middleware(
