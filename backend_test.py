@@ -277,50 +277,75 @@ class BazarioCurrencyTester:
             return False
             
     async def test_submit_currency_appeal(self) -> bool:
-        """Test GET /api/watchlist/check/{listing_id} endpoint"""
-        print("\n🧪 Testing GET /api/watchlist/check/{listing_id}...")
+        """Test POST /api/currency-appeal endpoint"""
+        print("\n🧪 Testing POST /api/currency-appeal...")
         
         try:
-            # Test checking listing that IS in watchlist
-            listing_in_watchlist = self.test_listing_ids[0]
+            # Test submitting a valid appeal
+            appeal_data = {
+                "requested_currency": "USD",
+                "reason": "Relocated to United States for work",
+                "current_location": "New York, NY"
+            }
             
-            async with self.session.get(
-                f"{BASE_URL}/watchlist/check/{listing_in_watchlist}",
+            async with self.session.post(
+                f"{BASE_URL}/currency-appeal",
+                json=appeal_data,
                 headers=self.get_auth_headers()
             ) as response:
                 if response.status == 200:
                     data = await response.json()
                     
                     # Verify response structure
-                    assert "in_watchlist" in data
-                    assert data["in_watchlist"] is True
+                    assert "success" in data
+                    assert "message" in data
+                    assert "appeal_id" in data
+                    assert data["success"] is True
                     
-                    print(f"✅ Correctly identified listing in watchlist: {listing_in_watchlist}")
+                    self.test_appeal_id = data["appeal_id"]
                     
-                    # Test checking listing that is NOT in watchlist
-                    listing_not_in_watchlist = self.test_listing_ids[1]
+                    print(f"✅ Successfully submitted currency appeal")
+                    print(f"   - Appeal ID: {data['appeal_id']}")
+                    print(f"   - Message: {data['message']}")
                     
-                    async with self.session.get(
-                        f"{BASE_URL}/watchlist/check/{listing_not_in_watchlist}",
-                        headers=self.get_auth_headers()
-                    ) as not_in_response:
-                        if not_in_response.status == 200:
-                            not_in_data = await not_in_response.json()
-                            assert "in_watchlist" in not_in_data
-                            assert not_in_data["in_watchlist"] is False
-                            print(f"✅ Correctly identified listing NOT in watchlist: {listing_not_in_watchlist}")
-                        else:
-                            print(f"❌ Failed to check non-watchlist item: {not_in_response.status}")
-                            return False
-                    
-                    return True
+                elif response.status == 400:
+                    # User might not have currency locked, which is expected in container environment
+                    data = await response.json()
+                    if "Currency is not locked" in data.get("detail", ""):
+                        print(f"✅ Correctly rejected appeal when currency not locked")
+                        print(f"   - Message: {data['detail']}")
+                        return True
+                    else:
+                        print(f"❌ Unexpected 400 error: {data.get('detail')}")
+                        return False
                 else:
-                    print(f"❌ Failed to check watchlist status: {response.status}")
+                    print(f"❌ Failed to submit appeal: {response.status}")
                     text = await response.text()
                     print(f"Response: {text}")
                     return False
+            
+            # Test invalid currency
+            async with self.session.post(
+                f"{BASE_URL}/currency-appeal",
+                json={
+                    "requested_currency": "EUR",  # Invalid currency
+                    "reason": "Test invalid currency",
+                    "current_location": "Paris, France"
+                },
+                headers=self.get_auth_headers()
+            ) as response:
+                if response.status == 400:
+                    data = await response.json()
+                    assert "Currency must be 'CAD' or 'USD'" in data.get("detail", "")
+                    print(f"✅ Correctly rejected invalid currency")
+                else:
+                    print(f"❌ Should have rejected invalid currency, got: {response.status}")
+                    return False
+            
+            return True
+            
         except Exception as e:
-            print(f"❌ Error testing watchlist status check: {str(e)}")
+            print(f"❌ Error testing currency appeal submission: {str(e)}")
             return False
             
     async def test_get_watchlist(self) -> bool:
