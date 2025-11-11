@@ -124,7 +124,18 @@ const LotsMarketplacePage = () => {
         .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
       
       const response = await axios.get(`${API}/multi-item-listings`, { params });
-      setListings(response.data);
+      
+      // Sort listings: featured first, then by selected sort order
+      const sortedListings = response.data.sort((a, b) => {
+        // Featured listings always come first
+        if (a.is_featured && !b.is_featured) return -1;
+        if (!a.is_featured && b.is_featured) return 1;
+        
+        // If both featured or both not featured, maintain original sort order
+        return 0;
+      });
+      
+      setListings(sortedListings);
     } catch (error) {
       console.error('Failed to fetch lots:', error);
     } finally {
