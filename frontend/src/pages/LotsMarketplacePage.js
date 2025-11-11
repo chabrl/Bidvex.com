@@ -600,6 +600,16 @@ const LotsMarketplacePage = () => {
                   onClick={() => navigate(`/lots/${listing.id}`)}
                   data-testid={`lot-card-${listing.id}`}
                 >
+                  {/* Featured Badge - Top Left */}
+                  {listing.is_featured && (
+                    <div className="absolute top-3 left-3 z-10">
+                      <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0 shadow-lg flex items-center gap-1">
+                        <Star className="h-3 w-3 fill-white" />
+                        Featured
+                      </Badge>
+                    </div>
+                  )}
+                  
                   {/* Wishlist Button - Absolute positioned on image */}
                   <div className="absolute top-3 right-3 z-10" onClick={(e) => e.stopPropagation()}>
                     <WishlistHeartButton 
