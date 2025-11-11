@@ -338,11 +338,36 @@ const LotsMarketplacePage = () => {
               </Button>
             </div>
           </div>
+          
+          {/* Homepage/Search View Toggle */}
+          <div className="mt-6 flex justify-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowHomepage(!showHomepage)}
+              className="gap-2"
+            >
+              {showHomepage ? (
+                <>
+                  <Search className="h-4 w-4" />
+                  Switch to Search View
+                </>
+              ) : (
+                <>
+                  <TrendingUp className="h-4 w-4" />
+                  Switch to Homepage
+                </>
+              )}
+            </Button>
+          </div>
         </div>
 
-        {/* Coming Soon Section */}
-        {upcomingListings.length > 0 && (
-          <div className="mb-12">
+        {/* 4-Row Homepage Layout */}
+        {showHomepage ? (
+          <div className="space-y-12">
+            {/* Row 1: Coming Soon Auctions */}
+            {upcomingListings.length > 0 && (
+              <div className="mb-12">
             <div className="flex items-center gap-3 mb-6">
               <Clock className="h-6 w-6 text-amber-500" />
               <h2 className="text-2xl font-bold">
