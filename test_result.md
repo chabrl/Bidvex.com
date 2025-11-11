@@ -206,6 +206,18 @@ backend:
         agent: "testing"
         comment: "COMPREHENSIVE TESTING COMPLETED: All 7 multi-item listings API tests PASSED. ✅ POST /api/multi-item-listings: Successfully creates listings with business accounts, correctly rejects personal accounts (403) and unauthenticated requests (401). Validates lot data including price ranges (1-10,000 CAD), quantities (1-100), and description lengths (20-500 chars). ✅ GET /api/multi-item-listings: Successfully retrieves all active listings with proper structure. ✅ GET /api/multi-item-listings/{id}: Successfully retrieves specific listings with complete lot details, returns 404 for non-existent listings. Created 5 test listings (1 minimal, 1 bulk with 10 lots, 3 validation edge cases). All endpoints working perfectly for Phase 3 Multi-Lot Wizard backend requirements."
 
+  - task: "Lots Auction Homepage 4-Row Backend Support"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "🎉 LOTS HOMEPAGE 4-ROW FEATURE BACKEND TESTING COMPLETE - ALL SUCCESS CRITERIA MET (7/7 TESTS PASSED): ✅ GET /api/multi-item-listings: Returns all active listings with complete data structure including id, title, description, category, city, region, total_lots, auction_end_date, auction_start_date, is_featured, promotion_expiry, seller_id, currency, status, lots array. ✅ GET /api/multi-item-listings?status=upcoming: Successfully filters upcoming auctions (3 found) with status='upcoming' and future auction_start_date validation. ✅ GET /api/multi-item-listings?status=active: Successfully filters active auctions (50 found) with status='active' and auction_end_date available for sorting. ✅ Featured Listings Filtering: 18 featured listings found with is_featured=true and promotion_expiry dates (VIP 7-day, Premium 3-day auto-promotion working). ✅ Pagination Support: limit parameter working correctly (tested limit=12, limit=5, large limits handled gracefully). ✅ Data Structure Completeness: All required fields present for frontend 4-row layout including lots array with lot_number, title, description, quantity, starting_price, current_price, condition, images. ✅ Error Handling: Invalid status returns empty array, negative limits handled, non-existent IDs return 404, large limits processed correctly. 🏠 HOMEPAGE 4-ROW SUPPORT CONFIRMED: (1) Coming Soon Row: status=upcoming filter working, (2) Featured Auctions Row: is_featured field available with promotion_expiry, (3) Ending Soon Row: status=active filter working with auction_end_date for sorting, (4) Recently Added Row: created_at field available for sorting. Created comprehensive test suite at /app/lots_homepage_test.py. All backend endpoints ready for frontend 4-row homepage implementation."
+
   - task: "Invoice System - Seller Statement"
     implemented: true
     working: true
