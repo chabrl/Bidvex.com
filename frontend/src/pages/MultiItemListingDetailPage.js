@@ -137,7 +137,7 @@ const MultiItemListingDetailPage = () => {
     setBidAmounts({ ...bidAmounts, [lotNumber]: value });
   };
 
-  const handlePlaceBid = async (lotNumber) => {
+  const handlePlaceBid = async (lotNumber, bidType = 'normal') => {
     if (!user) {
       toast.error('Please sign in to place a bid');
       navigate('/auth');
@@ -148,17 +148,28 @@ const MultiItemListingDetailPage = () => {
     const lot = listing.lots.find(l => l.lot_number === lotNumber);
 
     if (!bidAmount || bidAmount <= lot.current_price) {
-      toast.error(`Bid must be higher than current price of $${lot.current_price}`);
+      toast.error(`Bid must be higher than current price of $${lot.current_price.toFixed(2)}`);
       return;
+    }
+
+    // Validate increment for normal bids
+    if (bidType === 'normal') {
+      const minIncrement = getMinimumIncrement(lot.current_price);
+      const minimumBid = lot.current_price + minIncrement;
+      
+      if (bidAmount < minimumBid) {
+        toast.error(`Minimum bid is $${minimumBid.toFixed(2)} (increment: $${minIncrement.toFixed(2)})`);
+        return;
+      }
     }
 
     try {
       await axios.post(
         `${API}/multi-item-listings/${id}/lots/${lotNumber}/bid`,
-        { amount: bidAmount },
+        { amount: bidAmount, bid_type: bidType },
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
-      toast.success('Bid placed successfully!');
+      toast.success(bidType === 'monster' ? '⚡ Monster Bid placed!' : 'Bid placed successfully!');
       fetchListing();
       setBidAmounts({ ...bidAmounts, [lotNumber]: '' });
     } catch (error) {
