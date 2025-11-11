@@ -600,7 +600,7 @@ async def get_user(user_id: str):
 
 @api_router.put("/users/me")
 async def update_profile(updates: Dict[str, Any], current_user: User = Depends(get_current_user)):
-    allowed_fields = ["name", "phone", "address", "company_name", "tax_number", "bank_details", "language", "picture", "preferred_language", "preferred_currency"]
+    allowed_fields = ["name", "phone", "address", "company_name", "tax_number", "bank_details", "language", "picture", "preferred_language", "preferred_currency", "subscription_tier"]
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
     
     # Validate language
