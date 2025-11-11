@@ -290,6 +290,7 @@ class Lot(BaseModel):
     current_price: float
     condition: str
     images: List[str] = []
+    lot_end_time: Optional[datetime] = None  # Staggered end time (1 min per lot)
 
 class MultiItemListingCreate(BaseModel):
     title: str
