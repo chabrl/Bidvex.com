@@ -794,7 +794,6 @@ const CreateMultiItemListing = () => {
             const actualIndex = (currentPage - 1) * lotsPerPage + displayIndex;
             return (
             <Card key={actualIndex} className="border-2" data-lot-index={actualIndex}>
-            <Card key={index} className="border-2">
               <CardContent className="pt-6 space-y-4">
                 <div className="flex justify-between items-start">
                   <h4 className="font-semibold text-lg">Lot {lot.lot_number}</h4>
@@ -803,7 +802,7 @@ const CreateMultiItemListing = () => {
                       type="button" 
                       variant="ghost" 
                       size="sm" 
-                      onClick={() => removeLot(index)}
+                      onClick={() => removeLot(actualIndex)}
                       className="text-red-500 hover:text-red-700"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -816,7 +815,7 @@ const CreateMultiItemListing = () => {
                     <Label>Title *</Label>
                     <Input 
                       value={lot.title} 
-                      onChange={(e) => handleLotChange(index, 'title', e.target.value)} 
+                      onChange={(e) => handleLotChange(actualIndex, 'title', e.target.value)} 
                       required 
                     />
                   </div>
@@ -827,11 +826,11 @@ const CreateMultiItemListing = () => {
                       min="1" 
                       step="1"
                       value={lot.quantity} 
-                      onChange={(e) => handleLotChange(index, 'quantity', e.target.value)} 
+                      onChange={(e) => handleLotChange(actualIndex, 'quantity', e.target.value)} 
                       required 
                     />
-                    {validationErrors[index]?.quantity && (
-                      <p className="text-red-500 text-xs">{validationErrors[index].quantity}</p>
+                    {validationErrors[actualIndex]?.quantity && (
+                      <p className="text-red-500 text-xs">{validationErrors[actualIndex].quantity}</p>
                     )}
                   </div>
                 </div>
@@ -840,7 +839,7 @@ const CreateMultiItemListing = () => {
                   <Label>Description * (20-500 characters)</Label>
                   <Textarea 
                     value={lot.description} 
-                    onChange={(e) => handleLotChange(index, 'description', e.target.value)} 
+                    onChange={(e) => handleLotChange(actualIndex, 'description', e.target.value)} 
                     rows={2} 
                     required 
                   />
@@ -852,8 +851,8 @@ const CreateMultiItemListing = () => {
                     }>
                       {lot.description.length} characters
                     </span>
-                    {validationErrors[index]?.description && (
-                      <p className="text-red-500">{validationErrors[index].description}</p>
+                    {validationErrors[actualIndex]?.description && (
+                      <p className="text-red-500">{validationErrors[actualIndex].description}</p>
                     )}
                   </div>
                 </div>
@@ -867,18 +866,18 @@ const CreateMultiItemListing = () => {
                       min="1"
                       max="10000"
                       value={lot.starting_price} 
-                      onChange={(e) => handleLotChange(index, 'starting_price', e.target.value)} 
+                      onChange={(e) => handleLotChange(actualIndex, 'starting_price', e.target.value)} 
                       required 
                     />
-                    {validationErrors[index]?.starting_price && (
-                      <p className="text-red-500 text-xs">{validationErrors[index].starting_price}</p>
+                    {validationErrors[actualIndex]?.starting_price && (
+                      <p className="text-red-500 text-xs">{validationErrors[actualIndex].starting_price}</p>
                     )}
                   </div>
                   <div className="space-y-2">
                     <Label>Condition</Label>
                     <select 
                       value={lot.condition} 
-                      onChange={(e) => handleLotChange(index, 'condition', e.target.value)} 
+                      onChange={(e) => handleLotChange(actualIndex, 'condition', e.target.value)} 
                       className="w-full px-3 py-2 border border-input rounded-md bg-background"
                     >
                       <option value="new">New</option>
@@ -896,14 +895,14 @@ const CreateMultiItemListing = () => {
                     type="file" 
                     accept="image/*" 
                     multiple 
-                    onChange={(e) => handleLotImageUpload(index, e)} 
+                    onChange={(e) => handleLotImageUpload(actualIndex, e)} 
                     className="hidden" 
-                    id={`lot-image-${index}`} 
+                    id={`lot-image-${actualIndex}`} 
                   />
                   <Button 
                     type="button" 
                     variant="outline" 
-                    onClick={() => document.getElementById(`lot-image-${index}`).click()} 
+                    onClick={() => document.getElementById(`lot-image-${actualIndex}`).click()} 
                     className="w-full"
                   >
                     <Upload className="mr-2 h-4 w-4" /> Upload Images
@@ -915,7 +914,7 @@ const CreateMultiItemListing = () => {
                           <img src={img} alt="" className="w-full h-full object-cover" />
                           <button 
                             type="button" 
-                            onClick={() => removeLotImage(index, imgIdx)} 
+                            onClick={() => removeLotImage(actualIndex, imgIdx)} 
                             className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 text-xs hover:bg-red-600"
                           >
                             ×
