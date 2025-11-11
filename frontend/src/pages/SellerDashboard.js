@@ -141,10 +141,23 @@ const SellerDashboard = () => {
                           {listing.status}
                         </Badge>
                       </div>
-                      <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-2">
-                        <span>Current: ${listing.current_price.toFixed(2)}</span>
-                        <span>Bids: {listing.bid_count}</span>
-                        <span>Views: {listing.views}</span>
+                      <div className="flex flex-wrap gap-4 text-sm mb-2">
+                        <span className="text-green-600 font-semibold">
+                          <DollarSign className="h-3 w-3 inline mr-1" />
+                          ${listing.current_price.toFixed(2)}
+                        </span>
+                        <span className="text-blue-600">
+                          <TrendingUp className="h-3 w-3 inline mr-1" />
+                          {listing.bid_count} bids
+                        </span>
+                        <span className="text-gray-600">
+                          <Eye className="h-3 w-3 inline mr-1" />
+                          {listing.views} views
+                        </span>
+                        <span className="text-red-600">
+                          <Heart className="h-3 w-3 inline mr-1 fill-current" />
+                          {listing.wishlist_count || 0} wishlisted
+                        </span>
                       </div>
                       <div className="flex gap-2">
                         <Button
