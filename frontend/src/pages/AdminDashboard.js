@@ -180,6 +180,7 @@ const AdminDashboard = () => {
             <Tabs defaultValue="categories" className="space-y-4">
               <TabsList>
                 <TabsTrigger value="categories">{t('admin.categories')}</TabsTrigger>
+                <TabsTrigger value="subscriptions">💎 Subscriptions</TabsTrigger>
                 <TabsTrigger value="promotions">{t('admin.promotions')}</TabsTrigger>
                 <TabsTrigger value="affiliates">{t('admin.affiliates')}</TabsTrigger>
                 <TabsTrigger value="currency-appeals"><DollarSign className="h-4 w-4 mr-1" />{t('admin.currencyAppeals')}</TabsTrigger>
