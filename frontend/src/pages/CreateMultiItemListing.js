@@ -609,29 +609,32 @@ const CreateMultiItemListing = () => {
           🧩 Number of Lots to Generate
         </Label>
         <p className="text-sm text-muted-foreground mb-2">
-          Specify how many lots you want in this auction. Empty lot rows will be generated in Step 2.
+          Specify how many lots you want in this auction. Lot rows will be auto-generated as you type.
         </p>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           <Input 
             id="numLots" 
             type="number"
             min="1"
             max="500"
             value={numLots} 
-            onChange={(e) => setNumLots(parseInt(e.target.value) || 1)} 
+            onChange={(e) => {
+              const value = parseInt(e.target.value) || 1;
+              setNumLots(value);
+              // Auto-generate lots when valid number is entered
+              if (value > 0 && value <= 500) {
+                generateLots(value);
+              }
+            }} 
             placeholder="e.g., 280"
             className="w-32"
           />
-          <Button 
-            type="button"
-            onClick={() => generateLots(numLots)}
-            variant="outline"
-          >
-            Generate {numLots} Lot{numLots > 1 ? 's' : ''}
-          </Button>
+          <span className="text-sm text-muted-foreground">
+            {lots.length > 0 ? `✓ ${lots.length} lot${lots.length > 1 ? 's' : ''} ready` : 'Enter number to generate'}
+          </span>
         </div>
         <p className="text-xs text-muted-foreground">
-          💡 Max 500 lots per auction. Lots will be displayed 10 per page for easy editing.
+          💡 Max 500 lots per auction. Lots will be displayed 10 per page in Step 2 for easy editing.
         </p>
       </div>
     </div>
