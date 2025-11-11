@@ -176,11 +176,16 @@ const Navbar = () => {
                 </Button>
               </Link>
               {user && (
-                <Link to="/create-listing" onClick={() => setMobileMenuOpen(false)}>
-                  <Button variant="ghost" className="w-full justify-start">
-                    {t('nav.sell')}
-                  </Button>
-                </Link>
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-start"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setSellModalOpen(true);
+                  }}
+                >
+                  {t('nav.sell')}
+                </Button>
               )}
             </div>
           </div>
