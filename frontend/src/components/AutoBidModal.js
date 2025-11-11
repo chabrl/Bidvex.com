@@ -81,8 +81,8 @@ const AutoBidModal = ({ listingId, currentBid, minimumIncrement, onAutoBidSetup 
         onAutoBidSetup(amount);
       }
     } catch (error) {
-      console.error('Auto-Bid error:', error);
-      toast.error(error.response?.data?.detail || 'Failed to setup Auto-Bid Bot');
+      const errorMessage = extractErrorMessage(error);
+      toast.error(errorMessage || 'Failed to setup Auto-Bid Bot');
     } finally {
       setLoading(false);
     }
