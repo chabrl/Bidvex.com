@@ -305,6 +305,9 @@ class MultiItemListingCreate(BaseModel):
     auction_start_date: Optional[datetime] = None
     lots: List[Lot]
     currency: Optional[str] = None  # CAD or USD, auto-detected if not provided
+    documents: Optional[Dict[str, Any]] = None  # {terms_conditions, important_info, catalogue}
+    shipping_info: Optional[Dict[str, Any]] = None  # {available, methods, rates, delivery_time}
+    visit_availability: Optional[Dict[str, Any]] = None  # {offered, dates, instructions}
 
 class MultiItemListing(BaseModel):
     model_config = ConfigDict(extra="ignore")
