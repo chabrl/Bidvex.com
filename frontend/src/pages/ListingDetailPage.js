@@ -85,7 +85,8 @@ const ListingDetailPage = () => {
       fetchBids();
       setBidAmount('');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to place bid');
+      const errorMessage = extractErrorMessage(error);
+      toast.error(errorMessage || 'Failed to place bid');
     }
   };
 
