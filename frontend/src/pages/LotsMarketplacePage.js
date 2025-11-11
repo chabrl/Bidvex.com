@@ -13,6 +13,7 @@ import { Autoplay } from 'swiper/modules';
 import WatchlistButton from '../components/WatchlistButton';
 import WishlistHeartButton from '../components/WishlistHeartButton';
 import ImageCarouselComponent from '../components/ImageCarousel';
+import AuctioneerInfo from '../components/AuctioneerInfo';
 import { getCurrencyIcon } from '../utils/currency';
 import { Heart } from 'lucide-react';
 import 'swiper/css';
