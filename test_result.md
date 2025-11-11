@@ -592,6 +592,54 @@ backend:
         agent: "testing"
         comment: "✅ CURRENCY ENFORCEMENT SYSTEM TESTING COMPLETE - ALL SUCCESS CRITERIA MET (7/7 TESTS PASSED): ✅ User Model Fields: GET /api/auth/me includes enforced_currency, currency_locked, location_confidence_score fields with proper types and values. ✅ Profile Update Currency Lock: PUT /api/users/me correctly enforces currency restrictions - blocks changes when locked with proper 403 error structure including error type, message, enforced_currency, and appeal_link. Allows updates to same currency and other profile fields. ✅ Currency Appeal Endpoints: POST /api/currency-appeal validates request structure, rejects appeals when currency not locked (expected in container environment), validates currency values (CAD/USD only). GET /api/currency-appeals returns proper structure with appeals array. ✅ Admin Review Appeal: POST /api/admin/currency-appeals/{id}/review requires admin access (@admin.bazario.com email), validates status values (approved/rejected). Fixed admin authorization to be consistent with other endpoints. ✅ Geolocation Integration: Registration process integrates geolocation service, populates currency enforcement fields, creates audit logs in currency_audit_logs collection. Container environment correctly defaults to medium confidence with unlocked currency. ✅ Authorization & Validation: All endpoints properly secured with 401 for unauthenticated, 403 for unauthorized admin access, 400 for invalid data. Created comprehensive test suite at /app/backend_test.py covering all currency enforcement features."
 
+  - task: "BidVex Messaging System"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ BIDVEX MESSAGING SYSTEM TESTING COMPLETE (5/5 TESTS PASSED): ✅ POST /api/messages: Successfully sends messages to sellers with proper message structure including id, conversation_id, sender_id, receiver_id, content, is_read, created_at, and listing_id fields. Message creation working correctly with buyer-to-seller communication. ✅ GET /api/messages/unread-count: Returns correct unread message count with proper JSON structure {'unread_count': integer}. Fixed critical routing issue where endpoint was being matched by /messages/{conversation_id} - moved unread-count endpoint before parameterized route. ✅ GET /api/messages: Retrieves all user messages correctly, returns list of message objects with proper structure. Messages marked as read when retrieved by receiver. ✅ GET /api/messages?listing_id={id}: Successfully filters messages by listing_id parameter, returns only messages related to specific listing. ✅ Seller Reply Functionality: Sellers can reply to buyer messages successfully, creating proper conversation threads. 🔧 CRITICAL BUG FIXED: Added missing send_to_user method to ConnectionManager class for WebSocket message broadcasting. All messaging endpoints working perfectly for BidVex seller-buyer communication."
+
+  - task: "BidVex Document Upload System"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ BIDVEX DOCUMENT UPLOAD SYSTEM TESTING COMPLETE (5/5 TESTS PASSED): ✅ Valid PDF Upload: Successfully uploads PDF documents < 10MB, returns proper response with success=true, filename, content_type='application/pdf', size_mb, and base64_content fields. ✅ Valid PNG Image Upload: Successfully uploads PNG images < 10MB with proper validation and response structure. ✅ File Type Validation: Correctly rejects invalid file types (text/plain, .doc, etc.) with 400 status and clear error message 'Invalid file type. Allowed types: PDF, PNG, JPG'. ✅ File Size Validation: Correctly rejects files > 10MB with 400 status and error message showing actual file size. Tested with 11MB file successfully rejected. ✅ Base64 Content Validation: Correctly rejects invalid base64 content with 400 status and descriptive error message. All document upload requirements met for BidVex multi-item listings."
+
+  - task: "BidVex Multi-Item Listings with New Fields"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ BIDVEX MULTI-ITEM LISTINGS NEW FIELDS TESTING COMPLETE (4/4 TESTS PASSED): ✅ Document Fields: Successfully creates listings with documents={terms_conditions, important_info, catalogue} as base64 encoded strings. All documents persist correctly in database and are retrievable via GET endpoint. ✅ Shipping Info Fields: Successfully creates listings with shipping_info={available: true, methods: [...], rates: {...}, delivery_time} structure. When available=false, shipping details are properly handled. ✅ Visit Availability Fields: Successfully creates listings with visit_availability={offered: true, dates: [...], instructions} structure. When offered=false, visit details are properly handled. ✅ Data Persistence: All new fields persist correctly in MongoDB and are returned by GET /api/multi-item-listings/{id} endpoint with proper structure and data types. Created comprehensive test listings with all field combinations."
+
+  - task: "BidVex Data Integrity Validation"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ BIDVEX DATA INTEGRITY VALIDATION COMPLETE (6/6 TESTS PASSED): ✅ Base64 Document Persistence: All documents (terms_conditions, important_info, catalogue) persist as valid base64 strings and can be decoded successfully. ✅ Shipping Info Structure: When available=true, shipping_info contains required fields (methods array, rates object, delivery_time string). When available=false, shipping details properly handled. ✅ Visit Availability Structure: When offered=true, visit_availability contains required fields (dates array, instructions string). When offered=false, visit details properly handled. ✅ Field Schema Compliance: All expected fields present in listing response including new BidVex fields (documents, shipping_info, visit_availability) alongside existing fields (id, seller_id, title, description, etc.). ✅ Data Type Validation: All fields have correct data types - documents as base64 strings, shipping methods as arrays, rates as objects, dates as arrays, instructions as strings. ✅ Database Consistency: All new fields persist correctly in MongoDB and maintain data integrity across create/retrieve operations."
+
 metadata:
   created_by: "main_agent"
   version: "1.0"
