@@ -136,12 +136,21 @@ const AuctioneerInfo = ({ sellerId, variant = 'compact', className = '' }) => {
               )}
             </div>
 
-            {profile.city && (
-              <div className="flex items-center gap-1 text-sm text-muted-foreground mb-3">
-                <MapPin className="h-4 w-4" />
-                <span>{profile.city}</span>
-              </div>
-            )}
+            <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
+              {profile.city && (
+                <div className="flex items-center gap-1">
+                  <MapPin className="h-4 w-4" />
+                  <span>{profile.city}</span>
+                </div>
+              )}
+              {ratings && ratings.total_ratings > 0 && (
+                <div className="flex items-center gap-1">
+                  <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                  <span className="font-semibold text-foreground">{ratings.average_rating}</span>
+                  <span>({ratings.total_ratings} {ratings.total_ratings === 1 ? 'rating' : 'ratings'})</span>
+                </div>
+              )}
+            </div>
 
             {/* Stats */}
             <div className="grid grid-cols-2 gap-4 text-sm">
