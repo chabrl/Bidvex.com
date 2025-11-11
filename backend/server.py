@@ -1566,7 +1566,25 @@ async def bid_on_lot(listing_id: str, lot_number: int, data: Dict[str, float], c
     if amount <= current_price:
         raise HTTPException(status_code=400, detail="Bid must be higher than current price")
     
+    # Update current price
     lots[lot_index]["current_price"] = amount
+    
+    # Bid Extension Logic: Reset to 3 minutes if bid within final 3 minutes
+    now = datetime.now(timezone.utc)
+    lot_end_time_str = lots[lot_index].get("lot_end_time")
+    extension_applied = False
+    extension_count = lots[lot_index].get("extension_count", 0)
+    
+    if lot_end_time_str and extension_count < 3:  # Max 3 extensions
+        lot_end_time = datetime.fromisoformat(lot_end_time_str) if isinstance(lot_end_time_str, str) else lot_end_time_str
+        time_remaining = (lot_end_time - now).total_seconds()
+        
+        # If less than 3 minutes remaining, extend by 3 minutes
+        if 0 < time_remaining <= 180:  # 180 seconds = 3 minutes
+            new_end_time = now + timedelta(minutes=3)
+            lots[lot_index]["lot_end_time"] = new_end_time.isoformat()
+            lots[lot_index]["extension_count"] = extension_count + 1
+            extension_applied = True
     
     await db.multi_item_listings.update_one(
         {"id": listing_id},
