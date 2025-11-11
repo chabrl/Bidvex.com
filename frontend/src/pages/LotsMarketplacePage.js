@@ -169,9 +169,49 @@ const LotsMarketplacePage = () => {
   const fetchUpcomingLots = async () => {
     try {
       const response = await axios.get(`${API}/multi-item-listings?status=upcoming`);
-      setUpcomingListings(response.data);
+      setUpcomingListings(response.data.slice(0, 12)); // Limit to 12 for performance
     } catch (error) {
       console.error('Failed to fetch upcoming lots:', error);
+    }
+  };
+
+  const fetchFeaturedLots = async () => {
+    try {
+      const response = await axios.get(`${API}/multi-item-listings`);
+      const featured = response.data.filter(listing => listing.is_featured);
+      setFeaturedListings(featured.slice(0, 12));
+    } catch (error) {
+      console.error('Failed to fetch featured lots:', error);
+    }
+  };
+
+  const fetchEndingSoonLots = async () => {
+    try {
+      const response = await axios.get(`${API}/multi-item-listings?status=active`);
+      // Sort by auction_end_date ascending (soonest first)
+      const sorted = response.data.sort((a, b) => {
+        const dateA = new Date(a.auction_end_date);
+        const dateB = new Date(b.auction_end_date);
+        return dateA - dateB;
+      });
+      setEndingSoonListings(sorted.slice(0, 12));
+    } catch (error) {
+      console.error('Failed to fetch ending soon lots:', error);
+    }
+  };
+
+  const fetchRecentLots = async () => {
+    try {
+      const response = await axios.get(`${API}/multi-item-listings`);
+      // Sort by created_at descending (newest first)
+      const sorted = response.data.sort((a, b) => {
+        const dateA = new Date(a.created_at);
+        const dateB = new Date(b.created_at);
+        return dateB - dateA;
+      });
+      setRecentListings(sorted.slice(0, 12));
+    } catch (error) {
+      console.error('Failed to fetch recent lots:', error);
     }
   };
 
