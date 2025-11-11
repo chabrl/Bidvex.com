@@ -18,6 +18,7 @@ import MonsterBidButton from '../components/MonsterBidButton';
 import AutoBidModal from '../components/AutoBidModal';
 import SubscriptionBadge from '../components/SubscriptionBadge';
 import WishlistHeartButton from '../components/WishlistHeartButton';
+import AuctioneerInfo from '../components/AuctioneerInfo';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
