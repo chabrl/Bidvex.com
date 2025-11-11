@@ -617,6 +617,14 @@ const LotsMarketplacePage = () => {
                             </div>
                           )}
                         </div>
+                        
+                        {/* Auctioneer Info */}
+                        {listing.seller_id && (
+                          <div className="mt-4 pt-4 border-t">
+                            <p className="text-xs text-muted-foreground mb-2">Hosted by</p>
+                            <AuctioneerInfo sellerId={listing.seller_id} variant="compact" />
+                          </div>
+                        )}
                       </div>
                     </div>
                   </Card>
