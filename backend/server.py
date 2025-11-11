@@ -45,6 +45,7 @@ logger = logging.getLogger(__name__)
 class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, List[WebSocket]] = {}
+        self.user_connections: Dict[str, List[WebSocket]] = {}
 
     async def connect(self, websocket: WebSocket, listing_id: str):
         await websocket.accept()
@@ -59,6 +60,15 @@ class ConnectionManager:
     async def broadcast(self, listing_id: str, message: dict):
         if listing_id in self.active_connections:
             for connection in self.active_connections[listing_id]:
+                try:
+                    await connection.send_json(message)
+                except:
+                    pass
+
+    async def send_to_user(self, user_id: str, message: dict):
+        """Send message to specific user (for notifications, messages, etc.)"""
+        if user_id in self.user_connections:
+            for connection in self.user_connections[user_id]:
                 try:
                     await connection.send_json(message)
                 except:
