@@ -425,6 +425,18 @@ backend:
         comment: "🎉 PREMIUM & VIP AUTO-PROMOTION COMPREHENSIVE TESTING COMPLETE - ALL SUCCESS CRITERIA MET (13/13 TESTS PASSED): ✅ PREMIUM AUTO-PROMOTION (3-DAY FEATURE): Premium users' listings automatically featured for 3 days with precise promotion_expiry calculation (±0.01s accuracy). ✅ VIP AUTO-PROMOTION REGRESSION: VIP users still get 7-day auto-promotion (regression test passed). ✅ FREE TIER: Free users correctly NOT auto-promoted (is_featured=false, promotion_expiry=null). ✅ PREMIUM VS VIP COMPARISON: Duration difference exactly 4.00 days (7-3=4), both tiers featured correctly. ✅ LISTING RETRIEVAL: GET endpoints return correct featured status and promotion_expiry for all tiers with proper serialization. ✅ EDGE CASES VERIFIED: (1) Premium listings with future start dates still promoted, (2) Users without subscription_tier default to free behavior, (3) Personal account users correctly blocked (403 error), (4) MongoDB field persistence verified across multiple retrievals, (5) Multiple Premium listings from same user all promoted correctly. ✅ MONGODB PERSISTENCE: Fields correctly stored as boolean (is_featured) and ISO string (promotion_expiry), consistent retrieval verified. ✅ NO BACKEND ERRORS: All endpoints working without crashes, proper datetime serialization, accurate time calculations. Created comprehensive test suites: /app/premium_auto_promotion_test.py (8 tests), /app/premium_focused_test.py (focused verification), /app/premium_edge_cases_test.py (5 edge cases). Premium auto-promotion feature fully implemented, tested, and production-ready."
 
 frontend:
+  - task: "Auctioneer Information Display System"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/components/AuctioneerInfo.js, /app/frontend/src/pages/LotsMarketplacePage.js, /app/frontend/src/pages/MultiItemListingDetailPage.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "✅ AUCTIONEER DISPLAY COMPLETE: Created AuctioneerInfo.js reusable component with 3 display variants (compact, full, tooltip). Integrated into LotsMarketplacePage grid/list cards showing 'VIP Test User' with orange VIP badge and location. Added to MultiItemListingDetailPage with full profile display including stats (Total Auctions: 4, Completed: 0). Backend profile-summary endpoint provides name, location, subscription tier, auction counts. Visual verification confirms proper display on all auction types. Improves transparency and seller accountability. No linting errors."
+
   - task: "VIP & Premium Auto-Promotion - Complete System"
     implemented: true
     working: true
