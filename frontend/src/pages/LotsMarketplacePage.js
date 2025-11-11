@@ -862,6 +862,8 @@ const LotsMarketplacePage = () => {
           </div>
         )}
       </div>
+        )}
+      </div>
     </div>
   );
 };
