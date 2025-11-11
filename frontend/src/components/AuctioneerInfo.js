@@ -63,7 +63,7 @@ const AuctioneerInfo = ({ sellerId, variant = 'compact', className = '' }) => {
     return (
       <div className={`flex items-center gap-2 text-sm ${className}`}>
         <User className="h-4 w-4 text-muted-foreground" />
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="font-medium text-foreground">
             {profile.company_name || profile.name}
           </span>
@@ -78,6 +78,13 @@ const AuctioneerInfo = ({ sellerId, variant = 'compact', className = '' }) => {
             >
               {profile.subscription_tier === 'vip' ? 'VIP' : 'Premium'}
             </Badge>
+          )}
+          {ratings && ratings.total_ratings > 0 && (
+            <div className="flex items-center gap-1">
+              <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+              <span className="font-medium">{ratings.average_rating}</span>
+              <span className="text-muted-foreground">({ratings.total_ratings})</span>
+            </div>
           )}
         </div>
         {profile.city && (
