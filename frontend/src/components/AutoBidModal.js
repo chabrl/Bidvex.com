@@ -98,8 +98,8 @@ const AutoBidModal = ({ listingId, currentBid, minimumIncrement, onAutoBidSetup 
       setMaxBid('');
       setIsOpen(false);
     } catch (error) {
-      console.error('Failed to deactivate:', error);
-      toast.error('Failed to deactivate Auto-Bid Bot');
+      const errorMessage = extractErrorMessage(error);
+      toast.error(errorMessage || 'Failed to deactivate Auto-Bid Bot');
     } finally {
       setLoading(false);
     }
