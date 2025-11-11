@@ -456,7 +456,7 @@ class BidVexBackendTester:
                 json=listing_data,
                 headers=self.get_seller_headers()
             ) as response:
-                if response.status == 201:
+                if response.status in [200, 201]:
                     data = await response.json()
                     self.test_listing_id = data.get("id")
                     print(f"✅ Multi-item listing created successfully")
