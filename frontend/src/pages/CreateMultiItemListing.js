@@ -1054,6 +1054,233 @@ const CreateMultiItemListing = () => {
     </div>
   );
 
+  // Step 4: Documents, Shipping, Visit
+  const renderStep4 = () => {
+    const handleFileUpload = async (docType, event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      // Validate file size (10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error('File too large. Maximum size is 10MB');
+        return;
+      }
+
+      // Validate file type
+      const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg'];
+      if (!allowedTypes.includes(file.type)) {
+        toast.error('Invalid file type. Please upload PDF, PNG, or JPG');
+        return;
+      }
+
+      // Convert to base64
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = reader.result.split(',')[1];
+        setDocuments(prev => ({
+          ...prev,
+          [docType]: {
+            filename: file.name,
+            content_type: file.type,
+            base64_content: base64
+          }
+        }));
+        toast.success(`${file.name} uploaded successfully`);
+      };
+      reader.readAsDataURL(file);
+    };
+
+    return (
+      <div className="space-y-8">
+        <h3 className="text-2xl font-semibold">Documents, Shipping & Visit Options</h3>
+
+        {/* Documents Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Upload Documents (Optional)
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Upload PDFs or images (max 10MB each). These will be available to buyers.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Terms & Conditions */}
+            <div>
+              <Label>Terms & Conditions</Label>
+              <div className="flex items-center gap-2 mt-2">
+                <Input
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg"
+                  onChange={(e) => handleFileUpload('terms_conditions', e)}
+                  className="flex-1"
+                />
+                {documents.terms_conditions && (
+                  <span className="text-sm text-green-600 flex items-center gap-1">
+                    <CheckCircle className="h-4 w-4" />
+                    {documents.terms_conditions.filename}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Important Information */}
+            <div>
+              <Label>Important Information</Label>
+              <div className="flex items-center gap-2 mt-2">
+                <Input
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg"
+                  onChange={(e) => handleFileUpload('important_info', e)}
+                  className="flex-1"
+                />
+                {documents.important_info && (
+                  <span className="text-sm text-green-600 flex items-center gap-1">
+                    <CheckCircle className="h-4 w-4" />
+                    {documents.important_info.filename}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Catalogue */}
+            <div>
+              <Label>Catalogue</Label>
+              <div className="flex items-center gap-2 mt-2">
+                <Input
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg"
+                  onChange={(e) => handleFileUpload('catalogue', e)}
+                  className="flex-1"
+                />
+                {documents.catalogue && (
+                  <span className="text-sm text-green-600 flex items-center gap-1">
+                    <CheckCircle className="h-4 w-4" />
+                    {documents.catalogue.filename}
+                  </span>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Shipping Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Shipping Options</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="shipping-available"
+                checked={shippingInfo.available}
+                onChange={(e) => setShippingInfo(prev => ({ ...prev, available: e.target.checked }))}
+                className="w-4 h-4"
+              />
+              <Label htmlFor="shipping-available">Offer Shipping?</Label>
+            </div>
+
+            {shippingInfo.available && (
+              <div className="space-y-4 ml-6 p-4 border rounded-lg">
+                <div>
+                  <Label>Shipping Methods</Label>
+                  <div className="space-y-2 mt-2">
+                    {['local_pickup', 'standard', 'express'].map(method => (
+                      <div key={method} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id={`shipping-${method}`}
+                          checked={shippingInfo.methods.includes(method)}
+                          onChange={(e) => {
+                            setShippingInfo(prev => ({
+                              ...prev,
+                              methods: e.target.checked
+                                ? [...prev.methods, method]
+                                : prev.methods.filter(m => m !== method)
+                            }));
+                          }}
+                          className="w-4 h-4"
+                        />
+                        <Label htmlFor={`shipping-${method}`} className="capitalize">
+                          {method.replace('_', ' ')}
+                        </Label>
+                        {shippingInfo.methods.includes(method) && (
+                          <Input
+                            type="number"
+                            placeholder="Rate ($)"
+                            value={shippingInfo.rates[method] || ''}
+                            onChange={(e) => setShippingInfo(prev => ({
+                              ...prev,
+                              rates: { ...prev.rates, [method]: e.target.value }
+                            }))}
+                            className="w-24"
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <Label>Estimated Delivery Time</Label>
+                  <Input
+                    placeholder="e.g., 3-5 business days"
+                    value={shippingInfo.delivery_time}
+                    onChange={(e) => setShippingInfo(prev => ({ ...prev, delivery_time: e.target.value }))}
+                  />
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Visit Availability Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Visit Before Auction</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="visit-offered"
+                checked={visitAvailability.offered}
+                onChange={(e) => setVisitAvailability(prev => ({ ...prev, offered: e.target.checked }))}
+                className="w-4 h-4"
+              />
+              <Label htmlFor="visit-offered">Allow buyers to schedule a visit?</Label>
+            </div>
+
+            {visitAvailability.offered && (
+              <div className="space-y-4 ml-6 p-4 border rounded-lg">
+                <div>
+                  <Label>Available Dates</Label>
+                  <Input
+                    placeholder="e.g., Nov 15-20, 2025"
+                    value={visitAvailability.dates}
+                    onChange={(e) => setVisitAvailability(prev => ({ ...prev, dates: e.target.value }))}
+                  />
+                </div>
+
+                <div>
+                  <Label>Instructions</Label>
+                  <Textarea
+                    placeholder="Provide instructions for scheduling (e.g., contact info, time slots)"
+                    value={visitAvailability.instructions}
+                    onChange={(e) => setVisitAvailability(prev => ({ ...prev, instructions: e.target.value }))}
+                    rows={3}
+                  />
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen py-8 px-4">
       <div className="max-w-6xl mx-auto">
