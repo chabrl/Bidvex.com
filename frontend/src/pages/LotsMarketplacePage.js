@@ -603,10 +603,10 @@ const LotsMarketplacePage = () => {
                 {listings.map((listing) => {
                   const auctionEndDate = new Date(listing.auction_end_date);
                   const isEnded = new Date() > auctionEndDate;
-              const totalStarting = getTotalStartingPrice(listing.lots);
-              const totalCurrent = getTotalCurrentPrice(listing.lots);
+                  const totalStarting = getTotalStartingPrice(listing.lots);
+                  const totalCurrent = getTotalCurrentPrice(listing.lots);
 
-              if (viewMode === 'list') {
+                  if (viewMode === 'list') {
                 return (
                   <Card
                     key={listing.id}
