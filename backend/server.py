@@ -598,6 +598,58 @@ async def get_user(user_id: str):
         user_doc["created_at"] = datetime.fromisoformat(user_doc["created_at"])
     return User(**user_doc)
 
+@api_router.get("/users/{user_id}/profile-summary")
+async def get_user_profile_summary(user_id: str):
+    """
+    Get auctioneer profile summary for display on auction cards.
+    Returns name, location, profile image, and seller statistics.
+    """
+    try:
+        # Get user data
+        user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
+        if not user_doc:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Calculate seller statistics
+        total_single_auctions = await db.listings.count_documents({"seller_id": user_id})
+        total_lots_auctions = await db.multi_item_listings.count_documents({"seller_id": user_id})
+        total_auctions = total_single_auctions + total_lots_auctions
+        
+        # Calculate completed auctions
+        completed_single = await db.listings.count_documents({
+            "seller_id": user_id,
+            "status": {"$in": ["sold", "ended"]}
+        })
+        completed_lots = await db.multi_item_listings.count_documents({
+            "seller_id": user_id,
+            "status": {"$in": ["ended", "completed"]}
+        })
+        completed_auctions = completed_single + completed_lots
+        
+        # Build profile summary
+        profile_summary = {
+            "user_id": user_id,
+            "name": user_doc.get("name", "Anonymous"),
+            "picture": user_doc.get("picture"),
+            "company_name": user_doc.get("company_name"),
+            "account_type": user_doc.get("account_type", "personal"),
+            "city": user_doc.get("address", "").split(",")[0] if user_doc.get("address") else None,
+            "subscription_tier": user_doc.get("subscription_tier", "free"),
+            "stats": {
+                "total_auctions": total_auctions,
+                "completed_auctions": completed_auctions,
+                "member_since": user_doc.get("created_at")
+            }
+        }
+        
+        return profile_summary
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching user profile summary: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch profile summary")
+
 @api_router.put("/users/me")
 async def update_profile(updates: Dict[str, Any], current_user: User = Depends(get_current_user)):
     allowed_fields = ["name", "phone", "address", "company_name", "tax_number", "bank_details", "language", "picture", "preferred_language", "preferred_currency", "subscription_tier"]
