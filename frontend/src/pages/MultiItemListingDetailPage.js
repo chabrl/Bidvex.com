@@ -19,6 +19,8 @@ import AutoBidModal from '../components/AutoBidModal';
 import SubscriptionBadge from '../components/SubscriptionBadge';
 import WishlistHeartButton from '../components/WishlistHeartButton';
 import AuctioneerInfo from '../components/AuctioneerInfo';
+import WatchLotButton from '../components/WatchLotButton';
+import ShareButton from '../components/ShareButton';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
