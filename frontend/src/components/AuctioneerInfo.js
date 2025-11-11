@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, MapPin, Award, TrendingUp } from 'lucide-react';
+import { User, MapPin, Award, TrendingUp, Star } from 'lucide-react';
 import { Badge } from './ui/badge';
 import axios from 'axios';
 
@@ -7,7 +7,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 /**
  * AuctioneerInfo Component
- * Displays auctioneer/seller information with profile summary
+ * Displays auctioneer/seller information with profile summary and ratings
  * 
  * @param {string} sellerId - User ID of the auctioneer
  * @param {string} variant - Display variant: 'compact', 'full', 'tooltip'
@@ -15,19 +15,25 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
  */
 const AuctioneerInfo = ({ sellerId, variant = 'compact', className = '' }) => {
   const [profile, setProfile] = useState(null);
+  const [ratings, setRatings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchProfile = async () => {
+    const fetchData = async () => {
       if (!sellerId) {
         setLoading(false);
         return;
       }
 
       try {
-        const response = await axios.get(`${API}/users/${sellerId}/profile-summary`);
-        setProfile(response.data);
+        const [profileRes, ratingsRes] = await Promise.all([
+          axios.get(`${API}/users/${sellerId}/profile-summary`),
+          axios.get(`${API}/users/${sellerId}/ratings`)
+        ]);
+        
+        setProfile(profileRes.data);
+        setRatings(ratingsRes.data);
       } catch (err) {
         console.error('Failed to fetch auctioneer profile:', err);
         setError(err.message);
