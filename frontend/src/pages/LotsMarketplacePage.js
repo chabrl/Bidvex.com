@@ -85,6 +85,24 @@ const ImageCarousel = ({ lots, totalLots }) => {
   );
 };
 
+// Helper function to get promotion duration tooltip
+const getPromotionTooltip = (promotionExpiry) => {
+  if (!promotionExpiry) return 'Featured listing';
+  
+  const expiryDate = new Date(promotionExpiry);
+  const now = new Date();
+  const daysRemaining = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
+  
+  // Determine tier based on days remaining (approximation)
+  if (daysRemaining >= 7 || daysRemaining <= 0) {
+    return 'VIP listings are promoted for 7 days';
+  } else if (daysRemaining >= 3) {
+    return 'Premium listings are promoted for 3 days';
+  } else {
+    return `Featured listing (${daysRemaining} days remaining)`;
+  }
+};
+
 const LotsMarketplacePage = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
