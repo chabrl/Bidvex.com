@@ -702,6 +702,13 @@ const LotsMarketplacePage = () => {
                       </div>
                     )}
                     
+                    {/* Auctioneer Info */}
+                    {listing.seller_id && (
+                      <div className="pt-2 border-t">
+                        <AuctioneerInfo sellerId={listing.seller_id} variant="compact" />
+                      </div>
+                    )}
+                    
                     {/* Time Remaining */}
                     {!isEnded ? (
                       <div className="flex items-center gap-2 pt-2 border-t">
