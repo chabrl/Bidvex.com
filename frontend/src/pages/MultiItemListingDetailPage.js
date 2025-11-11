@@ -39,7 +39,39 @@ const MultiItemListingDetailPage = () => {
 
   useEffect(() => {
     fetchListing();
+    fetchIncrementInfo();
   }, [id]);
+
+  const fetchIncrementInfo = async () => {
+    try {
+      const response = await axios.get(`${API}/multi-item-listings/${id}/increment-info`);
+      setIncrementInfo(response.data);
+    } catch (error) {
+      console.error('Failed to fetch increment info:', error);
+    }
+  };
+
+  const getMinimumIncrement = (currentBid) => {
+    if (!incrementInfo) return 5; // Default fallback
+    
+    const option = incrementInfo.increment_option;
+    if (option === 'simplified') {
+      if (currentBid <= 100) return 1;
+      if (currentBid <= 1000) return 5;
+      if (currentBid <= 10000) return 25;
+      return 100;
+    } else {
+      // Tiered
+      if (currentBid < 100) return 5;
+      if (currentBid < 500) return 10;
+      if (currentBid < 1000) return 25;
+      if (currentBid < 5000) return 50;
+      if (currentBid < 10000) return 100;
+      if (currentBid < 50000) return 250;
+      if (currentBid < 100000) return 500;
+      return 1000;
+    }
+  };
 
   useEffect(() => {
     const handleScroll = () => {
