@@ -35,14 +35,14 @@ const AuctioneerInfo = ({ sellerId, variant = 'compact', className = '' }) => {
         setProfile(profileRes.data);
         setRatings(ratingsRes.data);
       } catch (err) {
-        console.error('Failed to fetch auctioneer profile:', err);
+        console.error('Failed to fetch auctioneer data:', err);
         setError(err.message);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProfile();
+    fetchData();
   }, [sellerId]);
 
   if (loading) {
