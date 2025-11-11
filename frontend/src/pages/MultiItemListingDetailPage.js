@@ -285,6 +285,14 @@ const MultiItemListingDetailPage = () => {
                     <CardTitle className="text-3xl mb-4">{listing.title}</CardTitle>
                     <p className="text-muted-foreground mb-4">{listing.description}</p>
 
+                    {/* Auctioneer Info Section */}
+                    {listing.seller_id && (
+                      <div className="mb-6">
+                        <p className="text-sm text-muted-foreground mb-2">Hosted by</p>
+                        <AuctioneerInfo sellerId={listing.seller_id} variant="full" />
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                       <div className="flex items-center gap-2">
                         <MapPin className="h-4 w-4 text-muted-foreground" />
