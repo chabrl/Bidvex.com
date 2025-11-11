@@ -534,18 +534,73 @@ const LotsMarketplacePage = () => {
 
         {/* 4-Row Homepage Layout */}
         {showHomepage ? (
-          <div className="space-y-12">
+          <div className="space-y-8">
             {/* Row 1: Coming Soon Auctions */}
-            {upcomingListings.length > 0 && (
-              <div className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <Clock className="h-6 w-6 text-amber-500" />
-              <h2 className="text-2xl font-bold">
-                {t('lotsMarketplace.comingSoon', 'Coming Soon')}
-              </h2>
-            </div>
-            <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
-              {upcomingListings.map((listing) => {
+            {renderAuctionRow(
+              "⏰ Coming Soon Auctions",
+              <Clock className="h-7 w-7 text-amber-500" />,
+              upcomingListings,
+              "text-amber-500"
+            )}
+
+            {/* Row 2: Featured Auctions */}
+            {renderAuctionRow(
+              "🔥 Featured Auctions",
+              <Star className="h-7 w-7 text-orange-500 fill-orange-500" />,
+              featuredListings,
+              "text-orange-500"
+            )}
+
+            {/* Row 3: Ending Soon Auctions */}
+            {renderAuctionRow(
+              "⏳ Ending Soon",
+              <ClockIcon className="h-7 w-7 text-red-500" />,
+              endingSoonListings,
+              "text-red-500"
+            )}
+
+            {/* Row 4: Recently Added Auctions */}
+            {renderAuctionRow(
+              "✨ Recently Added",
+              <Sparkles className="h-7 w-7 text-green-500" />,
+              recentListings,
+              "text-green-500"
+            )}
+
+            {/* Empty State if no auctions */}
+            {upcomingListings.length === 0 && featuredListings.length === 0 && 
+             endingSoonListings.length === 0 && recentListings.length === 0 && (
+              <Card className="p-12 text-center">
+                <Package className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+                <h3 className="text-xl font-semibold mb-2">
+                  {t('lotsMarketplace.noLots', 'No auctions available')}
+                </h3>
+                <p className="text-muted-foreground">
+                  {t('lotsMarketplace.noLotsDesc', 'Check back soon for new auctions')}
+                </p>
+              </Card>
+            )}
+          </div>
+        ) : (
+          /* Filtered Search View */
+          <div>
+            {loading ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
+              </div>
+            ) : listings.length === 0 ? (
+              <Card className="p-12 text-center">
+                <Package className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+                <h3 className="text-xl font-semibold mb-2">
+                  {t('lotsMarketplace.noLots', 'No lots found')}
+                </h3>
+                <p className="text-muted-foreground">
+                  {t('lotsMarketplace.noLotsDesc', 'Try adjusting your filters or check back later')}
+                </p>
+              </Card>
+            ) : (
+              <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
+                {listings.map((listing) => {
                 const auctionStartDate = new Date(listing.auction_start_date);
                 
                 if (viewMode === 'list') {
