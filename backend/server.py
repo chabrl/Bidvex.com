@@ -183,6 +183,22 @@ class ListingCreate(BaseModel):
     longitude: Optional[float] = None
     auction_end_date: datetime
 
+class AuctionRating(BaseModel):
+    """
+    Model for storing seller/auctioneer ratings.
+    One rating per auction per buyer.
+    """
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    auction_id: str  # Can be Listing ID or MultiItemListing ID
+    auction_type: str  # "single" or "multi"
+    rater_user_id: str  # Buyer who is rating
+    target_user_id: str  # Seller/auctioneer being rated
+    rating: int = Field(ge=1, le=5)  # 1-5 stars
+    comment: Optional[str] = None
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 class Listing(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
