@@ -373,7 +373,7 @@ class BidVexBackendTester:
             invalid_data = {
                 "filename": "invalid.pdf",
                 "content_type": "application/pdf",
-                "base64_content": "invalid_base64_content!!!"
+                "base64_content": "this is definitely not base64 content with spaces and special chars @#$%"
             }
             
             async with self.session.post(
