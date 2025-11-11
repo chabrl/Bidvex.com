@@ -1514,6 +1514,11 @@ async def get_multi_item_listing(listing_id: str):
     if isinstance(listing.get("auction_start_date"), str):
         listing["auction_start_date"] = datetime.fromisoformat(listing["auction_start_date"])
     
+    # Deserialize lot_end_time for each lot
+    for lot in listing.get("lots", []):
+        if isinstance(lot.get("lot_end_time"), str):
+            lot["lot_end_time"] = datetime.fromisoformat(lot["lot_end_time"])
+    
     return MultiItemListing(**listing)
 
 @api_router.post("/multi-item-listings/{listing_id}/lots/{lot_number}/bid")
