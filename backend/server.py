@@ -1390,6 +1390,15 @@ async def get_conversations(current_user: User = Depends(get_current_user)):
     
     return convos
 
+@api_router.get("/messages/unread-count")
+async def get_unread_message_count(current_user: User = Depends(get_current_user)):
+    """Get total count of unread messages for current user"""
+    count = await db.messages.count_documents({
+        "receiver_id": current_user.id,
+        "is_read": False
+    })
+    return {"unread_count": count}
+
 @api_router.get("/messages/{conversation_id}")
 async def get_messages(conversation_id: str, current_user: User = Depends(get_current_user), limit: int = 50):
     messages = await db.messages.find(
@@ -1407,15 +1416,6 @@ async def get_messages(conversation_id: str, current_user: User = Depends(get_cu
             msg["created_at"] = datetime.fromisoformat(msg["created_at"])
     
     return [Message(**msg) for msg in reversed(messages)]
-
-@api_router.get("/messages/unread-count")
-async def get_unread_message_count(current_user: User = Depends(get_current_user)):
-    """Get total count of unread messages for current user"""
-    count = await db.messages.count_documents({
-        "receiver_id": current_user.id,
-        "is_read": False
-    })
-    return {"unread_count": count}
 
 @api_router.get("/messages")
 async def get_all_user_messages(
