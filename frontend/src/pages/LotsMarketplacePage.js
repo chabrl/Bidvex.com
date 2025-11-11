@@ -109,6 +109,9 @@ const LotsMarketplacePage = () => {
   const navigate = useNavigate();
   const [listings, setListings] = useState([]);
   const [upcomingListings, setUpcomingListings] = useState([]);
+  const [featuredListings, setFeaturedListings] = useState([]);
+  const [endingSoonListings, setEndingSoonListings] = useState([]);
+  const [recentListings, setRecentListings] = useState([]);
   const [categories, setCategories] = useState([]);
   const [filters, setFilters] = useState({
     search: '',
@@ -119,6 +122,7 @@ const LotsMarketplacePage = () => {
   });
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('lotsViewMode') || 'grid');
+  const [showHomepage, setShowHomepage] = useState(true); // Toggle between homepage rows and filtered view
 
   useEffect(() => {
     fetchCategories();
