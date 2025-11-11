@@ -179,8 +179,8 @@ const MultiItemListingDetailPage = () => {
       fetchListing();
       setBidAmounts({ ...bidAmounts, [lotNumber]: '' });
     } catch (error) {
-      console.error('Bid failed:', error);
-      toast.error(error.response?.data?.detail || 'Failed to place bid');
+      const errorMessage = extractErrorMessage(error);
+      toast.error(errorMessage || 'Failed to place bid');
     }
   };
 
