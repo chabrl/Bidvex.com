@@ -447,23 +447,62 @@ const MultiItemListingDetailPage = () => {
                         )}
 
                         {!isPreviewMode && !auctionEnded && (
-                          <div className="flex gap-2 mt-4">
-                            <input
-                              type="number"
-                              step="0.01"
-                              min={lot.current_price + 0.01}
-                              placeholder={`Min: $${(lot.current_price + 1).toFixed(2)}`}
-                              value={bidAmounts[lot.lot_number] || ''}
-                              onChange={(e) => handleBidChange(lot.lot_number, e.target.value)}
-                              className="flex-1 px-4 py-2 border border-input rounded-md bg-background"
-                            />
-                            <Button 
-                              onClick={() => handlePlaceBid(lot.lot_number)}
-                              className="gradient-button text-white border-0"
-                            >
-                              <Gavel className="mr-2 h-4 w-4" />
-                              Place Bid
-                            </Button>
+                          <div className="space-y-3 mt-4">
+                            {/* Increment Info */}
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-md">
+                              <Info className="h-3 w-3" />
+                              <span>
+                                Minimum increment: ${getMinimumIncrement(lot.current_price).toFixed(2)} 
+                                {incrementInfo && ` (${incrementInfo.increment_option === 'tiered' ? 'Tiered' : 'Simplified'} schedule)`}
+                              </span>
+                            </div>
+
+                            {/* Standard Bid Input */}
+                            <div className="flex gap-2">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min={lot.current_price + getMinimumIncrement(lot.current_price)}
+                                placeholder={`Min: $${(lot.current_price + getMinimumIncrement(lot.current_price)).toFixed(2)}`}
+                                value={bidAmounts[lot.lot_number] || ''}
+                                onChange={(e) => handleBidChange(lot.lot_number, e.target.value)}
+                                className="flex-1 px-4 py-2 border border-input rounded-md bg-background"
+                              />
+                              <Button 
+                                onClick={() => handlePlaceBid(lot.lot_number, 'normal')}
+                                className="gradient-button text-white border-0"
+                              >
+                                <Gavel className="mr-2 h-4 w-4" />
+                                Place Bid
+                              </Button>
+                            </div>
+
+                            {/* Premium Bidding Options */}
+                            {user && (
+                              <div className="flex flex-wrap gap-2">
+                                <MonsterBidButton
+                                  listingId={lot.id}
+                                  currentBid={lot.current_price}
+                                  minimumIncrement={getMinimumIncrement(lot.current_price)}
+                                  onBidPlaced={(amount) => {
+                                    fetchListing();
+                                  }}
+                                />
+                                <AutoBidModal
+                                  listingId={lot.id}
+                                  currentBid={lot.current_price}
+                                  minimumIncrement={getMinimumIncrement(lot.current_price)}
+                                  onAutoBidSetup={() => {
+                                    fetchListing();
+                                  }}
+                                />
+                                {user.subscription_tier && (
+                                  <div className="flex items-center">
+                                    <SubscriptionBadge tier={user.subscription_tier} size="small" />
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         )}
 
