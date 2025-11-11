@@ -402,6 +402,19 @@ frontend:
         agent: "main"
         comment: "Completely redesigned auction cards for premium UX: (1) Grid Cards: Removed descriptions entirely for cleaner look, added title tooltips (native title attribute), implemented pricing box with gray background, icons for labels (💰 Current, 🏷️ Start), current price text-2xl text-green-700, starting price text-sm text-gray-500, divider between prices, consistent card heights with flexbox (flex flex-col h-full), hover scale on button (scale-105). (2) List Cards: Responsive stats grid (4 cols xl+, 2 cols sm-xl, 1 col mobile), title line-clamp-1 with tooltip, descriptions hidden on tablet/mobile (lg:block), enhanced price display with icons, all icons as emojis for visual clarity. (3) Responsive: Properly tested across mobile (375px), tablet (1024px), desktop (1440px) - all layouts working perfectly. Green pricing stands out, icons save space, cards feel premium and clean. Visual hierarchy improved significantly."
 
+backend:
+  - task: "VIP Auto-Promotion Logic"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented VIP auto-promotion logic in create_multi_item_listing endpoint (lines 1204-1210 and 1237-1238). When subscription_tier=='vip', automatically sets is_featured=true and promotion_expiry=now+7days. For non-VIP users, defaults to is_featured=false and promotion_expiry=None. Added proper datetime serialization for promotion_expiry field. Backend hot-reloaded successfully. Ready for testing with VIP and non-VIP user accounts to verify conditional logic and MongoDB field persistence."
+
   - task: "Metadata-Focused Cards (Pricing Removal)"
     implemented: true
     working: true
