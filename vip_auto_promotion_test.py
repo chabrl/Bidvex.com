@@ -125,10 +125,22 @@ class VIPAutoPromotionTester:
             return False
             
     async def update_user_subscription_tier(self, user_key: str, tier: str):
-        """Update user's subscription tier directly in database (simulated via API)"""
-        # Note: In a real scenario, this would be done via admin API or direct DB access
-        # For testing, we'll assume the user registration sets the tier correctly
-        pass
+        """Update user's subscription tier via profile update API"""
+        try:
+            async with self.session.put(
+                f"{BASE_URL}/users/me",
+                json={"subscription_tier": tier},
+                headers=self.get_auth_headers(user_key)
+            ) as response:
+                if response.status == 200:
+                    print(f"   - Updated {user_key} subscription tier to: {tier}")
+                    return True
+                else:
+                    print(f"   - Failed to update {user_key} subscription tier: {response.status}")
+                    return False
+        except Exception as e:
+            print(f"   - Error updating {user_key} subscription tier: {str(e)}")
+            return False
         
     def get_auth_headers(self, user_key: str) -> Dict[str, str]:
         """Get authorization headers for a specific user"""
