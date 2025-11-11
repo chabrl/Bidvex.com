@@ -926,7 +926,8 @@ const CreateMultiItemListing = () => {
                 </div>
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
