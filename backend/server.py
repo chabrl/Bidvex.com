@@ -1616,7 +1616,10 @@ async def bid_on_lot(listing_id: str, lot_number: int, data: Dict[str, float], c
     return {
         "message": "Bid placed successfully",
         "bid": bid,
-        "minimum_next_bid": current_price + get_minimum_increment(listing, amount) if bid_type == "normal" else None
+        "minimum_next_bid": current_price + get_minimum_increment(listing, amount) if bid_type == "normal" else None,
+        "extension_applied": extension_applied,
+        "extension_count": lots[lot_index].get("extension_count", 0),
+        "is_final_extension": lots[lot_index].get("extension_count", 0) >= 3
     }
 
 @app.websocket("/ws/messages/{user_id}")
