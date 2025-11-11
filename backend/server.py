@@ -1201,6 +1201,14 @@ async def create_multi_item_listing(listing_data: MultiItemListingCreate, curren
     # Get tax rates based on currency
     tax_rates = get_tax_rates_for_currency(currency)
     
+    # VIP Auto-Promotion: Automatically feature VIP users' listings for 7 days
+    is_featured = False
+    promotion_expiry = None
+    
+    if current_user.subscription_tier == "vip":
+        is_featured = True
+        promotion_expiry = now + timedelta(days=7)
+    
     listing = MultiItemListing(
         seller_id=current_user.id,
         title=listing_data.title,
@@ -1216,7 +1224,9 @@ async def create_multi_item_listing(listing_data: MultiItemListingCreate, curren
         status=status,
         currency=currency,
         tax_rate_gst=tax_rates["tax_rate_gst"],
-        tax_rate_qst=tax_rates["tax_rate_qst"]
+        tax_rate_qst=tax_rates["tax_rate_qst"],
+        is_featured=is_featured,
+        promotion_expiry=promotion_expiry
     )
     
     listing_dict = listing.model_dump()
