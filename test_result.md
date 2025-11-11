@@ -418,6 +418,19 @@ backend:
         agent: "testing"
         comment: "✅ VIP AUTO-PROMOTION COMPREHENSIVE TESTING COMPLETE (10/10 TESTS PASSED): ✅ VIP User Auto-Promotion: VIP users' listings automatically featured for 7 days with precise promotion_expiry calculation (±0.01s accuracy). ✅ Non-VIP Users (Free/Premium): Correctly NOT auto-promoted, is_featured=false, promotion_expiry=null. ✅ No Subscription Tier: Users without subscription_tier field default to free behavior (no promotion). ✅ Listing Retrieval: GET /api/multi-item-listings and GET /api/multi-item-listings/{id} correctly return featured status and properly serialize promotion_expiry dates. ✅ MongoDB Persistence: Fields correctly stored and retrieved from database. ✅ Edge Cases: VIP listings with future auction_start_date still promoted, promotion expiry calculated precisely to the second. ✅ Additional Tests: Personal account VIP users correctly blocked from creating multi-item listings (403 error), multiple VIP listings all promoted correctly. 🔧 MINOR FIX APPLIED: Added 'subscription_tier' to allowed fields in PUT /api/users/me for testing purposes with proper validation (free/premium/vip only). Created comprehensive test suites at /app/vip_auto_promotion_test.py and /app/vip_additional_tests.py. All VIP auto-promotion requirements fully implemented and verified."
 
+frontend:
+  - task: "VIP Auto-Promotion Featured Badges & Sorting"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/pages/LotsMarketplacePage.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "✅ FRONTEND VIP AUTO-PROMOTION COMPLETE: Implemented featured badges and sorting logic on Lots Marketplace. (1) Featured Badge: Added orange gradient badge with star icon (bg-gradient-to-r from-amber-500 to-orange-500) positioned top-left on card images in both Grid and List views. (2) Promotion Expiry Display: Added optional 'Promoted until [date]' text below listing title in grid view showing promotion_expiry date. (3) Client-Side Sorting: Implemented sorting logic in fetchLots() to prioritize featured listings first (is_featured=true listings always appear at top regardless of other sort options). (4) Visual Design: Badges have white text, shadow-lg, star icon with fill-white, positioned with absolute top-3 left-3 z-10. (5) Testing: Visual verification shows 5 VIP listings (VIP Auto-Promotion Test, VIP Precision Test, VIP MongoDB Persistence Test, Multi VIP Test Listing 1 & 2) all displaying featured badges correctly. Grid view shows badges and promotion dates ('Promoted until 11/18/2025'). List view shows badges on image overlays. Featured listings sorted to top of page. No JavaScript linting errors. All VIP auto-promotion frontend requirements fully implemented and visually verified."
+
   - task: "Metadata-Focused Cards (Pricing Removal)"
     implemented: true
     working: true
