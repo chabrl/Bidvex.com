@@ -399,7 +399,7 @@ const MultiItemListingDetailPage = () => {
                       {/* Lot Details */}
                       <div className="flex-1">
                         <div className="flex items-start justify-between mb-4">
-                          <div>
+                          <div className="flex-1">
                             <h3 className="text-xl font-bold mb-2">
                               Lot #{lot.lot_number} - {lot.title}
                             </h3>
@@ -417,6 +417,19 @@ const MultiItemListingDetailPage = () => {
                                 </Badge>
                               )}
                             </div>
+                          </div>
+                          
+                          {/* Share and Watch Buttons */}
+                          <div className="flex gap-2">
+                            <WatchLotButton 
+                              listingId={id}
+                              lotNumber={lot.lot_number}
+                            />
+                            <ShareButton 
+                              url={`${window.location.origin}/lots/${id}?lot=${lot.lot_number}`}
+                              title={`Lot #${lot.lot_number} - ${lot.title}`}
+                              description={`${lot.description} - Starting at $${lot.starting_price}`}
+                            />
                           </div>
                         </div>
 
