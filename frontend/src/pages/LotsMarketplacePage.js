@@ -487,6 +487,17 @@ const LotsMarketplacePage = () => {
                     <div className="flex flex-col md:flex-row">
                       <div className="w-full md:w-1/3 aspect-video md:aspect-square overflow-hidden relative">
                         <ImageCarousel lots={listing.lots} totalLots={listing.total_lots} />
+                        
+                        {/* Featured Badge - Top Left */}
+                        {listing.is_featured && (
+                          <div className="absolute top-3 left-3 z-10">
+                            <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0 shadow-lg flex items-center gap-1">
+                              <Star className="h-3 w-3 fill-white" />
+                              Featured
+                            </Badge>
+                          </div>
+                        )}
+                        
                         {/* Wishlist Button on Image */}
                         <div className="absolute top-3 right-3 z-10" onClick={(e) => e.stopPropagation()}>
                           <WishlistHeartButton 
