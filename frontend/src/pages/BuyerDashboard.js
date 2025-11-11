@@ -16,12 +16,10 @@ const BuyerDashboard = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [dashboard, setDashboard] = useState(null);
-  const [wishlist, setWishlist] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchDashboard();
-    fetchWishlist();
   }, []);
 
   const fetchDashboard = async () => {
