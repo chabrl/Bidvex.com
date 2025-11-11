@@ -309,6 +309,20 @@ const LotsMarketplacePage = () => {
               {listing.total_lots} {listing.total_lots === 1 ? 'Lot' : 'Lots'}
             </span>
           </div>
+
+          {/* Shipping & Visit Badges */}
+          <div className="flex flex-wrap gap-1">
+            {listing.shipping_info && listing.shipping_info.available && (
+              <Badge variant="secondary" className="text-xs">
+                🚚 Shipping
+              </Badge>
+            )}
+            {listing.visit_availability && listing.visit_availability.offered && (
+              <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+                🏠 Visit Available
+              </Badge>
+            )}
+          </div>
           
           {/* Time Display */}
           {isUpcoming ? (
