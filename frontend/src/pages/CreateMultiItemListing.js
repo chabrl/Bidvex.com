@@ -1315,7 +1315,7 @@ const CreateMultiItemListing = () => {
                 Back
               </Button>
 
-              {currentStep < 3 ? (
+              {currentStep < 4 ? (
                 <Button
                   type="button"
                   onClick={goToNextStep}
