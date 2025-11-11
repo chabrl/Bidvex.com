@@ -1206,11 +1206,14 @@ async def create_multi_item_listing(listing_data: MultiItemListingCreate, curren
     # Get tax rates based on currency
     tax_rates = get_tax_rates_for_currency(currency)
     
-    # VIP Auto-Promotion: Automatically feature VIP users' listings for 7 days
+    # Auto-Promotion: Premium (3 days) and VIP (7 days) users get featured listings
     is_featured = False
     promotion_expiry = None
     
-    if current_user.subscription_tier == "vip":
+    if current_user.subscription_tier == "premium":
+        is_featured = True
+        promotion_expiry = now + timedelta(days=3)
+    elif current_user.subscription_tier == "vip":
         is_featured = True
         promotion_expiry = now + timedelta(days=7)
     
