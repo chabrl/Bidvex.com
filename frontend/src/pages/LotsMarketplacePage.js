@@ -9,15 +9,16 @@ import { Badge } from '../components/ui/badge';
 import { Search, Package, Clock, MapPin, Layers, Grid as GridIcon, List as ListIcon, Tag, Star } from 'lucide-react';
 import Countdown from 'react-countdown';
 import { Swiper, SwiperSlide } from 'swiper/react';
-import { Autoplay } from 'swiper/modules';
+import { Autoplay, Navigation } from 'swiper/modules';
 import WatchlistButton from '../components/WatchlistButton';
 import WishlistHeartButton from '../components/WishlistHeartButton';
 import ImageCarouselComponent from '../components/ImageCarousel';
 import AuctioneerInfo from '../components/AuctioneerInfo';
 import { getCurrencyIcon } from '../utils/currency';
-import { Heart } from 'lucide-react';
+import { Heart, ChevronRight, TrendingUp, Clock as ClockIcon, Sparkles } from 'lucide-react';
 import 'swiper/css';
 import 'swiper/css/autoplay';
+import 'swiper/css/navigation';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
