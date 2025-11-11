@@ -291,6 +291,7 @@ class Lot(BaseModel):
     condition: str
     images: List[str] = []
     lot_end_time: Optional[datetime] = None  # Staggered end time (1 min per lot)
+    pricing_mode: str = "multiplied"  # "fixed" or "multiplied" - how quantity affects final price
 
 class MultiItemListingCreate(BaseModel):
     title: str
