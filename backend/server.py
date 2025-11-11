@@ -1441,6 +1441,64 @@ async def get_all_user_messages(
     
     return [Message(**msg) for msg in messages]
 
+@api_router.post("/upload-document")
+async def upload_document(
+    file_data: Dict[str, Any],
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Upload a document (PDF or image) as base64 with 10MB validation
+    Expected format: {
+        "filename": "document.pdf",
+        "content_type": "application/pdf",
+        "base64_content": "base64_encoded_string"
+    }
+    """
+    import base64
+    
+    filename = file_data.get("filename", "")
+    content_type = file_data.get("content_type", "")
+    base64_content = file_data.get("base64_content", "")
+    
+    # Validate file type (PDF or images)
+    allowed_types = ["application/pdf", "image/png", "image/jpeg", "image/jpg"]
+    if content_type not in allowed_types:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file type. Allowed types: PDF, PNG, JPG. Got: {content_type}"
+        )
+    
+    # Validate base64 content exists
+    if not base64_content:
+        raise HTTPException(status_code=400, detail="No file content provided")
+    
+    # Calculate file size (base64 decoded size)
+    try:
+        # Remove data URL prefix if present (e.g., "data:application/pdf;base64,")
+        if "base64," in base64_content:
+            base64_content = base64_content.split("base64,")[1]
+        
+        decoded_content = base64.b64decode(base64_content)
+        file_size_mb = len(decoded_content) / (1024 * 1024)
+        
+        # 10MB limit
+        if file_size_mb > 10:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File too large. Maximum size is 10MB. File size: {file_size_mb:.2f}MB"
+            )
+        
+        return {
+            "success": True,
+            "filename": filename,
+            "content_type": content_type,
+            "size_mb": round(file_size_mb, 2),
+            "base64_content": base64_content
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid base64 content: {str(e)}")
+
 @api_router.post("/multi-item-listings")
 async def create_multi_item_listing(listing_data: MultiItemListingCreate, current_user: User = Depends(get_current_user)):
     if current_user.account_type != "business":
