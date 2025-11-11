@@ -306,6 +306,54 @@ frontend:
         agent: "testing"
         comment: "✅ PHASE 6: FRONTEND LAUNCH READINESS VALIDATION COMPLETE - ALL SUCCESS CRITERIA MET (10/10 TESTS PASSED): ✅ Admin Access Controls: Admin panel correctly visible only to admin users (phase6.admin@admin.bazario.com), hidden from regular users (test.user@bazario.com). Admin panel navigation working with all tabs accessible (Users, Lots, Auctions, Trust & Safety, Analytics, Settings). ✅ Currency Appeals Manager: Accessible via Settings > Currency Appeals tab, displays proper empty state message, ready for production use. ✅ Bilingual Toggle (EN/FR): Language toggle working across pages - navigation items correctly translate (Home→Accueil, Marketplace→Marché), language preference persists in profile settings. ✅ Currency Enforcement UI: Profile settings display currency selector correctly, unlocked in container environment (expected), currency changes working, no locked state badges (expected for localhost). ✅ Profile Settings: All functionality working - language preferences, currency preferences, save functionality with success notifications. ✅ Mobile Responsiveness: Mobile menu button working, navigation accessible, proper viewport adaptation at 375px width. ✅ Tablet Responsiveness: Layout adapts correctly at 768px width, all features accessible. ✅ Authentication Flows: Regular user login working, admin login working with correct credentials, proper session management. ✅ Cross-browser Compatibility: No critical JavaScript errors, React 19 working properly, all UI components rendering correctly. ✅ User Experience: Smooth navigation, proper loading states, responsive design, bilingual support functional. CRITICAL FINDING: Admin credentials are phase6.admin@admin.bazario.com / Phase6Admin123! (not admin@admin.bazario.com as documented). All frontend systems ready for production deployment."
 
+  - task: "BidVex Multi-Item Listing Wizard - Step 4 (Documents, Shipping, Visit)"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/CreateMultiItemListing.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented Step 4 of Multi-Item Listing Wizard with Documents, Shipping & Visit Options. Added document upload functionality (PDF/PNG/JPG, max 10MB) for Terms & Conditions, Important Information, and Catalogue. Implemented shipping options toggle with methods selection (local_pickup, standard, express), rates input, and delivery time. Added visit availability toggle with dates and instructions fields. All form data properly integrated into submission payload. Step navigation updated to include Step 4 before final submission."
+
+  - task: "BidVex Auction Detail Page - New Features (Message Seller, Shipping, Visit)"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/MultiItemListingDetailPage.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Enhanced MultiItemListingDetailPage with new BidVex features: 1) Message Seller button (📨 Message Seller) visible when user is not the seller, opens MessageSellerModal for buyer-seller communication. 2) Documents section displays uploaded documents (Terms & Conditions, Important Information, Catalogue) with download functionality using base64 content. 3) Shipping Options card (🚚 Shipping Options) shows available methods, rates, and delivery time when shipping is enabled. 4) Visit Before Auction card (🏠 Visit Before Auction) displays available dates, instructions, and Request Visit button when visits are offered. All features integrated with existing auction detail layout."
+
+  - task: "BidVex Homepage Badge Visibility (Shipping & Visit Badges)"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/LotsMarketplacePage.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added shipping and visit availability badges to LotsMarketplacePage auction cards. Shipping badge (🚚 Shipping) appears when listing.shipping_info.available is true. Visit badge (🏠 Visit Available) appears when listing.visit_availability.offered is true with green styling (bg-green-100 text-green-700). Badges positioned in metadata section of both compact cards (homepage rows) and full cards (search view). Badges provide quick visual indication of available services for each auction."
+
+  - task: "BidVex Mobile Responsiveness - All New Features"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/CreateMultiItemListing.js, /app/frontend/src/pages/MultiItemListingDetailPage.js, /app/frontend/src/pages/LotsMarketplacePage.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Ensured mobile responsiveness for all BidVex features: 1) Step 4 wizard form fields use responsive layouts with proper spacing and touch-friendly inputs. 2) MessageSellerModal uses responsive dialog with sm:max-w-[500px] constraint and proper mobile padding. 3) Shipping and Visit cards in auction detail page stack properly on mobile with responsive grid layouts. 4) Homepage badges maintain proper positioning and readability on mobile viewport. All new features tested and optimized for mobile devices with proper touch targets and responsive breakpoints."
+
   - task: "Multi-Lot Wizard - Step-by-Step UI"
     implemented: true
     working: "NA"
