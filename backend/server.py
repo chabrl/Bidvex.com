@@ -624,6 +624,11 @@ async def update_profile(updates: Dict[str, Any], current_user: User = Depends(g
                 }
             )
     
+    # Validate subscription tier
+    if "subscription_tier" in update_data:
+        if update_data["subscription_tier"] not in ["free", "premium", "vip"]:
+            raise HTTPException(status_code=400, detail="Subscription tier must be 'free', 'premium', or 'vip'")
+    
     if update_data:
         await db.users.update_one({"id": current_user.id}, {"$set": update_data})
     return {"message": "Profile updated successfully"}
