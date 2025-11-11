@@ -1493,6 +1493,11 @@ async def get_multi_item_listings(limit: int = 50, skip: int = 0, status: Option
             listing["auction_end_date"] = datetime.fromisoformat(listing["auction_end_date"])
         if isinstance(listing.get("auction_start_date"), str):
             listing["auction_start_date"] = datetime.fromisoformat(listing["auction_start_date"])
+        
+        # Deserialize lot_end_time for each lot
+        for lot in listing.get("lots", []):
+            if isinstance(lot.get("lot_end_time"), str):
+                lot["lot_end_time"] = datetime.fromisoformat(lot["lot_end_time"])
     
     return [MultiItemListing(**listing) for listing in listings]
 
