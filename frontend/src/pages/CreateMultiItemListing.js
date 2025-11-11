@@ -369,7 +369,7 @@ const CreateMultiItemListing = () => {
         toast.error('Maximum 500 lots allowed');
         return;
       }
-      setCurrentStep(prev => Math.min(prev + 1, 3));
+      setCurrentStep(prev => Math.min(prev + 1, 4));
     }
   };
 
