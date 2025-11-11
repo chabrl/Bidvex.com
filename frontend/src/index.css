@@ -146,3 +146,49 @@
 }
 
 
+
+/* Swiper Navigation Styles for Auction Rows */
+.auction-row-swiper .swiper-button-next,
+.auction-row-swiper .swiper-button-prev {
+  color: hsl(var(--primary));
+  background: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.auction-row-swiper .swiper-button-next:hover,
+.auction-row-swiper .swiper-button-prev:hover {
+  background: hsl(var(--primary));
+  color: white;
+  box-shadow: 0 4px 12px rgba(0, 155, 255, 0.3);
+  transform: scale(1.1);
+}
+
+.auction-row-swiper .swiper-button-next:after,
+.auction-row-swiper .swiper-button-prev:after {
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.auction-row-swiper .swiper-button-disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Responsive adjustments for mobile */
+@media (max-width: 640px) {
+  .auction-row-swiper .swiper-button-next,
+  .auction-row-swiper .swiper-button-prev {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .auction-row-swiper .swiper-button-next:after,
+  .auction-row-swiper .swiper-button-prev:after {
+    font-size: 14px;
+  }
+}
+
