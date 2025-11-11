@@ -9,11 +9,15 @@ import { toast } from 'sonner';
 import { 
   Package, Clock, MapPin, User, Calendar, 
   ArrowLeft, Gavel, AlertCircle, TrendingUp,
-  Grid as GridIcon, List as ListIcon, Menu, X, Flame
+  Grid as GridIcon, List as ListIcon, Menu, X, Flame, Heart, Info
 } from 'lucide-react';
 import Countdown from 'react-countdown';
 import Lightbox from 'react-image-lightbox';
 import 'react-image-lightbox/style.css';
+import MonsterBidButton from '../components/MonsterBidButton';
+import AutoBidModal from '../components/AutoBidModal';
+import SubscriptionBadge from '../components/SubscriptionBadge';
+import WishlistHeartButton from '../components/WishlistHeartButton';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
