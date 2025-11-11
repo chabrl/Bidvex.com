@@ -126,9 +126,18 @@ const LotsMarketplacePage = () => {
 
   useEffect(() => {
     fetchCategories();
-    fetchLots();
-    fetchUpcomingLots();
-  }, [filters]);
+    if (showHomepage) {
+      // Homepage: fetch all 4 rows
+      fetchUpcomingLots();
+      fetchFeaturedLots();
+      fetchEndingSoonLots();
+      fetchRecentLots();
+      setLoading(false);
+    } else {
+      // Filtered view: fetch based on filters
+      fetchLots();
+    }
+  }, [filters, showHomepage]);
 
   const fetchCategories = async () => {
     try {
