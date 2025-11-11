@@ -115,6 +115,30 @@ const CreateMultiItemListing = () => {
     setLots(updatedLots);
   };
 
+  // Generate specified number of lots
+  const generateLots = (count) => {
+    if (count < 1 || count > 500) {
+      toast.error('Please enter a number between 1 and 500');
+      return;
+    }
+    
+    const newLots = Array.from({ length: count }, (_, i) => ({
+      lot_number: i + 1,
+      title: '',
+      description: '',
+      quantity: 1,
+      starting_price: '',
+      current_price: '',
+      condition: 'good',
+      images: [],
+      pricing_mode: 'multiplied'
+    }));
+    
+    setLots(newLots);
+    setCurrentPage(1); // Reset to first page
+    toast.success(`Generated ${count} lot${count > 1 ? 's' : ''}`);
+  };
+
   const handleLotImageUpload = (index, e) => {
     const files = Array.from(e.target.files);
     files.forEach(file => {
