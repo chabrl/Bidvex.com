@@ -9,6 +9,7 @@ import { Badge } from './ui/badge';
 import { Switch } from './ui/switch';
 import axios from 'axios';
 import { toast } from 'sonner';
+import { extractErrorMessage } from '../utils/errorHandler';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
