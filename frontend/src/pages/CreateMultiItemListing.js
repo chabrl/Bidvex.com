@@ -59,6 +59,26 @@ const CreateMultiItemListing = () => {
   const [bulkImages, setBulkImages] = useState([]);
   const [validationErrors, setValidationErrors] = useState({});
 
+  // Step 4: Documents, Shipping, Visit
+  const [documents, setDocuments] = useState({
+    terms_conditions: null, // {filename, content_type, base64_content}
+    important_info: null,
+    catalogue: null
+  });
+  
+  const [shippingInfo, setShippingInfo] = useState({
+    available: false,
+    methods: [], // ['local_pickup', 'standard', 'express']
+    rates: {}, // {local_pickup: 0, standard: 25, express: 50}
+    delivery_time: '' // e.g., "3-5 business days"
+  });
+  
+  const [visitAvailability, setVisitAvailability] = useState({
+    offered: false,
+    dates: '', // e.g., "Nov 15-20, 2025"
+    instructions: '' // Additional instructions for scheduling
+  });
+
   useEffect(() => {
     if (user && user.account_type !== 'business') {
       toast.error('Only business accounts can create multi-item listings');
