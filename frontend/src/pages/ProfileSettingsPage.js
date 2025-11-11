@@ -488,11 +488,26 @@ const ProfileSettingsPage = () => {
                           <td className="text-center p-4 bg-purple-50/50 dark:bg-purple-900/10"><X className="h-5 w-5 text-red-400 mx-auto" /></td>
                           <td className="text-center p-4 bg-yellow-50/50 dark:bg-yellow-900/10"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
                         </tr>
-                        <tr className="hover:bg-gray-50 dark:hover:bg-gray-900/50">
+                        <tr className="border-b hover:bg-gray-50 dark:hover:bg-gray-900/50">
                           <td className="p-4">Dedicated Support</td>
                           <td className="text-center p-4"><X className="h-5 w-5 text-red-400 mx-auto" /></td>
                           <td className="text-center p-4 bg-purple-50/50 dark:bg-purple-900/10"><X className="h-5 w-5 text-red-400 mx-auto" /></td>
                           <td className="text-center p-4 bg-yellow-50/50 dark:bg-yellow-900/10"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                        </tr>
+                        <tr className="hover:bg-gray-50 dark:hover:bg-gray-900/50 bg-gradient-to-r from-amber-50/30 to-orange-50/30 dark:from-amber-900/10 dark:to-orange-900/10">
+                          <td className="p-4 flex items-center gap-2 font-semibold">
+                            <TrendingUp className="h-4 w-4 text-amber-600" />
+                            Listing Promotion Duration
+                          </td>
+                          <td className="text-center p-4">
+                            <X className="h-5 w-5 text-red-400 mx-auto" />
+                          </td>
+                          <td className="text-center p-4 bg-purple-50/50 dark:bg-purple-900/10">
+                            <span className="font-semibold text-purple-700 dark:text-purple-400">3 days</span>
+                          </td>
+                          <td className="text-center p-4 bg-yellow-50/50 dark:bg-yellow-900/10">
+                            <span className="font-semibold text-amber-700 dark:text-amber-400">7 days</span>
+                          </td>
                         </tr>
                       </tbody>
                     </table>
