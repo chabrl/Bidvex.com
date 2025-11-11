@@ -642,6 +642,12 @@ const LotsMarketplacePage = () => {
                     >
                       {listing.title}
                     </CardTitle>
+                    {listing.is_featured && listing.promotion_expiry && (
+                      <p className="text-xs text-amber-600 font-medium mt-1 flex items-center gap-1">
+                        <Star className="h-3 w-3" />
+                        Promoted until {new Date(listing.promotion_expiry).toLocaleDateString()}
+                      </p>
+                    )}
                   </CardHeader>
                   
                   <CardContent className="space-y-3 flex-grow">
