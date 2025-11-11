@@ -1398,6 +1398,49 @@ async def get_messages(conversation_id: str, current_user: User = Depends(get_cu
     
     return [Message(**msg) for msg in reversed(messages)]
 
+@api_router.get("/messages/unread-count")
+async def get_unread_message_count(current_user: User = Depends(get_current_user)):
+    """Get total count of unread messages for current user"""
+    count = await db.messages.count_documents({
+        "receiver_id": current_user.id,
+        "is_read": False
+    })
+    return {"unread_count": count}
+
+@api_router.get("/messages")
+async def get_all_user_messages(
+    current_user: User = Depends(get_current_user),
+    listing_id: Optional[str] = None,
+    limit: int = 50
+):
+    """Get all messages for current user, optionally filtered by listing_id"""
+    query = {
+        "$or": [
+            {"sender_id": current_user.id},
+            {"receiver_id": current_user.id}
+        ]
+    }
+    
+    if listing_id:
+        query["listing_id"] = listing_id
+    
+    messages = await db.messages.find(
+        query,
+        {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    
+    # Mark messages as read if user is the receiver
+    await db.messages.update_many(
+        {"receiver_id": current_user.id, "is_read": False},
+        {"$set": {"is_read": True}}
+    )
+    
+    for msg in messages:
+        if isinstance(msg.get("created_at"), str):
+            msg["created_at"] = datetime.fromisoformat(msg["created_at"])
+    
+    return [Message(**msg) for msg in messages]
+
 @api_router.post("/multi-item-listings")
 async def create_multi_item_listing(listing_data: MultiItemListingCreate, current_user: User = Depends(get_current_user)):
     if current_user.account_type != "business":
