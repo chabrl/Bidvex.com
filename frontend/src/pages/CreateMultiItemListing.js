@@ -575,6 +575,38 @@ const CreateMultiItemListing = () => {
           This determines the minimum bid increment buyers must follow. You can change this for each auction.
         </p>
       </div>
+      
+      {/* Number of Lots */}
+      <div className="space-y-2 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <Label htmlFor="numLots" className="flex items-center gap-2 text-lg font-semibold">
+          🧩 Number of Lots to Generate
+        </Label>
+        <p className="text-sm text-muted-foreground mb-2">
+          Specify how many lots you want in this auction. Empty lot rows will be generated in Step 2.
+        </p>
+        <div className="flex gap-2">
+          <Input 
+            id="numLots" 
+            type="number"
+            min="1"
+            max="500"
+            value={numLots} 
+            onChange={(e) => setNumLots(parseInt(e.target.value) || 1)} 
+            placeholder="e.g., 280"
+            className="w-32"
+          />
+          <Button 
+            type="button"
+            onClick={() => generateLots(numLots)}
+            variant="outline"
+          >
+            Generate {numLots} Lot{numLots > 1 ? 's' : ''}
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          💡 Max 500 lots per auction. Lots will be displayed 10 per page for easy editing.
+        </p>
+      </div>
     </div>
   );
 
