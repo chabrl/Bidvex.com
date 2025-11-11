@@ -8,7 +8,7 @@ import aiohttp
 import json
 from datetime import datetime
 
-BASE_URL = "https://bidvex-auctions.preview.emergentagent.com/api"
+BASE_URL = "https://auction-hub-38.preview.emergentagent.com/api"
 
 async def debug_user_subscription():
     """Debug user subscription tier setting"""

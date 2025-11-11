@@ -11,7 +11,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = "https://bidvex-auctions.preview.emergentagent.com/api"
+BASE_URL = "https://auction-hub-38.preview.emergentagent.com/api"
 
 class EdgeCasesTester:
     def __init__(self):

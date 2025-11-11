@@ -1,90 +1,89 @@
 <analysis>
-The AI engineer successfully progressed BidVex through several critical development phases. Initial work focused on comprehensive Phase 6 Launch Readiness validation, completing all backend tests for security, infrastructure, currency enforcement, bilingual support, PDF generation, and admin panel functionality. Subsequently, a major effort was dedicated to auditing and fixing incomplete bilingual (EN/FR) translations across the entire frontend. The project then transitioned to significant Lots Auction enhancements, which involved extensive backend model updates, new API endpoints for wishlist and premium bidding features, and the creation of several new frontend components (e.g., , , , ). Finally, subscription management UI was integrated into user profiles and the admin panel, and the implementation of VIP auto-promotion logic was initiated. The current state is mid-implementation of the VIP auto-promotion feature.
+The AI engineer has progressed the BidVex application through several major feature implementations. Initially, the focus was on implementing and thoroughly testing VIP auto-promotion logic on both the backend and frontend. This included updating models, API endpoints, and adding visual cues like featured badges and sorting. Subsequently, Premium tier auto-promotion (3 days) was added, requiring backend logic updates and further frontend UI adjustments to comparison tables and tooltips. The next large feature was displaying auctioneer information, which involved creating a new backend profile summary endpoint and integrating a new frontend  component across multiple pages. The most recent sequence of tasks involved six enhancements from a new user request: removal of wishlist, updating sell button flow, adding a seller rating system, lot countdown timers, sharing/watching lots, and quantity pricing. The quick wins (wishlist removal, sell button flow) were completed. Backend aspects of seller ratings, lot countdowns, and lot watching were implemented, and  updated. The current work halted mid-implementation of the Lots Auction Homepage – 4 Filtered Rows frontend UI.
 </analysis>
 
 <product_requirements>
-The BidVex platform is an advanced, bilingual auction marketplace featuring responsive design, PWA capabilities, SEO, and accessibility. It includes user management, real-time auctions, dashboards, affiliate programs, promotions, AI support, and Stripe payments.
-
+The BidVex platform is a bilingual, advanced auction marketplace with responsive design, PWA, SEO, accessibility, user management, real-time auctions, dashboards, affiliate programs, promotions, AI support, and Stripe payments.
 Key implemented features:
-*   **Invoice System**: Zero seller commission, payment tracking, dual payment logic, bilingual (EN/FR) and dual currency (CAD/USD) support for PDFs, with geolocation-based currency detection.
-*   **Auction Preview**:  status, , APScheduler for transitions, Coming Soon UI.
-*   **Auto-Send PDFs**: Mock email service for automatic PDF distribution upon auction completion.
-*   **Currency Enforcement**: IP geolocation, confidence scoring, ,  states, and an admin-managed appeal process.
-*   **Admin Panel**: Admin user creation, visible Admin Panel button,  for reviewing appeals.
-*   **Bilingual Translation Fixes**: Audited and fixed all incorrect/incomplete French translations, ensuring full EN/FR coverage across UI, buttons, pages, forms, and admin tools.
-*   **Lots Auction Enhancement**: Redesigned layout, improved filters/sorting, image carousels, uniform item card display, wishlist functionality (public count, buyer dashboard tab), seller-controlled increment logic (Tiered/Simplified options), and premium buyer features (Monster Bid, Auto-Bid Bot, subscription tiers with mock logic).
-*   **Subscription Management**: New Subscription tab in  displaying user's tier, features, and upgrade options; new  in Admin Dashboard with stats and user management.
-*   **VIP Auto-Promotion**: VIP users' listings are automatically featured on the homepage and marketplace, and promoted for 7 days.
+- **Invoice System**: Zero commission, payment tracking, bilingual/dual currency PDFs, geolocation.
+- **Auction Preview**:  status, , APScheduler.
+- **Auto-Send PDFs**: Mock email service.
+- **Currency Enforcement**: IP geolocation, admin appeals.
+- **Admin Panel**: User, currency appeals, subscription management.
+- **Bilingual Translation Fixes**: Full EN/FR UI coverage.
+- **Lots Auction Enhancement**: Layout redesign, filters/sorting, image carousels, wishlist, increment logic, premium bidding (Monster Bid, Auto-Bid Bot).
+- **Subscription Management**: Profile tab, Admin Dashboard manager.
+- **VIP Auto-Promotion**: VIP listings , .
+- **Premium Auto-Promotion**: Premium listings , .
+- **Auctioneer Information Display**: Name, VIP status, location, total auctions on cards and detail pages.
+- **Removed Wishlist**: From Buyer Dashboard.
+- **Sell Button Flow**: Modal for single/multi-item listing creation.
+- **Seller Rating System**: Backend model, endpoints. Frontend display in .
+- **Lot Countdown Timers**:  (1-min staggered), frontend .
+- **Sharing & Watching Lots**: Backend endpoints, frontend Share/Watch buttons.
+- **Quantity Pricing Logic**: Backend  field for lots.
+- **Dynamic Lot Row Generation**: Frontend Number of Lots input, paginated lot creation UI.
+- **Bid Extension Logic**: Backend 3-minute reset for bids in final 3 minutes, max 3 extensions per lot.
 </product_requirements>
 
 <key_technical_concepts>
-- **Backend**: FastAPI, MongoDB, , , , , JWT.
-- **Frontend**: React.js, Tailwind CSS, Shadcn UI, , .
-- **Data Handling**: UUIDs for IDs, timezone-aware datetime.
+- Backend: FastAPI, MongoDB, , , JWT, .
+- Frontend: React.js, Tailwind CSS, Shadcn UI, , , , .
+- Data Handling: UUIDs for IDs, timezone-aware datetime, ISO string serialization.
+- Features: Multi-item listings, subscription management, auto-promotion, bid extension, rating system, internationalization.
 </key_technical_concepts>
 
 <code_architecture>
 The application uses a React frontend, FastAPI backend, and MongoDB database.
 
 
--   : Core backend logic.
-    -   **Changes:** , ,  models updated with , , , , , , . New  and  models created. Increment logic helper functions (, , ) added. New API endpoints for wishlist, premium bidding, subscription status, and increment info were added. Existing bid placement endpoint updated with increment validation. Currently being updated for VIP auto-promotion logic.
--   : Python dependencies.
-    -   **Changes:** , 
------
 
-WeasyPrint could not import some external libraries. Please carefully follow the installation steps before reporting an issue:
-https://doc.courtbouillon.org/weasyprint/stable/first_steps.html#installation
-https://doc.courtbouillon.org/weasyprint/stable/first_steps.html#troubleshooting 
-
------,  added.
--   : i18next configuration.
-    -   **Changes:** Comprehensively updated with English and French translations for various UI elements, including new translations for dashboards, authentication, footer, and How It Works page.
--   : User profile settings.
-    -   **Changes:** Updated with , , locked currency UI, and a new Subscription tab displaying tier, features, and upgrade options.
--   : Admin component.
-    -   **Changes:** Updated with translation keys.
--   : Multi-item listing creation.
-    -   **Changes:** Added a currency selector and a new increment option selector (Tiered/Simplified) in Step 1.
--   : Multi-item listings display.
-    -   **Changes:** Integrated  utility, added currency display, , , new filters (currency, region), and sorting options.
--   : New component for wishlist functionality.
--   : New component for displaying multiple images with navigation.
--   : New component for premium Monster Bid.
--   : New component for premium Auto-Bid Bot setup.
--   : New component to display user's subscription tier.
--   : Buyer's dashboard.
-    -   **Changes:** Added a new Wishlist tab to manage saved items.
--   : Seller's dashboard.
-    -   **Changes:** Updated to display wishlist counts per listing.
--   : Multi-item listing detail.
-    -   **Changes:** Integrated increment validation, , , and .
--   : Admin dashboard.
-    -   **Changes:** Integrated  and a new  tab.
--   : New component for admin subscription management.
+-   :
+    -   **Summary**: Core backend logic for user management, listings, bids, subscriptions, and new rating features.
+    -   **Changes**: , ,  models extended. New  model added. Endpoints for profile summary, ratings, lot watching added.  updated for Premium/VIP auto-promotion, lot  calculation, and serialization.  updated for bid extension logic.
+-   :
+    -   **Summary**: Buyer's main dashboard.
+    -   **Changes**: Wishlist tab and its associated logic/UI elements were removed.
+-   :
+    -   **Summary**: Top navigation bar.
+    -   **Changes**: Sell button now triggers  instead of direct navigation.
+-   : (New)
+    -   **Summary**: Modal to choose between creating single-item or multi-item listings.
+-   :
+    -   **Summary**: User profile settings page.
+    -   **Changes**: Subscription comparison table updated with Listing Promotion Duration. Current tier details display promotion benefits.
+-   :
+    -   **Summary**: Displays multi-item listings with filtering and sorting.
+    -   **Changes**: Implemented client-side sorting for featured listings. Featured badges and Promoted until text added. Tooltips for promotion duration integrated. Structure updated to fetch for 4 distinct rows (Upcoming, Featured, Ending Soon, Recently Added).  component integrated.
+-   : (New)
+    -   **Summary**: Component to display auctioneer's name, status (VIP), location, and aggregated ratings.
+    -   **Changes**: Updated to fetch and display seller ratings in both compact and full variants.
+-   : (New)
+    -   **Summary**: Modal for submitting seller ratings with a star selector and comment field.
+-   :
+    -   **Summary**: Detail page for multi-item listings.
+    -   **Changes**: Lot countdown timers added to individual lot cards and sidebar. , , and  components integrated prominently.
+-   :
+    -   **Summary**: Multi-item listing creation wizard.
+    -   **Changes**: Added Number of Lots input field. Implemented pagination (10 lots per page) for lot creation Step 2.
+-   : (New)
+    -   **Summary**: Button to add/remove a specific lot to/from user's watchlist.
+-   : (New)
+    -   **Summary**: Button providing various sharing options for a lot.
 </code_architecture>
 
 <pending_tasks>
--   Two-Factor Authentication (2FA) and other critical security features.
--   PWA capabilities (service worker, push notifications).
--   Advanced notifications (real-time push, email digests, SMS).
--   Confetti animations for auction wins.
--   Kinetic Typography with animated text elements.
--   Implementation of remaining original Phase 3 features: Shipping & Rigging, Seller Terms, Business Auction Access Control.
--   Optional original Phase 3 enhancements: Auctioneer Favorites, Voice Alerts for Live Auctions.
--   Stripe in live mode (currently test mode).
--   SendGrid integration (replace mock email service with SendGrid, API key needed).
--   Dark/Light mode toggle activation.
--   Implement the Active Bids Highlight for lots.
--   Notify users when favorited upcoming auctions go live.
--   Admin UI to create upcoming auctions with start dates.
--   Full automation of invoice generation *and* sending post-auction (beyond current auto-send endpoint).
+-   **Lots Auction Homepage**: Final frontend UI rendering of 4 filtered rows with Swiper.js, View All buttons, toggle functionality.
+-   **Buyer Messaging System**: Backend endpoints and frontend UI.
+-   **Seller Documents Upload**: Frontend fields and backend storage (base64).
+-   **Shipping Options & Rates**: Frontend fields and backend storage.
+-   **Visit Before Auction Option**: Frontend fields and backend storage.
 </pending_tasks>
 
 <current_work>
-The immediate work before this summary request involves implementing the VIP auto-promotion feature. This feature dictates that VIP users' listings are automatically  and  upon creation. The AI engineer is currently working on the backend part of this task, specifically checking the  model in  to ensure it has the necessary  and  fields to support this new logic. The next step is to add the  field if it's missing and then implement the conditional logic for VIP users during listing creation. This will complete the subscription management system and VIP promotional advantages.
+The immediate task before this summary request is the implementation of **Feature #4: Lots Auction Homepage – 4 Filtered Rows**. This feature aims to restructure the  to display four distinct, horizontally scrollable rows of auction cards: Coming Soon Auctions, Featured Auctions, Ending Soon Auctions, and Recently Added Auctions. The AI engineer has already added the necessary backend fetch functions to retrieve data for these categories and updated the  hooks in the frontend to call them. The current work is focused on the frontend UI rendering aspect, specifically integrating these fetched listings into the 4-row layout with horizontal scrolling using  (or similar), along with implementing View All buttons and a toggle mechanism to switch between this homepage view and a standard filtered search view. The trajectory concludes mid-way through this frontend rendering process for .
 </current_work>
 
 <optional_next_step>
-Update the  model in  to include the  field and then implement the VIP auto-promotion logic during listing creation.
+Continue implementing the frontend UI rendering for the 4 filtered rows on the .
 </optional_next_step>
