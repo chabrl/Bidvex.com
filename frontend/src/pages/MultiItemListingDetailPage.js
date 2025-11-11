@@ -21,6 +21,7 @@ import WishlistHeartButton from '../components/WishlistHeartButton';
 import AuctioneerInfo from '../components/AuctioneerInfo';
 import WatchLotButton from '../components/WatchLotButton';
 import ShareButton from '../components/ShareButton';
+import MessageSellerModal from '../components/MessageSellerModal';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
