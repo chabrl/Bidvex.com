@@ -34,6 +34,7 @@ const MultiItemListingDetailPage = () => {
   const [photoIndex, setPhotoIndex] = useState(0);
   const [showLotIndex, setShowLotIndex] = useState(false);
   const [activeLotId, setActiveLotId] = useState(null);
+  const [incrementInfo, setIncrementInfo] = useState(null);
   const lotRefs = useRef({});
 
   useEffect(() => {
