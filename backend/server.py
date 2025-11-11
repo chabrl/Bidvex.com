@@ -292,6 +292,7 @@ class Lot(BaseModel):
     images: List[str] = []
     lot_end_time: Optional[datetime] = None  # Staggered end time (1 min per lot)
     pricing_mode: str = "multiplied"  # "fixed" or "multiplied" - how quantity affects final price
+    extension_count: int = 0  # Number of 3-min extensions applied (max 3)
 
 class MultiItemListingCreate(BaseModel):
     title: str
