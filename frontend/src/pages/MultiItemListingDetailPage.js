@@ -39,6 +39,7 @@ const MultiItemListingDetailPage = () => {
   const [showLotIndex, setShowLotIndex] = useState(false);
   const [activeLotId, setActiveLotId] = useState(null);
   const [incrementInfo, setIncrementInfo] = useState(null);
+  const [messageModalOpen, setMessageModalOpen] = useState(false);
   const lotRefs = useRef({});
 
   useEffect(() => {
