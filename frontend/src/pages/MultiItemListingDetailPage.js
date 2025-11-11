@@ -261,15 +261,25 @@ const MultiItemListingDetailPage = () => {
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Package className="h-6 w-6 text-primary" />
-                      <Badge 
-                        variant={isPreviewMode ? "secondary" : auctionEnded ? "secondary" : "default"}
-                        className={isPreviewMode ? "bg-amber-500 text-white" : ""}
-                      >
-                        {isPreviewMode ? 'Coming Soon' : auctionEnded ? 'Auction Ended' : 'Active Auction'}
-                      </Badge>
-                      <Badge variant="outline">{listing.total_lots} Lots</Badge>
+                    <div className="flex gap-2 items-center mb-2 justify-between">
+                      <div className="flex gap-2 items-center">
+                        <Package className="h-6 w-6 text-primary" />
+                        <Badge 
+                          variant={isPreviewMode ? "secondary" : auctionEnded ? "secondary" : "default"}
+                          className={isPreviewMode ? "bg-amber-500 text-white" : ""}
+                        >
+                          {isPreviewMode ? 'Coming Soon' : auctionEnded ? 'Auction Ended' : 'Active Auction'}
+                        </Badge>
+                        <Badge variant="outline">{listing.total_lots} Lots</Badge>
+                      </div>
+                      {user && (
+                        <WishlistHeartButton
+                          auctionId={listing.id}
+                          size="large"
+                          showCount={true}
+                          wishlistCount={listing.wishlist_count || 0}
+                        />
+                      )}
                     </div>
                     <CardTitle className="text-3xl mb-4">{listing.title}</CardTitle>
                     <p className="text-muted-foreground mb-4">{listing.description}</p>
