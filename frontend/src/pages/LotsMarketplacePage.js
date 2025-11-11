@@ -242,6 +242,176 @@ const LotsMarketplacePage = () => {
     return lots.reduce((sum, lot) => sum + lot.current_price, 0);
   };
 
+  // Render compact auction card for horizontal rows
+  const renderCompactCard = (listing, badgeVariant = 'default') => {
+    const auctionEndDate = new Date(listing.auction_end_date);
+    const auctionStartDate = new Date(listing.auction_start_date);
+    const isEnded = new Date() > auctionEndDate;
+    const isUpcoming = listing.status === 'upcoming';
+
+    return (
+      <Card
+        key={listing.id}
+        className="overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer glassmorphism flex flex-col h-full relative group"
+        onClick={() => navigate(`/lots/${listing.id}`)}
+        data-testid={`compact-lot-card-${listing.id}`}
+      >
+        {/* Wishlist Heart Button on Image */}
+        <div className="absolute top-3 right-3 z-10" onClick={(e) => e.stopPropagation()}>
+          <WishlistHeartButton 
+            auctionId={listing.id} 
+            size="sm"
+            showCount={false}
+          />
+        </div>
+
+        {/* Featured Badge - Top Left */}
+        {listing.is_featured && (
+          <div className="absolute top-3 left-3 z-10" title={getPromotionTooltip(listing.promotion_expiry)}>
+            <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0 shadow-lg flex items-center gap-1 cursor-help">
+              <Star className="h-3 w-3 fill-white" />
+              Featured
+            </Badge>
+          </div>
+        )}
+
+        <div className="aspect-video overflow-hidden relative h-40">
+          <ImageCarousel lots={listing.lots} totalLots={listing.total_lots} />
+        </div>
+        
+        <CardHeader className="pb-3">
+          <CardTitle className="line-clamp-2 text-base leading-tight min-h-[2.5rem]" title={listing.title}>
+            {listing.title}
+          </CardTitle>
+        </CardHeader>
+        
+        <CardContent className="space-y-2 flex-grow text-sm">
+          {/* Category */}
+          <div className="flex items-center gap-2">
+            <Tag className="h-3 w-3 text-primary flex-shrink-0" />
+            <span className="text-xs font-medium text-primary truncate">
+              {listing.category || 'General'}
+            </span>
+          </div>
+
+          {/* Location */}
+          <div className="flex items-center gap-2">
+            <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+            <span className="text-xs text-muted-foreground truncate">
+              {listing.city}, {listing.region}
+            </span>
+          </div>
+          
+          {/* Lot Count */}
+          <div className="flex items-center gap-2">
+            <Package className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+            <span className="text-xs text-muted-foreground">
+              {listing.total_lots} {listing.total_lots === 1 ? 'Lot' : 'Lots'}
+            </span>
+          </div>
+          
+          {/* Time Display */}
+          {isUpcoming ? (
+            <div className="flex items-center gap-2 pt-2 border-t">
+              <Clock className="h-3 w-3 text-amber-500 flex-shrink-0" />
+              <div className="flex flex-col">
+                <span className="text-xs text-muted-foreground">Starts in</span>
+                <Countdown
+                  date={auctionStartDate}
+                  renderer={({ days, hours, minutes, completed }) => (
+                    <span className="font-semibold text-xs text-amber-600">
+                      {completed ? 'Live Now!' : `${days}d ${hours}h ${minutes}m`}
+                    </span>
+                  )}
+                />
+              </div>
+            </div>
+          ) : !isEnded ? (
+            <div className="flex items-center gap-2 pt-2 border-t">
+              <Clock className="h-3 w-3 text-primary flex-shrink-0" />
+              <div className="flex flex-col">
+                <span className="text-xs text-muted-foreground">Ends in</span>
+                <Countdown
+                  date={auctionEndDate}
+                  renderer={({ days, hours, minutes, completed }) => (
+                    <span className={`font-semibold text-xs ${completed ? 'text-red-500' : 'text-primary'}`}>
+                      {completed ? t('marketplace.ended', 'Ended') : `${days}d ${hours}h ${minutes}m`}
+                    </span>
+                  )}
+                />
+              </div>
+            </div>
+          ) : (
+            <Badge variant="destructive" className="w-fit text-xs">
+              {t('marketplace.ended', 'Auction Ended')}
+            </Badge>
+          )}
+        </CardContent>
+        
+        <CardFooter className="mt-auto pt-3">
+          <Button size="sm" className="w-full gradient-button text-white border-0 hover:scale-105 transition-transform text-xs">
+            {isUpcoming ? t('lotsMarketplace.viewDetails', 'View Details') : t('lotsMarketplace.viewLot', 'View & Bid')}
+          </Button>
+        </CardFooter>
+      </Card>
+    );
+  };
+
+  // Render auction row with horizontal Swiper
+  const renderAuctionRow = (title, icon, listings, iconColor = 'text-primary', emptyMessage = 'No auctions available') => {
+    if (listings.length === 0) return null;
+
+    return (
+      <div className="mb-12">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            {icon}
+            <h2 className="text-2xl md:text-3xl font-bold">{title}</h2>
+          </div>
+          <Button 
+            variant="ghost" 
+            className="gap-2 hover:gap-3 transition-all"
+            onClick={() => {
+              setShowHomepage(false);
+              // Set appropriate filters based on row type
+              if (title.includes('Coming Soon')) {
+                handleFilterChange('sort', 'auction_start_date');
+              } else if (title.includes('Featured')) {
+                // Featured will be sorted by default
+              } else if (title.includes('Ending Soon')) {
+                handleFilterChange('sort', 'auction_end_date');
+              } else if (title.includes('Recently Added')) {
+                handleFilterChange('sort', '-created_at');
+              }
+            }}
+          >
+            View All
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+        
+        <Swiper
+          modules={[Navigation]}
+          spaceBetween={20}
+          slidesPerView={1.2}
+          navigation
+          breakpoints={{
+            640: { slidesPerView: 2.2 },
+            1024: { slidesPerView: 3.2 },
+            1280: { slidesPerView: 4 },
+          }}
+          className="auction-row-swiper"
+        >
+          {listings.map((listing) => (
+            <SwiperSlide key={listing.id}>
+              {renderCompactCard(listing)}
+            </SwiperSlide>
+          ))}
+        </Swiper>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen py-8 px-4" data-testid="lots-marketplace-page">
       <div className="max-w-7xl mx-auto">
