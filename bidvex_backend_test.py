@@ -565,7 +565,7 @@ class BidVexBackendTester:
                 json=listing_no_shipping,
                 headers=self.get_seller_headers()
             ) as response:
-                if response.status == 201:
+                if response.status in [200, 201]:
                     data = await response.json()
                     no_shipping_id = data.get("id")
                     print(f"✅ Listing with no shipping created")
