@@ -62,19 +62,15 @@ const Navbar = () => {
                 {t('nav.lots', 'Lots Auction')}
               </Button>
             </Link>
-            {user && user.account_type === 'business' && (
-              <Link to="/create-multi-item-listing" data-testid="nav-multi-sell-link">
-                <Button variant="ghost" className="text-sm font-medium">
-                  Create Multi-Item
-                </Button>
-              </Link>
-            )}
             {user && (
-              <Link to="/create-listing" data-testid="nav-sell-link">
-                <Button variant="ghost" className="text-sm font-medium">
-                  {t('nav.sell')}
-                </Button>
-              </Link>
+              <Button 
+                variant="ghost" 
+                className="text-sm font-medium"
+                onClick={() => setSellModalOpen(true)}
+                data-testid="nav-sell-button"
+              >
+                {t('nav.sell')}
+              </Button>
             )}
           </div>
 
