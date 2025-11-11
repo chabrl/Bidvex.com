@@ -21,6 +21,7 @@ import TrustSafetyDashboard from './admin/TrustSafetyDashboard';
 import AnnouncementManager from './admin/AnnouncementManager';
 import AdminLogs from './admin/AdminLogs';
 import CurrencyAppealsManager from './admin/CurrencyAppealsManager';
+import SubscriptionManager from './admin/SubscriptionManager';
 import { Users, Package, Gavel, Shield, TrendingUp, Bell, Settings, FileText, MessageSquare, DollarSign } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
