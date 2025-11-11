@@ -338,6 +338,12 @@ class MultiItemListing(BaseModel):
     # Payment tracking fields
     payment_status: str = "pending"   # pending, paid, partial
     payment_date: Optional[datetime] = None
+    # Documents (base64 encoded, max 10MB each)
+    documents: Optional[Dict[str, Any]] = None  # {terms_conditions, important_info, catalogue}
+    # Shipping information
+    shipping_info: Optional[Dict[str, Any]] = None  # {available, methods, rates, delivery_time}
+    # Visit availability
+    visit_availability: Optional[Dict[str, Any]] = None  # {offered, dates, instructions}
     payment_method: Optional[str] = None  # e-transfer, bank transfer, cash, etc.
     payment_proof_url: Optional[str] = None  # URL to payment receipt/proof
 
