@@ -666,6 +666,143 @@ async def get_user_profile_summary(user_id: str):
         logger.error(f"Error fetching user profile summary: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch profile summary")
 
+# ============= RATING ENDPOINTS =============
+
+@api_router.post("/ratings")
+async def create_rating(
+    rating_data: Dict[str, Any],
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Create a rating for a seller/auctioneer after participating in an auction.
+    One rating per auction per buyer.
+    """
+    try:
+        required_fields = ["auction_id", "auction_type", "target_user_id", "rating"]
+        for field in required_fields:
+            if field not in rating_data:
+                raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
+        
+        # Validate rating value
+        if not (1 <= rating_data["rating"] <= 5):
+            raise HTTPException(status_code=400, detail="Rating must be between 1 and 5")
+        
+        # Validate auction type
+        if rating_data["auction_type"] not in ["single", "multi"]:
+            raise HTTPException(status_code=400, detail="Auction type must be 'single' or 'multi'")
+        
+        # Check if user has already rated this auction
+        existing_rating = await db.ratings.find_one({
+            "auction_id": rating_data["auction_id"],
+            "rater_user_id": current_user.id
+        })
+        
+        if existing_rating:
+            raise HTTPException(status_code=400, detail="You have already rated this auction")
+        
+        # Verify the auction exists and user participated
+        if rating_data["auction_type"] == "single":
+            auction = await db.listings.find_one({"id": rating_data["auction_id"]})
+            if not auction:
+                raise HTTPException(status_code=404, detail="Auction not found")
+            
+            # Check if user has bids on this auction
+            user_bid = await db.bids.find_one({
+                "listing_id": rating_data["auction_id"],
+                "bidder_id": current_user.id
+            })
+            if not user_bid:
+                raise HTTPException(status_code=403, detail="You must participate in the auction to rate it")
+        else:
+            auction = await db.multi_item_listings.find_one({"id": rating_data["auction_id"]})
+            if not auction:
+                raise HTTPException(status_code=404, detail="Auction not found")
+            
+            # Check if user has bids on any lot in this auction
+            user_bid = await db.bids.find_one({
+                "multi_item_listing_id": rating_data["auction_id"],
+                "bidder_id": current_user.id
+            })
+            if not user_bid:
+                raise HTTPException(status_code=403, detail="You must participate in the auction to rate it")
+        
+        # Prevent self-rating
+        if current_user.id == rating_data["target_user_id"]:
+            raise HTTPException(status_code=400, detail="You cannot rate yourself")
+        
+        # Create rating
+        rating = AuctionRating(
+            auction_id=rating_data["auction_id"],
+            auction_type=rating_data["auction_type"],
+            rater_user_id=current_user.id,
+            target_user_id=rating_data["target_user_id"],
+            rating=rating_data["rating"],
+            comment=rating_data.get("comment")
+        )
+        
+        rating_dict = rating.model_dump()
+        rating_dict["timestamp"] = rating_dict["timestamp"].isoformat()
+        rating_dict["created_at"] = rating_dict["created_at"].isoformat()
+        
+        await db.ratings.insert_one(rating_dict)
+        
+        return {"message": "Rating submitted successfully", "rating": rating_dict}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating rating: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create rating")
+
+@api_router.get("/users/{user_id}/ratings")
+async def get_user_ratings(user_id: str):
+    """
+    Get aggregated ratings for a specific seller/auctioneer.
+    Returns average rating, count, and recent ratings.
+    """
+    try:
+        # Get all ratings for this user
+        ratings_cursor = db.ratings.find({"target_user_id": user_id})
+        ratings = await ratings_cursor.to_list(length=None)
+        
+        if not ratings:
+            return {
+                "user_id": user_id,
+                "average_rating": 0,
+                "total_ratings": 0,
+                "ratings_breakdown": {"1": 0, "2": 0, "3": 0, "4": 0, "5": 0},
+                "recent_ratings": []
+            }
+        
+        # Calculate average
+        total_rating = sum(r["rating"] for r in ratings)
+        average_rating = round(total_rating / len(ratings), 2)
+        
+        # Ratings breakdown
+        ratings_breakdown = {"1": 0, "2": 0, "3": 0, "4": 0, "5": 0}
+        for r in ratings:
+            ratings_breakdown[str(r["rating"])] += 1
+        
+        # Get recent ratings (last 10)
+        recent_ratings = sorted(ratings, key=lambda x: x.get("timestamp", ""), reverse=True)[:10]
+        
+        # Remove sensitive IDs from recent ratings
+        for r in recent_ratings:
+            r.pop("_id", None)
+            r.pop("rater_user_id", None)
+        
+        return {
+            "user_id": user_id,
+            "average_rating": average_rating,
+            "total_ratings": len(ratings),
+            "ratings_breakdown": ratings_breakdown,
+            "recent_ratings": recent_ratings
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching user ratings: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch ratings")
+
 @api_router.put("/users/me")
 async def update_profile(updates: Dict[str, Any], current_user: User = Depends(get_current_user)):
     allowed_fields = ["name", "phone", "address", "company_name", "tax_number", "bank_details", "language", "picture", "preferred_language", "preferred_currency", "subscription_tier"]
