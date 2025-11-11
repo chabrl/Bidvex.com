@@ -648,7 +648,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Auctioneer Information Display - Implementation Complete"
+    - "BidVex Backend Features Testing - Complete"
   stuck_tasks: []
   test_all: false
   test_priority: "completed"
