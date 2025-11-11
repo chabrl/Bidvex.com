@@ -444,6 +444,36 @@ const MultiItemListingDetailPage = () => {
                           </div>
                         </div>
 
+                        {/* Lot Countdown Timer */}
+                        {lot.lot_end_time && !auctionEnded && (
+                          <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                                  This lot ends in:
+                                </span>
+                              </div>
+                              <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                                <Countdown 
+                                  date={new Date(lot.lot_end_time)}
+                                  renderer={({ days, hours, minutes, seconds, completed }) => {
+                                    if (completed) {
+                                      return <span className="text-red-600">Ended</span>;
+                                    }
+                                    return (
+                                      <span>
+                                        {days > 0 && `${days}d `}
+                                        {hours}h {minutes}m {seconds}s
+                                      </span>
+                                    );
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                         {/* Bidding Section */}
                         {isPreviewMode && (
                           <div className="bg-amber-50 dark:bg-amber-950 border border-amber-300 rounded-lg p-4 text-center mt-4">
