@@ -2685,6 +2685,103 @@ async def check_watchlist_status(listing_id: str, current_user: User = Depends(g
         logger.error(f"Error checking watchlist status: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to check watchlist status")
 
+# Lot Watching Endpoints (for multi-item listings)
+@api_router.post("/lots/watch")
+async def watch_lot(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
+    """Add a specific lot to user's watched lots"""
+    try:
+        listing_id = data.get("listing_id")
+        lot_number = data.get("lot_number")
+        
+        if not listing_id or lot_number is None:
+            raise HTTPException(status_code=400, detail="listing_id and lot_number are required")
+        
+        # Check if already watching
+        existing = await db.watched_lots.find_one({
+            "user_id": current_user.id,
+            "listing_id": listing_id,
+            "lot_number": lot_number
+        })
+        
+        if existing:
+            return {"message": "Already watching this lot", "already_watching": True}
+        
+        # Add to watched lots
+        watched_item = {
+            "id": str(uuid.uuid4()),
+            "user_id": current_user.id,
+            "listing_id": listing_id,
+            "lot_number": lot_number,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        await db.watched_lots.insert_one(watched_item)
+        return {"message": "Lot added to watched list", "success": True}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error watching lot: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to watch lot")
+
+@api_router.post("/lots/unwatch")
+async def unwatch_lot(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
+    """Remove a specific lot from user's watched lots"""
+    try:
+        listing_id = data.get("listing_id")
+        lot_number = data.get("lot_number")
+        
+        if not listing_id or lot_number is None:
+            raise HTTPException(status_code=400, detail="listing_id and lot_number are required")
+        
+        result = await db.watched_lots.delete_one({
+            "user_id": current_user.id,
+            "listing_id": listing_id,
+            "lot_number": lot_number
+        })
+        
+        if result.deleted_count == 0:
+            return {"message": "Lot not in watched list", "success": False}
+        
+        return {"message": "Lot removed from watched list", "success": True}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error unwatching lot: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to unwatch lot")
+
+@api_router.get("/lots/watched")
+async def get_watched_lots(current_user: User = Depends(get_current_user)):
+    """Get all lots the user is watching"""
+    try:
+        watched = await db.watched_lots.find(
+            {"user_id": current_user.id},
+            {"_id": 0}
+        ).to_list(1000)
+        
+        return {"watched_lots": watched}
+        
+    except Exception as e:
+        logger.error(f"Error fetching watched lots: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch watched lots")
+
+@api_router.get("/lots/watched/check")
+async def check_lot_watch_status(listing_id: str, lot_number: int, current_user: User = Depends(get_current_user)):
+    """Check if user is watching a specific lot"""
+    try:
+        exists = await db.watched_lots.find_one({
+            "user_id": current_user.id,
+            "listing_id": listing_id,
+            "lot_number": lot_number
+        })
+        
+        return {"is_watching": exists is not None}
+        
+    except Exception as e:
+        logger.error(f"Error checking lot watch status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to check watch status")
+
 
 # Recently Viewed Tracking Endpoints
 @api_router.post("/tracking/view/{listing_id}")
