@@ -34,15 +34,6 @@ const BuyerDashboard = () => {
     }
   };
 
-  const fetchWishlist = async () => {
-    try {
-      const response = await axios.get(`${API}/wishlist`);
-      setWishlist(response.data.wishlist || []);
-    } catch (error) {
-      console.error('Failed to fetch wishlist:', error);
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
