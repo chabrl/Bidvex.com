@@ -879,6 +879,17 @@ const MultiItemListingDetailPage = () => {
           enableZoom={true}
         />
       )}
+
+      {/* Message Seller Modal */}
+      {listing && (
+        <MessageSellerModal
+          isOpen={messageModalOpen}
+          onClose={() => setMessageModalOpen(false)}
+          sellerId={listing.seller_id}
+          listingId={listing.id}
+          listingTitle={listing.title}
+        />
+      )}
     </div>
   );
 };
