@@ -307,6 +307,8 @@ class MultiItemListing(BaseModel):
     wishlist_count: int = 0  # Total users who wishlisted this auction
     currency: str = "CAD"  # CAD or USD
     increment_option: str = "tiered"  # tiered or simplified
+    is_featured: bool = False  # VIP auto-promotion
+    promotion_expiry: Optional[datetime] = None  # 7-day promotion for VIP
     # Invoice configuration
     premium_percentage: float = 5.0  # Buyer's premium (5%)
     commission_rate: float = 0.0      # Seller commission (0% - no commission charged)
