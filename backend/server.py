@@ -1234,6 +1234,8 @@ async def create_multi_item_listing(listing_data: MultiItemListingCreate, curren
     listing_dict["created_at"] = listing_dict["created_at"].isoformat()
     if listing_dict["auction_start_date"]:
         listing_dict["auction_start_date"] = listing_dict["auction_start_date"].isoformat()
+    if listing_dict["promotion_expiry"]:
+        listing_dict["promotion_expiry"] = listing_dict["promotion_expiry"].isoformat()
     
     await db.multi_item_listings.insert_one(listing_dict)
     
