@@ -292,9 +292,139 @@ const MultiItemListingDetailPage = () => {
                     {/* Auctioneer Info Section */}
                     {listing.seller_id && (
                       <div className="mb-6">
-                        <p className="text-sm text-muted-foreground mb-2">Hosted by</p>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-sm text-muted-foreground">Hosted by</p>
+                          {user && user.id !== listing.seller_id && (
+                            <Button
+                              size="sm"
+                              onClick={() => setMessageModalOpen(true)}
+                              className="gap-2"
+                            >
+                              📨 Message Seller
+                            </Button>
+                          )}
+                        </div>
                         <AuctioneerInfo sellerId={listing.seller_id} variant="full" />
                       </div>
+                    )}
+
+                    {/* Documents Section */}
+                    {listing.documents && (listing.documents.terms_conditions || listing.documents.important_info || listing.documents.catalogue) && (
+                      <Card className="mb-6">
+                        <CardHeader>
+                          <CardTitle className="text-lg">📄 Documents</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                          {listing.documents.terms_conditions && (
+                            <Button
+                              variant="outline"
+                              className="w-full justify-start"
+                              onClick={() => {
+                                const link = document.createElement('a');
+                                link.href = `data:${listing.documents.terms_conditions.content_type};base64,${listing.documents.terms_conditions.base64_content}`;
+                                link.download = listing.documents.terms_conditions.filename;
+                                link.click();
+                              }}
+                            >
+                              📃 Terms & Conditions
+                            </Button>
+                          )}
+                          {listing.documents.important_info && (
+                            <Button
+                              variant="outline"
+                              className="w-full justify-start"
+                              onClick={() => {
+                                const link = document.createElement('a');
+                                link.href = `data:${listing.documents.important_info.content_type};base64,${listing.documents.important_info.base64_content}`;
+                                link.download = listing.documents.important_info.filename;
+                                link.click();
+                              }}
+                            >
+                              ℹ️ Important Information
+                            </Button>
+                          )}
+                          {listing.documents.catalogue && (
+                            <Button
+                              variant="outline"
+                              className="w-full justify-start"
+                              onClick={() => {
+                                const link = document.createElement('a');
+                                link.href = `data:${listing.documents.catalogue.content_type};base64,${listing.documents.catalogue.base64_content}`;
+                                link.download = listing.documents.catalogue.filename;
+                                link.click();
+                              }}
+                            >
+                              📚 Catalogue
+                            </Button>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Shipping Section */}
+                    {listing.shipping_info && listing.shipping_info.available && (
+                      <Card className="mb-6">
+                        <CardHeader>
+                          <CardTitle className="text-lg">🚚 Shipping Options</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          {listing.shipping_info.methods && listing.shipping_info.methods.length > 0 && (
+                            <div>
+                              <p className="text-sm font-semibold mb-2">Available Methods:</p>
+                              <div className="space-y-2">
+                                {listing.shipping_info.methods.map(method => (
+                                  <div key={method} className="flex justify-between items-center p-2 bg-muted rounded">
+                                    <span className="capitalize">{method.replace('_', ' ')}</span>
+                                    {listing.shipping_info.rates && listing.shipping_info.rates[method] && (
+                                      <span className="font-semibold">${listing.shipping_info.rates[method]}</span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {listing.shipping_info.delivery_time && (
+                            <div>
+                              <p className="text-sm font-semibold">Estimated Delivery:</p>
+                              <p className="text-sm text-muted-foreground">{listing.shipping_info.delivery_time}</p>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Visit Availability Section */}
+                    {listing.visit_availability && listing.visit_availability.offered && (
+                      <Card className="mb-6 border-green-200 bg-green-50 dark:bg-green-900/10">
+                        <CardHeader>
+                          <CardTitle className="text-lg flex items-center gap-2">
+                            🏠 Visit Before Auction
+                            <Badge variant="secondary" className="bg-green-500 text-white">Available</Badge>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          {listing.visit_availability.dates && (
+                            <div>
+                              <p className="text-sm font-semibold">Available Dates:</p>
+                              <p className="text-sm">{listing.visit_availability.dates}</p>
+                            </div>
+                          )}
+                          {listing.visit_availability.instructions && (
+                            <div>
+                              <p className="text-sm font-semibold">Instructions:</p>
+                              <p className="text-sm text-muted-foreground">{listing.visit_availability.instructions}</p>
+                            </div>
+                          )}
+                          {user && user.id !== listing.seller_id && (
+                            <Button
+                              className="w-full gradient-button text-white"
+                              onClick={() => setMessageModalOpen(true)}
+                            >
+                              📅 Request Visit
+                            </Button>
+                          )}
+                        </CardContent>
+                      </Card>
                     )}
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
