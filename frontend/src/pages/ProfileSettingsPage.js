@@ -406,6 +406,23 @@ const ProfileSettingsPage = () => {
                       }
                     </p>
                   )}
+                  {/* Promotion Duration Info */}
+                  {user?.subscription_tier === 'premium' && (
+                    <div className="mt-3 p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-purple-600" />
+                      <p className="text-sm font-medium text-purple-900 dark:text-purple-200">
+                        ✨ Your listings are promoted for <span className="font-bold">3 days</span>
+                      </p>
+                    </div>
+                  )}
+                  {user?.subscription_tier === 'vip' && (
+                    <div className="mt-3 p-3 bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 rounded-lg flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-amber-600" />
+                      <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
+                        ⭐ Your listings are promoted for <span className="font-bold">7 days</span>
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Feature Comparison Table */}
