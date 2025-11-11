@@ -616,3 +616,33 @@ agent_communication:
     message: "🎉 VIP AUTO-PROMOTION BACKEND TESTING COMPLETE - ALL SUCCESS CRITERIA MET (10/10 TESTS PASSED): ✅ VIP User Auto-Promotion: VIP users' listings automatically featured for 7 days with precise promotion_expiry calculation (±0.01s accuracy). ✅ Non-VIP Users (Free/Premium): Correctly NOT auto-promoted with is_featured=false and promotion_expiry=null. ✅ No Subscription Tier: Users without subscription_tier field default to free behavior (no promotion). ✅ Listing Retrieval: Both GET /api/multi-item-listings and GET /api/multi-item-listings/{id} correctly return featured status and properly serialize promotion_expiry dates. ✅ MongoDB Persistence: Fields correctly stored and retrieved from database with exact field matching. ✅ Edge Cases: VIP listings with future auction_start_date still promoted, promotion expiry calculated precisely to the second. ✅ Additional Tests: Personal account VIP users correctly blocked from creating multi-item listings (403 error), multiple VIP listings all promoted correctly. 🔧 MINOR FIX APPLIED: Added 'subscription_tier' to allowed fields in PUT /api/users/me for testing purposes with proper validation (free/premium/vip only). Created comprehensive test suites at /app/vip_auto_promotion_test.py and /app/vip_additional_tests.py covering all requirements. VIP auto-promotion feature fully implemented and verified - ready for production use."
   - agent: "testing"
     message: "🎉 PREMIUM AUTO-PROMOTION (3-DAY FEATURE) COMPREHENSIVE TESTING COMPLETE - ALL SUCCESS CRITERIA MET (13/13 TESTS PASSED): ✅ PREMIUM USER AUTO-PROMOTION: Premium users' listings automatically featured for 3 days with precise promotion_expiry calculation (±0.01s accuracy). ✅ VIP REGRESSION TEST: VIP users still get 7-day auto-promotion (existing functionality preserved). ✅ FREE TIER VERIFICATION: Free users correctly NOT auto-promoted (is_featured=false, promotion_expiry=null). ✅ PREMIUM VS VIP COMPARISON: Duration difference exactly 4.00 days (7-3=4), both tiers featured correctly. ✅ LISTING RETRIEVAL MIXED TIERS: GET /api/multi-item-listings returns correct featured status for all tiers with proper serialization. ✅ EDGE CASES VERIFIED: (1) Premium listings with future start dates still promoted, (2) Users without subscription_tier default to free behavior, (3) Personal account users correctly blocked (403 error), (4) MongoDB field persistence verified, (5) Multiple Premium listings all promoted correctly. ✅ MONGODB PERSISTENCE: Fields stored as boolean (is_featured) and ISO string (promotion_expiry), consistent retrieval across multiple requests. ✅ NO BACKEND ERRORS: All endpoints working without crashes, proper datetime serialization, accurate time calculations (±2s tolerance). Created comprehensive test suites: /app/premium_auto_promotion_test.py (8 comprehensive tests), /app/premium_focused_test.py (focused verification), /app/premium_edge_cases_test.py (5 edge cases). Premium auto-promotion feature fully implemented, tested, and production-ready. Ready for main agent to summarize and finish."
+
+frontend:
+  - task: "Lots Auction Homepage - 4 Filtered Rows with Swiper"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/LotsMarketplacePage.js, /app/frontend/src/index.css"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "✅ IMPLEMENTATION COMPLETE: Successfully implemented 4-row homepage layout with horizontal Swiper scrolling. (1) Created 4 distinct sections: ⏰ Coming Soon Auctions (Clock icon, amber), 🔥 Featured Auctions (Star icon, orange), ⏳ Ending Soon (Clock icon, red), ✨ Recently Added (Sparkles icon, green). (2) Each row displays 3-4 cards horizontally with Swiper navigation arrows. (3) Implemented toggle button to switch between homepage view and filtered search view. (4) Created reusable renderCompactCard() function for consistent card styling across all rows. (5) Added renderAuctionRow() helper function with title, icon, listings array parameters. (6) Responsive Swiper breakpoints: mobile 1.2 slides, tablet 2.2 slides, desktop 3.2 slides, large desktop 4 slides. (7) View All buttons for each row that switch to filtered view with appropriate sort settings. (8) Added Swiper navigation CSS styling in index.css with hover effects and responsive adjustments. (9) Compact cards show: Featured badges, wishlist heart buttons, image carousel, title, category, location, lot count, countdown timers. (10) Visual verification complete on desktop (1920px), mobile (375px) showing all 4 rows working perfectly with horizontal scrolling. Toggle functionality tested and working. Ready for comprehensive frontend testing."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.1"
+  test_sequence: 2
+  run_ui: true
+
+test_plan:
+  current_focus:
+    - "Lots Auction Homepage - 4 Filtered Rows with Swiper"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "✅ LOTS AUCTION HOMEPAGE - 4 FILTERED ROWS IMPLEMENTATION COMPLETE: Successfully transformed LotsMarketplacePage into a dynamic homepage with 4 horizontally scrollable sections using Swiper.js. All requirements met: (1) Bold section headers with emojis (⏰🔥⏳✨), (2) 3-4 cards per row with horizontal Swiper navigation, (3) Right-aligned View All buttons, (4) Toggle between homepage and search views, (5) Responsive design with touch-friendly mobile interface. Visual testing confirmed all 4 rows working on desktop and mobile with smooth horizontal scrolling, navigation arrows, and proper card styling. Ready for comprehensive frontend testing to verify all interactions and edge cases."
