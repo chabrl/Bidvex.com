@@ -94,7 +94,7 @@ const ProfileSettingsPage = () => {
         <h1 className="text-3xl font-bold mb-8">{t('profile.accountSettings')}</h1>
 
         <Tabs defaultValue="profile" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="profile" data-testid="profile-tab">
               <User className="mr-2 h-4 w-4" />
               {t('profile.profileTab')}
@@ -102,6 +102,10 @@ const ProfileSettingsPage = () => {
             <TabsTrigger value="payment" data-testid="payment-tab">
               <CreditCard className="mr-2 h-4 w-4" />
               {t('profile.paymentTab')}
+            </TabsTrigger>
+            <TabsTrigger value="subscription" data-testid="subscription-tab">
+              <Crown className="mr-2 h-4 w-4" />
+              Subscription
             </TabsTrigger>
             <TabsTrigger value="notifications" data-testid="notifications-tab">
               <Bell className="mr-2 h-4 w-4" />
