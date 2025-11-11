@@ -610,10 +610,22 @@ const MultiItemListingDetailPage = () => {
                         )}
                       </div>
                       <p className="text-xs truncate mb-1">{lot.title}</p>
-                      <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center justify-between text-xs mb-1">
                         <span>Qty: {lot.quantity}</span>
                         <span className="font-semibold">${lot.current_price.toFixed(2)}</span>
                       </div>
+                      {lot.lot_end_time && !auctionEnded && (
+                        <div className="flex items-center gap-1 text-xs">
+                          <Clock className="h-3 w-3" />
+                          <Countdown 
+                            date={new Date(lot.lot_end_time)}
+                            renderer={({ hours, minutes, seconds, completed }) => (
+                              completed ? <span className="text-red-400">Ended</span> : 
+                              <span className="font-mono">{hours}h {minutes}m {seconds}s</span>
+                            )}
+                          />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </CardContent>
