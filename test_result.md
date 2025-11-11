@@ -403,13 +403,13 @@ frontend:
         comment: "Completely redesigned auction cards for premium UX: (1) Grid Cards: Removed descriptions entirely for cleaner look, added title tooltips (native title attribute), implemented pricing box with gray background, icons for labels (💰 Current, 🏷️ Start), current price text-2xl text-green-700, starting price text-sm text-gray-500, divider between prices, consistent card heights with flexbox (flex flex-col h-full), hover scale on button (scale-105). (2) List Cards: Responsive stats grid (4 cols xl+, 2 cols sm-xl, 1 col mobile), title line-clamp-1 with tooltip, descriptions hidden on tablet/mobile (lg:block), enhanced price display with icons, all icons as emojis for visual clarity. (3) Responsive: Properly tested across mobile (375px), tablet (1024px), desktop (1440px) - all layouts working perfectly. Green pricing stands out, icons save space, cards feel premium and clean. Visual hierarchy improved significantly."
 
 backend:
-  - task: "VIP Auto-Promotion Logic"
+  - task: "Premium & VIP Auto-Promotion Logic"
     implemented: true
     working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
@@ -417,6 +417,9 @@ backend:
       - working: true
         agent: "testing"
         comment: "✅ VIP AUTO-PROMOTION COMPREHENSIVE TESTING COMPLETE (10/10 TESTS PASSED): ✅ VIP User Auto-Promotion: VIP users' listings automatically featured for 7 days with precise promotion_expiry calculation (±0.01s accuracy). ✅ Non-VIP Users (Free/Premium): Correctly NOT auto-promoted, is_featured=false, promotion_expiry=null. ✅ No Subscription Tier: Users without subscription_tier field default to free behavior (no promotion). ✅ Listing Retrieval: GET /api/multi-item-listings and GET /api/multi-item-listings/{id} correctly return featured status and properly serialize promotion_expiry dates. ✅ MongoDB Persistence: Fields correctly stored and retrieved from database. ✅ Edge Cases: VIP listings with future auction_start_date still promoted, promotion expiry calculated precisely to the second. ✅ Additional Tests: Personal account VIP users correctly blocked from creating multi-item listings (403 error), multiple VIP listings all promoted correctly. 🔧 MINOR FIX APPLIED: Added 'subscription_tier' to allowed fields in PUT /api/users/me for testing purposes with proper validation (free/premium/vip only). Created comprehensive test suites at /app/vip_auto_promotion_test.py and /app/vip_additional_tests.py. All VIP auto-promotion requirements fully implemented and verified."
+      - working: true
+        agent: "main"
+        comment: "✅ PREMIUM AUTO-PROMOTION ADDED: Updated backend logic to support both Premium (3 days) and VIP (7 days) auto-promotion. Changed conditional from single if to if/elif structure: Premium users get is_featured=true with promotion_expiry=now+3days, VIP users get is_featured=true with promotion_expiry=now+7days, Free users remain unfeatured. Logic implemented at lines 1209-1216 in server.py. Backend hot-reloaded successfully. Ready for comprehensive testing with Premium user accounts in addition to existing VIP tests."
 
 frontend:
   - task: "VIP & Premium Auto-Promotion - Complete System"
