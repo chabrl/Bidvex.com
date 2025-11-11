@@ -1462,7 +1462,10 @@ async def create_multi_item_listing(listing_data: MultiItemListingCreate, curren
         tax_rate_gst=tax_rates["tax_rate_gst"],
         tax_rate_qst=tax_rates["tax_rate_qst"],
         is_featured=is_featured,
-        promotion_expiry=promotion_expiry
+        promotion_expiry=promotion_expiry,
+        documents=listing_data.documents,
+        shipping_info=listing_data.shipping_info,
+        visit_availability=listing_data.visit_availability
     )
     
     listing_dict = listing.model_dump()
