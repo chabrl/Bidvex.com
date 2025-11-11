@@ -38,6 +38,10 @@ const CreateMultiItemListing = () => {
   });
 
   // Step 2: Lots
+  const [numLots, setNumLots] = useState(1); // Number of lots to generate
+  const [currentPage, setCurrentPage] = useState(1); // Pagination for lots
+  const lotsPerPage = 10;
+  
   const [lots, setLots] = useState([{
     lot_number: 1,
     title: '',
@@ -46,7 +50,8 @@ const CreateMultiItemListing = () => {
     starting_price: '',
     current_price: '',
     condition: 'good',
-    images: []
+    images: [],
+    pricing_mode: 'multiplied' // fixed or multiplied
   }]);
 
   const [uploadMethod, setUploadMethod] = useState('manual'); // 'manual', 'csv', 'images'
