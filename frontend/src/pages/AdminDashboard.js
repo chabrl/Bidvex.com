@@ -194,6 +194,10 @@ const AdminDashboard = () => {
                 <CategoryManager />
               </TabsContent>
 
+              <TabsContent value="subscriptions">
+                <SubscriptionManager />
+              </TabsContent>
+
               <TabsContent value="promotions">
                 <PromotionManager />
               </TabsContent>
