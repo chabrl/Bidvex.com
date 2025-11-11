@@ -1462,6 +1462,11 @@ async def create_multi_item_listing(listing_data: MultiItemListingCreate, curren
     if listing_dict["promotion_expiry"]:
         listing_dict["promotion_expiry"] = listing_dict["promotion_expiry"].isoformat()
     
+    # Serialize lot_end_time for each lot
+    for lot in listing_dict.get("lots", []):
+        if lot.get("lot_end_time"):
+            lot["lot_end_time"] = lot["lot_end_time"].isoformat()
+    
     await db.multi_item_listings.insert_one(listing_dict)
     
     return listing
