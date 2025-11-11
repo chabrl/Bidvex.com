@@ -403,13 +403,25 @@ frontend:
         comment: "Completely redesigned auction cards for premium UX: (1) Grid Cards: Removed descriptions entirely for cleaner look, added title tooltips (native title attribute), implemented pricing box with gray background, icons for labels (💰 Current, 🏷️ Start), current price text-2xl text-green-700, starting price text-sm text-gray-500, divider between prices, consistent card heights with flexbox (flex flex-col h-full), hover scale on button (scale-105). (2) List Cards: Responsive stats grid (4 cols xl+, 2 cols sm-xl, 1 col mobile), title line-clamp-1 with tooltip, descriptions hidden on tablet/mobile (lg:block), enhanced price display with icons, all icons as emojis for visual clarity. (3) Responsive: Properly tested across mobile (375px), tablet (1024px), desktop (1440px) - all layouts working perfectly. Green pricing stands out, icons save space, cards feel premium and clean. Visual hierarchy improved significantly."
 
 backend:
-  - task: "Premium & VIP Auto-Promotion Logic"
+  - task: "Auctioneer Profile Summary Endpoint"
     implemented: true
     working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
     needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "✅ PROFILE SUMMARY API COMPLETE: Created GET /api/users/{user_id}/profile-summary endpoint at line 601-647. Returns comprehensive seller profile data: user_id, name, picture, company_name, account_type, city (extracted from address), subscription_tier, stats (total_auctions aggregated from listings + multi_item_listings, completed_auctions, member_since). Aggregation queries both collections for accurate counts. Returns 404 if user not found, 500 for server errors. Endpoint enables frontend to display auctioneer information consistently across all auction views. No Python linting errors. Ready for production use."
+
+  - task: "Premium & VIP Auto-Promotion Logic"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
