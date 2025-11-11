@@ -738,8 +738,62 @@ const CreateMultiItemListing = () => {
           <Plus className="mr-2 h-4 w-4" /> Add Another Lot
         </Button>
 
-        <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-          {lots.map((lot, index) => (
+        {/* Pagination Controls */}
+        {lots.length > lotsPerPage && (
+          <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg border">
+            <div className="text-sm text-muted-foreground">
+              Showing lots {((currentPage - 1) * lotsPerPage) + 1} to {Math.min(currentPage * lotsPerPage, lots.length)} of {lots.length}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+              >
+                ← Previous
+              </Button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.ceil(lots.length / lotsPerPage) }, (_, i) => i + 1)
+                  .filter(page => {
+                    // Show first 2, last 2, and current +/- 1
+                    return page <= 2 || page > Math.ceil(lots.length / lotsPerPage) - 2 || 
+                           Math.abs(page - currentPage) <= 1;
+                  })
+                  .map((page, idx, arr) => (
+                    <React.Fragment key={page}>
+                      {idx > 0 && arr[idx - 1] !== page - 1 && <span className="px-1">...</span>}
+                      <Button
+                        type="button"
+                        variant={page === currentPage ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setCurrentPage(page)}
+                        className={page === currentPage ? 'gradient-button text-white' : ''}
+                      >
+                        {page}
+                      </Button>
+                    </React.Fragment>
+                  ))}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(Math.min(Math.ceil(lots.length / lotsPerPage), currentPage + 1))}
+                disabled={currentPage >= Math.ceil(lots.length / lotsPerPage)}
+              >
+                Next →
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-4 pr-2">
+          {lots.slice((currentPage - 1) * lotsPerPage, currentPage * lotsPerPage).map((lot, displayIndex) => {
+            const actualIndex = (currentPage - 1) * lotsPerPage + displayIndex;
+            return (
+            <Card key={actualIndex} className="border-2" data-lot-index={actualIndex}>
             <Card key={index} className="border-2">
               <CardContent className="pt-6 space-y-4">
                 <div className="flex justify-between items-start">
