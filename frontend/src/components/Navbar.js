@@ -6,6 +6,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { Moon, Sun, Globe, User, LogOut, LayoutDashboard, Menu, X, MessageCircle, DollarSign, Shield } from 'lucide-react';
 import { Button } from './ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from './ui/dropdown-menu';
+import SellOptionsModal from './SellOptionsModal';
 
 const Navbar = () => {
   const { t, i18n } = useTranslation();
@@ -13,6 +14,7 @@ const Navbar = () => {
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sellModalOpen, setSellModalOpen] = useState(false);
 
   const changeLanguage = async (lng) => {
     i18n.changeLanguage(lng);
