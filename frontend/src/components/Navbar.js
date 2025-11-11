@@ -191,6 +191,12 @@ const Navbar = () => {
           </div>
         )}
       </div>
+
+      {/* Sell Options Modal */}
+      <SellOptionsModal 
+        isOpen={sellModalOpen} 
+        onClose={() => setSellModalOpen(false)} 
+      />
     </nav>
   );
 };
