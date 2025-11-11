@@ -508,8 +508,8 @@ const LotsMarketplacePage = () => {
                         
                         {/* Featured Badge - Top Left */}
                         {listing.is_featured && (
-                          <div className="absolute top-3 left-3 z-10">
-                            <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0 shadow-lg flex items-center gap-1">
+                          <div className="absolute top-3 left-3 z-10" title={getPromotionTooltip(listing.promotion_expiry)}>
+                            <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0 shadow-lg flex items-center gap-1 cursor-help">
                               <Star className="h-3 w-3 fill-white" />
                               Featured
                             </Badge>
