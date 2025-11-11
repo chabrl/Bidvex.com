@@ -359,6 +359,12 @@ const CreateMultiItemListing = () => {
       return true;
     }
 
+    if (step === 3) {
+      // Step 3 is the review step - no additional validation needed
+      // Just ensure optional fields have default values
+      return true;
+    }
+
     return true;
   };
 
