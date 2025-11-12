@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { User, MapPin, Award, TrendingUp, Star } from 'lucide-react';
 import { Badge } from './ui/badge';
 import axios from 'axios';
