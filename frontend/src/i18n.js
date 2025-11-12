@@ -848,6 +848,12 @@ const resources = {
         addItems: 'Commencez à ajouter des articles qui vous intéressent',
         removeItem: 'Retirer de la Liste de Surveillance',
         viewListing: "Voir l'Annonce",
+        emptyTitle: "Vous ne suivez aucun article pour le moment",
+        emptyDescription: "Explorez les enchères ou les annonces pour suivre vos coups de cœur.",
+        browseMarketplace: 'Parcourir le Marché',
+        viewAuctions: 'Voir les Enchères',
+        goToAuction: "Aller à l'Enchère",
+        viewLot: 'Voir le Lot',
       },
 
       // Errors & Validation
