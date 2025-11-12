@@ -162,11 +162,12 @@ const WatchlistPage = () => {
     const lot = lotItem.lot;
     const auctionId = lotItem.auction_id;
     return (
-      <Card key={`${auctionId}:${lot.lot_number}`} className="overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer group" onClick={() => navigate(`/lots/${auctionId}#lot-${lot.lot_number}`)}>
-        <div className="relative">
+      <Card key={`${auctionId}:${lot.lot_number}`} className="overflow-hidden hover:shadow-lg transition-all duration-200 group">
+        <div className="relative cursor-pointer" onClick={() => navigate(`/lots/${auctionId}#lot-${lot.lot_number}`)}>
           <div className="absolute top-2 right-2 z-10" onClick={(e) => e.stopPropagation()}>
             <WatchlistButton itemId={`${auctionId}:${lot.lot_number}`} itemType="lot" size="default" />
           </div>
+          <Badge className="absolute top-2 left-2 z-10 bg-red-500 hover:bg-red-600">Watched</Badge>
           <div className="aspect-video overflow-hidden bg-gray-100">
             {lot.images && lot.images.length > 0 ? (
               <img src={lot.images[0]} alt={lot.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
@@ -188,6 +189,13 @@ const WatchlistPage = () => {
             <span className="text-sm text-muted-foreground">Current:</span>
             <span className="text-lg font-bold text-primary">${lot.current_price?.toFixed(2)}</span>
           </div>
+          <Button 
+            onClick={() => navigate(`/lots/${auctionId}#lot-${lot.lot_number}`)} 
+            className="w-full mt-2"
+            variant="outline"
+          >
+            {t('watchlist.viewLot', 'View Lot')}
+          </Button>
         </CardContent>
       </Card>
     );
