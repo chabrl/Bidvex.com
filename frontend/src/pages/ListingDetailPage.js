@@ -501,6 +501,38 @@ const ListingDetailPage = () => {
         listingId={listing?.id}
         listingTitle={listing?.title}
       />
+
+      {/* Message Seller Modal */}
+      {listing && (
+        <MessageSellerModal
+          isOpen={messageModalOpen}
+          onClose={() => setMessageModalOpen(false)}
+          sellerId={listing.seller_id}
+          listingId={listing.id}
+          listingTitle={listing.title}
+        />
+      )}
+
+      {/* Rate Seller Modal */}
+      {listing && (
+        <RateSellerModal
+          isOpen={rateSellerModalOpen}
+          onClose={() => setRateSellerModalOpen(false)}
+          sellerId={listing.seller_id}
+          auctionId={listing.id}
+          auctionTitle={listing.title}
+        />
+      )}
+
+      {/* Photo Lightbox */}
+      {lightboxOpen && listing?.images && (
+        <Lightbox
+          open={lightboxOpen}
+          close={() => setLightboxOpen(false)}
+          slides={listing.images.map(img => ({ src: img }))}
+          index={photoIndex}
+        />
+      )}
     </div>
   );
 };
