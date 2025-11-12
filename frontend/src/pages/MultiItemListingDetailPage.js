@@ -19,7 +19,7 @@ import AutoBidModal from '../components/AutoBidModal';
 import SubscriptionBadge from '../components/SubscriptionBadge';
 import WishlistHeartButton from '../components/WishlistHeartButton';
 import AuctioneerInfo from '../components/AuctioneerInfo';
-import WatchLotButton from '../components/WatchLotButton';
+import WatchlistButton from '../components/WatchlistButton';
 import ShareButton from '../components/ShareButton';
 import MessageSellerModal from '../components/MessageSellerModal';
 import BidErrorGuide from '../components/BidErrorGuide';
