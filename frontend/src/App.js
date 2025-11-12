@@ -100,6 +100,7 @@ const App = () => {
           <Route path="/watchlist" element={
             <ProtectedRoute><WatchlistPage /></ProtectedRoute>
           } />
+          <Route path="/seller/:sellerId" element={<SellerProfilePage />} />
           <Route path="/seller/dashboard" element={
             <ProtectedRoute><SellerDashboard /></ProtectedRoute>
           } />
