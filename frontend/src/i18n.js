@@ -575,6 +575,51 @@ const resources = {
         removeFromWatchlist: 'Retirer de la liste de surveillance',
       },
 
+      // Guide des Erreurs d'Enchères
+      bidErrorGuide: {
+        title: 'Erreurs Courantes d\'Enchères',
+        subtitle: 'Comprendre les problèmes d\'enchères et comment les résoudre',
+        errors: {
+          bidTooLow: {
+            title: 'L\'offre doit être supérieure au prix actuel',
+            description: 'Votre montant d\'enchère est inférieur au prix actuel. Essayez d\'enchérir un montant plus élevé que l\'enchère actuelle affichée.',
+            solution: 'Augmentez votre montant d\'enchère pour au moins correspondre à l\'enchère minimum requise.',
+          },
+          minimumIncrement: {
+            title: 'L\'offre doit être d\'au moins {{amount}} $',
+            description: 'Le pas d\'enchère minimum n\'a pas été respecté. Chaque enchère doit augmenter d\'un montant spécifique.',
+            solution: 'Entrez un montant d\'enchère d\'au moins {{amount}} $ pour respecter le pas minimum requis.',
+          },
+          networkError: {
+            title: 'Erreur réseau. Veuillez vérifier votre connexion.',
+            description: 'Impossible de se connecter au serveur. Cela peut être dû à des problèmes de connectivité Internet.',
+            solution: 'Vérifiez votre connexion Internet et réessayez. Si le problème persiste, actualisez la page.',
+          },
+          invalidAmount: {
+            title: 'Montant d\'offre invalide',
+            description: 'Le montant d\'enchère saisi n\'est pas un nombre valide ou contient des caractères invalides.',
+            solution: 'Entrez un montant numérique valide sans symboles monétaires ou caractères spéciaux.',
+          },
+          auctionEnded: {
+            title: 'L\'enchère est terminée',
+            description: 'Cette enchère n\'accepte plus d\'offres car la période d\'enchères est close.',
+            solution: 'Parcourez d\'autres enchères actives ou attendez que des articles similaires soient mis en vente.',
+          },
+          insufficientFunds: {
+            title: 'Fonds insuffisants',
+            description: 'Le solde de votre compte ou votre méthode de paiement pourrait ne pas couvrir ce montant d\'enchère.',
+            solution: 'Mettez à jour votre méthode de paiement ou réduisez votre montant d\'enchère.',
+          },
+          unauthorized: {
+            title: 'Veuillez vous connecter pour enchérir',
+            description: 'Vous devez être connecté pour placer des enchères sur les ventes.',
+            solution: 'Connectez-vous à votre compte ou créez un nouveau compte pour commencer à enchérir.',
+          },
+        },
+        helpText: 'Vous avez toujours des problèmes? Contactez notre équipe d\'assistance pour obtenir de l\'aide.',
+        closeButton: 'Compris',
+      },
+
       // Dashboard
       dashboard: {
         seller: {
