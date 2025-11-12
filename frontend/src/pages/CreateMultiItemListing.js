@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { useDropzone } from 'react-dropzone';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
