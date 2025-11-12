@@ -266,6 +266,11 @@ const ListingDetailPage = () => {
                       <DollarSign className="mr-2 h-4 w-4" />
                       {t('listing.placeBid')}
                     </Button>
+                    
+                    {/* Bid Error Guide */}
+                    <div className="pt-2">
+                      <BidErrorGuide compact={true} />
+                    </div>
                   </form>
 
                   <Button
