@@ -847,7 +847,8 @@ async def get_user_ratings(user_id: str):
 @api_router.get("/sellers/{seller_id}")
 async def get_seller_profile(
     seller_id: str,
-    current_user: Optional[User] = Depends(get_current_user)
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
 ):
     """
     Get seller profile with privacy-aware contact information.
