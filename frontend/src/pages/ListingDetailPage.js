@@ -146,7 +146,13 @@ const ListingDetailPage = () => {
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="space-y-4">
-            <div className="aspect-square rounded-2xl overflow-hidden bg-gray-100">
+            <div 
+              className="aspect-square rounded-2xl overflow-hidden bg-gray-100 cursor-pointer hover:opacity-95 transition-opacity"
+              onClick={() => {
+                setPhotoIndex(0);
+                setLightboxOpen(true);
+              }}
+            >
               {listing.images && listing.images.length > 0 ? (
                 <img
                   src={listing.images[0]}
@@ -163,7 +169,14 @@ const ListingDetailPage = () => {
             {listing.images && listing.images.length > 1 && (
               <div className="grid grid-cols-4 gap-2">
                 {listing.images.slice(1, 5).map((img, idx) => (
-                  <div key={idx} className="aspect-square rounded-lg overflow-hidden bg-gray-100">
+                  <div 
+                    key={idx} 
+                    className="aspect-square rounded-lg overflow-hidden bg-gray-100 cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => {
+                      setPhotoIndex(idx + 1);
+                      setLightboxOpen(true);
+                    }}
+                  >
                     <img src={img} alt={`${listing.title} ${idx + 2}`} className="w-full h-full object-cover" />
                   </div>
                 ))}
