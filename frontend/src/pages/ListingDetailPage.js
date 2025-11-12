@@ -17,6 +17,13 @@ import { Clock, MapPin, Eye, User, DollarSign, MessageCircle, TrendingUp } from 
 import PromotionManagerModal from '../components/PromotionManagerModal';
 import WatchlistButton from '../components/WatchlistButton';
 import SocialShare from '../components/SocialShare';
+import MonsterBidButton from '../components/MonsterBidButton';
+import AutoBidModal from '../components/AutoBidModal';
+import MessageSellerModal from '../components/MessageSellerModal';
+import RateSellerModal from '../components/RateSellerModal';
+import AuctioneerInfo from '../components/AuctioneerInfo';
+import Lightbox from 'yet-another-react-lightbox';
+import 'yet-another-react-lightbox/styles.css';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
