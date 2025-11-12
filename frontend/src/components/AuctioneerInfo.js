@@ -15,6 +15,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
  * @param {string} className - Additional CSS classes
  */
 const AuctioneerInfo = ({ sellerId, variant = 'compact', className = '' }) => {
+  const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [ratings, setRatings] = useState(null);
   const [loading, setLoading] = useState(true);
