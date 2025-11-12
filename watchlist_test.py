@@ -165,11 +165,13 @@ class WatchlistTester:
             ) as response:
                 if response.status == 200:
                     data = await response.json()
-                    assert "success" in data
-                    assert data["success"] is True
-                    print(f"✅ Successfully added auction to watchlist")
-                    print(f"   - Message: {data.get('message', 'N/A')}")
-                    return True
+                    if "success" in data and data["success"] is True:
+                        print(f"✅ Successfully added auction to watchlist")
+                        print(f"   - Message: {data.get('message', 'N/A')}")
+                        return True
+                    else:
+                        print(f"❌ Unexpected response structure: {data}")
+                        return False
                 else:
                     print(f"❌ Failed to add auction to watchlist: {response.status}")
                     text = await response.text()
