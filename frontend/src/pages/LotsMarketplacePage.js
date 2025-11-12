@@ -277,6 +277,14 @@ const LotsMarketplacePage = () => {
 
         <div className="aspect-video overflow-hidden relative h-40">
           <ImageCarousel lots={listing.lots} totalLots={listing.total_lots} />
+          <div className="absolute top-2 right-2 z-10">
+            <WatchlistButton 
+              itemId={listing.id} 
+              itemType="auction" 
+              size="default"
+              className="bg-white/90 backdrop-blur-sm rounded-full p-2 shadow-lg"
+            />
+          </div>
         </div>
         
         <CardHeader className="pb-3">
