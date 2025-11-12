@@ -873,7 +873,7 @@ async def get_seller_profile(
                         if isinstance(user_doc.get("created_at"), str):
                             user_doc["created_at"] = datetime.fromisoformat(user_doc["created_at"])
                         current_user = User(**user_doc)
-            except:
+            except (JWTError, Exception):
                 pass  # Invalid token, proceed as unauthenticated
         
         # Get seller data
