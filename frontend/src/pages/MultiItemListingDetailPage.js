@@ -675,6 +675,11 @@ const MultiItemListingDetailPage = () => {
                               </Button>
                             </div>
 
+                            {/* Bid Error Guide */}
+                            <div className="mt-2">
+                              <BidErrorGuide compact={true} />
+                            </div>
+
                             {/* Premium Bidding Options */}
                             {user && (
                               <div className="flex flex-wrap gap-2">
