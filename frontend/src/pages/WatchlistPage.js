@@ -106,11 +106,12 @@ const WatchlistPage = () => {
     const isEnded = auctionEndDate && new Date() > auctionEndDate;
 
     return (
-      <Card key={auction.id} className="overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer group" onClick={() => navigate(`/lots/${auction.id}`)}>
-        <div className="relative">
+      <Card key={auction.id} className="overflow-hidden hover:shadow-lg transition-all duration-200 group">
+        <div className="relative cursor-pointer" onClick={() => navigate(`/lots/${auction.id}`)}>
           <div className="absolute top-2 right-2 z-10" onClick={(e) => e.stopPropagation()}>
             <WatchlistButton itemId={auction.id} itemType="auction" size="default" />
           </div>
+          <Badge className="absolute top-2 left-2 z-10 bg-red-500 hover:bg-red-600">Watched</Badge>
           <div className="aspect-video overflow-hidden bg-gray-100">
             {auction.lots && auction.lots[0]?.images && auction.lots[0].images.length > 0 ? (
               <img src={auction.lots[0].images[0]} alt={auction.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
@@ -144,6 +145,13 @@ const WatchlistPage = () => {
               )}
             </div>
           </div>
+          <Button 
+            onClick={() => navigate(`/lots/${auction.id}`)} 
+            className="w-full mt-2"
+            variant="outline"
+          >
+            {t('watchlist.goToAuction', 'Go to Auction')}
+          </Button>
         </CardContent>
       </Card>
     );
