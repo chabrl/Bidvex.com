@@ -165,8 +165,8 @@ class WatchlistTester:
             ) as response:
                 if response.status == 200:
                     data = await response.json()
-                    if "success" in data and data["success"] is True:
-                        print(f"✅ Successfully added auction to watchlist")
+                    if ("success" in data and data["success"] is True) or ("already_added" in data and data["already_added"] is True):
+                        print(f"✅ Successfully added auction to watchlist (or already exists)")
                         print(f"   - Message: {data.get('message', 'N/A')}")
                         return True
                     else:
