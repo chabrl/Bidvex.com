@@ -31,6 +31,20 @@ const CreateListingPage = () => {
     auction_end_date: '',
   });
 
+  // Shipping & Visit Options
+  const [shippingInfo, setShippingInfo] = useState({
+    available: false,
+    methods: [],
+    rates: {},
+    delivery_time: ''
+  });
+
+  const [visitAvailability, setVisitAvailability] = useState({
+    offered: false,
+    dates: '',
+    instructions: ''
+  });
+
   useEffect(() => {
     fetchCategories();
     const tomorrow = new Date();
