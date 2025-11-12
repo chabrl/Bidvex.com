@@ -316,6 +316,119 @@ const CreateListingPage = () => {
                 )}
               </div>
 
+              {/* Shipping Options Section */}
+              <Card className="border-2">
+                <CardHeader>
+                  <CardTitle className="text-lg">🚚 Shipping Options</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="shipping-available"
+                      checked={shippingInfo.available}
+                      onChange={(e) => setShippingInfo(prev => ({ ...prev, available: e.target.checked }))}
+                      className="w-4 h-4"
+                    />
+                    <Label htmlFor="shipping-available">Offer Shipping?</Label>
+                  </div>
+
+                  {shippingInfo.available && (
+                    <div className="space-y-4 ml-6 p-4 border rounded-lg bg-muted/20">
+                      <div>
+                        <Label>Shipping Methods</Label>
+                        <div className="space-y-2 mt-2">
+                          {['local_pickup', 'standard', 'express'].map(method => (
+                            <div key={method} className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                id={`shipping-${method}`}
+                                checked={shippingInfo.methods.includes(method)}
+                                onChange={(e) => {
+                                  setShippingInfo(prev => ({
+                                    ...prev,
+                                    methods: e.target.checked
+                                      ? [...prev.methods, method]
+                                      : prev.methods.filter(m => m !== method)
+                                  }));
+                                }}
+                                className="w-4 h-4"
+                              />
+                              <Label htmlFor={`shipping-${method}`} className="capitalize">
+                                {method.replace('_', ' ')}
+                              </Label>
+                              {shippingInfo.methods.includes(method) && (
+                                <Input
+                                  type="number"
+                                  placeholder="Rate ($)"
+                                  value={shippingInfo.rates[method] || ''}
+                                  onChange={(e) => setShippingInfo(prev => ({
+                                    ...prev,
+                                    rates: { ...prev.rates, [method]: e.target.value }
+                                  }))}
+                                  className="w-24"
+                                />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label>Estimated Delivery Time</Label>
+                        <Input
+                          placeholder="e.g., 3-5 business days"
+                          value={shippingInfo.delivery_time}
+                          onChange={(e) => setShippingInfo(prev => ({ ...prev, delivery_time: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Visit Availability Section */}
+              <Card className="border-2">
+                <CardHeader>
+                  <CardTitle className="text-lg">🏠 Visit Before Purchase</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="visit-offered"
+                      checked={visitAvailability.offered}
+                      onChange={(e) => setVisitAvailability(prev => ({ ...prev, offered: e.target.checked }))}
+                      className="w-4 h-4"
+                    />
+                    <Label htmlFor="visit-offered">Allow buyers to schedule a visit?</Label>
+                  </div>
+
+                  {visitAvailability.offered && (
+                    <div className="space-y-4 ml-6 p-4 border rounded-lg bg-green-50 dark:bg-green-900/10">
+                      <div>
+                        <Label>Available Dates</Label>
+                        <Input
+                          placeholder="e.g., Nov 15-20, 2025"
+                          value={visitAvailability.dates}
+                          onChange={(e) => setVisitAvailability(prev => ({ ...prev, dates: e.target.value }))}
+                        />
+                      </div>
+
+                      <div>
+                        <Label>Instructions</Label>
+                        <Textarea
+                          placeholder="Provide instructions for scheduling (e.g., contact info, time slots)"
+                          value={visitAvailability.instructions}
+                          onChange={(e) => setVisitAvailability(prev => ({ ...prev, instructions: e.target.value }))}
+                          rows={3}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
               <Button
                 type="submit"
                 className="w-full gradient-button text-white border-0"
