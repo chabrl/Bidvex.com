@@ -51,13 +51,13 @@ const WatchlistPage = () => {
     return (
       <Card 
         key={listing.id}
-        className="overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer group"
-        onClick={() => navigate(`/listing/${listing.id}`)}
+        className="overflow-hidden hover:shadow-lg transition-all duration-200 group"
       >
-        <div className="relative">
+        <div className="relative cursor-pointer" onClick={() => navigate(`/listing/${listing.id}`)}>
           <div className="absolute top-2 right-2 z-10" onClick={(e) => e.stopPropagation()}>
             <WatchlistButton itemId={listing.id} itemType="listing" size="default" />
           </div>
+          <Badge className="absolute top-2 left-2 z-10 bg-red-500 hover:bg-red-600">Watched</Badge>
           <div className="aspect-video overflow-hidden bg-gray-100">
             {listing.images && listing.images.length > 0 ? (
               <img src={listing.images[0]} alt={listing.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
@@ -88,6 +88,13 @@ const WatchlistPage = () => {
             </div>
             <span className="text-lg font-bold text-primary">${listing.current_price?.toFixed(2)}</span>
           </div>
+          <Button 
+            onClick={() => navigate(`/listing/${listing.id}`)} 
+            className="w-full mt-2"
+            variant="outline"
+          >
+            {t('watchlist.viewListing', 'View Listing')}
+          </Button>
         </CardContent>
       </Card>
     );
