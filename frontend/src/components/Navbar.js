@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { Moon, Sun, Globe, User, LogOut, LayoutDashboard, Menu, X, MessageCircle, DollarSign, Shield } from 'lucide-react';
+import { Moon, Sun, Globe, User, LogOut, LayoutDashboard, MessageCircle, DollarSign, Shield } from 'lucide-react';
 import { Button } from './ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from './ui/dropdown-menu';
 import SellOptionsModal from './SellOptionsModal';
