@@ -429,6 +429,52 @@ const MultiItemListingDetailPage = () => {
                       </Card>
                     )}
 
+                    {/* Auction Terms & Conditions */}
+                    {(listing.auction_terms_en || listing.auction_terms_fr) && (
+                      <Card className="mb-6">
+                        <CardHeader>
+                          <CardTitle className="text-lg flex items-center justify-between">
+                            <span>📝 Terms & Conditions</span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => window.open(`${API}/multi-item-listings/${listing.id}/terms/pdf`, '_blank')}
+                            >
+                              📄 Download PDF
+                            </Button>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          {listing.auction_terms_en && (
+                            <div>
+                              <p className="text-sm font-semibold mb-2">English Terms:</p>
+                              <div 
+                                className="prose prose-sm max-w-none dark:prose-invert"
+                                dangerouslySetInnerHTML={{ __html: listing.auction_terms_en }}
+                              />
+                            </div>
+                          )}
+                          {listing.auction_terms_fr && (
+                            <div className="pt-4 border-t">
+                              <p className="text-sm font-semibold mb-2">Termes en Français:</p>
+                              <div 
+                                className="prose prose-sm max-w-none dark:prose-invert"
+                                dangerouslySetInnerHTML={{ __html: listing.auction_terms_fr }}
+                              />
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {(!listing.auction_terms_en && !listing.auction_terms_fr) && (
+                      <Card className="mb-6">
+                        <CardContent className="p-4 text-center text-muted-foreground">
+                          <p>No terms provided by seller</p>
+                        </CardContent>
+                      </Card>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                       <div className="flex items-center gap-2">
                         <MapPin className="h-4 w-4 text-muted-foreground" />
