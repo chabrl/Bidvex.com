@@ -13,7 +13,6 @@ const Navbar = () => {
   const { user, logout, updateUserPreferences } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sellModalOpen, setSellModalOpen] = useState(false);
 
   const changeLanguage = async (lng) => {
