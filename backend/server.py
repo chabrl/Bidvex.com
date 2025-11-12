@@ -855,6 +855,27 @@ async def get_seller_profile(
     Contact details only visible to authenticated users based on seller's privacy settings.
     """
     try:
+        # Check if user is authenticated (optional)
+        current_user = None
+        token = None
+        if "session_token" in request.cookies:
+            token = request.cookies["session_token"]
+        elif credentials:
+            token = credentials.credentials
+        
+        if token:
+            try:
+                payload = jwt.decode(token, jwt_secret, algorithms=["HS256"])
+                user_id = payload.get("sub")
+                if user_id:
+                    user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
+                    if user_doc:
+                        if isinstance(user_doc.get("created_at"), str):
+                            user_doc["created_at"] = datetime.fromisoformat(user_doc["created_at"])
+                        current_user = User(**user_doc)
+            except:
+                pass  # Invalid token, proceed as unauthenticated
+        
         # Get seller data
         seller_doc = await db.users.find_one({"id": seller_id}, {"_id": 0, "password": 0})
         if not seller_doc:
