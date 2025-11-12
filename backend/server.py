@@ -2729,18 +2729,41 @@ async def get_my_promotions(current_user: User = Depends(get_current_user)):
 
 # Watchlist Endpoints
 @api_router.post("/watchlist/add")
-async def add_to_watchlist(listing_id: str, current_user: User = Depends(get_current_user)):
-    """Add a listing to user's watchlist"""
+async def add_to_watchlist(
+    item_id: str,
+    item_type: str = "listing",  # 'listing', 'auction', 'lot'
+    current_user: User = Depends(get_current_user)
+):
+    """Add an item to user's watchlist (listing, auction, or lot)"""
     try:
-        # Check if listing exists
-        listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
-        if not listing:
-            raise HTTPException(status_code=404, detail="Listing not found")
+        # Validate item_type
+        if item_type not in ['listing', 'auction', 'lot']:
+            raise HTTPException(status_code=400, detail="Invalid item_type. Must be 'listing', 'auction', or 'lot'")
+        
+        # Check if item exists based on type
+        if item_type == 'listing':
+            item = await db.listings.find_one({"id": item_id}, {"_id": 0})
+            if not item:
+                raise HTTPException(status_code=404, detail="Listing not found")
+        elif item_type == 'auction':
+            item = await db.multi_item_listings.find_one({"id": item_id}, {"_id": 0})
+            if not item:
+                raise HTTPException(status_code=404, detail="Auction not found")
+        elif item_type == 'lot':
+            # For lots, check if the parent auction exists
+            # Extract auction_id from lot reference (format: auction_id:lot_number or just use item_id as reference)
+            item = await db.multi_item_listings.find_one(
+                {"lots.lot_number": {"$exists": True}}, 
+                {"_id": 0}
+            )
+            if not item:
+                raise HTTPException(status_code=404, detail="Lot not found")
         
         # Check if already in watchlist
         existing = await db.watchlist.find_one({
             "user_id": current_user.id,
-            "listing_id": listing_id
+            "item_id": item_id,
+            "item_type": item_type
         })
         
         if existing:
@@ -2750,7 +2773,8 @@ async def add_to_watchlist(listing_id: str, current_user: User = Depends(get_cur
         watchlist_item = {
             "id": str(uuid.uuid4()),
             "user_id": current_user.id,
-            "listing_id": listing_id,
+            "item_id": item_id,
+            "item_type": item_type,
             "added_at": datetime.now(timezone.utc).isoformat()
         }
         
@@ -2764,12 +2788,17 @@ async def add_to_watchlist(listing_id: str, current_user: User = Depends(get_cur
         raise HTTPException(status_code=500, detail="Failed to add to watchlist")
 
 @api_router.post("/watchlist/remove")
-async def remove_from_watchlist(listing_id: str, current_user: User = Depends(get_current_user)):
-    """Remove a listing from user's watchlist"""
+async def remove_from_watchlist(
+    item_id: str,
+    item_type: str = "listing",
+    current_user: User = Depends(get_current_user)
+):
+    """Remove an item from user's watchlist"""
     try:
         result = await db.watchlist.delete_one({
             "user_id": current_user.id,
-            "listing_id": listing_id
+            "item_id": item_id,
+            "item_type": item_type
         })
         
         if result.deleted_count == 0:
