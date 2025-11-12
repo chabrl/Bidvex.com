@@ -234,6 +234,8 @@ class Listing(BaseModel):
     bid_count: int = 0
     is_promoted: bool = False
     views: int = 0
+    shipping_info: Optional[Dict[str, Any]] = None  # {available, methods, rates, delivery_time}
+    visit_availability: Optional[Dict[str, Any]] = None  # {offered, dates, instructions}
 
 class BidCreate(BaseModel):
     listing_id: str
