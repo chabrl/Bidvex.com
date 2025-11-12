@@ -38,6 +38,10 @@ const ListingDetailPage = () => {
   const [bidAmount, setBidAmount] = useState('');
   const [loading, setLoading] = useState(true);
   const [showPromotionModal, setShowPromotionModal] = useState(false);
+  const [messageModalOpen, setMessageModalOpen] = useState(false);
+  const [rateSellerModalOpen, setRateSellerModalOpen] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [photoIndex, setPhotoIndex] = useState(0);
 
   useEffect(() => {
     fetchListing();
