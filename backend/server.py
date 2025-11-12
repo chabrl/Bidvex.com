@@ -844,8 +844,22 @@ async def get_user_ratings(user_id: str):
 
 @api_router.put("/users/me")
 async def update_profile(updates: Dict[str, Any], current_user: User = Depends(get_current_user)):
-    allowed_fields = ["name", "phone", "address", "company_name", "tax_number", "bank_details", "language", "picture", "preferred_language", "preferred_currency", "subscription_tier"]
+    allowed_fields = ["name", "phone", "address", "company_name", "tax_number", "bank_details", "language", "picture", "preferred_language", "preferred_currency", "subscription_tier", "bio", "bio_fr", "privacy_settings"]
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
+    
+    # Validate bio length
+    if "bio" in update_data and update_data["bio"] and len(update_data["bio"]) > 500:
+        raise HTTPException(status_code=400, detail="Bio must be 500 characters or less")
+    if "bio_fr" in update_data and update_data["bio_fr"] and len(update_data["bio_fr"]) > 500:
+        raise HTTPException(status_code=400, detail="French bio must be 500 characters or less")
+    
+    # Validate privacy settings
+    if "privacy_settings" in update_data:
+        if not isinstance(update_data["privacy_settings"], dict):
+            raise HTTPException(status_code=400, detail="Privacy settings must be an object")
+        valid_keys = {"show_email", "show_phone", "show_address"}
+        if not all(k in valid_keys for k in update_data["privacy_settings"].keys()):
+            raise HTTPException(status_code=400, detail="Invalid privacy setting keys")
     
     # Validate language
     if "preferred_language" in update_data and update_data["preferred_language"] not in ["en", "fr"]:
