@@ -104,6 +104,8 @@ const CreateListingPage = () => {
         starting_price: parseFloat(formData.starting_price),
         buy_now_price: formData.buy_now_price ? parseFloat(formData.buy_now_price) : null,
         auction_end_date: new Date(formData.auction_end_date).toISOString(),
+        shipping_info: shippingInfo.available ? shippingInfo : null,
+        visit_availability: visitAvailability.offered ? visitAvailability : null,
       };
 
       const response = await axios.post(`${API}/listings`, payload);
