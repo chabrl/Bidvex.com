@@ -59,12 +59,17 @@ const CreateMultiItemListing = () => {
   const [bulkImages, setBulkImages] = useState([]);
   const [validationErrors, setValidationErrors] = useState({});
 
-  // Step 4: Documents, Shipping, Visit
+  // Step 4: Documents, Shipping, Visit, Auction Terms
   const [documents, setDocuments] = useState({
     terms_conditions: null, // {filename, content_type, base64_content}
     important_info: null,
     catalogue: null
   });
+  const [auctionTerms, setAuctionTerms] = useState({
+    en: '',
+    fr: ''
+  });
+  const [activeTermsLang, setActiveTermsLang] = useState('en'); // 'en' or 'fr'
   
   const [shippingInfo, setShippingInfo] = useState({
     available: false,
