@@ -192,6 +192,8 @@ class ListingCreate(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     auction_end_date: datetime
+    shipping_info: Optional[Dict[str, Any]] = None  # {available, methods, rates, delivery_time}
+    visit_availability: Optional[Dict[str, Any]] = None  # {offered, dates, instructions}
 
 class AuctionRating(BaseModel):
     """
