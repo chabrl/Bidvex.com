@@ -555,9 +555,11 @@ const MultiItemListingDetailPage = () => {
                           
                           {/* Share and Watch Buttons */}
                           <div className="flex gap-2">
-                            <WatchLotButton 
-                              listingId={id}
-                              lotNumber={lot.lot_number}
+                            <WatchlistButton 
+                              itemId={`${id}:${lot.lot_number}`}
+                              itemType="lot"
+                              size="default"
+                              showLabel={true}
                             />
                             <ShareButton 
                               url={`${window.location.origin}/lots/${id}?lot=${lot.lot_number}`}
