@@ -842,6 +842,127 @@ async def get_user_ratings(user_id: str):
         logger.error(f"Error fetching user ratings: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch ratings")
 
+# ============= SELLER PROFILE ENDPOINTS =============
+
+@api_router.get("/sellers/{seller_id}")
+async def get_seller_profile(
+    seller_id: str,
+    current_user: Optional[User] = Depends(get_current_user)
+):
+    """
+    Get seller profile with privacy-aware contact information.
+    Contact details only visible to authenticated users based on seller's privacy settings.
+    """
+    try:
+        # Get seller data
+        seller_doc = await db.users.find_one({"id": seller_id}, {"_id": 0, "password": 0})
+        if not seller_doc:
+            raise HTTPException(status_code=404, detail="Seller not found")
+        
+        # Get seller ratings
+        ratings_cursor = db.ratings.find({"target_user_id": seller_id})
+        ratings = await ratings_cursor.to_list(length=None)
+        
+        average_rating = 0
+        total_ratings = len(ratings)
+        if ratings:
+            total_rating = sum(r["rating"] for r in ratings)
+            average_rating = round(total_rating / len(ratings), 2)
+        
+        # Count active listings
+        single_listings_count = await db.listings.count_documents({
+            "seller_id": seller_id,
+            "status": "active"
+        })
+        multi_listings_count = await db.multi_item_listings.count_documents({
+            "seller_id": seller_id,
+            "status": {"$in": ["active", "upcoming"]}
+        })
+        total_active_listings = single_listings_count + multi_listings_count
+        
+        # Build base profile
+        profile = {
+            "id": seller_id,
+            "name": seller_doc.get("name"),
+            "company_name": seller_doc.get("company_name"),
+            "account_type": seller_doc.get("account_type"),
+            "picture": seller_doc.get("picture"),
+            "bio": seller_doc.get("bio"),
+            "bio_fr": seller_doc.get("bio_fr"),
+            "subscription_tier": seller_doc.get("subscription_tier", "free"),
+            "member_since": seller_doc.get("created_at"),
+            "average_rating": average_rating,
+            "total_ratings": total_ratings,
+            "total_active_listings": total_active_listings
+        }
+        
+        # Apply privacy settings (only for authenticated users)
+        privacy_settings = seller_doc.get("privacy_settings", {
+            "show_email": True,
+            "show_phone": True,
+            "show_address": True
+        })
+        
+        if current_user:
+            # Show contact info based on privacy settings
+            if privacy_settings.get("show_email", True):
+                profile["email"] = seller_doc.get("email")
+            if privacy_settings.get("show_phone", True):
+                profile["phone"] = seller_doc.get("phone")
+            if privacy_settings.get("show_address", True):
+                profile["address"] = seller_doc.get("address")
+        
+        return profile
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching seller profile: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch seller profile")
+
+@api_router.get("/sellers/{seller_id}/listings")
+async def get_seller_listings(seller_id: str, limit: int = 20, skip: int = 0):
+    """
+    Get active listings for a specific seller (both single-item and multi-lot auctions).
+    """
+    try:
+        # Get single-item listings
+        single_listings = await db.listings.find(
+            {"seller_id": seller_id, "status": "active"},
+            {"_id": 0}
+        ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+        
+        # Get multi-item listings
+        multi_listings = await db.multi_item_listings.find(
+            {"seller_id": seller_id, "status": {"$in": ["active", "upcoming"]}},
+            {"_id": 0}
+        ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+        
+        # Format datetime fields
+        for listing in single_listings:
+            if isinstance(listing.get("created_at"), str):
+                listing["created_at"] = datetime.fromisoformat(listing["created_at"])
+            if isinstance(listing.get("auction_end_date"), str):
+                listing["auction_end_date"] = datetime.fromisoformat(listing["auction_end_date"])
+        
+        for listing in multi_listings:
+            if isinstance(listing.get("created_at"), str):
+                listing["created_at"] = datetime.fromisoformat(listing["created_at"])
+            if isinstance(listing.get("auction_end_date"), str):
+                listing["auction_end_date"] = datetime.fromisoformat(listing["auction_end_date"])
+            if isinstance(listing.get("auction_start_date"), str):
+                listing["auction_start_date"] = datetime.fromisoformat(listing["auction_start_date"])
+        
+        return {
+            "single_listings": single_listings,
+            "multi_listings": multi_listings,
+            "total": len(single_listings) + len(multi_listings)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching seller listings: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch seller listings")
+
 @api_router.put("/users/me")
 async def update_profile(updates: Dict[str, Any], current_user: User = Depends(get_current_user)):
     allowed_fields = ["name", "phone", "address", "company_name", "tax_number", "bank_details", "language", "picture", "preferred_language", "preferred_currency", "subscription_tier", "bio", "bio_fr", "privacy_settings"]
