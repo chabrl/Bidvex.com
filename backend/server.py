@@ -371,6 +371,9 @@ class MultiItemListing(BaseModel):
     visit_availability: Optional[Dict[str, Any]] = None  # {offered, dates, instructions}
     payment_method: Optional[str] = None  # e-transfer, bank transfer, cash, etc.
     payment_proof_url: Optional[str] = None  # URL to payment receipt/proof
+    # Auction terms (rich text HTML content)
+    auction_terms_en: Optional[str] = None  # English auction terms
+    auction_terms_fr: Optional[str] = None  # French auction terms
 
 class PaymentTransaction(BaseModel):
     model_config = ConfigDict(extra="ignore")
