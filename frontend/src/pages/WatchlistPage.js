@@ -222,11 +222,19 @@ const WatchlistPage = () => {
           <Card className="p-12">
             <div className="text-center space-y-4">
               <Heart className="h-16 w-16 mx-auto text-muted-foreground opacity-50" />
-              <h3 className="text-xl font-semibold">You're not watching any items yet</h3>
-              <p className="text-muted-foreground max-w-md mx-auto">Start watching items to keep track of auctions, lots, and marketplace listings you're interested in.</p>
+              <h3 className="text-xl font-semibold">
+                {t('watchlist.emptyTitle', "You're not watching any items yet")}
+              </h3>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                {t('watchlist.emptyDescription', "Start exploring auctions or listings to track your favorites.")}
+              </p>
               <div className="flex gap-3 justify-center pt-4">
-                <Button onClick={() => navigate('/marketplace')}>Browse Marketplace</Button>
-                <Button variant="outline" onClick={() => navigate('/lots')}>View Auctions</Button>
+                <Button onClick={() => navigate('/marketplace')}>
+                  {t('watchlist.browseMarketplace', 'Browse Marketplace')}
+                </Button>
+                <Button variant="outline" onClick={() => navigate('/lots')}>
+                  {t('watchlist.viewAuctions', 'View Auctions')}
+                </Button>
               </div>
             </div>
           </Card>
