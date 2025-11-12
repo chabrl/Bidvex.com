@@ -548,6 +548,7 @@ class WatchlistTester:
                         for field in required_auction_fields:
                             if field not in auction:
                                 print(f"❌ Missing field in auction: {field}")
+                                print(f"   Available fields: {list(auction.keys())}")
                                 success = False
                     
                     # Check lots structure
