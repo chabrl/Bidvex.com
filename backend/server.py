@@ -168,6 +168,14 @@ class User(BaseModel):
     subscription_start_date: Optional[datetime] = None
     subscription_end_date: Optional[datetime] = None
     monster_bids_used: Dict[str, int] = Field(default_factory=dict)  # {auction_id: count}
+    # Seller profile fields
+    bio: Optional[str] = None  # Seller bio (max 500 chars)
+    bio_fr: Optional[str] = None  # French bio (max 500 chars)
+    privacy_settings: Dict[str, bool] = Field(default_factory=lambda: {
+        "show_email": True,
+        "show_phone": True,
+        "show_address": True
+    })
 
 class UserLogin(BaseModel):
     email: EmailStr
