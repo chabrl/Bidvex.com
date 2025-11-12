@@ -413,7 +413,9 @@ const CreateMultiItemListing = () => {
           catalogue: documents.catalogue
         },
         shipping_info: shippingInfo.available ? shippingInfo : null,
-        visit_availability: visitAvailability.offered ? visitAvailability : null
+        visit_availability: visitAvailability.offered ? visitAvailability : null,
+        auction_terms_en: auctionTerms.en || null,
+        auction_terms_fr: auctionTerms.fr || null
       };
       const response = await axios.post(`${API}/multi-item-listings`, payload);
       toast.success('Multi-item listing created successfully!');
