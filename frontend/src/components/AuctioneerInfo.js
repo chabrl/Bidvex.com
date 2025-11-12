@@ -66,7 +66,13 @@ const AuctioneerInfo = ({ sellerId, variant = 'compact', className = '' }) => {
       <div className={`flex items-center gap-2 text-sm ${className}`}>
         <User className="h-4 w-4 text-muted-foreground" />
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-medium text-foreground">
+          <span 
+            className="font-medium text-foreground hover:text-primary cursor-pointer hover:underline"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/seller/${sellerId}`);
+            }}
+          >
             {profile.company_name || profile.name}
           </span>
           {profile.subscription_tier !== 'free' && (
