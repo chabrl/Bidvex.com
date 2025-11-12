@@ -1293,6 +1293,101 @@ const CreateMultiItemListing = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Auction Terms & Conditions */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              📝 Auction Terms & Conditions (Optional)
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Write your auction terms directly on the platform. Buyers can view and download them as PDF.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Language Toggle */}
+            <div className="flex gap-2 mb-4">
+              <Button
+                type="button"
+                variant={activeTermsLang === 'en' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setActiveTermsLang('en')}
+              >
+                English
+              </Button>
+              <Button
+                type="button"
+                variant={activeTermsLang === 'fr' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setActiveTermsLang('fr')}
+              >
+                Français
+              </Button>
+            </div>
+
+            {/* English Editor */}
+            {activeTermsLang === 'en' && (
+              <div>
+                <Label>English Terms & Conditions</Label>
+                <div className="mt-2 border rounded-md">
+                  <ReactQuill
+                    theme="snow"
+                    value={auctionTerms.en}
+                    onChange={(value) => setAuctionTerms(prev => ({ ...prev, en: value }))}
+                    placeholder="Enter your auction terms and conditions in English..."
+                    modules={{
+                      toolbar: [
+                        [{ 'header': [1, 2, 3, false] }],
+                        ['bold', 'italic', 'underline'],
+                        [{'list': 'ordered'}, {'list': 'bullet'}],
+                        ['link'],
+                        ['clean']
+                      ]
+                    }}
+                    style={{ minHeight: '200px' }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Use the toolbar to format your terms. Supports bold, italic, lists, and links.
+                </p>
+              </div>
+            )}
+
+            {/* French Editor */}
+            {activeTermsLang === 'fr' && (
+              <div>
+                <Label>Termes et Conditions (Français)</Label>
+                <div className="mt-2 border rounded-md">
+                  <ReactQuill
+                    theme="snow"
+                    value={auctionTerms.fr}
+                    onChange={(value) => setAuctionTerms(prev => ({ ...prev, fr: value }))}
+                    placeholder="Entrez les termes et conditions de votre enchère en français..."
+                    modules={{
+                      toolbar: [
+                        [{ 'header': [1, 2, 3, false] }],
+                        ['bold', 'italic', 'underline'],
+                        [{'list': 'ordered'}, {'list': 'bullet'}],
+                        ['link'],
+                        ['clean']
+                      ]
+                    }}
+                    style={{ minHeight: '200px' }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Utilisez la barre d'outils pour formater vos termes.
+                </p>
+              </div>
+            )}
+
+            <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
+              <p className="text-sm text-blue-800 dark:text-blue-200">
+                💡 <strong>Tip:</strong> If you leave this blank, buyers will see "No terms provided by seller" on the auction page.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   };
