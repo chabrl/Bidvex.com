@@ -715,6 +715,31 @@ backend:
         agent: "testing"
         comment: "✅ BIDVEX DATA INTEGRITY VALIDATION COMPLETE (6/6 TESTS PASSED): ✅ Base64 Document Persistence: All documents (terms_conditions, important_info, catalogue) persist as valid base64 strings and can be decoded successfully. ✅ Shipping Info Structure: When available=true, shipping_info contains required fields (methods array, rates object, delivery_time string). When available=false, shipping details properly handled. ✅ Visit Availability Structure: When offered=true, visit_availability contains required fields (dates array, instructions string). When offered=false, visit details properly handled. ✅ Field Schema Compliance: All expected fields present in listing response including new BidVex fields (documents, shipping_info, visit_availability) alongside existing fields (id, seller_id, title, description, etc.). ✅ Data Type Validation: All fields have correct data types - documents as base64 strings, shipping methods as arrays, rates as objects, dates as arrays, instructions as strings. ✅ Database Consistency: All new fields persist correctly in MongoDB and maintain data integrity across create/retrieve operations."
 
+  - task: "Unified Watchlist System - Backend"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "✅ UNIFIED WATCHLIST BACKEND IMPLEMENTATION COMPLETE: Refactored watchlist system to support three distinct item types (listings, auctions, lots). (1) POST /api/watchlist/add: Accepts item_id and item_type parameters ('listing', 'auction', 'lot'). Validates item existence, checks for duplicates, stores watchlist entry with user_id, item_id, item_type, and added_at timestamp. (2) POST /api/watchlist/remove: Removes items from watchlist by item_id and item_type. (3) GET /api/watchlist: Returns grouped watchlist data with separate arrays for listings, auctions, and lots. For lots, parses item_id format 'auction_id:lot_number' and fetches parent auction details. Returns total count and enriched item details including auction_title for lots. All endpoints support proper authentication and error handling. Ready for comprehensive backend testing to verify all three item types."
+
+frontend:
+  - task: "Unified Watchlist System - Frontend"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/WatchlistPage.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "✅ UNIFIED WATCHLIST FRONTEND IMPLEMENTATION COMPLETE: Completed comprehensive watchlist UI with all requested enhancements. (1) WatchlistPage.js: Implemented tab-based filtering (All, Auctions, Lots, Marketplace), separate render functions for each card type, bilingual empty state messages (EN: 'You're not watching any items yet' / FR: 'Vous ne suivez aucun article pour le moment'), 'Watched' badge indicators on all cards (red badge positioned top-left), quick action buttons ('View Listing', 'Go to Auction', 'View Lot') on each card, proper navigation with URL hash support for lots. (2) WatchlistButton Integration: Added to LotsMarketplacePage on auction cards (both grid and list views) with proper positioning (top-right on image overlay, white backdrop-blur background). Replaced old WatchLotButton with unified WatchlistButton on MultiItemListingDetailPage lot cards (itemId format: 'auction_id:lot_number', itemType: 'lot', showLabel: true). (3) BuyerDashboard Integration: Updated 'Watching' tab to show call-to-action card with link to full watchlist page, removed old implementation that only showed marketplace listings. (4) Bilingual Support: Added i18n translations for watchlist.emptyTitle, emptyDescription, browseMarketplace, viewAuctions, goToAuction, viewLot in both English and French. All JavaScript files pass linting with zero errors. Ready for comprehensive frontend testing."
+
 metadata:
   created_by: "main_agent"
   version: "1.0"
