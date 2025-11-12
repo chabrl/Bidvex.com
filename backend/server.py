@@ -330,6 +330,8 @@ class MultiItemListingCreate(BaseModel):
     documents: Optional[Dict[str, Any]] = None  # {terms_conditions, important_info, catalogue}
     shipping_info: Optional[Dict[str, Any]] = None  # {available, methods, rates, delivery_time}
     visit_availability: Optional[Dict[str, Any]] = None  # {offered, dates, instructions}
+    auction_terms_en: Optional[str] = None  # English auction terms (rich text HTML)
+    auction_terms_fr: Optional[str] = None  # French auction terms (rich text HTML)
 
 class MultiItemListing(BaseModel):
     model_config = ConfigDict(extra="ignore")
