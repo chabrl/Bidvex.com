@@ -1752,7 +1752,9 @@ async def create_multi_item_listing(listing_data: MultiItemListingCreate, curren
         promotion_expiry=promotion_expiry,
         documents=listing_data.documents,
         shipping_info=listing_data.shipping_info,
-        visit_availability=listing_data.visit_availability
+        visit_availability=listing_data.visit_availability,
+        auction_terms_en=listing_data.auction_terms_en,
+        auction_terms_fr=listing_data.auction_terms_fr
     )
     
     listing_dict = listing.model_dump()
