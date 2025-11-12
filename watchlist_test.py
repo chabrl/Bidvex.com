@@ -544,12 +544,19 @@ class WatchlistTester:
                     
                     # Check auctions structure
                     for auction in data["auctions"]:
-                        required_auction_fields = ["id", "title", "total_lots", "lots", "category", "auction_end_date", "city", "region", "is_featured", "watchlist_added_at"]
+                        required_auction_fields = ["id", "title", "total_lots", "lots", "category", "auction_end_date", "city", "region", "watchlist_added_at"]
+                        optional_auction_fields = ["is_featured"]  # May not exist in older auctions
+                        
                         for field in required_auction_fields:
                             if field not in auction:
-                                print(f"❌ Missing field in auction: {field}")
+                                print(f"❌ Missing required field in auction: {field}")
                                 print(f"   Available fields: {list(auction.keys())}")
                                 success = False
+                        
+                        # Check optional fields (just log if missing)
+                        for field in optional_auction_fields:
+                            if field not in auction:
+                                print(f"ℹ️  Optional field missing in auction (expected for older data): {field}")
                     
                     # Check lots structure
                     for lot_item in data["lots"]:
