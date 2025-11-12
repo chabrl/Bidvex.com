@@ -22,6 +22,7 @@ import AuctioneerInfo from '../components/AuctioneerInfo';
 import WatchLotButton from '../components/WatchLotButton';
 import ShareButton from '../components/ShareButton';
 import MessageSellerModal from '../components/MessageSellerModal';
+import BidErrorGuide from '../components/BidErrorGuide';
 import { extractErrorMessage } from '../utils/errorHandler';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
