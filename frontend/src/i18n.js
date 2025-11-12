@@ -115,6 +115,51 @@ const resources = {
         removeFromWatchlist: 'Remove from Watchlist',
       },
 
+      // Bid Error Guide
+      bidErrorGuide: {
+        title: 'Common Bid Errors',
+        subtitle: 'Understanding bidding issues and how to fix them',
+        errors: {
+          bidTooLow: {
+            title: 'Bid must be higher than current price',
+            description: 'Your bid amount is below the current price. Try bidding an amount higher than the displayed current bid.',
+            solution: 'Increase your bid amount to at least match the minimum required bid.',
+          },
+          minimumIncrement: {
+            title: 'Bid must be at least ${{amount}}',
+            description: 'The minimum bid increment has not been met. Each bid must increase by a specific amount.',
+            solution: 'Enter a bid amount of at least ${{amount}} to meet the minimum increment requirement.',
+          },
+          networkError: {
+            title: 'Network error. Please check your connection.',
+            description: 'Unable to connect to the server. This may be due to internet connectivity issues.',
+            solution: 'Check your internet connection and try again. If the problem persists, refresh the page.',
+          },
+          invalidAmount: {
+            title: 'Invalid bid amount',
+            description: 'The bid amount entered is not a valid number or contains invalid characters.',
+            solution: 'Enter a valid numeric amount without currency symbols or special characters.',
+          },
+          auctionEnded: {
+            title: 'Auction has ended',
+            description: 'This auction is no longer accepting bids as the bidding period has closed.',
+            solution: 'Browse other active auctions or wait for similar items to be listed.',
+          },
+          insufficientFunds: {
+            title: 'Insufficient funds',
+            description: 'Your account balance or payment method may not cover this bid amount.',
+            solution: 'Update your payment method or lower your bid amount.',
+          },
+          unauthorized: {
+            title: 'Please sign in to bid',
+            description: 'You must be logged in to place bids on auctions.',
+            solution: 'Sign in to your account or create a new account to start bidding.',
+          },
+        },
+        helpText: 'Still having trouble? Contact our support team for assistance.',
+        closeButton: 'Got it',
+      },
+
       // Dashboard
       dashboard: {
         seller: {
