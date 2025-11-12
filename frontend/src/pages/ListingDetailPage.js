@@ -397,6 +397,29 @@ const ListingDetailPage = () => {
               </CardContent>
             </Card>
 
+            {/* Auctioneer/Seller Info & Rating */}
+            {listing.seller_id && (
+              <Card className="glassmorphism">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">Seller Information</CardTitle>
+                    {user && user.id !== listing.seller_id && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setRateSellerModalOpen(true)}
+                      >
+                        ⭐ Rate Seller
+                      </Button>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <AuctioneerInfo sellerId={listing.seller_id} variant="full" />
+                </CardContent>
+              </Card>
+            )}
+
             <Card className="glassmorphism">
               <CardHeader>
                 <CardTitle className="text-lg">Description</CardTitle>
