@@ -297,14 +297,43 @@ const ListingDetailPage = () => {
                     </div>
                   </form>
 
+                  {/* Premium Bidding Features */}
+                  <div className="space-y-3 pt-2">
+                    <Separator />
+                    <div className="flex gap-2">
+                      <MonsterBidButton
+                        listingId={listing.id}
+                        currentBid={listing.current_price}
+                        minimumIncrement={1}
+                        onBidPlaced={(amount) => {
+                          fetchListing();
+                          fetchBids();
+                          toast.success(`⚡ Monster Bid of $${amount.toFixed(2)} placed!`);
+                        }}
+                      />
+                      
+                      <AutoBidModal
+                        listingId={listing.id}
+                        currentBid={listing.current_price}
+                        minimumIncrement={1}
+                        onAutoBidSetup={() => {
+                          fetchListing();
+                          toast.success('🤖 Auto-Bid Bot activated!');
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <Separator />
+
                   <Button
                     variant="outline"
                     className="w-full"
-                    onClick={() => navigate(`/messages?seller=${listing.seller_id}&listing=${listing.id}`)}
+                    onClick={() => setMessageModalOpen(true)}
                     data-testid="message-seller-btn"
                   >
                     <MessageCircle className="mr-2 h-4 w-4" />
-                    Message Seller
+                    📨 Message Seller
                   </Button>
 
                   {listing.buy_now_price && (
