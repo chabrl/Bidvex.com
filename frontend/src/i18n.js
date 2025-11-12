@@ -382,6 +382,12 @@ const resources = {
         addItems: 'Start adding items you\'re interested in',
         removeItem: 'Remove from Watchlist',
         viewListing: 'View Listing',
+        emptyTitle: "You're not watching any items yet",
+        emptyDescription: "Start exploring auctions or listings to track your favorites.",
+        browseMarketplace: 'Browse Marketplace',
+        viewAuctions: 'View Auctions',
+        goToAuction: 'Go to Auction',
+        viewLot: 'View Lot',
       },
 
       // Errors & Validation
