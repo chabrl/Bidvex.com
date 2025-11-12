@@ -7,12 +7,26 @@ import axios from 'axios';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-const WatchlistButton = ({ listingId, className = '', size = 'default', showLabel = false }) => {
+const WatchlistButton = ({ 
+  itemId,  // Can be listingId, auctionId, or lotId
+  itemType = 'listing',  // 'listing', 'auction', or 'lot'
+  className = '', 
+  size = 'default', 
+  showLabel = false,
+  // Legacy support
+  listingId,
+  auctionId,
+  lotId
+}) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isInWatchlist, setIsInWatchlist] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
+
+  // Determine the actual item ID and type (support legacy props)
+  const actualItemId = itemId || listingId || auctionId || lotId;
+  const actualItemType = itemId ? itemType : (listingId ? 'listing' : (auctionId ? 'auction' : 'lot'));
 
   // Size variants
   const sizeClasses = {
@@ -22,15 +36,28 @@ const WatchlistButton = ({ listingId, className = '', size = 'default', showLabe
   };
 
   useEffect(() => {
-    if (user && listingId) {
+    if (user && actualItemId) {
       checkWatchlistStatus();
     }
-  }, [user, listingId]);
+  }, [user, actualItemId, actualItemType]);
 
   const checkWatchlistStatus = async () => {
     try {
-      const response = await axios.get(`${API}/watchlist/check/${listingId}`);
-      setIsInWatchlist(response.data.in_watchlist);
+      const response = await axios.get(`${API}/watchlist`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      
+      // Check if item is in watchlist based on type
+      let isWatched = false;
+      if (actualItemType === 'listing' && response.data.listings) {
+        isWatched = response.data.listings.some(item => item.id === actualItemId);
+      } else if (actualItemType === 'auction' && response.data.auctions) {
+        isWatched = response.data.auctions.some(item => item.id === actualItemId);
+      } else if (actualItemType === 'lot' && response.data.lots) {
+        isWatched = response.data.lots.some(item => item.lot?.lot_number && item.auction_id && `${item.auction_id}:${item.lot.lot_number}` === actualItemId);
+      }
+      
+      setIsInWatchlist(isWatched);
     } catch (error) {
       console.error('Error checking watchlist status:', error);
     }
@@ -54,7 +81,8 @@ const WatchlistButton = ({ listingId, className = '', size = 'default', showLabe
       if (isInWatchlist) {
         // Remove from watchlist
         await axios.post(`${API}/watchlist/remove`, null, {
-          params: { listing_id: listingId }
+          params: { item_id: actualItemId, item_type: actualItemType },
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
         setIsInWatchlist(false);
         toast.success('Removed from watchlist', {
@@ -64,7 +92,8 @@ const WatchlistButton = ({ listingId, className = '', size = 'default', showLabe
       } else {
         // Add to watchlist
         await axios.post(`${API}/watchlist/add`, null, {
-          params: { listing_id: listingId }
+          params: { item_id: actualItemId, item_type: actualItemType },
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
         setIsInWatchlist(true);
         toast.success('Added to watchlist', {
