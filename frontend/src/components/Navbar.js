@@ -155,41 +155,8 @@ const Navbar = () => {
                 </Button>
               </Link>
             )}
-
-            <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} data-testid="mobile-menu-btn">
-              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </Button>
           </div>
         </div>
-
-        {mobileMenuOpen && (
-          <div className="md:hidden py-4 border-t">
-            <div className="flex flex-col space-y-2">
-              <Link to="/" onClick={() => setMobileMenuOpen(false)}>
-                <Button variant="ghost" className="w-full justify-start">
-                  {t('nav.home')}
-                </Button>
-              </Link>
-              <Link to="/marketplace" onClick={() => setMobileMenuOpen(false)}>
-                <Button variant="ghost" className="w-full justify-start">
-                  {t('nav.marketplace')}
-                </Button>
-              </Link>
-              {user && (
-                <Button 
-                  variant="ghost" 
-                  className="w-full justify-start"
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    setSellModalOpen(true);
-                  }}
-                >
-                  {t('nav.sell')}
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Sell Options Modal */}
