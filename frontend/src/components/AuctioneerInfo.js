@@ -128,7 +128,10 @@ const AuctioneerInfo = ({ sellerId, variant = 'compact', className = '' }) => {
           {/* Profile Details */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <h3 className="text-lg font-semibold">
+              <h3 
+                className="text-lg font-semibold hover:text-primary cursor-pointer hover:underline"
+                onClick={() => navigate(`/seller/${sellerId}`)}
+              >
                 {profile.company_name || profile.name}
               </h3>
               {profile.subscription_tier !== 'free' && (
