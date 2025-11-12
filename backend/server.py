@@ -2812,38 +2812,100 @@ async def remove_from_watchlist(
 
 @api_router.get("/watchlist")
 async def get_watchlist(current_user: User = Depends(get_current_user)):
-    """Get user's watchlist with listing details"""
+    """Get user's watchlist with item details (listings, auctions, and lots)"""
     try:
         # Get all watchlist items for user
         watchlist_items = await db.watchlist.find(
             {"user_id": current_user.id},
             {"_id": 0}
-        ).sort("added_at", -1).to_list(100)
+        ).sort("added_at", -1).to_list(200)
         
         if not watchlist_items:
-            return []
+            return {
+                "listings": [],
+                "auctions": [],
+                "lots": [],
+                "total": 0
+            }
         
-        # Get listing IDs
-        listing_ids = [item["listing_id"] for item in watchlist_items]
+        # Separate by type
+        listing_items = [item for item in watchlist_items if item.get("item_type", "listing") == "listing"]
+        auction_items = [item for item in watchlist_items if item.get("item_type") == "auction"]
+        lot_items = [item for item in watchlist_items if item.get("item_type") == "lot"]
         
-        # Fetch listing details
-        listings = await db.listings.find(
-            {"id": {"$in": listing_ids}, "status": {"$ne": "deleted"}},
-            {"_id": 0}
-        ).to_list(100)
+        result = {
+            "listings": [],
+            "auctions": [],
+            "lots": [],
+            "total": len(watchlist_items)
+        }
         
-        # Create a map of listing_id to listing for quick lookup
-        listings_map = {listing["id"]: listing for listing in listings}
+        # Fetch listings
+        if listing_items:
+            listing_ids = [item.get("item_id") or item.get("listing_id") for item in listing_items]
+            listings = await db.listings.find(
+                {"id": {"$in": listing_ids}, "status": {"$ne": "deleted"}},
+                {"_id": 0}
+            ).to_list(100)
+            
+            listings_map = {listing["id"]: listing for listing in listings}
+            
+            for item in listing_items:
+                item_id = item.get("item_id") or item.get("listing_id")
+                listing = listings_map.get(item_id)
+                if listing:
+                    result["listings"].append({
+                        **listing,
+                        "watchlist_added_at": item["added_at"],
+                        "watchlist_type": "listing"
+                    })
         
-        # Combine watchlist items with listing details
-        result = []
-        for item in watchlist_items:
-            listing = listings_map.get(item["listing_id"])
-            if listing:
-                result.append({
-                    **listing,
-                    "watchlist_added_at": item["added_at"]
-                })
+        # Fetch auctions
+        if auction_items:
+            auction_ids = [item["item_id"] for item in auction_items]
+            auctions = await db.multi_item_listings.find(
+                {"id": {"$in": auction_ids}, "status": {"$ne": "deleted"}},
+                {"_id": 0}
+            ).to_list(100)
+            
+            auctions_map = {auction["id"]: auction for auction in auctions}
+            
+            for item in auction_items:
+                auction = auctions_map.get(item["item_id"])
+                if auction:
+                    result["auctions"].append({
+                        **auction,
+                        "watchlist_added_at": item["added_at"],
+                        "watchlist_type": "auction"
+                    })
+        
+        # Fetch lots (need to find parent auction and specific lot)
+        if lot_items:
+            # lot_items contain item_id in format "auction_id:lot_number"
+            for item in lot_items:
+                item_id = item["item_id"]
+                # Parse auction_id and lot_number
+                if ":" in item_id:
+                    auction_id, lot_number = item_id.split(":")
+                    lot_number = int(lot_number)
+                    
+                    # Find the auction
+                    auction = await db.multi_item_listings.find_one(
+                        {"id": auction_id},
+                        {"_id": 0}
+                    )
+                    
+                    if auction:
+                        # Find the specific lot
+                        lot = next((l for l in auction.get("lots", []) if l.get("lot_number") == lot_number), None)
+                        if lot:
+                            result["lots"].append({
+                                "auction_id": auction_id,
+                                "auction_title": auction.get("title"),
+                                "lot": lot,
+                                "watchlist_added_at": item["added_at"],
+                                "watchlist_type": "lot"
+                            })
         
         return result
         
