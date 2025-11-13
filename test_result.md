@@ -577,9 +577,8 @@ metadata:
 
 test_plan:
   current_focus:
-    - "BidVex Critical Fixes Testing"
-  stuck_tasks:
-    - "BidVex Critical Fixes Testing"
+    - "All critical fixes completed and tested"
+  stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
