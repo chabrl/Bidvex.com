@@ -31,6 +31,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const MultiItemListingDetailPage = () => {
   const { id } = useParams();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
