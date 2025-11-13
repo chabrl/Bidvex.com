@@ -131,6 +131,9 @@ const App = () => {
           <Route path="/admin" element={
             <ProtectedRoute><AdminDashboard /></ProtectedRoute>
           } />
+          <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+          <Route path="/terms-of-service" element={<TermsOfServicePage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
         <Footer />
         <AIAssistant />
