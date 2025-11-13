@@ -627,6 +627,26 @@ backend:
     status_history:
       - working: true
         agent: "testing"
+        comment: "✅ BILINGUAL LOTS WON PDF TESTED: POST /api/invoices/lots-won/{auction_id}/{user_id} working perfectly with bilingual support. English PDF generated with proper formatting, French PDF generated with translated headers and content. Both versions include correct lot details, pricing calculations (hammer total + 5% premium + taxes), and payment instructions. PDF files saved to /app/invoices/{user_id}/ directory. Invoice records created in database with proper metadata. Bilingual functionality fully implemented and production-ready."
+
+  - task: "BidVex Critical Fixes Testing"
+    implemented: true
+    working: false
+    file: "/app/backend/server.py"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: false
+        agent: "testing"
+        comment: "❌ CRITICAL BIDVEX FIXES TESTING - 2/3 TESTS FAILED: ✅ FILTERS WORKING: All query parameters (category, region, currency, search, combined) return correctly filtered results. ❌ MULTI-LOT AUCTION VISIBILITY FIX FAILED: Default GET /api/multi-item-listings excludes upcoming auctions due to 50-item limit with no sorting. With 75 active + 3 upcoming listings, upcoming auctions don't appear in default results. Only visible with explicit ?status=upcoming filter. Root cause: Missing sort order in query (lines 1816-1819). ❌ BID PLACEMENT FIX FAILED: All bid attempts return 500 Internal Server Error. MongoDB ObjectId serialization issue in FastAPI response encoding. bid_type string validation works (no parsing errors), but server crashes during response serialization. Error: 'ObjectId' object is not iterable. URGENT: Both issues require immediate main agent fixes for production readiness."
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
         comment: "✅ BILINGUAL LOTS WON PDF TESTED: POST /api/invoices/lots-won/{auction_id}/{user_id}?lang=fr working perfectly. English PDF (lang=en) generated successfully with invoice number BV-2025-8c8e3b57-0001, paddle number 5051, file size 1.38MB. French PDF (lang=fr) generated successfully with invoice number BV-2025-8c8e3b57-0002, paddle number 5052, file size 1.38MB. Different paddle numbers correctly assigned to different buyers. Both PDFs generated with proper structure including invoice_number, pdf_path, paddle_number, and success flag. Authorization working (admin or matching user_id required). Bilingual template integration working correctly."
 
   - task: "Phase 5 Part 5: Auction Completion with Auto-Send"
