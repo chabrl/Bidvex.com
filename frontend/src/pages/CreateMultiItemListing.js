@@ -1330,26 +1330,15 @@ const CreateMultiItemListing = () => {
             {activeTermsLang === 'en' && (
               <div>
                 <Label>English Terms & Conditions</Label>
-                <div className="mt-2 border rounded-md">
-                  <ReactQuill
-                    theme="snow"
-                    value={auctionTerms.en}
+                <div className="mt-2">
+                  <RichTextEditor
+                    content={auctionTerms.en}
                     onChange={(value) => setAuctionTerms(prev => ({ ...prev, en: value }))}
                     placeholder="Enter your auction terms and conditions in English..."
-                    modules={{
-                      toolbar: [
-                        [{ 'header': [1, 2, 3, false] }],
-                        ['bold', 'italic', 'underline'],
-                        [{'list': 'ordered'}, {'list': 'bullet'}],
-                        ['link'],
-                        ['clean']
-                      ]
-                    }}
-                    style={{ minHeight: '200px' }}
                   />
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Use the toolbar to format your terms. Supports bold, italic, lists, and links.
+                  Use the toolbar to format your terms. Supports headings, bold, italic, underline, lists, and links.
                 </p>
               </div>
             )}
