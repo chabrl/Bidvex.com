@@ -42,6 +42,11 @@ const MultiItemListingDetailPage = () => {
   const [activeLotId, setActiveLotId] = useState(null);
   const [incrementInfo, setIncrementInfo] = useState(null);
   const [messageModalOpen, setMessageModalOpen] = useState(false);
+  const [ratingModalOpen, setRatingModalOpen] = useState(false);
+  const [autoBidModalOpen, setAutoBidModalOpen] = useState(false);
+  const [selectedLot, setSelectedLot] = useState(null);
+  const [showFullTerms, setShowFullTerms] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const lotRefs = useRef({});
 
   useEffect(() => {
