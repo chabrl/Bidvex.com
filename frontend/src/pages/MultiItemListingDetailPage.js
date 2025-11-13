@@ -440,40 +440,85 @@ const MultiItemListingDetailPage = () => {
                       </Card>
                     )}
 
-                    {/* Auction Terms & Conditions */}
+                    {/* Auction Terms & Conditions - Enhanced with Show More/Less and Agreement */}
                     {(listing.auction_terms_en || listing.auction_terms_fr) && (
-                      <Card className="mb-6">
+                      <Card className="mb-6 border-2 border-primary/20">
                         <CardHeader>
                           <CardTitle className="text-lg flex items-center justify-between">
-                            <span>📝 Terms & Conditions</span>
+                            <span className="flex items-center gap-2">
+                              📝 {t('auction.termsAndConditions', 'Terms & Conditions')}
+                              <Badge variant="outline" className="text-xs">Required</Badge>
+                            </span>
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => window.open(`${API}/multi-item-listings/${listing.id}/terms/pdf`, '_blank')}
                             >
-                              📄 Download PDF
+                              📄 {t('common.downloadPDF', 'Download PDF')}
                             </Button>
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                           {listing.auction_terms_en && (
                             <div>
-                              <p className="text-sm font-semibold mb-2">English Terms:</p>
-                              <div 
-                                className="prose prose-sm max-w-none dark:prose-invert"
-                                dangerouslySetInnerHTML={{ __html: listing.auction_terms_en }}
-                              />
+                              <p className="text-sm font-semibold mb-2">{t('auction.englishTerms', 'English Terms')}:</p>
+                              <div className={`prose prose-sm max-w-none dark:prose-invert ${!showFullTerms ? 'max-h-32 overflow-hidden relative' : 'max-h-96 overflow-y-auto'} border rounded-lg p-4 bg-muted/30`}>
+                                <div dangerouslySetInnerHTML={{ 
+                                  __html: showFullTerms 
+                                    ? listing.auction_terms_en 
+                                    : (listing.auction_terms_en.substring(0, 300) + (listing.auction_terms_en.length > 300 ? '...' : ''))
+                                }} />
+                                {!showFullTerms && listing.auction_terms_en.length > 300 && (
+                                  <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-muted/30 to-transparent" />
+                                )}
+                              </div>
+                              {listing.auction_terms_en.length > 300 && (
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  onClick={() => setShowFullTerms(!showFullTerms)}
+                                  className="mt-2 text-primary"
+                                >
+                                  {showFullTerms ? t('common.showLess', 'Show Less') : t('common.showMore', 'Show More')} ▼
+                                </Button>
+                              )}
                             </div>
                           )}
                           {listing.auction_terms_fr && (
                             <div className="pt-4 border-t">
-                              <p className="text-sm font-semibold mb-2">Termes en Français:</p>
-                              <div 
-                                className="prose prose-sm max-w-none dark:prose-invert"
-                                dangerouslySetInnerHTML={{ __html: listing.auction_terms_fr }}
-                              />
+                              <p className="text-sm font-semibold mb-2">{t('auction.frenchTerms', 'Termes en Français')}:</p>
+                              <div className={`prose prose-sm max-w-none dark:prose-invert ${!showFullTerms ? 'max-h-32 overflow-hidden relative' : 'max-h-96 overflow-y-auto'} border rounded-lg p-4 bg-muted/30`}>
+                                <div dangerouslySetInnerHTML={{ 
+                                  __html: showFullTerms 
+                                    ? listing.auction_terms_fr 
+                                    : (listing.auction_terms_fr.substring(0, 300) + (listing.auction_terms_fr.length > 300 ? '...' : ''))
+                                }} />
+                                {!showFullTerms && listing.auction_terms_fr.length > 300 && (
+                                  <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-muted/30 to-transparent" />
+                                )}
+                              </div>
                             </div>
                           )}
+
+                          {/* Agreement Checkbox - Prominent and Required */}
+                          <div className="mt-6 p-4 bg-primary/5 border-2 border-primary/20 rounded-lg">
+                            <label className="flex items-start gap-3 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={agreedToTerms}
+                                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                                className="mt-1 h-5 w-5 rounded border-primary text-primary focus:ring-primary cursor-pointer"
+                              />
+                              <span className="text-sm font-medium leading-tight">
+                                {t('auction.agreeToTerms', "I have read and agree to the auction's Terms & Conditions")} *
+                              </span>
+                            </label>
+                            {!agreedToTerms && (
+                              <p className="text-xs text-muted-foreground mt-2 ml-8">
+                                ⚠️ {t('auction.mustAgreeBeforeBid', 'You must agree to the terms before placing a bid')}
+                              </p>
+                            )}
+                          </div>
                         </CardContent>
                       </Card>
                     )}
@@ -481,7 +526,7 @@ const MultiItemListingDetailPage = () => {
                     {(!listing.auction_terms_en && !listing.auction_terms_fr) && (
                       <Card className="mb-6">
                         <CardContent className="p-4 text-center text-muted-foreground">
-                          <p>No terms provided by seller</p>
+                          <p>{t('auction.noTermsProvided', 'No terms provided by seller')}</p>
                         </CardContent>
                       </Card>
                     )}
