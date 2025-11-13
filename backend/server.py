@@ -1775,14 +1775,43 @@ async def create_multi_item_listing(listing_data: MultiItemListingCreate, curren
     return listing
 
 @api_router.get("/multi-item-listings")
-async def get_multi_item_listings(limit: int = 50, skip: int = 0, status: Optional[str] = None):
+async def get_multi_item_listings(
+    limit: int = 50, 
+    skip: int = 0, 
+    status: Optional[str] = None,
+    category: Optional[str] = None,
+    region: Optional[str] = None,
+    currency: Optional[str] = None,
+    search: Optional[str] = None
+):
     # Build query filter
     query = {}
+    
+    # Status filter - default to both active and upcoming
     if status:
         query["status"] = status
     else:
-        # Default to active listings if no status specified
-        query["status"] = "active"
+        # Show both active and upcoming listings by default
+        query["status"] = {"$in": ["active", "upcoming"]}
+    
+    # Category filter
+    if category:
+        query["category"] = category
+    
+    # Region filter
+    if region:
+        query["region"] = region
+    
+    # Currency filter
+    if currency:
+        query["currency"] = currency
+    
+    # Search filter (title or description)
+    if search:
+        query["$or"] = [
+            {"title": {"$regex": search, "$options": "i"}},
+            {"description": {"$regex": search, "$options": "i"}}
+        ]
     
     listings = await db.multi_item_listings.find(
         query,
