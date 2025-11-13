@@ -103,17 +103,15 @@
 #====================================================================================================
 
 user_problem_statement: |
-  Phase 6: Launch Readiness Validation - Comprehensive Pre-Production Testing
+  Terms & Conditions UX Enhancement Testing on BidVex Multi-Lot Auction Pages
   
-  Complete validation of all systems before production deployment:
-  1. Security & Access: Admin authorization, bcrypt passwords, audit logging
-  2. Infrastructure: Backend health check, MongoDB integrity, service status, load testing
-  3. User Experience: Bilingual toggle (EN/FR), currency enforcement (CAD/USD), appeal workflow
-  4. Compliance: Tax logic (GST+QST for CAD, none for USD), geolocation privacy, bilingual messaging
-  5. Admin Panel: CurrencyAppealsManager functionality, all admin tabs working
-  6. E2E Scenarios: Registration → Currency lock → Appeal → Admin review
-  7. PDF Generation: Test all 4 invoice combinations (EN/CAD, EN/USD, FR/CAD, FR/USD)
-  8. Cross-browser/device: Chrome, Firefox, Safari, mobile responsiveness
+  Test the new Terms & Conditions UX enhancements to verify:
+  1. Show More/Show Less toggle functionality with gradient overlay
+  2. Agreement checkbox enforcement for bidding
+  3. Proper warning messages and UI state management
+  4. Bilingual support (EN/FR) for all terms-related text
+  5. Bid button and input field state management based on agreement
+  6. Toast error messages when attempting to bid without agreement
 
 backend:
   - task: "Phase 6: Security & Access Validation"
