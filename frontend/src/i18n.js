@@ -836,6 +836,27 @@ const resources = {
         cad: 'CAD',
         usd: 'USD',
         currency: 'Devise',
+        showMore: 'Voir Plus',
+        showLess: 'Voir Moins',
+        downloadPDF: 'Télécharger PDF',
+      },
+
+      // Termes de l'Enchère
+      auction: {
+        termsAndConditions: 'Termes et Conditions',
+        englishTerms: 'Termes en Anglais',
+        frenchTerms: 'Termes en Français',
+        noTermsProvided: 'Aucune condition fournie par le vendeur',
+        agreeToTerms: "J'ai lu et j'accepte les Conditions de vente aux enchères",
+        mustAgreeBeforeBid: "Vous devez accepter les conditions avant de placer une enchère",
+        mustAgreeToTermsFirst: 'Veuillez accepter les conditions générales d\'abord',
+        agreeToTermsToPlaceBid: 'Veuillez faire défiler vers le haut et accepter les Termes et Conditions pour placer une enchère',
+      },
+
+      // Enchères
+      bid: {
+        placeBid: 'Placer une enchère',
+        mustAgreeToTerms: "Vous devez accepter les conditions de l'enchère avant de placer une enchère",
       },
 
       // Payment
