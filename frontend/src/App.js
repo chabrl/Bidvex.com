@@ -25,6 +25,9 @@ import AdminDashboard from './pages/AdminDashboard';
 import WatchlistPage from './pages/WatchlistPage';
 import HowItWorksPage from './pages/HowItWorksPage';
 import SellerProfilePage from './pages/SellerProfilePage';
+import NotFoundPage from './pages/NotFoundPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import TermsOfServicePage from './pages/TermsOfServicePage';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
