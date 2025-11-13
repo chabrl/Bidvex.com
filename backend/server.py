@@ -1816,7 +1816,7 @@ async def get_multi_item_listings(
     listings = await db.multi_item_listings.find(
         query,
         {"_id": 0}
-    ).skip(skip).limit(limit).to_list(limit)
+    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
     
     for listing in listings:
         if isinstance(listing.get("created_at"), str):
