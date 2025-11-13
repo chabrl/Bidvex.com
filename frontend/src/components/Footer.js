@@ -16,20 +16,20 @@ const Footer = () => {
         {/* Essential Links */}
         <div className="flex flex-wrap justify-center items-center gap-6 mb-6">
           <Link to="/how-it-works" className="hover:text-white transition-colors text-sm">
-            {t('footer.howItWorks')}
+            {t('footer.howItWorks', 'How It Works')}
           </Link>
           <span className="text-gray-600">|</span>
-          <Link to="/privacy" className="hover:text-white transition-colors text-sm">
-            {t('footer.privacyPolicy')}
+          <Link to="/privacy-policy" className="hover:text-white transition-colors text-sm">
+            {t('footer.privacyPolicy', 'Privacy Policy')}
           </Link>
           <span className="text-gray-600">|</span>
-          <Link to="/terms" className="hover:text-white transition-colors text-sm">
-            {t('footer.termsOfService')}
+          <Link to="/terms-of-service" className="hover:text-white transition-colors text-sm">
+            {t('footer.termsOfService', 'Terms of Service')}
           </Link>
           <span className="text-gray-600">|</span>
-          <Link to="/cookies" className="hover:text-white transition-colors text-sm">
-            {t('footer.cookiePreferences')}
-          </Link>
+          <a href="mailto:support@bidvex.com" className="hover:text-white transition-colors text-sm">
+            {t('footer.contact', 'Contact Support')}
+          </a>
         </div>
 
         {/* Copyright & Language Selector */}
