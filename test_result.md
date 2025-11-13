@@ -577,11 +577,9 @@ metadata:
 
 test_plan:
   current_focus:
-    - "BidVex Multi-Item Listing Wizard - Step 4 (Documents, Shipping, Visit)"
-    - "BidVex Auction Detail Page - New Features (Message Seller, Shipping, Visit)"
-    - "BidVex Homepage Badge Visibility (Shipping & Visit Badges)"
-    - "BidVex Mobile Responsiveness - All New Features"
-  stuck_tasks: []
+    - "BidVex Critical Fixes Testing"
+  stuck_tasks:
+    - "BidVex Critical Fixes Testing"
   test_all: false
   test_priority: "high_first"
 
