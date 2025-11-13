@@ -2077,6 +2077,7 @@ async def bid_on_lot(listing_id: str, lot_number: int, data: Dict[str, Any], cur
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
+    # Insert bid into database (MongoDB will add _id field)
     await db.lot_bids.insert_one(bid)
     
     # Update monster bids used if applicable
@@ -2088,9 +2089,10 @@ async def bid_on_lot(listing_id: str, lot_number: int, data: Dict[str, Any], cur
             {"$set": {"monster_bids_used": monster_bids_used_dict}}
         )
     
+    # Return response with clean bid data (no MongoDB _id field)
     return {
         "message": "Bid placed successfully",
-        "bid": bid,
+        "bid": bid,  # This is the original dict without MongoDB _id
         "minimum_next_bid": current_price + get_minimum_increment(listing, amount) if bid_type == "normal" else None,
         "extension_applied": extension_applied,
         "extension_count": lots[lot_index].get("extension_count", 0),
