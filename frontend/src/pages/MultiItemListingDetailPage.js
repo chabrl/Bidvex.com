@@ -156,6 +156,12 @@ const MultiItemListingDetailPage = () => {
       return;
     }
 
+    // Check if user agreed to terms
+    if ((listing.auction_terms_en || listing.auction_terms_fr) && !agreedToTerms) {
+      toast.error(t('bid.mustAgreeToTerms', 'You must agree to the auction terms before placing a bid'));
+      return;
+    }
+
     const bidAmount = parseFloat(bidAmounts[lotNumber]);
     const lot = listing.lots.find(l => l.lot_number === lotNumber);
 
