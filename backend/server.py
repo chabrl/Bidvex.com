@@ -1999,7 +1999,7 @@ async def export_auction_terms_pdf(listing_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to generate PDF: {str(e)}")
 
 @api_router.post("/multi-item-listings/{listing_id}/lots/{lot_number}/bid")
-async def bid_on_lot(listing_id: str, lot_number: int, data: Dict[str, float], current_user: User = Depends(get_current_user)):
+async def bid_on_lot(listing_id: str, lot_number: int, data: Dict[str, Any], current_user: User = Depends(get_current_user)):
     listing = await db.multi_item_listings.find_one({"id": listing_id})
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
