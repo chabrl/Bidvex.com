@@ -587,7 +587,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "All critical fixes completed and tested"
+    - "Terms & Conditions UX Enhancement Testing"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
