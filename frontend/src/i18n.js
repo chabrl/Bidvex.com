@@ -349,6 +349,27 @@ const resources = {
         cad: 'CAD',
         usd: 'USD',
         currency: 'Currency',
+        showMore: 'Show More',
+        showLess: 'Show Less',
+        downloadPDF: 'Download PDF',
+      },
+
+      // Auction Terms
+      auction: {
+        termsAndConditions: 'Terms & Conditions',
+        englishTerms: 'English Terms',
+        frenchTerms: 'French Terms',
+        noTermsProvided: 'No terms provided by seller',
+        agreeToTerms: "I have read and agree to the auction's Terms & Conditions",
+        mustAgreeBeforeBid: 'You must agree to the terms before placing a bid',
+        mustAgreeToTermsFirst: 'Please agree to terms & conditions first',
+        agreeToTermsToPlaceBid: 'Please scroll up and agree to the Terms & Conditions to place a bid',
+      },
+
+      // Bidding
+      bid: {
+        placeBid: 'Place Bid',
+        mustAgreeToTerms: 'You must agree to the auction terms before placing a bid',
       },
 
       // Payment
