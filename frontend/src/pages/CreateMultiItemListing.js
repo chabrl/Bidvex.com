@@ -1347,22 +1347,11 @@ const CreateMultiItemListing = () => {
             {activeTermsLang === 'fr' && (
               <div>
                 <Label>Termes et Conditions (Français)</Label>
-                <div className="mt-2 border rounded-md">
-                  <ReactQuill
-                    theme="snow"
-                    value={auctionTerms.fr}
+                <div className="mt-2">
+                  <RichTextEditor
+                    content={auctionTerms.fr}
                     onChange={(value) => setAuctionTerms(prev => ({ ...prev, fr: value }))}
                     placeholder="Entrez les termes et conditions de votre enchère en français..."
-                    modules={{
-                      toolbar: [
-                        [{ 'header': [1, 2, 3, false] }],
-                        ['bold', 'italic', 'underline'],
-                        [{'list': 'ordered'}, {'list': 'bullet'}],
-                        ['link'],
-                        ['clean']
-                      ]
-                    }}
-                    style={{ minHeight: '200px' }}
                   />
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
