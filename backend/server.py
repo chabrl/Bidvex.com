@@ -33,10 +33,15 @@ db = client[db_name]
 import stripe
 stripe.api_key = stripe_api_key
 
-# Fix for MongoDB ObjectId serialization in FastAPI
-import pydantic
+# Fix for MongoDB ObjectId serialization in FastAPI (Pydantic v2)
 from bson.objectid import ObjectId
-pydantic.json.ENCODERS_BY_TYPE[ObjectId] = str
+from fastapi.encoders import jsonable_encoder
+
+# Custom encoder for ObjectId
+def custom_jsonable_encoder(obj):
+    if isinstance(obj, ObjectId):
+        return str(obj)
+    return jsonable_encoder(obj)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer(auto_error=False)
