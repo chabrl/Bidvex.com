@@ -769,15 +769,24 @@ const MultiItemListingDetailPage = () => {
                                 value={bidAmounts[lot.lot_number] || ''}
                                 onChange={(e) => handleBidChange(lot.lot_number, e.target.value)}
                                 className="flex-1 px-4 py-2 border border-input rounded-md bg-background"
+                                disabled={(listing.auction_terms_en || listing.auction_terms_fr) && !agreedToTerms}
                               />
                               <Button 
                                 onClick={() => handlePlaceBid(lot.lot_number, 'normal')}
                                 className="gradient-button text-white border-0"
+                                disabled={(listing.auction_terms_en || listing.auction_terms_fr) && !agreedToTerms}
+                                title={!agreedToTerms && (listing.auction_terms_en || listing.auction_terms_fr) ? t('auction.mustAgreeToTermsFirst', 'Please agree to terms & conditions first') : ''}
                               >
                                 <Gavel className="mr-2 h-4 w-4" />
-                                Place Bid
+                                {t('bid.placeBid', 'Place Bid')}
                               </Button>
                             </div>
+                            {!agreedToTerms && (listing.auction_terms_en || listing.auction_terms_fr) && (
+                              <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 px-3 py-2 rounded-md">
+                                <Info className="h-3 w-3" />
+                                <span>{t('auction.agreeToTermsToPlaceBid', 'Please scroll up and agree to the Terms & Conditions to place a bid')}</span>
+                              </div>
+                            )}
 
                             {/* Bid Error Guide */}
                             <div className="mt-2">
