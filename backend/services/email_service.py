@@ -237,7 +237,7 @@ class EmailService:
             message = Mail(
                 from_email=Email(self.from_email, 'BidVex System'),
                 to_emails=To(admin_email),
-                subject=f'[BidVex] Email Delivery Failure',
+                subject='[BidVex] Email Delivery Failure',
                 plain_text_content=Content(
                     'text/plain',
                     "Failed to send email after multiple retries.\n\n"
