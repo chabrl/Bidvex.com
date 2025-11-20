@@ -4638,6 +4638,57 @@ async def review_currency_appeal(
         "appeal_id": appeal_id
     }
 
+# ==================== SENDGRID WEBHOOKS ====================
+
+@api_router.post("/webhooks/sendgrid")
+async def sendgrid_webhook(request: Request):
+    """
+    SendGrid Event Webhook for email tracking.
+    
+    Tracks: delivered, opened, clicked, bounced, dropped, etc.
+    Configure in SendGrid: Settings → Mail Settings → Event Webhook
+    """
+    try:
+        events = await request.json()
+        
+        # Process each event
+        for event in events:
+            event_type = event.get('event')
+            email = event.get('email')
+            timestamp = event.get('timestamp')
+            message_id = event.get('sg_message_id')
+            
+            # Log event for analytics
+            logger.info(
+                f"SendGrid event: type={event_type}, email={email}, "
+                f"message_id={message_id}, timestamp={timestamp}"
+            )
+            
+            # Store event in database for tracking
+            await db.email_events.insert_one({
+                "event_type": event_type,
+                "email": email,
+                "message_id": message_id,
+                "timestamp": datetime.fromtimestamp(timestamp) if timestamp else None,
+                "raw_event": event,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            })
+            
+            # Handle specific events
+            if event_type == 'bounce':
+                logger.warning(f"Email bounced: {email}, reason: {event.get('reason')}")
+                # TODO: Mark email as invalid in user profile
+            
+            elif event_type == 'dropped':
+                logger.error(f"Email dropped by SendGrid: {email}, reason: {event.get('reason')}")
+            
+        return {"status": "success", "processed": len(events)}
+        
+    except Exception as e:
+        logger.exception(f"SendGrid webhook error: {str(e)}")
+        # Return 200 to prevent SendGrid from retrying
+        return {"status": "error", "message": str(e)}
+
 app.include_router(api_router)
 
 app.add_middleware(
