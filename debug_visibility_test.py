@@ -8,7 +8,7 @@ import aiohttp
 import json
 from datetime import datetime, timezone, timedelta
 
-BASE_URL = "https://bidding-platform-14.preview.emergentagent.com/api"
+BASE_URL = "https://bidvault-2.preview.emergentagent.com/api"
 TEST_USER_EMAIL = "lots.homepage.tester@bazario.com"
 TEST_USER_PASSWORD = "LotsTest123!"
 
