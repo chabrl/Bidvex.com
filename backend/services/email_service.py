@@ -240,7 +240,7 @@ class EmailService:
                 subject=f'[BidVex] Email Delivery Failure',
                 plain_text_content=Content(
                     'text/plain',
-                    f"Failed to send email after multiple retries.\n\n"
+                    "Failed to send email after multiple retries.\n\n"
                     f"Recipient: {recipient}\n"
                     f"Template ID: {template_id}\n"
                     f"Error: {error}\n"
