@@ -126,3 +126,5 @@ zipp==3.23.0
 emergentintegrations==0.1.0
 APScheduler==3.11.1
 weasyprint
+sendgrid==6.11.0
+python-http-client==3.3.7
