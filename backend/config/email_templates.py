@@ -89,6 +89,17 @@ class EmailDataBuilder:
         }
     
     @staticmethod
+    def password_changed_email(user: Dict[str, Any]) -> Dict[str, Any]:
+        """Build data for password changed confirmation email."""
+        return {
+            'first_name': user.get('name', '').split()[0],
+            'email': user.get('email'),
+            'change_time': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
+            'support_email': 'support@bidvex.com',
+            'login_url': 'https://bidvex.com/auth'
+        }
+    
+    @staticmethod
     def bid_placed_email(
         user: Dict[str, Any],
         listing: Dict[str, Any],
