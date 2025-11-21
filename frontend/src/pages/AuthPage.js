@@ -108,7 +108,18 @@ const AuthPage = () => {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="password">{t('auth.password')}</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">{t('auth.password')}</Label>
+                {isLogin && (
+                  <Link 
+                    to="/forgot-password" 
+                    className="text-sm text-primary hover:underline"
+                    data-testid="forgot-password-link"
+                  >
+                    {t('auth.forgotPassword') || 'Forgot password?'}
+                  </Link>
+                )}
+              </div>
               <Input
                 id="password"
                 name="password"
