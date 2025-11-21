@@ -20,41 +20,41 @@ class EmailTemplates:
     Go to: SendGrid Dashboard → Email API → Dynamic Templates
     """
     
-    # User Authentication
-    WELCOME = 'd-welcome-template-id'  # New user registration
-    EMAIL_VERIFICATION = 'd-email-verification-id'  # Email verification
-    PASSWORD_RESET = 'd-password-reset-id'  # Password reset link
-    PASSWORD_CHANGED = 'd-password-changed-id'  # Password successfully changed
+    # User Authentication (Category Template ID: d-e0ee403fbd8646db8011339cf2eeac30)
+    WELCOME = 'd-e0ee403fbd8646db8011339cf2eeac30'  # New user registration
+    EMAIL_VERIFICATION = 'd-e0ee403fbd8646db8011339cf2eeac30'  # Email verification
+    PASSWORD_RESET = 'd-e0ee403fbd8646db8011339cf2eeac30'  # Password reset link
+    PASSWORD_CHANGED = 'd-e0ee403fbd8646db8011339cf2eeac30'  # Password successfully changed
     
-    # Bidding Notifications
-    BID_PLACED = 'd-bid-placed-id'  # Confirmation of bid placement
-    BID_OUTBID = 'd-outbid-id'  # User has been outbid
-    BID_WON = 'd-bid-won-id'  # User won the auction
-    BID_LOST = 'd-bid-lost-id'  # Auction ended, user didn't win
+    # Bidding Notifications (Category Template ID: d-13806757fbd24818b24bc520074ea979)
+    BID_PLACED = 'd-13806757fbd24818b24bc520074ea979'  # Confirmation of bid placement
+    BID_OUTBID = 'd-13806757fbd24818b24bc520074ea979'  # User has been outbid
+    BID_WON = 'd-13806757fbd24818b24bc520074ea979'  # User won the auction
+    BID_LOST = 'd-13806757fbd24818b24bc520074ea979'  # Auction ended, user didn't win
     
-    # Auction Notifications
-    AUCTION_ENDING_SOON = 'd-auction-ending-id'  # Auction ending in 24h
-    AUCTION_STARTED = 'd-auction-started-id'  # Upcoming auction now live
-    AUCTION_CANCELLED = 'd-auction-cancelled-id'  # Auction cancelled by seller
+    # Auction Updates (Category Template ID: d-f22625d31ef74262887e3a8f96934bc1)
+    AUCTION_ENDING_SOON = 'd-f22625d31ef74262887e3a8f96934bc1'  # Auction ending in 24h
+    AUCTION_STARTED = 'd-f22625d31ef74262887e3a8f96934bc1'  # Upcoming auction now live
+    AUCTION_CANCELLED = 'd-f22625d31ef74262887e3a8f96934bc1'  # Auction cancelled by seller
     
-    # Seller Notifications
-    NEW_BID_RECEIVED = 'd-new-bid-received-id'  # Seller: new bid on item
-    LISTING_APPROVED = 'd-listing-approved-id'  # Listing approved by admin
-    LISTING_REJECTED = 'd-listing-rejected-id'  # Listing rejected
-    ITEM_SOLD = 'd-item-sold-id'  # Item sold successfully
+    # Seller Notifications (Category Template ID: d-794b529ec05e407da60b26113e0c4ea1)
+    NEW_BID_RECEIVED = 'd-794b529ec05e407da60b26113e0c4ea1'  # Seller: new bid on item
+    LISTING_APPROVED = 'd-794b529ec05e407da60b26113e0c4ea1'  # Listing approved by admin
+    LISTING_REJECTED = 'd-794b529ec05e407da60b26113e0c4ea1'  # Listing rejected
+    ITEM_SOLD = 'd-794b529ec05e407da60b26113e0c4ea1'  # Item sold successfully
     
-    # Financial
-    INVOICE = 'd-invoice-id'  # Invoice/receipt for purchase
-    PAYMENT_RECEIVED = 'd-payment-received-id'  # Payment confirmed
-    PAYMENT_FAILED = 'd-payment-failed-id'  # Payment processing failed
-    REFUND_ISSUED = 'd-refund-issued-id'  # Refund processed
+    # Financial (Category Template ID: d-a8cb13c061e3449394e900b406e9a391)
+    INVOICE = 'd-a8cb13c061e3449394e900b406e9a391'  # Invoice/receipt for purchase
+    PAYMENT_RECEIVED = 'd-a8cb13c061e3449394e900b406e9a391'  # Payment confirmed
+    PAYMENT_FAILED = 'd-a8cb13c061e3449394e900b406e9a391'  # Payment processing failed
+    REFUND_ISSUED = 'd-a8cb13c061e3449394e900b406e9a391'  # Refund processed
     
-    # Messaging
-    NEW_MESSAGE = 'd-new-message-id'  # New message from another user
+    # Communication (Category Template ID: d-3153ed45d6764d0687e69c85ffddcb10)
+    NEW_MESSAGE = 'd-3153ed45d6764d0687e69c85ffddcb10'  # New message from another user
     
-    # Admin
-    REPORT_RECEIVED = 'd-report-received-id'  # Report/flag submitted
-    ACCOUNT_SUSPENDED = 'd-account-suspended-id'  # Account suspended
+    # Admin (Category Template ID: d-94d4a5d7855b4fa38badae9cf12ded41)
+    REPORT_RECEIVED = 'd-94d4a5d7855b4fa38badae9cf12ded41'  # Report/flag submitted
+    ACCOUNT_SUSPENDED = 'd-94d4a5d7855b4fa38badae9cf12ded41'  # Account suspended
 
 
 class EmailDataBuilder:
