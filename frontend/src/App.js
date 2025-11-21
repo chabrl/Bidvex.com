@@ -101,6 +101,8 @@ const App = () => {
           <Route path="/lots/:id" element={<MultiItemListingDetailPage />} />
           <Route path="/listing/:id" element={<ListingDetailPage />} />
           <Route path="/auth" element={<AuthPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/watchlist" element={
             <ProtectedRoute><WatchlistPage /></ProtectedRoute>
