@@ -648,6 +648,208 @@ async def logout(current_user: User = Depends(get_current_user)):
 async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
+# Password Reset Models
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+class PasswordResetToken(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    token: str
+    expires_at: datetime
+    used: bool = False
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+@api_router.post("/auth/forgot-password")
+async def forgot_password(request: ForgotPasswordRequest):
+    """
+    Initiate password reset process.
+    Sends reset email if user exists (doesn't reveal if email exists for security).
+    """
+    try:
+        # Find user by email
+        user_doc = await db.users.find_one({"email": request.email}, {"_id": 0})
+        
+        if user_doc:
+            # Generate secure reset token
+            reset_token = str(uuid.uuid4())
+            expires_at = datetime.now(timezone.utc) + timedelta(hours=1)  # 1 hour expiry
+            
+            # Store reset token in database
+            token_doc = {
+                "id": str(uuid.uuid4()),
+                "user_id": user_doc["id"],
+                "token": reset_token,
+                "expires_at": expires_at.isoformat(),
+                "used": False,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            await db.password_reset_tokens.insert_one(token_doc)
+            
+            # Send password reset email using SendGrid
+            email_service = get_email_service()
+            
+            if email_service.is_configured():
+                from config.email_templates import send_password_reset_email
+                
+                try:
+                    result = await send_password_reset_email(
+                        email_service,
+                        user=user_doc,
+                        reset_token=reset_token,
+                        language=user_doc.get('preferred_language', 'en')
+                    )
+                    
+                    if result['success']:
+                        logger.info(f"Password reset email sent to {request.email}, message_id: {result.get('message_id')}")
+                    else:
+                        logger.error(f"Failed to send password reset email: {result.get('error')}")
+                        # Don't fail the request, just log the error
+                        
+                except Exception as e:
+                    logger.exception(f"Error sending password reset email: {str(e)}")
+                    # Don't reveal email service errors to user
+            else:
+                logger.warning("Email service not configured - password reset email not sent")
+        
+        # Always return success to prevent email enumeration
+        return {
+            "message": "If an account with that email exists, a password reset link has been sent.",
+            "success": True
+        }
+        
+    except Exception as e:
+        logger.exception(f"Error in forgot_password: {str(e)}")
+        # Return generic message to prevent information leakage
+        return {
+            "message": "If an account with that email exists, a password reset link has been sent.",
+            "success": True
+        }
+
+@api_router.post("/auth/reset-password")
+async def reset_password(request: ResetPasswordRequest):
+    """
+    Reset password using valid token.
+    """
+    try:
+        # Find the token
+        token_doc = await db.password_reset_tokens.find_one(
+            {"token": request.token, "used": False},
+            {"_id": 0}
+        )
+        
+        if not token_doc:
+            raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+        
+        # Check if token is expired
+        expires_at = datetime.fromisoformat(token_doc["expires_at"])
+        if datetime.now(timezone.utc) > expires_at:
+            raise HTTPException(status_code=400, detail="Reset token has expired")
+        
+        # Get user
+        user_doc = await db.users.find_one(
+            {"id": token_doc["user_id"]},
+            {"_id": 0}
+        )
+        
+        if not user_doc:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Validate new password
+        if len(request.new_password) < 6:
+            raise HTTPException(status_code=400, detail="Password must be at least 6 characters long")
+        
+        # Hash new password
+        hashed_password = pwd_context.hash(request.new_password)
+        
+        # Update user password
+        await db.users.update_one(
+            {"id": user_doc["id"]},
+            {"$set": {"password": hashed_password}}
+        )
+        
+        # Mark token as used
+        await db.password_reset_tokens.update_one(
+            {"token": request.token},
+            {"$set": {"used": True}}
+        )
+        
+        # Invalidate all existing sessions for security
+        await db.sessions.delete_many({"user_id": user_doc["id"]})
+        
+        # Send password changed confirmation email
+        email_service = get_email_service()
+        
+        if email_service.is_configured():
+            try:
+                from config.email_templates import EmailTemplates, EmailDataBuilder
+                
+                result = await email_service.send_email(
+                    to=user_doc["email"],
+                    template_id=EmailTemplates.PASSWORD_CHANGED,
+                    dynamic_data=EmailDataBuilder.password_changed_email(user_doc),
+                    language=user_doc.get('preferred_language', 'en')
+                )
+                
+                if result['success']:
+                    logger.info(f"Password changed confirmation sent to {user_doc['email']}")
+                else:
+                    logger.error(f"Failed to send password changed email: {result.get('error')}")
+                    
+            except Exception as e:
+                logger.exception(f"Error sending password changed email: {str(e)}")
+        
+        logger.info(f"Password reset successful for user {user_doc['id']}")
+        
+        return {
+            "message": "Password reset successful. Please log in with your new password.",
+            "success": True
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error in reset_password: {str(e)}")
+        raise HTTPException(status_code=500, detail="An error occurred while resetting password")
+
+@api_router.get("/auth/verify-reset-token/{token}")
+async def verify_reset_token(token: str):
+    """
+    Verify if a reset token is valid and not expired.
+    Used by frontend to check token before showing password reset form.
+    """
+    try:
+        token_doc = await db.password_reset_tokens.find_one(
+            {"token": token, "used": False},
+            {"_id": 0}
+        )
+        
+        if not token_doc:
+            return {"valid": False, "message": "Invalid or already used token"}
+        
+        # Check if expired
+        expires_at = datetime.fromisoformat(token_doc["expires_at"])
+        if datetime.now(timezone.utc) > expires_at:
+            return {"valid": False, "message": "Token has expired"}
+        
+        # Calculate time remaining
+        time_remaining = expires_at - datetime.now(timezone.utc)
+        minutes_remaining = int(time_remaining.total_seconds() / 60)
+        
+        return {
+            "valid": True,
+            "message": "Token is valid",
+            "expires_in_minutes": minutes_remaining
+        }
+        
+    except Exception as e:
+        logger.exception(f"Error verifying reset token: {str(e)}")
+        return {"valid": False, "message": "Error verifying token"}
+
 @api_router.get("/users/{user_id}", response_model=User)
 async def get_user(user_id: str):
     user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
