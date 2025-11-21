@@ -587,7 +587,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Terms & Conditions UX Enhancement Testing"
+    - "Password Reset Flow Testing"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
