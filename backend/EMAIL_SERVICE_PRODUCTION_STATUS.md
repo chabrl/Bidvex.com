@@ -252,13 +252,28 @@ mongosh bazario_db --eval "db.email_events.find().limit(5).pretty()"
 - [x] **Real email sending validated (4 test emails sent)**
 - [x] **Helper functions tested and working**
 
-### 🔧 Remaining Optional Tasks
-- [ ] Configure SendGrid webhook URL (for event tracking)
-- [ ] Verify webhook event storage in MongoDB
-- [ ] Add bilingual (FR) template versions
-- [ ] Test all 22 template variations
+### 🔧 Optional Enhancements (Ready for Implementation)
+
+**Webhook Configuration** 📊
+- [ ] Configure SendGrid Event Webhook
+- [ ] Guide: `/app/backend/WEBHOOK_CONFIGURATION_GUIDE.md`
+- [ ] URL: `https://bidvex.com/api/webhooks/sendgrid`
+- [ ] Events: delivered, opened, clicked, bounced
+- [ ] Estimated Time: 15-20 minutes
+
+**Bilingual Support** 🌍
+- [ ] Add French (FR) translations to templates
+- [ ] Guide: `/app/backend/BILINGUAL_SUPPORT_GUIDE.md`
+- [ ] Option 1: Single template with conditionals (recommended)
+- [ ] Option 2: Separate FR template IDs
+- [ ] Estimated Time: 4-6 hours (all 7 templates)
+
+**Additional Tasks:**
+- [ ] Test all 22 template variations with real data
 - [ ] Monitor delivery rates in SendGrid dashboard
 - [ ] Set up email alerts for delivery failures
+- [ ] Create admin dashboard for email analytics
+- [ ] Implement email preferences in user settings
 
 ### 📋 Optional Enhancements
 - [ ] Password Reset flow implementation
