@@ -137,25 +137,29 @@ All 7 SendGrid template categories have been successfully configured and mapped 
 
 All emails returned Status 202 (Accepted by SendGrid for delivery)
 
-#### Step 3: Update Template IDs
+### How to Test Production Templates
 
-After creating each template in SendGrid:
-1. Copy the Template ID (format: `d-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`)
-2. Open: `/app/backend/config/email_templates.py`
-3. Replace placeholder IDs with actual SendGrid Template IDs
+Run the production template verification script to send test emails for all 7 categories:
 
-Example:
-```python
-# Before
-WELCOME = 'd-welcome-template-id'
-
-# After (example)
-WELCOME = 'd-a1b2c3d4e5f6789012345678901234'
+```bash
+cd /app/backend
+python test_production_templates.py
 ```
 
-#### Step 4: Template Variables
+This will:
+1. Prompt for your email address
+2. Send 7 test emails (one per template category)
+3. Display results for each template
+4. Provide detailed success/failure information
 
-Each template should support these dynamic variables:
+**What to Check:**
+- All 7 emails arrive in your inbox
+- Template formatting is correct
+- Dynamic variables are rendered properly
+- Images and links work correctly
+- Branding is consistent
+
+### Template Variables Reference
 
 **Common Variables (all templates):**
 - `{{ first_name }}` - User's first name
@@ -163,12 +167,19 @@ Each template should support these dynamic variables:
 - `{{ current_year }}` - Current year for footer
 
 **Template-Specific Variables:**
-See `/app/backend/config/email_templates.py` for complete list of variables for each template type.
+See `/app/backend/config/email_templates.py` for the complete list of variables required for each template type.
 
-**Bilingual Support:**
-- Create EN and FR versions of each template
-- Use `{{ language }}` variable to switch content
-- Or create separate template IDs for each language
+### Bilingual Support
+
+**Option 1: Single Template with Language Logic** (Recommended)
+- Use `{{ language }}` variable in SendGrid template
+- Add conditional blocks: `{{#if (eq language "fr")}}...{{/if}}`
+- Dynamically switch content based on language
+
+**Option 2: Separate Template IDs**
+- Create separate templates for EN and FR
+- Modify `email_templates.py` to select template based on language
+- More complex but offers complete translation control
 
 ---
 
