@@ -694,9 +694,13 @@ async def forgot_password(request: ForgotPasswordRequest):
             email_service = get_email_service()
             
             if email_service.is_configured():
-                from config.email_templates import send_password_reset_email
+                from config.email_templates import send_password_reset_email, EmailDataBuilder
                 
                 try:
+                    # Build email data for logging
+                    email_data = EmailDataBuilder.password_reset_email(user_doc, reset_token)
+                    logger.info(f"Sending password reset email with data: {email_data}")
+                    
                     result = await send_password_reset_email(
                         email_service,
                         user=user_doc,
