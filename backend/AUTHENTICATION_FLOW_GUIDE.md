@@ -272,8 +272,12 @@ if email_service.is_configured():
 **Email Template Variables:**
 - `first_name`: User's first name
 - `reset_url`: `https://bidvex.com/reset-password?token={{token}}`
-- `expires_in_hours`: 1
+- `reset_link`: `https://bidvex.com/reset-password?token={{token}}` (alternative name)
+- `expires_in_hours`: 1 (numeric)
+- `expiry_time`: "1 hour" (formatted string)
 - `support_email`: support@bidvex.com
+
+**Note**: Both `reset_url` and `reset_link` are sent for template compatibility. Use `reset_link` in your SendGrid template button href.
 
 ---
 
