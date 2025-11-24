@@ -81,10 +81,16 @@ class EmailDataBuilder:
         expires_in_hours: int = 1
     ) -> Dict[str, Any]:
         """Build data for password reset email."""
+        reset_url = f'https://bidvex.com/reset-password?token={reset_token}'
+        expiry_message = f'{expires_in_hours} hour' if expires_in_hours == 1 else f'{expires_in_hours} hours'
+        
         return {
             'first_name': user.get('name', '').split()[0],
-            'reset_url': f'https://bidvex.com/reset-password?token={reset_token}',
+            # Both variable name formats for template compatibility
+            'reset_url': reset_url,
+            'reset_link': reset_url,  # Alternative name used in template
             'expires_in_hours': expires_in_hours,
+            'expiry_time': expiry_message,  # Formatted expiry time
             'support_email': 'support@bidvex.com'
         }
     
