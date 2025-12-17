@@ -347,9 +347,9 @@ class AntiSnipingTester:
                     # Verify extension was applied
                     assert data.get("extension_applied") == True, "Extension should be applied for bid within 2 minutes"
                     
-                    # Verify new auction end time for this lot
-                    if "new_auction_end" in data:
-                        new_end_str = data["new_auction_end"]
+                    # Verify new lot end time for this lot (multi-item uses different field name)
+                    if "new_lot_end_time" in data:
+                        new_end_str = data["new_lot_end_time"]
                         new_end = datetime.fromisoformat(new_end_str.replace('Z', '+00:00'))
                         expected_end = bid_time + timedelta(seconds=120)
                         
@@ -360,7 +360,7 @@ class AntiSnipingTester:
                         print(f"   - New lot end time: {new_end_str}")
                         print(f"   - Extension formula verified for Lot 1")
                     else:
-                        print("❌ Missing new_auction_end in response")
+                        print("❌ Missing new_lot_end_time in response")
                         return False
                     
                 else:
