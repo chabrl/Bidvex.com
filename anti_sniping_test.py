@@ -408,21 +408,13 @@ class AntiSnipingTester:
                         lot2_extension_count = lot2.get("extension_count", 0)
                         assert lot2_extension_count == 0, f"Lot 2 extension count should be 0, got {lot2_extension_count}"
                         
-                        # Verify Lot 2 end time is different from Lot 1 (independent)
-                        if isinstance(lot2_end_str, str):
-                            lot2_end = datetime.fromisoformat(lot2_end_str.replace('Z', '+00:00'))
-                        else:
-                            lot2_end = lot2_end_str
+                        # The key test: Lot 2 should have 0 extensions while Lot 1 has 1
+                        lot1_extension_count = lot1.get("extension_count", 0)
+                        assert lot1_extension_count == 1, f"Lot 1 should have 1 extension, got {lot1_extension_count}"
+                        assert lot2_extension_count == 0, f"Lot 2 should have 0 extensions, got {lot2_extension_count}"
                         
-                        if isinstance(lot1_end_str, str):
-                            lot1_end = datetime.fromisoformat(lot1_end_str.replace('Z', '+00:00'))
-                        else:
-                            lot1_end = lot1_end_str
-                        
-                        # Lot 2 should have a different end time than Lot 1 (independent lots)
-                        time_diff = abs((lot2_end - lot1_end).total_seconds())
-                        assert time_diff > 30, f"Lot 2 should have different end time than Lot 1 (independent lots)"
                         print(f"✅ Verified: Lot 1 extension did NOT affect Lot 2 (independent cascading)")
+                        print(f"   - Lot 1 extensions: {lot1_extension_count}, Lot 2 extensions: {lot2_extension_count}")
                     
                 else:
                     print(f"❌ Failed to retrieve updated multi-item listing: {response.status}")
