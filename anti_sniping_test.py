@@ -178,7 +178,10 @@ class AntiSnipingTester:
                         "current_price": 50.0,
                         "condition": "New",
                         "images": [],
-                        "lot_end_time": (datetime.now(timezone.utc) + timedelta(seconds=end_in_seconds)).isoformat()
+                        "lot_end_time": (datetime.now(timezone.utc) + timedelta(seconds=end_in_seconds)).isoformat(),
+                        "available_quantity": 1,
+                        "sold_quantity": 0,
+                        "pricing_mode": "multiplied"
                     },
                     {
                         "lot_number": 2,
@@ -189,7 +192,10 @@ class AntiSnipingTester:
                         "current_price": 75.0,
                         "condition": "New",
                         "images": [],
-                        "lot_end_time": (datetime.now(timezone.utc) + timedelta(seconds=end_in_seconds + 60)).isoformat()
+                        "lot_end_time": (datetime.now(timezone.utc) + timedelta(seconds=end_in_seconds + 60)).isoformat(),
+                        "available_quantity": 1,
+                        "sold_quantity": 0,
+                        "pricing_mode": "multiplied"
                     }
                 ]
             }
