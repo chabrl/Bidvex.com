@@ -1633,14 +1633,76 @@ async def create_promotion_checkout(request: Request, data: Dict[str, Any], curr
     return {"url": session.url, "session_id": session.session_id}
 
 @app.websocket("/ws/listings/{listing_id}")
-async def websocket_endpoint(websocket: WebSocket, listing_id: str):
-    await manager.connect(websocket, listing_id)
+async def websocket_endpoint(websocket: WebSocket, listing_id: str, user_id: str = None):
+    """
+    Enhanced WebSocket endpoint for real-time bidding updates.
+    Supports personalized status updates (LEADING/OUTBID).
+    """
+    await manager.connect(websocket, listing_id, user_id)
+    logger.info(f"WebSocket connected: listing_id={listing_id}, user_id={user_id}")
+    
     try:
+        # Send initial connection confirmation
+        await websocket.send_json({
+            'type': 'CONNECTION_ESTABLISHED',
+            'listing_id': listing_id,
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+            'message': 'Real-time updates active'
+        })
+        
+        # Send current listing state
+        listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
+        if listing:
+            # Get highest bidder
+            highest_bid = await db.bids.find_one(
+                {"listing_id": listing_id},
+                {"_id": 0},
+                sort=[("amount", -1)]
+            )
+            
+            highest_bidder_id = highest_bid.get('bidder_id') if highest_bid else None
+            bid_status = 'LEADING' if user_id and user_id == highest_bidder_id else 'OUTBID' if highest_bid else 'NO_BIDS'
+            
+            await websocket.send_json({
+                'type': 'INITIAL_STATE',
+                'listing_id': listing_id,
+                'current_price': listing.get('current_price'),
+                'bid_count': listing.get('bid_count', 0),
+                'highest_bidder_id': highest_bidder_id,
+                'bid_status': bid_status,
+                'timestamp': datetime.now(timezone.utc).isoformat()
+            })
+        
+        # Keep connection alive with heartbeat
         while True:
-            data = await websocket.receive_text()
-            await asyncio.sleep(1)
+            try:
+                # Receive and handle messages
+                message = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
+                data = json.loads(message) if message else {}
+                
+                # Handle ping/pong for connection health
+                if data.get('type') == 'PING':
+                    await websocket.send_json({
+                        'type': 'PONG',
+                        'timestamp': datetime.now(timezone.utc).isoformat()
+                    })
+                    
+            except asyncio.TimeoutError:
+                # Send heartbeat
+                try:
+                    await websocket.send_json({
+                        'type': 'HEARTBEAT',
+                        'timestamp': datetime.now(timezone.utc).isoformat()
+                    })
+                except:
+                    break
+                    
     except WebSocketDisconnect:
-        manager.disconnect(websocket, listing_id)
+        logger.info(f"WebSocket disconnected: listing_id={listing_id}, user_id={user_id}")
+    except Exception as e:
+        logger.error(f"WebSocket error: {str(e)}")
+    finally:
+        manager.disconnect(websocket, listing_id, user_id)
 
 @api_router.post("/payment-methods")
 async def add_payment_method(data: PaymentMethodCreate, current_user: User = Depends(get_current_user)):
