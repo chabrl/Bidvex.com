@@ -43,6 +43,16 @@ const ListingDetailPage = () => {
   const [rateSellerModalOpen, setRateSellerModalOpen] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [photoIndex, setPhotoIndex] = useState(0);
+  
+  // Real-time bidding hook - provides instant updates via WebSocket
+  const {
+    currentPrice: realtimePrice,
+    bidCount: realtimeBidCount,
+    bidStatus,
+    isConnected,
+    connectionHealth,
+    lastUpdate
+  } = useRealtimeBidding(id);
 
   useEffect(() => {
     fetchListing();
