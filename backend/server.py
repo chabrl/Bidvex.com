@@ -408,6 +408,20 @@ class Lot(BaseModel):
     lot_end_time: Optional[datetime] = None  # Staggered end time (1 min per lot)
     pricing_mode: str = "multiplied"  # "fixed" or "multiplied" - how quantity affects final price
     extension_count: int = 0  # Number of 3-min extensions applied (max 3)
+    # Buy Now functionality
+    buy_now_price: Optional[float] = None  # Fixed "Buy Now" price per unit
+    buy_now_enabled: bool = False  # Toggle Buy Now availability
+    available_quantity: int = None  # Current available quantity (decrements on Buy Now)
+    sold_quantity: int = 0  # Quantity sold via Buy Now
+    lot_status: str = "active"  # active, partially_sold, sold_out, auction_ended
+    # Bid tracking
+    bid_count: int = 0
+    highest_bidder_id: Optional[str] = None
+    # Promotion
+    is_promoted: bool = False  # Seller-paid promotion
+    promotion_tier: Optional[str] = None  # "premium", "standard", "basic"
+    impressions: int = 0  # Number of times viewed in search
+    clicks: int = 0  # Number of times clicked
 
 class MultiItemListingCreate(BaseModel):
     title: str
