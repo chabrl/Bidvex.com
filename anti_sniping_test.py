@@ -631,14 +631,17 @@ class AntiSnipingTester:
                     data = await response.json()
                     
                     print(f"✅ Items marketplace API working")
-                    print(f"   - Total items returned: {len(data)}")
                     
-                    # Verify response structure
-                    assert isinstance(data, list), "Response should be a list of items"
+                    # Verify response structure - should be {"items": [...]}
+                    assert isinstance(data, dict), "Response should be a dict with 'items' key"
+                    assert "items" in data, "Response should contain 'items' key"
                     
-                    if len(data) > 0:
-                        item = data[0]
-                        required_fields = ["title", "current_price", "lot_end_time"]
+                    items = data["items"]
+                    print(f"   - Total items returned: {len(items)}")
+                    
+                    if len(items) > 0:
+                        item = items[0]
+                        required_fields = ["title", "current_price", "auction_end_date"]
                         
                         for field in required_fields:
                             if field not in item:
