@@ -2948,14 +2948,20 @@ async def bid_on_lot(listing_id: str, lot_number: int, data: Dict[str, Any], cur
         )
     
     # Return response with clean bid data (original bid dict without MongoDB _id)
-    return {
+    response = {
         "message": "Bid placed successfully",
         "bid": bid,  # Original dict, not mutated by MongoDB
         "minimum_next_bid": current_price + get_minimum_increment(listing, amount) if bid_type == "normal" else None,
         "extension_applied": extension_applied,
-        "extension_count": lots[lot_index].get("extension_count", 0),
-        "is_final_extension": lots[lot_index].get("extension_count", 0) >= 3
+        "extension_count": lots[lot_index].get("extension_count", 0)
     }
+    
+    # Include new end time if extension was applied
+    if extension_applied and new_end_time:
+        response["new_lot_end_time"] = new_end_time.isoformat()
+        response["anti_sniping_message"] = "Auction extended by 2 minutes due to last-minute bidding activity."
+    
+    return response
 
 @app.websocket("/ws/messages/{user_id}")
 async def websocket_messages(websocket: WebSocket, user_id: str):
