@@ -1443,12 +1443,46 @@ async def place_bid(bid_data: BidCreate, current_user: User = Depends(get_curren
         raise HTTPException(status_code=400, detail="Auction has ended")
     if bid_data.amount <= listing["current_price"]:
         raise HTTPException(status_code=400, detail="Bid must be higher than current price")
+    
+    # Create bid
     bid = Bid(listing_id=bid_data.listing_id, bidder_id=current_user.id, amount=bid_data.amount)
     bid_dict = bid.model_dump()
     bid_dict["created_at"] = bid_dict["created_at"].isoformat()
+    
+    # Insert bid and update listing atomically
     await db.bids.insert_one(bid_dict)
-    await db.listings.update_one({"id": bid_data.listing_id}, {"$set": {"current_price": bid_data.amount}, "$inc": {"bid_count": 1}})
-    await manager.broadcast(bid_data.listing_id, {"type": "new_bid", "bid": bid_dict, "current_price": bid_data.amount})
+    new_bid_count = listing.get("bid_count", 0) + 1
+    await db.listings.update_one(
+        {"id": bid_data.listing_id}, 
+        {
+            "$set": {
+                "current_price": bid_data.amount,
+                "highest_bidder_id": current_user.id  # Track highest bidder
+            }, 
+            "$inc": {"bid_count": 1}
+        }
+    )
+    
+    # Get updated listing for broadcast
+    updated_listing = await db.listings.find_one({"id": bid_data.listing_id}, {"_id": 0})
+    
+    # Real-time broadcast with personalized status
+    await manager.broadcast_bid_update(
+        bid_data.listing_id,
+        {
+            'id': bid_dict['id'],
+            'bidder_id': current_user.id,
+            'amount': bid_data.amount,
+            'created_at': bid_dict['created_at']
+        },
+        {
+            'bid_count': new_bid_count,
+            'current_price': bid_data.amount
+        }
+    )
+    
+    logger.info(f"Bid placed: listing={bid_data.listing_id}, bidder={current_user.id}, amount={bid_data.amount}")
+    
     return bid
 
 @api_router.get("/bids/listing/{listing_id}")
