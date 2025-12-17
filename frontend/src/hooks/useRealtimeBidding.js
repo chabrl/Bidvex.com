@@ -105,29 +105,51 @@ export const useRealtimeBidding = (listingId) => {
       return; // Already connected
     }
 
+    setConnectionHealth('connecting');
+
     try {
       const wsUrl = user 
         ? `${WS_URL}/ws/listings/${listingId}?user_id=${user.id}`
         : `${WS_URL}/ws/listings/${listingId}`;
       
       console.log('[Bidding] Connecting to WebSocket:', wsUrl);
+      debugToast(`Connecting to ${wsUrl.split('?')[0]}...`, 'info', user);
       
       const ws = new WebSocket(wsUrl);
       
       ws.onopen = () => {
         console.log('[Bidding] WebSocket connected');
         setIsConnected(true);
+        setConnectionHealth('healthy');
         reconnectAttemptsRef.current = 0;
+        lastPongRef.current = Date.now();
         stopFallbackPolling();
         
-        // Send ping every 25 seconds to keep connection alive
-        const pingInterval = setInterval(() => {
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'PING' }));
-          }
-        }, 25000);
+        debugToast('✅ WebSocket Connected - Live updates active', 'success', user);
         
-        ws.pingInterval = pingInterval;
+        // Clear any existing ping interval
+        if (pingIntervalRef.current) {
+          clearInterval(pingIntervalRef.current);
+        }
+        
+        // Send ping every 20 seconds (as user requested)
+        pingIntervalRef.current = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            // Check if we haven't received a pong in 40 seconds (missed 2 pings)
+            const timeSinceLastPong = Date.now() - (lastPongRef.current || Date.now());
+            if (timeSinceLastPong > 40000) {
+              console.warn('[Bidding] No pong received in 40s, connection may be dead');
+              setConnectionHealth('degraded');
+              debugToast('⚠️ Connection degraded - no heartbeat response', 'warning', user);
+              // Force reconnect
+              ws.close();
+              return;
+            }
+            
+            console.log('[Bidding] Sending PING');
+            ws.send(JSON.stringify({ type: 'PING', timestamp: Date.now() }));
+          }
+        }, 20000);
       };
 
       ws.onmessage = (event) => {
@@ -136,7 +158,8 @@ export const useRealtimeBidding = (listingId) => {
           
           switch (data.type) {
             case 'CONNECTION_ESTABLISHED':
-              console.log('[Bidding] Connection established');
+              console.log('[Bidding] Connection established:', data);
+              debugToast(`Connection confirmed: ${data.message}`, 'success', user);
               break;
               
             case 'INITIAL_STATE':
@@ -146,6 +169,7 @@ export const useRealtimeBidding = (listingId) => {
               setBidStatus(data.bid_status);
               setLastUpdate(data.timestamp);
               console.log('[Bidding] Initial state received:', data);
+              debugToast(`Initial state: $${data.current_price}, ${data.bid_count} bids`, 'info', user);
               break;
               
             case 'BID_UPDATE':
@@ -156,13 +180,17 @@ export const useRealtimeBidding = (listingId) => {
               setBidStatus(data.bid_status);
               setLastUpdate(data.timestamp);
               
+              const latency = Date.now() - new Date(data.timestamp).getTime();
               console.log('[Bidding] Real-time update:', {
                 price: data.current_price,
                 status: data.bid_status,
-                latency: Date.now() - new Date(data.timestamp).getTime() + 'ms'
+                latency: latency + 'ms'
               });
               
-              // Show toast notification
+              // Admin-only debug toast for bid updates
+              debugToast(`📥 Incoming Bid: $${data.current_price} (${latency}ms latency) - Status: ${data.bid_status}`, 'info', user);
+              
+              // Show toast notification for all users
               if (data.bid_status === 'OUTBID' && user) {
                 toast.warning('You\'ve been outbid!', {
                   description: `New bid: $${data.current_price}`,
@@ -176,8 +204,15 @@ export const useRealtimeBidding = (listingId) => {
               break;
               
             case 'HEARTBEAT':
+              lastPongRef.current = Date.now();
+              setConnectionHealth('healthy');
+              console.log('[Bidding] Heartbeat received from server');
+              break;
+              
             case 'PONG':
-              // Connection health check
+              lastPongRef.current = Date.now();
+              setConnectionHealth('healthy');
+              console.log('[Bidding] Pong received');
               break;
               
             default:
@@ -185,21 +220,28 @@ export const useRealtimeBidding = (listingId) => {
           }
         } catch (error) {
           console.error('[Bidding] Error parsing message:', error);
+          debugToast(`Parse error: ${error.message}`, 'error', user);
         }
       };
 
       ws.onerror = (error) => {
         console.error('[Bidding] WebSocket error:', error);
         setIsConnected(false);
+        setConnectionHealth('disconnected');
+        debugToast(`WebSocket error - check console`, 'error', user);
       };
 
       ws.onclose = (event) => {
         console.log('[Bidding] WebSocket closed:', event.code, event.reason);
         setIsConnected(false);
+        setConnectionHealth('disconnected');
+        
+        debugToast(`Connection closed (code: ${event.code})`, 'warning', user);
         
         // Clear ping interval
-        if (ws.pingInterval) {
-          clearInterval(ws.pingInterval);
+        if (pingIntervalRef.current) {
+          clearInterval(pingIntervalRef.current);
+          pingIntervalRef.current = null;
         }
         
         // Start fallback polling immediately
