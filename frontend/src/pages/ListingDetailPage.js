@@ -143,18 +143,25 @@ const ListingDetailPage = () => {
 
   if (!listing) return null;
 
-  // Use real-time end date if available (anti-sniping extension), otherwise use listing end date
+  // CRITICAL: Use real-time end date as SINGLE SOURCE OF TRUTH
+  // This prevents UI/Logic sync conflicts between countdown and backend validation
+  // Priority: WebSocket realtimeEndDate > listing.auction_end_date
   const effectiveEndDate = realtimeEndDate || new Date(listing.auction_end_date);
-  const isAuctionEnded = new Date() > effectiveEndDate;
   
-  // Debug logging for promote button visibility
-  console.log('=== Promote Button Debug ===');
-  console.log('User:', user);
-  console.log('Listing seller_id:', listing.seller_id);
-  console.log('User matches seller?', user && listing.seller_id === user.id);
-  console.log('Is promoted?', listing.is_promoted);
-  console.log('Should show promote button?', user && listing.seller_id === user.id && !listing.is_promoted);
-  console.log('Time extended by anti-sniping:', timeExtended);
+  // Only mark as ended if BOTH countdown is complete AND we're not waiting for WebSocket sync
+  // This prevents false "Auction has ended" when anti-sniping extensions occur
+  const now = new Date();
+  const timeRemaining = effectiveEndDate - now;
+  const isAuctionEnded = timeRemaining <= 0 && bidStatus !== 'EXTENDING';
+  
+  // Debug logging
+  console.log('=== Auction Status Debug ===');
+  console.log('Listing end date:', listing.auction_end_date);
+  console.log('Real-time end date:', realtimeEndDate?.toISOString());
+  console.log('Effective end date:', effectiveEndDate.toISOString());
+  console.log('Time remaining (ms):', timeRemaining);
+  console.log('Is auction ended:', isAuctionEnded);
+  console.log('Time extended:', timeExtended);
 
   return (
     <div className="min-h-screen py-8 px-4" data-testid="listing-detail-page">
