@@ -2135,6 +2135,22 @@ async def websocket_endpoint(
             highest_bidder_id = highest_bid.get('bidder_id') if highest_bid else None
             bid_status = 'LEADING' if user_id and user_id == highest_bidder_id else 'OUTBID' if highest_bid else 'NO_BIDS'
             
+            # Include auction_end_date for countdown synchronization
+            auction_end_date = listing.get('auction_end_date')
+            if auction_end_date and not isinstance(auction_end_date, str):
+                auction_end_date = auction_end_date.isoformat()
+            
+            # Check if auction has actually ended
+            now = datetime.now(timezone.utc)
+            if auction_end_date:
+                try:
+                    end_dt = datetime.fromisoformat(auction_end_date.replace('Z', '+00:00'))
+                    auction_active = now < end_dt
+                except:
+                    auction_active = True
+            else:
+                auction_active = True
+            
             await websocket.send_json({
                 'type': 'INITIAL_STATE',
                 'listing_id': listing_id,
@@ -2142,7 +2158,9 @@ async def websocket_endpoint(
                 'bid_count': listing.get('bid_count', 0),
                 'highest_bidder_id': highest_bidder_id,
                 'bid_status': bid_status,
-                'timestamp': datetime.now(timezone.utc).isoformat()
+                'auction_end_date': auction_end_date,  # Send actual end date for countdown sync
+                'auction_active': auction_active,      # Whether auction is still accepting bids
+                'timestamp': now.isoformat()
             })
         
         # Keep connection alive with heartbeat
