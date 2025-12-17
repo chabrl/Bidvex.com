@@ -1525,6 +1525,139 @@ async def place_bid(bid_data: BidCreate, current_user: User = Depends(get_curren
     
     return bid
 
+@api_router.post("/buy-now")
+async def purchase_buy_now(
+    purchase: BuyNowPurchase,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Process Buy Now purchase for multi-item lots.
+    Implements atomic quantity decrement and partial lot liquidation.
+    """
+    # Fetch the auction
+    auction = await db.multi_item_listings.find_one(
+        {"id": purchase.auction_id},
+        {"_id": 0}
+    )
+    
+    if not auction:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    
+    if auction["status"] != "active":
+        raise HTTPException(status_code=400, detail="Auction is not active")
+    
+    # Find the specific lot
+    lot_index = None
+    target_lot = None
+    
+    for idx, lot in enumerate(auction["lots"]):
+        if lot["lot_number"] == purchase.lot_number:
+            lot_index = idx
+            target_lot = lot
+            break
+    
+    if not target_lot:
+        raise HTTPException(status_code=404, detail="Lot not found")
+    
+    # Validate Buy Now is enabled
+    if not target_lot.get("buy_now_enabled", False):
+        raise HTTPException(status_code=400, detail="Buy Now not available for this lot")
+    
+    if not target_lot.get("buy_now_price"):
+        raise HTTPException(status_code=400, detail="Buy Now price not set")
+    
+    # Check available quantity
+    available_qty = target_lot.get("available_quantity", target_lot["quantity"])
+    
+    if available_qty <= 0:
+        raise HTTPException(status_code=400, detail="Item sold out")
+    
+    if purchase.quantity > available_qty:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Only {available_qty} units available"
+        )
+    
+    # Calculate total
+    price_per_unit = target_lot["buy_now_price"]
+    total_amount = price_per_unit * purchase.quantity
+    
+    # Atomic update: decrement quantity
+    new_available_qty = available_qty - purchase.quantity
+    new_sold_qty = target_lot.get("sold_quantity", 0) + purchase.quantity
+    
+    # Determine new lot status
+    if new_available_qty == 0:
+        new_lot_status = "sold_out"
+    elif new_sold_qty > 0:
+        new_lot_status = "partially_sold"
+    else:
+        new_lot_status = target_lot.get("lot_status", "active")
+    
+    # Update lot in database (atomic operation)
+    update_fields = {
+        f"lots.{lot_index}.available_quantity": new_available_qty,
+        f"lots.{lot_index}.sold_quantity": new_sold_qty,
+        f"lots.{lot_index}.lot_status": new_lot_status
+    }
+    
+    # If sold out, close the auction for this lot
+    if new_available_qty == 0:
+        update_fields[f"lots.{lot_index}.lot_status"] = "sold_out"
+    
+    result = await db.multi_item_listings.update_one(
+        {"id": purchase.auction_id},
+        {"$set": update_fields}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=500, detail="Failed to update inventory")
+    
+    # Create transaction record
+    transaction = BuyNowTransaction(
+        auction_id=purchase.auction_id,
+        lot_number=purchase.lot_number,
+        buyer_id=current_user.id,
+        quantity_purchased=purchase.quantity,
+        price_per_unit=price_per_unit,
+        total_amount=total_amount,
+        payment_status="pending"
+    )
+    
+    transaction_dict = transaction.model_dump()
+    transaction_dict["transaction_date"] = transaction_dict["transaction_date"].isoformat()
+    
+    await db.buy_now_transactions.insert_one(transaction_dict)
+    
+    # Real-time broadcast to all viewers
+    await manager.broadcast(
+        purchase.auction_id,
+        {
+            "type": "BUY_NOW_PURCHASE",
+            "auction_id": purchase.auction_id,
+            "lot_number": purchase.lot_number,
+            "quantity_purchased": purchase.quantity,
+            "available_quantity": new_available_qty,
+            "lot_status": new_lot_status,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    )
+    
+    logger.info(
+        f"Buy Now purchase: auction={purchase.auction_id}, "
+        f"lot={purchase.lot_number}, buyer={current_user.id}, "
+        f"qty={purchase.quantity}, total=${total_amount}"
+    )
+    
+    return {
+        "success": True,
+        "transaction_id": transaction.id,
+        "total_amount": total_amount,
+        "available_quantity": new_available_qty,
+        "lot_status": new_lot_status,
+        "message": "Purchase successful! Payment pending."
+    }
+
 @api_router.get("/bids/listing/{listing_id}")
 async def get_listing_bids(listing_id: str, limit: int = 20):
     """Get bids for a listing with bidder information"""
