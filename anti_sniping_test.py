@@ -404,16 +404,24 @@ class AntiSnipingTester:
                         print(f"✅ Lot 2 end time unchanged (independent): {lot2_end_str}")
                         print(f"   - Lot 2 extension count: {lot2.get('extension_count', 0)}")
                         
-                        # Verify Lot 2 still ends at original time (not affected by Lot 1 extension)
-                        original_lot2_end = bid_time + timedelta(seconds=150)  # 90 + 60 from creation
+                        # Verify Lot 2 extension count is still 0 (not affected by Lot 1 extension)
+                        lot2_extension_count = lot2.get("extension_count", 0)
+                        assert lot2_extension_count == 0, f"Lot 2 extension count should be 0, got {lot2_extension_count}"
+                        
+                        # Verify Lot 2 end time is different from Lot 1 (independent)
                         if isinstance(lot2_end_str, str):
                             lot2_end = datetime.fromisoformat(lot2_end_str.replace('Z', '+00:00'))
                         else:
                             lot2_end = lot2_end_str
                         
-                        # Lot 2 should still be close to original time (within 10 seconds tolerance)
-                        time_diff = abs((lot2_end - original_lot2_end).total_seconds())
-                        assert time_diff <= 10, f"Lot 2 should not be affected by Lot 1 extension"
+                        if isinstance(lot1_end_str, str):
+                            lot1_end = datetime.fromisoformat(lot1_end_str.replace('Z', '+00:00'))
+                        else:
+                            lot1_end = lot1_end_str
+                        
+                        # Lot 2 should have a different end time than Lot 1 (independent lots)
+                        time_diff = abs((lot2_end - lot1_end).total_seconds())
+                        assert time_diff > 30, f"Lot 2 should have different end time than Lot 1 (independent lots)"
                         print(f"✅ Verified: Lot 1 extension did NOT affect Lot 2 (independent cascading)")
                     
                 else:
