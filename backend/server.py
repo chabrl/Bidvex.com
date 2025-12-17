@@ -1675,7 +1675,7 @@ async def track_item_click(item_id: str):
     
     return {"success": True}
 
-@api_router.post("/bids", response_model=Bid)
+@api_router.post("/bids")
 async def place_bid(bid_data: BidCreate, current_user: User = Depends(get_current_user)):
     listing = await db.listings.find_one({"id": bid_data.listing_id}, {"_id": 0})
     if not listing:
@@ -1688,34 +1688,71 @@ async def place_bid(bid_data: BidCreate, current_user: User = Depends(get_curren
         auction_end = datetime.fromisoformat(listing["auction_end_date"])
     else:
         auction_end = listing["auction_end_date"]
-    if datetime.now(timezone.utc) > auction_end:
+    
+    now = datetime.now(timezone.utc)
+    if now > auction_end:
         raise HTTPException(status_code=400, detail="Auction has ended")
+    
+    # Calculate minimum bid with helpful error message
+    min_bid = listing["current_price"] + 1  # Default $1 increment
     if bid_data.amount <= listing["current_price"]:
-        raise HTTPException(status_code=400, detail="Bid must be higher than current price")
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Your bid must be at least ${min_bid:.2f} to lead."
+        )
     
     # Create bid
     bid = Bid(listing_id=bid_data.listing_id, bidder_id=current_user.id, amount=bid_data.amount)
     bid_dict = bid.model_dump()
     bid_dict["created_at"] = bid_dict["created_at"].isoformat()
     
+    # ========== ANTI-SNIPING LOGIC (2-Minute Rule) ==========
+    # If bid is placed within final 2 minutes, extend by 2 minutes from now
+    ANTI_SNIPE_WINDOW = 120  # 2 minutes in seconds
+    time_remaining = (auction_end - now).total_seconds()
+    extension_applied = False
+    new_auction_end = None
+    
+    if 0 < time_remaining <= ANTI_SNIPE_WINDOW:
+        # Calculate new end time: Time of Bid + 120 seconds
+        new_auction_end = now + timedelta(seconds=ANTI_SNIPE_WINDOW)
+        extension_applied = True
+        logger.info(f"⏰ Anti-sniping triggered: listing={bid_data.listing_id}, old_end={auction_end.isoformat()}, new_end={new_auction_end.isoformat()}")
+    
     # Insert bid and update listing atomically
     await db.bids.insert_one(bid_dict)
     new_bid_count = listing.get("bid_count", 0) + 1
+    
+    update_fields = {
+        "current_price": bid_data.amount,
+        "highest_bidder_id": current_user.id
+    }
+    
+    # Apply time extension if anti-sniping triggered
+    if extension_applied and new_auction_end:
+        update_fields["auction_end_date"] = new_auction_end.isoformat()
+        update_fields["extension_count"] = listing.get("extension_count", 0) + 1
+    
     await db.listings.update_one(
         {"id": bid_data.listing_id}, 
         {
-            "$set": {
-                "current_price": bid_data.amount,
-                "highest_bidder_id": current_user.id  # Track highest bidder
-            }, 
+            "$set": update_fields,
             "$inc": {"bid_count": 1}
         }
     )
     
-    # Get updated listing for broadcast
-    updated_listing = await db.listings.find_one({"id": bid_data.listing_id}, {"_id": 0})
+    # Real-time broadcast with personalized status AND time extension
+    broadcast_data = {
+        'bid_count': new_bid_count,
+        'current_price': bid_data.amount
+    }
     
-    # Real-time broadcast with personalized status
+    # Include time extension info in broadcast
+    if extension_applied and new_auction_end:
+        broadcast_data['time_extended'] = True
+        broadcast_data['new_auction_end'] = new_auction_end.isoformat()
+        broadcast_data['extension_reason'] = 'anti_sniping'
+    
     await manager.broadcast_bid_update(
         bid_data.listing_id,
         {
@@ -1724,15 +1761,19 @@ async def place_bid(bid_data: BidCreate, current_user: User = Depends(get_curren
             'amount': bid_data.amount,
             'created_at': bid_dict['created_at']
         },
-        {
-            'bid_count': new_bid_count,
-            'current_price': bid_data.amount
-        }
+        broadcast_data
     )
     
-    logger.info(f"Bid placed: listing={bid_data.listing_id}, bidder={current_user.id}, amount={bid_data.amount}")
+    logger.info(f"Bid placed: listing={bid_data.listing_id}, bidder={current_user.id}, amount={bid_data.amount}, extension={extension_applied}")
     
-    return bid
+    # Return bid with extension info
+    response = bid.model_dump()
+    response["created_at"] = bid_dict["created_at"]
+    if extension_applied:
+        response["extension_applied"] = True
+        response["new_auction_end"] = new_auction_end.isoformat()
+    
+    return response
 
 @api_router.post("/buy-now")
 async def purchase_buy_now(
