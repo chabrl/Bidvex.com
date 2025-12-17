@@ -288,16 +288,29 @@ const ListingDetailPage = () => {
                 </div>
 
                 {!isAuctionEnded && (
-                  <div className="flex items-center gap-2 text-lg">
-                    <Clock className="h-5 w-5 text-primary" />
-                    <Countdown
-                      date={auctionEndDate}
-                      renderer={({ days, hours, minutes, seconds, completed }) => (
-                        <span className={`font-semibold countdown-timer ${completed ? 'text-red-500' : 'text-primary'}`}>
-                          {completed ? t('marketplace.ended') : `${days}d ${hours}h ${minutes}m ${seconds}s`}
-                        </span>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-lg">
+                      <Clock className={`h-5 w-5 ${timeExtended ? 'text-orange-500 animate-pulse' : 'text-primary'}`} />
+                      <Countdown
+                        key={effectiveEndDate?.getTime()} // Re-render countdown when end date changes
+                        date={effectiveEndDate}
+                        renderer={({ days, hours, minutes, seconds, completed }) => (
+                          <span className={`font-semibold countdown-timer ${completed ? 'text-red-500' : timeExtended ? 'text-orange-500' : 'text-primary'}`}>
+                            {completed ? t('marketplace.ended') : `${days}d ${hours}h ${minutes}m ${seconds}s`}
+                          </span>
+                        )}
+                      />
+                      {timeExtended && (
+                        <Badge className="bg-orange-100 text-orange-700 text-xs ml-2 animate-pulse">
+                          ⏰ Extended
+                        </Badge>
                       )}
-                    />
+                    </div>
+                    {timeExtended && (
+                      <p className="text-xs text-orange-600">
+                        Auction extended due to last-minute bidding activity
+                      </p>
+                    )}
                   </div>
                 )}
 
