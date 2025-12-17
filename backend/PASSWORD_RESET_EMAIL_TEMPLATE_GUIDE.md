@@ -339,7 +339,7 @@ INFO: Sending password reset email with data: {'first_name': 'Jean', 'reset_link
 
 **Valid URL format:**
 ```
-https://bidvex.com/reset-password?token=550e8400-e29b-41d4-a716-446655440000
+https://bidvex.com/reset-password?token=bidvex-sync
 ```
 
 ---

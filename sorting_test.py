@@ -9,7 +9,7 @@ import aiohttp
 import json
 from datetime import datetime
 
-BASE_URL = "https://bidvault-2.preview.emergentagent.com/api"
+BASE_URL = "https://bidvex-sync.preview.emergentagent.com/api"
 
 async def test_sorting_fix():
     async with aiohttp.ClientSession() as session:

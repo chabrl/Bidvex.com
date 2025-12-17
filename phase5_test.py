@@ -12,7 +12,7 @@ from typing import Dict, Any, Optional, List
 import os
 
 # Configuration
-BASE_URL = "https://bidvault-2.preview.emergentagent.com/api"
+BASE_URL = "https://bidvex-sync.preview.emergentagent.com/api"
 
 # Test users
 ADMIN_EMAIL = "admin@admin.bazario.com"

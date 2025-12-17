@@ -11,7 +11,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = "https://bidvault-2.preview.emergentagent.com/api"
+BASE_URL = "https://bidvex-sync.preview.emergentagent.com/api"
 
 class VIPAutoPromotionTester:
     def __init__(self):
