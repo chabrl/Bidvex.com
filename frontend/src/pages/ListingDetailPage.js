@@ -335,10 +335,10 @@ const ListingDetailPage = () => {
                       <Input
                         type="number"
                         step="0.01"
-                        min={listing.current_price + 0.01}
+                        min={(realtimePrice ?? listing.current_price) + 0.01}
                         value={bidAmount}
                         onChange={(e) => setBidAmount(e.target.value)}
-                        placeholder={`Min: $${(listing.current_price + 1).toFixed(2)}`}
+                        placeholder={`Min: $${((realtimePrice ?? listing.current_price) + 1).toFixed(2)}`}
                         required
                         data-testid="bid-amount-input"
                       />
