@@ -255,7 +255,10 @@ export const useRealtimeBidding = (listingId) => {
           
           reconnectTimeoutRef.current = setTimeout(() => {
             reconnectAttemptsRef.current++;
-            connect();
+            // Use ref to call connect to avoid self-reference issue
+            if (connectRef.current) {
+              connectRef.current();
+            }
           }, delay);
           
           toast.error('Live Connection Lost - Reconnecting...', {
@@ -274,9 +277,13 @@ export const useRealtimeBidding = (listingId) => {
     } catch (error) {
       console.error('[Bidding] Error creating WebSocket:', error);
       setIsConnected(false);
+      setConnectionHealth('disconnected');
       startFallbackPolling();
     }
-  }, [listingId, user, WS_URL, startFallbackPolling, stopFallbackPolling, API_URL]);
+  }, [listingId, user, WS_URL, startFallbackPolling, stopFallbackPolling]);
+  
+  // Update ref when connect changes
+  connectRef.current = connect;
 
   // Disconnect WebSocket
   const disconnect = useCallback(() => {
