@@ -152,9 +152,10 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Single-Item Anti-Sniping Extension"
-    - "Multi-Item Anti-Sniping (Independent Lots)"
-    - "Unlimited Extensions"
+    - "Homepage Browse Individual Items Section"
+    - "Items Marketplace Page"
+    - "Navbar Browse Items Link"
+    - "Countdown Timer Extension Updates"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
