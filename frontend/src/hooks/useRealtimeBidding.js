@@ -184,15 +184,30 @@ export const useRealtimeBidding = (listingId) => {
               setBidStatus(data.bid_status);
               setLastUpdate(data.timestamp);
               
+              // Handle anti-sniping time extension
+              if (data.time_extended && data.new_auction_end) {
+                setAuctionEndDate(new Date(data.new_auction_end));
+                setTimeExtended(true);
+                console.log('[Bidding] ⏰ Time extended due to anti-sniping:', data.new_auction_end);
+                
+                // Show time extension notification to all users
+                toast.info('⏰ Auction Extended!', {
+                  description: 'A last-minute bid has extended the auction by 2 minutes.',
+                  duration: 5000,
+                  id: 'time-extension'
+                });
+              }
+              
               const latency = Date.now() - new Date(data.timestamp).getTime();
               console.log('[Bidding] Real-time update:', {
                 price: data.current_price,
                 status: data.bid_status,
-                latency: latency + 'ms'
+                latency: latency + 'ms',
+                timeExtended: data.time_extended
               });
               
               // Admin-only debug toast for bid updates
-              debugToast(`📥 Incoming Bid: $${data.current_price} (${latency}ms latency) - Status: ${data.bid_status}`, 'info', user);
+              debugToast(`📥 Incoming Bid: $${data.current_price} (${latency}ms latency) - Status: ${data.bid_status}${data.time_extended ? ' ⏰ TIME EXTENDED' : ''}`, 'info', user);
               
               // Show toast notification for all users
               if (data.bid_status === 'OUTBID' && user) {
@@ -203,6 +218,21 @@ export const useRealtimeBidding = (listingId) => {
               } else if (data.bid_status === 'LEADING' && user) {
                 toast.success('You\'re now the highest bidder!', {
                   duration: 3000
+                });
+              }
+              break;
+              
+            case 'TIME_EXTENSION':
+              // Handle dedicated time extension message (for lot-based auctions)
+              if (data.new_end_time) {
+                setAuctionEndDate(new Date(data.new_end_time));
+                setTimeExtended(true);
+                console.log('[Bidding] ⏰ TIME_EXTENSION received:', data);
+                
+                toast.info('⏰ Auction Extended!', {
+                  description: `Lot ${data.lot_number || ''} extended by 2 minutes due to bidding activity.`,
+                  duration: 5000,
+                  id: 'time-extension'
                 });
               }
               break;
