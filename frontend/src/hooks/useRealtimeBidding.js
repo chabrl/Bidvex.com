@@ -317,14 +317,20 @@ export const useRealtimeBidding = (listingId) => {
     return () => {
       disconnect();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listingId]); // Re-connect if listingId changes
 
   // Reconnect if user logs in/out
   useEffect(() => {
     if (wsRef.current) {
       disconnect();
-      setTimeout(connect, 100);
+      setTimeout(() => {
+        if (connectRef.current) {
+          connectRef.current();
+        }
+      }, 100);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
   return {
