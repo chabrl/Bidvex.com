@@ -281,19 +281,23 @@ export const useRealtimeBidding = (listingId) => {
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+    
+    if (pingIntervalRef.current) {
+      clearInterval(pingIntervalRef.current);
+      pingIntervalRef.current = null;
     }
     
     stopFallbackPolling();
     
     if (wsRef.current) {
-      if (wsRef.current.pingInterval) {
-        clearInterval(wsRef.current.pingInterval);
-      }
       wsRef.current.close();
       wsRef.current = null;
     }
     
     setIsConnected(false);
+    setConnectionHealth('disconnected');
   }, [stopFallbackPolling]);
 
   // Connect on mount, disconnect on unmount
