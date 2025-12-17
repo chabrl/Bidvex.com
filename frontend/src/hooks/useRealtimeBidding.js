@@ -47,6 +47,8 @@ export const useRealtimeBidding = (listingId) => {
   const [isConnected, setIsConnected] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [connectionHealth, setConnectionHealth] = useState('connecting'); // connecting, healthy, degraded, disconnected
+  const [auctionEndDate, setAuctionEndDate] = useState(null); // For anti-sniping time extensions
+  const [timeExtended, setTimeExtended] = useState(false); // Flag when time is extended
   
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
