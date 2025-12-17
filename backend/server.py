@@ -158,7 +158,11 @@ class ConnectionManager:
                             'bid_count': listing_data.get('bid_count', 0),
                             'bid_status': 'VIEWER',  # Not bidding
                             'timestamp': datetime.now(timezone.utc).isoformat(),
-                            'bid_data': bid_data
+                            'bid_data': bid_data,
+                            # Anti-sniping time extension data
+                            'time_extended': listing_data.get('time_extended', False),
+                            'new_auction_end': listing_data.get('new_auction_end'),
+                            'extension_reason': listing_data.get('extension_reason')
                         }
                         await connection.send_json(message)
                         sent_count += 1
