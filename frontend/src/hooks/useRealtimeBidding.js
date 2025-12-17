@@ -54,6 +54,7 @@ export const useRealtimeBidding = (listingId) => {
   const pingIntervalRef = useRef(null);
   const lastPongRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
+  const connectRef = useRef(null); // Ref to store connect function for self-referencing
   const maxReconnectAttempts = 10;
 
   const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
