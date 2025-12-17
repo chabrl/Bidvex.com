@@ -318,8 +318,7 @@ export const useRealtimeBidding = (listingId) => {
     return () => {
       disconnect();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listingId]); // Re-connect if listingId changes
+  }, [listingId, connect, disconnect]); // Re-connect if listingId changes
 
   // Reconnect if user logs in/out
   useEffect(() => {
@@ -331,8 +330,7 @@ export const useRealtimeBidding = (listingId) => {
         }
       }, 100);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  }, [user?.id, disconnect]);
 
   return {
     currentPrice,
