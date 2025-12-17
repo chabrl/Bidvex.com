@@ -462,6 +462,14 @@ class MultiItemListing(BaseModel):
     increment_option: str = "tiered"  # tiered or simplified
     is_featured: bool = False  # VIP auto-promotion
     promotion_expiry: Optional[datetime] = None  # 7-day promotion for VIP
+    # Seller promotion (paid feature)
+    is_promoted: bool = False  # Seller-paid promotion flag
+    promotion_tier: Optional[str] = None  # "premium" ($50), "standard" ($25), "basic" ($10)
+    promotion_start: Optional[datetime] = None
+    promotion_end: Optional[datetime] = None
+    # Analytics for promoted listings
+    total_impressions: int = 0  # Total views in search results
+    total_clicks: int = 0  # Total clicks to detail page
     # Invoice configuration
     premium_percentage: float = 5.0  # Buyer's premium (5%)
     commission_rate: float = 0.0      # Seller commission (0% - no commission charged)
