@@ -230,11 +230,57 @@ const ListingDetailPage = () => {
               <Separator className="my-4" />
 
               <div className="space-y-4">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">{t('marketplace.currentBid')}</p>
-                  <p className="text-4xl font-bold gradient-text" data-testid="current-price">
-                    ${listing.current_price.toFixed(2)}
-                  </p>
+                {/* Real-time connection status indicator */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {isConnected ? (
+                      <>
+                        <Wifi className="h-4 w-4 text-green-500" />
+                        <span className="text-xs text-green-600 font-medium">Live Updates Active</span>
+                      </>
+                    ) : (
+                      <>
+                        <WifiOff className="h-4 w-4 text-orange-500 animate-pulse" />
+                        <span className="text-xs text-orange-600 font-medium">Reconnecting...</span>
+                      </>
+                    )}
+                  </div>
+                  {lastUpdate && (
+                    <span className="text-xs text-muted-foreground">
+                      Updated {new Date(lastUpdate).toLocaleTimeString()}
+                    </span>
+                  )}
+                </div>
+
+                {/* Current bid with real-time price */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">{t('marketplace.currentBid')}</p>
+                    <p className="text-4xl font-bold gradient-text" data-testid="current-price">
+                      ${(realtimePrice ?? listing.current_price).toFixed(2)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {realtimeBidCount ?? listing.bid_count ?? 0} {(realtimeBidCount ?? listing.bid_count ?? 0) === 1 ? 'bid' : 'bids'} placed
+                    </p>
+                  </div>
+                  
+                  {/* Bidding status badge */}
+                  {user && bidStatus && bidStatus !== 'VIEWER' && bidStatus !== 'NO_BIDS' && (
+                    <div>
+                      {bidStatus === 'LEADING' && (
+                        <Badge className="bg-green-500 text-white px-4 py-2 text-sm font-bold animate-pulse">
+                          <CheckCircle2 className="h-4 w-4 mr-1" />
+                          LEADING
+                        </Badge>
+                      )}
+                      {bidStatus === 'OUTBID' && (
+                        <Badge className="bg-red-500 text-white px-4 py-2 text-sm font-bold">
+                          <AlertCircle className="h-4 w-4 mr-1" />
+                          OUTBID
+                        </Badge>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {!isAuctionEnded && (
