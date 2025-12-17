@@ -6,7 +6,7 @@ import axios from 'axios';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
-import { ArrowRight, Gavel, TrendingUp, Shield, Users, Award, Flame } from 'lucide-react';
+import { ArrowRight, Gavel, TrendingUp, Shield, Users, Award, Flame, Package } from 'lucide-react';
 import Countdown from 'react-countdown';
 import HeroBanner from '../components/HeroBanner';
 import HomepageBanner from '../components/HomepageBanner';
