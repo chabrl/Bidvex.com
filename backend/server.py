@@ -2061,9 +2061,8 @@ async def websocket_endpoint(
     """
     logger.info(f"🔌 WebSocket connection request: listing_id={listing_id}, user_id={user_id}")
     
-    try:
-        await manager.connect(websocket, listing_id, user_id)
-        logger.info(f"✅ WebSocket connected: listing_id={listing_id}, user_id={user_id}, total_viewers={len(manager.active_connections.get(listing_id, []))}")
+    await manager.connect(websocket, listing_id, user_id)
+    logger.info(f"✅ WebSocket connected: listing_id={listing_id}, user_id={user_id}, total_viewers={len(manager.active_connections.get(listing_id, []))}")
     
     try:
         # Send initial connection confirmation
