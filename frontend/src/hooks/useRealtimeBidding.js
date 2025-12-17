@@ -109,9 +109,10 @@ export const useRealtimeBidding = (listingId) => {
     setConnectionHealth('connecting');
 
     try {
+      // Use /api/ws prefix for Kubernetes Ingress routing to backend
       const wsUrl = user 
-        ? `${WS_URL}/ws/listings/${listingId}?user_id=${user.id}`
-        : `${WS_URL}/ws/listings/${listingId}`;
+        ? `${WS_URL}/api/ws/listings/${listingId}?user_id=${user.id}`
+        : `${WS_URL}/api/ws/listings/${listingId}`;
       
       console.log('[Bidding] Connecting to WebSocket:', wsUrl);
       debugToast(`Connecting to ${wsUrl.split('?')[0]}...`, 'info', user);
