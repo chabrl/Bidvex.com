@@ -315,8 +315,10 @@ export const useRealtimeBidding = (listingId) => {
     }
   }, [listingId, user, WS_URL, startFallbackPolling, stopFallbackPolling]);
   
-  // Update ref when connect changes
-  connectRef.current = connect;
+  // Update ref when connect changes - use useEffect to avoid updating during render
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   // Disconnect WebSocket
   const disconnect = useCallback(() => {
