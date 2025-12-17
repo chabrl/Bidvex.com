@@ -1466,6 +1466,190 @@ async def delete_listing(listing_id: str, current_user: User = Depends(get_curre
     await db.listings.delete_one({"id": listing_id})
     return {"message": "Listing deleted successfully"}
 
+@api_router.get("/marketplace/items")
+async def get_marketplace_items(
+    search: Optional[str] = None,
+    category: Optional[str] = None,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
+    condition: Optional[str] = None,
+    sort: str = "-promoted",  # Default: promoted first
+    limit: int = 50,
+    skip: int = 0,
+    track_impression: bool = False
+):
+    """
+    Decomposed marketplace view: Returns individual items from multi-item lots.
+    Features:
+    - Item-centric discovery (not lot-centric)
+    - Promoted items appear first
+    - Each item has individual Buy Now price, bid, and staggered end time
+    - Tracks impressions for promoted items
+    """
+    # Query active multi-item auctions
+    query = {"status": "active"}
+    
+    if category:
+        query["category"] = category
+    
+    if search:
+        query["$or"] = [
+            {"title": {"$regex": search, "$options": "i"}},
+            {"description": {"$regex": search, "$options": "i"}}
+        ]
+    
+    # Fetch all active auctions
+    auctions = await db.multi_item_listings.find(query, {"_id": 0}).to_list(None)
+    
+    # Decompose lots into individual items
+    items = []
+    
+    for auction in auctions:
+        # Track impressions for promoted auctions
+        if auction.get("is_promoted") and track_impression:
+            await db.multi_item_listings.update_one(
+                {"id": auction["id"]},
+                {"$inc": {"total_impressions": 1}}
+            )
+        
+        for lot in auction.get("lots", []):
+            # Skip sold out lots
+            if lot.get("lot_status") == "sold_out":
+                continue
+            
+            # Apply price filters
+            current_price = lot.get("current_price", lot.get("starting_price", 0))
+            if min_price is not None and current_price < min_price:
+                continue
+            if max_price is not None and current_price > max_price:
+                continue
+            
+            # Apply condition filter
+            if condition and lot.get("condition") != condition:
+                continue
+            
+            # Calculate staggered end time
+            # Item end time = base auction end + (lot_number * 1 minute)
+            base_end_time = auction.get("auction_end_date")
+            if isinstance(base_end_time, str):
+                base_end_time = datetime.fromisoformat(base_end_time)
+            
+            lot_end_time = lot.get("lot_end_time")
+            if not lot_end_time and base_end_time:
+                # Calculate staggered time: base + (lot_number * 60 seconds)
+                stagger_seconds = lot["lot_number"] * 60
+                lot_end_time = base_end_time + timedelta(seconds=stagger_seconds)
+            elif isinstance(lot_end_time, str):
+                lot_end_time = datetime.fromisoformat(lot_end_time)
+            
+            # Build decomposed item
+            item = {
+                "id": f"{auction['id']}_lot{lot['lot_number']}",  # Composite ID
+                "auction_id": auction["id"],
+                "lot_number": lot["lot_number"],
+                "title": lot["title"],
+                "description": lot["description"],
+                "category": auction.get("category"),
+                "condition": lot.get("condition"),
+                "images": lot.get("images", []),
+                
+                # Pricing
+                "starting_price": lot.get("starting_price"),
+                "current_price": current_price,
+                "buy_now_price": lot.get("buy_now_price"),
+                "buy_now_enabled": lot.get("buy_now_enabled", False),
+                
+                # Quantity
+                "quantity": lot.get("quantity", 1),
+                "available_quantity": lot.get("available_quantity", lot.get("quantity", 1)),
+                "sold_quantity": lot.get("sold_quantity", 0),
+                
+                # Bidding
+                "bid_count": lot.get("bid_count", 0),
+                "highest_bidder_id": lot.get("highest_bidder_id"),
+                
+                # Timing
+                "auction_end_date": lot_end_time.isoformat() if lot_end_time else None,
+                "extension_count": lot.get("extension_count", 0),
+                
+                # Status
+                "lot_status": lot.get("lot_status", "active"),
+                "pricing_mode": lot.get("pricing_mode", "multiplied"),
+                
+                # Promotion (inherited from parent auction)
+                "is_promoted": auction.get("is_promoted", False),
+                "promotion_tier": auction.get("promotion_tier"),
+                "is_featured": auction.get("is_featured", False),
+                
+                # Parent context
+                "parent_auction_title": auction.get("title"),
+                "total_lots_in_auction": len(auction.get("lots", [])),
+                "seller_id": auction.get("seller_id"),
+                
+                # Location
+                "city": auction.get("city"),
+                "region": auction.get("region"),
+                "country": auction.get("country"),
+                
+                # Metadata
+                "created_at": auction.get("created_at")
+            }
+            
+            items.append(item)
+    
+    # Sorting logic
+    if sort == "-promoted":
+        # Promoted items first (by tier), then by created_at
+        promotion_weight = {"premium": 3, "standard": 2, "basic": 1, None: 0}
+        items.sort(
+            key=lambda x: (
+                -promotion_weight.get(x.get("promotion_tier"), 0),  # Promoted first
+                -1 if x.get("is_featured") else 0,  # Featured second
+                -(x.get("created_at").timestamp() if isinstance(x.get("created_at"), datetime) else 0)  # Newest
+            )
+        )
+    elif sort == "price":
+        items.sort(key=lambda x: x.get("current_price", 0))
+    elif sort == "-price":
+        items.sort(key=lambda x: -x.get("current_price", 0))
+    elif sort == "ending_soon":
+        items.sort(
+            key=lambda x: datetime.fromisoformat(x["auction_end_date"]) if x.get("auction_end_date") else datetime.max
+        )
+    else:  # Default: newest first
+        items.sort(
+            key=lambda x: -(x.get("created_at").timestamp() if isinstance(x.get("created_at"), datetime) else 0)
+        )
+    
+    # Pagination
+    total_items = len(items)
+    paginated_items = items[skip:skip + limit]
+    
+    return {
+        "items": paginated_items,
+        "total": total_items,
+        "limit": limit,
+        "skip": skip,
+        "has_more": (skip + limit) < total_items
+    }
+
+@api_router.post("/marketplace/items/{item_id}/track-click")
+async def track_item_click(item_id: str):
+    """Track clicks on marketplace items for promoted listings analytics"""
+    # Parse composite ID: auction_id_lotN
+    if "_lot" not in item_id:
+        return {"success": False, "message": "Invalid item ID"}
+    
+    auction_id = item_id.split("_lot")[0]
+    
+    # Increment click count for auction
+    await db.multi_item_listings.update_one(
+        {"id": auction_id, "is_promoted": True},
+        {"$inc": {"total_clicks": 1}}
+    )
+    
+    return {"success": True}
+
 @api_router.post("/bids", response_model=Bid)
 async def place_bid(bid_data: BidCreate, current_user: User = Depends(get_current_user)):
     listing = await db.listings.find_one({"id": bid_data.listing_id}, {"_id": 0})
