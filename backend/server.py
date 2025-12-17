@@ -2864,33 +2864,63 @@ async def bid_on_lot(listing_id: str, lot_number: int, data: Dict[str, Any], cur
         if amount <= current_price:
             raise HTTPException(status_code=400, detail="Monster Bid must be higher than current price")
     
+    # Calculate minimum bid with helpful error message
+    min_increment = get_minimum_increment(listing, current_price) if bid_type == "normal" else 1
+    min_bid = current_price + min_increment
+    
     if amount <= current_price:
-        raise HTTPException(status_code=400, detail="Bid must be higher than current price")
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Your bid must be at least ${min_bid:.2f} to lead."
+        )
     
     # Update current price
     lots[lot_index]["current_price"] = amount
+    lots[lot_index]["highest_bidder_id"] = current_user.id
     
-    # Bid Extension Logic: Reset to 3 minutes if bid within final 3 minutes
+    # ========== ANTI-SNIPING LOGIC (2-Minute Rule) ==========
+    # If bid is placed within final 2 minutes, extend by 2 minutes from TIME OF BID
+    # UNLIMITED extensions - auction only ends when bidding activity truly stops
+    ANTI_SNIPE_WINDOW = 120  # 2 minutes in seconds
+    
     now = datetime.now(timezone.utc)
     lot_end_time_str = lots[lot_index].get("lot_end_time")
     extension_applied = False
+    new_end_time = None
     extension_count = lots[lot_index].get("extension_count", 0)
     
-    if lot_end_time_str and extension_count < 3:  # Max 3 extensions
+    if lot_end_time_str:
         lot_end_time = datetime.fromisoformat(lot_end_time_str) if isinstance(lot_end_time_str, str) else lot_end_time_str
         time_remaining = (lot_end_time - now).total_seconds()
         
-        # If less than 3 minutes remaining, extend by 3 minutes
-        if 0 < time_remaining <= 180:  # 180 seconds = 3 minutes
-            new_end_time = now + timedelta(minutes=3)
+        # If within final 2 minutes, extend by 2 minutes from NOW (unlimited extensions)
+        if 0 < time_remaining <= ANTI_SNIPE_WINDOW:
+            # T_new = Time of Bid + 120 seconds
+            new_end_time = now + timedelta(seconds=ANTI_SNIPE_WINDOW)
             lots[lot_index]["lot_end_time"] = new_end_time.isoformat()
             lots[lot_index]["extension_count"] = extension_count + 1
             extension_applied = True
+            logger.info(f"⏰ Anti-sniping triggered: listing={listing_id}, lot={lot_number}, old_end={lot_end_time.isoformat()}, new_end={new_end_time.isoformat()}, extensions={extension_count + 1}")
+    
+    # Note: Cascading behavior is INDEPENDENT - Item 1 extension does NOT affect Item 2/3
+    # Each lot maintains its own end time independently
     
     await db.multi_item_listings.update_one(
         {"id": listing_id},
         {"$set": {"lots": lots}}
     )
+    
+    # Broadcast time extension via WebSocket if applied
+    if extension_applied and new_end_time:
+        await manager.broadcast(listing_id, {
+            'type': 'TIME_EXTENSION',
+            'listing_id': listing_id,
+            'lot_number': lot_number,
+            'new_end_time': new_end_time.isoformat(),
+            'extension_count': extension_count + 1,
+            'reason': 'anti_sniping',
+            'timestamp': now.isoformat()
+        })
     
     bid = {
         "id": str(uuid.uuid4()),
