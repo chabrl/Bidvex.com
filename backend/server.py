@@ -2025,13 +2025,21 @@ async def create_promotion_checkout(request: Request, data: Dict[str, Any], curr
     return {"url": session.url, "session_id": session.session_id}
 
 @app.websocket("/ws/listings/{listing_id}")
-async def websocket_endpoint(websocket: WebSocket, listing_id: str, user_id: str = None):
+async def websocket_endpoint(
+    websocket: WebSocket, 
+    listing_id: str, 
+    user_id: Optional[str] = Query(default=None)
+):
     """
     Enhanced WebSocket endpoint for real-time bidding updates.
     Supports personalized status updates (LEADING/OUTBID).
+    Includes ping/pong heartbeat for connection health.
     """
-    await manager.connect(websocket, listing_id, user_id)
-    logger.info(f"WebSocket connected: listing_id={listing_id}, user_id={user_id}")
+    logger.info(f"🔌 WebSocket connection request: listing_id={listing_id}, user_id={user_id}")
+    
+    try:
+        await manager.connect(websocket, listing_id, user_id)
+        logger.info(f"✅ WebSocket connected: listing_id={listing_id}, user_id={user_id}, total_viewers={len(manager.active_connections.get(listing_id, []))}")
     
     try:
         # Send initial connection confirmation
