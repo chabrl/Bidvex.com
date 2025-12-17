@@ -21,6 +21,7 @@ import MessagesPage from './pages/MessagesPage';
 import CreateMultiItemListing from './pages/CreateMultiItemListing';
 import LotsMarketplacePage from './pages/LotsMarketplacePage';
 import MultiItemListingDetailPage from './pages/MultiItemListingDetailPage';
+import ItemsMarketplacePage from './pages/ItemsMarketplacePage';
 import AdminDashboard from './pages/AdminDashboard';
 import WatchlistPage from './pages/WatchlistPage';
 import HowItWorksPage from './pages/HowItWorksPage';
