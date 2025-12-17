@@ -325,6 +325,7 @@ export const useRealtimeBidding = (listingId) => {
     highestBidderId,
     bidStatus,
     isConnected,
+    connectionHealth,
     lastUpdate,
     reconnect: connect
   };
