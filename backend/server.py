@@ -341,6 +341,24 @@ class Listing(BaseModel):
 class BidCreate(BaseModel):
     listing_id: str
     amount: float
+
+class BuyNowPurchase(BaseModel):
+    auction_id: str  # Multi-item listing ID
+    lot_number: int  # Which lot/item to buy
+    quantity: int = 1  # How many units to purchase
+    
+class BuyNowTransaction(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    auction_id: str
+    lot_number: int
+    buyer_id: str
+    quantity_purchased: int
+    price_per_unit: float
+    total_amount: float
+    transaction_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    payment_status: str = "pending"  # pending, completed, failed
+    payment_method: Optional[str] = None
     bid_type: str = "normal"  # normal, monster, auto
 
 class Bid(BaseModel):
