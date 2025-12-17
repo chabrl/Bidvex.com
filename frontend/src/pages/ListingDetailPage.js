@@ -51,7 +51,9 @@ const ListingDetailPage = () => {
     bidStatus,
     isConnected,
     connectionHealth,
-    lastUpdate
+    lastUpdate,
+    auctionEndDate: realtimeEndDate,  // Anti-sniping extended end time
+    timeExtended
   } = useRealtimeBidding(id);
 
   useEffect(() => {
