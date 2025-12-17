@@ -50,24 +50,98 @@ class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, List[WebSocket]] = {}
         self.user_connections: Dict[str, List[WebSocket]] = {}
+        # Track user IDs per listing for status updates
+        self.listing_viewers: Dict[str, Dict[str, WebSocket]] = {}  # {listing_id: {user_id: websocket}}
 
-    async def connect(self, websocket: WebSocket, listing_id: str):
+    async def connect(self, websocket: WebSocket, listing_id: str, user_id: str = None):
         await websocket.accept()
         if listing_id not in self.active_connections:
             self.active_connections[listing_id] = []
         self.active_connections[listing_id].append(websocket)
+        
+        # Track user viewing this listing
+        if user_id:
+            if listing_id not in self.listing_viewers:
+                self.listing_viewers[listing_id] = {}
+            self.listing_viewers[listing_id][user_id] = websocket
 
-    def disconnect(self, websocket: WebSocket, listing_id: str):
+    def disconnect(self, websocket: WebSocket, listing_id: str, user_id: str = None):
         if listing_id in self.active_connections:
-            self.active_connections[listing_id].remove(websocket)
+            try:
+                self.active_connections[listing_id].remove(websocket)
+            except ValueError:
+                pass
+        
+        # Remove user from listing viewers
+        if user_id and listing_id in self.listing_viewers:
+            self.listing_viewers[listing_id].pop(user_id, None)
 
     async def broadcast(self, listing_id: str, message: dict):
+        """Broadcast message to all connections viewing a specific listing"""
         if listing_id in self.active_connections:
+            disconnected = []
             for connection in self.active_connections[listing_id]:
                 try:
                     await connection.send_json(message)
-                except:
+                except Exception as e:
+                    logger.error(f"Error broadcasting to connection: {str(e)}")
+                    disconnected.append(connection)
+            
+            # Clean up disconnected websockets
+            for conn in disconnected:
+                try:
+                    self.active_connections[listing_id].remove(conn)
+                except ValueError:
                     pass
+
+    async def broadcast_bid_update(self, listing_id: str, bid_data: dict, listing_data: dict):
+        """
+        Enhanced broadcast with personalized status updates for each user.
+        Sends LEADING/OUTBID status based on user_id.
+        """
+        highest_bidder_id = bid_data.get('bidder_id')
+        current_price = bid_data.get('amount')
+        
+        if listing_id in self.listing_viewers:
+            for user_id, websocket in self.listing_viewers[listing_id].items():
+                try:
+                    # Determine bid status for this user
+                    bid_status = 'LEADING' if user_id == highest_bidder_id else 'OUTBID'
+                    
+                    # Personalized message for each user
+                    message = {
+                        'type': 'BID_UPDATE',
+                        'listing_id': listing_id,
+                        'current_price': current_price,
+                        'highest_bidder_id': highest_bidder_id,
+                        'bid_count': listing_data.get('bid_count', 0),
+                        'bid_status': bid_status,  # Personalized status
+                        'timestamp': datetime.now(timezone.utc).isoformat(),
+                        'bid_data': bid_data
+                    }
+                    
+                    await websocket.send_json(message)
+                except Exception as e:
+                    logger.error(f"Error sending bid update to user {user_id}: {str(e)}")
+        
+        # Also broadcast to anonymous viewers (non-logged-in)
+        if listing_id in self.active_connections:
+            for connection in self.active_connections[listing_id]:
+                if connection not in [ws for ws in self.listing_viewers.get(listing_id, {}).values()]:
+                    try:
+                        message = {
+                            'type': 'BID_UPDATE',
+                            'listing_id': listing_id,
+                            'current_price': current_price,
+                            'highest_bidder_id': highest_bidder_id,
+                            'bid_count': listing_data.get('bid_count', 0),
+                            'bid_status': 'VIEWER',  # Not bidding
+                            'timestamp': datetime.now(timezone.utc).isoformat(),
+                            'bid_data': bid_data
+                        }
+                        await connection.send_json(message)
+                    except:
+                        pass
 
     async def send_to_user(self, user_id: str, message: dict):
         """Send message to specific user (for notifications, messages, etc.)"""
@@ -77,6 +151,21 @@ class ConnectionManager:
                     await connection.send_json(message)
                 except:
                     pass
+    
+    async def connect_user(self, websocket: WebSocket, user_id: str):
+        """Connect user for personal notifications"""
+        await websocket.accept()
+        if user_id not in self.user_connections:
+            self.user_connections[user_id] = []
+        self.user_connections[user_id].append(websocket)
+    
+    def disconnect_user(self, websocket: WebSocket, user_id: str):
+        """Disconnect user from personal notifications"""
+        if user_id in self.user_connections:
+            try:
+                self.user_connections[user_id].remove(websocket)
+            except ValueError:
+                pass
 
 manager = ConnectionManager()
 
