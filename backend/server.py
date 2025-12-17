@@ -2048,7 +2048,7 @@ async def create_promotion_checkout(request: Request, data: Dict[str, Any], curr
     
     return {"url": session.url, "session_id": session.session_id}
 
-@app.websocket("/ws/listings/{listing_id}")
+@app.websocket("/api/ws/listings/{listing_id}")
 async def websocket_endpoint(
     websocket: WebSocket, 
     listing_id: str, 
