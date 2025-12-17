@@ -2,28 +2,62 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
 
+// Check if debug mode is enabled (admin or environment variable)
+const isDebugMode = () => {
+  return process.env.REACT_APP_DEBUG_MODE === 'true' || 
+         localStorage.getItem('debug_mode') === 'true';
+};
+
+// Admin-only debug toast helper
+const debugToast = (message, type = 'info', user = null) => {
+  // Only show debug toasts for admin users or when debug mode is enabled
+  const isAdmin = user?.role === 'admin' || user?.email?.includes('@admin.');
+  if (!isAdmin && !isDebugMode()) return;
+  
+  const prefix = '🔧 DEBUG: ';
+  const options = { duration: 3000, id: `debug-${Date.now()}` };
+  
+  switch(type) {
+    case 'success':
+      toast.success(prefix + message, options);
+      break;
+    case 'error':
+      toast.error(prefix + message, options);
+      break;
+    case 'warning':
+      toast.warning(prefix + message, options);
+      break;
+    default:
+      toast.info(prefix + message, options);
+  }
+};
+
 /**
  * Real-time bidding hook with WebSocket connection
  * Provides instant bid updates with <200ms latency
  * Automatically handles reconnection and fallback polling
+ * Includes admin-only debug toasts for troubleshooting
  */
 export const useRealtimeBidding = (listingId) => {
   const { user } = useAuth();
   const [currentPrice, setCurrentPrice] = useState(null);
-  const [bidCount, setB idCount] = useState(0);
+  const [bidCount, setBidCount] = useState(0);
   const [highestBidderId, setHighestBidderId] = useState(null);
   const [bidStatus, setBidStatus] = useState('VIEWER'); // LEADING, OUTBID, VIEWER, NO_BIDS
   const [isConnected, setIsConnected] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
+  const [connectionHealth, setConnectionHealth] = useState('connecting'); // connecting, healthy, degraded, disconnected
   
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const pollingIntervalRef = useRef(null);
+  const pingIntervalRef = useRef(null);
+  const lastPongRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
   const maxReconnectAttempts = 10;
 
   const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
-  const WS_URL = API_URL.replace('http', 'ws');
+  const WS_URL = API_URL.replace('https', 'wss').replace('http', 'ws');
 
   // Fallback polling when WebSocket is disconnected
   const startFallbackPolling = useCallback(() => {
