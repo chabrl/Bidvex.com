@@ -13,7 +13,7 @@ import { Separator } from '../components/ui/separator';
 import { toast } from 'sonner';
 import Countdown from 'react-countdown';
 import confetti from 'canvas-confetti';
-import { Clock, MapPin, Eye, User, DollarSign, MessageCircle, TrendingUp } from 'lucide-react';
+import { Clock, MapPin, Eye, User, DollarSign, MessageCircle, TrendingUp, Wifi, WifiOff, AlertCircle, CheckCircle2 } from 'lucide-react';
 import PromotionManagerModal from '../components/PromotionManagerModal';
 import WatchlistButton from '../components/WatchlistButton';
 import SocialShare from '../components/SocialShare';
@@ -24,6 +24,7 @@ import RateSellerModal from '../components/RateSellerModal';
 import AuctioneerInfo from '../components/AuctioneerInfo';
 import Lightbox from 'yet-another-react-lightbox';
 import 'yet-another-react-lightbox/styles.css';
+import { useRealtimeBidding } from '../hooks/useRealtimeBidding';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
