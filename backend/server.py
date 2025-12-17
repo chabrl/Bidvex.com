@@ -103,8 +103,16 @@ class ConnectionManager:
         highest_bidder_id = bid_data.get('bidder_id')
         current_price = bid_data.get('amount')
         
+        # Log broadcast attempt
+        viewer_count = len(self.listing_viewers.get(listing_id, {}))
+        connection_count = len(self.active_connections.get(listing_id, []))
+        logger.info(f"📡 Broadcasting bid update: listing_id={listing_id}, price={current_price}, viewers={viewer_count}, connections={connection_count}")
+        
+        sent_count = 0
+        error_count = 0
+        
         if listing_id in self.listing_viewers:
-            for user_id, websocket in self.listing_viewers[listing_id].items():
+            for user_id, websocket in list(self.listing_viewers[listing_id].items()):
                 try:
                     # Determine bid status for this user
                     bid_status = 'LEADING' if user_id == highest_bidder_id else 'OUTBID'
@@ -122,12 +130,20 @@ class ConnectionManager:
                     }
                     
                     await websocket.send_json(message)
+                    sent_count += 1
+                    logger.info(f"✅ Sent bid update to user {user_id}: status={bid_status}")
                 except Exception as e:
-                    logger.error(f"Error sending bid update to user {user_id}: {str(e)}")
+                    error_count += 1
+                    logger.error(f"❌ Error sending bid update to user {user_id}: {str(e)}")
+                    # Clean up dead connection
+                    try:
+                        self.listing_viewers[listing_id].pop(user_id, None)
+                    except:
+                        pass
         
         # Also broadcast to anonymous viewers (non-logged-in)
         if listing_id in self.active_connections:
-            for connection in self.active_connections[listing_id]:
+            for connection in list(self.active_connections[listing_id]):
                 if connection not in [ws for ws in self.listing_viewers.get(listing_id, {}).values()]:
                     try:
                         message = {
@@ -141,8 +157,16 @@ class ConnectionManager:
                             'bid_data': bid_data
                         }
                         await connection.send_json(message)
-                    except:
-                        pass
+                        sent_count += 1
+                    except Exception as e:
+                        error_count += 1
+                        # Clean up dead connection
+                        try:
+                            self.active_connections[listing_id].remove(connection)
+                        except:
+                            pass
+        
+        logger.info(f"📊 Broadcast complete: sent={sent_count}, errors={error_count}")
 
     async def send_to_user(self, user_id: str, message: dict):
         """Send message to specific user (for notifications, messages, etc.)"""
