@@ -172,8 +172,22 @@ export const useRealtimeBidding = (listingId) => {
               setHighestBidderId(data.highest_bidder_id);
               setBidStatus(data.bid_status);
               setLastUpdate(data.timestamp);
+              
+              // Sync auction end date from server (single source of truth)
+              if (data.auction_end_date) {
+                const serverEndDate = new Date(data.auction_end_date);
+                setAuctionEndDate(serverEndDate);
+                console.log('[Bidding] Synced auction end date from server:', data.auction_end_date);
+              }
+              
+              // Check if auction has ended according to server
+              if (data.auction_active === false) {
+                console.log('[Bidding] Server reports auction has ended');
+                setBidStatus('AUCTION_ENDED');
+              }
+              
               console.log('[Bidding] Initial state received:', data);
-              debugToast(`Initial state: $${data.current_price}, ${data.bid_count} bids`, 'info', user);
+              debugToast(`Initial state: $${data.current_price}, ${data.bid_count} bids, active=${data.auction_active}`, 'info', user);
               break;
               
             case 'BID_UPDATE':
