@@ -56,6 +56,11 @@ const Navbar = () => {
                 {t('nav.marketplace')}
               </Button>
             </Link>
+            <Link to="/items" data-testid="nav-items-link">
+              <Button variant="ghost" className="text-sm font-medium">
+                {t('nav.items', 'Browse Items')}
+              </Button>
+            </Link>
             <Link to="/lots" data-testid="nav-lots-link">
               <Button variant="ghost" className="text-sm font-medium">
                 {t('nav.lots', 'Lots Auction')}
