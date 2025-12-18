@@ -2594,16 +2594,56 @@ async def upload_document(
 
 @api_router.post("/multi-item-listings")
 async def create_multi_item_listing(listing_data: MultiItemListingCreate, current_user: User = Depends(get_current_user)):
-    if current_user.account_type != "business":
-        raise HTTPException(status_code=403, detail="Only business accounts can create multi-item listings")
+    # ========== ENFORCE MARKETPLACE SETTINGS ==========
+    settings = await get_marketplace_settings()
     
-    # Determine status based on auction_start_date
+    # Check 1: Multi-lot access restriction
+    if not settings.get("allow_all_users_multi_lot", True):
+        # Only business accounts can create multi-lot auctions
+        if current_user.account_type != "business":
+            raise HTTPException(
+                status_code=403, 
+                detail="Multi-lot auctions are restricted to business accounts. Please upgrade your account or contact support."
+            )
+    
+    # Check 2: Quota - Maximum active auctions per user
+    max_active = settings.get("max_active_auctions_per_user", 20)
+    active_count = await db.multi_item_listings.count_documents({
+        "seller_id": current_user.id,
+        "status": {"$in": ["active", "upcoming"]}
+    })
+    if active_count >= max_active:
+        raise HTTPException(
+            status_code=400,
+            detail=f"You have reached the maximum limit of {max_active} active auctions. Please wait for current auctions to end."
+        )
+    
+    # Check 3: Quota - Maximum lots per auction
+    max_lots = settings.get("max_lots_per_auction", 50)
+    if len(listing_data.lots) > max_lots:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Maximum {max_lots} lots allowed per auction. You submitted {len(listing_data.lots)} lots."
+        )
+    
+    # Determine status based on auction_start_date and seller approval requirement
     now = datetime.now(timezone.utc)
     status = "active"  # Default to active
     
+    # Check 4: Require approval for new sellers
+    if settings.get("require_approval_new_sellers", False):
+        # Check if user has completed any auctions
+        completed_count = await db.multi_item_listings.count_documents({
+            "seller_id": current_user.id,
+            "status": "completed"
+        })
+        if completed_count < 1:
+            status = "pending"  # Requires admin approval
+            logger.info(f"📋 New seller {current_user.email} listing set to PENDING for approval")
+    
     if listing_data.auction_start_date:
-        # If start date is in the future, set to upcoming
-        if listing_data.auction_start_date > now:
+        # If start date is in the future, set to upcoming (unless pending)
+        if listing_data.auction_start_date > now and status != "pending":
             status = "upcoming"
     
     # Auto-detect currency if not provided
