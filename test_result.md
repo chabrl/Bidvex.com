@@ -225,10 +225,10 @@ frontend:
 
 test_plan:
   current_focus:
-    - "Premium Marketplace UI System"
-    - "Glassmorphic Navigation"
-    - "Card-based Layouts"
-    - "Mobile Responsiveness"
+    - "Email Template Manager"
+    - "Database-driven Template IDs"
+    - "Bilingual Email Support"
+    - "Admin UI Card-based Layout"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
