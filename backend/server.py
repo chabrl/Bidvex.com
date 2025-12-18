@@ -3133,6 +3133,21 @@ async def admin_update_user_status(user_id: str, data: Dict[str, str], current_u
     return {"message": "User status updated"}
 
 # ========== MARKETPLACE SETTINGS API ==========
+@api_router.get("/marketplace/feature-flags")
+async def get_public_feature_flags():
+    """
+    Public endpoint to get marketplace feature flags.
+    Used by frontend to conditionally show/hide features like Buy Now.
+    Only exposes safe, non-sensitive settings.
+    """
+    settings = await get_marketplace_settings()
+    return {
+        "enable_buy_now": settings.get("enable_buy_now", True),
+        "enable_anti_sniping": settings.get("enable_anti_sniping", True),
+        "anti_sniping_window_minutes": settings.get("anti_sniping_window_minutes", 2),
+        "minimum_bid_increment": settings.get("minimum_bid_increment", 1.0),
+    }
+
 @api_router.get("/admin/marketplace-settings")
 async def get_admin_marketplace_settings(current_user: User = Depends(get_current_user)):
     """Get current marketplace settings (admin only)."""
