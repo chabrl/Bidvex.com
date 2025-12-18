@@ -422,8 +422,10 @@ export const useRealtimeBidding = (listingId) => {
     isConnected,
     connectionHealth,
     lastUpdate,
-    auctionEndDate,    // Updated end date when anti-sniping extends time
-    timeExtended,      // Flag indicating time was extended
+    auctionEndDate,      // Date object (for react-countdown)
+    auctionEndEpoch,     // Unix timestamp (timezone-safe, primary source)
+    serverTimeOffset,    // Client-server time difference in seconds
+    timeExtended,        // Flag indicating time was extended
     reconnect: connect
   };
 };
