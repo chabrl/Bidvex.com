@@ -1778,10 +1778,12 @@ async def place_bid(bid_data: BidCreate, current_user: User = Depends(get_curren
         'current_price': bid_data.amount
     }
     
-    # Include time extension info in broadcast
+    # Include time extension info in broadcast (with epoch timestamp for timezone safety)
     if extension_applied and new_auction_end:
         broadcast_data['time_extended'] = True
         broadcast_data['new_auction_end'] = new_auction_end.isoformat()
+        broadcast_data['new_auction_end_epoch'] = get_epoch_timestamp(new_auction_end)  # Timezone-safe
+        broadcast_data['server_time_epoch'] = get_server_timestamp()
         broadcast_data['extension_reason'] = 'anti_sniping'
     
     await manager.broadcast_bid_update(
