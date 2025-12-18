@@ -48,6 +48,8 @@ export const useRealtimeBidding = (listingId) => {
   const [lastUpdate, setLastUpdate] = useState(null);
   const [connectionHealth, setConnectionHealth] = useState('connecting'); // connecting, healthy, degraded, disconnected
   const [auctionEndDate, setAuctionEndDate] = useState(null); // For anti-sniping time extensions
+  const [auctionEndEpoch, setAuctionEndEpoch] = useState(null); // Unix timestamp (timezone-safe)
+  const [serverTimeOffset, setServerTimeOffset] = useState(0); // Client-server time difference
   const [timeExtended, setTimeExtended] = useState(false); // Flag when time is extended
   
   const wsRef = useRef(null);
