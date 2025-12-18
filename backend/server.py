@@ -3761,6 +3761,163 @@ async def update_marketplace_settings(
     # Return updated settings
     return await get_marketplace_settings()
 
+# ========== EMAIL TEMPLATE MANAGEMENT ENDPOINTS ==========
+
+@api_router.get("/admin/email-templates")
+async def get_admin_email_templates(current_user: User = Depends(get_current_user)):
+    """Get all email templates with categories (admin only)."""
+    if current_user.role != "admin" and not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    templates = await get_email_templates()
+    
+    # Count templates per category and build response
+    template_dict = templates.get("templates", {})
+    total_count = len(template_dict)
+    
+    # Group templates by category
+    categorized = {}
+    for cat_key, cat_info in EMAIL_TEMPLATE_CATEGORIES.items():
+        cat_templates = []
+        for base_key in cat_info["keys"]:
+            en_key = f"{base_key}_en"
+            fr_key = f"{base_key}_fr"
+            if en_key in template_dict or fr_key in template_dict:
+                cat_templates.append({
+                    "key": base_key,
+                    "name": base_key.replace("_", " ").title(),
+                    "en_id": template_dict.get(en_key, ""),
+                    "fr_id": template_dict.get(fr_key, ""),
+                })
+        
+        categorized[cat_key] = {
+            **cat_info,
+            "templates": cat_templates,
+            "count": len(cat_templates)
+        }
+    
+    return {
+        "id": templates.get("id"),
+        "categories": categorized,
+        "total_templates": total_count,
+        "updated_at": templates.get("updated_at"),
+        "updated_by": templates.get("updated_by")
+    }
+
+@api_router.put("/admin/email-templates")
+async def update_email_templates(
+    updates: Dict[str, Any],
+    current_user: User = Depends(get_current_user)
+):
+    """Update email template IDs (admin only)."""
+    if current_user.role != "admin" and not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    templates = await get_email_templates()
+    current_templates = templates.get("templates", {})
+    
+    # Validate and update templates
+    updated_keys = []
+    for key, new_id in updates.get("templates", {}).items():
+        # Validate SendGrid template ID format (d- followed by 32 hex chars)
+        if new_id and not (new_id.startswith("d-") and len(new_id) == 35):
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid template ID format for '{key}'. Must start with 'd-' and be 35 characters."
+            )
+        
+        old_id = current_templates.get(key, "")
+        if old_id != new_id:
+            current_templates[key] = new_id
+            updated_keys.append(key)
+            
+            # Log the change to admin action logs
+            await db.admin_action_logs.insert_one({
+                "id": str(uuid.uuid4()),
+                "admin_id": current_user.id,
+                "admin_email": current_user.email,
+                "action": "email_template_update",
+                "target_type": "email_template",
+                "target_id": key,
+                "old_value": old_id,
+                "new_value": new_id,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            })
+    
+    # Update database
+    await db.email_settings.update_one(
+        {"id": "email_templates"},
+        {
+            "$set": {
+                "templates": current_templates,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "updated_by": current_user.email
+            }
+        },
+        upsert=True
+    )
+    
+    return {
+        "message": f"Updated {len(updated_keys)} template(s)",
+        "updated_keys": updated_keys,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_by": current_user.email
+    }
+
+@api_router.get("/admin/email-templates/search")
+async def search_email_templates(
+    q: str = "",
+    current_user: User = Depends(get_current_user)
+):
+    """Search email templates by name or ID (admin only)."""
+    if current_user.role != "admin" and not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    templates = await get_email_templates()
+    template_dict = templates.get("templates", {})
+    
+    query = q.lower()
+    results = []
+    
+    for key, template_id in template_dict.items():
+        if query in key.lower() or query in template_id.lower():
+            # Find category for this template
+            category = "unknown"
+            base_key = "_".join(key.split("_")[:-1])  # Remove language suffix
+            for cat_key, cat_info in EMAIL_TEMPLATE_CATEGORIES.items():
+                if base_key in cat_info["keys"]:
+                    category = cat_key
+                    break
+            
+            results.append({
+                "key": key,
+                "template_id": template_id,
+                "category": category,
+                "name": key.replace("_", " ").title()
+            })
+    
+    return {
+        "query": q,
+        "count": len(results),
+        "results": results
+    }
+
+@api_router.get("/admin/email-templates/audit-log")
+async def get_email_template_audit_log(
+    limit: int = 50,
+    current_user: User = Depends(get_current_user)
+):
+    """Get audit log of email template changes (admin only)."""
+    if current_user.role != "admin" and not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    logs = await db.admin_action_logs.find(
+        {"action": "email_template_update"},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    
+    return logs
+
 @api_router.get("/admin/reports")
 async def admin_get_reports(current_user: User = Depends(get_current_user)):
     if not current_user.email.endswith("@admin.bazario.com"):
