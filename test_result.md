@@ -71,6 +71,18 @@ backend:
         agent: "testing"
         comment: "✅ PASS - GET /api/marketplace/items returns correct response structure with 'items' array. Items contain required fields: title, current_price, auction_end_date. API returns 50 items successfully with proper decomposed marketplace format."
 
+  - task: "Pre-Launch Calibration APIs"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASS - All pre-launch calibration APIs working correctly (7/7 tests passed). Public feature flags endpoint (/api/marketplace/feature-flags) accessible without auth. Admin marketplace settings GET/PUT (/api/admin/marketplace-settings) working with proper authentication. Buy Now master toggle enforcement returns 403 when disabled with message 'Buy Now feature is currently disabled by admin'. Quota enforcement (max_lots_per_auction) returns 400 'Maximum 2 lots allowed per auction. You submitted 5 lots.' Live Controls integration confirmed - buyNowEnabled and antiSnipingEnabled toggles sync with backend. Unauthorized access properly rejected. All status codes and error messages match specifications."
+
   - task: "Unlimited Extensions"
     implemented: true
     working: true
