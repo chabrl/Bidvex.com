@@ -279,56 +279,6 @@ const MessagesPage = () => {
     convo.other_user?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Connection status indicator
-  const ConnectionStatus = () => (
-    <div className={`flex items-center gap-1 text-xs ${
-      connectionHealth === 'healthy' ? 'text-green-500' :
-      connectionHealth === 'connecting' ? 'text-yellow-500' :
-      'text-red-500'
-    }`}>
-      {connectionHealth === 'healthy' ? (
-        <><Wifi className="h-3 w-3" /> Live</>
-      ) : connectionHealth === 'connecting' ? (
-        <><Loader2 className="h-3 w-3 animate-spin" /> Connecting</>
-      ) : (
-        <><WifiOff className="h-3 w-3" /> Offline</>
-      )}
-    </div>
-  );
-
-  // Reference Card for listing context
-  const ListingReferenceCard = ({ info }) => {
-    if (!info) return null;
-    
-    return (
-      <div 
-        className="mx-4 mt-2 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-lg border border-blue-200 dark:border-blue-800 cursor-pointer hover:shadow-md transition-shadow"
-        onClick={() => navigate(`/auction/${info.id}`)}
-      >
-        <div className="flex items-center gap-3">
-          {info.image ? (
-            <img src={info.image} alt="" className="w-12 h-12 rounded-lg object-cover" />
-          ) : (
-            <div className="w-12 h-12 rounded-lg bg-gray-200 flex items-center justify-center">
-              <Package className="h-6 w-6 text-gray-400" />
-            </div>
-          )}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-              {info.title}
-            </p>
-            {info.price && (
-              <p className="text-xs text-blue-600 dark:text-blue-400 font-semibold">
-                Current: ${info.price.toFixed(2)}
-              </p>
-            )}
-          </div>
-          <ExternalLink className="h-4 w-4 text-gray-400" />
-        </div>
-      </div>
-    );
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
