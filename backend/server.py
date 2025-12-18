@@ -1857,6 +1857,14 @@ async def purchase_buy_now(
     Process Buy Now purchase for multi-item lots.
     Implements atomic quantity decrement and partial lot liquidation.
     """
+    # ========== CHECK IF BUY NOW IS GLOBALLY ENABLED ==========
+    settings = await get_marketplace_settings()
+    if not settings.get("enable_buy_now", True):
+        raise HTTPException(
+            status_code=400, 
+            detail="Buy Now feature is currently disabled. Please place a bid instead."
+        )
+    
     # Fetch the auction
     auction = await db.multi_item_listings.find_one(
         {"id": purchase.auction_id},
@@ -1882,7 +1890,7 @@ async def purchase_buy_now(
     if not target_lot:
         raise HTTPException(status_code=404, detail="Lot not found")
     
-    # Validate Buy Now is enabled
+    # Validate Buy Now is enabled for this specific lot
     if not target_lot.get("buy_now_enabled", False):
         raise HTTPException(status_code=400, detail="Buy Now not available for this lot")
     
