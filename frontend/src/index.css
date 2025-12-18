@@ -298,10 +298,10 @@
   }
   
   /* Status Colors */
-  .text-success { color: hsl(var(--success)); }
-  .bg-success { background-color: hsl(var(--success)); }
-  .text-warning { color: hsl(var(--warning)); }
-  .bg-warning { background-color: hsl(var(--warning)); }
+  .text-success { color: hsl(152, 76%, 43%); }
+  .bg-success { background-color: hsl(152, 76%, 43%); }
+  .text-warning { color: hsl(38, 92%, 50%); }
+  .bg-warning { background-color: hsl(38, 92%, 50%); }
   
   /* Live Status Indicator */
   .status-live {
