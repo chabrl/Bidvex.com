@@ -3064,10 +3064,71 @@ async def admin_get_users(current_user: User = Depends(get_current_user), limit:
 
 @api_router.put("/admin/users/{user_id}/status")
 async def admin_update_user_status(user_id: str, data: Dict[str, str], current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@admin.bazario.com") and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     await db.users.update_one({"id": user_id}, {"$set": {"status": data.get("status")}})
     return {"message": "User status updated"}
+
+# ========== MARKETPLACE SETTINGS API ==========
+@api_router.get("/admin/marketplace-settings")
+async def get_admin_marketplace_settings(current_user: User = Depends(get_current_user)):
+    """Get current marketplace settings (admin only)."""
+    if current_user.role != "admin" and not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    settings = await get_marketplace_settings()
+    return settings
+
+@api_router.put("/admin/marketplace-settings")
+async def update_marketplace_settings(
+    settings_data: Dict,
+    current_user: User = Depends(get_current_user)
+):
+    """Update marketplace settings (admin only). Changes take effect immediately."""
+    if current_user.role != "admin" and not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Validate settings
+    allowed_fields = [
+        "allow_all_users_multi_lot",
+        "require_approval_new_sellers", 
+        "max_active_auctions_per_user",
+        "max_lots_per_auction",
+        "minimum_bid_increment",
+        "enable_anti_sniping",
+        "anti_sniping_window_minutes",
+        "enable_buy_now"
+    ]
+    
+    # Filter only allowed fields
+    update_data = {k: v for k, v in settings_data.items() if k in allowed_fields}
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    update_data["updated_by"] = current_user.email
+    
+    # Upsert settings
+    await db.settings.update_one(
+        {"id": "marketplace_settings"},
+        {"$set": update_data},
+        upsert=True
+    )
+    
+    # Log the change
+    log_entry = {
+        "id": str(uuid4()),
+        "action": "MARKETPLACE_SETTINGS_UPDATE",
+        "admin_id": current_user.id,
+        "admin_email": current_user.email,
+        "target_type": "settings",
+        "target_id": "marketplace_settings",
+        "details": f"Updated settings: {list(update_data.keys())}",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.admin_logs.insert_one(log_entry)
+    
+    logger.info(f"📋 Marketplace settings updated by {current_user.email}: {list(update_data.keys())}")
+    
+    # Return updated settings
+    return await get_marketplace_settings()
 
 @api_router.get("/admin/reports")
 async def admin_get_reports(current_user: User = Depends(get_current_user)):
