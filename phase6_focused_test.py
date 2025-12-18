@@ -11,7 +11,7 @@ import time
 from datetime import datetime, timezone, timedelta
 
 # Configuration
-BASE_URL = "https://bidvex-sync.preview.emergentagent.com/api"
+BASE_URL = "https://market-admin-dash.preview.emergentagent.com/api"
 ADMIN_EMAIL = "super.admin@admin.bazario.com"
 ADMIN_PASSWORD = "SuperAdmin123!"
 USER_EMAIL = "phase6.user@bazario.com"

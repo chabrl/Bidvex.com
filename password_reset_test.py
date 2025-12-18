@@ -12,7 +12,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = "https://bidvex-sync.preview.emergentagent.com/api"
+BASE_URL = "https://market-admin-dash.preview.emergentagent.com/api"
 TEST_USER_EMAIL = "password.reset.tester@bidvex.com"
 TEST_USER_PASSWORD = "PasswordTest123!"
 TEST_USER_NAME = "Password Reset Tester"

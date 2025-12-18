@@ -12,7 +12,7 @@ from typing import Dict, Any, Optional
 import uuid
 
 # Configuration
-BASE_URL = "https://bidvex-sync.preview.emergentagent.com/api"
+BASE_URL = "https://market-admin-dash.preview.emergentagent.com/api"
 
 class PremiumAutoPromotionTester:
     def __init__(self):

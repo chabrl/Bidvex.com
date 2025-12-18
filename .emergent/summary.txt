@@ -1,77 +1,58 @@
-<analysis>**original_problem_statement:** The user wants to finalize the SendGrid integration, implement a secure password reset feature, and then build out several advanced real-time auction features. These include:
-1.  A WebSocket-based real-time bidding system with instant price and status (LEADING/OUTBID) updates.
-2.  A quantity-based price multiplier UI to show buyers the Total Value for multi-item lots.
-3.  Buy Now functionality for items in a multi-item lot.
-4.  A cascading (staggered) closing sequence for items within a lot.
-5.  A seller promotion engine to feature items.
-6.  A decomposed, item-centric marketplace view.
-
-After implementing these features, a critical bug was reported: the real-time price and status updates are not synchronizing between different users viewing the same auction item. The immediate goal is to diagnose and fix this synchronization failure.
+<analysis>**original_problem_statement:** Initially, the user requested the implementation of an Extended Bidding (Anti-Sniping) feature and a series of Production Hardening tasks, including database cleanup and UI improvements. This was immediately superseded by several critical bug reports from the user:
+1.  A UI/Logic sync conflict where an Auction has ended notification appeared while the countdown timer still showed significant time remaining.
+2.  A Sync Error popup that blocked users from bidding.
+3.  A major timezone bug causing the auction countdown to be off by exactly one hour.
+4.  Following the bug fixes, the user requested a complete overhaul of the Admin Panel to improve usability, including a two-tier navigation system, live-editing controls, and a professional, card-based interface for managing marketplace settings, complete with backend logic to enforce the new rules.
 
 **User's preferred language**: English
 
 **what currently exists?**
-The project is a full-stack auction platform named BidVex with a FastAPI backend and a React frontend. Key systems that have been implemented include:
-- A fully configured and validated **SendGrid Email Service** for transactional emails.
-- A complete, secure **Password Reset Flow** integrated with SendGrid templates, including backend endpoints and frontend pages.
-- The initial backend and frontend implementation for a **Real-Time Bidding System** using WebSockets, including room-based management and new UI components.
-- The initial implementation of advanced auction features: **Buy Now logic**, **cascading auction closing**, a **seller promotion engine**, and a **decomposed marketplace view**.
-
-However, the core real-time bidding synchronization is currently broken.
+The project is a full-stack real-time auction platform (BidVex). The agent has successfully resolved all critical bugs related to real-time synchronization and timezone offsets. The core anti-sniping (extended bidding) feature is implemented. Most significantly, a brand new, professionally designed Admin Panel has been built with a two-tier navigation structure and a card-based UI. The backend has been updated with new APIs and logic to support and enforce the settings configured in this new admin panel (e.g., controlling who can create auctions, setting bid increments, enabling/disabling features globally).
 
 **Last working item**:
--   **Last item agent was working:** Diagnosing and fixing a critical bug where real-time price and status updates are not synchronizing across different clients via WebSockets. User A's bid does not update User B's screen.
--   **Status:** IN PROGRESS
--   **Agent Testing Done:** N
--   **Which testing method agent to use?** Manual testing first with browser developer tools and backend logs to identify the root cause. The user has specifically requested visible Debug Toasts on the frontend. Once a fix is implemented, use **both** frontend and backend testing agents to validate the end-to-end real-time flow.
+-   **Last item agent was working:** Implementing and verifying the complete end-to-end flow for the new Marketplace Settings admin panel. This included creating the backend API endpoints (), enforcing the rules (e.g., for auction creation, bidding), and connecting the redesigned frontend UI to fetch and save these settings.
+-   **Status:** USER VERIFICATION PENDING
+-   **Agent Testing Done:** Y
+-   **Which testing method agent to use?** Frontend testing agent. The agent should be instructed to test the full admin workflow: log in as admin, change various marketplace settings (e.g., disable Buy Now, increase min bid), save them, then log in as a regular user to confirm the new rules are being enforced on the live site.
 -   **User Testing Done:** N
 
 **All Pending/In progress Issue list**:
--   **Issue 1: Real-time bidding synchronization is not working. (P0)**
-
-    **Issues Detail:**
-    -   **Issue 1:**
-        -   **Description:** When one user places a bid, other users viewing the same item do not see the price update or their bidding status (OUTBID) change in real-time without a manual refresh. This is a blocker for the application's core functionality.
-        -   **Attempted fixes:** None yet. The agent was just beginning the investigation when the last session ended.
-        -   **Next debug checklist:**
-            1.  **Backend ():**
-                -   Verify the WebSocket handshake is succeeding for all clients connecting to the room (). Check for any Ingress or Load Balancer issues terminating the connection.
-                -   Implement a Ping/Pong heartbeat mechanism to keep the WebSocket connection alive and prevent idle timeouts.
-                -   Examine the  method. Ensure it's sending the update payload to all clients in the correct  room.
-                -   Log the exact payload being broadcasted to ensure it contains the correct  and .
-            2.  **Frontend ():**
-                -   Add debug toasts or console logs as requested by the user to confirm WebSocket Connected and Incoming Bid Detected events.
-                -   Verify the  handler is correctly receiving and parsing the broadcasted data.
-                -   Ensure the received data is triggering a React state update to re-render the price and status components.
-                -   Implement the graceful degradation fallback: if the WebSocket connection drops (/), trigger a one-time API fetch for the latest data, then switch to polling every 3 seconds while displaying a warning to the user.
-        -   **Why fix this issue and what will be achieved with the fix?** This is a critical, blocking bug. Fixing it will make the core auction functionality usable and enable real-time competitive bidding.
-        -   **Status:** IN PROGRESS
-        -   **Is recurring issue?** N
-        -   **Should Test frontend/backend/both after fix?** Both
-        -   **Blocked on other issue:** None
+There are no pending high-priority issues. The last major task was a feature implementation which is now ready for user review.
 
 **In progress Task List**:
--   None. The sole focus is on fixing the P0 bug.
+-   **Task 1: Finalize and Verify Admin Marketplace Settings (P0)**
+    -   **Where to resume:** The feature is fully implemented and has passed initial agent API and UI tests. It is now awaiting final verification from the user.
+    -   **What will be achieved with this?** A production-ready admin panel that gives administrators powerful control over core marketplace rules and features.
+    -   **Status:** USER VERIFICATION PENDING
+    -   **Should Test frontend/backend/both after fix?** Both. A full end-to-end test simulating both an admin and a user is required.
+    -   **Blocked on something:** User feedback.
 
 **Upcoming and Future Tasks**
 -   **Upcoming Tasks:**
-    -   **Integrate New Frontend Components (P1):** The newly created components (, , ) are standalone and have not been integrated into the main application pages like  or the marketplace. This needs to be done to activate the new features.
-    -   **Configure SendGrid Event Webhook (P1):** The webhook URL () needs to be configured in the SendGrid dashboard to track email events (delivered, opened, clicked, bounced). A guide () has been created.
+    -   **Database Cleanup (P1):** The original request to clear test bids and listings from the database was not completed. Confirm with the user if they want to proceed with cleaning up test data.
+    -   **Configure SendGrid Event Webhook (P1):** The webhook URL () needs to be configured in the SendGrid dashboard to track email events (delivered, opened, etc.). A guide for this exists at .
 -   **Future Tasks:**
-    -   **Implement Seller Promotion Analytics (P2):** While the DB schema supports promotions, the backend logic to track impressions vs. clicks for seller ROI is missing.
-    -   **Implement Bilingual (EN/FR) Email Support (P2):** Fully implement and test sending emails in both English and French based on user preference. A guide exists, but the work is not complete.
-    -   **Refine Anti-Sniping Logic (P2):** Implement the specific user requirement that an anti-sniping time extension on one item does not affect other items' closing times unless explicitly configured for Lot-wide extension.
+    -   **Implement Seller Promotion Analytics (P2):** Build the backend logic to track impressions vs. clicks for promoted items to calculate seller ROI.
+    -   **Implement Bilingual (EN/FR) Email Support (P2):** Complete the work to send transactional emails in both English and French based on user preferences.
+    -   **Refactor  (P2):** The main backend file has become a large monolith. It should be broken down into smaller, domain-specific  files (e.g., , , , ) to improve maintainability.
 
 **Completed work in this session**
--   **SendGrid Integration:** Fully validated, configured with production template IDs, and tested. Real emails are being sent successfully.
--   **Password Reset Feature:** A complete, secure password reset flow was implemented from end-to-end (backend endpoints, frontend pages, SendGrid integration).
--   **Frontend Bug Fix:** Resolved a  on the .
--   **Backend Bug Fix:** Fixed an issue where password reset emails were sent with incorrect dynamic variable names (, ).
--   **Advanced Auction Features (Initial Implementation):** Created the foundational backend models, API endpoints, and frontend components for Buy Now, cascading closes, seller promotions, and a decomposed marketplace view.
--   **Documentation:** Created numerous  guides for the email service, authentication flow, and new auction systems.
+-   **Resolved Critical Sync Bugs:** Fixed a series of critical, show-stopping bugs related to real-time updates and time synchronization.
+    -   **Fixed Auction has ended error:** Ensured the frontend's countdown timer and the backend's status check are perfectly synced by making the WebSocket message the single source of truth for the auction's end date.
+    -   **Fixed Timezone Countdown Bug:** Eliminated a 1-hour offset by converting all time-related logic to use Unix epoch timestamps, making the countdown immune to client-side timezone issues.
+-   **Implemented Anti-Sniping Logic:** The core extended bidding feature is now active. Bids placed in the final minutes correctly extend the auction deadline.
+-   **Redesigned Admin Panel:** Executed a complete overhaul of the admin dashboard ().
+    -   Implemented a new two-tier navigation system and a Live Controls panel for toggling site features.
+    -   Built a professional, card-based UI for Marketplace Settings ().
+-   **Implemented Marketplace Settings Backend:**
+    -   Created new API endpoints () to manage site-wide rules.
+    -   Enforced these rules in the backend for auction creation, bidding (), and Buy Now functionality.
+-   **UI/UX Improvements:**
+    -   Created a new Items Marketplace page at  to display individual items.
+    -   Removed a cluttered Common Bid Errors component from the listing detail page for a cleaner UI.
 
 **Earlier issues found/mentioned but not fixed**
--   None. The current critical issue was the last one raised.
+-   None. All issues raised during this session were addressed and resolved.
 
 **Known issue recurrence from previous fork**
 -   None.
@@ -80,476 +61,76 @@ However, the core real-time bidding synchronization is currently broken.
 
 
 **Key Technical Concepts**
--   **Backend:** FastAPI, Pydantic, MongoDB, WebSockets, SendGrid API, WeasyPrint.
--   **Frontend:** React.js, React Hooks, , Tailwind CSS.
--   **Real-Time:** WebSocket-based pub/sub architecture for real-time updates.
--   **Tooling:** yarn install v1.22.22
-[1/4] Resolving packages...
-success Already up-to-date.
-Done in 0.03s., , ============================= test session starts ==============================
-platform linux -- Python 3.11.14, pytest-8.4.2, pluggy-1.6.0
-rootdir: /app
-plugins: anyio-4.11.0
-collected 19 items
-
-backend/test_email_service.py FFFFFFFFF                                  [ 47%]
-backend/test_password_reset_email.py F                                   [ 52%]
-backend/test_production_templates.py EEEEEEE                             [ 89%]
-bid_placement_test.py F                                                  [ 94%]
-sorting_test.py F                                                        [100%]
-
-==================================== ERRORS ====================================
-________________ ERROR at setup of test_authentication_template ________________
-file /app/backend/test_production_templates.py, line 46
-  async def test_authentication_template(email_service, test_email):
-      """Test Authentication category template (Welcome, Password Reset, etc.)"""
-      print_header("Testing Authentication Template (d-e0ee403fbd8646db8011339cf2eeac30)")
-
-      try:
-          result = await email_service.send_email(
-              to=test_email,
-              template_id=EmailTemplates.WELCOME,
-              dynamic_data={
-                  'first_name': 'Test',
-                  'full_name': 'Test User',
-                  'email': test_email,
-                  'login_url': 'https://bidvex.com/auth',
-                  'explore_url': 'https://bidvex.com/marketplace',
-                  'account_type': 'Personal'
-              },
-              language='en'
-          )
-
-          if result['success']:
-              print_success(f"Welcome email sent successfully")
-              print_info(f"Message ID: {result['message_id']}")
-              print_info(f"Status Code: {result['status_code']}")
-              return True
-          else:
-              print_error(f"Failed: {result['error']}")
-              return False
-      except Exception as e:
-          print_error(f"Exception: {str(e)}")
-          return False
-E       fixture 'email_service' not found
->       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
->       use 'pytest --fixtures [testpath]' for help on them.
-
-/app/backend/test_production_templates.py:46
-___________________ ERROR at setup of test_bidding_template ____________________
-file /app/backend/test_production_templates.py, line 77
-  async def test_bidding_template(email_service, test_email):
-      """Test Bidding category template (Bid Placed, Outbid, Won, Lost)"""
-      print_header("Testing Bidding Template (d-13806757fbd24818b24bc520074ea979)")
-
-      try:
-          result = await email_service.send_email(
-              to=test_email,
-              template_id=EmailTemplates.BID_PLACED,
-              dynamic_data={
-                  'first_name': 'Test',
-                  'listing_title': 'Vintage Watch',
-                  'listing_url': 'https://bidvex.com/listing/123',
-                  'bid_amount': '150.00',
-                  'currency': 'CAD',
-                  'listing_image': 'https://images.unsplash.com/photo-1523170335258-f5ed11844a49',
-                  'auction_end_date': '2025-12-31',
-                  'current_high_bid': '150.00'
-              },
-              language='en'
-          )
-
-          if result['success']:
-              print_success(f"Bid confirmation sent successfully")
-              print_info(f"Message ID: {result['message_id']}")
-              print_info(f"Status Code: {result['status_code']}")
-              return True
-          else:
-              print_error(f"Failed: {result['error']}")
-              return False
-      except Exception as e:
-          print_error(f"Exception: {str(e)}")
-          return False
-E       fixture 'email_service' not found
->       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
->       use 'pytest --fixtures [testpath]' for help on them.
-
-/app/backend/test_production_templates.py:77
-_______________ ERROR at setup of test_auction_updates_template ________________
-file /app/backend/test_production_templates.py, line 110
-  async def test_auction_updates_template(email_service, test_email):
-      """Test Auction Updates category template (Ending Soon, Started, Cancelled)"""
-      print_header("Testing Auction Updates Template (d-f22625d31ef74262887e3a8f96934bc1)")
-
-      try:
-          result = await email_service.send_email(
-              to=test_email,
-              template_id=EmailTemplates.AUCTION_ENDING_SOON,
-              dynamic_data={
-                  'first_name': 'Test',
-                  'auction_title': 'Estate Sale Collection',
-                  'auction_url': 'https://bidvex.com/auction/456',
-                  'end_time': '2025-11-22 15:00:00',
-                  'current_bid': '250.00',
-                  'currency': 'CAD'
-              },
-              language='en'
-          )
-
-          if result['success']:
-              print_success(f"Auction ending notification sent successfully")
-              print_info(f"Message ID: {result['message_id']}")
-              print_info(f"Status Code: {result['status_code']}")
-              return True
-          else:
-              print_error(f"Failed: {result['error']}")
-              return False
-      except Exception as e:
-          print_error(f"Exception: {str(e)}")
-          return False
-E       fixture 'email_service' not found
->       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
->       use 'pytest --fixtures [testpath]' for help on them.
-
-/app/backend/test_production_templates.py:110
-_____________ ERROR at setup of test_seller_notifications_template _____________
-file /app/backend/test_production_templates.py, line 141
-  async def test_seller_notifications_template(email_service, test_email):
-      """Test Seller Notifications category template (New Bid, Approved, Sold)"""
-      print_header("Testing Seller Notifications Template (d-794b529ec05e407da60b26113e0c4ea1)")
-
-      try:
-          result = await email_service.send_email(
-              to=test_email,
-              template_id=EmailTemplates.NEW_BID_RECEIVED,
-              dynamic_data={
-                  'first_name': 'Test',
-                  'listing_title': 'Antique Vase',
-                  'listing_url': 'https://bidvex.com/listing/789',
-                  'bid_amount': '300.00',
-                  'currency': 'CAD',
-                  'bidder_name': 'John Doe',
-                  'total_bids': '5'
-              },
-              language='en'
-          )
-
-          if result['success']:
-              print_success(f"Seller notification sent successfully")
-              print_info(f"Message ID: {result['message_id']}")
-              print_info(f"Status Code: {result['status_code']}")
-              return True
-          else:
-              print_error(f"Failed: {result['error']}")
-              return False
-      except Exception as e:
-          print_error(f"Exception: {str(e)}")
-          return False
-E       fixture 'email_service' not found
->       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
->       use 'pytest --fixtures [testpath]' for help on them.
-
-/app/backend/test_production_templates.py:141
-__________________ ERROR at setup of test_financial_template ___________________
-file /app/backend/test_production_templates.py, line 173
-  async def test_financial_template(email_service, test_email):
-      """Test Financial category template (Invoice, Payment, Refund)"""
-      print_header("Testing Financial Template (d-a8cb13c061e3449394e900b406e9a391)")
-
-      try:
-          result = await email_service.send_email(
-              to=test_email,
-              template_id=EmailTemplates.INVOICE,
-              dynamic_data={
-                  'first_name': 'Test',
-                  'invoice_number': 'BV-2025-001',
-                  'invoice_date': '2025-11-21',
-                  'total_amount': '450.00',
-                  'currency': 'CAD',
-                  'items': [
-                      {'name': 'Vintage Watch', 'amount': '150.00'},
-                      {'name': 'Antique Vase', 'amount': '300.00'}
-                  ],
-                  'subtotal': '450.00',
-                  'tax': '67.49',
-                  'shipping': '0.00',
-                  'invoice_pdf_url': 'https://bidvex.com/invoices/001.pdf',
-                  'payment_method': 'Credit Card'
-              },
-              language='en'
-          )
-
-          if result['success']:
-              print_success(f"Invoice email sent successfully")
-              print_info(f"Message ID: {result['message_id']}")
-              print_info(f"Status Code: {result['status_code']}")
-              return True
-          else:
-              print_error(f"Failed: {result['error']}")
-              return False
-      except Exception as e:
-          print_error(f"Exception: {str(e)}")
-          return False
-E       fixture 'email_service' not found
->       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
->       use 'pytest --fixtures [testpath]' for help on them.
-
-/app/backend/test_production_templates.py:173
-________________ ERROR at setup of test_communication_template _________________
-file /app/backend/test_production_templates.py, line 212
-  async def test_communication_template(email_service, test_email):
-      """Test Communication category template (New Message)"""
-      print_header("Testing Communication Template (d-3153ed45d6764d0687e69c85ffddcb10)")
-
-      try:
-          result = await email_service.send_email(
-              to=test_email,
-              template_id=EmailTemplates.NEW_MESSAGE,
-              dynamic_data={
-                  'first_name': 'Test',
-                  'sender_name': 'Jane Smith',
-                  'message_preview': 'Hello! I have a question about the vintage watch you listed...',
-                  'messages_url': 'https://bidvex.com/messages',
-                  'sender_profile_url': 'https://bidvex.com/seller/123'
-              },
-              language='en'
-          )
-
-          if result['success']:
-              print_success(f"Message notification sent successfully")
-              print_info(f"Message ID: {result['message_id']}")
-              print_info(f"Status Code: {result['status_code']}")
-              return True
-          else:
-              print_error(f"Failed: {result['error']}")
-              return False
-      except Exception as e:
-          print_error(f"Exception: {str(e)}")
-          return False
-E       fixture 'email_service' not found
->       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
->       use 'pytest --fixtures [testpath]' for help on them.
-
-/app/backend/test_production_templates.py:212
-____________________ ERROR at setup of test_admin_template _____________________
-file /app/backend/test_production_templates.py, line 242
-  async def test_admin_template(email_service, test_email):
-      """Test Admin category template (Report Received, Account Suspended)"""
-      print_header("Testing Admin Template (d-94d4a5d7855b4fa38badae9cf12ded41)")
-
-      try:
-          result = await email_service.send_email(
-              to=test_email,
-              template_id=EmailTemplates.REPORT_RECEIVED,
-              dynamic_data={
-                  'first_name': 'Admin',
-                  'report_type': 'Spam',
-                  'reported_item': 'Listing #456',
-                  'reporter_name': 'John Doe',
-                  'report_reason': 'This listing appears to be spam',
-                  'admin_url': 'https://bidvex.com/admin/reports/123'
-              },
-              language='en'
-          )
-
-          if result['success']:
-              print_success(f"Admin notification sent successfully")
-              print_info(f"Message ID: {result['message_id']}")
-              print_info(f"Status Code: {result['status_code']}")
-              return True
-          else:
-              print_error(f"Failed: {result['error']}")
-              return False
-      except Exception as e:
-          print_error(f"Exception: {str(e)}")
-          return False
-E       fixture 'email_service' not found
->       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
->       use 'pytest --fixtures [testpath]' for help on them.
-
-/app/backend/test_production_templates.py:242
-=================================== FAILURES ===================================
-_________________________ test_service_initialization __________________________
-async def functions are not natively supported.
-You need to install a suitable plugin for your async framework, for example:
-  - anyio
-  - pytest-asyncio
-  - pytest-tornasync
-  - pytest-trio
-  - pytest-twisted
-______________________________ test_data_builders ______________________________
-async def functions are not natively supported.
-You need to install a suitable plugin for your async framework, for example:
-  - anyio
-  - pytest-asyncio
-  - pytest-tornasync
-  - pytest-trio
-  - pytest-twisted
-__________________________ test_send_email_validation __________________________
-async def functions are not natively supported.
-You need to install a suitable plugin for your async framework, for example:
-  - anyio
-  - pytest-asyncio
-  - pytest-tornasync
-  - pytest-trio
-  - pytest-twisted
-_____________________________ test_simulated_send ______________________________
-async def functions are not natively supported.
-You need to install a suitable plugin for your async framework, for example:
-  - anyio
-  - pytest-asyncio
-  - pytest-tornasync
-  - pytest-trio
-  - pytest-twisted
-_______________________________ test_bulk_email ________________________________
-async def functions are not natively supported.
-You need to install a suitable plugin for your async framework, for example:
-  - anyio
-  - pytest-asyncio
-  - pytest-tornasync
-  - pytest-trio
-  - pytest-twisted
-____________________________ test_helper_functions _____________________________
-async def functions are not natively supported.
-You need to install a suitable plugin for your async framework, for example:
-  - anyio
-  - pytest-asyncio
-  - pytest-tornasync
-  - pytest-trio
-  - pytest-twisted
-_______________________________ test_retry_logic _______________________________
-async def functions are not natively supported.
-You need to install a suitable plugin for your async framework, for example:
-  - anyio
-  - pytest-asyncio
-  - pytest-tornasync
-  - pytest-trio
-  - pytest-twisted
-_________________________ test_template_configuration __________________________
-async def functions are not natively supported.
-You need to install a suitable plugin for your async framework, for example:
-  - anyio
-  - pytest-asyncio
-  - pytest-tornasync
-  - pytest-trio
-  - pytest-twisted
-___________________________ test_webhook_processing ____________________________
-async def functions are not natively supported.
-You need to install a suitable plugin for your async framework, for example:
-  - anyio
-  - pytest-asyncio
-  - pytest-tornasync
-  - pytest-trio
-  - pytest-twisted
-________________________ test_password_reset_email_data ________________________
-async def functions are not natively supported.
-You need to install a suitable plugin for your async framework, for example:
-  - anyio
-  - pytest-asyncio
-  - pytest-tornasync
-  - pytest-trio
-  - pytest-twisted
-______________________________ test_bid_placement ______________________________
-async def functions are not natively supported.
-You need to install a suitable plugin for your async framework, for example:
-  - anyio
-  - pytest-asyncio
-  - pytest-tornasync
-  - pytest-trio
-  - pytest-twisted
-_______________________________ test_sorting_fix _______________________________
-async def functions are not natively supported.
-You need to install a suitable plugin for your async framework, for example:
-  - anyio
-  - pytest-asyncio
-  - pytest-tornasync
-  - pytest-trio
-  - pytest-twisted
-=========================== short test summary info ============================
-FAILED backend/test_email_service.py::test_service_initialization - Failed: a...
-FAILED backend/test_email_service.py::test_data_builders - Failed: async def ...
-FAILED backend/test_email_service.py::test_send_email_validation - Failed: as...
-FAILED backend/test_email_service.py::test_simulated_send - Failed: async def...
-FAILED backend/test_email_service.py::test_bulk_email - Failed: async def fun...
-FAILED backend/test_email_service.py::test_helper_functions - Failed: async d...
-FAILED backend/test_email_service.py::test_retry_logic - Failed: async def fu...
-FAILED backend/test_email_service.py::test_template_configuration - Failed: a...
-FAILED backend/test_email_service.py::test_webhook_processing - Failed: async...
-FAILED backend/test_password_reset_email.py::test_password_reset_email_data
-FAILED bid_placement_test.py::test_bid_placement - Failed: async def function...
-FAILED sorting_test.py::test_sorting_fix - Failed: async def functions are no...
-ERROR backend/test_production_templates.py::test_authentication_template
-ERROR backend/test_production_templates.py::test_bidding_template
-ERROR backend/test_production_templates.py::test_auction_updates_template
-ERROR backend/test_production_templates.py::test_seller_notifications_template
-ERROR backend/test_production_templates.py::test_financial_template
-ERROR backend/test_production_templates.py::test_communication_template
-ERROR backend/test_production_templates.py::test_admin_template
-========================= 12 failed, 7 errors in 0.68s =========================.
+-   **Backend:** FastAPI, WebSockets, MongoDB, Pydantic.
+-   **Frontend:** React.js, React Hooks (, , ), , shadcn/ui.
+-   **Real-Time:** The primary change was shifting from ISO date strings to **Unix Epoch Timestamps** for all time-sensitive communication via WebSockets. This has made the application's time logic robust and immune to timezone discrepancies.
+-   **API Design:** Created a new singleton-style REST resource () for managing global configuration.
 
 **key DB schema**
--   **User:** Added , .
--   **Lot:** (within ) Added , , , , .
--   **MultiItemListing:** Logic for cascading closes was added to the scheduler, relying on the  of individual lots.
+-   ** (New Collection):** A singleton collection was created to store a single document holding the global marketplace configuration.
+    -   
+    -   
+    -   
+    -   
+    -   
+    -   
+    -   
+    -   
 
 **changes in tech stack**
--   No significant changes to the core stack.
+-   No changes to the core technologies.
 
 **All files of reference**
--   : Heavily modified to add password reset, Buy Now, decomposed marketplace, and enhanced WebSocket logic. This is the primary file for the backend bug investigation.
--   : Contains the frontend WebSocket connection logic. This is a key file for the frontend bug investigation.
--   : The UI component that should display real-time updates.
--   , , : New/modified files for the auth flow.
--   : Contains the mapping of helper functions to SendGrid template IDs and the data builders for emails.
+-   : The central point for all backend bug fixes and new feature logic.
+-   : Contains the critical frontend logic for real-time data handling and timezone-safe countdowns.
+-   : The new, completely rewritten admin panel entry point.
+-   : The new UI for managing marketplace settings.
+-   : The user-facing page where all real-time bidding fixes are visible.
 
 **Areas that need refactoring**
--   **Component Integration:** The new frontend components (, , ) are not yet integrated into the main application pages. They need to be wired up to replace static content.
--   ** monolith:** This file has grown significantly and handles auth, listings, bidding, WebSockets, and more. It should be broken down into smaller, more manageable route files (e.g., using FastAPI's  for different domains).
+-   ** monolith:** This file's size and complexity have increased significantly. It is the top candidate for refactoring. It should be broken down into separate modules/routers (e.g., , ).
 
 **key api endpoints**
--   : Initiates the password reset process.
--   : Completes the password reset with a valid token.
--   : Handles the Buy Now purchase for an item.
--   : Fetches items for the new decomposed, item-centric marketplace view.
--   : The WebSocket endpoint for real-time bidding updates (currently malfunctioning).
+-   ** (New):** Fetches the current marketplace configuration (Admin only).
+-   ** (New):** Updates the marketplace configuration (Admin only).
+-   ** (Path Updated):** The corrected WebSocket endpoint for real-time bidding.
+-   ** (Logic Updated):** Now enforces marketplace settings from the database.
+-   ** (Logic Updated):** Now enforces dynamic minimum bid increment and anti-sniping rules from settings.
+-   ** (Logic Updated):** Now checks the global Enable Buy Now setting.
 
 **Critical Info for New Agent**
--   **Priority #1 is fixing the WebSocket synchronization bug.** This is a showstopper. Follow the debug checklist provided in the Pending Issues section.
--   The user has specifically requested visible frontend **debug toasts** for WebSocket Connected and Incoming Bid events to help diagnose the issue.
--   The fix must include a **ping/pong heartbeat** to prevent connection drops and a **graceful fallback to polling** if the WebSocket fails.
+-   **Epoch Time is Standard:** All real-time and countdown-related logic now exclusively uses Unix epoch timestamps to prevent timezone bugs. Maintain this standard for any new time-sensitive features.
+-   **Admin Panel is New:** The admin panel has been completely redesigned. The backend APIs are in place, but thorough end-to-end testing is the next logical step.
+-   ** Refactor is Needed:** The backend's main file is becoming unmanageable. Prioritize breaking it down into smaller routers in any future backend work.
 
 **documents created in this job**
--   
--   
--   
--   
--   
--   
--   
--   
--   
--   
--   
+-   None.
 
 **Last 10 User Messages and any pending user messages**
--   The last user message is a bug report and a directive to fix the broken real-time bidding synchronization. The user outlines specific checks (WebSocket handshake, broadcast logic, state management) and required fixes (heartbeat, room-based broadcast, re-sync fallback). The user has marked this as a blocker and needs it resolved immediately.
+1.  **User reported** Sync Error popup with a screenshot. (Resolved)
+2.  **User reported** a 1-hour timezone offset in the countdown with a screenshot. (Resolved)
+3.  **User provided** a detailed prompt to fix the timezone issue using epoch timestamps. (Implemented)
+4.  **User requested** a complete redesign of the Admin Panel with a two-tier navigation structure. (Implemented)
+5.  **User navigated** to the marketplace settings page. (Action)
+6.  **User provided** a detailed UI/UX prompt for overhauling the Marketplace Settings page. (Implemented)
+7.  **User provided** a final, comprehensive prompt detailing the backend logic for the new settings. (Implemented)
+8.  There are no pending messages requiring immediate action. The user is awaiting a summary of the completed work.
 
 **Project Health Check:**
--   **Broken:** Real-time bidding synchronization is non-functional.
+-   **Broken:** None. The application is currently in a stable state with all reported bugs fixed and new features implemented.
+-   **Mocked:** None.
 
 **3rd Party Integrations**
 -   **SendGrid:** Used for all transactional emails. The integration is complete and validated.
 
 **Testing status**
--   **Testing agent used after significant changes:** YES (for the password reset backend).
+-   **Testing agent used after significant changes:** YES (Backend tests were run for anti-sniping).
 -   **Troubleshoot agent used after agent stuck in loop:** NO
--   **Test files created:**
-    -   
-    -   
--   **Known regressions:** The real-time bidding synchronization, which was part of a new feature implementation, is not working.
+-   **Test files created:** None. The agent used ad-hoc Python scripts and  commands for verification.
+-   **Known regressions:** None. All bugs reported in this session have been fixed.
 
 **Credentials to test flow:**
--   N/A. The SendGrid API key is configured in .
+-   **Admin User:**  / 
 
 **What agent forgot to execute**
--   The agent created several new frontend components for the advanced auction features (, , ) but **did not integrate them into the existing application pages**. For example, the  still needs to be updated to use the new  component. This is a critical next step after the bug fix.</analysis>
+-   **Database Cleanup:** The user's initial request to perform a Database Cleanup of test bids and listings was not executed. The agent identified the test data but did not proceed with deletion. This should be raised with the user for confirmation.</analysis>
