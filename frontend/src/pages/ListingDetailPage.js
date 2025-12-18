@@ -94,7 +94,7 @@ const ListingDetailPage = () => {
     }
 
     try {
-      await axios.post(`${API}/bids`, {
+      const response = await axios.post(`${API}/bids`, {
         listing_id: id,
         amount: parseFloat(bidAmount),
       });
@@ -106,12 +106,43 @@ const ListingDetailPage = () => {
         origin: { y: 0.6 }
       });
       
+      // Check if anti-sniping extension was applied
+      if (response.data.extension_applied && response.data.new_auction_end) {
+        toast.info('⏰ Auction Extended!', {
+          description: 'Your bid triggered the 2-minute anti-sniping extension.',
+          duration: 5000
+        });
+      }
+      
       fetchListing();
       fetchBids();
       setBidAmount('');
     } catch (error) {
       const errorMessage = extractErrorMessage(error);
-      toast.error(errorMessage || 'Failed to place bid');
+      
+      // Provide better context for "Auction has ended" error
+      if (errorMessage?.toLowerCase().includes('auction has ended')) {
+        // Check if our local countdown still shows time remaining
+        const currentEffectiveEnd = realtimeEndDate || new Date(listing?.auction_end_date);
+        const stillShowingTime = currentEffectiveEnd > new Date();
+        
+        if (stillShowingTime) {
+          // Sync issue - tell user to refresh
+          toast.error('Sync Error', {
+            description: 'Please refresh the page to get the latest auction status.',
+            duration: 8000
+          });
+          // Force refresh the listing data
+          fetchListing();
+        } else {
+          toast.error('Auction has ended', {
+            description: 'This auction is no longer accepting bids.',
+            duration: 5000
+          });
+        }
+      } else {
+        toast.error(errorMessage || 'Failed to place bid');
+      }
     }
   };
 
