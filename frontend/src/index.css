@@ -1,44 +1,110 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================
+   BIDVEX PREMIUM MARKETPLACE - 2025 UI SYSTEM
+   ============================================ */
+
 @layer base {
   * {
     @apply border-border;
   }
-  body {
-    @apply bg-background text-foreground;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  
+  html {
+    scroll-behavior: smooth;
   }
+  
+  body {
+    @apply bg-surface text-foreground antialiased;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Space Grotesk', sans-serif;
+    @apply font-semibold tracking-tight;
   }
+  
+  /* Typography Scale */
+  h1 { @apply text-4xl sm:text-5xl lg:text-6xl; }
+  h2 { @apply text-2xl sm:text-3xl lg:text-4xl; }
+  h3 { @apply text-xl sm:text-2xl; }
 }
 
 :root {
-  /* BidVex Brand Colors */
+  /* ===== BidVex Premium Color Palette ===== */
   --background: 0 0% 100%;
-  --foreground: 0 0% 16.9%; /* #2B2B2B */
+  --foreground: 220 20% 16%;
+  
+  /* Surface Colors - Off-white for depth */
+  --surface: 220 14% 96%;
+  --surface-elevated: 0 0% 100%;
+  
+  /* Card System */
   --card: 0 0% 100%;
-  --card-foreground: 0 0% 16.9%;
+  --card-foreground: 220 20% 16%;
+  
+  /* Popover */
   --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 16.9%;
-  --primary: 205 100% 50%; /* #009BFF */
+  --popover-foreground: 220 20% 16%;
+  
+  /* BidVex Blue - Primary */
+  --primary: 205 100% 50%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 0 0% 16.9%; /* #2B2B2B */
+  --primary-hover: 209 100% 45%;
+  
+  /* Secondary - Deep Navy */
+  --secondary: 209 100% 33%;
   --secondary-foreground: 0 0% 100%;
-  --muted: 206 100% 96.7%; /* #E8F4FF */
-  --muted-foreground: 205 10% 50%;
-  --accent: 206 100% 96.7%; /* #E8F4FF */
-  --accent-foreground: 0 0% 16.9%;
-  --destructive: 0 84.2% 60.2%;
+  
+  /* Muted - Soft Blue Tint */
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+  
+  /* Accent - Light Blue */
+  --accent: 206 100% 97%;
+  --accent-foreground: 209 100% 33%;
+  
+  /* Status Colors */
+  --success: 152 76% 43%;
+  --success-foreground: 0 0% 100%;
+  --warning: 38 92% 50%;
+  --warning-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 98%;
-  --border: 206 60% 92%;
-  --input: 206 60% 92%;
+  --live: 152 76% 43%;
+  
+  /* Border & Input */
+  --border: 220 13% 91%;
+  --input: 220 13% 91%;
   --ring: 205 100% 50%;
-  --radius: 0.5rem;
+  
+  /* Standardized Radius - 12px for modern feel */
+  --radius: 0.75rem;
+  --radius-sm: 0.5rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  
+  /* Shadows - Soft depth */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 8px 30px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 15px 50px rgba(0, 0, 0, 0.1);
+  --shadow-glow: 0 0 40px rgba(0, 155, 255, 0.15);
+  
+  /* Spacing */
+  --container-padding-mobile: 24px;
+  --container-padding-desktop: 48px;
+  
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
   
   /* BidVex Gradient */
   --gradient-start: #009BFF;
@@ -46,144 +112,467 @@
 }
 
 .dark {
-  /* BidVex Dark Mode */
-  --background: 0 0% 10%; /* Darker background */
-  --foreground: 0 0% 98%;
-  --card: 0 0% 13%;
-  --card-foreground: 0 0% 98%;
-  --popover: 0 0% 13%;
-  --popover-foreground: 0 0% 98%;
-  --primary: 205 100% 50%; /* #009BFF */
+  --background: 222 47% 8%;
+  --foreground: 210 40% 98%;
+  
+  --surface: 222 47% 6%;
+  --surface-elevated: 222 47% 11%;
+  
+  --card: 222 47% 11%;
+  --card-foreground: 210 40% 98%;
+  
+  --popover: 222 47% 11%;
+  --popover-foreground: 210 40% 98%;
+  
+  --primary: 205 100% 55%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 0 0% 16.9%; /* #2B2B2B */
+  --primary-hover: 205 100% 60%;
+  
+  --secondary: 209 100% 40%;
   --secondary-foreground: 0 0% 100%;
-  --muted: 0 0% 20%;
-  --muted-foreground: 206 20% 70%;
-  --accent: 205 100% 20%;
-  --accent-foreground: 0 0% 98%;
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 0 0% 20%;
-  --input: 0 0% 20%;
-  --ring: 205 100% 50%;
+  
+  --muted: 222 47% 15%;
+  --muted-foreground: 215 20% 65%;
+  
+  --accent: 222 47% 18%;
+  --accent-foreground: 210 40% 98%;
+  
+  --border: 222 47% 18%;
+  --input: 222 47% 18%;
+  
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 30px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 15px 50px rgba(0, 0, 0, 0.5);
 }
 
+/* ===== Page Transitions ===== */
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
-/* BidVex Brand Utilities */
+.page-transition {
+  animation: pageEnter 200ms ease-out;
+}
+
+/* ===== Premium Card System ===== */
+@layer components {
+  .premium-card {
+    @apply bg-card rounded-xl border border-border/50;
+    box-shadow: var(--shadow);
+    transition: all var(--transition-base);
+  }
+  
+  .premium-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+  }
+  
+  .premium-card-static {
+    @apply bg-card rounded-xl border border-border/50;
+    box-shadow: var(--shadow);
+  }
+  
+  .premium-card-elevated {
+    @apply bg-card rounded-xl;
+    box-shadow: var(--shadow-md);
+    transition: all var(--transition-base);
+  }
+  
+  .premium-card-elevated:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-4px);
+  }
+}
+
+/* ===== Glassmorphism Navigation ===== */
+.glass-nav {
+  @apply fixed top-0 left-0 right-0 z-50;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.dark .glass-nav {
+  background: rgba(17, 24, 39, 0.85);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Legacy glassmorphism support */
+.glassmorphism {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.dark .glassmorphism {
+  background: rgba(17, 24, 39, 0.85);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ===== Container System ===== */
+.container-premium {
+  @apply w-full mx-auto;
+  padding-left: var(--container-padding-mobile);
+  padding-right: var(--container-padding-mobile);
+  max-width: 1440px;
+}
+
+@media (min-width: 768px) {
+  .container-premium {
+    padding-left: var(--container-padding-desktop);
+    padding-right: var(--container-padding-desktop);
+  }
+}
+
+/* ===== BidVex Brand Utilities ===== */
 @layer utilities {
+  /* Background Surface */
+  .bg-surface {
+    background-color: hsl(var(--surface));
+  }
+  
+  .bg-surface-elevated {
+    background-color: hsl(var(--surface-elevated));
+  }
+  
+  /* Gradient Button */
   .gradient-button {
-    background: linear-gradient(90deg, #009BFF 0%, #0056A6 100%);
+    background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
     color: #FFFFFF;
     border: none;
-    border-radius: 6px;
-    padding: 10px 20px;
+    border-radius: var(--radius);
     font-weight: 600;
-    box-shadow: 0 2px 6px rgba(0, 91, 187, 0.3);
-    transition: all 0.3s ease;
+    box-shadow: 0 4px 14px rgba(0, 91, 187, 0.3);
+    transition: all var(--transition-base);
   }
   
   .gradient-button:hover {
-    background: linear-gradient(90deg, #0056A6 0%, #009BFF 100%);
-    box-shadow: 0 4px 12px rgba(0, 91, 187, 0.4);
-    transform: translateY(-1px);
+    background: linear-gradient(135deg, var(--gradient-end) 0%, var(--gradient-start) 100%);
+    box-shadow: 0 6px 20px rgba(0, 91, 187, 0.4);
+    transform: translateY(-2px);
   }
   
   .gradient-button:active {
     transform: translateY(0);
-    box-shadow: 0 1px 3px rgba(0, 91, 187, 0.3);
+    box-shadow: 0 2px 8px rgba(0, 91, 187, 0.3);
   }
   
+  /* Gradient Text */
   .gradient-text {
-    background: linear-gradient(90deg, #009BFF 0%, #0056A6 100%);
+    background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
   }
   
+  /* Gradient Background */
   .gradient-bg {
-    background: linear-gradient(90deg, #009BFF 0%, #0056A6 100%);
+    background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
   }
   
-  .bidvex-shadow {
-    box-shadow: 0 4px 20px rgba(0, 155, 255, 0.15);
+  /* Premium Shadows */
+  .shadow-premium {
+    box-shadow: var(--shadow);
   }
   
-  .bidvex-shadow-lg {
-    box-shadow: 0 10px 40px rgba(0, 155, 255, 0.25);
+  .shadow-premium-md {
+    box-shadow: var(--shadow-md);
   }
   
-  /* Animations for Mobile Lot Index */
-  @keyframes pulse-subtle {
-    0%, 100% {
-      opacity: 1;
-      transform: scale(1);
-    }
-    50% {
-      opacity: 0.9;
-      transform: scale(1.05);
-    }
+  .shadow-premium-lg {
+    box-shadow: var(--shadow-lg);
   }
   
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
   }
   
-  @keyframes slideUp {
-    from {
-      transform: translateY(100%);
-      opacity: 0;
-    }
-    to {
-      transform: translateY(0);
-      opacity: 1;
-    }
+  /* Status Colors */
+  .text-success { color: hsl(var(--success)); }
+  .bg-success { background-color: hsl(var(--success)); }
+  .text-warning { color: hsl(var(--warning)); }
+  .bg-warning { background-color: hsl(var(--warning)); }
+  
+  /* Live Status Indicator */
+  .status-live {
+    @apply relative;
+  }
+  
+  .status-live::before {
+    content: '';
+    @apply absolute -left-3 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full;
+    background-color: hsl(var(--live));
+    animation: pulse-live 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  /* Rounded Corners - Standardized */
+  .rounded-premium { border-radius: var(--radius); }
+  .rounded-premium-sm { border-radius: var(--radius-sm); }
+  .rounded-premium-lg { border-radius: var(--radius-lg); }
+  .rounded-premium-xl { border-radius: var(--radius-xl); }
+}
+
+/* ===== Animations ===== */
+@keyframes pulse-live {
+  0%, 100% {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: translateY(-50%) scale(1.2);
   }
 }
 
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
 
-/* Swiper Navigation Styles for Auction Rows */
+@keyframes slideInRight {
+  from {
+    transform: translateX(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes bidPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
+.animate-fadeIn { animation: fadeIn 200ms ease-out; }
+.animate-slideUp { animation: slideUp 300ms ease-out; }
+.animate-slideInRight { animation: slideInRight 300ms ease-out; }
+.bid-animation { animation: bidPulse 500ms ease-in-out; }
+
+/* ===== Card Hover Effects ===== */
+.card-hover {
+  transition: transform var(--transition-base), box-shadow var(--transition-base);
+}
+
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+}
+
+/* ===== Listing Card - Uniform Aspect Ratio ===== */
+.listing-card-image {
+  @apply relative overflow-hidden;
+  aspect-ratio: 4 / 3;
+}
+
+.listing-card-image img {
+  @apply absolute inset-0 w-full h-full object-cover;
+  transition: transform var(--transition-slow);
+}
+
+.listing-card:hover .listing-card-image img {
+  transform: scale(1.05);
+}
+
+/* ===== Chat UI - WhatsApp Style ===== */
+.chat-container {
+  @apply flex flex-col;
+  height: calc(100vh - 64px);
+}
+
+.chat-messages {
+  @apply flex-1 overflow-y-auto;
+  scroll-behavior: smooth;
+}
+
+.chat-input-bar {
+  @apply sticky bottom-0 bg-card border-t border-border p-4;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.message-bubble {
+  @apply max-w-[75%] rounded-2xl px-4 py-2.5;
+  box-shadow: var(--shadow-sm);
+}
+
+.message-bubble-sent {
+  @apply bg-primary text-primary-foreground rounded-br-md;
+}
+
+.message-bubble-received {
+  @apply bg-muted text-foreground rounded-bl-md;
+}
+
+/* ===== Form Elements ===== */
+input:focus,
+textarea:focus,
+select:focus {
+  @apply outline-none ring-2 ring-primary/20 border-primary;
+  transition: all var(--transition-fast);
+}
+
+/* ===== Modal & Dialog ===== */
+[data-radix-dialog-overlay] {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+}
+
+[data-radix-dialog-content] {
+  @apply rounded-xl;
+  box-shadow: var(--shadow-lg);
+}
+
+/* ===== Dropdown & Select ===== */
+[data-radix-select-content],
+[data-radix-dropdown-content] {
+  @apply rounded-xl border-border/50;
+  box-shadow: var(--shadow-md);
+}
+
+[data-radix-select-item]:focus,
+[data-radix-dropdown-item]:focus {
+  @apply bg-accent text-accent-foreground;
+}
+
+/* ===== Tab Navigation ===== */
+[role="tab"][data-state="active"] {
+  @apply text-primary border-b-2 border-primary;
+}
+
+/* ===== Badge Styles ===== */
+.badge-live {
+  @apply inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full;
+  background: linear-gradient(135deg, hsl(var(--success)) 0%, hsl(152, 76%, 35%) 100%);
+  color: white;
+  animation: pulse-live 2s infinite;
+}
+
+.badge-status {
+  @apply inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full;
+}
+
+.badge-active {
+  @apply bg-primary/10 text-primary;
+}
+
+.badge-closed {
+  @apply bg-muted text-muted-foreground;
+}
+
+.badge-pending {
+  @apply bg-warning/10 text-warning;
+}
+
+/* ===== Scrollbar Styling ===== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground));
+}
+
+/* ===== Swiper Navigation ===== */
 .auction-row-swiper .swiper-button-next,
 .auction-row-swiper .swiper-button-prev {
   color: hsl(var(--primary));
-  background: white;
-  width: 40px;
-  height: 40px;
+  background: hsl(var(--card));
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
+  box-shadow: var(--shadow);
+  transition: all var(--transition-base);
 }
 
 .auction-row-swiper .swiper-button-next:hover,
 .auction-row-swiper .swiper-button-prev:hover {
   background: hsl(var(--primary));
   color: white;
-  box-shadow: 0 4px 12px rgba(0, 155, 255, 0.3);
-  transform: scale(1.1);
+  box-shadow: var(--shadow-md);
+  transform: scale(1.05);
 }
 
 .auction-row-swiper .swiper-button-next:after,
 .auction-row-swiper .swiper-button-prev:after {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: bold;
 }
 
-.auction-row-swiper .swiper-button-disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
+/* ===== Price Typography ===== */
+.price-display {
+  @apply font-bold tabular-nums tracking-tight;
 }
 
-/* Responsive adjustments for mobile */
+.price-current {
+  @apply text-2xl text-primary;
+}
+
+.price-starting {
+  @apply text-lg text-muted-foreground line-through;
+}
+
+/* ===== Loading States ===== */
+.skeleton {
+  @apply bg-muted animate-pulse rounded-lg;
+}
+
+@keyframes bidvex-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.bidvex-spinner {
+  @apply w-8 h-8 rounded-full;
+  border: 3px solid hsl(var(--muted));
+  border-top-color: hsl(var(--primary));
+  animation: bidvex-spin 1s linear infinite;
+}
+
+/* ===== Responsive Utilities ===== */
 @media (max-width: 640px) {
+  .container-premium {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  
   .auction-row-swiper .swiper-button-next,
   .auction-row-swiper .swiper-button-prev {
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
   }
   
   .auction-row-swiper .swiper-button-next:after,
@@ -192,3 +581,11 @@
   }
 }
 
+/* ===== Print Styles ===== */
+@media print {
+  .glass-nav,
+  .chat-input-bar,
+  button {
+    display: none !important;
+  }
+}
