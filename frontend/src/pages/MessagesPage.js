@@ -401,12 +401,12 @@ const MessagesPage = () => {
                     </p>
                   </div>
                 </div>
-                <ConnectionStatus />
+                <ConnectionStatus connectionHealth={connectionHealth} />
               </div>
             </div>
 
             {/* Listing Reference Card */}
-            <ListingReferenceCard info={listingInfo} />
+            <ListingReferenceCard info={listingInfo} navigate={navigate} />
 
             {/* Messages Area */}
             <ScrollArea className="flex-1 p-4">
