@@ -1,205 +1,399 @@
-/* BidVex Brand Gradients */
-.gradient-bg {
-  background: linear-gradient(90deg, #009BFF 0%, #0056A6 100%);
+/* ============================================
+   BIDVEX APP.CSS - Component-Specific Styles
+   ============================================ */
+
+/* ===== Countdown Timer ===== */
+.countdown-timer {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
-.gradient-text {
-  background: linear-gradient(90deg, #009BFF 0%, #0056A6 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.gradient-button {
-  background: linear-gradient(90deg, #009BFF 0%, #0056A6 100%);
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 6px rgba(0, 91, 187, 0.3);
-}
-
-.gradient-button:hover {
-  background: linear-gradient(90deg, #0056A6 0%, #009BFF 100%);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 91, 187, 0.4);
-}
-
-.gradient-button:active {
-  transform: translateY(0);
-  box-shadow: 0 1px 3px rgba(0, 91, 187, 0.3);
-}
-
-/* BidVex Card Effects */
-.card-hover {
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.card-hover:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 15px 40px rgba(0, 155, 255, 0.15);
-}
-
-.glassmorphism {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-.dark .glassmorphism {
-  background: rgba(30, 30, 30, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.auction-badge {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.7;
-  }
-}
-
-.scroll-smooth {
-  scroll-behavior: smooth;
-}
-
+/* ===== Image Gallery Grid ===== */
 .image-gallery {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
   gap: 0.5rem;
 }
 
-.countdown-timer {
-  font-variant-numeric: tabular-nums;
+/* ===== Auction Badge - Pulsing ===== */
+.auction-badge {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-.bid-animation {
-  animation: bidPulse 0.5s ease-in-out;
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
-@keyframes bidPulse {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.05);
-
-
-/* BidVex Modal & Dropdown Enhancements */
-[data-radix-dialog-overlay] {
-  background: rgba(0, 86, 166, 0.2);
-  backdrop-filter: blur(4px);
-}
-
-[data-radix-dialog-content] {
-  border: 2px solid rgba(0, 155, 255, 0.1);
-  box-shadow: 0 10px 40px rgba(0, 155, 255, 0.25);
-}
-
-[data-radix-select-trigger],
-[data-radix-dropdown-trigger] {
-  border-color: rgba(0, 155, 255, 0.3);
-}
-
-[data-radix-select-trigger]:hover,
-[data-radix-dropdown-trigger]:hover {
-  border-color: #009BFF;
-  box-shadow: 0 0 0 2px rgba(0, 155, 255, 0.1);
-}
-
-[data-radix-select-content],
-[data-radix-dropdown-content] {
-  border: 1px solid rgba(0, 155, 255, 0.2);
-  box-shadow: 0 4px 20px rgba(0, 155, 255, 0.15);
-}
-
-[data-radix-select-item]:focus,
-[data-radix-dropdown-item]:focus {
-  background: rgba(0, 155, 255, 0.1);
-  color: #0056A6;
-}
-
-/* BidVex Toggle Switches */
-[data-radix-switch-thumb] {
-  background: linear-gradient(90deg, #009BFF 0%, #0056A6 100%);
-}
-
-/* BidVex Feature Icons */
+/* ===== Feature Icon Hover ===== */
 .feature-icon {
-  color: #009BFF;
+  color: hsl(var(--primary));
   transition: all 0.3s ease;
 }
 
 .feature-icon:hover {
-  color: #0056A6;
+  color: hsl(var(--secondary));
   transform: scale(1.1);
 }
 
-/* BidVex Input Focus States */
-input:focus,
-textarea:focus,
-select:focus {
-  border-color: #009BFF;
-  box-shadow: 0 0 0 3px rgba(0, 155, 255, 0.1);
-  outline: none;
+/* ===== Accent Highlight Box ===== */
+.accent-highlight {
+  background: hsl(var(--accent));
+  border-left: 3px solid hsl(var(--primary));
+  padding: 1rem;
+  border-radius: 0 var(--radius) var(--radius) 0;
 }
 
-/* BidVex Tab Active State */
-[role="tab"][data-state="active"] {
-  border-bottom: 2px solid #009BFF;
-  color: #0056A6;
+/* ===== Link Hover States ===== */
+a:hover:not(.gradient-button):not([class*="nav"]):not(.no-hover) {
+  color: hsl(var(--primary));
 }
 
-/* BidVex Checkbox & Radio */
-input[type="checkbox"]:checked,
-input[type="radio"]:checked {
-  background: linear-gradient(90deg, #009BFF 0%, #0056A6 100%);
-  border-color: #0056A6;
+/* ===== Progress Bar ===== */
+progress::-webkit-progress-bar {
+  background: hsl(var(--muted));
+  border-radius: var(--radius);
 }
 
-/* BidVex Progress Bar */
 progress::-webkit-progress-value {
-  background: linear-gradient(90deg, #009BFF 0%, #0056A6 100%);
+  background: linear-gradient(90deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
+  border-radius: var(--radius);
 }
 
 progress::-moz-progress-bar {
-  background: linear-gradient(90deg, #009BFF 0%, #0056A6 100%);
+  background: linear-gradient(90deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
+  border-radius: var(--radius);
 }
 
-/* BidVex Link Hover */
-a:hover:not(.gradient-button):not([class*="nav"]) {
-  color: #009BFF;
+/* ===== Checkbox & Radio ===== */
+input[type="checkbox"]:checked,
+input[type="radio"]:checked {
+  background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
+  border-color: hsl(var(--primary));
 }
 
-/* BidVex Accent Highlights */
-.accent-highlight {
-  background: rgba(0, 155, 255, 0.1);
-  border-left: 3px solid #009BFF;
-  padding: 1rem;
+/* ===== Toggle Switch ===== */
+[data-radix-switch-thumb] {
+  background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
 }
 
-/* BidVex Loading Spinner */
-@keyframes bidvex-spin {
-  from {
-    transform: rotate(0deg);
+/* ===== Bid Animation ===== */
+.bid-pulse {
+  animation: bidPulse 0.5s ease-in-out;
+}
+
+@keyframes bidPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+
+/* ===== Hero Section ===== */
+.hero-gradient {
+  background: linear-gradient(135deg, 
+    hsl(var(--background)) 0%, 
+    hsl(var(--accent)) 50%, 
+    hsl(var(--background)) 100%
+  );
+}
+
+/* ===== Marketplace Grid ===== */
+.marketplace-grid {
+  display: grid;
+  grid-template-columns: repeat(1, 1fr);
+  gap: 1.5rem;
+}
+
+@media (min-width: 640px) {
+  .marketplace-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
-  to {
-    transform: rotate(360deg);
+}
+
+@media (min-width: 1024px) {
+  .marketplace-grid {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
-.bidvex-spinner {
-  border: 3px solid rgba(0, 155, 255, 0.2);
-  border-top-color: #009BFF;
-  border-radius: 50%;
-  animation: bidvex-spin 1s linear infinite;
+@media (min-width: 1280px) {
+  .marketplace-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
 
+/* ===== Listing Card Styles ===== */
+.listing-card {
+  @apply premium-card overflow-hidden;
+}
+
+.listing-card .image-container {
+  @apply relative overflow-hidden;
+  aspect-ratio: 4 / 3;
+}
+
+.listing-card .image-container img {
+  @apply w-full h-full object-cover;
+  transition: transform 0.3s ease;
+}
+
+.listing-card:hover .image-container img {
+  transform: scale(1.05);
+}
+
+.listing-card .content {
+  @apply p-4;
+}
+
+.listing-card .title {
+  @apply font-semibold text-foreground line-clamp-2 mb-2;
+}
+
+.listing-card .price {
+  @apply text-xl font-bold text-primary;
+}
+
+.listing-card .meta {
+  @apply text-sm text-muted-foreground mt-2;
+}
+
+/* ===== Admin Dashboard ===== */
+.admin-sidebar {
+  @apply bg-card border-r border-border;
+  min-width: 260px;
+}
+
+.admin-nav-item {
+  @apply flex items-center gap-3 px-4 py-3 text-muted-foreground rounded-lg mx-2 transition-all;
+}
+
+.admin-nav-item:hover {
+  @apply bg-accent text-accent-foreground;
+}
+
+.admin-nav-item.active {
+  @apply bg-primary/10 text-primary font-medium;
+}
+
+.admin-nav-item svg {
+  @apply w-5 h-5;
+}
+
+/* ===== Status Badges ===== */
+.status-badge {
+  @apply inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-full;
+}
+
+.status-badge.active {
+  @apply bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400;
+}
+
+.status-badge.closed {
+  @apply bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400;
+}
+
+.status-badge.live {
+  @apply bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400;
+}
+
+.status-badge.pending {
+  @apply bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400;
+}
+
+/* ===== Product Page - Bidding Panel ===== */
+.bidding-panel {
+  @apply bg-card rounded-xl border border-border;
+  box-shadow: var(--shadow-md);
+}
+
+.bidding-panel-header {
+  @apply p-4 border-b border-border;
+}
+
+.bidding-panel-content {
+  @apply p-4 space-y-4;
+}
+
+.bid-input-group {
+  @apply flex gap-2;
+}
+
+.bid-input-group input {
+  @apply flex-1;
+}
+
+/* ===== Mobile Bid Panel ===== */
+@media (max-width: 768px) {
+  .mobile-bid-panel {
+    @apply fixed bottom-16 left-0 right-0 z-40 p-4;
+    background: hsl(var(--card));
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+    border-top: 1px solid hsl(var(--border));
   }
-  100% {
+  
+  .mobile-bid-panel .bid-actions {
+    @apply flex gap-2;
+  }
+  
+  .mobile-bid-panel .bid-actions button {
+    @apply flex-1;
+  }
+}
+
+/* ===== Online Status Dot ===== */
+.online-dot {
+  @apply w-3 h-3 rounded-full bg-green-500;
+  box-shadow: 0 0 0 2px white;
+  animation: pulse-dot 2s infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* ===== Typing Indicator ===== */
+.typing-indicator {
+  @apply flex items-center gap-1;
+}
+
+.typing-indicator span {
+  @apply w-2 h-2 bg-muted-foreground rounded-full;
+  animation: typing-bounce 1.4s infinite ease-in-out both;
+}
+
+.typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+.typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+.typing-indicator span:nth-child(3) { animation-delay: 0s; }
+
+@keyframes typing-bounce {
+  0%, 80%, 100% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  40% {
     transform: scale(1);
+    opacity: 1;
   }
+}
+
+/* ===== Toast Notifications ===== */
+[data-sonner-toast] {
+  @apply rounded-xl;
+  box-shadow: var(--shadow-lg);
+}
+
+/* ===== Skeleton Loading ===== */
+.skeleton-card {
+  @apply bg-card rounded-xl overflow-hidden;
+  box-shadow: var(--shadow);
+}
+
+.skeleton-image {
+  @apply bg-muted;
+  aspect-ratio: 4 / 3;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-text {
+  @apply bg-muted rounded;
+  height: 1rem;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-text.short { width: 60%; }
+.skeleton-text.medium { width: 80%; }
+.skeleton-text.full { width: 100%; }
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ===== Empty State ===== */
+.empty-state {
+  @apply flex flex-col items-center justify-center py-16 text-center;
+}
+
+.empty-state-icon {
+  @apply w-16 h-16 mb-4 text-muted-foreground opacity-50;
+}
+
+.empty-state-title {
+  @apply text-xl font-semibold text-foreground mb-2;
+}
+
+.empty-state-description {
+  @apply text-muted-foreground max-w-md;
+}
+
+/* ===== Filter Panel ===== */
+.filter-panel {
+  @apply bg-card rounded-xl border border-border p-4;
+  box-shadow: var(--shadow);
+}
+
+.filter-section {
+  @apply py-4 border-b border-border last:border-b-0;
+}
+
+.filter-section-title {
+  @apply font-semibold text-foreground mb-3;
+}
+
+/* ===== Price Range Slider ===== */
+.price-range-slider {
+  @apply relative h-2 bg-muted rounded-full;
+}
+
+.price-range-slider-thumb {
+  @apply absolute top-1/2 -translate-y-1/2 w-5 h-5 bg-primary rounded-full;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+}
+
+/* ===== Responsive Navigation ===== */
+.mobile-nav {
+  @apply fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.mobile-nav-item {
+  @apply flex flex-col items-center justify-center py-2 text-muted-foreground;
+  flex: 1;
+  font-size: 0.75rem;
+}
+
+.mobile-nav-item.active {
+  @apply text-primary;
+}
+
+.mobile-nav-item svg {
+  @apply w-6 h-6 mb-1;
+}
+
+/* ===== Footer ===== */
+.footer {
+  @apply bg-card border-t border-border py-12;
+}
+
+.footer-section {
+  @apply space-y-4;
+}
+
+.footer-title {
+  @apply font-semibold text-foreground;
+}
+
+.footer-link {
+  @apply text-muted-foreground hover:text-primary transition-colors;
+}
+
+/* ===== Responsive Adjustments ===== */
+@media (max-width: 768px) {
+  .hide-mobile { display: none; }
+}
+
+@media (min-width: 769px) {
+  .hide-desktop { display: none; }
 }
