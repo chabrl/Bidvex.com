@@ -1861,8 +1861,8 @@ async def purchase_buy_now(
     settings = await get_marketplace_settings()
     if not settings.get("enable_buy_now", True):
         raise HTTPException(
-            status_code=400, 
-            detail="Buy Now feature is currently disabled. Please place a bid instead."
+            status_code=403, 
+            detail="Buy Now feature is currently disabled by admin. Please place a bid instead."
         )
     
     # Fetch the auction
