@@ -62,7 +62,17 @@ const ListingDetailPage = () => {
   useEffect(() => {
     fetchListing();
     fetchBids();
+    fetchFeatureFlags();
   }, [id]);
+
+  const fetchFeatureFlags = async () => {
+    try {
+      const response = await axios.get(`${API}/marketplace/feature-flags`);
+      setFeatureFlags(response.data);
+    } catch (error) {
+      console.error('Failed to fetch feature flags:', error);
+    }
+  };
 
   const fetchListing = async () => {
     try {
