@@ -3192,7 +3192,7 @@ async def update_marketplace_settings(
     
     # Log the change
     log_entry = {
-        "id": str(uuid4()),
+        "id": str(uuid.uuid4()),
         "action": "MARKETPLACE_SETTINGS_UPDATE",
         "admin_id": current_user.id,
         "admin_email": current_user.email,
