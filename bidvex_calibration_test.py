@@ -372,7 +372,7 @@ class BidVexCalibrationTester:
                     return False
                     
                 data = await response.json()
-                print(f"   - Quota set to: {data['settings']['max_lots_per_auction']}")
+                print(f"   - Quota set to: {data['max_lots_per_auction']}")
             
             # Test: Try to create multi-item listing with 5 lots (exceeds limit of 2)
             lots_data = []
