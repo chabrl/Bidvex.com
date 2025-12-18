@@ -2163,6 +2163,10 @@ async def websocket_endpoint(
             if auction_end_date and not isinstance(auction_end_date, str):
                 auction_end_date = auction_end_date.isoformat()
             
+            # CRITICAL: Send epoch timestamp for timezone-safe countdown calculation
+            auction_end_epoch = get_epoch_timestamp(listing.get('auction_end_date'))
+            server_time_epoch = get_server_timestamp()
+            
             # Check if auction has actually ended
             now = datetime.now(timezone.utc)
             if auction_end_date:
@@ -2181,8 +2185,10 @@ async def websocket_endpoint(
                 'bid_count': listing.get('bid_count', 0),
                 'highest_bidder_id': highest_bidder_id,
                 'bid_status': bid_status,
-                'auction_end_date': auction_end_date,  # Send actual end date for countdown sync
-                'auction_active': auction_active,      # Whether auction is still accepting bids
+                'auction_end_date': auction_end_date,  # ISO string (backup)
+                'auction_end_epoch': auction_end_epoch,  # Unix timestamp (primary - timezone-safe)
+                'server_time_epoch': server_time_epoch,  # Server's current time for sync
+                'auction_active': auction_active,
                 'timestamp': now.isoformat()
             })
         
