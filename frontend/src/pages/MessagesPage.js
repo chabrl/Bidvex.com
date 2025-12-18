@@ -294,7 +294,7 @@ const MessagesPage = () => {
         <div className="p-4 border-b">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold">Messages</h2>
-            <ConnectionStatus />
+            <ConnectionStatus connectionHealth={connectionHealth} />
           </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
