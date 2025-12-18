@@ -47,6 +47,25 @@ api_router = APIRouter(prefix="/api")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# ========== TIMEZONE-SAFE TIMESTAMP HELPER ==========
+def get_epoch_timestamp(dt) -> int:
+    """
+    Convert datetime to Unix epoch timestamp (seconds since 1970-01-01 UTC).
+    This is immune to timezone interpretation issues on the frontend.
+    """
+    if dt is None:
+        return None
+    if isinstance(dt, str):
+        dt = datetime.fromisoformat(dt.replace('Z', '+00:00'))
+    if dt.tzinfo is None:
+        # Assume UTC if no timezone
+        dt = dt.replace(tzinfo=timezone.utc)
+    return int(dt.timestamp())
+
+def get_server_timestamp() -> int:
+    """Get current server time as Unix epoch timestamp."""
+    return int(datetime.now(timezone.utc).timestamp())
+
 class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, List[WebSocket]] = {}
