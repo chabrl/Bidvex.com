@@ -83,12 +83,21 @@ const AdminLogs = ({ searchQuery = '' }) => {
       </div>
 
       <Card>
-        <CardHeader><CardTitle>Action History ({logs.length})</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>Action History ({filteredLogs.length})</span>
+            {searchQuery && (
+              <Badge variant="secondary" className="font-normal">
+                Showing results for "{searchQuery}"
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
         <CardContent>
-          {logs.length > 0 ? (
+          {filteredLogs.length > 0 ? (
             <div className="space-y-2">
-              {logs.map(log => (
-                <div key={log.id} className="flex justify-between items-start p-3 border rounded-lg">
+              {filteredLogs.map(log => (
+                <div key={log.id} className="flex justify-between items-start p-3 border rounded-lg hover:bg-gray-50 transition-colors">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <Badge>{log.action}</Badge>
@@ -102,7 +111,9 @@ const AdminLogs = ({ searchQuery = '' }) => {
               ))}
             </div>
           ) : (
-            <p className="text-center text-muted-foreground py-8">No logs yet</p>
+            <p className="text-center text-muted-foreground py-8">
+              {searchQuery ? `No logs matching "${searchQuery}"` : 'No logs yet'}
+            </p>
           )}
         </CardContent>
       </Card>
