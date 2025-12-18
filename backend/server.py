@@ -47,6 +47,31 @@ api_router = APIRouter(prefix="/api")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# ========== MARKETPLACE SETTINGS (Global Configuration) ==========
+# These settings are stored in the database and can be changed by admins
+DEFAULT_MARKETPLACE_SETTINGS = {
+    "id": "marketplace_settings",
+    "allow_all_users_multi_lot": True,  # If False, only business accounts can create multi-lot auctions
+    "require_approval_new_sellers": False,  # If True, first-time sellers need admin approval
+    "max_active_auctions_per_user": 20,
+    "max_lots_per_auction": 50,
+    "minimum_bid_increment": 1.0,
+    "enable_anti_sniping": True,
+    "anti_sniping_window_minutes": 2,
+    "enable_buy_now": True,
+    "updated_at": None,
+    "updated_by": None
+}
+
+async def get_marketplace_settings():
+    """Fetch marketplace settings from database, or return defaults if not set."""
+    settings = await db.settings.find_one({"id": "marketplace_settings"}, {"_id": 0})
+    if not settings:
+        # Initialize with defaults
+        settings = {**DEFAULT_MARKETPLACE_SETTINGS, "updated_at": datetime.now(timezone.utc).isoformat()}
+        await db.settings.insert_one(settings)
+    return settings
+
 # ========== TIMEZONE-SAFE TIMESTAMP HELPER ==========
 def get_epoch_timestamp(dt) -> int:
     """
