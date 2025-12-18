@@ -8,7 +8,7 @@ import { FileText, Download } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-const AdminLogs = () => {
+const AdminLogs = ({ searchQuery = '' }) => {
   const [logs, setLogs] = useState([]);
   const [filter, setFilter] = useState('');
   const [loading, setLoading] = useState(true);
@@ -16,6 +16,16 @@ const AdminLogs = () => {
   useEffect(() => {
     fetchLogs();
   }, [filter]);
+  
+  // Filter logs based on search query from parent
+  const filteredLogs = searchQuery 
+    ? logs.filter(log => 
+        log.admin_email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        log.action?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        log.target_type?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        log.details?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : logs;
 
   const fetchLogs = async () => {
     try {
