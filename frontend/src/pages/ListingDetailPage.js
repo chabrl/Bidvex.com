@@ -43,6 +43,7 @@ const ListingDetailPage = () => {
   const [rateSellerModalOpen, setRateSellerModalOpen] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [photoIndex, setPhotoIndex] = useState(0);
+  const [featureFlags, setFeatureFlags] = useState({ enable_buy_now: true });
   
   // Real-time bidding hook - provides instant updates via WebSocket
   const {
