@@ -261,9 +261,6 @@ frontend:
 
 test_plan:
   current_focus:
-    - "Email Template Manager"
-    - "Database-driven Template IDs"
-    - "Bilingual Email Support"
     - "Admin UI Card-based Layout"
   stuck_tasks: []
   test_all: false
