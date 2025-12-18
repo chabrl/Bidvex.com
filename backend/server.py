@@ -3819,11 +3819,12 @@ async def update_email_templates(
     # Validate and update templates
     updated_keys = []
     for key, new_id in updates.get("templates", {}).items():
-        # Validate SendGrid template ID format (d- followed by 32 hex chars)
-        if new_id and not (new_id.startswith("d-") and len(new_id) == 35):
+        # Validate SendGrid template ID format (d- followed by 32 hex chars = 34 total)
+        import re
+        if new_id and not re.match(r'^d-[a-f0-9]{32}$', new_id):
             raise HTTPException(
                 status_code=400, 
-                detail=f"Invalid template ID format for '{key}'. Must start with 'd-' and be 35 characters."
+                detail=f"Invalid template ID format for '{key}'. Must be 'd-' followed by 32 hexadecimal characters."
             )
         
         old_id = current_templates.get(key, "")
