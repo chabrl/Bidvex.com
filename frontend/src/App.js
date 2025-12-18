@@ -144,6 +144,7 @@ const App = () => {
         </Routes>
         <Footer />
         <AIAssistant />
+        <MessageNotificationListener />
         <Toaster position="top-right" />
         <MobileBottomNav />
       </div>
