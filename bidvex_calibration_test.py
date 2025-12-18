@@ -477,10 +477,10 @@ class BidVexCalibrationTester:
             ) as response:
                 if response.status == 200:
                     data = await response.json()
-                    if data["settings"]["enable_buy_now"] == new_buy_now_value:
+                    if data["enable_buy_now"] == new_buy_now_value:
                         print(f"✅ buyNowEnabled toggle working - updated to: {new_buy_now_value}")
                     else:
-                        print(f"❌ buyNowEnabled toggle failed - expected: {new_buy_now_value}, got: {data['settings']['enable_buy_now']}")
+                        print(f"❌ buyNowEnabled toggle failed - expected: {new_buy_now_value}, got: {data['enable_buy_now']}")
                         return False
                 else:
                     print(f"❌ Failed to toggle buyNowEnabled: {response.status}")
