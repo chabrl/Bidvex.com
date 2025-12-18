@@ -143,6 +143,42 @@ backend:
         agent: "testing"
         comment: "✅ PASS - Message notification system working correctly. Real-time delivery via WebSocket when user is in conversation room. Global notification fallback via manager.send_to_user() when user not in conversation. NEW_MESSAGE broadcasts include sender info and timestamp. new_message_notification type sent with conversation_id, sender details, and message preview. Dual delivery system ensures messages reach users regardless of active conversation status."
 
+  - task: "Email Template Manager"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASS - Email Template Manager backend APIs working correctly (7/7 tests passed). GET /api/admin/email-templates returns all 53 templates grouped by 6 categories (authentication, financial, bidding, seller, communication, affiliate) with proper structure including total_templates, categories with templates, updated_at, updated_by. Each template has key, name, en_id, fr_id fields. PUT /api/admin/email-templates successfully updates template IDs with validation - valid format d-[32 hex characters] accepted, invalid formats correctly rejected with 400 error. Changes logged to admin_action_logs collection. GET /api/admin/email-templates/search returns accurate results by name or ID with query, count, results structure. GET /api/admin/email-templates/audit-log returns audit log with target_id, old_value, new_value, admin_email, created_at fields. Unauthorized access properly rejected with 401 status."
+
+  - task: "Database-driven Template IDs"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASS - Database-driven template ID system working correctly. Templates stored in email_settings collection with proper structure. Template ID format validation enforces d-[32 hex characters] pattern (e.g., d-89c95108533249aaa1659e258f11dd90). Invalid formats rejected: 'invalid-id', 'd-123' (too short), 'd-12345678901234567890123456789012345' (too long), 'd-gggggggggggggggggggggggggggggggg' (invalid hex), 'e-12345678901234567890123456789012' (wrong prefix). Valid format 'd-1234567890abcdef1234567890abcdef' accepted. All changes logged to admin_action_logs with proper audit trail."
+
+  - task: "Bilingual Email Support"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASS - Bilingual email template system working correctly. get_email_template_id function properly handles language-specific templates. English templates: 26, French templates: 26. Template structure includes both en_id and fr_id fields. Language fallback logic verified: get_email_template_id('auth_welcome', 'fr') returns French template ID, get_email_template_id('auth_welcome', 'en') returns English template ID, get_email_template_id('auth_welcome', 'es') falls back to English template. Non-existent templates return 'd-default-template-id' placeholder. All 52+ templates properly categorized and accessible via admin APIs."
+
 frontend:
   - task: "Homepage Browse Individual Items Section"
     implemented: true
