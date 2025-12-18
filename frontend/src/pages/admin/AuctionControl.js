@@ -39,14 +39,30 @@ const AuctionControl = () => {
 
   const fetchSettings = async () => {
     try {
-      // In production, fetch from API
-      // const response = await axios.get(`${API}/admin/marketplace-settings`);
-      // setSettings(response.data);
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API}/admin/marketplace-settings`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       
-      // For now, use defaults
-      setOriginalSettings({ ...settings });
+      // Map backend field names to frontend state
+      const data = response.data;
+      const mappedSettings = {
+        allowAllUsersMultiLot: data.allow_all_users_multi_lot ?? true,
+        requireApprovalNewSellers: data.require_approval_new_sellers ?? false,
+        maxActiveAuctionsPerUser: data.max_active_auctions_per_user ?? 20,
+        maxLotsPerAuction: data.max_lots_per_auction ?? 50,
+        minimumBidIncrement: data.minimum_bid_increment ?? 1,
+        enableAntiSniping: data.enable_anti_sniping ?? true,
+        antiSnipingWindowMinutes: data.anti_sniping_window_minutes ?? 2,
+        enableBuyNow: data.enable_buy_now ?? true,
+      };
+      
+      setSettings(mappedSettings);
+      setOriginalSettings({ ...mappedSettings });
     } catch (error) {
       console.error('Failed to load settings:', error);
+      // Use defaults if API fails
+      setOriginalSettings({ ...settings });
     } finally {
       setLoading(false);
     }
