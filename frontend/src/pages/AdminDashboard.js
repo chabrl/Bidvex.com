@@ -53,6 +53,7 @@ const SECONDARY_TABS = {
   settings: [
     { id: 'subscriptions', label: 'Subscriptions', icon: '💎', lucideIcon: CreditCard },
     { id: 'trust-safety', label: 'Trust & Safety', icon: '🛡️', lucideIcon: Shield },
+    { id: 'email-templates', label: 'Email Templates', icon: '📧', lucideIcon: Mail },
   ],
   banners: [
     { id: 'banner-manager', label: 'Banner Manager', icon: '🖼️', lucideIcon: Image },
