@@ -500,10 +500,10 @@ class BidVexCalibrationTester:
             ) as response:
                 if response.status == 200:
                     data = await response.json()
-                    if data["settings"]["enable_anti_sniping"] == new_anti_sniping_value:
+                    if data["enable_anti_sniping"] == new_anti_sniping_value:
                         print(f"✅ antiSnipingEnabled toggle working - updated to: {new_anti_sniping_value}")
                     else:
-                        print(f"❌ antiSnipingEnabled toggle failed - expected: {new_anti_sniping_value}, got: {data['settings']['enable_anti_sniping']}")
+                        print(f"❌ antiSnipingEnabled toggle failed - expected: {new_anti_sniping_value}, got: {data['enable_anti_sniping']}")
                         return False
                 else:
                     print(f"❌ Failed to toggle antiSnipingEnabled: {response.status}")
