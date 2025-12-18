@@ -2592,13 +2592,18 @@ async def send_message(msg: MessageCreate, current_user: User = Depends(get_curr
     msg_dict["created_at"] = msg_dict["created_at"].isoformat()
     await db.messages.insert_one(msg_dict)
     
+    # Store listing_id in conversation for reference cards
+    update_fields = {
+        "last_message": msg.content[:100],
+        "last_message_at": datetime.now(timezone.utc).isoformat()
+    }
+    if msg.listing_id:
+        update_fields["listing_id"] = msg.listing_id
+    
     await db.conversations.update_one(
         {"id": conversation_id},
         {
-            "$set": {
-                "last_message": msg.content,
-                "last_message_at": datetime.now(timezone.utc).isoformat()
-            },
+            "$set": update_fields,
             "$setOnInsert": {
                 "id": conversation_id,
                 "participants": [current_user.id, msg.receiver_id],
@@ -2608,10 +2613,30 @@ async def send_message(msg: MessageCreate, current_user: User = Depends(get_curr
         upsert=True
     )
     
-    await manager.send_to_user(msg.receiver_id, {
-        "type": "new_message",
-        "message": msg_dict
-    })
+    # Send via real-time messaging WebSocket if recipient is in conversation
+    sender_info = {"id": current_user.id, "name": current_user.name, "picture": current_user.picture}
+    await message_manager.send_to_conversation(
+        conversation_id,
+        {
+            "type": "NEW_MESSAGE",
+            "message": msg_dict,
+            "sender": sender_info,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        },
+        exclude_user=current_user.id
+    )
+    
+    # Also send via global notification channel for users not in conversation
+    if not message_manager.is_user_in_conversation(conversation_id, msg.receiver_id):
+        await manager.send_to_user(msg.receiver_id, {
+            "type": "new_message_notification",
+            "conversation_id": conversation_id,
+            "sender_name": current_user.name,
+            "sender_picture": current_user.picture,
+            "preview": msg.content[:50] + ("..." if len(msg.content) > 50 else ""),
+            "message": msg_dict,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
     
     return message
 
