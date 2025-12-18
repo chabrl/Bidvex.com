@@ -7,6 +7,7 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import MobileBottomNav from './components/MobileBottomNav';
 import AIAssistant from './components/AIAssistant';
+import MessageNotificationListener from './components/MessageNotificationListener';
 import HomePage from './pages/HomePage';
 import MarketplacePage from './pages/MarketplacePage';
 import ListingDetailPage from './pages/ListingDetailPage';
