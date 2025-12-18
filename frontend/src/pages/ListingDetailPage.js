@@ -52,7 +52,9 @@ const ListingDetailPage = () => {
     isConnected,
     connectionHealth,
     lastUpdate,
-    auctionEndDate: realtimeEndDate,  // Anti-sniping extended end time
+    auctionEndDate: realtimeEndDate,  // Anti-sniping extended end time (Date object)
+    auctionEndEpoch,                   // Unix timestamp (timezone-safe primary source)
+    serverTimeOffset,                  // Client-server time difference
     timeExtended
   } = useRealtimeBidding(id);
 
