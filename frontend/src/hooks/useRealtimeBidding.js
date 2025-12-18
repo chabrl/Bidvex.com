@@ -175,11 +175,30 @@ export const useRealtimeBidding = (listingId) => {
               setBidStatus(data.bid_status);
               setLastUpdate(data.timestamp);
               
-              // Sync auction end date from server (single source of truth)
-              if (data.auction_end_date) {
+              // CRITICAL: Use epoch timestamp for timezone-safe countdown
+              // This is immune to browser timezone interpretation issues
+              if (data.auction_end_epoch) {
+                setAuctionEndEpoch(data.auction_end_epoch);
+                // Calculate client-server time offset for accurate countdown
+                const clientNow = Math.floor(Date.now() / 1000);
+                const serverNow = data.server_time_epoch || clientNow;
+                const offset = serverNow - clientNow;
+                setServerTimeOffset(offset);
+                console.log('[Bidding] ⏱️ Epoch sync:', {
+                  auction_end_epoch: data.auction_end_epoch,
+                  server_time_epoch: data.server_time_epoch,
+                  client_time: clientNow,
+                  offset_seconds: offset
+                });
+                
+                // Also set Date object for backwards compatibility
+                const endDate = new Date(data.auction_end_epoch * 1000);
+                setAuctionEndDate(endDate);
+              } else if (data.auction_end_date) {
+                // Fallback to ISO string parsing
                 const serverEndDate = new Date(data.auction_end_date);
                 setAuctionEndDate(serverEndDate);
-                console.log('[Bidding] Synced auction end date from server:', data.auction_end_date);
+                console.log('[Bidding] Synced auction end date from ISO string:', data.auction_end_date);
               }
               
               // Check if auction has ended according to server
