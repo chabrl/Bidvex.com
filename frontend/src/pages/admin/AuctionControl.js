@@ -71,11 +71,23 @@ const AuctionControl = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      // In production, save to API
-      // await axios.put(`${API}/admin/marketplace-settings`, settings);
+      const token = localStorage.getItem('token');
       
-      // Simulate save
-      await new Promise(resolve => setTimeout(resolve, 800));
+      // Map frontend state to backend field names
+      const payload = {
+        allow_all_users_multi_lot: settings.allowAllUsersMultiLot,
+        require_approval_new_sellers: settings.requireApprovalNewSellers,
+        max_active_auctions_per_user: settings.maxActiveAuctionsPerUser,
+        max_lots_per_auction: settings.maxLotsPerAuction,
+        minimum_bid_increment: settings.minimumBidIncrement,
+        enable_anti_sniping: settings.enableAntiSniping,
+        anti_sniping_window_minutes: settings.antiSnipingWindowMinutes,
+        enable_buy_now: settings.enableBuyNow,
+      };
+      
+      await axios.put(`${API}/admin/marketplace-settings`, payload, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       
       setOriginalSettings({ ...settings });
       toast.success('Settings saved successfully', {
@@ -83,7 +95,10 @@ const AuctionControl = () => {
         icon: <CheckCircle className="h-4 w-4 text-green-500" />
       });
     } catch (error) {
-      toast.error('Failed to save settings');
+      console.error('Failed to save settings:', error);
+      toast.error('Failed to save settings', {
+        description: error.response?.data?.detail || 'Please try again.'
+      });
     } finally {
       setSaving(false);
     }
