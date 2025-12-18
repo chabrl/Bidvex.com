@@ -47,6 +47,150 @@ api_router = APIRouter(prefix="/api")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# ========== EMAIL TEMPLATE SETTINGS (SendGrid Template IDs) ==========
+# All 40+ email templates stored in database for admin management
+DEFAULT_EMAIL_TEMPLATES = {
+    # Authentication
+    "auth_password_reset_en": "d-dbfba723dd5e4895a579b462b19c56fb",
+    "auth_password_reset_fr": "d-9084b4478e024056a9fa5207fdfc91e6",
+    "auth_password_changed_en": "d-1e018cb66df54ee58616f9abd0720b0f",
+    "auth_password_changed_fr": "d-16ad9371e1c54f2996f4ff453dfc2b82",
+    "auth_email_verification_en": "d-79352dd5a50849c7bb4cbe93e726051f",
+    "auth_email_verification_fr": "d-48d6d49961ab439f89d55b890bc84b8a",
+    "auth_welcome_en": "d-db7d296ad54247138f3f210a1fb52e0a",
+    "auth_welcome_fr": "d-256f3801670441808730c4cfb259d9a2",
+    "auth_two_factor_en": "d-7fe6f17a934f491ca91aa36534be85e2",
+    "auth_two_factor_fr": "d-ec1e531f92bc4d01bf24dc47620cabed",
+    "auth_login_alert_en": "d-2cbb18036b9e44e4ba67ac3ee614e339",
+    "auth_login_alert_fr": "d-2e3509d0a8c3480e83cd0d6b6ffc8c25",
+    # Admin
+    "admin_account_suspended_en": "d-cf2d8fb5bad74d4ab00b85236a93755d",
+    "admin_account_suspended_fr": "d-89596fbe221f4740aa29cff3d09d6754",
+    "admin_report_received_en": "d-539a4d89254f42baa38de4f139e7a36b",
+    "admin_report_received_fr": "d-1e6b72f9301c49949b9a5cb21f0a39d5",
+    # Communication
+    "comm_announcement_en": "d-877f77c6623b4ed3879e4a7fcab2f8a5",
+    "comm_announcement_fr": "d-b1fd6b2e096d47bb95c96fc9ca93af68",
+    "comm_support_ack_en": "d-5a4bdee8c66041ba8d44ba0d7fc0244a",
+    "comm_support_ack_fr": "d-7ecc0e3ab5c24c8283416a0e1ef4c9eb",
+    "comm_platform_updates_en": "d-268de17d00514f3bb674e688d414b157",
+    "comm_platform_updates_fr": "d-3dc15879450146dd9e1d48e59dc8cccc",
+    # Financial
+    "fin_invoice_issued_en": "d-d25445886edb4cc08cc8107b07cb343f",
+    "fin_invoice_issued_fr": "d-780daa32909e438aad5ee459cb21703a",
+    "fin_payment_receipt_en": "d-5f88411aa2584e63afccbbe6603b3b3a",
+    "fin_payment_receipt_fr": "d-110c93dfaea74c439488cdbe89985bf3",
+    "fin_payout_sent_en": "d-36b5f93ff1064b8c815253aa60c02829",
+    "fin_payout_sent_fr": "d-73eae4ffc4e9404f9aa931493a4f2724",
+    # Seller
+    "seller_new_bid_en": "d-da5049e2aac143aa937c4dd113d9fb96",
+    "seller_new_bid_fr": "d-5e45290634c648d5aa818a733a94f13d",
+    "seller_listing_approved_en": "d-e65e2943cc6d4b0b968fb0f877357fc0",
+    "seller_listing_approved_fr": "d-2d34d8977ef84acaad852ddf73cf8fb7",
+    "seller_listing_rejected_en": "d-57976d80ab25467cad32db22cd11d06b",
+    "seller_listing_rejected_fr": "d-168a20ae972845658e166bc442904136",
+    # Auction
+    "auction_announcement_en": "d-e525a2ab091a42049f75fb9d102b9cde",
+    "auction_announcement_fr": "d-7a20775199774c5b84e0c3c12c1721a6",
+    "auction_reminder_en": "d-7ae5b7a394494823b16e71a1029e1e6e",
+    "auction_reminder_fr": "d-8c5efdf9cd2449a7b288bc8d3be54885",
+    "auction_results_en": "d-4c519ffa806f41729c07b5c9feca09ab",
+    "auction_results_fr": "d-284252b173364ddab13854da54c70a87",
+    # Bidding
+    "bid_outbid_en": "d-89c95108533249aaa1659e258f11dd90",
+    "bid_outbid_fr": "d-94110d612e1243a58fc28c99872cfce6",
+    "bid_confirmed_en": "d-fde06627d9dc4b79a250123604efb39c",
+    "bid_confirmed_fr": "d-e1fec1eab388405cb172f71c7b6e7879",
+    "bid_winning_en": "d-27a3e1edafe24fa09437ab929eeab070",
+    "bid_winning_fr": "d-a790684646d0430b91686923b46bf697",
+    # Affiliate Program
+    "affiliate_monthly_earnings_en": "d-bacce34b0273477f8e7e4df61b737512",
+    "affiliate_monthly_earnings_fr": "d-7e4e67d882ad490fac384ab166e7f89b",
+    "affiliate_commission_earned_en": "d-60618f4cb6d54a579fe4cc82052ea41d",
+    "affiliate_commission_earned_fr": "d-df3d97fe87b34060b5b6dee14977efcd",
+    "affiliate_referral_notification_en": "d-da95ceff24c54d39b15a29e56d804ee9",
+    "affiliate_referral_notification_fr": "d-32a08f1a11a7441186944747602cfd53",
+}
+
+# Email template categories for admin UI
+EMAIL_TEMPLATE_CATEGORIES = {
+    "authentication": {
+        "name": "Authentication",
+        "description": "User authentication emails (login, password, verification)",
+        "icon": "🔐",
+        "keys": ["auth_password_reset", "auth_password_changed", "auth_email_verification", 
+                 "auth_welcome", "auth_two_factor", "auth_login_alert"]
+    },
+    "financial": {
+        "name": "Financial",
+        "description": "Invoices, receipts, and payout notifications",
+        "icon": "💰",
+        "keys": ["fin_invoice_issued", "fin_payment_receipt", "fin_payout_sent"]
+    },
+    "bidding": {
+        "name": "Bidding & Auction",
+        "description": "Bid confirmations, outbid alerts, and auction results",
+        "icon": "🔨",
+        "keys": ["bid_outbid", "bid_confirmed", "bid_winning", "auction_announcement",
+                 "auction_reminder", "auction_results"]
+    },
+    "seller": {
+        "name": "Seller Notifications",
+        "description": "Seller-specific emails for bids and listing status",
+        "icon": "🏪",
+        "keys": ["seller_new_bid", "seller_listing_approved", "seller_listing_rejected"]
+    },
+    "communication": {
+        "name": "Communication & Admin",
+        "description": "Announcements, support acknowledgments, and admin alerts",
+        "icon": "📢",
+        "keys": ["comm_announcement", "comm_support_ack", "comm_platform_updates",
+                 "admin_account_suspended", "admin_report_received"]
+    },
+    "affiliate": {
+        "name": "Affiliate Program",
+        "description": "Commission and referral notifications",
+        "icon": "🤝",
+        "keys": ["affiliate_monthly_earnings", "affiliate_commission_earned", 
+                 "affiliate_referral_notification"]
+    }
+}
+
+async def get_email_templates():
+    """Fetch email templates from database, or return defaults if not set."""
+    templates = await db.email_settings.find_one({"id": "email_templates"}, {"_id": 0})
+    if not templates:
+        # Initialize with defaults
+        templates = {
+            "id": "email_templates",
+            "templates": DEFAULT_EMAIL_TEMPLATES,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_by": "system"
+        }
+        await db.email_settings.insert_one(templates)
+    return templates
+
+async def get_email_template_id(template_key: str, language: str = "en") -> str:
+    """
+    Get a specific email template ID based on key and language.
+    Falls back to English if language-specific template not found.
+    """
+    templates = await get_email_templates()
+    template_dict = templates.get("templates", {})
+    
+    # Try language-specific key first
+    lang_key = f"{template_key}_{language}"
+    if lang_key in template_dict:
+        return template_dict[lang_key]
+    
+    # Fall back to English
+    en_key = f"{template_key}_en"
+    if en_key in template_dict:
+        return template_dict[en_key]
+    
+    # Return default placeholder if not found
+    return "d-default-template-id"
+
 # ========== MARKETPLACE SETTINGS (Global Configuration) ==========
 # These settings are stored in the database and can be changed by admins
 DEFAULT_MARKETPLACE_SETTINGS = {
