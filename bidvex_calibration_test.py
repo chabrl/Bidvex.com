@@ -227,13 +227,11 @@ class BidVexCalibrationTester:
                 if response.status == 200:
                     data = await response.json()
                     
-                    assert "message" in data, "Response should contain message"
-                    assert "settings" in data, "Response should contain updated settings"
-                    assert data["settings"]["enable_buy_now"] == False, "enable_buy_now should be False"
+                    # The API returns the updated settings directly, not wrapped in a "settings" key
+                    assert data["enable_buy_now"] == False, "enable_buy_now should be False"
                     
                     print(f"✅ Successfully disabled Buy Now feature")
-                    print(f"   - Message: {data['message']}")
-                    print(f"   - enable_buy_now: {data['settings']['enable_buy_now']}")
+                    print(f"   - enable_buy_now: {data['enable_buy_now']}")
                 else:
                     print(f"❌ Failed to update marketplace settings: {response.status}")
                     text = await response.text()
