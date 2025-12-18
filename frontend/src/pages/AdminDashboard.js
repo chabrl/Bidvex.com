@@ -161,27 +161,73 @@ const AdminDashboard = () => {
   };
 
   const fetchLiveSettings = async () => {
-    // In production, this would fetch from backend
-    // For now, use default state
+    try {
+      const response = await axios.get(`${API}/admin/marketplace-settings`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = response.data;
+      
+      // Map backend settings to live controls
+      setLiveSettings(prev => ({
+        ...prev,
+        buyNowEnabled: data.enable_buy_now ?? true,
+        antiSnipingEnabled: data.enable_anti_sniping ?? true,
+      }));
+    } catch (error) {
+      console.error('Failed to fetch live settings:', error);
+    }
   };
 
-  const handleLiveSettingChange = (setting, value) => {
+  const handleLiveSettingChange = async (setting, value) => {
+    const oldValue = liveSettings[setting];
+    
+    // Optimistically update UI
     setLiveSettings(prev => ({ ...prev, [setting]: value }));
+    
+    // Map frontend settings to backend field names
+    const settingMap = {
+      'buyNowEnabled': 'enable_buy_now',
+      'antiSnipingEnabled': 'enable_anti_sniping',
+    };
+    
+    const backendField = settingMap[setting];
+    
+    // If this is a backend-persisted setting, save it
+    if (backendField) {
+      try {
+        await axios.put(`${API}/admin/marketplace-settings`, {
+          [backendField]: value
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        toast.success(`${setting} ${value ? 'enabled' : 'disabled'}`, {
+          description: `Saved to server • Changed by ${user.name || user.email}`,
+        });
+      } catch (error) {
+        // Rollback on failure
+        setLiveSettings(prev => ({ ...prev, [setting]: oldValue }));
+        toast.error('Failed to save setting', {
+          description: error.response?.data?.detail || 'Please try again.',
+        });
+        return;
+      }
+    } else {
+      toast.success(`${setting} ${value ? 'enabled' : 'disabled'}`, {
+        description: `Changed by ${user.name || user.email}`,
+      });
+    }
     
     // Add to audit log
     const logEntry = {
       id: Date.now(),
       admin: user.name || user.email,
       setting: setting,
-      oldValue: liveSettings[setting],
+      oldValue: oldValue,
       newValue: value,
       timestamp: new Date().toISOString(),
     };
     setLiveAuditLog(prev => [logEntry, ...prev].slice(0, 50));
-    
-    toast.success(`${setting} ${value ? 'enabled' : 'disabled'}`, {
-      description: `Changed by ${user.name || user.email}`,
-    });
   };
 
   // Render the active content based on current tab selection
