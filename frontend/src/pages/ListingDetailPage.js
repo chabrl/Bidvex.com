@@ -203,9 +203,11 @@ const ListingDetailPage = () => {
   const timeRemaining = effectiveEndDate - now;
   const isAuctionEnded = timeRemaining <= 0 && bidStatus !== 'EXTENDING';
   
-  // Debug logging
-  console.log('=== Auction Status Debug ===');
-  console.log('Listing end date:', listing.auction_end_date);
+  // Debug logging with epoch timestamps
+  console.log('=== Auction Status Debug (Timezone-Safe) ===');
+  console.log('Epoch timestamp (primary):', auctionEndEpoch);
+  console.log('Server time offset (seconds):', serverTimeOffset);
+  console.log('Listing end date (API):', listing.auction_end_date);
   console.log('Real-time end date:', realtimeEndDate?.toISOString());
   console.log('Effective end date:', effectiveEndDate.toISOString());
   console.log('Time remaining (ms):', timeRemaining);
