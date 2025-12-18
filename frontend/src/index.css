@@ -483,7 +483,7 @@ select:focus {
 }
 
 .badge-pending {
-  @apply bg-warning/10 text-warning;
+  @apply bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400;
 }
 
 /* ===== Scrollbar Styling ===== */
