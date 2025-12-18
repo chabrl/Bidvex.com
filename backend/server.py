@@ -2649,7 +2649,7 @@ async def get_conversations(current_user: User = Depends(get_current_user)):
     
     for convo in convos:
         other_user_id = [p for p in convo["participants"] if p != current_user.id][0]
-        user = await db.users.find_one({"id": other_user_id}, {"_id": 0, "password": 0, "name": 1, "picture": 1})
+        user = await db.users.find_one({"id": other_user_id}, {"_id": 0, "name": 1, "picture": 1, "id": 1})
         convo["other_user"] = user
         
         unread = await db.messages.count_documents({
