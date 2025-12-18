@@ -254,6 +254,7 @@ const AdminDashboard = () => {
         switch (secondaryTab) {
           case 'subscriptions': return <SubscriptionManager />;
           case 'trust-safety': return <TrustSafetyDashboard />;
+          case 'email-templates': return <EmailTemplates />;
           default: return <SubscriptionManager />;
         }
       case 'banners':
