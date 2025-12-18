@@ -474,7 +474,7 @@ const ListingDetailPage = () => {
                     📨 Message Seller
                   </Button>
 
-                  {listing.buy_now_price && (
+                  {listing.buy_now_price && featureFlags.enable_buy_now && (
                     <>
                       <div className="relative">
                         <div className="absolute inset-0 flex items-center">
