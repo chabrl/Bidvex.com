@@ -246,6 +246,146 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+# ========== MESSAGING CONNECTION MANAGER ==========
+class MessageConnectionManager:
+    """
+    WebSocket connection manager for real-time messaging.
+    Handles conversation rooms, typing indicators, and read receipts.
+    """
+    def __init__(self):
+        # {conversation_id: {user_id: WebSocket}}
+        self.conversation_rooms: Dict[str, Dict[str, WebSocket]] = {}
+        # {user_id: set of conversation_ids} - tracks which convos user is actively in
+        self.user_active_convos: Dict[str, set] = {}
+        # {user_id: timestamp} - last seen online
+        self.user_online_status: Dict[str, datetime] = {}
+        # {conversation_id: {user_id: bool}} - typing status
+        self.typing_status: Dict[str, Dict[str, bool]] = {}
+    
+    async def connect(self, websocket: WebSocket, conversation_id: str, user_id: str) -> bool:
+        """Connect user to a conversation room. Returns False if user not authorized."""
+        await websocket.accept()
+        
+        # Track connection
+        if conversation_id not in self.conversation_rooms:
+            self.conversation_rooms[conversation_id] = {}
+        self.conversation_rooms[conversation_id][user_id] = websocket
+        
+        # Track user's active conversations
+        if user_id not in self.user_active_convos:
+            self.user_active_convos[user_id] = set()
+        self.user_active_convos[user_id].add(conversation_id)
+        
+        # Update online status
+        self.user_online_status[user_id] = datetime.now(timezone.utc)
+        
+        # Initialize typing status
+        if conversation_id not in self.typing_status:
+            self.typing_status[conversation_id] = {}
+        self.typing_status[conversation_id][user_id] = False
+        
+        logger.info(f"💬 User {user_id} connected to conversation {conversation_id}")
+        return True
+    
+    def disconnect(self, conversation_id: str, user_id: str):
+        """Disconnect user from conversation room."""
+        if conversation_id in self.conversation_rooms:
+            self.conversation_rooms[conversation_id].pop(user_id, None)
+            if not self.conversation_rooms[conversation_id]:
+                del self.conversation_rooms[conversation_id]
+        
+        if user_id in self.user_active_convos:
+            self.user_active_convos[user_id].discard(conversation_id)
+        
+        # Clear typing status
+        if conversation_id in self.typing_status:
+            self.typing_status[conversation_id].pop(user_id, None)
+        
+        logger.info(f"💬 User {user_id} disconnected from conversation {conversation_id}")
+    
+    async def send_to_conversation(self, conversation_id: str, message: dict, exclude_user: str = None):
+        """Send message to all users in a conversation except the excluded one."""
+        if conversation_id not in self.conversation_rooms:
+            return
+        
+        disconnected = []
+        for user_id, websocket in self.conversation_rooms[conversation_id].items():
+            if user_id == exclude_user:
+                continue
+            try:
+                await websocket.send_json(message)
+                logger.info(f"📤 Sent message to user {user_id} in conversation {conversation_id}")
+            except Exception as e:
+                logger.error(f"❌ Error sending to user {user_id}: {str(e)}")
+                disconnected.append(user_id)
+        
+        # Clean up disconnected users
+        for user_id in disconnected:
+            self.disconnect(conversation_id, user_id)
+    
+    async def send_to_user_in_conversation(self, conversation_id: str, user_id: str, message: dict):
+        """Send message to a specific user in a conversation."""
+        if conversation_id in self.conversation_rooms:
+            websocket = self.conversation_rooms[conversation_id].get(user_id)
+            if websocket:
+                try:
+                    await websocket.send_json(message)
+                except Exception as e:
+                    logger.error(f"❌ Error sending to user {user_id}: {str(e)}")
+                    self.disconnect(conversation_id, user_id)
+    
+    def is_user_online(self, user_id: str, timeout_seconds: int = 30) -> bool:
+        """Check if user is currently online (active within timeout)."""
+        if user_id not in self.user_online_status:
+            return False
+        last_seen = self.user_online_status[user_id]
+        return (datetime.now(timezone.utc) - last_seen).total_seconds() < timeout_seconds
+    
+    def is_user_in_conversation(self, conversation_id: str, user_id: str) -> bool:
+        """Check if user is currently viewing a specific conversation."""
+        return (conversation_id in self.conversation_rooms and 
+                user_id in self.conversation_rooms[conversation_id])
+    
+    def update_online_status(self, user_id: str):
+        """Update user's online status timestamp."""
+        self.user_online_status[user_id] = datetime.now(timezone.utc)
+    
+    async def broadcast_typing_status(self, conversation_id: str, user_id: str, is_typing: bool):
+        """Broadcast typing indicator to other users in conversation."""
+        self.typing_status.setdefault(conversation_id, {})[user_id] = is_typing
+        
+        await self.send_to_conversation(
+            conversation_id,
+            {
+                "type": "TYPING_STATUS",
+                "user_id": user_id,
+                "is_typing": is_typing,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            },
+            exclude_user=user_id
+        )
+    
+    async def broadcast_read_receipt(self, conversation_id: str, user_id: str, message_ids: List[str]):
+        """Broadcast read receipt to other users."""
+        await self.send_to_conversation(
+            conversation_id,
+            {
+                "type": "READ_RECEIPT",
+                "reader_id": user_id,
+                "message_ids": message_ids,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            },
+            exclude_user=user_id
+        )
+    
+    def get_online_users_in_conversation(self, conversation_id: str) -> List[str]:
+        """Get list of online users in a conversation."""
+        if conversation_id not in self.conversation_rooms:
+            return []
+        return list(self.conversation_rooms[conversation_id].keys())
+
+message_manager = MessageConnectionManager()
+
 # Scheduled job to transition upcoming auctions to active
 async def transition_upcoming_auctions():
     """
