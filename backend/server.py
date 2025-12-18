@@ -1768,12 +1768,21 @@ async def place_bid(bid_data: BidCreate, current_user: User = Depends(get_curren
         extension_applied = True
         logger.info(f"⏰ Anti-sniping triggered: listing={bid_data.listing_id}, time_remaining={time_remaining:.1f}s, new_end={new_auction_end.isoformat()}")
     
-    # Calculate minimum bid with helpful error message
-    min_bid = listing["current_price"] + 1  # Default $1 increment
+    # Calculate minimum bid using configurable increment from settings
+    min_increment = settings.get("minimum_bid_increment", 1.0)
+    min_bid = listing["current_price"] + min_increment
+    
     if bid_data.amount <= listing["current_price"]:
         raise HTTPException(
             status_code=400, 
             detail=f"Your bid must be at least ${min_bid:.2f} to lead."
+        )
+    
+    # Also validate the bid meets minimum increment
+    if bid_data.amount < min_bid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Minimum bid increment is ${min_increment:.2f}. Your bid must be at least ${min_bid:.2f}."
         )
     
     # Create bid
