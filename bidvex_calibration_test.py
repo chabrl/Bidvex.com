@@ -251,10 +251,10 @@ class BidVexCalibrationTester:
                 if response.status == 200:
                     data = await response.json()
                     
-                    assert data["settings"]["enable_buy_now"] == True, "enable_buy_now should be True"
+                    assert data["enable_buy_now"] == True, "enable_buy_now should be True"
                     
                     print(f"✅ Successfully enabled Buy Now feature")
-                    print(f"   - enable_buy_now: {data['settings']['enable_buy_now']}")
+                    print(f"   - enable_buy_now: {data['enable_buy_now']}")
                 else:
                     print(f"❌ Failed to re-enable Buy Now: {response.status}")
                     text = await response.text()
