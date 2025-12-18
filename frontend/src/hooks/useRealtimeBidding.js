@@ -219,11 +219,24 @@ export const useRealtimeBidding = (listingId) => {
               setBidStatus(data.bid_status);
               setLastUpdate(data.timestamp);
               
-              // Handle anti-sniping time extension
-              if (data.time_extended && data.new_auction_end) {
-                setAuctionEndDate(new Date(data.new_auction_end));
+              // Handle anti-sniping time extension (use epoch timestamp if available)
+              if (data.time_extended) {
+                if (data.new_auction_end_epoch) {
+                  // Use timezone-safe epoch timestamp
+                  setAuctionEndEpoch(data.new_auction_end_epoch);
+                  setAuctionEndDate(new Date(data.new_auction_end_epoch * 1000));
+                  // Update server time offset
+                  if (data.server_time_epoch) {
+                    const clientNow = Math.floor(Date.now() / 1000);
+                    setServerTimeOffset(data.server_time_epoch - clientNow);
+                  }
+                  console.log('[Bidding] ⏰ Time extended (epoch):', data.new_auction_end_epoch);
+                } else if (data.new_auction_end) {
+                  // Fallback to ISO string
+                  setAuctionEndDate(new Date(data.new_auction_end));
+                  console.log('[Bidding] ⏰ Time extended (ISO):', data.new_auction_end);
+                }
                 setTimeExtended(true);
-                console.log('[Bidding] ⏰ Time extended due to anti-sniping:', data.new_auction_end);
                 
                 // Show time extension notification to all users
                 toast.info('⏰ Auction Extended!', {
