@@ -188,10 +188,6 @@ class EmailTemplateTester:
                         print(f"   - Message: {data['message']}")
                         print(f"   - Updated by: {data['updated_by']}")
                     
-                    print(f"✅ Successfully updated template with valid ID")
-                    print(f"   - Updated keys: {data['updated_keys']}")
-                    print(f"   - Message: {data['message']}")
-                    print(f"   - Updated by: {data['updated_by']}")
                 else:
                     print(f"❌ Failed to update template with valid ID: {response.status}")
                     text = await response.text()
