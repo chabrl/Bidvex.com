@@ -120,26 +120,14 @@ const ListingDetailPage = () => {
     } catch (error) {
       const errorMessage = extractErrorMessage(error);
       
-      // Provide better context for "Auction has ended" error
+      // Show clear error message
       if (errorMessage?.toLowerCase().includes('auction has ended')) {
-        // Check if our local countdown still shows time remaining
-        const currentEffectiveEnd = realtimeEndDate || new Date(listing?.auction_end_date);
-        const stillShowingTime = currentEffectiveEnd > new Date();
-        
-        if (stillShowingTime) {
-          // Sync issue - tell user to refresh
-          toast.error('Sync Error', {
-            description: 'Please refresh the page to get the latest auction status.',
-            duration: 8000
-          });
-          // Force refresh the listing data
-          fetchListing();
-        } else {
-          toast.error('Auction has ended', {
-            description: 'This auction is no longer accepting bids.',
-            duration: 5000
-          });
-        }
+        toast.error('Auction has ended', {
+          description: 'This auction is no longer accepting bids.',
+          duration: 5000
+        });
+        // Refresh listing to update UI
+        fetchListing();
       } else {
         toast.error(errorMessage || 'Failed to place bid');
       }
