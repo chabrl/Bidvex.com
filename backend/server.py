@@ -1698,8 +1698,25 @@ async def place_bid(bid_data: BidCreate, current_user: User = Depends(get_curren
         auction_end = listing["auction_end_date"]
     
     now = datetime.now(timezone.utc)
-    if now > auction_end:
+    
+    # ========== ANTI-SNIPING LOGIC (2-Minute Rule) ==========
+    # Must check BEFORE rejecting "ended" bids, so late bids can still trigger extension
+    ANTI_SNIPE_WINDOW = 120  # 2 minutes in seconds
+    GRACE_PERIOD = 5  # 5 second grace for network latency
+    time_remaining = (auction_end - now).total_seconds()
+    extension_applied = False
+    new_auction_end = None
+    
+    # Check if auction has truly ended (beyond grace period)
+    if time_remaining < -GRACE_PERIOD:
         raise HTTPException(status_code=400, detail="Auction has ended")
+    
+    # If bid is within final 2 minutes OR within grace period after end, extend
+    if time_remaining <= ANTI_SNIPE_WINDOW:
+        # Calculate new end time: Time of Bid + 120 seconds
+        new_auction_end = now + timedelta(seconds=ANTI_SNIPE_WINDOW)
+        extension_applied = True
+        logger.info(f"⏰ Anti-sniping triggered: listing={bid_data.listing_id}, time_remaining={time_remaining:.1f}s, new_end={new_auction_end.isoformat()}")
     
     # Calculate minimum bid with helpful error message
     min_bid = listing["current_price"] + 1  # Default $1 increment
@@ -1713,19 +1730,6 @@ async def place_bid(bid_data: BidCreate, current_user: User = Depends(get_curren
     bid = Bid(listing_id=bid_data.listing_id, bidder_id=current_user.id, amount=bid_data.amount)
     bid_dict = bid.model_dump()
     bid_dict["created_at"] = bid_dict["created_at"].isoformat()
-    
-    # ========== ANTI-SNIPING LOGIC (2-Minute Rule) ==========
-    # If bid is placed within final 2 minutes, extend by 2 minutes from now
-    ANTI_SNIPE_WINDOW = 120  # 2 minutes in seconds
-    time_remaining = (auction_end - now).total_seconds()
-    extension_applied = False
-    new_auction_end = None
-    
-    if 0 < time_remaining <= ANTI_SNIPE_WINDOW:
-        # Calculate new end time: Time of Bid + 120 seconds
-        new_auction_end = now + timedelta(seconds=ANTI_SNIPE_WINDOW)
-        extension_applied = True
-        logger.info(f"⏰ Anti-sniping triggered: listing={bid_data.listing_id}, old_end={auction_end.isoformat()}, new_end={new_auction_end.isoformat()}")
     
     # Insert bid and update listing atomically
     await db.bids.insert_one(bid_dict)
