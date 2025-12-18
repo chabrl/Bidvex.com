@@ -164,10 +164,10 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Homepage Browse Individual Items Section"
-    - "Items Marketplace Page"
-    - "Navbar Browse Items Link"
-    - "Countdown Timer Extension Updates"
+    - "Real-time Messaging WebSocket"
+    - "Typing Indicators"
+    - "Read Receipts"
+    - "Message Notification Listener"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
