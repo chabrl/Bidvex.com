@@ -3334,7 +3334,7 @@ async def websocket_messaging(websocket: WebSocket, conversation_id: str, user_i
     
     # Get other participant info
     other_user_id = [p for p in conversation["participants"] if p != user_id][0]
-    other_user = await db.users.find_one({"id": other_user_id}, {"_id": 0, "password": 0, "name": 1, "picture": 1, "id": 1})
+    other_user = await db.users.find_one({"id": other_user_id}, {"_id": 0, "name": 1, "picture": 1, "id": 1})
     
     # Get listing info if conversation has one
     listing_info = None
