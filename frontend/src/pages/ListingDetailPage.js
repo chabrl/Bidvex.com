@@ -165,7 +165,21 @@ const ListingDetailPage = () => {
   // CRITICAL: Use real-time end date as SINGLE SOURCE OF TRUTH
   // This prevents UI/Logic sync conflicts between countdown and backend validation
   // Priority: WebSocket realtimeEndDate > listing.auction_end_date
-  const effectiveEndDate = realtimeEndDate || new Date(listing.auction_end_date);
+  
+  // Helper to properly parse ISO date strings (handles timezone correctly)
+  const parseISODate = (dateStr) => {
+    if (!dateStr) return null;
+    // Ensure the date string is parsed as UTC
+    // JavaScript's Date constructor can misinterpret timezone offsets
+    const date = new Date(dateStr);
+    // If the string doesn't have 'Z' or '+', append 'Z' to treat as UTC
+    if (typeof dateStr === 'string' && !dateStr.includes('Z') && !dateStr.includes('+') && !dateStr.includes('-', 10)) {
+      return new Date(dateStr + 'Z');
+    }
+    return date;
+  };
+  
+  const effectiveEndDate = realtimeEndDate || parseISODate(listing.auction_end_date);
   
   // Only mark as ended if BOTH countdown is complete AND we're not waiting for WebSocket sync
   // This prevents false "Auction has ended" when anti-sniping extensions occur
