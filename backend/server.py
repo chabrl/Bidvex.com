@@ -1729,6 +1729,9 @@ async def track_item_click(item_id: str):
 
 @api_router.post("/bids")
 async def place_bid(bid_data: BidCreate, current_user: User = Depends(get_current_user)):
+    # ========== LOAD MARKETPLACE SETTINGS ==========
+    settings = await get_marketplace_settings()
+    
     listing = await db.listings.find_one({"id": bid_data.listing_id}, {"_id": 0})
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
@@ -1743,10 +1746,13 @@ async def place_bid(bid_data: BidCreate, current_user: User = Depends(get_curren
     
     now = datetime.now(timezone.utc)
     
-    # ========== ANTI-SNIPING LOGIC (2-Minute Rule) ==========
-    # Must check BEFORE rejecting "ended" bids, so late bids can still trigger extension
-    ANTI_SNIPE_WINDOW = 120  # 2 minutes in seconds
+    # ========== ANTI-SNIPING LOGIC (Configurable) ==========
+    # Get anti-sniping settings from admin configuration
+    anti_sniping_enabled = settings.get("enable_anti_sniping", True)
+    anti_sniping_window_minutes = settings.get("anti_sniping_window_minutes", 2)
+    ANTI_SNIPE_WINDOW = anti_sniping_window_minutes * 60  # Convert to seconds
     GRACE_PERIOD = 5  # 5 second grace for network latency
+    
     time_remaining = (auction_end - now).total_seconds()
     extension_applied = False
     new_auction_end = None
@@ -1755,8 +1761,8 @@ async def place_bid(bid_data: BidCreate, current_user: User = Depends(get_curren
     if time_remaining < -GRACE_PERIOD:
         raise HTTPException(status_code=400, detail="Auction has ended")
     
-    # If bid is within final 2 minutes OR within grace period after end, extend
-    if time_remaining <= ANTI_SNIPE_WINDOW:
+    # If anti-sniping is enabled and bid is within final window, extend
+    if anti_sniping_enabled and time_remaining <= ANTI_SNIPE_WINDOW:
         # Calculate new end time: Time of Bid + 120 seconds
         new_auction_end = now + timedelta(seconds=ANTI_SNIPE_WINDOW)
         extension_applied = True
