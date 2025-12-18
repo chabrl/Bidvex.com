@@ -3256,7 +3256,251 @@ async def websocket_messages(websocket: WebSocket, user_id: str):
             data = await websocket.receive_text()
             await asyncio.sleep(0.1)
     except WebSocketDisconnect:
-        manager.disconnect_user(user_id)
+        manager.disconnect_user(websocket, user_id)
+
+# ========== REAL-TIME MESSAGING WEBSOCKET ==========
+@app.websocket("/api/ws/messaging/{conversation_id}")
+async def websocket_messaging(websocket: WebSocket, conversation_id: str, user_id: str = Query(None)):
+    """
+    Real-time WebSocket for messaging within a conversation.
+    
+    Features:
+    - Instant message delivery (<200ms)
+    - Typing indicators
+    - Read receipts
+    - Online/offline status
+    - Message persistence
+    
+    Query params:
+        user_id: The authenticated user's ID
+    
+    Message types (client -> server):
+        SEND_MESSAGE: Send a new message
+        TYPING_START: User started typing
+        TYPING_STOP: User stopped typing
+        MARK_READ: Mark messages as read
+        PING: Heartbeat
+    
+    Message types (server -> client):
+        NEW_MESSAGE: New message received
+        TYPING_STATUS: Other user typing indicator
+        READ_RECEIPT: Messages marked as read
+        USER_STATUS: Online/offline status change
+        CONNECTION_ESTABLISHED: Connection confirmed
+        HEARTBEAT: Server heartbeat
+        ERROR: Error message
+    """
+    if not user_id:
+        await websocket.close(code=4001, reason="User ID required")
+        return
+    
+    # Validate user has access to this conversation
+    conversation = await db.conversations.find_one({"id": conversation_id}, {"_id": 0})
+    if not conversation:
+        await websocket.close(code=4004, reason="Conversation not found")
+        return
+    
+    if user_id not in conversation.get("participants", []):
+        await websocket.close(code=4003, reason="Not authorized for this conversation")
+        return
+    
+    # Connect to conversation room
+    await message_manager.connect(websocket, conversation_id, user_id)
+    
+    # Get other participant info
+    other_user_id = [p for p in conversation["participants"] if p != user_id][0]
+    other_user = await db.users.find_one({"id": other_user_id}, {"_id": 0, "password": 0, "name": 1, "picture": 1, "id": 1})
+    
+    # Get listing info if conversation has one
+    listing_info = None
+    if conversation.get("listing_id"):
+        listing = await db.multi_item_listings.find_one({"id": conversation["listing_id"]}, {"_id": 0, "id": 1, "title": 1, "lots": {"$slice": 1}})
+        if not listing:
+            listing = await db.listings.find_one({"id": conversation["listing_id"]}, {"_id": 0, "id": 1, "title": 1, "images": {"$slice": 1}, "current_price": 1})
+        if listing:
+            listing_info = {
+                "id": listing.get("id"),
+                "title": listing.get("title"),
+                "image": listing.get("images", [None])[0] if listing.get("images") else (listing.get("lots", [{}])[0].get("images", [None])[0] if listing.get("lots") else None),
+                "price": listing.get("current_price") or (listing.get("lots", [{}])[0].get("current_price") if listing.get("lots") else None)
+            }
+    
+    # Send connection confirmation with initial state
+    try:
+        await websocket.send_json({
+            "type": "CONNECTION_ESTABLISHED",
+            "conversation_id": conversation_id,
+            "other_user": other_user,
+            "other_user_online": message_manager.is_user_in_conversation(conversation_id, other_user_id),
+            "listing_info": listing_info,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+        
+        # Notify other user that this user is now online in this conversation
+        await message_manager.send_to_conversation(
+            conversation_id,
+            {
+                "type": "USER_STATUS",
+                "user_id": user_id,
+                "status": "online",
+                "in_conversation": True,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            },
+            exclude_user=user_id
+        )
+        
+    except Exception as e:
+        logger.error(f"Error sending initial state: {str(e)}")
+        return
+    
+    try:
+        while True:
+            # Receive message with timeout for heartbeat
+            try:
+                raw_message = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
+                data = json.loads(raw_message)
+                message_manager.update_online_status(user_id)
+                
+                msg_type = data.get("type")
+                
+                if msg_type == "SEND_MESSAGE":
+                    # Create and persist message
+                    content = data.get("content", "").strip()
+                    if not content:
+                        await websocket.send_json({"type": "ERROR", "message": "Message content required"})
+                        continue
+                    
+                    message = Message(
+                        conversation_id=conversation_id,
+                        sender_id=user_id,
+                        receiver_id=other_user_id,
+                        listing_id=conversation.get("listing_id"),
+                        content=content
+                    )
+                    
+                    msg_dict = message.model_dump()
+                    msg_dict["created_at"] = msg_dict["created_at"].isoformat()
+                    await db.messages.insert_one(msg_dict)
+                    
+                    # Update conversation
+                    await db.conversations.update_one(
+                        {"id": conversation_id},
+                        {"$set": {
+                            "last_message": content[:100],
+                            "last_message_at": datetime.now(timezone.utc).isoformat()
+                        }}
+                    )
+                    
+                    # Broadcast to other participant(s) in room
+                    await message_manager.send_to_conversation(
+                        conversation_id,
+                        {
+                            "type": "NEW_MESSAGE",
+                            "message": msg_dict,
+                            "sender": {
+                                "id": user_id,
+                                "name": (await db.users.find_one({"id": user_id}, {"name": 1})).get("name", "User")
+                            },
+                            "timestamp": datetime.now(timezone.utc).isoformat()
+                        },
+                        exclude_user=user_id
+                    )
+                    
+                    # Also send via global notification if user not in conversation
+                    if not message_manager.is_user_in_conversation(conversation_id, other_user_id):
+                        sender = await db.users.find_one({"id": user_id}, {"name": 1, "picture": 1})
+                        await manager.send_to_user(other_user_id, {
+                            "type": "new_message_notification",
+                            "conversation_id": conversation_id,
+                            "sender_name": sender.get("name", "Someone"),
+                            "sender_picture": sender.get("picture"),
+                            "preview": content[:50] + ("..." if len(content) > 50 else ""),
+                            "timestamp": datetime.now(timezone.utc).isoformat()
+                        })
+                    
+                    # Confirm to sender
+                    await websocket.send_json({
+                        "type": "MESSAGE_SENT",
+                        "message_id": msg_dict["id"],
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    })
+                    
+                    # Clear typing status after sending
+                    await message_manager.broadcast_typing_status(conversation_id, user_id, False)
+                    
+                    logger.info(f"💬 Message sent in conversation {conversation_id}: {user_id} -> {other_user_id}")
+                    
+                elif msg_type == "TYPING_START":
+                    await message_manager.broadcast_typing_status(conversation_id, user_id, True)
+                    
+                elif msg_type == "TYPING_STOP":
+                    await message_manager.broadcast_typing_status(conversation_id, user_id, False)
+                    
+                elif msg_type == "MARK_READ":
+                    message_ids = data.get("message_ids", [])
+                    if message_ids:
+                        # Update messages in database
+                        await db.messages.update_many(
+                            {"id": {"$in": message_ids}, "receiver_id": user_id},
+                            {"$set": {"is_read": True, "read_at": datetime.now(timezone.utc).isoformat()}}
+                        )
+                        # Broadcast read receipt
+                        await message_manager.broadcast_read_receipt(conversation_id, user_id, message_ids)
+                    
+                elif msg_type == "PING":
+                    await websocket.send_json({
+                        "type": "PONG",
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    })
+                    
+            except asyncio.TimeoutError:
+                # Send heartbeat on timeout
+                try:
+                    await websocket.send_json({
+                        "type": "HEARTBEAT",
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    })
+                except:
+                    break
+                    
+    except WebSocketDisconnect:
+        logger.info(f"💬 WebSocket disconnected: user {user_id} from conversation {conversation_id}")
+    except Exception as e:
+        logger.error(f"💬 WebSocket error: {str(e)}")
+    finally:
+        # Clean up and notify others
+        message_manager.disconnect(conversation_id, user_id)
+        
+        # Notify other user that this user went offline
+        await message_manager.send_to_conversation(
+            conversation_id,
+            {
+                "type": "USER_STATUS",
+                "user_id": user_id,
+                "status": "offline",
+                "in_conversation": False,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            },
+            exclude_user=user_id
+        )
+
+@api_router.get("/conversations/{conversation_id}/online-status")
+async def get_conversation_online_status(conversation_id: str, current_user: User = Depends(get_current_user)):
+    """Get online status of users in a conversation."""
+    conversation = await db.conversations.find_one({"id": conversation_id}, {"_id": 0})
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    if current_user.id not in conversation.get("participants", []):
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    online_users = message_manager.get_online_users_in_conversation(conversation_id)
+    
+    return {
+        "conversation_id": conversation_id,
+        "online_users": online_users,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
 
 @api_router.get("/admin/users")
 async def admin_get_users(current_user: User = Depends(get_current_user), limit: int = 100, skip: int = 0):
