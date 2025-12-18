@@ -157,7 +157,7 @@ class EmailTemplateTester:
         
         try:
             # Test 1: Valid template ID update
-            valid_template_id = "d-89c95108533249aaa1659e258f11dd90"  # Valid format
+            valid_template_id = "d-12345678901234567890123456789012"  # Valid format, different from current
             update_data = {
                 "templates": {
                     "bid_outbid_en": valid_template_id
