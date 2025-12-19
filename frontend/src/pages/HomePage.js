@@ -249,32 +249,48 @@ const HomePage = () => {
       </section>
 
       {/* ========== LIVE AUCTIONS SECTION ========== */}
-      <LiveAuctionsSection items={endingSoon} navigate={navigate} />
+      {isSectionVisible('ending_soon') && (
+        <LiveAuctionsSection items={endingSoon} navigate={navigate} />
+      )}
 
       {/* Homepage Banner */}
-      <section className="py-8 px-4">
-        <div className="max-w-7xl mx-auto">
-          <HomepageBanner />
-        </div>
-      </section>
+      {isSectionVisible('homepage_banner') && (
+        <section className="py-8 px-4">
+          <div className="max-w-7xl mx-auto">
+            <HomepageBanner />
+          </div>
+        </section>
+      )}
 
       {/* ========== HOT ITEMS WITH LIVE ANIMATIONS ========== */}
-      <HotItemsSection items={hotItems} navigate={navigate} />
+      {isSectionVisible('hot_items') && (
+        <HotItemsSection items={hotItems} navigate={navigate} />
+      )}
 
       {/* ========== FEATURED AUCTIONS ========== */}
-      <FeaturedSection items={featured} navigate={navigate} />
+      {isSectionVisible('featured') && (
+        <FeaturedSection items={featured} navigate={navigate} />
+      )}
 
-      {/* ========== NEW LISTINGS ========== */}
-      <NewListingsSection items={newListings} navigate={navigate} />
+      {/* ========== BROWSE INDIVIDUAL ITEMS (Uses browse_items toggle) ========== */}
+      {isSectionVisible('browse_items') && (
+        <NewListingsSection items={newListings} navigate={navigate} />
+      )}
 
-      {/* ========== WHY CHOOSE BIDVEX ========== */}
-      <FeaturesSection navigate={navigate} />
+      {/* ========== WHY CHOOSE BIDVEX (Trust Features) ========== */}
+      {isSectionVisible('trust_features') && (
+        <FeaturesSection navigate={navigate} />
+      )}
 
       {/* ========== TOP SELLERS ========== */}
-      {topSellers.length > 0 && <TopSellersSection sellers={topSellers} />}
+      {isSectionVisible('top_sellers') && topSellers.length > 0 && (
+        <TopSellersSection sellers={topSellers} />
+      )}
 
       {/* ========== HOW IT WORKS ========== */}
-      <HowItWorksSection navigate={navigate} />
+      {isSectionVisible('how_it_works') && (
+        <HowItWorksSection navigate={navigate} />
+      )}
     </div>
   );
 };
