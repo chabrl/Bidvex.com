@@ -269,15 +269,18 @@ test_plan:
 backend:
   - task: "Marketplace Settings API with Validation"
     implemented: true
-    working: pending
+    working: true
     file: "server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: pending
         agent: "main"
         comment: "Enhanced PUT /api/admin/marketplace-settings with type validation, range checks (1-100 for auctions, 1-500 for lots, min $1 bid). Added POST /api/admin/marketplace-settings/restore-defaults to reset to factory defaults. All changes logged to admin_logs with field-level audit trail."
+      - working: true
+        agent: "testing"
+        comment: "✅ PASS - Marketplace Settings API endpoints working correctly (6/6 tests passed). GET /api/admin/marketplace-settings returns all required fields with correct types and value ranges. PUT validation properly rejects invalid values: max_active_auctions_per_user (150 > 100, 0 < 1), max_lots_per_auction (600 > 500), minimum_bid_increment (0.50 < 1.0) with descriptive 400 errors. Valid updates succeed and persist correctly. POST /api/admin/marketplace-settings/restore-defaults resets to factory values (max_auctions: 20, max_lots: 50, min_bid: $1.0, anti_sniping: 2min, all booleans: true). Authorization working - admin access required (403 'Admin access required' for non-admin users), unauthenticated requests rejected with 401. Audit logging confirmed - changes logged to admin_logs collection with field-level tracking. Settings persistence verified after page refresh."
 
 frontend:
   - task: "Marketplace Settings Admin UI"
