@@ -512,6 +512,274 @@
   color: #9CA3AF !important; /* Gray-400 */
 }
 
+/* ============================================
+   BIDVEX LIVE AUCTION ANIMATIONS
+   ============================================ */
+
+/* Brand Gradient - Blue to Cyan */
+.bidvex-gradient {
+  background: linear-gradient(135deg, #1E3A8A 0%, #06B6D4 50%, #22D3EE 100%);
+}
+
+.bidvex-gradient-text {
+  background: linear-gradient(135deg, #3B82F6 0%, #06B6D4 50%, #22D3EE 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Pulsing Timer Animation - Urgency Effect */
+@keyframes pulse-timer {
+  0%, 100% { 
+    box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.7);
+    transform: scale(1);
+  }
+  50% { 
+    box-shadow: 0 0 0 8px rgba(6, 182, 212, 0);
+    transform: scale(1.02);
+  }
+}
+
+@keyframes pulse-urgent {
+  0%, 100% { 
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    color: #EF4444;
+  }
+  50% { 
+    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+    color: #FCA5A5;
+  }
+}
+
+.pulse-timer {
+  animation: pulse-timer 2s ease-in-out infinite;
+}
+
+.pulse-urgent {
+  animation: pulse-urgent 1s ease-in-out infinite;
+}
+
+/* Cyan Glow Hover Effect */
+@keyframes glow-cyan {
+  0%, 100% { box-shadow: 0 0 20px rgba(6, 182, 212, 0.3); }
+  50% { box-shadow: 0 0 40px rgba(6, 182, 212, 0.6); }
+}
+
+.hover-glow-cyan {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-glow-cyan:hover {
+  transform: scale(1.03) translateY(-4px);
+  box-shadow: 0 20px 40px rgba(6, 182, 212, 0.3), 0 0 60px rgba(6, 182, 212, 0.2);
+}
+
+/* Live Activity Indicator */
+@keyframes live-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.5); }
+}
+
+.live-indicator::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  background: #06B6D4;
+  border-radius: 50%;
+  animation: live-dot 1.5s ease-in-out infinite;
+}
+
+/* Scroll Reveal Animations */
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(60px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes reveal-left {
+  from {
+    opacity: 0;
+    transform: translateX(-60px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes reveal-right {
+  from {
+    opacity: 0;
+    transform: translateX(60px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes reveal-scale {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.reveal-up {
+  opacity: 0;
+  animation: reveal-up 0.8s ease-out forwards;
+}
+
+.reveal-left {
+  opacity: 0;
+  animation: reveal-left 0.8s ease-out forwards;
+}
+
+.reveal-right {
+  opacity: 0;
+  animation: reveal-right 0.8s ease-out forwards;
+}
+
+.reveal-scale {
+  opacity: 0;
+  animation: reveal-scale 0.6s ease-out forwards;
+}
+
+/* Staggered Animation Delays */
+.stagger-1 { animation-delay: 0.1s; }
+.stagger-2 { animation-delay: 0.2s; }
+.stagger-3 { animation-delay: 0.3s; }
+.stagger-4 { animation-delay: 0.4s; }
+.stagger-5 { animation-delay: 0.5s; }
+.stagger-6 { animation-delay: 0.6s; }
+
+/* Hero Text Reveal */
+@keyframes text-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+    filter: blur(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.text-reveal {
+  animation: text-reveal 1s ease-out forwards;
+}
+
+/* Logo Energy Flow */
+@keyframes energy-flow {
+  0% { 
+    filter: drop-shadow(0 0 5px rgba(6, 182, 212, 0.5));
+  }
+  50% { 
+    filter: drop-shadow(0 0 20px rgba(6, 182, 212, 0.8)) drop-shadow(0 0 40px rgba(34, 211, 238, 0.4));
+  }
+  100% { 
+    filter: drop-shadow(0 0 5px rgba(6, 182, 212, 0.5));
+  }
+}
+
+.logo-glow {
+  animation: energy-flow 3s ease-in-out infinite;
+}
+
+/* Floating Animation */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.float-animation {
+  animation: float 4s ease-in-out infinite;
+}
+
+/* Particle/Sparkle Effect */
+@keyframes sparkle {
+  0%, 100% { 
+    opacity: 0;
+    transform: scale(0);
+  }
+  50% { 
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Card Hover Pop Effect */
+.card-hover-pop {
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.card-hover-pop:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 
+    0 25px 50px -12px rgba(6, 182, 212, 0.25),
+    0 0 0 1px rgba(6, 182, 212, 0.1);
+}
+
+/* Bidding Activity Ticker */
+@keyframes ticker-slide {
+  from { transform: translateX(100%); }
+  to { transform: translateX(-100%); }
+}
+
+.ticker-animation {
+  animation: ticker-slide 20s linear infinite;
+}
+
+/* Background Gradient Animation */
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animated-gradient {
+  background: linear-gradient(-45deg, #1E3A8A, #3B82F6, #06B6D4, #22D3EE);
+  background-size: 400% 400%;
+  animation: gradient-shift 15s ease infinite;
+}
+
+/* Button Shine Effect */
+@keyframes button-shine {
+  from { left: -100%; }
+  to { left: 100%; }
+}
+
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-shine::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  animation: button-shine 3s ease-in-out infinite;
+}
+
 /* ===== Animations ===== */
 @keyframes pulse-live {
   0%, 100% {
