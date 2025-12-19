@@ -83,34 +83,56 @@ const SellOptionsModal = ({ isOpen, onClose }) => {
 
           {/* Multi-Item Auction Option */}
           <Card 
-            className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105 border-2 hover:border-primary"
+            className={`transition-all duration-200 border-2 ${
+              canAccessMultiLot 
+                ? 'cursor-pointer hover:shadow-lg hover:scale-105 hover:border-primary' 
+                : 'opacity-75 cursor-not-allowed bg-gray-50'
+            }`}
             onClick={() => handleSelectOption('/create-multi-item-listing')}
           >
             <CardContent className="p-6">
               <div className="flex flex-col items-center text-center space-y-4">
-                <div className="p-4 bg-purple-500/10 rounded-full">
-                  <Layers className="h-12 w-12 text-purple-600" />
+                <div className={`p-4 rounded-full ${canAccessMultiLot ? 'bg-purple-500/10' : 'bg-gray-200'}`}>
+                  {canAccessMultiLot ? (
+                    <Layers className="h-12 w-12 text-purple-600" />
+                  ) : (
+                    <Lock className="h-12 w-12 text-gray-400" />
+                  )}
                 </div>
-                <h3 className="text-xl font-semibold">Multi-Item Auction</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xl font-semibold">Multi-Item Auction</h3>
+                  {!canAccessMultiLot && (
+                    <Badge variant="secondary" className="bg-amber-100 text-amber-700">
+                      Business Only
+                    </Badge>
+                  )}
+                </div>
                 <p className="text-sm text-muted-foreground">
                   Ideal for bulk sales, liquidations, or multiple related items
                 </p>
                 <ul className="text-sm text-left space-y-2 w-full">
                   <li className="flex items-center gap-2">
-                    <ArrowRight className="h-4 w-4 text-purple-600" />
+                    <ArrowRight className={`h-4 w-4 ${canAccessMultiLot ? 'text-purple-600' : 'text-gray-400'}`} />
                     Multiple lots in one auction
                   </li>
                   <li className="flex items-center gap-2">
-                    <ArrowRight className="h-4 w-4 text-purple-600" />
+                    <ArrowRight className={`h-4 w-4 ${canAccessMultiLot ? 'text-purple-600' : 'text-gray-400'}`} />
                     Staggered bidding (1-min intervals)
                   </li>
                   <li className="flex items-center gap-2">
-                    <ArrowRight className="h-4 w-4 text-purple-600" />
+                    <ArrowRight className={`h-4 w-4 ${canAccessMultiLot ? 'text-purple-600' : 'text-gray-400'}`} />
                     Higher visibility
                   </li>
                 </ul>
-                <Button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white border-0 hover:opacity-90">
-                  Create Multi-Item Auction
+                <Button 
+                  className={`w-full ${
+                    canAccessMultiLot 
+                      ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white border-0 hover:opacity-90' 
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  }`}
+                  disabled={!canAccessMultiLot}
+                >
+                  {canAccessMultiLot ? 'Create Multi-Item Auction' : 'Upgrade to Business Account'}
                 </Button>
               </div>
             </CardContent>
