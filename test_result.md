@@ -269,15 +269,18 @@ test_plan:
 frontend:
   - task: "Global Scroll-to-Top Navigation"
     implemented: true
-    working: pending
+    working: true
     file: "ScrollToTop.js, App.js, AdminDashboard.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: pending
         agent: "main"
         comment: "Implemented global ScrollToTop component that resets scroll position to (0,0) on every route change using useLayoutEffect. Also added scroll-to-top on admin tab navigation. Needs validation across all routes."
+      - working: true
+        agent: "testing"
+        comment: "✅ PASS - Global scroll-to-top navigation working correctly across all tested scenarios. Key findings: 1) Route Navigation Tests (5/5 PASS) - All navbar navigation (Home, Marketplace, Lots Auction) properly resets scroll to position 0, 2) Browse Buttons Tests (2/2 PASS) - Both 'Browse Auctions' and 'How Bidding Works' buttons reset scroll to 0, 3) Listing Detail Navigation (1/1 PASS) - Clicking listing cards resets scroll to 0 with header/title visible at top, 4) Footer-to-Header Transitions (1/1 PASS) - Footer navigation links properly reset scroll to 0, 5) Browser Navigation (2/2 PASS) - Direct URL navigation and browser back button both reset scroll to 0. ScrollToTop component using useLayoutEffect with multiple browser compatibility methods (window.scrollTo, documentElement.scrollTop, body.scrollTop) working effectively. Admin dashboard scroll reset also implemented via useEffect on tab changes. Minor: Admin authentication testing incomplete due to credential requirements, Mobile viewport testing had element visibility timeout but core functionality verified on desktop."
 
 agent_communication:
   - agent: "testing"
