@@ -411,55 +411,55 @@ const MarketplaceSettings = () => {
         </Card>
       </div>
 
-      {/* Configuration Summary */}
-      <Card className="border-2 border-primary/20 bg-primary/5">
+      {/* Configuration Summary - Dark Background for High Contrast */}
+      <Card className="border-2 border-slate-700 bg-gradient-to-br from-slate-800 to-slate-900 text-white">
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Info className="h-5 w-5 text-primary" />
+          <CardTitle className="flex items-center gap-2 text-lg text-white">
+            <Info className="h-5 w-5 text-blue-400" />
             Current Configuration Summary
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-3 bg-white rounded-lg shadow-sm">
-              <p className="text-xs text-muted-foreground uppercase">Multi-Lot Access</p>
-              <p className="font-bold text-lg">
+            <div className="text-center p-3 bg-white/10 backdrop-blur rounded-lg border border-white/10">
+              <p className="text-xs text-slate-300 uppercase tracking-wider font-medium">Multi-Lot Access</p>
+              <p className="font-bold text-lg text-white mt-1">
                 {settings.allow_all_users_multi_lot ? 'All Users' : 'Business Only'}
               </p>
             </div>
-            <div className="text-center p-3 bg-white rounded-lg shadow-sm">
-              <p className="text-xs text-muted-foreground uppercase">New Seller Approval</p>
-              <p className="font-bold text-lg">
+            <div className="text-center p-3 bg-white/10 backdrop-blur rounded-lg border border-white/10">
+              <p className="text-xs text-slate-300 uppercase tracking-wider font-medium">New Seller Approval</p>
+              <p className="font-bold text-lg text-white mt-1">
                 {settings.require_approval_new_sellers ? 'Required' : 'Not Required'}
               </p>
             </div>
-            <div className="text-center p-3 bg-white rounded-lg shadow-sm">
-              <p className="text-xs text-muted-foreground uppercase">Max Auctions/User</p>
-              <p className="font-bold text-lg">{settings.max_active_auctions_per_user}</p>
+            <div className="text-center p-3 bg-white/10 backdrop-blur rounded-lg border border-white/10">
+              <p className="text-xs text-slate-300 uppercase tracking-wider font-medium">Max Auctions/User</p>
+              <p className="font-bold text-lg text-white mt-1">{settings.max_active_auctions_per_user}</p>
             </div>
-            <div className="text-center p-3 bg-white rounded-lg shadow-sm">
-              <p className="text-xs text-muted-foreground uppercase">Max Lots/Auction</p>
-              <p className="font-bold text-lg">{settings.max_lots_per_auction}</p>
+            <div className="text-center p-3 bg-white/10 backdrop-blur rounded-lg border border-white/10">
+              <p className="text-xs text-slate-300 uppercase tracking-wider font-medium">Max Lots/Auction</p>
+              <p className="font-bold text-lg text-white mt-1">{settings.max_lots_per_auction}</p>
             </div>
-            <div className="text-center p-3 bg-white rounded-lg shadow-sm">
-              <p className="text-xs text-muted-foreground uppercase">Min Bid Increment</p>
-              <p className="font-bold text-lg">${settings.minimum_bid_increment?.toFixed(2)}</p>
+            <div className="text-center p-3 bg-white/10 backdrop-blur rounded-lg border border-white/10">
+              <p className="text-xs text-slate-300 uppercase tracking-wider font-medium">Min Bid Increment</p>
+              <p className="font-bold text-lg text-white mt-1">${settings.minimum_bid_increment?.toFixed(2)}</p>
             </div>
-            <div className="text-center p-3 bg-white rounded-lg shadow-sm">
-              <p className="text-xs text-muted-foreground uppercase">Anti-Sniping</p>
-              <p className="font-bold text-lg">
+            <div className="text-center p-3 bg-white/10 backdrop-blur rounded-lg border border-white/10">
+              <p className="text-xs text-slate-300 uppercase tracking-wider font-medium">Anti-Sniping</p>
+              <p className="font-bold text-lg text-white mt-1">
                 {settings.enable_anti_sniping ? `${settings.anti_sniping_window_minutes} min` : 'OFF'}
               </p>
             </div>
-            <div className="text-center p-3 bg-white rounded-lg shadow-sm">
-              <p className="text-xs text-muted-foreground uppercase">Buy Now</p>
-              <p className={`font-bold text-lg ${settings.enable_buy_now ? 'text-green-600' : 'text-red-600'}`}>
+            <div className="text-center p-3 bg-white/10 backdrop-blur rounded-lg border border-white/10">
+              <p className="text-xs text-slate-300 uppercase tracking-wider font-medium">Buy Now</p>
+              <p className={`font-bold text-lg mt-1 ${settings.enable_buy_now ? 'text-emerald-400' : 'text-red-400'}`}>
                 {settings.enable_buy_now ? 'Enabled' : 'DISABLED'}
               </p>
             </div>
-            <div className="text-center p-3 bg-white rounded-lg shadow-sm">
-              <p className="text-xs text-muted-foreground uppercase">Last Updated</p>
-              <p className="font-medium text-sm">
+            <div className="text-center p-3 bg-white/10 backdrop-blur rounded-lg border border-white/10">
+              <p className="text-xs text-slate-300 uppercase tracking-wider font-medium">Last Updated</p>
+              <p className="font-semibold text-sm text-white mt-1">
                 {settings.updated_at 
                   ? new Date(settings.updated_at).toLocaleDateString()
                   : 'Never'}
@@ -467,7 +467,7 @@ const MarketplaceSettings = () => {
             </div>
           </div>
           {settings.updated_by && (
-            <p className="text-xs text-muted-foreground mt-3 text-center">
+            <p className="text-xs text-slate-400 mt-3 text-center">
               Last modified by: {settings.updated_by}
             </p>
           )}
