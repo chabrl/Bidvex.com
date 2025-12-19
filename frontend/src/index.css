@@ -830,6 +830,20 @@
 .animate-slideInRight { animation: slideInRight 300ms ease-out; }
 .bid-animation { animation: bidPulse 500ms ease-in-out; }
 
+/* ===== Homepage Section Visibility (Admin Toggle Support) ===== */
+.homepage-section-hidden {
+  display: none !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Ensure seamless layout flow when sections are toggled */
+.homepage-content > *:empty {
+  display: none;
+}
+
 /* ===== Card Hover Effects ===== */
 .card-hover {
   transition: transform var(--transition-base), box-shadow var(--transition-base);
