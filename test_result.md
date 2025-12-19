@@ -475,3 +475,16 @@ frontend:
         agent: 'testing'
         comment: '✅ PASS - Hot Items Section Visibility & Animation Fix testing completed successfully (8/9 test categories passed). Key findings: 1) Visibility Test - Section visible immediately upon scrolling with 1.5s fallback working correctly, 2) Brand Color Alignment - Perfect BidVex brand colors verified: Primary Blue (#1E3A8A) to Vibrant Cyan (#06B6D4) gradient background, current bid prices in cyan (#22D3EE), Bid Now buttons with cyan gradient and dark text, 3) Animation Tests - Staggered card animations working with correct 150ms delays (0ms, 150ms), hover-glow-cyan class applied to cards, 4) Live Indicators - 12 "Active bidding" indicators found with vibrant cyan (#06B6D4) pulsing dots and proper glow effects, 5) View All Button - Desktop button has white text and cyan styling, mobile "View All Hot Items" button properly styled with cyan gradient, 6) Mobile Responsiveness - Cards stack vertically with grid-cols-1 md:grid-cols-2 lg:grid-cols-3 responsive classes, mobile button visible and functional. Minor: Header animation classes not explicitly detected but section visibility and animations working correctly. All success criteria from review request met: section always visible with fallback, BidVex brand colors consistent throughout, smooth animations on scroll, enhanced hover glow on cards, clear readable buttons, mobile responsive design.'
 
+
+  - task: 'Bilingual EN/FR Support & Dark Mode Fix'
+    implemented: true
+    working: pending
+    files: ['i18n.js', 'HomePage.js', 'index.css']
+    stuck_count: 0
+    priority: 'high'
+    needs_retesting: true
+    status_history:
+      - working: pending
+        agent: 'main'
+        comment: 'Implemented complete EN/FR bilingual support with i18next-browser-languagedetector for language persistence via localStorage. Added comprehensive homepage translations. Enhanced dark mode CSS with WCAG 2.1 AA compliant colors (4.5:1 contrast ratio). Fixed text visibility, input borders, card backgrounds with glass effect, and maintained vibrant brand animations in dark mode.'
+
