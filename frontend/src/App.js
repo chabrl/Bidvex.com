@@ -146,12 +146,13 @@ const App = () => {
           <Route path="/terms-of-service" element={<TermsOfServicePage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
-        <Footer />
-        <AIAssistant />
-        <MessageNotificationListener />
-        <Toaster position="top-right" />
-        <MobileBottomNav />
-      </div>
+          <Footer />
+          <AIAssistant />
+          <MessageNotificationListener />
+          <Toaster position="top-right" />
+          <MobileBottomNav />
+        </div>
+      </FeatureFlagsProvider>
     </BrowserRouter>
   );
 };
