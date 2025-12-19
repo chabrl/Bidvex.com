@@ -43,9 +43,9 @@ const MobileBottomNav = () => {
   const handleSellOption = (path) => {
     if (!user) {
       navigate('/auth');
-    } else if (path === '/create-multi-item-listing' && user.account_type !== 'business') {
+    } else if (path === '/create-multi-item-listing' && !canCreateMultiLot(user)) {
       // Show toast or message that business account is required
-      alert('Business account required for multi-item listings');
+      alert('Multi-lot auctions are restricted to business accounts. Please upgrade your account or contact support.');
     } else {
       navigate(path);
     }
