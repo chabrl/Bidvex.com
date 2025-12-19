@@ -6949,19 +6949,11 @@ async def get_public_site_config():
     """
     config = await get_site_config()
     
-    # Get active hero banners
-    now = datetime.now(timezone.utc)
-    active_banners = await db.hero_banners.find({
-        "active": True,
-        "$or": [
-            {"start_date": None},
-            {"start_date": {"$lte": now.isoformat()}}
-        ],
-        "$or": [
-            {"end_date": None},
-            {"end_date": {"$gte": now.isoformat()}}
-        ]
-    }, {"_id": 0}).sort("order", 1).to_list(20)
+    # Get active hero banners (simple filter for now)
+    active_banners = await db.hero_banners.find(
+        {"active": True}, 
+        {"_id": 0}
+    ).sort("order", 1).to_list(20)
     
     return {
         "branding": config.get("branding", DEFAULT_SITE_CONFIG["branding"]),
