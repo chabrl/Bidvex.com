@@ -261,10 +261,36 @@ frontend:
 
 test_plan:
   current_focus:
-    - "Allow All Users Multi-Lot Feature Flag"
+    - "Branding & Layout Manager"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
+
+backend:
+  - task: "Site Config & Branding API"
+    implemented: true
+    working: pending
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: pending
+        agent: "main"
+        comment: "Created comprehensive site config APIs: GET /api/site-config (public), GET/PUT /api/admin/site-config/branding, PUT /api/admin/site-config/homepage-layout, and CRUD for hero banners. All changes logged with before/after snapshots."
+
+frontend:
+  - task: "Branding & Layout Manager Admin UI"
+    implemented: true
+    working: pending
+    file: "BrandingLayoutManager.js, SiteConfigContext.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: pending
+        agent: "main"
+        comment: "Created BrandingLayoutManager.js with 3 tabs: Branding (logo, colors, typography), Homepage Layout (section visibility/reordering), Hero Banners (CRUD). Created SiteConfigContext.js to apply CSS variables dynamically. Updated HomePage.js to respect section visibility including the 'Browse Individual Items' toggle."
 
 backend:
   - task: "Allow All Users Multi-Lot Feature Flag"
