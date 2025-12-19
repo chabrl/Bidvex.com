@@ -43,6 +43,7 @@ const HomePage = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { isSectionVisible } = useSiteConfig();
   const [topSellers, setTopSellers] = useState([]);
   const [hotItems, setHotItems] = useState([]);
   const [endingSoon, setEndingSoon] = useState([]);
