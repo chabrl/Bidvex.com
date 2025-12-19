@@ -298,7 +298,7 @@ class MarketplaceSettingsTester:
                     for key, expected_value in expected_defaults.items():
                         assert data[key] == expected_value, f"Default value mismatch for {key}: expected {expected_value}, got {data[key]}"
                     
-                    assert data["updated_by"] == self.admin_id
+                    assert data["updated_by"] == ADMIN_EMAIL
                     
                     print(f"✅ Factory defaults restored successfully")
                     print(f"   - Max active auctions per user: {data['max_active_auctions_per_user']}")
