@@ -152,9 +152,10 @@ const App = () => {
           <AIAssistant />
           <MessageNotificationListener />
           <Toaster position="top-right" />
-          <MobileBottomNav />
-        </div>
-      </FeatureFlagsProvider>
+            <MobileBottomNav />
+          </div>
+        </FeatureFlagsProvider>
+      </SiteConfigProvider>
     </BrowserRouter>
   );
 };
