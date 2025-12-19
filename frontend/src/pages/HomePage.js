@@ -143,32 +143,34 @@ const HomePage = () => {
           </section>
         )}
 
-        {/* Browse Individual Items CTA */}
-        <section className="px-4 py-8">
-          <div className="max-w-7xl mx-auto">
-            <div className="bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 rounded-2xl p-8 border border-primary/20">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                <div>
-                  <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
-                    <Package className="h-6 w-6 text-primary" />
-                    Browse Individual Items
-                  </h2>
-                  <p className="text-muted-foreground max-w-lg">
-                    Discover unique items from estate sales and multi-lot auctions. 
-                    Each item has its own countdown timer and bid - perfect for finding exactly what you want.
-                  </p>
+        {/* Browse Individual Items CTA - Controlled by Admin */}
+        {isSectionVisible('browse_items') && (
+          <section className="px-4 py-8">
+            <div className="max-w-7xl mx-auto">
+              <div className="bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 rounded-2xl p-8 border border-primary/20">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                  <div>
+                    <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
+                      <Package className="h-6 w-6 text-primary" />
+                      Browse Individual Items
+                    </h2>
+                    <p className="text-muted-foreground max-w-lg">
+                      Discover unique items from estate sales and multi-lot auctions. 
+                      Each item has its own countdown timer and bid - perfect for finding exactly what you want.
+                    </p>
+                  </div>
+                  <Button 
+                    onClick={() => navigate('/items')}
+                    className="gradient-button text-white px-8 py-6 text-lg font-semibold"
+                  >
+                    Explore Items
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
                 </div>
-                <Button 
-                  onClick={() => navigate('/items')}
-                  className="gradient-button text-white px-8 py-6 text-lg font-semibold"
-                >
-                  Explore Items
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* New Listings Carousel */}
         {newListings.length > 0 && (
