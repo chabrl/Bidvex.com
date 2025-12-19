@@ -2,14 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useSiteConfig } from '../contexts/SiteConfigContext';
 import axios from 'axios';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
-import { ArrowRight, Gavel, TrendingUp, Shield, Users, Award, Flame, Package } from 'lucide-react';
-import Countdown from 'react-countdown';
-import HeroBanner from '../components/HeroBanner';
+import { 
+  ArrowRight, Gavel, TrendingUp, Shield, Users, Award, Flame, 
+  Search, Trophy, CreditCard, Sparkles, Clock, CheckCircle2 
+} from 'lucide-react';
 import HomepageBanner from '../components/HomepageBanner';
 import AuctionCarousel from '../components/AuctionCarousel';
 
@@ -19,7 +19,6 @@ const HomePage = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { isSectionVisible } = useSiteConfig();
   const [topSellers, setTopSellers] = useState([]);
   const [hotItems, setHotItems] = useState([]);
   const [endingSoon, setEndingSoon] = useState([]);
@@ -104,22 +103,113 @@ const HomePage = () => {
   };
 
   return (
-    <div className="min-h-screen" data-testid="home-page">
-      {/* Enhanced Hero Banner */}
-      <HeroBanner />
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white" data-testid="home-page">
+      {/* Modern Hero Section */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 text-white">
+        {/* Animated background pattern */}
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute inset-0" style={{
+            backgroundImage: `radial-gradient(circle at 2px 2px, rgba(255,255,255,0.15) 1px, transparent 0)`,
+            backgroundSize: '40px 40px'
+          }} />
+        </div>
+        
+        {/* Gradient orbs */}
+        <div className="absolute top-10 left-10 w-72 h-72 bg-blue-500/30 rounded-full blur-[100px]" />
+        <div className="absolute bottom-10 right-10 w-96 h-96 bg-purple-500/20 rounded-full blur-[120px]" />
+        
+        <div className="relative max-w-7xl mx-auto px-4 py-20 md:py-28">
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div className="space-y-8">
+              <Badge className="bg-white/10 backdrop-blur-sm text-white border-white/20 text-sm px-4 py-2 w-fit">
+                <Sparkles className="h-4 w-4 mr-2 inline" />
+                #1 Trusted Auction Platform
+              </Badge>
+              
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
+                Discover. Bid.
+                <span className="block bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-400 bg-clip-text text-transparent">
+                  Win Amazing Deals.
+                </span>
+              </h1>
+              
+              <p className="text-lg md:text-xl text-blue-100/80 max-w-lg leading-relaxed">
+                Join thousands of savvy bidders on BidVex. Find unique items, place competitive bids, 
+                and win incredible deals with our secure auction platform.
+              </p>
+              
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Button 
+                  onClick={() => navigate('/marketplace')}
+                  className="bg-white text-slate-900 hover:bg-blue-50 px-8 py-6 text-lg font-semibold shadow-xl hover:shadow-2xl transition-all"
+                >
+                  Browse Auctions
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+                <Button 
+                  onClick={() => navigate('/how-it-works')}
+                  variant="outline"
+                  className="border-2 border-white/30 text-white hover:bg-white/10 px-8 py-6 text-lg"
+                >
+                  How It Works
+                </Button>
+              </div>
+
+              {/* Trust indicators */}
+              <div className="flex flex-wrap items-center gap-6 pt-4 text-sm text-blue-200/80">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-green-400" />
+                  <span>Secure Payments</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-green-400" />
+                  <span>Verified Sellers</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Trophy className="h-5 w-5 text-yellow-400" />
+                  <span>Buyer Protection</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Stats cards */}
+            <div className="hidden md:grid grid-cols-2 gap-4">
+              {[
+                { value: '50K+', label: 'Active Users', icon: <Users className="h-6 w-6" /> },
+                { value: '10K+', label: 'Daily Auctions', icon: <Gavel className="h-6 w-6" /> },
+                { value: '$2M+', label: 'Items Sold', icon: <TrendingUp className="h-6 w-6" /> },
+                { value: '99.9%', label: 'Uptime', icon: <Shield className="h-6 w-6" /> }
+              ].map((stat, i) => (
+                <div key={i} className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/10 hover:bg-white/15 transition-all">
+                  <div className="text-blue-400 mb-3">{stat.icon}</div>
+                  <div className="text-3xl font-bold text-white">{stat.value}</div>
+                  <div className="text-blue-200/70">{stat.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        
+        {/* Wave divider */}
+        <div className="absolute bottom-0 left-0 right-0">
+          <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M0 120L60 110C120 100 240 80 360 70C480 60 600 60 720 65C840 70 960 80 1080 85C1200 90 1320 90 1380 90L1440 90V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0Z" fill="rgb(248 250 252)" />
+          </svg>
+        </div>
+      </section>
 
       {/* Homepage Banner Carousel */}
-      <div className="px-4">
+      <section className="py-8 px-4">
         <div className="max-w-7xl mx-auto">
           <HomepageBanner />
         </div>
-      </div>
+      </section>
 
-      {/* Carousel Sections */}
-      <div className="space-y-16 py-12">
+      {/* Auction Carousels */}
+      <div className="space-y-0">
         {/* Ending Soon Carousel */}
         {endingSoon.length > 0 && (
-          <section className="px-4">
+          <section className="py-12 px-4">
             <div className="max-w-7xl mx-auto">
               <AuctionCarousel 
                 title="⏰ Ending Soon" 
@@ -132,7 +222,7 @@ const HomePage = () => {
 
         {/* Featured Auctions Carousel */}
         {featured.length > 0 && (
-          <section className="px-4 bg-gradient-to-br from-primary/5 to-accent/5 py-12">
+          <section className="py-12 px-4 bg-gradient-to-r from-slate-50 via-blue-50/50 to-slate-50">
             <div className="max-w-7xl mx-auto">
               <AuctionCarousel 
                 title="✨ Featured Auctions" 
@@ -143,38 +233,9 @@ const HomePage = () => {
           </section>
         )}
 
-        {/* Browse Individual Items CTA - Controlled by Admin */}
-        {isSectionVisible('browse_items') && (
-          <section className="px-4 py-8">
-            <div className="max-w-7xl mx-auto">
-              <div className="bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 rounded-2xl p-8 border border-primary/20">
-                <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                  <div>
-                    <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
-                      <Package className="h-6 w-6 text-primary" />
-                      Browse Individual Items
-                    </h2>
-                    <p className="text-muted-foreground max-w-lg">
-                      Discover unique items from estate sales and multi-lot auctions. 
-                      Each item has its own countdown timer and bid - perfect for finding exactly what you want.
-                    </p>
-                  </div>
-                  <Button 
-                    onClick={() => navigate('/items')}
-                    className="gradient-button text-white px-8 py-6 text-lg font-semibold"
-                  >
-                    Explore Items
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
-
         {/* New Listings Carousel */}
         {newListings.length > 0 && (
-          <section className="px-4">
+          <section className="py-12 px-4">
             <div className="max-w-7xl mx-auto">
               <AuctionCarousel 
                 title="🆕 New Listings" 
@@ -187,7 +248,7 @@ const HomePage = () => {
 
         {/* Recently Sold Carousel */}
         {recentlySold.length > 0 && (
-          <section className="px-4 bg-gradient-to-br from-accent/5 to-primary/5 py-12">
+          <section className="py-12 px-4 bg-gradient-to-r from-slate-50 via-purple-50/30 to-slate-50">
             <div className="max-w-7xl mx-auto">
               <AuctionCarousel 
                 title="💰 Recently Sold" 
@@ -200,7 +261,7 @@ const HomePage = () => {
 
         {/* Recently Viewed Carousel - Only for logged-in users */}
         {user && recentlyViewed.length > 0 && (
-          <section className="px-4">
+          <section className="py-12 px-4">
             <div className="max-w-7xl mx-auto">
               <AuctionCarousel 
                 title="👁️ Recently Viewed" 
@@ -210,129 +271,147 @@ const HomePage = () => {
             </div>
           </section>
         )}
-
-        {/* Top Sellers Carousel */}
-        {topSellers.length > 0 && (
-          <section className="px-4 bg-gradient-to-br from-accent/5 to-primary/5 py-12">
-            <div className="max-w-7xl mx-auto">
-              <AuctionCarousel 
-                title="🏆 Featured Sellers" 
-                items={topSellers.map(seller => ({
-                  id: seller._id,
-                  seller_name: seller.user?.name || 'Seller',
-                  seller_avatar: seller.user?.avatar || null,
-                  count: seller.items_sold,
-                  total_sales: seller.total_sales
-                }))}
-                type="seller"
-              />
-            </div>
-          </section>
-        )}
       </div>
 
-      <section className="py-20 px-4 bg-white/50 dark:bg-gray-800/50">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            <FeatureCard 
-              icon={<Gavel className="h-8 w-8" />}
-              title="Live Auctions"
-              description="Real-time bidding with instant updates"
-            />
-            <FeatureCard 
-              icon={<TrendingUp className="h-8 w-8" />}
-              title="Best Deals"
-              description="Competitive pricing for buyers and sellers"
-            />
-            <FeatureCard 
-              icon={<Shield className="h-8 w-8" />}
-              title="Secure Payments"
-              description="Protected transactions with Stripe"
-            />
-            <FeatureCard 
-              icon={<Users className="h-8 w-8" />}
-              title="Global Community"
-              description="Connect with buyers worldwide"
-            />
-          </div>
-        </div>
-      </section>
-
-      {topSellers.length > 0 && (
-        <section className="py-20 px-4 bg-white/50 dark:bg-gray-800/50">
-          <div className="max-w-7xl mx-auto">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h2 className="text-3xl md:text-4xl font-bold flex items-center gap-3">
-                  <Award className="h-8 w-8 text-yellow-500" />
-                  Top Sellers
-                </h2>
-                <p className="text-muted-foreground mt-2">Meet our highest performing sellers</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {topSellers.map((seller, idx) => (
-                <Card key={seller.user.id} className="glassmorphism card-hover">
-                  <CardContent className="p-6 text-center">
-                    <div className="relative inline-block mb-4">
-                      {seller.user.picture ? (
-                        <img src={seller.user.picture} alt={seller.user.name} className="w-24 h-24 rounded-full mx-auto" />
-                      ) : (
-                        <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white text-2xl font-bold mx-auto">
-                          {seller.user.name.charAt(0)}
-                        </div>
-                      )}
-                      {idx === 0 && <Badge className="absolute -top-2 -right-2 bg-yellow-500 text-white">🏆 #1</Badge>}
-                    </div>
-                    <h3 className="font-bold text-lg mb-2">{seller.user.name}</h3>
-                    <div className="space-y-1 text-sm">
-                      <p className="text-muted-foreground">Total Sales: <span className="font-bold text-green-600">${seller.total_sales.toFixed(2)}</span></p>
-                      <p className="text-muted-foreground">Items Sold: <span className="font-bold">{seller.items_sold}</span></p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
+      {/* Hot Items Section - Modern Grid */}
       {hotItems.length > 0 && (
         <section className="py-20 px-4">
           <div className="max-w-7xl mx-auto">
             <div className="flex items-center justify-between mb-8">
               <div>
-                <h2 className="text-3xl md:text-4xl font-bold flex items-center gap-3">
+                <h2 className="text-3xl md:text-4xl font-bold text-slate-900 flex items-center gap-3">
                   <Flame className="h-8 w-8 text-orange-500" />
                   Hot Items
                 </h2>
-                <p className="text-muted-foreground mt-2">Trending auctions everyone is watching</p>
+                <p className="text-slate-600 mt-2">Trending auctions everyone is watching</p>
               </div>
-              <Button onClick={() => navigate('/marketplace')} variant="outline">View All</Button>
+              <Button onClick={() => navigate('/marketplace')} variant="outline" className="hidden md:flex">
+                View All
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {hotItems.map(item => (
-                <Card key={item.id} className="card-hover cursor-pointer glassmorphism" onClick={() => navigate(`/listing/${item.id}`)}>
-                  <div className="relative h-48 overflow-hidden bg-gray-100 rounded-t-lg">
+                <Card 
+                  key={item.id} 
+                  className="group cursor-pointer overflow-hidden border-0 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1" 
+                  onClick={() => navigate(`/listing/${item.id}`)}
+                >
+                  <div className="relative h-52 overflow-hidden bg-slate-100">
                     {item.images && item.images[0] ? (
-                      <img src={item.images[0]} alt={item.title} className="w-full h-full object-cover" />
+                      <img 
+                        src={item.images[0]} 
+                        alt={item.title} 
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+                      />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-accent/10">
-                        <span className="text-4xl">📦</span>
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
+                        <span className="text-5xl">📦</span>
                       </div>
                     )}
-                    <Badge className="absolute top-2 right-2 bg-orange-500 text-white">🔥 Hot</Badge>
+                    <Badge className="absolute top-3 right-3 bg-orange-500 text-white border-0 shadow-lg">
+                      🔥 Hot
+                    </Badge>
                   </div>
-                  <CardContent className="p-4">
-                    <h3 className="font-semibold mb-2 line-clamp-1">{item.title}</h3>
-                    <div className="flex justify-between items-center">
+                  <CardContent className="p-5">
+                    <h3 className="font-semibold text-lg mb-3 line-clamp-1 text-slate-900">{item.title}</h3>
+                    <div className="flex justify-between items-end">
                       <div>
-                        <p className="text-xs text-muted-foreground">Current Bid</p>
-                        <p className="text-lg font-bold gradient-text">${item.current_price.toFixed(2)}</p>
+                        <p className="text-xs text-slate-500 uppercase tracking-wider">Current Bid</p>
+                        <p className="text-2xl font-bold text-blue-600">${item.current_price?.toFixed(2)}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs text-muted-foreground">Views</p>
-                        <p className="font-semibold">{item.views}</p>
+                        <p className="text-xs text-slate-500 uppercase tracking-wider">Views</p>
+                        <p className="text-lg font-semibold text-slate-700">{item.views}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <div className="text-center mt-8 md:hidden">
+              <Button onClick={() => navigate('/marketplace')} variant="outline">
+                View All Hot Items
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Features Section */}
+      <section className="py-20 px-4 bg-slate-900 text-white">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Why Choose BidVex?</h2>
+            <p className="text-slate-400 max-w-2xl mx-auto">The trusted platform for buyers and sellers worldwide</p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <FeatureCard 
+              icon={<Gavel className="h-7 w-7" />}
+              title="Live Auctions"
+              description="Real-time bidding with instant updates and notifications"
+            />
+            <FeatureCard 
+              icon={<TrendingUp className="h-7 w-7" />}
+              title="Best Deals"
+              description="Competitive pricing for buyers and great returns for sellers"
+            />
+            <FeatureCard 
+              icon={<Shield className="h-7 w-7" />}
+              title="Secure Payments"
+              description="Bank-level encryption with Stripe protection"
+            />
+            <FeatureCard 
+              icon={<Users className="h-7 w-7" />}
+              title="Global Community"
+              description="Connect with verified buyers and sellers worldwide"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Top Sellers Section */}
+      {topSellers.length > 0 && (
+        <section className="py-20 px-4">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h2 className="text-3xl md:text-4xl font-bold text-slate-900 flex items-center gap-3">
+                  <Award className="h-8 w-8 text-yellow-500" />
+                  Top Sellers
+                </h2>
+                <p className="text-slate-600 mt-2">Meet our highest performing sellers</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {topSellers.slice(0, 3).map((seller, idx) => (
+                <Card key={seller.user?.id || idx} className="overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all">
+                  <CardContent className="p-8 text-center">
+                    <div className="relative inline-block mb-6">
+                      {seller.user?.picture ? (
+                        <img src={seller.user.picture} alt={seller.user.name} className="w-24 h-24 rounded-full mx-auto ring-4 ring-slate-100" />
+                      ) : (
+                        <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center text-white text-3xl font-bold mx-auto ring-4 ring-slate-100">
+                          {seller.user?.name?.charAt(0) || 'S'}
+                        </div>
+                      )}
+                      {idx === 0 && (
+                        <Badge className="absolute -top-1 -right-1 bg-yellow-500 text-white border-0 shadow-lg px-3">
+                          🏆 #1
+                        </Badge>
+                      )}
+                    </div>
+                    <h3 className="font-bold text-xl mb-4 text-slate-900">{seller.user?.name || 'Top Seller'}</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-slate-50 rounded-xl p-4">
+                        <p className="text-xs text-slate-500 uppercase tracking-wider">Total Sales</p>
+                        <p className="text-xl font-bold text-green-600">${seller.total_sales?.toFixed(2)}</p>
+                      </div>
+                      <div className="bg-slate-50 rounded-xl p-4">
+                        <p className="text-xs text-slate-500 uppercase tracking-wider">Items Sold</p>
+                        <p className="text-xl font-bold text-slate-700">{seller.items_sold}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -343,13 +422,44 @@ const HomePage = () => {
         </section>
       )}
 
-      <section className="py-20 px-4">
-        <div className="max-w-4xl mx-auto text-center space-y-6">
-          <h2 className="text-3xl md:text-4xl font-bold">How It Works</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-8">
-            <Step number="1" title="Browse" description="Explore unique items from trusted sellers" />
-            <Step number="2" title="Bid" description="Place competitive bids or buy instantly" />
-            <Step number="3" title="Win" description="Secure your purchase with safe payments" />
+      {/* How It Works Summary - Modern Style */}
+      <section className="py-20 px-4 bg-gradient-to-br from-slate-50 to-blue-50">
+        <div className="max-w-4xl mx-auto text-center">
+          <Badge className="bg-blue-100 text-blue-700 mb-4">Getting Started</Badge>
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">How It Works</h2>
+          <p className="text-slate-600 mb-12 max-w-2xl mx-auto">
+            Start winning amazing deals in just three simple steps
+          </p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <StepCard 
+              number="1" 
+              icon={<Search className="h-6 w-6" />}
+              title="Browse" 
+              description="Explore thousands of unique items from trusted sellers" 
+            />
+            <StepCard 
+              number="2" 
+              icon={<Gavel className="h-6 w-6" />}
+              title="Bid" 
+              description="Place competitive bids or use Buy Now for instant purchase" 
+            />
+            <StepCard 
+              number="3" 
+              icon={<Trophy className="h-6 w-6" />}
+              title="Win" 
+              description="Secure your items with safe, encrypted payments" 
+            />
+          </div>
+          
+          <div className="mt-12">
+            <Button 
+              onClick={() => navigate('/how-it-works')}
+              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8 py-6 text-lg font-semibold shadow-lg shadow-blue-500/30"
+            >
+              Learn More
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
           </div>
         </div>
       </section>
@@ -357,23 +467,30 @@ const HomePage = () => {
   );
 };
 
+// Feature Card Component - Modern Style
 const FeatureCard = ({ icon, title, description }) => (
-  <div className="p-6 rounded-2xl glassmorphism card-hover text-center space-y-3">
-    <div className="gradient-bg w-16 h-16 rounded-xl flex items-center justify-center text-white mx-auto">
+  <div className="p-8 rounded-2xl bg-white/5 backdrop-blur border border-white/10 hover:bg-white/10 transition-all text-center">
+    <div className="w-14 h-14 mx-auto mb-5 rounded-xl bg-blue-600/20 flex items-center justify-center text-blue-400">
       {icon}
     </div>
-    <h3 className="text-xl font-semibold">{title}</h3>
-    <p className="text-muted-foreground text-sm">{description}</p>
+    <h3 className="text-xl font-semibold mb-3">{title}</h3>
+    <p className="text-slate-400 leading-relaxed">{description}</p>
   </div>
 );
 
-const Step = ({ number, title, description }) => (
-  <div className="space-y-3">
-    <div className="gradient-bg w-12 h-12 rounded-full flex items-center justify-center text-white text-xl font-bold mx-auto">
-      {number}
+// Step Card Component - Modern Style with Icons
+const StepCard = ({ number, icon, title, description }) => (
+  <div className="relative group">
+    <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all border border-slate-100">
+      <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
+        {icon}
+      </div>
+      <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-slate-900 text-white text-sm font-bold flex items-center justify-center">
+        {number}
+      </div>
+      <h3 className="text-xl font-bold text-slate-900 mb-3">{title}</h3>
+      <p className="text-slate-600 leading-relaxed">{description}</p>
     </div>
-    <h3 className="text-lg font-semibold">{title}</h3>
-    <p className="text-muted-foreground text-sm">{description}</p>
   </div>
 );
 
