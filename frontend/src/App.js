@@ -96,10 +96,11 @@ const App = () => {
 
   return (
     <BrowserRouter>
-      <ScrollToTop />
-      <div className="App min-h-screen bg-gradient-to-br from-blue-50 via-white to-teal-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-        <Navbar />
-        <Routes>
+      <FeatureFlagsProvider>
+        <ScrollToTop />
+        <div className="App min-h-screen bg-gradient-to-br from-blue-50 via-white to-teal-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+          <Navbar />
+          <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/marketplace" element={<MarketplacePage />} />
           <Route path="/items" element={<ItemsMarketplacePage />} />
