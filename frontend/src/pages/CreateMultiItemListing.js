@@ -21,6 +21,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const CreateMultiItemListing = () => {
   const { user } = useAuth();
+  const { canCreateMultiLot } = useFeatureFlags();
   const navigate = useNavigate();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
