@@ -454,3 +454,16 @@ frontend:
         agent: 'main'
         comment: 'Fixed by adding isSectionVisible conditional rendering for all homepage sections. Sections are now completely removed from DOM when toggled OFF, preventing blank space. Need to test with admin toggle.'
 
+
+  - task: 'Hot Items Section Visibility & Animation Fix'
+    implemented: true
+    working: pending
+    file: 'HomePage.js'
+    stuck_count: 0
+    priority: 'high'
+    needs_retesting: true
+    status_history:
+      - working: pending
+        agent: 'main'
+        comment: 'Fixed visibility fallback in useScrollReveal hook (1.5s timeout + IntersectionObserver check). Updated HotItemsSection with brand colors (#1E3A8A to #06B6D4 gradient), enhanced hover-glow-cyan CSS (60px shadow), staggered animation delays (150ms intervals), and vibrant cyan live indicators. Fixed View All button text visibility.'
+
