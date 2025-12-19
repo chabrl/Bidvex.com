@@ -16,24 +16,45 @@ import HomepageBanner from '../components/HomepageBanner';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-// Custom hook for scroll-triggered animations
+// Custom hook for scroll-triggered animations with fallback visibility
 const useScrollReveal = (threshold = 0.1) => {
   const [isVisible, setIsVisible] = useState(false);
   const ref = useRef(null);
 
   useEffect(() => {
+    // Fallback: Ensure visibility after 1.5s if IntersectionObserver fails
+    const fallbackTimer = setTimeout(() => {
+      setIsVisible(true);
+    }, 1500);
+
+    // Check if IntersectionObserver is supported
+    if (!('IntersectionObserver' in window)) {
+      setIsVisible(true);
+      return () => clearTimeout(fallbackTimer);
+    }
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
           setIsVisible(true);
+          clearTimeout(fallbackTimer);
           observer.unobserve(entry.target);
         }
       },
-      { threshold }
+      { threshold, rootMargin: '50px' }
     );
 
-    if (ref.current) observer.observe(ref.current);
-    return () => observer.disconnect();
+    if (ref.current) {
+      observer.observe(ref.current);
+    } else {
+      // If ref not available, show content immediately
+      setIsVisible(true);
+    }
+
+    return () => {
+      clearTimeout(fallbackTimer);
+      observer.disconnect();
+    };
   }, [threshold]);
 
   return [ref, isVisible];
