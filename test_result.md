@@ -261,10 +261,23 @@ frontend:
 
 test_plan:
   current_focus:
-    - "Admin UI Card-based Layout"
+    - "Scroll-to-Top Navigation"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
+
+frontend:
+  - task: "Global Scroll-to-Top Navigation"
+    implemented: true
+    working: pending
+    file: "ScrollToTop.js, App.js, AdminDashboard.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: pending
+        agent: "main"
+        comment: "Implemented global ScrollToTop component that resets scroll position to (0,0) on every route change using useLayoutEffect. Also added scroll-to-top on admin tab navigation. Needs validation across all routes."
 
 agent_communication:
   - agent: "testing"
