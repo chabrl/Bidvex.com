@@ -715,15 +715,15 @@ const TopSellersSection = ({ sellers }) => {
           {sellers.slice(0, 3).map((seller, idx) => (
             <Card 
               key={seller.user?.id || idx} 
-              className={`card-hover-pop overflow-hidden border-0 shadow-lg transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+              className={`card-hover-pop overflow-hidden border-0 shadow-lg dark:bg-slate-800/50 dark:backdrop-blur-sm transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
               style={{ transitionDelay: `${idx * 150}ms` }}
             >
               <CardContent className="p-8 text-center">
                 <div className="relative inline-block mb-6">
                   {seller.user?.picture ? (
-                    <img src={seller.user.picture} alt={seller.user.name} className="w-24 h-24 rounded-full mx-auto ring-4 ring-slate-100" />
+                    <img src={seller.user.picture} alt={seller.user.name} className="w-24 h-24 rounded-full mx-auto ring-4 ring-slate-100 dark:ring-slate-700" />
                   ) : (
-                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center text-white text-3xl font-bold mx-auto ring-4 ring-slate-100">
+                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center text-white text-3xl font-bold mx-auto ring-4 ring-slate-100 dark:ring-slate-700">
                       {seller.user?.name?.charAt(0) || 'S'}
                     </div>
                   )}
@@ -733,15 +733,15 @@ const TopSellersSection = ({ sellers }) => {
                     </div>
                   )}
                 </div>
-                <h3 className="font-bold text-xl mb-4 text-slate-900">{seller.user?.name || 'Top Seller'}</h3>
+                <h3 className="font-bold text-xl mb-4 text-slate-900 dark:text-slate-50">{seller.user?.name || 'Top Seller'}</h3>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-slate-50 rounded-xl p-4">
-                    <p className="text-xs text-slate-500 uppercase tracking-wider">Total Sales</p>
-                    <p className="text-xl font-bold text-green-600">${seller.total_sales?.toFixed(0)}</p>
+                  <div className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-4">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('homepage.totalSales')}</p>
+                    <p className="text-xl font-bold text-green-600 dark:text-green-400">${seller.total_sales?.toFixed(0)}</p>
                   </div>
-                  <div className="bg-slate-50 rounded-xl p-4">
-                    <p className="text-xs text-slate-500 uppercase tracking-wider">Items Sold</p>
-                    <p className="text-xl font-bold text-slate-700">{seller.items_sold}</p>
+                  <div className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-4">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('homepage.itemsSold')}</p>
+                    <p className="text-xl font-bold text-slate-700 dark:text-slate-200">{seller.items_sold}</p>
                   </div>
                 </div>
               </CardContent>
@@ -755,12 +755,13 @@ const TopSellersSection = ({ sellers }) => {
 
 // ========== HOW IT WORKS SECTION ==========
 const HowItWorksSection = ({ navigate }) => {
+  const { t } = useTranslation();
   const [ref, isVisible] = useScrollReveal(0.1);
 
   const steps = [
-    { icon: <Search className="h-7 w-7" />, title: 'Browse', desc: 'Find unique items from trusted sellers' },
-    { icon: <Gavel className="h-7 w-7" />, title: 'Bid', desc: 'Place competitive bids in real-time' },
-    { icon: <Trophy className="h-7 w-7" />, title: 'Win', desc: 'Secure your items with safe payment' }
+    { icon: <Search className="h-7 w-7" />, title: t('homepage.browse'), desc: t('homepage.browseDesc') },
+    { icon: <Gavel className="h-7 w-7" />, title: t('homepage.bidStep'), desc: t('homepage.bidStepDesc') },
+    { icon: <Trophy className="h-7 w-7" />, title: t('homepage.winStep'), desc: t('homepage.winStepDesc') }
   ];
 
   return (
@@ -772,9 +773,9 @@ const HowItWorksSection = ({ navigate }) => {
 
       <div className="relative max-w-5xl mx-auto text-center">
         <div className={`mb-12 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-          <Badge className="bg-white/10 backdrop-blur text-white border-cyan-400/30 mb-4">Getting Started</Badge>
-          <h2 className="text-3xl md:text-5xl font-bold mb-4">How It Works</h2>
-          <p className="text-blue-200/70 max-w-2xl mx-auto">Start winning amazing deals in three simple steps</p>
+          <Badge className="bg-white/10 backdrop-blur text-white border-cyan-400/30 mb-4">{t('homepage.gettingStarted')}</Badge>
+          <h2 className="text-3xl md:text-5xl font-bold mb-4">{t('homepage.howItWorksTitle')}</h2>
+          <p className="text-blue-200/70 max-w-2xl mx-auto">{t('homepage.startWinning')}</p>
         </div>
 
         <div className="grid md:grid-cols-3 gap-8 mb-12">
@@ -801,9 +802,9 @@ const HowItWorksSection = ({ navigate }) => {
         <div className={`transition-all duration-700 delay-500 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
           <Button 
             onClick={() => navigate('/how-it-works')}
-            className="btn-shine bg-gradient-to-r from-cyan-500 to-cyan-400 hover:from-cyan-400 hover:to-cyan-300 text-slate-900 font-bold px-10 py-6 text-lg shadow-xl shadow-cyan-500/30"
+            className="btn-shine bg-gradient-to-r from-cyan-500 to-cyan-400 hover:from-cyan-400 hover:to-cyan-300 text-slate-900 font-bold px-10 py-6 text-lg shadow-xl shadow-cyan-500/30 whitespace-nowrap"
           >
-            Learn More
+            {t('homepage.learnMore')}
             <ArrowRight className="ml-2 h-5 w-5" />
           </Button>
         </div>
