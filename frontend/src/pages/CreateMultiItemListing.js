@@ -88,15 +88,16 @@ const CreateMultiItemListing = () => {
   });
 
   useEffect(() => {
-    if (user && user.account_type !== 'business') {
-      toast.error('Only business accounts can create multi-item listings');
-      navigate('/dashboard');
+    // Check if user can create multi-lot auctions based on feature flag
+    if (user && !canCreateMultiLot(user)) {
+      toast.error('Multi-lot auctions are restricted to business accounts. Please upgrade your account or contact support.');
+      navigate('/seller/dashboard');
     }
     fetchCategories();
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     setFormData(prev => ({ ...prev, auction_end_date: tomorrow.toISOString().slice(0, 16) }));
-  }, [user]);
+  }, [user, canCreateMultiLot, navigate]);
 
   const fetchCategories = async () => {
     try {
