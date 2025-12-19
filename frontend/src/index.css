@@ -250,6 +250,35 @@
   }
 }
 
+/* ===== WCAG 2.1 AA Compliant Typography ===== */
+@layer base {
+  /* High contrast text colors */
+  .text-primary-content {
+    color: var(--text-primary);
+  }
+  
+  .text-secondary-content {
+    color: var(--text-secondary);
+  }
+  
+  .text-muted-content {
+    color: var(--text-muted);
+  }
+  
+  /* Section headers - Bold 700 */
+  .section-header {
+    @apply font-bold text-lg;
+    color: var(--text-primary);
+    line-height: 1.3;
+  }
+  
+  /* Descriptive text - Better line height */
+  .description-text {
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+}
+
 /* ===== BidVex Brand Utilities ===== */
 @layer utilities {
   /* Background Surface */
@@ -261,21 +290,49 @@
     background-color: hsl(var(--surface-elevated));
   }
   
-  /* Gradient Button */
+  /* Enhanced Gradient Button - WCAG AA Compliant */
   .gradient-button {
-    background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
-    color: #FFFFFF;
+    background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+    color: #FFFFFF !important;
     border: none;
     border-radius: var(--radius);
     font-weight: 600;
-    box-shadow: 0 4px 14px rgba(0, 91, 187, 0.3);
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
     transition: all var(--transition-base);
   }
   
   .gradient-button:hover {
-    background: linear-gradient(135deg, var(--gradient-end) 0%, var(--gradient-start) 100%);
-    box-shadow: 0 6px 20px rgba(0, 91, 187, 0.4);
+    background: linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%);
+    box-shadow: 0 6px 20px rgba(37, 99, 235, 0.45);
     transform: translateY(-2px);
+  }
+  
+  .gradient-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
+  }
+  
+  /* Primary Button - High Contrast */
+  .btn-primary-high-contrast {
+    background-color: #2563EB !important;
+    color: #FFFFFF !important;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+    transition: all var(--transition-base);
+  }
+  
+  .btn-primary-high-contrast:hover {
+    background-color: #1D4ED8 !important;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+    transform: translateY(-1px);
+  }
+  
+  /* Disabled Button - Clear Grey State */
+  .btn-disabled-state {
+    background-color: #9CA3AF !important;
+    color: #FFFFFF !important;
+    cursor: not-allowed;
+    box-shadow: none;
   }
   
   .gradient-button:active {
