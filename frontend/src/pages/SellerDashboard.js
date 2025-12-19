@@ -76,7 +76,7 @@ const SellerDashboard = () => {
               <Plus className="mr-2 h-4 w-4" />
               {t('dashboard.seller.createListing')}
             </Button>
-            {user.account_type === 'business' && (
+            {canCreateMultiLot(user) && (
               <Button
                 variant="outline"
                 onClick={() => navigate('/create-multi-item-listing')}
