@@ -261,10 +261,23 @@ frontend:
 
 test_plan:
   current_focus:
-    - "Marketplace Settings Admin UI"
+    - "Allow All Users Multi-Lot Feature Flag"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
+
+backend:
+  - task: "Allow All Users Multi-Lot Feature Flag"
+    implemented: true
+    working: pending
+    file: "server.py, FeatureFlagsContext.js, CreateMultiItemListing.js, SellerDashboard.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: pending
+        agent: "main"
+        comment: "Fixed bug where allow_all_users_multi_lot setting was ignored. Added flag to public /api/marketplace/feature-flags. Created FeatureFlagsContext.js to provide global settings. Updated CreateMultiItemListing.js, SellerDashboard.js, MobileBottomNav.js, and SellOptionsModal.js to use canCreateMultiLot() helper instead of hardcoded business account check."
 
 backend:
   - task: "Marketplace Settings API with Validation"
