@@ -3124,6 +3124,36 @@ async def create_auction_won_conversation(
         return None
 
 
+@api_router.get("/uploads/messages/{filename}")
+async def serve_message_attachment(filename: str):
+    """Serve uploaded message attachment files"""
+    from fastapi.responses import FileResponse
+    
+    file_path = Path("uploads/messages") / filename
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    # Determine content type
+    content_type = "application/octet-stream"
+    if filename.lower().endswith(('.jpg', '.jpeg')):
+        content_type = "image/jpeg"
+    elif filename.lower().endswith('.png'):
+        content_type = "image/png"
+    elif filename.lower().endswith('.gif'):
+        content_type = "image/gif"
+    elif filename.lower().endswith('.webp'):
+        content_type = "image/webp"
+    elif filename.lower().endswith('.pdf'):
+        content_type = "application/pdf"
+    
+    return FileResponse(
+        path=str(file_path),
+        media_type=content_type,
+        filename=filename
+    )
+
+
 @api_router.post("/upload-document")
 async def upload_document(
     file_data: Dict[str, Any],
