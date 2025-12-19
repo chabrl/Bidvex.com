@@ -269,15 +269,18 @@ test_plan:
 backend:
   - task: "Allow All Users Multi-Lot Feature Flag"
     implemented: true
-    working: pending
+    working: true
     file: "server.py, FeatureFlagsContext.js, CreateMultiItemListing.js, SellerDashboard.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: pending
         agent: "main"
         comment: "Fixed bug where allow_all_users_multi_lot setting was ignored. Added flag to public /api/marketplace/feature-flags. Created FeatureFlagsContext.js to provide global settings. Updated CreateMultiItemListing.js, SellerDashboard.js, MobileBottomNav.js, and SellOptionsModal.js to use canCreateMultiLot() helper instead of hardcoded business account check."
+      - working: true
+        agent: "testing"
+        comment: "✅ PASS - Allow All Users Multi-Lot feature flag implementation working correctly. Key findings: 1) Admin Settings Access - Successfully accessed admin panel marketplace settings, found 'Allow All Users Multi-Lot' toggle with description 'Only business accounts can create multi-lot auctions' when OFF. 2) Feature Flags API - Public endpoint /api/marketplace/feature-flags accessible and returns correct flag values including allow_all_users_multi_lot: false. 3) Backend Logic - canCreateMultiLot() function correctly implemented: business accounts always allowed, personal accounts only when flag enabled. 4) Frontend Integration - FeatureFlagsContext properly fetches and provides flags, all UI components (SellerDashboard, CreateMultiItemListing, MobileBottomNav, SellOptionsModal) use canCreateMultiLot helper. 5) Business Logic Verification - Personal users cannot create multi-lot when flag disabled (false), personal users can create multi-lot when flag enabled (true), business users always can create multi-lot regardless of flag state. 6) Real-time Updates - Flag changes reflect immediately via API, FeatureFlagsContext refreshes every 5 minutes for admin changes. All test scenarios passed: toggle OFF restricts personal users, toggle ON allows all users, business accounts unaffected by flag state."
 
 backend:
   - task: "Marketplace Settings API with Validation"
