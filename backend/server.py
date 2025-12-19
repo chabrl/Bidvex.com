@@ -3719,20 +3719,62 @@ async def update_marketplace_settings(
     if current_user.role != "admin" and not current_user.email.endswith("@admin.bazario.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    # Validate settings
-    allowed_fields = [
-        "allow_all_users_multi_lot",
-        "require_approval_new_sellers", 
-        "max_active_auctions_per_user",
-        "max_lots_per_auction",
-        "minimum_bid_increment",
-        "enable_anti_sniping",
-        "anti_sniping_window_minutes",
-        "enable_buy_now"
-    ]
+    # Get current settings for comparison
+    current_settings = await get_marketplace_settings()
     
-    # Filter only allowed fields
-    update_data = {k: v for k, v in settings_data.items() if k in allowed_fields}
+    # Validate settings with type and range checks
+    allowed_fields = {
+        "allow_all_users_multi_lot": {"type": bool},
+        "require_approval_new_sellers": {"type": bool}, 
+        "max_active_auctions_per_user": {"type": int, "min": 1, "max": 100},
+        "max_lots_per_auction": {"type": int, "min": 1, "max": 500},
+        "minimum_bid_increment": {"type": float, "min": 1.0},
+        "enable_anti_sniping": {"type": bool},
+        "anti_sniping_window_minutes": {"type": int, "min": 1, "max": 60},
+        "enable_buy_now": {"type": bool}
+    }
+    
+    # Filter and validate fields
+    update_data = {}
+    changes = []
+    
+    for key, value in settings_data.items():
+        if key not in allowed_fields:
+            continue
+            
+        field_rules = allowed_fields[key]
+        expected_type = field_rules["type"]
+        
+        # Type validation
+        if expected_type == bool and not isinstance(value, bool):
+            raise HTTPException(status_code=400, detail=f"{key} must be a boolean")
+        elif expected_type == int:
+            if not isinstance(value, int) or isinstance(value, bool):
+                raise HTTPException(status_code=400, detail=f"{key} must be an integer")
+            if "min" in field_rules and value < field_rules["min"]:
+                raise HTTPException(status_code=400, detail=f"{key} must be at least {field_rules['min']}")
+            if "max" in field_rules and value > field_rules["max"]:
+                raise HTTPException(status_code=400, detail=f"{key} must be at most {field_rules['max']}")
+        elif expected_type == float:
+            if not isinstance(value, (int, float)) or isinstance(value, bool):
+                raise HTTPException(status_code=400, detail=f"{key} must be a number")
+            if "min" in field_rules and value < field_rules["min"]:
+                raise HTTPException(status_code=400, detail=f"{key} must be at least {field_rules['min']}")
+        
+        # Track changes for audit
+        old_value = current_settings.get(key)
+        if old_value != value:
+            changes.append({
+                "field": key,
+                "old_value": old_value,
+                "new_value": value
+            })
+        
+        update_data[key] = value
+    
+    if not update_data:
+        return current_settings  # No changes to make
+    
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     update_data["updated_by"] = current_user.email
     
@@ -3743,23 +3785,78 @@ async def update_marketplace_settings(
         upsert=True
     )
     
-    # Log the change
+    # Log each change with detailed audit trail
+    for change in changes:
+        log_entry = {
+            "id": str(uuid.uuid4()),
+            "action": "MARKETPLACE_SETTINGS_UPDATE",
+            "admin_id": current_user.id,
+            "admin_email": current_user.email,
+            "target_type": "settings",
+            "target_id": "marketplace_settings",
+            "field_changed": change["field"],
+            "old_value": str(change["old_value"]),
+            "new_value": str(change["new_value"]),
+            "details": f"Changed {change['field']}: {change['old_value']} → {change['new_value']}",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.admin_logs.insert_one(log_entry)
+    
+    logger.info(f"📋 Marketplace settings updated by {current_user.email}: {[c['field'] for c in changes]}")
+    
+    # Return updated settings
+    return await get_marketplace_settings()
+
+
+@api_router.post("/admin/marketplace-settings/restore-defaults")
+async def restore_marketplace_defaults(current_user: User = Depends(get_current_user)):
+    """Restore marketplace settings to factory defaults (admin only)."""
+    if current_user.role != "admin" and not current_user.email.endswith("@admin.bazario.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Get current settings before reset for audit
+    current_settings = await get_marketplace_settings()
+    
+    # Define hard-coded system defaults
+    system_defaults = {
+        "id": "marketplace_settings",
+        "allow_all_users_multi_lot": True,
+        "require_approval_new_sellers": False,
+        "max_active_auctions_per_user": 20,
+        "max_lots_per_auction": 50,
+        "minimum_bid_increment": 1.0,
+        "enable_anti_sniping": True,
+        "anti_sniping_window_minutes": 2,
+        "enable_buy_now": True,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_by": current_user.email
+    }
+    
+    # Replace all settings with defaults
+    await db.settings.replace_one(
+        {"id": "marketplace_settings"},
+        system_defaults,
+        upsert=True
+    )
+    
+    # Log the reset action with detailed before/after
     log_entry = {
         "id": str(uuid.uuid4()),
-        "action": "MARKETPLACE_SETTINGS_UPDATE",
+        "action": "MARKETPLACE_SETTINGS_RESET",
         "admin_id": current_user.id,
         "admin_email": current_user.email,
         "target_type": "settings",
         "target_id": "marketplace_settings",
-        "details": f"Updated settings: {list(update_data.keys())}",
+        "details": "Restored all marketplace settings to factory defaults",
+        "previous_settings": {k: v for k, v in current_settings.items() if k != "_id"},
+        "new_settings": {k: v for k, v in system_defaults.items() if k != "_id"},
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.admin_logs.insert_one(log_entry)
     
-    logger.info(f"📋 Marketplace settings updated by {current_user.email}: {list(update_data.keys())}")
+    logger.info(f"⚠️ Marketplace settings RESET to defaults by {current_user.email}")
     
-    # Return updated settings
-    return await get_marketplace_settings()
+    return system_defaults
 
 # ========== EMAIL TEMPLATE MANAGEMENT ENDPOINTS ==========
 
