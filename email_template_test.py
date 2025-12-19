@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = "https://market-admin-dash.preview.emergentagent.com/api"
+BASE_URL = "https://visual-lab-7.preview.emergentagent.com/api"
 ADMIN_EMAIL = "admin@bazario.com"
 ADMIN_PASSWORD = "Admin123!"
 

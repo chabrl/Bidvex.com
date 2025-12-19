@@ -12,7 +12,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = "https://market-admin-dash.preview.emergentagent.com/api"
+BASE_URL = "https://visual-lab-7.preview.emergentagent.com/api"
 WS_URL = "wss://bidvex-sync.preview.emergentagent.com/ws"
 SELLER_EMAIL = "seller.wstest@example.com"
 SELLER_PASSWORD = "TestPassword123!"
