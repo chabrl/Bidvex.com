@@ -2891,7 +2891,7 @@ async def upload_message_attachment(
     
     # Generate unique filename
     file_ext = file.filename.split('.')[-1] if '.' in file.filename else 'bin'
-    unique_filename = f"msg_{conversation_id}_{uuid4().hex[:8]}.{file_ext}"
+    unique_filename = f"msg_{conversation_id}_{uuid.uuid4().hex[:8]}.{file_ext}"
     
     # Store file (in production, use S3/Cloudinary)
     upload_dir = Path("uploads/messages")
