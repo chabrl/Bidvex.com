@@ -6576,7 +6576,7 @@ async def sendgrid_webhook(request: Request):
         # Return 200 to prevent SendGrid from retrying
         return {"status": "error", "message": str(e)}
 
-app.include_router(api_router)
+# NOTE: api_router is included at the end of the file after all routes are defined
 
 app.add_middleware(
     CORSMiddleware, allow_credentials=True,
