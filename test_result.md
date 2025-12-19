@@ -261,10 +261,36 @@ frontend:
 
 test_plan:
   current_focus:
-    - "Scroll-to-Top Navigation"
+    - "Marketplace Settings Admin UI"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
+
+backend:
+  - task: "Marketplace Settings API with Validation"
+    implemented: true
+    working: pending
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: pending
+        agent: "main"
+        comment: "Enhanced PUT /api/admin/marketplace-settings with type validation, range checks (1-100 for auctions, 1-500 for lots, min $1 bid). Added POST /api/admin/marketplace-settings/restore-defaults to reset to factory defaults. All changes logged to admin_logs with field-level audit trail."
+
+frontend:
+  - task: "Marketplace Settings Admin UI"
+    implemented: true
+    working: pending
+    file: "MarketplaceSettings.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: pending
+        agent: "main"
+        comment: "Created comprehensive MarketplaceSettings.js with dirty state tracking, real-time summary updates, Save/Restore Defaults buttons, and confirmation modal. Integrated into AdminDashboard under Settings tab."
 
 frontend:
   - task: "Global Scroll-to-Top Navigation"
