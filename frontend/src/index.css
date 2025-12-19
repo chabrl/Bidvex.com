@@ -37,12 +37,21 @@
 }
 
 :root {
+  /* ===== Dynamic Branding Colors (Controlled by Admin) ===== */
+  --primary: #3B82F6;
+  --primary-rgb: 59, 130, 246;
+  --secondary: #10B981;
+  --secondary-rgb: 16, 185, 129;
+  --accent: #8B5CF6;
+  --accent-rgb: 139, 92, 246;
+  --surface: #F8FAFC;
+  --font-family: "Inter", sans-serif;
+  
   /* ===== BidVex Premium Color Palette ===== */
   --background: 0 0% 100%;
   --foreground: 220 20% 16%;
   
   /* Surface Colors - Off-white for depth */
-  --surface: 220 14% 96%;
   --surface-elevated: 0 0% 100%;
   
   /* Card System */
