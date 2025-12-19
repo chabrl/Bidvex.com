@@ -252,7 +252,7 @@ class MarketplaceSettingsTester:
                     assert data["max_lots_per_auction"] == 75
                     assert data["minimum_bid_increment"] == 2.0
                     assert data["enable_buy_now"] == False
-                    assert data["updated_by"] == self.admin_id
+                    assert data["updated_by"] == ADMIN_EMAIL  # Use email instead of ID
                     
                     print(f"   ✅ Valid update successful")
                     print(f"      - Max auctions: {data['max_active_auctions_per_user']}")
