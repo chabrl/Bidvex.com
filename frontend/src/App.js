@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { useTranslation } from 'react-i18next';
 import { useAuth } from './contexts/AuthContext';
 import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
+import { SiteConfigProvider } from './contexts/SiteConfigContext';
 import { Toaster } from './components/ui/sonner';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
