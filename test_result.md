@@ -285,15 +285,18 @@ backend:
 frontend:
   - task: "Marketplace Settings Admin UI"
     implemented: true
-    working: pending
+    working: true
     file: "MarketplaceSettings.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: pending
         agent: "main"
         comment: "Created comprehensive MarketplaceSettings.js with dirty state tracking, real-time summary updates, Save/Restore Defaults buttons, and confirmation modal. Integrated into AdminDashboard under Settings tab."
+      - working: true
+        agent: "testing"
+        comment: "✅ PASS - Marketplace Settings Admin UI testing completed successfully (7/7 test categories passed). Key findings: 1) Page Load Test - All components found: 'Marketplace Settings' header, subtitle 'Configure global auction and marketplace behavior', 'Restore Defaults' button, and 'No Changes to Save' button (disabled state). 2) Settings Cards Test - All 13 elements verified: User & Seller Rules (Allow All Users Multi-Lot toggle, Require Seller Approval toggle), Auction Limits (Max Active Auctions per User input 1-100, Max Lots per Auction input 1-500), Bidding Rules (Minimum Bid Increment input with $ prefix), Anti-Sniping Protection (Enable Anti-Sniping toggle, Extension Window input 1-60), Buy Now Feature (Enable Buy Now toggle). 3) Configuration Summary Test - All 8 summary boxes found and updating in real-time: Multi-Lot Access, New Seller Approval, Max Auctions/User, Max Lots/Auction, Min Bid Increment, Anti-Sniping, Buy Now, Last Updated. 4) Interactive Elements - 4 toggle switches and 4 numeric inputs working correctly with proper validation. 5) Dirty State Test - Button changes from 'No Changes to Save' to 'Save Settings' when settings modified, amber warning banner 'You have unsaved changes' appears correctly. 6) Save Settings Test - Settings persist correctly, success toast notifications appear, button returns to disabled state after save. 7) Restore Defaults Modal Test - Confirmation modal appears with red warning styling, 'Are you sure?' text, default values listed (20 auctions, 50 lots, $1.00, 2 minutes), 'cannot be undone' warning, Cancel and 'Yes, Reset All' buttons functional. Admin authentication working correctly with admin@bazario.com credentials. Navigation flow: /admin → Settings tab → Marketplace Settings sub-tab working seamlessly. All UI components render properly with proper styling and responsiveness."
 
 frontend:
   - task: "Global Scroll-to-Top Navigation"
