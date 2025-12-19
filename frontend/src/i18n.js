@@ -61,6 +61,83 @@ const resources = {
         discoverDeals: 'Discover rare finds and exclusive deals in our trusted marketplace',
       },
 
+      // Homepage Sections
+      homepage: {
+        // Hero
+        liveAuctionsNow: 'Live Auctions Happening Now',
+        discover: 'Discover.',
+        bid: 'Bid.',
+        win: 'Win.',
+        heroDescription: 'Experience the thrill of live auctions. Join thousands of bidders competing for unique items at unbeatable prices. Your next treasure awaits.',
+        howItWorks: 'How It Works',
+        
+        // Trust Indicators
+        securePayments: 'Secure Payments',
+        verifiedSellers: 'Verified Sellers',
+        buyerProtection: 'Buyer Protection',
+        
+        // Stats
+        activeBidders: 'Active Bidders',
+        liveAuctions: 'Live Auctions',
+        itemsWon: 'Items Won',
+        satisfaction: 'Satisfaction',
+        
+        // Sections
+        endingSoon: 'Ending Soon',
+        endingSoonDesc: "Don't miss out! These auctions close soon",
+        hotItems: 'Hot Items',
+        hotItemsDesc: 'Trending auctions with the most activity',
+        featuredAuctions: 'Featured Auctions',
+        curatedAuctions: 'Curated Auctions',
+        handPicked: 'Hand-picked items from our top sellers',
+        justListed: '🆕 Just Listed',
+        freshAuctions: 'Fresh auctions added today',
+        whyChooseBidvex: 'Why Choose BidVex?',
+        trustedPlatform: 'The trusted platform for smart bidders',
+        topSellers: 'Our Best Sellers',
+        topPerformers: 'Top Performers',
+        
+        // Actions
+        viewAll: 'View All',
+        bidNow: 'Bid Now',
+        learnMore: 'Learn More',
+        gettingStarted: 'Getting Started',
+        viewAllHotItems: 'View All Hot Items',
+        
+        // Status
+        live: 'LIVE',
+        activeBidding: 'Active bidding',
+        currentBid: 'Current Bid',
+        ended: 'Ended',
+        views: 'views',
+        bids: 'bids',
+        totalSales: 'Total Sales',
+        itemsSold: 'Items Sold',
+        new: 'NEW',
+        featured: 'Featured',
+        
+        // Features
+        liveBidding: 'Live Bidding',
+        liveBiddingDesc: 'Real-time auctions with instant updates',
+        securePaymentsDesc: 'Bank-level encryption via Stripe',
+        buyerProtectionDesc: 'Full refund guarantee on disputes',
+        globalCommunity: 'Global Community',
+        globalCommunityDesc: 'Verified buyers and sellers worldwide',
+        
+        // How It Works
+        howItWorksTitle: 'How It Works',
+        startWinning: 'Start winning amazing deals in three simple steps',
+        browse: 'Browse',
+        browseDesc: 'Find unique items from trusted sellers',
+        bidStep: 'Bid',
+        bidStepDesc: 'Place competitive bids in real-time',
+        winStep: 'Win',
+        winStepDesc: 'Secure your items with safe payment',
+        
+        // Fallback for dynamic content
+        translatedFromOriginal: 'Translated from original',
+      },
+
       // Authentication
       auth: {
         welcomeBack: 'Welcome Back',
