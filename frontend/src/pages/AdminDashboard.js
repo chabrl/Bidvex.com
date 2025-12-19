@@ -52,6 +52,7 @@ const SECONDARY_TABS = {
     { id: 'categories', label: 'Categories', icon: '📂', lucideIcon: Settings },
   ],
   settings: [
+    { id: 'marketplace-settings', label: 'Marketplace Settings', icon: '⚙️', lucideIcon: Sliders },
     { id: 'subscriptions', label: 'Subscriptions', icon: '💎', lucideIcon: CreditCard },
     { id: 'trust-safety', label: 'Trust & Safety', icon: '🛡️', lucideIcon: Shield },
     { id: 'email-templates', label: 'Email Templates', icon: '📧', lucideIcon: Mail },
