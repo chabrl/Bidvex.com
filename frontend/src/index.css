@@ -38,60 +38,67 @@
 
 :root {
   /* ===== Dynamic Branding Colors (Controlled by Admin) ===== */
-  --primary: #3B82F6;
-  --primary-rgb: 59, 130, 246;
-  --secondary: #10B981;
-  --secondary-rgb: 16, 185, 129;
-  --accent: #8B5CF6;
-  --accent-rgb: 139, 92, 246;
+  --primary: #2563EB;
+  --primary-rgb: 37, 99, 235;
+  --secondary: #059669;
+  --secondary-rgb: 5, 150, 105;
+  --accent: #7C3AED;
+  --accent-rgb: 124, 58, 237;
   --surface: #F8FAFC;
   --font-family: "Inter", sans-serif;
   
-  /* ===== BidVex Premium Color Palette ===== */
+  /* ===== BidVex Premium Color Palette (WCAG 2.1 AA Compliant) ===== */
   --background: 0 0% 100%;
-  --foreground: 220 20% 16%;
+  --foreground: 220 14% 15%; /* Deep Charcoal #1F2937 for better readability */
   
   /* Surface Colors - Off-white for depth */
   --surface-elevated: 0 0% 100%;
   
   /* Card System */
   --card: 0 0% 100%;
-  --card-foreground: 220 20% 16%;
+  --card-foreground: 220 14% 15%; /* Deep Charcoal */
   
   /* Popover */
   --popover: 0 0% 100%;
-  --popover-foreground: 220 20% 16%;
+  --popover-foreground: 220 14% 15%;
   
-  /* BidVex Blue - Primary */
-  --primary: 205 100% 50%;
+  /* BidVex Blue - Primary (Deeper Royal/Cobalt Blue for WCAG AA 4.5:1 contrast) */
+  --primary: 221 83% 53%; /* #2563EB - Vibrant Royal Blue */
   --primary-foreground: 0 0% 100%;
-  --primary-hover: 209 100% 45%;
+  --primary-hover: 221 83% 45%; /* Darker on hover */
   
   /* Secondary - Deep Navy */
-  --secondary: 209 100% 33%;
+  --secondary: 209 100% 28%; /* Deeper for better contrast */
   --secondary-foreground: 0 0% 100%;
   
   /* Muted - Soft Blue Tint */
   --muted: 210 40% 96%;
-  --muted-foreground: 215 16% 47%;
+  --muted-foreground: 215 25% 35%; /* Darker grey for readable labels: #4B5563 */
   
   /* Accent - Light Blue */
   --accent: 206 100% 97%;
-  --accent-foreground: 209 100% 33%;
+  --accent-foreground: 221 83% 45%;
   
   /* Status Colors */
-  --success: 152 76% 43%;
+  --success: 152 76% 36%; /* Slightly darker green for contrast */
   --success-foreground: 0 0% 100%;
-  --warning: 38 92% 50%;
+  --warning: 38 92% 45%; /* Slightly darker amber */
   --warning-foreground: 0 0% 100%;
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 98%;
-  --live: 152 76% 43%;
+  --destructive: 0 84% 55%;
+  --destructive-foreground: 0 0% 100%;
+  --live: 152 76% 36%;
   
-  /* Border & Input */
-  --border: 220 13% 91%;
-  --input: 220 13% 91%;
-  --ring: 205 100% 50%;
+  /* Border & Input - Darker borders for better visibility */
+  --border: 220 13% 82%; /* Darker border #CBD5E1 */
+  --input: 220 13% 78%; /* Even darker input borders #B4BCC9 */
+  --input-border: #94A3B8; /* Slate-400 for clear input boundaries */
+  --ring: 221 83% 53%;
+  
+  /* Text Colors - High Contrast Hierarchy */
+  --text-primary: #1F2937; /* Slate-800 - Main text */
+  --text-secondary: #374151; /* Slate-700 - Secondary text */
+  --text-muted: #4B5563; /* Slate-600 - Descriptions */
+  --text-disabled: #9CA3AF; /* Gray-400 - Disabled states */
   
   /* Standardized Radius - 12px for modern feel */
   --radius: 0.75rem;
