@@ -37,13 +37,22 @@
 }
 
 :root {
+  /* ===== BidVex Brand Colors (Blue, Cyan, Grey) ===== */
+  --bidvex-blue: #1E3A8A;
+  --bidvex-blue-light: #3B82F6;
+  --bidvex-cyan: #06B6D4;
+  --bidvex-cyan-light: #22D3EE;
+  --bidvex-grey: #64748B;
+  --bidvex-grey-dark: #1E293B;
+  --bidvex-grey-light: #F1F5F9;
+  
   /* ===== Dynamic Branding Colors (Controlled by Admin) ===== */
-  --primary: #2563EB;
-  --primary-rgb: 37, 99, 235;
-  --secondary: #059669;
-  --secondary-rgb: 5, 150, 105;
-  --accent: #7C3AED;
-  --accent-rgb: 124, 58, 237;
+  --primary: #1E3A8A;
+  --primary-rgb: 30, 58, 138;
+  --secondary: #06B6D4;
+  --secondary-rgb: 6, 182, 212;
+  --accent: #22D3EE;
+  --accent-rgb: 34, 211, 238;
   --surface: #F8FAFC;
   --font-family: "Inter", sans-serif;
   
