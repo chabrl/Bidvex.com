@@ -1,5 +1,28 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
+import LanguageDetector from 'i18next-browser-languagedetector';
+
+// Helper to get persisted language from localStorage
+const getPersistedLanguage = () => {
+  try {
+    const stored = localStorage.getItem('bidvex_language');
+    if (stored && ['en', 'fr'].includes(stored)) {
+      return stored;
+    }
+  } catch (e) {
+    console.warn('localStorage not available for language persistence');
+  }
+  return null;
+};
+
+// Helper to persist language choice
+export const persistLanguage = (lng) => {
+  try {
+    localStorage.setItem('bidvex_language', lng);
+  } catch (e) {
+    console.warn('Could not persist language preference');
+  }
+};
 
 const resources = {
   en: {
