@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
 /**
@@ -15,15 +15,25 @@ import { useLocation } from 'react-router-dom';
 const ScrollToTop = () => {
   const { pathname } = useLocation();
 
+  // Use useLayoutEffect for synchronous DOM mutation before paint
+  // This ensures scroll happens immediately before the browser paints
+  useLayoutEffect(() => {
+    // Force scroll to absolute top - use multiple methods for browser compatibility
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0; // For Safari compatibility
+  }, [pathname]);
+
+  // Also handle cases where content loads async
   useEffect(() => {
-    // Instant scroll to top on route change
-    // Using 'instant' behavior to prevent any "jumping" effect
-    // and ensure the scroll happens before content renders
-    window.scrollTo({
-      top: 0,
-      left: 0,
-      behavior: 'instant'
-    });
+    // Small timeout to catch any async content rendering
+    const timeoutId = setTimeout(() => {
+      if (window.scrollY !== 0) {
+        window.scrollTo(0, 0);
+      }
+    }, 50);
+    
+    return () => clearTimeout(timeoutId);
   }, [pathname]);
 
   return null; // This component doesn't render anything
