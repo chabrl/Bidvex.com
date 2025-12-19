@@ -183,53 +183,52 @@ const HomePage = () => {
               <div className={`transition-all duration-1000 ${heroLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
                 <Badge className="bg-white/10 backdrop-blur-md text-white border border-cyan-400/30 text-sm px-5 py-2.5 shadow-lg shadow-cyan-500/20">
                   <Sparkles className="h-4 w-4 mr-2 inline text-cyan-400" />
-                  Live Auctions Happening Now
+                  {t('homepage.liveAuctionsNow')}
                 </Badge>
               </div>
               
               {/* Animated Headline */}
               <div className="space-y-4">
                 <h1 className={`text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.1] transition-all duration-1000 delay-200 ${heroLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-                  <span className="block text-white">Discover.</span>
+                  <span className="block text-white">{t('homepage.discover')}</span>
                   <span className="block bg-gradient-to-r from-cyan-400 via-cyan-300 to-blue-400 bg-clip-text text-transparent">
-                    Bid.
+                    {t('homepage.bid')}
                   </span>
-                  <span className="block text-white">Win.</span>
+                  <span className="block text-white">{t('homepage.win')}</span>
                 </h1>
               </div>
               
               {/* Animated Description */}
               <p className={`text-lg md:text-xl text-blue-100/90 max-w-lg leading-relaxed transition-all duration-1000 delay-400 ${heroLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-                Experience the thrill of live auctions. Join thousands of bidders competing for 
-                unique items at unbeatable prices. Your next treasure awaits.
+                {t('homepage.heroDescription')}
               </p>
               
               {/* Animated CTA Buttons */}
               <div className={`flex flex-col sm:flex-row gap-4 transition-all duration-1000 delay-500 ${heroLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
                 <Button 
                   onClick={() => navigate('/marketplace')}
-                  className="btn-shine bg-gradient-to-r from-cyan-500 to-cyan-400 hover:from-cyan-400 hover:to-cyan-300 text-slate-900 font-bold px-8 py-6 text-lg shadow-xl shadow-cyan-500/30 hover:shadow-2xl hover:shadow-cyan-400/40 transition-all hover:-translate-y-1"
+                  className="btn-shine bg-gradient-to-r from-cyan-500 to-cyan-400 hover:from-cyan-400 hover:to-cyan-300 text-slate-900 font-bold px-8 py-6 text-lg shadow-xl shadow-cyan-500/30 hover:shadow-2xl hover:shadow-cyan-400/40 transition-all hover:-translate-y-1 whitespace-nowrap"
                 >
-                  <Zap className="mr-2 h-5 w-5" />
-                  Browse Auctions
-                  <ArrowRight className="ml-2 h-5 w-5" />
+                  <Zap className="mr-2 h-5 w-5 flex-shrink-0" />
+                  {t('hero.browseAuctions')}
+                  <ArrowRight className="ml-2 h-5 w-5 flex-shrink-0" />
                 </Button>
                 <Button 
                   onClick={() => navigate('/how-it-works')}
                   variant="outline"
-                  className="border-2 border-white/30 bg-white/5 backdrop-blur-sm text-white hover:bg-white/15 hover:border-cyan-400/50 px-8 py-6 text-lg transition-all"
+                  className="border-2 border-white/30 bg-white/5 backdrop-blur-sm text-white hover:bg-white/15 hover:border-cyan-400/50 px-8 py-6 text-lg transition-all whitespace-nowrap"
                 >
-                  <Play className="mr-2 h-5 w-5" />
-                  How It Works
+                  <Play className="mr-2 h-5 w-5 flex-shrink-0" />
+                  {t('homepage.howItWorks')}
                 </Button>
               </div>
 
               {/* Trust Indicators */}
               <div className={`flex flex-wrap items-center gap-6 pt-4 transition-all duration-1000 delay-700 ${heroLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
                 {[
-                  { icon: <Shield className="h-5 w-5" />, text: 'Secure Payments', color: 'text-green-400' },
-                  { icon: <CheckCircle2 className="h-5 w-5" />, text: 'Verified Sellers', color: 'text-cyan-400' },
-                  { icon: <Trophy className="h-5 w-5" />, text: 'Buyer Protection', color: 'text-yellow-400' }
+                  { icon: <Shield className="h-5 w-5" />, text: t('homepage.securePayments'), color: 'text-green-400' },
+                  { icon: <CheckCircle2 className="h-5 w-5" />, text: t('homepage.verifiedSellers'), color: 'text-cyan-400' },
+                  { icon: <Trophy className="h-5 w-5" />, text: t('homepage.buyerProtection'), color: 'text-yellow-400' }
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-2 text-sm text-blue-100/80">
                     <span className={item.color}>{item.icon}</span>
@@ -242,10 +241,10 @@ const HomePage = () => {
             {/* Right Side - Live Stats Cards */}
             <div className={`hidden lg:grid grid-cols-2 gap-5 transition-all duration-1000 delay-300 ${heroLoaded ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-20'}`}>
               {[
-                { value: '50K+', label: 'Active Bidders', icon: <Users className="h-6 w-6" />, delay: 0 },
-                { value: '10K+', label: 'Live Auctions', icon: <Gavel className="h-6 w-6" />, delay: 100 },
-                { value: '$2M+', label: 'Items Won', icon: <TrendingUp className="h-6 w-6" />, delay: 200 },
-                { value: '99.9%', label: 'Satisfaction', icon: <Award className="h-6 w-6" />, delay: 300 }
+                { value: '50K+', label: t('homepage.activeBidders'), icon: <Users className="h-6 w-6" />, delay: 0 },
+                { value: '10K+', label: t('homepage.liveAuctions'), icon: <Gavel className="h-6 w-6" />, delay: 100 },
+                { value: '$2M+', label: t('homepage.itemsWon'), icon: <TrendingUp className="h-6 w-6" />, delay: 200 },
+                { value: '99.9%', label: t('homepage.satisfaction'), icon: <Award className="h-6 w-6" />, delay: 300 }
               ].map((stat, i) => (
                 <div 
                   key={i} 
