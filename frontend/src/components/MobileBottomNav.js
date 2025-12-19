@@ -8,6 +8,7 @@ const MobileBottomNav = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const { canCreateMultiLot } = useFeatureFlags();
   const [showSellMenu, setShowSellMenu] = useState(false);
 
   const navItems = [
