@@ -317,12 +317,13 @@ const HomePage = () => {
 
 // ========== LIVE AUCTIONS SECTION ==========
 const LiveAuctionsSection = ({ items, navigate }) => {
+  const { t } = useTranslation();
   const [ref, isVisible] = useScrollReveal(0.1);
 
   if (!items.length) return null;
 
   return (
-    <section ref={ref} className="py-16 px-4 bg-gradient-to-b from-slate-50 to-white">
+    <section ref={ref} className="py-16 px-4 bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800">
       <div className="max-w-7xl mx-auto">
         <div className={`flex items-center justify-between mb-10 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
           <div className="flex items-center gap-4">
@@ -332,12 +333,12 @@ const LiveAuctionsSection = ({ items, navigate }) => {
               <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full" />
             </div>
             <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-slate-900">Ending Soon</h2>
-              <p className="text-slate-600">Don't miss out! These auctions close soon</p>
+              <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-slate-50">{t('homepage.endingSoon')}</h2>
+              <p className="text-slate-600 dark:text-slate-300">{t('homepage.endingSoonDesc')}</p>
             </div>
           </div>
-          <Button onClick={() => navigate('/marketplace?sort=ending')} variant="outline" className="hidden md:flex border-2 border-slate-300 hover:border-cyan-500 hover:text-cyan-600">
-            View All <ChevronRight className="ml-1 h-4 w-4" />
+          <Button onClick={() => navigate('/marketplace?sort=ending')} variant="outline" className="hidden md:flex border-2 border-slate-300 dark:border-cyan-500/50 hover:border-cyan-500 hover:text-cyan-600 dark:text-slate-200 dark:hover:text-cyan-400">
+            {t('homepage.viewAll')} <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
         </div>
 
