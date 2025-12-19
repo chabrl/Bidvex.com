@@ -7252,6 +7252,10 @@ async def delete_hero_banner(
     return {"message": "Banner deleted successfully"}
 
 
+# Include all API routes - MUST be after all routes are defined
+app.include_router(api_router)
+
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
