@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 import { Home, Search, Heart, User, Plus, Package, X, FileText, Layers } from 'lucide-react';
 
 const MobileBottomNav = () => {
