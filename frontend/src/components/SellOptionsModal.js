@@ -1,23 +1,39 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
-import { Package, Layers, ArrowRight } from 'lucide-react';
+import { Badge } from './ui/badge';
+import { Package, Layers, ArrowRight, Lock } from 'lucide-react';
+import { toast } from 'sonner';
 
 /**
  * SellOptionsModal Component
  * Displays modal with two listing type options:
  * 1. Create Single Item Listing
  * 2. Create Multi-Item Auction
+ * 
+ * Multi-Item Auction visibility is controlled by:
+ * - User has business account, OR
+ * - Admin has enabled allow_all_users_multi_lot flag
  */
 const SellOptionsModal = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { canCreateMultiLot } = useFeatureFlags();
 
   const handleSelectOption = (path) => {
+    if (path === '/create-multi-item-listing' && !canCreateMultiLot(user)) {
+      toast.error('Multi-lot auctions are restricted to business accounts. Please upgrade your account.');
+      return;
+    }
     onClose();
     navigate(path);
   };
+  
+  const canAccessMultiLot = canCreateMultiLot(user);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
