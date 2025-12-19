@@ -141,6 +141,11 @@ const AdminDashboard = () => {
     }
   }, [primaryTab]);
 
+  // Scroll to top when navigating between admin tabs
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [primaryTab, secondaryTab]);
+
   const fetchDashboardStats = async () => {
     try {
       const [usersRes, listingsRes, revenueRes] = await Promise.all([
