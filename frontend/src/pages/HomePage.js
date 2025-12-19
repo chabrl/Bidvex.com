@@ -545,14 +545,14 @@ const HotItemsSection = ({ items, navigate }) => {
         <div className="flex md:hidden justify-center mt-8">
           <Button 
             onClick={() => navigate('/marketplace?sort=hot')} 
-            className="font-bold px-8 py-3"
+            className="font-bold px-8 py-3 whitespace-nowrap"
             style={{ 
               background: 'linear-gradient(135deg, #06B6D4 0%, #22D3EE 100%)',
               color: '#0F172A',
               boxShadow: '0 4px 20px rgba(6, 182, 212, 0.4)'
             }}
           >
-            View All Hot Items <ChevronRight className="ml-1 h-4 w-4" />
+            {t('homepage.viewAllHotItems')} <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -562,42 +562,43 @@ const HotItemsSection = ({ items, navigate }) => {
 
 // ========== FEATURED SECTION ==========
 const FeaturedSection = ({ items, navigate }) => {
+  const { t } = useTranslation();
   const [ref, isVisible] = useScrollReveal(0.1);
 
   if (!items.length) return null;
 
   return (
-    <section ref={ref} className="py-16 px-4 bg-white">
+    <section ref={ref} className="py-16 px-4 bg-white dark:bg-slate-900">
       <div className="max-w-7xl mx-auto">
         <div className={`text-center mb-12 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
           <Badge className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white border-0 mb-4 px-4 py-2">
             <Sparkles className="h-4 w-4 mr-2 inline" />
-            Featured
+            {t('homepage.featured')}
           </Badge>
-          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3">Curated Auctions</h2>
-          <p className="text-slate-600 max-w-2xl mx-auto">Hand-picked items from our top sellers</p>
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-slate-50 mb-3">{t('homepage.curatedAuctions')}</h2>
+          <p className="text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">{t('homepage.handPicked')}</p>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
           {items.slice(0, 8).map((item, index) => (
             <Card 
               key={item.id}
-              className={`card-hover-pop cursor-pointer overflow-hidden border-0 shadow-md transition-all duration-700 ${isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
+              className={`card-hover-pop cursor-pointer overflow-hidden border-0 shadow-md dark:bg-slate-800/50 dark:backdrop-blur-sm transition-all duration-700 ${isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
               style={{ transitionDelay: `${index * 50}ms` }}
               onClick={() => navigate(`/listing/${item.id}`)}
             >
-              <div className="relative aspect-square overflow-hidden bg-slate-100">
+              <div className="relative aspect-square overflow-hidden bg-slate-100 dark:bg-slate-700">
                 {item.images?.[0] ? (
                   <img src={item.images[0]} alt={item.title} className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-600">
                     <span className="text-4xl">📦</span>
                   </div>
                 )}
               </div>
               <CardContent className="p-4">
-                <h3 className="font-medium text-sm mb-2 line-clamp-1 text-slate-900">{item.title}</h3>
-                <p className="text-lg font-bold text-blue-600">${item.current_price?.toFixed(2)}</p>
+                <h3 className="font-medium text-sm mb-2 line-clamp-1 text-slate-900 dark:text-slate-50">{item.title}</h3>
+                <p className="text-lg font-bold text-blue-600 dark:text-cyan-400">${item.current_price?.toFixed(2)}</p>
               </CardContent>
             </Card>
           ))}
