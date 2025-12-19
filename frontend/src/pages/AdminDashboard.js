@@ -24,11 +24,12 @@ import AdminLogs from './admin/AdminLogs';
 import CurrencyAppealsManager from './admin/CurrencyAppealsManager';
 import SubscriptionManager from './admin/SubscriptionManager';
 import EmailTemplates from './admin/EmailTemplates';
+import MarketplaceSettings from './admin/MarketplaceSettings';
 import { 
   Users, Package, Gavel, Shield, TrendingUp, Bell, Settings, FileText, 
   MessageSquare, DollarSign, Search, Image, CreditCard, Megaphone, 
   Activity, AlertTriangle, ChevronRight, Power, Zap, Eye, History,
-  ToggleLeft, ToggleRight, Clock, Mail
+  ToggleLeft, ToggleRight, Clock, Mail, Sliders
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
