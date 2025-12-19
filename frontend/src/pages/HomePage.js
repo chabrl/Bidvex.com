@@ -432,54 +432,73 @@ const HotItemsSection = ({ items, navigate }) => {
   if (!items.length) return null;
 
   return (
-    <section ref={ref} className="py-20 px-4 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 text-white relative overflow-hidden">
-      {/* Background Elements */}
-      <div className="absolute inset-0 opacity-20">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-cyan-500 rounded-full blur-[150px]" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500 rounded-full blur-[150px]" />
+    <section 
+      ref={ref} 
+      className="py-20 px-4 text-white relative overflow-hidden"
+      style={{
+        background: 'linear-gradient(135deg, #1E3A8A 0%, #0F172A 40%, #06B6D4 100%)'
+      }}
+    >
+      {/* Brand-aligned Background Orbs */}
+      <div className="absolute inset-0 opacity-30">
+        <div className="absolute top-0 left-1/4 w-96 h-96 rounded-full blur-[150px]" style={{ backgroundColor: '#06B6D4' }} />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 rounded-full blur-[150px]" style={{ backgroundColor: '#1E3A8A' }} />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full blur-[200px]" style={{ backgroundColor: '#22D3EE', opacity: 0.15 }} />
       </div>
 
       <div className="relative max-w-7xl mx-auto">
-        <div className={`flex items-center justify-between mb-12 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+        {/* Header with fallback visibility */}
+        <div className={`flex items-center justify-between mb-12 transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
           <div className="flex items-center gap-4">
             <div className="p-3 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl shadow-lg shadow-orange-500/30">
               <Flame className="h-8 w-8 text-white" />
             </div>
             <div>
-              <h2 className="text-3xl md:text-4xl font-bold">Hot Items</h2>
-              <p className="text-blue-200/70">Trending auctions with the most activity</p>
+              <h2 className="text-3xl md:text-4xl font-bold text-white">Hot Items</h2>
+              <p className="text-cyan-200/80">Trending auctions with the most activity</p>
             </div>
           </div>
-          <Button onClick={() => navigate('/marketplace?sort=hot')} variant="outline" className="hidden md:flex border-2 border-white/20 text-white hover:bg-white/10">
+          <Button 
+            onClick={() => navigate('/marketplace?sort=hot')} 
+            variant="outline" 
+            className="hidden md:flex border-2 border-cyan-400/50 text-white font-semibold hover:bg-cyan-500/20 hover:border-cyan-400 transition-all"
+          >
             View All <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
         </div>
 
+        {/* Cards Grid with staggered wave animation */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {items.map((item, index) => (
             <Card 
               key={item.id}
-              className={`hover-glow-cyan cursor-pointer overflow-hidden bg-white/10 backdrop-blur-sm border border-white/10 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
-              style={{ transitionDelay: `${index * 100}ms` }}
+              className={`hover-glow-cyan cursor-pointer overflow-hidden bg-white/5 backdrop-blur-md border border-white/20 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+              style={{ transitionDelay: `${index * 150}ms` }}
               onClick={() => navigate(`/listing/${item.id}`)}
             >
               <div className="relative h-52 overflow-hidden">
                 {item.images?.[0] ? (
-                  <img src={item.images[0]} alt={item.title} className="w-full h-full object-cover" />
+                  <img src={item.images[0]} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 hover:scale-110" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-700 to-slate-800">
+                  <div className="w-full h-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #1E3A8A 0%, #0F172A 100%)' }}>
                     <span className="text-5xl">📦</span>
                   </div>
                 )}
-                <Badge className="absolute top-3 right-3 bg-gradient-to-r from-orange-500 to-red-500 text-white border-0 shadow-lg">
+                <Badge className="absolute top-3 right-3 bg-gradient-to-r from-orange-500 to-red-500 text-white border-0 shadow-lg font-semibold">
                   🔥 {item.views || 0} views
                 </Badge>
                 
-                {/* Activity Indicator */}
+                {/* Live Activity Indicator with Vibrant Cyan */}
                 <div className="absolute bottom-3 left-3 right-3">
-                  <div className="bg-slate-900/80 backdrop-blur rounded-lg px-3 py-2 flex items-center gap-2">
-                    <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse" />
-                    <span className="text-xs text-white/80">Active bidding</span>
+                  <div className="bg-slate-900/90 backdrop-blur-md rounded-lg px-3 py-2 flex items-center gap-2 border border-cyan-500/30">
+                    <span 
+                      className="w-2.5 h-2.5 rounded-full animate-pulse shadow-lg"
+                      style={{ 
+                        backgroundColor: '#06B6D4',
+                        boxShadow: '0 0 10px #06B6D4, 0 0 20px rgba(6, 182, 212, 0.5)'
+                      }} 
+                    />
+                    <span className="text-xs text-cyan-100 font-medium">Active bidding</span>
                   </div>
                 </div>
               </div>
@@ -488,16 +507,39 @@ const HotItemsSection = ({ items, navigate }) => {
                 <h3 className="font-semibold text-lg mb-3 line-clamp-1 text-white">{item.title}</h3>
                 <div className="flex justify-between items-end">
                   <div>
-                    <p className="text-xs text-blue-200/60 uppercase tracking-wider">Current Bid</p>
-                    <p className="text-2xl font-bold text-cyan-400">${item.current_price?.toFixed(2)}</p>
+                    <p className="text-xs text-cyan-200/70 uppercase tracking-wider font-medium">Current Bid</p>
+                    <p className="text-2xl font-bold" style={{ color: '#22D3EE' }}>${item.current_price?.toFixed(2)}</p>
                   </div>
-                  <Button size="sm" className="bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-semibold">
+                  <Button 
+                    size="sm" 
+                    className="font-bold shadow-lg transition-all hover:-translate-y-0.5"
+                    style={{ 
+                      background: 'linear-gradient(135deg, #06B6D4 0%, #22D3EE 100%)',
+                      color: '#0F172A',
+                      boxShadow: '0 4px 15px rgba(6, 182, 212, 0.4)'
+                    }}
+                  >
                     Bid Now
                   </Button>
                 </div>
               </CardContent>
             </Card>
           ))}
+        </div>
+
+        {/* Mobile View All Button */}
+        <div className="flex md:hidden justify-center mt-8">
+          <Button 
+            onClick={() => navigate('/marketplace?sort=hot')} 
+            className="font-bold px-8 py-3"
+            style={{ 
+              background: 'linear-gradient(135deg, #06B6D4 0%, #22D3EE 100%)',
+              color: '#0F172A',
+              boxShadow: '0 4px 20px rgba(6, 182, 212, 0.4)'
+            }}
+          >
+            View All Hot Items <ChevronRight className="ml-1 h-4 w-4" />
+          </Button>
         </div>
       </div>
     </section>
