@@ -1001,15 +1001,33 @@ const resources = {
   },
 };
 
+// Determine initial language with priority: localStorage > browser > default
+const initialLanguage = getPersistedLanguage() || 
+  (typeof navigator !== 'undefined' && navigator.language?.startsWith('fr') ? 'fr' : 'en');
+
 i18n
+  .use(LanguageDetector)
   .use(initReactI18next)
   .init({
     resources,
-    lng: 'en',
+    lng: initialLanguage,
     fallbackLng: 'en',
+    supportedLngs: ['en', 'fr'],
     interpolation: {
       escapeValue: false,
     },
+    detection: {
+      order: ['localStorage', 'navigator', 'htmlTag'],
+      lookupLocalStorage: 'bidvex_language',
+      caches: ['localStorage'],
+    },
   });
+
+// Persist language changes
+i18n.on('languageChanged', (lng) => {
+  persistLanguage(lng);
+  // Update HTML lang attribute for accessibility
+  document.documentElement.lang = lng;
+});
 
 export default i18n;
