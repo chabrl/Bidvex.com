@@ -428,6 +428,7 @@ const LiveAuctionCard = ({ item, index, isVisible, navigate }) => {
 
 // ========== HOT ITEMS SECTION ==========
 const HotItemsSection = ({ items, navigate }) => {
+  const { t } = useTranslation();
   const [ref, isVisible] = useScrollReveal(0.1);
 
   if (!items.length) return null;
@@ -455,13 +456,13 @@ const HotItemsSection = ({ items, navigate }) => {
               <Flame className="h-8 w-8 text-white" />
             </div>
             <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-white">Hot Items</h2>
-              <p className="text-cyan-200/80">Trending auctions with the most activity</p>
+              <h2 className="text-3xl md:text-4xl font-bold text-white">{t('homepage.hotItems')}</h2>
+              <p className="text-cyan-200/80">{t('homepage.hotItemsDesc')}</p>
             </div>
           </div>
           <Button 
             onClick={() => navigate('/marketplace?sort=hot')} 
-            className="hidden md:flex items-center gap-1 px-5 py-2 rounded-md font-semibold transition-all hover:-translate-y-0.5"
+            className="hidden md:flex items-center gap-1 px-5 py-2 rounded-md font-semibold transition-all hover:-translate-y-0.5 whitespace-nowrap"
             style={{ 
               backgroundColor: 'transparent',
               border: '2px solid rgba(6, 182, 212, 0.6)',
@@ -476,7 +477,7 @@ const HotItemsSection = ({ items, navigate }) => {
               e.currentTarget.style.borderColor = 'rgba(6, 182, 212, 0.6)';
             }}
           >
-            View All <ChevronRight className="ml-1 h-4 w-4" />
+            {t('homepage.viewAll')} <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
         </div>
 
@@ -498,7 +499,7 @@ const HotItemsSection = ({ items, navigate }) => {
                   </div>
                 )}
                 <Badge className="absolute top-3 right-3 bg-gradient-to-r from-orange-500 to-red-500 text-white border-0 shadow-lg font-semibold">
-                  🔥 {item.views || 0} views
+                  🔥 {item.views || 0} {t('homepage.views')}
                 </Badge>
                 
                 {/* Live Activity Indicator with Vibrant Cyan */}
@@ -511,7 +512,7 @@ const HotItemsSection = ({ items, navigate }) => {
                         boxShadow: '0 0 10px #06B6D4, 0 0 20px rgba(6, 182, 212, 0.5)'
                       }} 
                     />
-                    <span className="text-xs text-cyan-100 font-medium">Active bidding</span>
+                    <span className="text-xs text-cyan-100 font-medium">{t('homepage.activeBidding')}</span>
                   </div>
                 </div>
               </div>
@@ -520,19 +521,19 @@ const HotItemsSection = ({ items, navigate }) => {
                 <h3 className="font-semibold text-lg mb-3 line-clamp-1 text-white">{item.title}</h3>
                 <div className="flex justify-between items-end">
                   <div>
-                    <p className="text-xs text-cyan-200/70 uppercase tracking-wider font-medium">Current Bid</p>
+                    <p className="text-xs text-cyan-200/70 uppercase tracking-wider font-medium">{t('homepage.currentBid')}</p>
                     <p className="text-2xl font-bold" style={{ color: '#22D3EE' }}>${item.current_price?.toFixed(2)}</p>
                   </div>
                   <Button 
                     size="sm" 
-                    className="font-bold shadow-lg transition-all hover:-translate-y-0.5"
+                    className="font-bold shadow-lg transition-all hover:-translate-y-0.5 whitespace-nowrap"
                     style={{ 
                       background: 'linear-gradient(135deg, #06B6D4 0%, #22D3EE 100%)',
                       color: '#0F172A',
                       boxShadow: '0 4px 15px rgba(6, 182, 212, 0.4)'
                     }}
                   >
-                    Bid Now
+                    {t('homepage.bidNow')}
                   </Button>
                 </div>
               </CardContent>
