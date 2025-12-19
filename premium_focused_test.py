@@ -11,7 +11,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = "https://visual-lab-7.preview.emergentagent.com/api"
+BASE_URL = "https://bid-masters-1.preview.emergentagent.com/api"
 
 class FocusedPremiumTester:
     def __init__(self):
