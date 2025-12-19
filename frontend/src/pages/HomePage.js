@@ -610,20 +610,21 @@ const FeaturedSection = ({ items, navigate }) => {
 
 // ========== NEW LISTINGS SECTION ==========
 const NewListingsSection = ({ items, navigate }) => {
+  const { t } = useTranslation();
   const [ref, isVisible] = useScrollReveal(0.1);
 
   if (!items.length) return null;
 
   return (
-    <section ref={ref} className="py-16 px-4 bg-slate-50">
+    <section ref={ref} className="py-16 px-4 bg-slate-50 dark:bg-slate-900">
       <div className="max-w-7xl mx-auto">
         <div className={`flex items-center justify-between mb-10 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
           <div>
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-900">🆕 Just Listed</h2>
-            <p className="text-slate-600 mt-2">Fresh auctions added today</p>
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-slate-50">{t('homepage.justListed')}</h2>
+            <p className="text-slate-600 dark:text-slate-300 mt-2">{t('homepage.freshAuctions')}</p>
           </div>
-          <Button onClick={() => navigate('/marketplace?sort=newest')} variant="outline" className="hidden md:flex border-2 border-slate-300 hover:border-cyan-500 hover:text-cyan-600">
-            View All <ChevronRight className="ml-1 h-4 w-4" />
+          <Button onClick={() => navigate('/marketplace?sort=newest')} variant="outline" className="hidden md:flex border-2 border-slate-300 dark:border-cyan-500/50 hover:border-cyan-500 hover:text-cyan-600 dark:text-slate-200 dark:hover:text-cyan-400">
+            {t('homepage.viewAll')} <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
         </div>
 
@@ -631,23 +632,23 @@ const NewListingsSection = ({ items, navigate }) => {
           {items.slice(0, 6).map((item, index) => (
             <Card 
               key={item.id}
-              className={`card-hover-pop cursor-pointer overflow-hidden border-0 shadow-md transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+              className={`card-hover-pop cursor-pointer overflow-hidden border-0 shadow-md dark:bg-slate-800/50 dark:backdrop-blur-sm transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
               style={{ transitionDelay: `${index * 80}ms` }}
               onClick={() => navigate(`/listing/${item.id}`)}
             >
-              <div className="relative aspect-square overflow-hidden bg-slate-100">
+              <div className="relative aspect-square overflow-hidden bg-slate-100 dark:bg-slate-700">
                 {item.images?.[0] ? (
                   <img src={item.images[0]} alt={item.title} className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-600">
                     <span className="text-3xl">📦</span>
                   </div>
                 )}
-                <Badge className="absolute top-2 left-2 bg-green-500 text-white text-xs border-0">NEW</Badge>
+                <Badge className="absolute top-2 left-2 bg-green-500 text-white text-xs border-0">{t('homepage.new')}</Badge>
               </div>
               <CardContent className="p-3">
-                <h3 className="font-medium text-xs mb-1 line-clamp-1 text-slate-900">{item.title}</h3>
-                <p className="text-sm font-bold text-blue-600">${item.current_price?.toFixed(2)}</p>
+                <h3 className="font-medium text-xs mb-1 line-clamp-1 text-slate-900 dark:text-slate-50">{item.title}</h3>
+                <p className="text-sm font-bold text-blue-600 dark:text-cyan-400">${item.current_price?.toFixed(2)}</p>
               </CardContent>
             </Card>
           ))}
@@ -659,35 +660,36 @@ const NewListingsSection = ({ items, navigate }) => {
 
 // ========== FEATURES SECTION ==========
 const FeaturesSection = ({ navigate }) => {
+  const { t } = useTranslation();
   const [ref, isVisible] = useScrollReveal(0.1);
 
   const features = [
-    { icon: <Gavel className="h-7 w-7" />, title: 'Live Bidding', desc: 'Real-time auctions with instant updates' },
-    { icon: <Shield className="h-7 w-7" />, title: 'Secure Payments', desc: 'Bank-level encryption via Stripe' },
-    { icon: <Trophy className="h-7 w-7" />, title: 'Buyer Protection', desc: 'Full refund guarantee on disputes' },
-    { icon: <Users className="h-7 w-7" />, title: 'Global Community', desc: 'Verified buyers and sellers worldwide' }
+    { icon: <Gavel className="h-7 w-7" />, title: t('homepage.liveBidding'), desc: t('homepage.liveBiddingDesc') },
+    { icon: <Shield className="h-7 w-7" />, title: t('homepage.securePayments'), desc: t('homepage.securePaymentsDesc') },
+    { icon: <Trophy className="h-7 w-7" />, title: t('homepage.buyerProtection'), desc: t('homepage.buyerProtectionDesc') },
+    { icon: <Users className="h-7 w-7" />, title: t('homepage.globalCommunity'), desc: t('homepage.globalCommunityDesc') }
   ];
 
   return (
-    <section ref={ref} className="py-20 px-4 bg-white">
+    <section ref={ref} className="py-20 px-4 bg-white dark:bg-slate-800">
       <div className="max-w-7xl mx-auto">
         <div className={`text-center mb-12 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3">Why Choose BidVex?</h2>
-          <p className="text-slate-600">The trusted platform for smart bidders</p>
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-slate-50 mb-3">{t('homepage.whyChooseBidvex')}</h2>
+          <p className="text-slate-600 dark:text-slate-300">{t('homepage.trustedPlatform')}</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {features.map((feature, index) => (
             <div 
               key={index}
-              className={`group p-8 rounded-2xl bg-gradient-to-br from-slate-50 to-white border border-slate-100 hover:border-cyan-200 hover:shadow-xl hover:shadow-cyan-500/10 transition-all duration-500 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+              className={`group p-8 rounded-2xl bg-gradient-to-br from-slate-50 to-white dark:from-slate-800 dark:to-slate-700 border border-slate-100 dark:border-slate-600 hover:border-cyan-200 dark:hover:border-cyan-500/50 hover:shadow-xl hover:shadow-cyan-500/10 dark:hover:shadow-cyan-500/20 transition-all duration-500 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
               style={{ transitionDelay: `${index * 100}ms` }}
             >
               <div className="w-14 h-14 mb-5 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/30 group-hover:scale-110 transition-transform">
                 {feature.icon}
               </div>
-              <h3 className="text-xl font-semibold text-slate-900 mb-2">{feature.title}</h3>
-              <p className="text-slate-600 leading-relaxed">{feature.desc}</p>
+              <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-50 mb-2">{feature.title}</h3>
+              <p className="text-slate-600 dark:text-slate-300 leading-relaxed">{feature.desc}</p>
             </div>
           ))}
         </div>
@@ -698,14 +700,15 @@ const FeaturesSection = ({ navigate }) => {
 
 // ========== TOP SELLERS SECTION ==========
 const TopSellersSection = ({ sellers }) => {
+  const { t } = useTranslation();
   const [ref, isVisible] = useScrollReveal(0.1);
 
   return (
-    <section ref={ref} className="py-20 px-4 bg-slate-50">
+    <section ref={ref} className="py-20 px-4 bg-slate-50 dark:bg-slate-900">
       <div className="max-w-7xl mx-auto">
         <div className={`text-center mb-12 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-          <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200 mb-4"><Award className="h-4 w-4 mr-2 inline" />Top Performers</Badge>
-          <h2 className="text-3xl md:text-4xl font-bold text-slate-900">Our Best Sellers</h2>
+          <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-700 mb-4"><Award className="h-4 w-4 mr-2 inline" />{t('homepage.topPerformers')}</Badge>
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-slate-50">{t('homepage.topSellers')}</h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
