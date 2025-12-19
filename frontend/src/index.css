@@ -395,6 +395,114 @@
   .rounded-premium-xl { border-radius: var(--radius-xl); }
 }
 
+/* ===== Admin Panel Enhancements - High Contrast ===== */
+
+/* Input Fields - Clear Boundaries */
+.admin-input {
+  border: 1.5px solid #94A3B8 !important; /* Slate-400 */
+  border-radius: var(--radius-sm);
+  background-color: #FFFFFF;
+  color: var(--text-primary);
+  transition: border-color 0.2s ease;
+}
+
+.admin-input:focus {
+  border-color: #2563EB !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  outline: none;
+}
+
+.admin-input::placeholder {
+  color: #9CA3AF;
+}
+
+/* Configuration Summary Box - Dark Background */
+.config-summary {
+  background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+}
+
+.config-summary-item {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  text-align: center;
+}
+
+.config-summary-label {
+  color: #94A3B8;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+}
+
+.config-summary-value {
+  color: #FFFFFF;
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+/* Admin Card Section Headers */
+.admin-section-header {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #1F2937;
+  line-height: 1.3;
+}
+
+.admin-section-description {
+  font-size: 0.875rem;
+  color: #4B5563;
+  line-height: 1.5;
+}
+
+/* Toggle Labels - Better Contrast */
+.toggle-label {
+  font-weight: 500;
+  color: #1F2937;
+}
+
+.toggle-description {
+  font-size: 0.875rem;
+  color: #4B5563;
+  line-height: 1.5;
+}
+
+/* Admin Panel Buttons */
+.admin-btn-primary {
+  background-color: #2563EB !important;
+  color: #FFFFFF !important;
+  font-weight: 600;
+  border: none;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+  transition: all 0.2s ease;
+}
+
+.admin-btn-primary:hover:not(:disabled) {
+  background-color: #1D4ED8 !important;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+  transform: translateY(-1px);
+}
+
+.admin-btn-primary:disabled {
+  background-color: #9CA3AF !important;
+  color: #FFFFFF !important;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+/* Visibility Toggle Icons */
+.visibility-icon-active {
+  color: #059669 !important; /* Emerald-600 */
+}
+
+.visibility-icon-inactive {
+  color: #9CA3AF !important; /* Gray-400 */
+}
+
 /* ===== Animations ===== */
 @keyframes pulse-live {
   0%, 100% {
