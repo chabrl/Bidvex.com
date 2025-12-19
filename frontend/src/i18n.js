@@ -625,6 +625,83 @@ const resources = {
         discoverDeals: 'Découvrez des trouvailles rares et des offres exclusives sur notre marché de confiance',
       },
 
+      // Homepage Sections
+      homepage: {
+        // Hero
+        liveAuctionsNow: 'Enchères en Direct',
+        discover: 'Découvrir.',
+        bid: 'Enchérir.',
+        win: 'Gagner.',
+        heroDescription: "Vivez le frisson des enchères en direct. Rejoignez des milliers d'enchérisseurs pour des articles uniques à des prix imbattables. Votre prochain trésor vous attend.",
+        howItWorks: 'Comment ça marche',
+        
+        // Trust Indicators
+        securePayments: 'Paiements Sécurisés',
+        verifiedSellers: 'Vendeurs Vérifiés',
+        buyerProtection: 'Protection Acheteur',
+        
+        // Stats
+        activeBidders: 'Enchérisseurs Actifs',
+        liveAuctions: 'Enchères en Direct',
+        itemsWon: 'Articles Gagnés',
+        satisfaction: 'Satisfaction',
+        
+        // Sections
+        endingSoon: 'Se Termine Bientôt',
+        endingSoonDesc: 'Ne manquez pas ! Ces enchères se terminent bientôt',
+        hotItems: 'Articles Populaires',
+        hotItemsDesc: 'Enchères tendances avec le plus d\'activité',
+        featuredAuctions: 'Enchères en Vedette',
+        curatedAuctions: 'Enchères Sélectionnées',
+        handPicked: 'Articles sélectionnés de nos meilleurs vendeurs',
+        justListed: '🆕 Nouveautés',
+        freshAuctions: "Nouvelles enchères ajoutées aujourd'hui",
+        whyChooseBidvex: 'Pourquoi Choisir BidVex?',
+        trustedPlatform: 'La plateforme de confiance pour les enchérisseurs avisés',
+        topSellers: 'Nos Meilleurs Vendeurs',
+        topPerformers: 'Meilleurs Performeurs',
+        
+        // Actions
+        viewAll: 'Voir Tout',
+        bidNow: 'Enchérir',
+        learnMore: 'En Savoir Plus',
+        gettingStarted: 'Pour Commencer',
+        viewAllHotItems: 'Voir Tous les Articles Populaires',
+        
+        // Status
+        live: 'EN DIRECT',
+        activeBidding: 'Enchères actives',
+        currentBid: 'Enchère Actuelle',
+        ended: 'Terminé',
+        views: 'vues',
+        bids: 'enchères',
+        totalSales: 'Ventes Totales',
+        itemsSold: 'Articles Vendus',
+        new: 'NOUVEAU',
+        featured: 'En vedette',
+        
+        // Features
+        liveBidding: 'Enchères en Direct',
+        liveBiddingDesc: 'Enchères en temps réel avec mises à jour instantanées',
+        securePaymentsDesc: 'Chiffrement bancaire via Stripe',
+        buyerProtectionDesc: 'Garantie de remboursement complet en cas de litige',
+        globalCommunity: 'Communauté Mondiale',
+        globalCommunityDesc: 'Acheteurs et vendeurs vérifiés dans le monde entier',
+        
+        // How It Works
+        howItWorksTitle: 'Comment Ça Marche',
+        startWinning: 'Commencez à gagner des offres incroyables en trois étapes simples',
+        browse: 'Parcourir',
+        browseDesc: 'Trouvez des articles uniques de vendeurs de confiance',
+        bidStep: 'Enchérir',
+        bidStepDesc: 'Placez des enchères compétitives en temps réel',
+        winStep: 'Gagner',
+        winStepDesc: 'Sécurisez vos articles avec un paiement sûr',
+        
+        // Fallback for dynamic content
+        translatedFromOriginal: 'Traduit de l\'original',
+      },
+
       // Authentication
       auth: {
         welcomeBack: 'Bienvenue',
