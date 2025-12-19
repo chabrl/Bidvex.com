@@ -354,6 +354,7 @@ const LiveAuctionsSection = ({ items, navigate }) => {
 
 // ========== LIVE AUCTION CARD ==========
 const LiveAuctionCard = ({ item, index, isVisible, navigate }) => {
+  const { t } = useTranslation();
   const [timeLeft, setTimeLeft] = useState('');
 
   useEffect(() => {
@@ -362,7 +363,7 @@ const LiveAuctionCard = ({ item, index, isVisible, navigate }) => {
       const now = new Date();
       const diff = end - now;
       
-      if (diff <= 0) return 'Ended';
+      if (diff <= 0) return t('homepage.ended');
       
       const hours = Math.floor(diff / (1000 * 60 * 60));
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
@@ -375,21 +376,21 @@ const LiveAuctionCard = ({ item, index, isVisible, navigate }) => {
     setTimeLeft(calculateTimeLeft());
     const timer = setInterval(() => setTimeLeft(calculateTimeLeft()), 1000);
     return () => clearInterval(timer);
-  }, [item.auction_end_date]);
+  }, [item.auction_end_date, t]);
 
   const isUrgent = timeLeft.includes('m') && !timeLeft.includes('h') && !timeLeft.includes('d');
 
   return (
     <Card 
-      className={`card-hover-pop cursor-pointer overflow-hidden border-0 shadow-lg bg-white transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+      className={`card-hover-pop cursor-pointer overflow-hidden border-0 shadow-lg bg-white dark:bg-slate-800/50 dark:backdrop-blur-sm transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
       style={{ transitionDelay: `${index * 100}ms` }}
       onClick={() => navigate(`/listing/${item.id}`)}
     >
-      <div className="relative h-48 overflow-hidden bg-slate-100">
+      <div className="relative h-48 overflow-hidden bg-slate-100 dark:bg-slate-700">
         {item.images?.[0] ? (
           <img src={item.images[0]} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-600">
             <span className="text-5xl">📦</span>
           </div>
         )}
@@ -403,21 +404,21 @@ const LiveAuctionCard = ({ item, index, isVisible, navigate }) => {
         {/* Live Indicator */}
         <div className="absolute top-3 left-3 px-2 py-1 bg-cyan-500 text-white text-xs font-semibold rounded-full flex items-center gap-1.5">
           <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
-          LIVE
+          {t('homepage.live')}
         </div>
       </div>
       
       <CardContent className="p-5">
-        <h3 className="font-semibold text-lg mb-3 line-clamp-1 text-slate-900">{item.title}</h3>
+        <h3 className="font-semibold text-lg mb-3 line-clamp-1 text-slate-900 dark:text-slate-50">{item.title}</h3>
         <div className="flex justify-between items-end">
           <div>
-            <p className="text-xs text-slate-500 uppercase tracking-wider">Current Bid</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('homepage.currentBid')}</p>
             <p className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
               ${item.current_price?.toFixed(2)}
             </p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-slate-500">{item.total_bids || 0} bids</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{item.total_bids || 0} {t('homepage.bids')}</p>
           </div>
         </div>
       </CardContent>
