@@ -460,8 +460,20 @@ const HotItemsSection = ({ items, navigate }) => {
           </div>
           <Button 
             onClick={() => navigate('/marketplace?sort=hot')} 
-            variant="outline" 
-            className="hidden md:flex border-2 border-cyan-400/50 text-white font-semibold hover:bg-cyan-500/20 hover:border-cyan-400 transition-all"
+            className="hidden md:flex items-center gap-1 px-5 py-2 rounded-md font-semibold transition-all hover:-translate-y-0.5"
+            style={{ 
+              backgroundColor: 'transparent',
+              border: '2px solid rgba(6, 182, 212, 0.6)',
+              color: '#FFFFFF',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(6, 182, 212, 0.2)';
+              e.currentTarget.style.borderColor = '#06B6D4';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.borderColor = 'rgba(6, 182, 212, 0.6)';
+            }}
           >
             View All <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
