@@ -261,10 +261,23 @@ frontend:
 
 test_plan:
   current_focus:
-    - "UI Contrast & Typography Enhancement"
+    - "How It Works & Homepage Redesign"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
+
+frontend:
+  - task: "How It Works & Homepage Redesign"
+    implemented: true
+    working: pending
+    file: "HowItWorksPage.js, HomePage.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: pending
+        agent: "main"
+        comment: "Complete redesign of both pages: How It Works page with modern hero, zigzag timeline for 5 steps, FAQ accordion, video teaser section. HomePage with modern hero and stats cards, removed Browse Individual Items section, consistent design language with How It Works page, 3-step summary with modern icons."
 
 frontend:
   - task: "UI Contrast & Typography Enhancement"
