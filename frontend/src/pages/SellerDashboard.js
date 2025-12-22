@@ -91,7 +91,38 @@ const SellerDashboard = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Tab Navigation */}
+        <div className="flex border-b border-slate-200 dark:border-slate-700">
+          <button
+            onClick={() => setActiveTab('listings')}
+            className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 -mb-px ${
+              activeTab === 'listings'
+                ? 'border-[#06B6D4] text-[#06B6D4]'
+                : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+            }`}
+          >
+            <Package className="h-4 w-4 inline mr-2" />
+            {t('dashboard.seller.listings', 'Listings')}
+          </button>
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 -mb-px ${
+              activeTab === 'analytics'
+                ? 'border-[#06B6D4] text-[#06B6D4]'
+                : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+            }`}
+          >
+            <BarChart3 className="h-4 w-4 inline mr-2" />
+            {t('dashboard.seller.analytics', 'Analytics')}
+          </button>
+        </div>
+
+        {/* Tab Content */}
+        {activeTab === 'analytics' ? (
+          <SellerAnalyticsDashboard />
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatCard
             icon={<Package className="h-6 w-6" />}
             title={t('dashboard.seller.activeListings')}
