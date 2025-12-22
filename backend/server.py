@@ -7560,10 +7560,12 @@ async def delete_hero_banner(
 try:
     from routes.analytics import analytics_router, set_db as set_analytics_db
     from routes.auctions import auctions_router, set_db as set_auctions_db, set_notification_manager
+    from routes.sms_verification import sms_router, set_db as set_sms_db
     
     # Inject database and managers into routers
     set_analytics_db(db)
     set_auctions_db(db)
+    set_sms_db(db)
     # Use message_manager for notifications (or None if not available)
     set_notification_manager(message_manager if 'message_manager' in dir() else None)
     
@@ -7574,6 +7576,10 @@ try:
     # Include auctions router under /api prefix
     api_router.include_router(auctions_router)
     logger.info("✅ Auctions router loaded")
+    
+    # Include SMS verification router under /api prefix
+    api_router.include_router(sms_router)
+    logger.info("✅ SMS Verification router loaded")
     
 except ImportError as e:
     logger.warning(f"⚠️ Could not load modular routers: {e}")
