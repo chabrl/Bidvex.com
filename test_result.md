@@ -543,3 +543,22 @@ frontend:
         agent: 'main'
         comment: 'Implemented Twilio SMS verification with: (1) OTP send/verify endpoints with rate limiting, (2) Beautiful verification UI with 6-digit auto-focus inputs and 60s cooldown, (3) EN/FR bilingual support, (4) Mock mode for development. Wired SellerAnalyticsDashboard to seller dashboard with tabs. Executed database cleanup: deleted 442 test records, preserved admin users, site_config, admin_logs, categories.'
 
+
+  - task: 'SMS Verification + Seller Analytics + Protected Routes (Dec 22)'
+    implemented: true
+    working: pending
+    files: ['routes/sms_verification.py', 'PhoneVerificationPage.js', 'SellerAnalyticsDashboard.js', 'App.js', 'AuthContext.js']
+    stuck_count: 0
+    priority: 'high'
+    needs_retesting: true
+    status_history:
+      - working: pending
+        agent: 'main'
+        comment: 'Completed: (1) SMS verification with Twilio Verify API - live/mock modes with rate limiting and EN/FR support, (2) Beautiful 6-digit OTP UI with auto-focus and 60s cooldown, (3) ProtectedRoute now redirects unverified users to /verify-phone for critical routes (create-listing, seller/dashboard, etc), (4) Seller Analytics wired and displaying with BidVex brand colors, (5) refreshUser added to AuthContext for post-verification state update. Admin users bypass phone verification.'
+
+Incorporate User Feedback:
+- Test SMS verification flow: phone input -> OTP send -> 6-digit entry -> verification
+- Test protected route redirect for unverified users
+- Test seller analytics dashboard with all charts and period selector
+- Test that admin users can bypass phone verification
+- Test 60-second resend cooldown
