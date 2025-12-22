@@ -7,28 +7,39 @@ Handles auction lifecycle management including:
 - Push notifications for auction events
 """
 
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
-from typing import Dict, Any, Optional, List
+from fastapi import APIRouter, HTTPException, BackgroundTasks
+from typing import Dict, Any, Optional
 from datetime import datetime, timezone, timedelta
 from uuid import uuid4
 import logging
-import asyncio
 
 logger = logging.getLogger(__name__)
 
 auctions_router = APIRouter(prefix="/auctions", tags=["Auctions"])
 
+# Instances will be injected from main app
+_db = None
+_notification_manager = None
+
+def set_db(db_instance):
+    """Set database instance from main app"""
+    global _db
+    _db = db_instance
+
+def set_notification_manager(manager):
+    """Set notification manager from main app"""
+    global _notification_manager
+    _notification_manager = manager
 
 def get_db():
     """Get database instance"""
-    from server import db
-    return db
-
+    if _db is None:
+        raise RuntimeError("Database not initialized")
+    return _db
 
 def get_notification_manager():
     """Get notification WebSocket manager"""
-    from server import notification_manager
-    return notification_manager
+    return _notification_manager
 
 
 # ========== PROCESS ENDED AUCTIONS ==========
