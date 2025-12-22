@@ -7559,10 +7559,12 @@ async def delete_hero_banner(
 # Import and include modular routers for better code organization
 try:
     from routes.analytics import analytics_router, set_db as set_analytics_db
-    from routes.auctions import auctions_router
+    from routes.auctions import auctions_router, set_db as set_auctions_db, set_notification_manager
     
-    # Inject database into routers
+    # Inject database and managers into routers
     set_analytics_db(db)
+    set_auctions_db(db)
+    set_notification_manager(notification_manager)
     
     # Include analytics router under /api prefix
     api_router.include_router(analytics_router)
