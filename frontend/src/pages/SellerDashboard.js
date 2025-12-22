@@ -226,6 +226,8 @@ const SellerDashboard = () => {
             )}
           </CardContent>
         </Card>
+          </>
+        )}
       </div>
     </div>
   );
