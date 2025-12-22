@@ -38,7 +38,16 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import PhoneVerificationPage from './pages/PhoneVerificationPage';
 import './App.css';
 
-const ProtectedRoute = ({ children }) => {
+// Routes that require phone verification before access
+const VERIFICATION_REQUIRED_ROUTES = [
+  '/create-listing',
+  '/create-multi-item-listing',
+  '/seller/dashboard',
+  '/buyer/dashboard',
+  '/messages',
+];
+
+const ProtectedRoute = ({ children, requireVerification = false }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
   
@@ -52,6 +61,44 @@ const ProtectedRoute = ({ children }) => {
   
   if (!user) {
     return <Navigate to="/auth" state={{ from: location }} replace />;
+  }
+  
+  // Check if route requires phone verification
+  const needsVerification = requireVerification || 
+    VERIFICATION_REQUIRED_ROUTES.some(route => location.pathname.startsWith(route));
+  
+  // Redirect unverified users to phone verification (except admins and already on verify page)
+  if (needsVerification && 
+      !user.phone_verified && 
+      user.role !== 'admin' && 
+      location.pathname !== '/verify-phone') {
+    return <Navigate to="/verify-phone" state={{ from: location }} replace />;
+  }
+  
+  return children;
+};
+
+// Wrapper for phone verification page - allow access but redirect if already verified
+const PhoneVerificationRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+  const location = useLocation();
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
+      </div>
+    );
+  }
+  
+  if (!user) {
+    return <Navigate to="/auth" state={{ from: location }} replace />;
+  }
+  
+  // If already verified, redirect to intended destination or dashboard
+  if (user.phone_verified) {
+    const from = location.state?.from?.pathname || '/seller/dashboard';
+    return <Navigate to={from} replace />;
   }
   
   return children;
