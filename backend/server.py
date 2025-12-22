@@ -7564,7 +7564,8 @@ try:
     # Inject database and managers into routers
     set_analytics_db(db)
     set_auctions_db(db)
-    set_notification_manager(notification_manager)
+    # Use message_manager for notifications (or None if not available)
+    set_notification_manager(message_manager if 'message_manager' in dir() else None)
     
     # Include analytics router under /api prefix
     api_router.include_router(analytics_router)
