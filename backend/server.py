@@ -572,11 +572,25 @@ scheduler.add_job(
     replace_existing=True
 )
 
+# Add job to process ended auctions every minute
+async def run_process_ended_auctions():
+    """Wrapper to run the async auction end processor"""
+    from routes.auctions import process_ended_auctions
+    await process_ended_auctions()
+
+scheduler.add_job(
+    run_process_ended_auctions,
+    trigger=IntervalTrigger(minutes=1),
+    id='process_ended_auctions',
+    name='Process ended auctions and create handshakes',
+    replace_existing=True
+)
+
 # Start scheduler on app startup
 @app.on_event("startup")
 async def start_scheduler():
     scheduler.start()
-    logger.info("🚀 APScheduler started - checking for upcoming auctions every 5 minutes")
+    logger.info("🚀 APScheduler started - checking auctions every minute, transitions every 5 minutes")
 
 @app.on_event("shutdown")
 async def shutdown_scheduler():
