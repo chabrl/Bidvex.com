@@ -161,7 +161,7 @@ const App = () => {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/verify-phone" element={
-            <ProtectedRoute><PhoneVerificationPage /></ProtectedRoute>
+            <PhoneVerificationRoute><PhoneVerificationPage /></PhoneVerificationRoute>
           } />
           <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/watchlist" element={
