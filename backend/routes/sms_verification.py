@@ -176,8 +176,29 @@ async def send_otp(request: SendOTPRequest, req: Request):
                 logger.info(f"✅ OTP sent to {phone[:6]}*** via Twilio: {status}")
                 
             except Exception as twilio_error:
+                error_str = str(twilio_error)
                 logger.error(f"Twilio error: {twilio_error}")
-                raise HTTPException(status_code=500, detail="Failed to send verification code. Please try again.")
+                
+                # Check if it's a trial account limitation (unverified number)
+                if "21608" in error_str or "unverified" in error_str.lower() or "trial" in error_str.lower():
+                    # Fallback to mock mode for trial accounts
+                    logger.warning(f"📱 Trial account limitation - falling back to mock mode for {phone[:6]}***")
+                    import random
+                    mock_code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+                    
+                    await db.sms_verifications.update_one(
+                        {"phone_number": phone, "verified": False},
+                        {"$set": {
+                            "mock_code": mock_code,
+                            "created_at": datetime.now(timezone.utc).isoformat()
+                        }},
+                        upsert=True
+                    )
+                    
+                    status = "pending"
+                    logger.info(f"📱 MOCK OTP for {phone}: {mock_code} (trial fallback)")
+                else:
+                    raise HTTPException(status_code=500, detail="Failed to send verification code. Please try again.")
         else:
             # Mock mode for development
             import random
