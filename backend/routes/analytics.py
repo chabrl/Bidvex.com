@@ -7,8 +7,8 @@ Handles seller analytics and promotion tracking including:
 - Real-time analytics updates
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Query
-from typing import Dict, Any, Optional, List
+from fastapi import APIRouter, HTTPException, Query
+from typing import Dict, Any
 from datetime import datetime, timezone, timedelta
 from uuid import uuid4
 import logging
@@ -17,11 +17,19 @@ logger = logging.getLogger(__name__)
 
 analytics_router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
+# Database will be injected from main app
+_db = None
+
+def set_db(db_instance):
+    """Set database instance from main app"""
+    global _db
+    _db = db_instance
 
 def get_db():
-    """Get database instance - will be set by main app"""
-    from server import db
-    return db
+    """Get database instance"""
+    if _db is None:
+        raise HTTPException(status_code=500, detail="Database not initialized")
+    return _db
 
 
 # ========== TRACK IMPRESSION ==========
