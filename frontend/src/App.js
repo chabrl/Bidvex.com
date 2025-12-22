@@ -36,7 +36,17 @@ import TermsOfServicePage from './pages/TermsOfServicePage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import PhoneVerificationPage from './pages/PhoneVerificationPage';
+import { registerServiceWorker } from './utils/pushNotifications';
 import './App.css';
+
+// Initialize Service Worker for push notifications
+if (typeof window !== 'undefined') {
+  registerServiceWorker().then((registration) => {
+    if (registration) {
+      console.log('[BidVex] Push notifications ready');
+    }
+  });
+}
 
 // Routes that require phone verification before access
 const VERIFICATION_REQUIRED_ROUTES = [
