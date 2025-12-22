@@ -7555,6 +7555,24 @@ async def delete_hero_banner(
     return {"message": "Banner deleted successfully"}
 
 
+# ========== MODULAR ROUTERS ==========
+# Import and include modular routers for better code organization
+try:
+    from routes.analytics import analytics_router
+    from routes.auctions import auctions_router
+    
+    # Include analytics router under /api prefix
+    api_router.include_router(analytics_router)
+    logger.info("✅ Analytics router loaded")
+    
+    # Include auctions router under /api prefix
+    api_router.include_router(auctions_router)
+    logger.info("✅ Auctions router loaded")
+    
+except ImportError as e:
+    logger.warning(f"⚠️ Could not load modular routers: {e}")
+
+
 # Include all API routes - MUST be after all routes are defined
 app.include_router(api_router)
 
