@@ -7,18 +7,20 @@ import axios from 'axios';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
-import { Plus, DollarSign, Package, FileText, ShoppingBag, Heart, Eye, TrendingUp } from 'lucide-react';
+import { Plus, DollarSign, Package, FileText, ShoppingBag, Heart, Eye, TrendingUp, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
+import SellerAnalyticsDashboard from '../components/SellerAnalyticsDashboard';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const SellerDashboard = () => {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const { canCreateMultiLot } = useFeatureFlags();
   const navigate = useNavigate();
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('listings'); // 'listings' or 'analytics'
 
   useEffect(() => {
     fetchDashboard();
