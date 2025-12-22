@@ -113,6 +113,9 @@ const App = () => {
           <Route path="/auth" element={<AuthPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/verify-phone" element={
+            <ProtectedRoute><PhoneVerificationPage /></ProtectedRoute>
+          } />
           <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/watchlist" element={
             <ProtectedRoute><WatchlistPage /></ProtectedRoute>
