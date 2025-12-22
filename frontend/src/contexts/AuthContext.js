@@ -90,6 +90,20 @@ export const AuthProvider = ({ children }) => {
     delete axios.defaults.headers.common['Authorization'];
   };
 
+  // Refresh user data (used after phone verification)
+  const refreshUser = async () => {
+    if (token) {
+      try {
+        const response = await axios.get(`${API}/auth/me`);
+        setUser(response.data);
+        return response.data;
+      } catch (error) {
+        console.error('Failed to refresh user:', error);
+        throw error;
+      }
+    }
+  };
+
   const updateUserPreferences = async (preferences) => {
     try {
       const response = await axios.put(`${API}/users/me`, preferences);
@@ -123,7 +137,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, processGoogleSession, updateUserPreferences, token }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, processGoogleSession, updateUserPreferences, refreshUser, token }}>
       {children}
     </AuthContext.Provider>
   );
