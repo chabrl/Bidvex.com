@@ -13,7 +13,7 @@ from typing import Dict, Any, Optional, List
 import logging
 
 # Configuration
-BASE_URL = "https://bid-masters-1.preview.emergentagent.com/api"
+BASE_URL = "https://auction-house-2.preview.emergentagent.com/api"
 WS_BASE_URL = "wss://bidvex-sync.preview.emergentagent.com/api/ws"
 TEST_LISTING_ID = "5c2217ed-79c8-492e-b04e-9b9984e3f21c"
 BIDDER_EMAIL = "bidtest@example.com"

@@ -11,7 +11,7 @@ import time
 from datetime import datetime, timezone, timedelta
 
 # Configuration
-BASE_URL = "https://bid-masters-1.preview.emergentagent.com/api"
+BASE_URL = "https://auction-house-2.preview.emergentagent.com/api"
 SUPER_ADMIN_EMAIL = "super.admin@admin.bazario.com"
 SUPER_ADMIN_PASSWORD = "SuperAdmin123!"
 ADMIN_EMAIL = "admin@admin.bazario.com"
