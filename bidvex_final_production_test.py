@@ -186,8 +186,15 @@ class BidVexFinalProductionTester:
         print("\n🧪 Testing GET /api/sms/status/{user_id}...")
         
         try:
-            # Use admin user ID for testing
-            user_id = self.admin_id
+            # First, let's verify the admin user exists by checking /api/auth/me
+            async with self.session.get(f"{BASE_URL}/auth/me", headers=self.get_admin_headers()) as me_response:
+                if me_response.status != 200:
+                    print(f"❌ Cannot verify admin user exists: {me_response.status}")
+                    return False
+                
+                me_data = await me_response.json()
+                user_id = me_data["id"]
+                print(f"   - Using verified admin user ID: {user_id}")
             
             async with self.session.get(f"{BASE_URL}/sms/status/{user_id}") as response:
                 if response.status == 200:
@@ -207,6 +214,22 @@ class BidVexFinalProductionTester:
                     print(f"   - Phone Number: {data.get('phone_number', 'N/A')}")
                     
                     return True
+                elif response.status == 404:
+                    # This might indicate the user doesn't exist in the database
+                    # Let's check if this is a database issue or endpoint issue
+                    print(f"⚠️  User not found in SMS status endpoint (404)")
+                    print(f"   - This could indicate the admin user was not properly created in the database")
+                    print(f"   - Or the SMS status endpoint has a different user lookup mechanism")
+                    
+                    # Let's test with a non-existent user to see if we get the same error
+                    async with self.session.get(f"{BASE_URL}/sms/status/nonexistent-user-id") as test_response:
+                        if test_response.status == 404:
+                            print(f"   - Confirmed: SMS status endpoint returns 404 for non-existent users")
+                            print(f"   - This suggests the admin user may not be in the database")
+                            return False
+                        else:
+                            print(f"   - Different response for non-existent user: {test_response.status}")
+                            return False
                 else:
                     print(f"❌ Failed to check SMS status: {response.status}")
                     text = await response.text()
