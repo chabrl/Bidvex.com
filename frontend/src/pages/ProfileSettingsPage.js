@@ -96,7 +96,7 @@ const ProfileSettingsPage = () => {
       <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold mb-8">{t('profile.accountSettings')}</h1>
 
-        <Tabs defaultValue="profile" className="space-y-6">
+        <Tabs defaultValue={defaultTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="profile" data-testid="profile-tab">
               <User className="mr-2 h-4 w-4" />
@@ -115,6 +115,63 @@ const ProfileSettingsPage = () => {
               {t('profile.notificationsTab')}
             </TabsTrigger>
           </TabsList>
+
+          {/* Trust Status Card */}
+          <Card className="bg-gradient-to-r from-slate-50 to-cyan-50 dark:from-slate-900 dark:to-cyan-900/20 border-slate-200 dark:border-slate-700">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-[#1E3A8A] to-[#06B6D4] flex items-center justify-center">
+                    <Shield className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-900 dark:text-white">
+                      {t('profile.trustStatus') || 'Trust Status'}
+                    </p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      {t('profile.completeVerification') || 'Complete verification to bid and sell'}
+                    </p>
+                  </div>
+                </div>
+                <TrustBadge 
+                  phoneVerified={user?.phone_verified} 
+                  hasPaymentMethod={user?.has_payment_method}
+                  size="default"
+                />
+              </div>
+              
+              {/* Action prompts for incomplete verification */}
+              {(!user?.phone_verified || !user?.has_payment_method) && (
+                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 flex flex-wrap gap-3">
+                  {!user?.phone_verified && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.location.href = '/verify-phone'}
+                      className="border-[#06B6D4] text-[#06B6D4] hover:bg-[#06B6D4]/10"
+                    >
+                      <Phone className="h-4 w-4 mr-2" />
+                      {t('profile.verifyPhone') || 'Verify Phone'}
+                    </Button>
+                  )}
+                  {!user?.has_payment_method && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const tabTrigger = document.querySelector('[data-testid="payment-tab"]');
+                        if (tabTrigger) tabTrigger.click();
+                      }}
+                      className="border-[#1E3A8A] text-[#1E3A8A] hover:bg-[#1E3A8A]/10"
+                    >
+                      <CreditCard className="h-4 w-4 mr-2" />
+                      {t('profile.addPayment') || 'Add Payment'}
+                    </Button>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           <TabsContent value="profile">
             <Card className="glassmorphism">
