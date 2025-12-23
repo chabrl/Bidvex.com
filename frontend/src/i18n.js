@@ -319,6 +319,10 @@ const resources = {
         profileTab: 'Profile',
         paymentTab: 'Payment Methods',
         notificationsTab: 'Notifications',
+        trustStatus: 'Trust Status',
+        completeVerification: 'Complete verification to bid and sell',
+        verifyPhone: 'Verify Phone',
+        addPayment: 'Add Payment',
       },
 
       // Currency Enforcement
