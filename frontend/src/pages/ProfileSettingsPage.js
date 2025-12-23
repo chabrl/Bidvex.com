@@ -369,9 +369,13 @@ const ProfileSettingsPage = () => {
                     <CardContent className="pt-6">
                       <Elements stripe={stripePromise}>
                         <AddCardForm 
-                          onSuccess={() => {
+                          onSuccess={async () => {
                             setShowAddCard(false);
                             fetchPaymentMethods();
+                            // Refresh user to update has_payment_method flag
+                            if (refreshUser) {
+                              await refreshUser();
+                            }
                           }}
                           onCancel={() => setShowAddCard(false)}
                         />
