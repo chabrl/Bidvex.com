@@ -7625,6 +7625,173 @@ except ImportError as e:
     logger.warning(f"⚠️ Could not load modular routers: {e}")
 
 
+# ========== ADMIN BANNER MANAGEMENT ENDPOINTS ==========
+
+class BannerCreate(BaseModel):
+    title: str
+    image_url: str
+    cta_text: Optional[str] = None
+    cta_url: Optional[str] = None
+    is_active: bool = True
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    priority: int = 0
+
+@api_router.get("/admin/banners")
+async def get_admin_banners(current_user: User = Depends(get_current_user)):
+    """Get all banners (admin only)"""
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    banners = await db.banners.find({}, {"_id": 0}).sort("priority", -1).to_list(100)
+    return {"banners": banners}
+
+@api_router.post("/admin/banners")
+async def create_admin_banner(banner_data: BannerCreate, current_user: User = Depends(get_current_user)):
+    """Create a new banner (admin only)"""
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    banner = {
+        "id": str(uuid.uuid4()),
+        "title": banner_data.title,
+        "image_url": banner_data.image_url,
+        "cta_text": banner_data.cta_text,
+        "cta_url": banner_data.cta_url,
+        "is_active": banner_data.is_active,
+        "start_date": banner_data.start_date,
+        "end_date": banner_data.end_date,
+        "priority": banner_data.priority,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.banners.insert_one(banner)
+    banner.pop("_id", None)
+    return {"message": "Banner created successfully", "banner": banner}
+
+@api_router.put("/admin/banners/{banner_id}")
+async def update_admin_banner(banner_id: str, banner_data: dict, current_user: User = Depends(get_current_user)):
+    """Update a banner (admin only)"""
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    existing = await db.banners.find_one({"id": banner_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Banner not found")
+    
+    # Remove fields that shouldn't be updated
+    banner_data.pop("id", None)
+    banner_data.pop("_id", None)
+    banner_data.pop("created_at", None)
+    banner_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    await db.banners.update_one({"id": banner_id}, {"$set": banner_data})
+    return {"message": "Banner updated successfully"}
+
+@api_router.delete("/admin/banners/{banner_id}")
+async def delete_admin_banner(banner_id: str, current_user: User = Depends(get_current_user)):
+    """Delete a banner (admin only)"""
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    result = await db.banners.delete_one({"id": banner_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Banner not found")
+    
+    return {"message": "Banner deleted successfully"}
+
+@api_router.get("/banners/active")
+async def get_active_banners():
+    """Get active banners for homepage display"""
+    now = datetime.now(timezone.utc).isoformat()
+    
+    # Query for active banners within date range (or no date range)
+    query = {
+        "is_active": True,
+        "$or": [
+            {"start_date": None, "end_date": None},
+            {"start_date": None, "end_date": {"$gte": now}},
+            {"start_date": {"$lte": now}, "end_date": None},
+            {"start_date": {"$lte": now}, "end_date": {"$gte": now}}
+        ]
+    }
+    
+    banners = await db.banners.find(query, {"_id": 0}).sort("priority", -1).to_list(10)
+    return {"banners": banners}
+
+
+# ========== ADMIN USER DETAIL ENDPOINT ==========
+
+@api_router.get("/admin/users/{user_id}/detail")
+async def get_admin_user_detail(user_id: str, current_user: User = Depends(get_current_user)):
+    """Get comprehensive user details for admin panel"""
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Get verification status
+    sms_verification = await db.sms_verifications.find_one(
+        {"user_id": user_id, "verified": True}, 
+        {"_id": 0}
+    )
+    
+    # Get payment methods count
+    payment_methods_count = await db.payment_methods.count_documents({"user_id": user_id})
+    
+    # Get activity stats
+    total_bids = await db.bids.count_documents({"bidder_id": user_id})
+    total_listings = await db.listings.count_documents({"seller_id": user_id})
+    total_multi_listings = await db.multi_item_listings.count_documents({"seller_id": user_id})
+    
+    # Build comprehensive contact card
+    contact_card = {
+        "identity": {
+            "full_name": user_doc.get("name"),
+            "email": user_doc.get("email"),
+            "email_verified": user_doc.get("email_verified", False),
+            "picture": user_doc.get("picture")
+        },
+        "phone": {
+            "number": user_doc.get("phone"),
+            "verified": user_doc.get("phone_verified", False),
+            "verification_timestamp": sms_verification.get("verified_at") if sms_verification else None
+        },
+        "logistics": {
+            "address": user_doc.get("address"),
+            "city": user_doc.get("city"),
+            "region": user_doc.get("region"),
+            "postal_code": user_doc.get("postal_code"),
+            "country": user_doc.get("country")
+        },
+        "account": {
+            "role": user_doc.get("role", "user"),
+            "account_type": user_doc.get("account_type", "personal"),
+            "company_name": user_doc.get("company_name"),
+            "tax_number": user_doc.get("tax_number"),
+            "subscription_tier": user_doc.get("subscription_tier", "free"),
+            "created_at": user_doc.get("created_at")
+        },
+        "verification_status": {
+            "phone_verified": user_doc.get("phone_verified", False),
+            "has_payment_method": payment_methods_count > 0,
+            "payment_methods_count": payment_methods_count,
+            "is_fully_verified": user_doc.get("phone_verified", False) and payment_methods_count > 0
+        },
+        "activity": {
+            "total_bids": total_bids,
+            "total_listings": total_listings + total_multi_listings,
+            "preferred_language": user_doc.get("preferred_language", "en"),
+            "preferred_currency": user_doc.get("preferred_currency", "CAD")
+        }
+    }
+    
+    return contact_card
+
+
 # Include all API routes - MUST be after all routes are defined
 app.include_router(api_router)
 
