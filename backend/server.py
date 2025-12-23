@@ -1149,9 +1149,13 @@ async def logout(current_user: User = Depends(get_current_user)):
     await db.sessions.delete_many({"user_id": current_user.id})
     return {"message": "Logged out successfully"}
 
-@api_router.get("/auth/me", response_model=User)
+@api_router.get("/auth/me")
 async def get_me(current_user: User = Depends(get_current_user)):
-    return current_user
+    # Add dynamic has_payment_method flag
+    payment_methods_count = await db.payment_methods.count_documents({"user_id": current_user.id})
+    user_dict = current_user.model_dump()
+    user_dict["has_payment_method"] = payment_methods_count > 0
+    return user_dict
 
 # Password Reset Models
 class ForgotPasswordRequest(BaseModel):
