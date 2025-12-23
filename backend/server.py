@@ -2046,6 +2046,24 @@ async def track_item_click(item_id: str):
 
 @api_router.post("/bids")
 async def place_bid(bid_data: BidCreate, current_user: User = Depends(get_current_user)):
+    # ========== HIGH-TRUST GATEKEEPING ==========
+    # Server-side verification check (unless admin)
+    if current_user.role != 'admin':
+        # Check phone verification
+        if not current_user.phone_verified:
+            raise HTTPException(
+                status_code=403, 
+                detail="Phone verification required. Please verify your phone number before placing bids."
+            )
+        
+        # Check payment method
+        payment_methods = await db.payment_methods.count_documents({"user_id": current_user.id})
+        if payment_methods == 0:
+            raise HTTPException(
+                status_code=403, 
+                detail="Payment method required. Please add a payment card before placing bids."
+            )
+    
     # ========== LOAD MARKETPLACE SETTINGS ==========
     settings = await get_marketplace_settings()
     
