@@ -887,6 +887,10 @@ const resources = {
         profileTab: 'Profil',
         paymentTab: 'Modes de Paiement',
         notificationsTab: 'Notifications',
+        trustStatus: 'Statut de Confiance',
+        completeVerification: 'Compléter la vérification pour enchérir et vendre',
+        verifyPhone: 'Vérifier le Téléphone',
+        addPayment: 'Ajouter un Paiement',
       },
 
       // Currency Enforcement
