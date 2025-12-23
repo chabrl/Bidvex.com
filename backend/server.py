@@ -1751,6 +1751,24 @@ async def update_profile(updates: Dict[str, Any], current_user: User = Depends(g
 
 @api_router.post("/listings", response_model=Listing)
 async def create_listing(listing_data: ListingCreate, current_user: User = Depends(get_current_user)):
+    # ========== HIGH-TRUST GATEKEEPING ==========
+    # Server-side verification check (unless admin)
+    if current_user.role != 'admin':
+        # Check phone verification
+        if not current_user.phone_verified:
+            raise HTTPException(
+                status_code=403, 
+                detail="Phone verification required. Please verify your phone number before creating listings."
+            )
+        
+        # Check payment method
+        payment_methods = await db.payment_methods.count_documents({"user_id": current_user.id})
+        if payment_methods == 0:
+            raise HTTPException(
+                status_code=403, 
+                detail="Payment method required. Please add a payment card before creating listings."
+            )
+    
     listing = Listing(
         seller_id=current_user.id, title=listing_data.title, description=listing_data.description,
         category=listing_data.category, condition=listing_data.condition,
