@@ -26,6 +26,7 @@ const ProfileSettingsPage = () => {
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const defaultTab = searchParams.get('tab') || 'profile';
+  const [activeTab, setActiveTab] = useState(defaultTab);
   const [profileData, setProfileData] = useState({
     name: '',
     phone: '',
@@ -37,6 +38,12 @@ const ProfileSettingsPage = () => {
   });
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [showAddCard, setShowAddCard] = useState(false);
+
+  // Handler to switch to payment tab and open add card form
+  const handleAddPaymentClick = () => {
+    setActiveTab('payment');
+    setShowAddCard(true);
+  };
 
   useEffect(() => {
     if (user) {
