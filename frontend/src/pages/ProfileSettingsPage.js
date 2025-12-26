@@ -103,23 +103,23 @@ const ProfileSettingsPage = () => {
       <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold mb-8">{t('profile.accountSettings')}</h1>
 
-        <Tabs defaultValue={defaultTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="profile" data-testid="profile-tab">
-              <User className="mr-2 h-4 w-4" />
-              {t('profile.profileTab')}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="flex flex-wrap w-full gap-1 h-auto p-1">
+            <TabsTrigger value="profile" data-testid="profile-tab" className="flex-1 min-w-[120px] whitespace-nowrap">
+              <User className="mr-2 h-4 w-4 flex-shrink-0" />
+              <span className="truncate">{t('profile.profileTab')}</span>
             </TabsTrigger>
-            <TabsTrigger value="payment" data-testid="payment-tab">
-              <CreditCard className="mr-2 h-4 w-4" />
-              {t('profile.paymentTab')}
+            <TabsTrigger value="payment" data-testid="payment-tab" className="flex-1 min-w-[140px] whitespace-nowrap">
+              <CreditCard className="mr-2 h-4 w-4 flex-shrink-0" />
+              <span className="truncate">{t('profile.paymentTab')}</span>
             </TabsTrigger>
-            <TabsTrigger value="subscription" data-testid="subscription-tab">
-              <Crown className="mr-2 h-4 w-4" />
-              Subscription
+            <TabsTrigger value="subscription" data-testid="subscription-tab" className="flex-1 min-w-[130px] whitespace-nowrap">
+              <Crown className="mr-2 h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Subscription</span>
             </TabsTrigger>
-            <TabsTrigger value="notifications" data-testid="notifications-tab">
-              <Bell className="mr-2 h-4 w-4" />
-              {t('profile.notificationsTab')}
+            <TabsTrigger value="notifications" data-testid="notifications-tab" className="flex-1 min-w-[130px] whitespace-nowrap">
+              <Bell className="mr-2 h-4 w-4 flex-shrink-0" />
+              <span className="truncate">{t('profile.notificationsTab')}</span>
             </TabsTrigger>
           </TabsList>
 
