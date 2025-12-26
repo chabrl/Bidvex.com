@@ -165,10 +165,7 @@ const ProfileSettingsPage = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
-                        const tabTrigger = document.querySelector('[data-testid="payment-tab"]');
-                        if (tabTrigger) tabTrigger.click();
-                      }}
+                      onClick={handleAddPaymentClick}
                       className="border-[#1E3A8A] text-[#1E3A8A] hover:bg-[#1E3A8A]/10"
                     >
                       <CreditCard className="h-4 w-4 mr-2" />
