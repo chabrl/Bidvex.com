@@ -139,21 +139,17 @@ class BidVexNotificationTester:
         print("\n🧪 Testing manual notification creation...")
         
         try:
-            # Create a test notification directly in database
-            notification_data = {
+            # Create a test notification using query parameters
+            params = {
                 "user_id": self.test_user_id,
                 "notification_type": "test",
                 "title": "Test Notification",
-                "message": "This is a test notification for the notification center",
-                "data": {
-                    "test_field": "test_value",
-                    "timestamp": datetime.now(timezone.utc).isoformat()
-                }
+                "message": "This is a test notification for the notification center"
             }
             
             async with self.session.post(
                 f"{BASE_URL}/notifications/create",
-                json=notification_data,
+                params=params,
                 headers=self.get_admin_headers()
             ) as response:
                 if response.status == 200:
