@@ -3426,6 +3426,22 @@ async def create_multi_item_listing(listing_data: MultiItemListingCreate, curren
         is_featured = True
         promotion_expiry = now + timedelta(days=7)
     
+    # Handle seller-paid promotion tiers
+    promotion_tier = listing_data.promotion_tier
+    is_promoted = listing_data.is_promoted
+    promotion_start = None
+    promotion_end = None
+    
+    if promotion_tier in ['premium', 'elite']:
+        is_promoted = True
+        promotion_start = now
+        if promotion_tier == 'premium':
+            promotion_end = now + timedelta(days=7)  # 7 days for premium
+        elif promotion_tier == 'elite':
+            promotion_end = now + timedelta(days=14)  # 14 days for elite
+            is_featured = True  # Elite gets homepage carousel placement
+        logger.info(f"📣 Seller promoted listing: tier={promotion_tier}, ends={promotion_end}")
+    
     # Calculate staggered lot_end_time (1 minute per lot)
     # Start from auction_start_date if provided, otherwise use current time
     auction_start = listing_data.auction_start_date or now
