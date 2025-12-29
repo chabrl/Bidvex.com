@@ -965,6 +965,49 @@ const CreateMultiItemListing = () => {
                   </div>
                 </div>
 
+                {/* Buy Now Price Section */}
+                <div className="p-4 border-2 border-dashed border-cyan-300 dark:border-cyan-700 rounded-lg bg-cyan-50 dark:bg-cyan-900/20">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">⚡</span>
+                      <Label className="text-base font-semibold text-cyan-800 dark:text-cyan-200">Buy Now Option</Label>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={lot.buy_now_enabled || false}
+                        onChange={(e) => handleLotChange(actualIndex, 'buy_now_enabled', e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-cyan-300 dark:peer-focus:ring-cyan-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-[#06B6D4]"></div>
+                    </label>
+                  </div>
+                  
+                  {lot.buy_now_enabled && (
+                    <div className="space-y-2">
+                      <Label className="text-sm">Buy Now Price ($) *</Label>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">$</span>
+                        <Input 
+                          type="number" 
+                          step="0.01" 
+                          min={lot.starting_price ? (parseFloat(lot.starting_price) * 1.2).toFixed(2) : '1'}
+                          value={lot.buy_now_price || ''} 
+                          onChange={(e) => handleLotChange(actualIndex, 'buy_now_price', e.target.value)} 
+                          placeholder={lot.starting_price ? `Min: $${(parseFloat(lot.starting_price) * 1.2).toFixed(2)}` : 'Enter starting price first'}
+                          className="flex-1"
+                        />
+                      </div>
+                      {validationErrors[actualIndex]?.buy_now_price && (
+                        <p className="text-red-500 text-xs">{validationErrors[actualIndex].buy_now_price}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        ℹ️ Buy Now price must be at least 20% higher than starting bid to protect auction integrity.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                 <div className="space-y-2">
                   <Label>Images</Label>
                   <input 
