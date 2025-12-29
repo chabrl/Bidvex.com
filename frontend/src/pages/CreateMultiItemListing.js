@@ -422,7 +422,12 @@ const CreateMultiItemListing = () => {
       ...lot,
       starting_price: parseFloat(lot.starting_price),
       current_price: parseFloat(lot.starting_price),
-      quantity: parseInt(lot.quantity)
+      quantity: parseInt(lot.quantity),
+      buy_now_enabled: lot.buy_now_enabled || false,
+      buy_now_price: lot.buy_now_enabled && lot.buy_now_price ? parseFloat(lot.buy_now_price) : null,
+      available_quantity: parseInt(lot.quantity),
+      sold_quantity: 0,
+      lot_status: 'active'
     }));
 
     try {
@@ -438,7 +443,10 @@ const CreateMultiItemListing = () => {
         shipping_info: shippingInfo.available ? shippingInfo : null,
         visit_availability: visitAvailability.offered ? visitAvailability : null,
         auction_terms_en: auctionTerms.en || null,
-        auction_terms_fr: auctionTerms.fr || null
+        auction_terms_fr: auctionTerms.fr || null,
+        // Promotion tier
+        promotion_tier: promotionTier !== 'standard' ? promotionTier : null,
+        is_promoted: promotionTier !== 'standard'
       };
       const response = await axios.post(`${API}/multi-item-listings`, payload);
       toast.success('Multi-item listing created successfully!');
