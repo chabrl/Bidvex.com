@@ -181,6 +181,9 @@ const Navbar = () => {
                 </DropdownMenuContent>
               </DropdownMenu>
 
+              {/* Notification Center (Bell Icon) */}
+              {user && <NotificationCenter />}
+
               {/* User Menu */}
               {user ? (
                 <DropdownMenu>
