@@ -3471,6 +3471,11 @@ async def create_multi_item_listing(listing_data: MultiItemListingCreate, curren
         tax_rate_qst=tax_rates["tax_rate_qst"],
         is_featured=is_featured,
         promotion_expiry=promotion_expiry,
+        # Seller promotion
+        is_promoted=is_promoted,
+        promotion_tier=promotion_tier,
+        promotion_start=promotion_start,
+        promotion_end=promotion_end,
         documents=listing_data.documents,
         shipping_info=listing_data.shipping_info,
         visit_availability=listing_data.visit_availability,
