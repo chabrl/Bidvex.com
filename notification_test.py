@@ -473,13 +473,11 @@ class BidVexNotificationTester:
             
             # Original bidder places first bid
             first_bid_data = {
-                "multi_item_listing_id": self.test_auction_id,
-                "lot_number": 1,
                 "amount": 15.0
             }
             
             async with self.session.post(
-                f"{BASE_URL}/multi-item-bids",
+                f"{BASE_URL}/multi-item-listings/{self.test_auction_id}/lots/1/bid",
                 json=first_bid_data,
                 headers={"Authorization": f"Bearer {original_bidder_token}"}
             ) as response:
@@ -493,13 +491,11 @@ class BidVexNotificationTester:
             
             # Test user places higher bid (should trigger outbid notification)
             second_bid_data = {
-                "multi_item_listing_id": self.test_auction_id,
-                "lot_number": 1,
                 "amount": 20.0
             }
             
             async with self.session.post(
-                f"{BASE_URL}/multi-item-bids",
+                f"{BASE_URL}/multi-item-listings/{self.test_auction_id}/lots/1/bid",
                 json=second_bid_data,
                 headers=self.get_user_headers()
             ) as response:
