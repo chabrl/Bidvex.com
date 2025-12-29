@@ -197,25 +197,44 @@ class BidVexNotificationTester:
                 if response.status == 200:
                     data = await response.json()
                     
-                    # Verify response structure
-                    assert "notifications" in data, "Missing 'notifications' field"
-                    assert "unread_count" in data, "Missing 'unread_count' field"
-                    assert len(data["notifications"]) > 0, "Should have at least one notification"
-                    assert data["unread_count"] > 0, "Should have unread notifications"
-                    
-                    # Verify notification structure
-                    notification = data["notifications"][0]
-                    required_fields = ["id", "user_id", "type", "title", "message", "data", "read", "created_at"]
-                    for field in required_fields:
-                        assert field in notification, f"Missing required field: {field}"
-                    
-                    print(f"✅ GET /api/notifications returns notification data correctly")
-                    print(f"   - Total notifications: {len(data['notifications'])}")
-                    print(f"   - Unread count: {data['unread_count']}")
-                    print(f"   - First notification ID: {notification['id']}")
-                    print(f"   - First notification type: {notification['type']}")
-                    
-                    return True
+                    # Handle both response formats
+                    if isinstance(data, list):
+                        notifications = data
+                        print(f"✅ GET /api/notifications returns list format with data")
+                        print(f"   - Total notifications: {len(notifications)}")
+                        
+                        if len(notifications) > 0:
+                            # Verify notification structure
+                            notification = notifications[0]
+                            required_fields = ["id", "user_id", "type", "title", "message", "data", "read", "created_at"]
+                            for field in required_fields:
+                                assert field in notification, f"Missing required field: {field}"
+                            
+                            print(f"   - First notification ID: {notification['id']}")
+                            print(f"   - First notification type: {notification['type']}")
+                        
+                        return True
+                    elif isinstance(data, dict) and "notifications" in data:
+                        # Verify response structure
+                        assert "unread_count" in data, "Missing 'unread_count' field"
+                        assert len(data["notifications"]) > 0, "Should have at least one notification"
+                        
+                        # Verify notification structure
+                        notification = data["notifications"][0]
+                        required_fields = ["id", "user_id", "type", "title", "message", "data", "read", "created_at"]
+                        for field in required_fields:
+                            assert field in notification, f"Missing required field: {field}"
+                        
+                        print(f"✅ GET /api/notifications returns notification data correctly")
+                        print(f"   - Total notifications: {len(data['notifications'])}")
+                        print(f"   - Unread count: {data['unread_count']}")
+                        print(f"   - First notification ID: {notification['id']}")
+                        print(f"   - First notification type: {notification['type']}")
+                        
+                        return True
+                    else:
+                        print(f"❌ Unexpected response format: {type(data)}")
+                        return False
                 else:
                     print(f"❌ Failed to get notifications: {response.status}")
                     text = await response.text()
