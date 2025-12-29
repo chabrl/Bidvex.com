@@ -203,6 +203,54 @@ const MultiItemListingDetailPage = () => {
     }
   };
 
+  // Buy Now Handler
+  const handleBuyNow = async (lot) => {
+    if (!user) {
+      toast.error('Please login to purchase');
+      navigate('/auth');
+      return;
+    }
+
+    // Check verification requirements
+    if (user.role !== 'admin' && (!user.phone_verified || !user.has_payment_method)) {
+      setVerificationAction('bid');
+      setVerificationModalOpen(true);
+      return;
+    }
+
+    setBuyNowLoading(prev => ({ ...prev, [lot.lot_number]: true }));
+    
+    try {
+      const response = await axios.post(
+        `${API}/buy-now`,
+        {
+          listing_id: id,
+          lot_number: lot.lot_number,
+          quantity: 1
+        },
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+      );
+      
+      toast.success(`🎉 Congratulations! You purchased "${lot.title}" for $${lot.buy_now_price.toFixed(2)}!`);
+      
+      // Refresh listing to update lot status
+      fetchListing();
+      
+      // Redirect to messages if handshake was created
+      if (response.data.conversation_id) {
+        toast.info('A chat with the seller has been created. Redirecting...');
+        setTimeout(() => {
+          navigate(`/messages?conversation=${response.data.conversation_id}`);
+        }, 2000);
+      }
+    } catch (error) {
+      const errorMessage = extractErrorMessage(error);
+      toast.error(errorMessage || 'Failed to complete purchase');
+    } finally {
+      setBuyNowLoading(prev => ({ ...prev, [lot.lot_number]: false }));
+    }
+  };
+
   const isAuctionEnded = (endDate) => {
     return new Date(endDate) < new Date();
   };
