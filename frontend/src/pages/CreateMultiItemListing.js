@@ -342,6 +342,17 @@ const CreateMultiItemListing = () => {
       errors.quantity = 'Quantity must be a positive integer';
     }
 
+    // Buy Now price validation: must be at least 20% higher than starting price
+    if (lot.buy_now_enabled && lot.buy_now_price && lot.starting_price) {
+      const startingPrice = parseFloat(lot.starting_price);
+      const buyNowPrice = parseFloat(lot.buy_now_price);
+      const minBuyNowPrice = startingPrice * 1.2; // 20% higher
+      
+      if (buyNowPrice < minBuyNowPrice) {
+        errors.buy_now_price = `Buy Now price must be at least $${minBuyNowPrice.toFixed(2)} (20% above starting price)`;
+      }
+    }
+
     setValidationErrors(prev => ({ ...prev, [index]: errors }));
     return Object.keys(errors).length === 0;
   };
