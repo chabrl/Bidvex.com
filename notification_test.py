@@ -450,7 +450,8 @@ class BidVexNotificationTester:
                         "current_price": 10.0,
                         "condition": "new",
                         "images": [],
-                        "pricing_mode": "fixed"
+                        "pricing_mode": "fixed",
+                        "available_quantity": 1  # Add this required field
                     }
                 ]
             }
