@@ -7829,6 +7829,97 @@ async def get_active_banners():
     return {"banners": banners}
 
 
+# ========== PROMOTED LISTINGS ENDPOINTS ==========
+
+@api_router.get("/promoted-listings")
+async def get_promoted_listings(limit: int = 12, tier: Optional[str] = None):
+    """Get promoted listings for homepage Hot Items carousel"""
+    now = datetime.now(timezone.utc)
+    
+    query = {
+        "status": {"$in": ["active", "upcoming"]},
+        "is_promoted": True,
+        "$or": [
+            {"promotion_end": None},
+            {"promotion_end": {"$gte": now.isoformat()}}
+        ]
+    }
+    
+    if tier:
+        query["promotion_tier"] = tier
+    
+    # Elite tier gets priority, then premium, sorted by promotion_start (newest first)
+    sort_order = [
+        ("promotion_tier", -1),  # elite > premium (alphabetically reversed)
+        ("promotion_start", -1)
+    ]
+    
+    listings = await db.multi_item_listings.find(query, {"_id": 0}).sort(sort_order).limit(limit).to_list(limit)
+    
+    # Enrich with seller info
+    for listing in listings:
+        seller = await db.users.find_one({"id": listing.get("seller_id")}, {"_id": 0, "name": 1, "picture": 1})
+        listing["seller_name"] = seller.get("name") if seller else "Unknown Seller"
+        listing["seller_picture"] = seller.get("picture") if seller else None
+        
+        # Track impression
+        await db.multi_item_listings.update_one(
+            {"id": listing["id"]},
+            {"$inc": {"total_impressions": 1}}
+        )
+    
+    return {"listings": listings, "total": len(listings)}
+
+
+@api_router.get("/admin/listings-promotions")
+async def get_admin_listings_promotions(current_user: User = Depends(get_current_user)):
+    """Get all listings with their promotion levels (admin only)"""
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Get all active/upcoming listings with promotion info
+    listings = await db.multi_item_listings.find(
+        {"status": {"$in": ["active", "upcoming", "pending"]}},
+        {
+            "_id": 0, 
+            "id": 1, 
+            "title": 1, 
+            "seller_id": 1,
+            "status": 1,
+            "is_promoted": 1, 
+            "promotion_tier": 1,
+            "promotion_start": 1,
+            "promotion_end": 1,
+            "is_featured": 1,
+            "total_impressions": 1,
+            "total_clicks": 1,
+            "created_at": 1
+        }
+    ).sort("created_at", -1).to_list(500)
+    
+    # Enrich with seller info
+    for listing in listings:
+        seller = await db.users.find_one({"id": listing.get("seller_id")}, {"_id": 0, "name": 1, "email": 1})
+        listing["seller_name"] = seller.get("name") if seller else "Unknown"
+        listing["seller_email"] = seller.get("email") if seller else "N/A"
+    
+    # Calculate revenue stats
+    promotion_revenue = {
+        "premium": await db.multi_item_listings.count_documents({"promotion_tier": "premium"}) * 25,
+        "elite": await db.multi_item_listings.count_documents({"promotion_tier": "elite"}) * 50
+    }
+    
+    return {
+        "listings": listings,
+        "stats": {
+            "total_promoted": sum(1 for l in listings if l.get("is_promoted")),
+            "premium_count": sum(1 for l in listings if l.get("promotion_tier") == "premium"),
+            "elite_count": sum(1 for l in listings if l.get("promotion_tier") == "elite"),
+            "promotion_revenue": promotion_revenue["premium"] + promotion_revenue["elite"]
+        }
+    }
+
+
 # ========== ADMIN USER DETAIL ENDPOINT ==========
 
 @api_router.get("/admin/users/{user_id}/detail")
