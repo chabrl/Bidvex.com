@@ -602,6 +602,23 @@ frontend:
     priority: 'high'
     needs_retesting: false
     status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASS - Homepage layout collapse bug fix verified working correctly with proper section visibility and spacing."
+
+  - task: "BidVex Buy Now and Promoted Listings UI Features"
+    implemented: true
+    working: true
+    file: "CreateMultiItemListing.js, MultiItemListingDetailPage.js, VerificationRequiredModal.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASS - BidVex Buy Now and Promoted Listings UI features testing completed successfully (5/5 test categories passed). Key findings: 1) Create Multi-Item Listing (/create-multi-item-listing) - Step Indicator correctly shows 5 steps (not 4), Step 1 Basic Details form fields working (title, description, category, city, region, location), Step 2 Lots section verified with Buy Now Option sections containing toggle switch, when enabled shows Buy Now Price field with 20% minimum validation message. 2) Step 5 Promote Your Listing - Three tier cards found: Standard (Free), Premium ($25) with '⭐ Popular' badge in cyan (#06B6D4), Elite ($50) with '👑 Best Value' badge in amber color, feature lists with checkmarks, selection indicator changes when clicked. 3) Multi-Item Listing Detail - Lots with buy_now_enabled display cyan gradient 'Buy Now Available' section, Zap icon (⚡) with 'Buy Now Available' text, Buy Now price prominently displayed, 'Buy Now' button with ShoppingCart icon, 'Skip the bidding' helper text. 4) Sold Out Display - Lots with 'sold_out' status show 'SOLD OUT' badge correctly. 5) Verification Modal - VerificationRequiredModal.js implemented with BidVex brand styling (blue #1E3A8A to cyan #06B6D4 gradient), Shield icon, Phone Verification and Payment Method checklist, direct links to /verify-phone and /settings?tab=payment. All UI components use proper glassmorphic design with BidVex brand colors. All success criteria from review request met: 5-step wizard displays correctly, Buy Now toggle and price field in lot cards, promotion tier selection with brand colors, Buy Now button on eligible lots, verification modal for unverified users."
+    needs_retesting: false
+    status_history:
       - working: pending
         agent: 'main'
         comment: 'Fixed by adding isSectionVisible conditional rendering for all homepage sections. Sections are now completely removed from DOM when toggled OFF, preventing blank space. Need to test with admin toggle.'
