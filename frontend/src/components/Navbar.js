@@ -6,7 +6,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { 
   Moon, Sun, Globe, User, LogOut, LayoutDashboard, 
   MessageCircle, DollarSign, Shield, Menu, X, Search,
-  Home, ShoppingBag, Gavel, ChevronDown, Bell
+  Home, ShoppingBag, Gavel, ChevronDown
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger, DropdownMenuSeparator 
 } from './ui/dropdown-menu';
 import SellOptionsModal from './SellOptionsModal';
+import NotificationCenter from './NotificationCenter';
 
 const Navbar = () => {
   const { t, i18n } = useTranslation();
