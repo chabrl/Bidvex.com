@@ -1630,6 +1630,7 @@ const CreateMultiItemListing = () => {
               {currentStep === 2 && renderStep2()}
               {currentStep === 3 && renderStep3()}
               {currentStep === 4 && renderStep4()}
+              {currentStep === 5 && renderStep5()}
             </div>
 
             {/* Navigation Buttons */}
@@ -1644,7 +1645,7 @@ const CreateMultiItemListing = () => {
                 Back
               </Button>
 
-              {currentStep < 4 ? (
+              {currentStep < 5 ? (
                 <Button
                   type="button"
                   onClick={goToNextStep}
