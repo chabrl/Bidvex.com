@@ -175,7 +175,7 @@ class BidVexBuyNowTester:
                 json=auction_data,
                 headers=self.get_admin_headers()
             ) as response:
-                if response.status == 201:
+                if response.status == 200:
                     data = await response.json()
                     self.test_auction_id = data["id"]
                     print(f"✅ Test auction created successfully: {self.test_auction_id}")
