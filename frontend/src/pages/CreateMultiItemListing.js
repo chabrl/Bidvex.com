@@ -166,7 +166,9 @@ const CreateMultiItemListing = () => {
       current_price: '',
       condition: 'good',
       images: [],
-      pricing_mode: 'multiplied'
+      pricing_mode: 'multiplied',
+      buy_now_enabled: false,
+      buy_now_price: ''
     }));
     
     setLots(newLots);
