@@ -274,8 +274,9 @@ class BidVexNotificationTester:
                     ) as verify_response:
                         if verify_response.status == 200:
                             verify_data = await verify_response.json()
+                            notifications = verify_data if isinstance(verify_data, list) else verify_data.get("notifications", [])
                             # Find our notification
-                            for notif in verify_data["notifications"]:
+                            for notif in notifications:
                                 if notif["id"] == self.test_notification_id:
                                     assert notif["read"] == True, "Notification should be marked as read"
                                     print(f"   - Verified notification is marked as read")
