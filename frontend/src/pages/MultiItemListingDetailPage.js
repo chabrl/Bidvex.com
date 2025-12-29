@@ -1121,6 +1121,13 @@ const MultiItemListingDetailPage = () => {
           listingTitle={listing.title}
         />
       )}
+
+      {/* Verification Required Modal */}
+      <VerificationRequiredModal
+        isOpen={verificationModalOpen}
+        onClose={() => setVerificationModalOpen(false)}
+        action={verificationAction}
+      />
     </div>
   );
 };
