@@ -3843,6 +3843,27 @@ async def bid_on_lot(listing_id: str, lot_number: int, data: Dict[str, Any], cur
     # Insert bid into database (MongoDB will add _id field to bid_for_db)
     await db.lot_bids.insert_one(bid_for_db)
     
+    # ========== CREATE OUTBID NOTIFICATION ==========
+    # Notify the previous highest bidder that they've been outbid
+    if previous_highest_bidder and previous_highest_bidder != current_user.id:
+        outbid_notification = {
+            "id": str(uuid.uuid4()),
+            "user_id": previous_highest_bidder,
+            "type": "outbid",
+            "title": "You've been outbid! 🔔",
+            "message": f"Someone placed a higher bid of ${amount:.2f} on Lot #{lot_number} - {lot.get('title', 'Item')}. Tap to bid again.",
+            "data": {
+                "auction_id": listing_id,
+                "lot_number": lot_number,
+                "current_bid": amount,
+                "listing_title": listing.get("title")
+            },
+            "read": False,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.notifications.insert_one(outbid_notification)
+        logger.info(f"📢 Outbid notification created for user {previous_highest_bidder}")
+    
     # Update monster bids used if applicable
     if bid_type == "monster":
         monster_bids_used_dict = current_user.monster_bids_used.copy()
