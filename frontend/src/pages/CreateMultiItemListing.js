@@ -140,7 +140,9 @@ const CreateMultiItemListing = () => {
       starting_price: '',
       current_price: '',
       condition: 'good',
-      images: []
+      images: [],
+      buy_now_enabled: false,
+      buy_now_price: ''
     }]);
   };
 
