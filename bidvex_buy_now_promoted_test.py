@@ -483,7 +483,7 @@ class BidVexBuyNowTester:
                 json=listing_data,
                 headers=self.get_admin_headers()
             ) as response:
-                if response.status == 201:
+                if response.status == 200:
                     data = await response.json()
                     
                     # Verify promotion fields are set correctly
