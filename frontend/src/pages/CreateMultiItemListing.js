@@ -462,7 +462,7 @@ const CreateMultiItemListing = () => {
   // Render Step Indicator
   const StepIndicator = () => (
     <div className="flex items-center justify-center mb-8">
-      {[1, 2, 3, 4].map(step => (
+      {[1, 2, 3, 4, 5].map(step => (
         <React.Fragment key={step}>
           <div className={`flex items-center justify-center w-10 h-10 rounded-full font-semibold transition-all ${
             step === currentStep 
@@ -473,8 +473,8 @@ const CreateMultiItemListing = () => {
           }`}>
             {step < currentStep ? <CheckCircle className="h-5 w-5" /> : step}
           </div>
-          {step < 4 && (
-            <div className={`w-20 h-1 mx-2 ${
+          {step < 5 && (
+            <div className={`w-16 h-1 mx-2 ${
               step < currentStep ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-700'
             }`} />
           )}
