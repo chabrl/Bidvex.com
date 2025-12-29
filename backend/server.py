@@ -833,6 +833,9 @@ class MultiItemListingCreate(BaseModel):
     visit_availability: Optional[Dict[str, Any]] = None  # {offered, dates, instructions}
     auction_terms_en: Optional[str] = None  # English auction terms (rich text HTML)
     auction_terms_fr: Optional[str] = None  # French auction terms (rich text HTML)
+    # Promotion fields
+    promotion_tier: Optional[str] = None  # 'premium' ($25), 'elite' ($50)
+    is_promoted: bool = False
 
 class MultiItemListing(BaseModel):
     model_config = ConfigDict(extra="ignore")
