@@ -748,3 +748,22 @@ Incorporate User Feedback:
 - Test Trust Badge displays correctly on profile page
 - Test admin user detail shows complete contact dossier
 - Test payment method linked triggers refreshUser
+
+  - task: 'Buy Now & Promoted Listings Feature (Dec 29)'
+    implemented: true
+    working: pending
+    files: ['server.py', 'CreateMultiItemListing.js', 'MultiItemListingDetailPage.js']
+    stuck_count: 0
+    priority: 'high'
+    needs_retesting: true
+    status_history:
+      - working: pending
+        agent: 'main'
+        comment: 'Implemented: (1) Per-Lot Buy Now price field with 20% validation in Create Listing form, (2) Buy Now button on lot cards in MultiItemListingDetailPage, (3) Automated handshake on Buy Now purchase (creates conversation + system message + seller notification), (4) 3-tier promotion system: Standard (Free), Premium ($25/7days), Elite ($50/14days), (5) Step 5 promotion selection UI with feature comparison cards, (6) Admin endpoints for promoted listings tracking and revenue stats, (7) Homepage Hot Items carousel endpoint for elite/promoted listings.'
+
+Incorporate User Feedback:
+- Test Buy Now price validation (must be >= 20% above starting price)
+- Test Buy Now purchase creates handshake conversation
+- Test promotion tier selection in create listing flow
+- Test admin can see promotion levels and revenue
+- Test promoted listings appear in homepage carousel
