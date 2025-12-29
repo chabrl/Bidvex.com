@@ -10,7 +10,8 @@ import { toast } from 'sonner';
 import { 
   Package, Clock, MapPin, User, Calendar, 
   ArrowLeft, Gavel, AlertCircle, TrendingUp,
-  Grid as GridIcon, List as ListIcon, Menu, X, Flame, Heart, Info
+  Grid as GridIcon, List as ListIcon, Menu, X, Flame, Heart, Info,
+  Zap, ShoppingCart, Loader2
 } from 'lucide-react';
 import Countdown from 'react-countdown';
 import Lightbox from 'react-image-lightbox';
@@ -24,6 +25,7 @@ import WatchlistButton from '../components/WatchlistButton';
 import ShareButton from '../components/ShareButton';
 import MessageSellerModal from '../components/MessageSellerModal';
 import BidErrorGuide from '../components/BidErrorGuide';
+import VerificationRequiredModal from '../components/VerificationRequiredModal';
 import { extractErrorMessage } from '../utils/errorHandler';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -48,6 +50,9 @@ const MultiItemListingDetailPage = () => {
   const [autoBidModalOpen, setAutoBidModalOpen] = useState(false);
   const [selectedLot, setSelectedLot] = useState(null);
   const [showFullTerms, setShowFullTerms] = useState(false);
+  const [buyNowLoading, setBuyNowLoading] = useState({});
+  const [verificationModalOpen, setVerificationModalOpen] = useState(false);
+  const [verificationAction, setVerificationAction] = useState('bid');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const lotRefs = useRef({});
 
