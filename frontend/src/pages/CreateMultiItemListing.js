@@ -1446,6 +1446,170 @@ const CreateMultiItemListing = () => {
     );
   };
 
+  // Step 5: Promotion Selection
+  const renderStep5 = () => {
+    const promotionTiers = [
+      {
+        id: 'standard',
+        name: 'Standard',
+        price: 0,
+        priceText: 'Free',
+        description: 'Basic placement in search results',
+        features: [
+          'Visible in category searches',
+          'Appears in main marketplace',
+          'Standard listing appearance'
+        ],
+        badge: null,
+        borderColor: 'border-gray-200 dark:border-gray-700',
+        bgColor: 'bg-gray-50 dark:bg-gray-800/50'
+      },
+      {
+        id: 'premium',
+        name: 'Premium',
+        price: 25,
+        priceText: '$25',
+        description: 'Highlighted border and "Featured" badge',
+        features: [
+          'Highlighted gold border',
+          '"Featured" badge on listing',
+          'Appears at top of category searches',
+          'Priority in search results',
+          '7-day promotion duration'
+        ],
+        badge: '⭐ Popular',
+        recommended: true,
+        borderColor: 'border-[#06B6D4]',
+        bgColor: 'bg-cyan-50 dark:bg-cyan-900/20'
+      },
+      {
+        id: 'elite',
+        name: 'Elite',
+        price: 50,
+        priceText: '$50',
+        description: 'Maximum visibility across the platform',
+        features: [
+          'Everything in Premium',
+          'Guaranteed homepage "Hot Items" carousel',
+          'Priority in "Featured Auctions" section',
+          'Premium gold badge with animation',
+          'Email newsletter spotlight',
+          '14-day promotion duration'
+        ],
+        badge: '👑 Best Value',
+        borderColor: 'border-amber-400',
+        bgColor: 'bg-amber-50 dark:bg-amber-900/20'
+      }
+    ];
+
+    return (
+      <div className="space-y-6">
+        <div className="text-center mb-8">
+          <h3 className="text-2xl font-bold mb-2">🚀 Promote Your Listing</h3>
+          <p className="text-muted-foreground">
+            Choose a promotion tier to increase visibility and drive more bids
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {promotionTiers.map((tier) => (
+            <Card
+              key={tier.id}
+              className={`relative cursor-pointer transition-all duration-300 hover:shadow-lg ${
+                promotionTier === tier.id 
+                  ? `ring-2 ring-[#06B6D4] ${tier.bgColor}` 
+                  : `${tier.borderColor} hover:border-[#06B6D4]/50`
+              } ${tier.recommended ? 'scale-105 shadow-lg' : ''}`}
+              onClick={() => setPromotionTier(tier.id)}
+            >
+              {/* Badge */}
+              {tier.badge && (
+                <div className={`absolute -top-3 left-1/2 transform -translate-x-1/2 px-3 py-1 rounded-full text-xs font-semibold ${
+                  tier.recommended 
+                    ? 'bg-[#06B6D4] text-white' 
+                    : 'bg-amber-400 text-amber-900'
+                }`}>
+                  {tier.badge}
+                </div>
+              )}
+
+              <CardHeader className="text-center pt-8">
+                <CardTitle className="text-xl">{tier.name}</CardTitle>
+                <div className="mt-2">
+                  <span className={`text-3xl font-bold ${
+                    tier.price === 0 ? 'text-green-600' : 'text-[#1E3A8A]'
+                  }`}>
+                    {tier.priceText}
+                  </span>
+                  {tier.price > 0 && <span className="text-muted-foreground text-sm"> one-time</span>}
+                </div>
+                <p className="text-sm text-muted-foreground mt-2">
+                  {tier.description}
+                </p>
+              </CardHeader>
+
+              <CardContent>
+                <ul className="space-y-2">
+                  {tier.features.map((feature, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-sm">
+                      <CheckCircle className={`h-4 w-4 mt-0.5 flex-shrink-0 ${
+                        promotionTier === tier.id ? 'text-[#06B6D4]' : 'text-green-500'
+                      }`} />
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                {/* Selection Indicator */}
+                <div className={`mt-4 py-2 rounded-lg text-center text-sm font-medium transition-colors ${
+                  promotionTier === tier.id
+                    ? 'bg-[#06B6D4] text-white'
+                    : 'bg-gray-100 dark:bg-gray-800 text-muted-foreground'
+                }`}>
+                  {promotionTier === tier.id ? '✓ Selected' : 'Select'}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Promotion Summary */}
+        {promotionTier !== 'standard' && (
+          <Card className="border-2 border-[#06B6D4] bg-[#06B6D4]/5">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold text-lg">
+                    {promotionTier === 'premium' ? '⭐ Premium' : '👑 Elite'} Promotion Selected
+                  </p>
+                  <p className="text-muted-foreground text-sm">
+                    Your listing will be promoted immediately after creation
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-2xl font-bold text-[#1E3A8A]">
+                    ${promotionTier === 'premium' ? '25' : '50'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Added to your total
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Info Box */}
+        <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
+          <p className="text-sm text-blue-800 dark:text-blue-200">
+            💡 <strong>Tip:</strong> Promoted listings receive on average 3x more views and 2x more bids. 
+            The promotion fee is charged when you create the listing.
+          </p>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen py-8 px-4">
       <div className="max-w-6xl mx-auto">
