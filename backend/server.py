@@ -3779,6 +3779,9 @@ async def bid_on_lot(listing_id: str, lot_number: int, data: Dict[str, Any], cur
             detail=f"Your bid must be at least ${min_bid:.2f} to lead."
         )
     
+    # Capture previous highest bidder for outbid notification
+    previous_highest_bidder = lot.get("highest_bidder_id")
+    
     # Update current price
     lots[lot_index]["current_price"] = amount
     lots[lot_index]["highest_bidder_id"] = current_user.id
