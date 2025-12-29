@@ -54,8 +54,14 @@ const CreateMultiItemListing = () => {
     current_price: '',
     condition: 'good',
     images: [],
-    pricing_mode: 'multiplied' // fixed or multiplied
+    pricing_mode: 'multiplied', // fixed or multiplied
+    buy_now_enabled: false,
+    buy_now_price: ''
   }]);
+
+  // Step 5: Promotion Selection
+  const [promotionTier, setPromotionTier] = useState('standard'); // 'standard', 'premium', 'elite'
+  const [promotionPaymentComplete, setPromotionPaymentComplete] = useState(false);
 
   const [uploadMethod, setUploadMethod] = useState('manual'); // 'manual', 'csv', 'images'
   const [csvData, setCsvData] = useState(null);
