@@ -782,6 +782,62 @@ const MultiItemListingDetailPage = () => {
                           </div>
                         )}
 
+                        {/* Buy Now Section */}
+                        {lot.buy_now_enabled && lot.buy_now_price && lot.lot_status !== 'sold_out' && !auctionEnded && (
+                          <div className="bg-gradient-to-r from-[#06B6D4]/10 to-[#1E3A8A]/10 border-2 border-[#06B6D4] rounded-lg p-4 mb-4">
+                            <div className="flex items-center justify-between flex-wrap gap-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-[#06B6D4] flex items-center justify-center">
+                                  <Zap className="h-5 w-5 text-white" />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium text-[#06B6D4]">⚡ Buy Now Available</p>
+                                  <p className="text-2xl font-bold text-[#1E3A8A] dark:text-white">
+                                    ${lot.buy_now_price.toFixed(2)}
+                                  </p>
+                                  {lot.available_quantity && lot.available_quantity < lot.quantity && (
+                                    <p className="text-xs text-amber-600">
+                                      Only {lot.available_quantity} left!
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              <Button
+                                onClick={() => handleBuyNow(lot)}
+                                disabled={buyNowLoading[lot.lot_number] || lot.lot_status === 'sold_out'}
+                                className="bg-gradient-to-r from-[#06B6D4] to-[#1E3A8A] hover:opacity-90 text-white px-6 py-3 h-auto"
+                              >
+                                {buyNowLoading[lot.lot_number] ? (
+                                  <>
+                                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                                    Processing...
+                                  </>
+                                ) : (
+                                  <>
+                                    <ShoppingCart className="h-5 w-5 mr-2" />
+                                    Buy Now
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-2">
+                              Skip the bidding - purchase instantly at the fixed price
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Sold Out Badge */}
+                        {lot.lot_status === 'sold_out' && (
+                          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4 text-center">
+                            <Badge variant="destructive" className="text-lg px-4 py-1">
+                              SOLD OUT
+                            </Badge>
+                            <p className="text-sm text-red-600 dark:text-red-400 mt-2">
+                              This item has been purchased via Buy Now
+                            </p>
+                          </div>
+                        )}
+
                         {/* Bidding Section */}
                         {isPreviewMode && (
                           <div className="bg-amber-50 dark:bg-amber-950 border border-amber-300 rounded-lg p-4 text-center mt-4">
