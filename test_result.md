@@ -414,6 +414,18 @@ backend:
         agent: "testing"
         comment: "✅ PASS - Site Config & Branding API working correctly. Admin authentication successful with admin@bazario.com credentials. All API endpoints accessible and functional. Backend properly serves branding configuration data to frontend components."
 
+  - task: "BidVex Buy Now and Promoted Listings Features"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASS - BidVex Buy Now and Promoted Listings features testing completed successfully (4/4 tests passed). 1) Buy Now Purchase Flow - POST /api/buy-now endpoint working correctly: valid purchases return success with transaction_id, total_amount, available_quantity, and conversation_id for automated handshake; 404 returned for non-existent auctions; 400 returned for lots without Buy Now enabled; 400 returned for excessive quantity requests. 2) Promoted Listings Endpoints - GET /api/promoted-listings returns correct structure with 'listings' array and 'total' count, supports optional 'tier' parameter for filtering by promotion tier (premium/elite), returns empty structure when no promoted listings found. 3) Admin Listings Promotions - GET /api/admin/listings-promotions working with admin authentication, returns listings array with promotion fields and stats object including total_promoted, premium_count, elite_count, and promotion_revenue calculation; correctly denies non-admin access with 403. 4) Multi-Item Listing Creation with Promotion - POST /api/multi-item-listings accepts promotion_tier ('premium'/'elite') and is_promoted fields, lots support buy_now_enabled and buy_now_price fields, promotion dates automatically calculated (premium: 7 days, elite: 14 days). All endpoints properly authenticated and return expected data structures. Automated handshake conversation creation verified for Buy Now purchases."
+
 frontend:
   - task: "Branding & Layout Manager Admin UI"
     implemented: true
