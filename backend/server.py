@@ -2319,13 +2319,93 @@ async def purchase_buy_now(
         f"qty={purchase.quantity}, total=${total_amount}"
     )
     
+    # ========== AUTOMATED HANDSHAKE ==========
+    # Create conversation between buyer and seller
+    conversation_id = None
+    try:
+        seller_id = auction.get("seller_id")
+        if seller_id and seller_id != current_user.id:
+            # Get seller info
+            seller = await db.users.find_one({"id": seller_id}, {"_id": 0, "name": 1, "email": 1, "phone": 1})
+            buyer = await db.users.find_one({"id": current_user.id}, {"_id": 0, "name": 1, "email": 1, "phone": 1})
+            
+            # Create conversation
+            conversation_id = str(uuid.uuid4())
+            conversation = {
+                "id": conversation_id,
+                "participants": [seller_id, current_user.id],
+                "listing_id": purchase.auction_id,
+                "lot_number": purchase.lot_number,
+                "type": "buy_now_purchase",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "last_message": None,
+                "unread_count": {seller_id: 1, current_user.id: 0}
+            }
+            await db.conversations.insert_one(conversation)
+            
+            # Create system message for the handshake
+            system_message = {
+                "id": str(uuid.uuid4()),
+                "conversation_id": conversation_id,
+                "sender_id": "system",
+                "content": f"""🎉 **Buy Now Purchase Complete!**
+
+**Lot #{purchase.lot_number}: {target_lot.get('title', 'Item')}**
+**Amount:** ${total_amount:.2f}
+
+---
+
+**Buyer:** {buyer.get('name', 'Buyer') if buyer else 'Buyer'}
+• Email: {buyer.get('email', 'Not provided') if buyer else 'Not provided'}
+• Phone: {buyer.get('phone', 'Not provided') if buyer else 'Not provided'}
+
+**Seller:** {seller.get('name', 'Seller') if seller else 'Seller'}
+• Email: {seller.get('email', 'Not provided') if seller else 'Not provided'}
+• Phone: {seller.get('phone', 'Not provided') if seller else 'Not provided'}
+
+---
+
+Please coordinate pickup/delivery directly. Thank you for using BidVex!
+""",
+                "message_type": "system_card",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "read": False
+            }
+            await db.messages.insert_one(system_message)
+            
+            # Create notification for seller
+            seller_notification = {
+                "id": str(uuid.uuid4()),
+                "user_id": seller_id,
+                "type": "buy_now_purchase",
+                "title": f"🎉 Buy Now Purchase!",
+                "message": f"Lot #{purchase.lot_number} - {target_lot.get('title', 'Item')} was purchased for ${total_amount:.2f}",
+                "data": {
+                    "auction_id": purchase.auction_id,
+                    "lot_number": purchase.lot_number,
+                    "buyer_id": current_user.id,
+                    "amount": total_amount,
+                    "conversation_id": conversation_id
+                },
+                "read": False,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            await db.notifications.insert_one(seller_notification)
+            
+            logger.info(f"✅ Buy Now handshake created: conversation={conversation_id}")
+    except Exception as e:
+        logger.error(f"Failed to create handshake for Buy Now: {e}")
+        # Don't fail the purchase if handshake fails
+    
     return {
         "success": True,
         "transaction_id": transaction.id,
         "total_amount": total_amount,
         "available_quantity": new_available_qty,
         "lot_status": new_lot_status,
-        "message": "Purchase successful! Payment pending."
+        "conversation_id": conversation_id,
+        "message": "Purchase successful! A chat with the seller has been created."
     }
 
 @api_router.get("/bids/listing/{listing_id}")
