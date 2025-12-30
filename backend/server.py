@@ -8497,13 +8497,13 @@ async def seed_legal_pages(
                         "title": "Privacy Policy",
                         "content": "<h1>Privacy Policy</h1><p>Your privacy is important to us...</p>",
                         "link_type": "page",
-                        "link_value": "/privacy"
+                        "link_value": "/privacy-policy"
                     },
                     "fr": {
                         "title": "Politique de confidentialité",
                         "content": "<h1>Politique de confidentialité</h1><p>Votre vie privée est importante pour nous...</p>",
                         "link_type": "page",
-                        "link_value": "/privacy"
+                        "link_value": "/privacy-policy"
                     }
                 },
                 "terms_of_service": {
@@ -8511,21 +8511,21 @@ async def seed_legal_pages(
                         "title": "Terms & Conditions",
                         "content": "<h1>Terms of Service</h1><p>Welcome to BidVex. By using our platform...</p>",
                         "link_type": "page",
-                        "link_value": "/terms"
+                        "link_value": "/terms-of-service"
                     },
                     "fr": {
                         "title": "Conditions d'utilisation",
                         "content": "<h1>Conditions d'utilisation</h1><p>Bienvenue sur BidVex. En utilisant notre plateforme...</p>",
                         "link_type": "page",
-                        "link_value": "/terms"
+                        "link_value": "/terms-of-service"
                     }
                 },
                 "support": {
                     "en": {
                         "title": "Contact Support",
                         "content": "<h1>Contact Support</h1><p>Need help? Our support team is here for you.</p><p>Email: support@bidvex.com</p>",
-                        "link_type": "chatbot",
-                        "link_value": ""
+                        "link_type": "mailto",
+                        "link_value": "support@bidvex.com"
                     },
                     "fr": {
                         "title": "Contacter le support",
