@@ -19,7 +19,7 @@ distro==1.9.0
 dnspython==2.8.0
 ecdsa==0.19.1
 email-validator==2.3.0
-emergentintegrations==0.1.0
+# emergentintegrations==0.1.0  # Installed manually with extra-index-url
 fastapi==0.110.1
 fastuuid==0.14.0
 filelock==3.20.0
@@ -123,7 +123,7 @@ watchfiles==1.1.0
 websockets==15.0.1
 yarl==1.22.0
 zipp==3.23.0
-emergentintegrations==0.1.0
+# emergentintegrations==0.1.0  # Installed manually with extra-index-url
 APScheduler==3.11.1
 weasyprint
 sendgrid==6.11.0
