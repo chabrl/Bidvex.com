@@ -23,19 +23,47 @@ const SiteContentManager = () => {
   }, []);
 
   const fetchPages = async () => {
+    setLoading(true);
     try {
       const token = localStorage.getItem('token');
+      
+      if (!token) {
+        toast.error('Not authenticated. Please login.');
+        setLoading(false);
+        return;
+      }
+
+      console.log('[SiteContentManager] Fetching pages...', {
+        apiUrl: `${API}/admin/site-config/legal-pages`
+      });
+
       const response = await axios.get(`${API}/admin/site-config/legal-pages`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
+      console.log('[SiteContentManager] Fetch response:', {
+        success: response.data.success,
+        pageCount: response.data.pages ? Object.keys(response.data.pages).length : 0,
+        updated_at: response.data.updated_at
+      });
+
       if (response.data.success) {
         setPages(response.data.pages);
         setLastUpdated(response.data.updated_at);
+        setHasChanges(false); // Reset changes flag after fresh fetch
+      } else {
+        toast.error('Failed to load pages: ' + (response.data.message || 'Unknown error'));
       }
     } catch (error) {
-      toast.error('Failed to load pages');
-      console.error('Error fetching pages:', error);
+      console.error('[SiteContentManager] Fetch error:', error);
+      
+      if (error.response?.status === 401) {
+        toast.error('Authentication failed. Please login again.');
+      } else if (error.response?.status === 403) {
+        toast.error('Access denied. Admin permissions required.');
+      } else {
+        toast.error('Failed to load pages. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
