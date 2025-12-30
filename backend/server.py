@@ -8139,8 +8139,8 @@ async def ai_chat_message(
             except:
                 pass  # Allow unauthenticated users to chat
         
-        # Import AI assistant
-        from services.ai_assistant import get_assistant
+        # Import AI assistant (v2 with emergentintegrations)
+        from services.ai_assistant_v2 import get_assistant
         assistant = get_assistant(EMERGENT_LLM_KEY, db)
         
         # Process chat message
