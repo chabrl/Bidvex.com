@@ -8235,8 +8235,8 @@ async def clear_ai_chat_history(
 async def get_knowledge_base_status():
     """Get status of AI knowledge base (public endpoint)"""
     try:
-        from services.ai_knowledge_base import get_knowledge_base
-        kb = get_knowledge_base(EMERGENT_LLM_KEY)
+        from services.ai_knowledge_base_v2 import get_knowledge_base
+        kb = get_knowledge_base()
         
         doc_count = kb.get_all_documents()
         
