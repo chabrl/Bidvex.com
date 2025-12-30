@@ -8530,8 +8530,8 @@ async def seed_legal_pages(
                     "fr": {
                         "title": "Contacter le support",
                         "content": "<h1>Contacter le support</h1><p>Besoin d'aide? Notre équipe de support est là pour vous.</p><p>Email: support@bidvex.com</p>",
-                        "link_type": "chatbot",
-                        "link_value": ""
+                        "link_type": "mailto",
+                        "link_value": "support@bidvex.com"
                     }
                 }
             },
