@@ -9,7 +9,7 @@ import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from emergentintegrations.llm.chat import LlmChat, UserMessage
-from services.ai_knowledge_base import get_knowledge_base
+from services.ai_knowledge_base_v2 import get_knowledge_base
 
 logger = logging.getLogger(__name__)
 
