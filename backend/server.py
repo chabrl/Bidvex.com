@@ -8375,16 +8375,16 @@ async def get_legal_pages_admin(
                         "fr": {"title": "Comment ça marche", "content": "", "link_type": "page", "link_value": "/how-it-works"}
                     },
                     "privacy_policy": {
-                        "en": {"title": "Privacy Policy", "content": "", "link_type": "page", "link_value": "/privacy"},
-                        "fr": {"title": "Confidentialité", "content": "", "link_type": "page", "link_value": "/privacy"}
+                        "en": {"title": "Privacy Policy", "content": "", "link_type": "page", "link_value": "/privacy-policy"},
+                        "fr": {"title": "Confidentialité", "content": "", "link_type": "page", "link_value": "/privacy-policy"}
                     },
                     "terms_of_service": {
-                        "en": {"title": "Terms & Conditions", "content": "", "link_type": "page", "link_value": "/terms"},
-                        "fr": {"title": "Conditions d'utilisation", "content": "", "link_type": "page", "link_value": "/terms"}
+                        "en": {"title": "Terms & Conditions", "content": "", "link_type": "page", "link_value": "/terms-of-service"},
+                        "fr": {"title": "Conditions d'utilisation", "content": "", "link_type": "page", "link_value": "/terms-of-service"}
                     },
                     "support": {
-                        "en": {"title": "Contact Support", "content": "", "link_type": "chatbot", "link_value": ""},
-                        "fr": {"title": "Contacter le support", "content": "", "link_type": "chatbot", "link_value": ""}
+                        "en": {"title": "Contact Support", "content": "", "link_type": "mailto", "link_value": "support@bidvex.com"},
+                        "fr": {"title": "Contacter le support", "content": "", "link_type": "mailto", "link_value": "support@bidvex.com"}
                     }
                 },
                 "updated_at": None,
