@@ -18,7 +18,7 @@ const AIAssistant = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
-  const { token } = useContext(AuthContext);
+  const { token } = useAuth();
   const navigate = useNavigate();
   const backendUrl = import.meta.env.REACT_APP_BACKEND_URL || process.env.REACT_APP_BACKEND_URL;
 
