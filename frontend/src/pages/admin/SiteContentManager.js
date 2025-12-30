@@ -56,23 +56,73 @@ const SiteContentManager = () => {
   };
 
   const handleSave = async () => {
+    if (!pages) {
+      toast.error('No pages to save');
+      return;
+    }
+
     setSaving(true);
     try {
       const token = localStorage.getItem('token');
+      
+      if (!token) {
+        toast.error('❌ Not authenticated. Please login again.');
+        setSaving(false);
+        return;
+      }
+
+      console.log('[SiteContentManager] Saving pages...', { 
+        pageKeys: Object.keys(pages),
+        apiUrl: `${API}/admin/site-config/legal-pages`
+      });
+
       const response = await axios.put(
         `${API}/admin/site-config/legal-pages`,
         pages,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { 
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          } 
+        }
       );
 
+      console.log('[SiteContentManager] Save response:', response.data);
+
       if (response.data.success) {
-        toast.success('✅ Pages updated successfully!');
+        toast.success('✅ Pages updated successfully! Changes are live.', {
+          duration: 3000,
+        });
         setHasChanges(false);
         setLastUpdated(response.data.updated_at);
+        
+        // Fetch fresh data from database to confirm save
+        await fetchPages();
+      } else {
+        toast.error('❌ Save failed: ' + (response.data.message || 'Unknown error'));
       }
     } catch (error) {
-      toast.error('Failed to save changes');
-      console.error('Error saving pages:', error);
+      console.error('[SiteContentManager] Save error:', error);
+      
+      if (error.response) {
+        // Server responded with error
+        const status = error.response.status;
+        const message = error.response.data?.detail || error.response.data?.message || 'Unknown error';
+        
+        if (status === 401) {
+          toast.error('❌ Authentication failed. Please login again.');
+        } else if (status === 403) {
+          toast.error('❌ Access denied. Admin permissions required.');
+        } else {
+          toast.error(`❌ Save failed (${status}): ${message}`);
+        }
+      } else if (error.request) {
+        // Request made but no response
+        toast.error('❌ No response from server. Please check your connection.');
+      } else {
+        // Error setting up request
+        toast.error('❌ Failed to save changes: ' + error.message);
+      }
     } finally {
       setSaving(false);
     }
