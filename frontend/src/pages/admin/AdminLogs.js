@@ -104,7 +104,13 @@ const AdminLogs = ({ searchQuery = '' }) => {
                       <span className="text-xs text-muted-foreground">{log.admin_email}</span>
                     </div>
                     <p className="text-sm text-muted-foreground">{log.target_type}: {log.target_id}</p>
-                    {log.details && <p className="text-xs text-muted-foreground mt-1">{log.details}</p>}
+                    {log.details && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {typeof log.details === 'object' 
+                          ? JSON.stringify(log.details, null, 2) 
+                          : log.details}
+                      </p>
+                    )}
                   </div>
                   <span className="text-xs text-muted-foreground whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</span>
                 </div>
