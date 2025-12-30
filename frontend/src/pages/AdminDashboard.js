@@ -54,6 +54,7 @@ const SECONDARY_TABS = {
     { id: 'categories', label: 'Categories', icon: '📂', lucideIcon: Settings },
   ],
   settings: [
+    { id: 'site-content', label: 'Site Content & Pages', icon: '📄', lucideIcon: FileText },
     { id: 'branding-layout', label: 'Branding & Layout', icon: '🎨', lucideIcon: Settings },
     { id: 'marketplace-settings', label: 'Marketplace Settings', icon: '⚙️', lucideIcon: Sliders },
     { id: 'subscriptions', label: 'Subscriptions', icon: '💎', lucideIcon: CreditCard },
