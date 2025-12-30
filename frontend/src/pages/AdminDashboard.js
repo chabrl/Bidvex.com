@@ -263,12 +263,13 @@ const AdminDashboard = () => {
         }
       case 'settings':
         switch (secondaryTab) {
+          case 'site-content': return <SiteContentManager />;
           case 'branding-layout': return <BrandingLayoutManager />;
           case 'marketplace-settings': return <MarketplaceSettings />;
           case 'subscriptions': return <SubscriptionManager />;
           case 'trust-safety': return <TrustSafetyDashboard />;
           case 'email-templates': return <EmailTemplates />;
-          default: return <BrandingLayoutManager />;
+          default: return <SiteContentManager />;
         }
       case 'banners':
         switch (secondaryTab) {
