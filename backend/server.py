@@ -8354,18 +8354,12 @@ async def get_legal_pages_public(language: str = "en"):
 
 @api_router.get("/admin/site-config/legal-pages")
 async def get_legal_pages_admin(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    current_user: User = Depends(get_current_user)
 ):
     """Get legal pages for editing (Admin only)"""
-    if not credentials:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    
     try:
-        user = decode_token(credentials.credentials)
-        
         # Check admin role
-        user_doc = await db.users.find_one({"id": user.get("sub")})
-        if not user_doc or user_doc.get("role") != "admin":
+        if current_user.role != "admin":
             raise HTTPException(status_code=403, detail="Admin access required")
         
         # Get site config
@@ -8413,18 +8407,12 @@ async def get_legal_pages_admin(
 @api_router.put("/admin/site-config/legal-pages")
 async def update_legal_pages(
     pages: Dict[str, Any],
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    current_user: User = Depends(get_current_user)
 ):
     """Update legal pages content (Admin only)"""
-    if not credentials:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    
     try:
-        user = decode_token(credentials.credentials)
-        
         # Check admin role
-        user_doc = await db.users.find_one({"id": user.get("sub")})
-        if not user_doc or user_doc.get("role") != "admin":
+        if current_user.role != "admin":
             raise HTTPException(status_code=403, detail="Admin access required")
         
         # Get existing config for audit log
@@ -8435,8 +8423,8 @@ async def update_legal_pages(
             "type": "legal_pages",
             "pages": pages,
             "updated_at": datetime.utcnow(),
-            "updated_by": user.get("sub"),
-            "updated_by_email": user.get("email")
+            "updated_by": current_user.id,
+            "updated_by_email": current_user.email
         }
         
         await db.site_config.update_one(
@@ -8448,8 +8436,8 @@ async def update_legal_pages(
         # Log to admin logs
         await db.admin_logs.insert_one({
             "action": "legal_pages_updated",
-            "admin_id": user.get("sub"),
-            "admin_email": user.get("email"),
+            "admin_id": current_user.id,
+            "admin_email": current_user.email,
             "details": {
                 "pages_updated": list(pages.keys())
             },
@@ -8470,18 +8458,12 @@ async def update_legal_pages(
 
 @api_router.post("/admin/site-config/seed-legal-pages")
 async def seed_legal_pages(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    current_user: User = Depends(get_current_user)
 ):
     """Seed legal pages with default content from existing pages (Admin only)"""
-    if not credentials:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    
     try:
-        user = decode_token(credentials.credentials)
-        
         # Check admin role
-        user_doc = await db.users.find_one({"id": user.get("sub")})
-        if not user_doc or user_doc.get("role") != "admin":
+        if current_user.role != "admin":
             raise HTTPException(status_code=403, detail="Admin access required")
         
         # Check if already seeded
@@ -8554,8 +8536,8 @@ async def seed_legal_pages(
                 }
             },
             "updated_at": datetime.utcnow(),
-            "updated_by": user.get("sub"),
-            "updated_by_email": user.get("email"),
+            "updated_by": current_user.id,
+            "updated_by_email": current_user.email,
             "seeded": True
         }
         
@@ -8564,8 +8546,8 @@ async def seed_legal_pages(
         # Log action
         await db.admin_logs.insert_one({
             "action": "legal_pages_seeded",
-            "admin_id": user.get("sub"),
-            "admin_email": user.get("email"),
+            "admin_id": current_user.id,
+            "admin_email": current_user.email,
             "created_at": datetime.utcnow()
         })
         
