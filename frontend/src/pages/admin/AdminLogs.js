@@ -19,12 +19,15 @@ const AdminLogs = ({ searchQuery = '' }) => {
   
   // Filter logs based on search query from parent
   const filteredLogs = searchQuery 
-    ? logs.filter(log => 
-        log.admin_email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        log.action?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        log.target_type?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        log.details?.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+    ? logs.filter(log => {
+        const detailsStr = typeof log.details === 'object' 
+          ? JSON.stringify(log.details) 
+          : (log.details || '');
+        return log.admin_email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          log.action?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          log.target_type?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          detailsStr.toLowerCase().includes(searchQuery.toLowerCase());
+      })
     : logs;
 
   const fetchLogs = async () => {
