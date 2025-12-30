@@ -8272,8 +8272,8 @@ async def reload_knowledge_base(
             raise HTTPException(status_code=403, detail="Admin access required")
         
         # Reload knowledge base
-        from services.ai_knowledge_base import get_knowledge_base
-        kb = get_knowledge_base(EMERGENT_LLM_KEY)
+        from services.ai_knowledge_base_v2 import get_knowledge_base
+        kb = get_knowledge_base()
         kb.clear_and_reload()
         
         # Log action
