@@ -51,7 +51,7 @@ const AdminLogs = ({ searchQuery = '' }) => {
         log.action,
         log.target_type,
         log.target_id,
-        log.details
+        typeof log.details === 'object' ? JSON.stringify(log.details) : (log.details || '')
       ])
     ].map(row => row.join(',')).join('\n');
     
