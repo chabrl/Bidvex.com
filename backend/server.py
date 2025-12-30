@@ -8104,6 +8104,198 @@ async def get_admin_user_detail(user_id: str, current_user: User = Depends(get_c
     return contact_card
 
 
+# ==================== AI ASSISTANT ENDPOINTS ====================
+# BidVex Master Concierge - RAG-based AI Chat Assistant
+
+class AIChatRequest(BaseModel):
+    message: str
+    chat_history: Optional[List[Dict]] = None
+    language: Optional[str] = "en"
+
+class AIChatResponse(BaseModel):
+    success: bool
+    message: str
+    language: str
+    rich_content: Optional[Dict] = None
+    usage: Optional[Dict] = None
+    error: Optional[str] = None
+
+# Initialize AI Assistant with Emergent LLM Key
+EMERGENT_LLM_KEY = "sk-emergent-f90A4371fEc229569D"
+
+@api_router.post("/ai-chat/message", response_model=AIChatResponse)
+async def ai_chat_message(
+    request: AIChatRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Send message to AI Assistant and get response"""
+    try:
+        # Get current user
+        user_id = None
+        if credentials:
+            try:
+                user = decode_token(credentials.credentials)
+                user_id = user.get("sub")
+            except:
+                pass  # Allow unauthenticated users to chat
+        
+        # Import AI assistant
+        from services.ai_assistant import get_assistant
+        assistant = get_assistant(EMERGENT_LLM_KEY, db)
+        
+        # Process chat message
+        response = await assistant.chat(
+            user_message=request.message,
+            user_id=user_id,
+            chat_history=request.chat_history,
+            language=request.language
+        )
+        
+        # Save chat history to database
+        if user_id:
+            await db.ai_chat_history.insert_one({
+                "user_id": user_id,
+                "message": request.message,
+                "response": response["message"],
+                "language": response["language"],
+                "created_at": datetime.utcnow()
+            })
+        
+        return AIChatResponse(**response)
+    
+    except Exception as e:
+        logger.error(f"Error in AI chat endpoint: {e}", exc_info=True)
+        return AIChatResponse(
+            success=False,
+            message="I apologize, but I'm experiencing technical difficulties. Please try again or contact support@bidvex.com.",
+            language=request.language or "en",
+            error=str(e)
+        )
+
+@api_router.get("/ai-chat/history")
+async def get_ai_chat_history(
+    limit: int = 50,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Get chat history for current user"""
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        user = decode_token(credentials.credentials)
+        user_id = user.get("sub")
+        
+        # Get chat history from database
+        history = await db.ai_chat_history.find(
+            {"user_id": user_id}
+        ).sort("created_at", -1).limit(limit).to_list(length=limit)
+        
+        return {
+            "success": True,
+            "history": [
+                {
+                    "message": h["message"],
+                    "response": h["response"],
+                    "language": h.get("language", "en"),
+                    "created_at": h["created_at"].isoformat()
+                }
+                for h in history
+            ]
+        }
+    
+    except Exception as e:
+        logger.error(f"Error getting chat history: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve chat history")
+
+@api_router.post("/ai-chat/clear-history")
+async def clear_ai_chat_history(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Clear chat history for current user"""
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        user = decode_token(credentials.credentials)
+        user_id = user.get("sub")
+        
+        # Delete chat history
+        result = await db.ai_chat_history.delete_many({"user_id": user_id})
+        
+        return {
+            "success": True,
+            "message": f"Deleted {result.deleted_count} chat messages"
+        }
+    
+    except Exception as e:
+        logger.error(f"Error clearing chat history: {e}")
+        raise HTTPException(status_code=500, detail="Failed to clear chat history")
+
+@api_router.get("/ai-chat/knowledge-base/status")
+async def get_knowledge_base_status():
+    """Get status of AI knowledge base (public endpoint)"""
+    try:
+        from services.ai_knowledge_base import get_knowledge_base
+        kb = get_knowledge_base(EMERGENT_LLM_KEY)
+        
+        doc_count = kb.get_all_documents()
+        
+        return {
+            "success": True,
+            "status": "operational" if doc_count > 0 else "empty",
+            "document_count": doc_count,
+            "last_updated": datetime.utcnow().isoformat()
+        }
+    
+    except Exception as e:
+        logger.error(f"Error getting KB status: {e}")
+        return {
+            "success": False,
+            "status": "error",
+            "error": str(e)
+        }
+
+@api_router.post("/admin/ai-chat/reload-knowledge-base")
+async def reload_knowledge_base(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Reload AI knowledge base from documents (Admin only)"""
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        user = decode_token(credentials.credentials)
+        
+        # Check admin role
+        user_doc = await db.users.find_one({"id": user.get("sub")})
+        if not user_doc or user_doc.get("role") != "admin":
+            raise HTTPException(status_code=403, detail="Admin access required")
+        
+        # Reload knowledge base
+        from services.ai_knowledge_base import get_knowledge_base
+        kb = get_knowledge_base(EMERGENT_LLM_KEY)
+        kb.clear_and_reload()
+        
+        # Log action
+        await db.admin_logs.insert_one({
+            "action": "ai_knowledge_base_reload",
+            "admin_id": user.get("sub"),
+            "admin_email": user.get("email"),
+            "created_at": datetime.utcnow()
+        })
+        
+        return {
+            "success": True,
+            "message": f"Knowledge base reloaded with {kb.get_all_documents()} documents"
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error reloading knowledge base: {e}")
+        raise HTTPException(status_code=500, detail="Failed to reload knowledge base")
+
+
 # Include all API routes - MUST be after all routes are defined
 app.include_router(api_router)
 
