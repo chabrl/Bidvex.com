@@ -8121,7 +8121,10 @@ class AIChatResponse(BaseModel):
     error: Optional[str] = None
 
 # Initialize AI Assistant with Emergent LLM Key
-EMERGENT_LLM_KEY = "sk-emergent-f90A4371fEc229569D"
+import os
+from dotenv import load_dotenv
+load_dotenv()
+EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', 'sk-emergent-f90A4371fEc229569D')
 
 @api_router.post("/ai-chat/message", response_model=AIChatResponse)
 async def ai_chat_message(
