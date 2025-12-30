@@ -3,7 +3,7 @@ import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { Input } from './ui/input';
 import { X, MessageCircle, Send, Loader2, ShieldCheck, CreditCard, Package, HelpCircle, Mail } from 'lucide-react';
-import { AuthContext } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 const AIAssistant = () => {
