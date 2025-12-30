@@ -29,6 +29,13 @@ const RichTextEditor = ({ content, onChange, placeholder = 'Start typing...' }) 
     },
   });
 
+  // Sync editor content when prop changes
+  React.useEffect(() => {
+    if (editor && content !== editor.getHTML()) {
+      editor.commands.setContent(content || '');
+    }
+  }, [content, editor]);
+
   if (!editor) {
     return null;
   }
