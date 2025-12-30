@@ -295,7 +295,7 @@ const SiteContentManager = () => {
               <div>
                 <label className="text-sm font-medium mb-2 block">Page Content (HTML)</label>
                 <RichTextEditor
-                  value={langData.content || ''}
+                  content={langData.content || ''}
                   onChange={(value) => handleContentChange(config.key, currentLang, 'content', value)}
                   placeholder={`Enter ${currentLang === 'en' ? 'English' : 'French'} content...`}
                 />
