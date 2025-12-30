@@ -85,9 +85,9 @@ Remember: You are not just an assistant - you are the Master Concierge, the face
         self.api_key = api_key
         self.db = db
         
-        # Initialize knowledge base with OpenAI embeddings (try with Emergent key)
+        # Initialize knowledge base with local embeddings
         try:
-            self.kb = get_knowledge_base(api_key)
+            self.kb = get_knowledge_base()
         except Exception as e:
             logger.error(f"Error initializing knowledge base: {e}")
             self.kb = None
