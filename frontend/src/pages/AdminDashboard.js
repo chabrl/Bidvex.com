@@ -26,6 +26,7 @@ import SubscriptionManager from './admin/SubscriptionManager';
 import EmailTemplates from './admin/EmailTemplates';
 import MarketplaceSettings from './admin/MarketplaceSettings';
 import BrandingLayoutManager from './admin/BrandingLayoutManager';
+import SiteContentManager from './admin/SiteContentManager';
 import { 
   Users, Package, Gavel, Shield, TrendingUp, Bell, Settings, FileText, 
   MessageSquare, DollarSign, Search, Image, CreditCard, Megaphone, 
