@@ -194,7 +194,7 @@ const MultiItemListingDetailPage = () => {
         { amount: bidAmount, bid_type: bidType },
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
-      toast.success(bidType === 'monster' ? '⚡ Monster Bid placed!' : 'Bid placed successfully!');
+      toast.success(bidType === 'monster' ? '⚡ Power Bid placed!' : 'Bid placed successfully!');
       fetchListing();
       setBidAmounts({ ...bidAmounts, [lotNumber]: '' });
     } catch (error) {
