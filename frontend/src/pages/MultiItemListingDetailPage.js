@@ -55,6 +55,7 @@ const MultiItemListingDetailPage = () => {
   const [verificationModalOpen, setVerificationModalOpen] = useState(false);
   const [verificationAction, setVerificationAction] = useState('bid');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [sellerInfo, setSellerInfo] = useState(null);
   const lotRefs = useRef({});
 
   useEffect(() => {
