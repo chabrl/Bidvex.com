@@ -6,7 +6,7 @@ Debug script to test if limit is causing the visibility issue
 import asyncio
 import aiohttp
 
-BASE_URL = "https://bidvex-upgrade.preview.emergentagent.com/api"
+BASE_URL = "https://lotfocus.preview.emergentagent.com/api"
 
 async def debug_limit():
     async with aiohttp.ClientSession() as session:

@@ -14,7 +14,7 @@ from typing import Dict, Any, Optional
 from motor.motor_asyncio import AsyncIOMotorClient
 
 # Configuration
-BASE_URL = "https://bidvex-upgrade.preview.emergentagent.com/api"
+BASE_URL = "https://lotfocus.preview.emergentagent.com/api"
 TEST_USER_EMAIL = "comprehensive.reset.tester@bidvex.com"
 TEST_USER_PASSWORD = "ComprehensiveTest123!"
 TEST_USER_NAME = "Comprehensive Reset Tester"

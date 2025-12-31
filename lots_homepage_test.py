@@ -15,7 +15,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional, List
 
 # Configuration
-BASE_URL = "https://bidvex-upgrade.preview.emergentagent.com/api"
+BASE_URL = "https://lotfocus.preview.emergentagent.com/api"
 TEST_USER_EMAIL = "lots.homepage.tester@bazario.com"
 TEST_USER_PASSWORD = "LotsTest123!"
 TEST_USER_NAME = "Lots Homepage Tester"

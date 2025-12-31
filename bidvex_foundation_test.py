@@ -12,7 +12,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = "https://bidvex-upgrade.preview.emergentagent.com/api"
+BASE_URL = "https://lotfocus.preview.emergentagent.com/api"
 
 # Test user credentials from review request
 PIONEER_EMAIL = "pioneer@bidvextest.com"
