@@ -211,6 +211,16 @@ const DecomposedMarketplace = () => {
                 </div>
               )}
 
+              {/* Private Sale Badge - for individual sellers */}
+              {!item.seller_is_business && (
+                <div className="absolute top-2 left-2 z-10">
+                  <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 text-xs">
+                    <User className="h-3 w-3 mr-1" />
+                    Private Sale
+                  </Badge>
+                </div>
+              )}
+
               {/* Image */}
               <Link
                 to={`/multi-item-auction/${item.auction_id}`}
