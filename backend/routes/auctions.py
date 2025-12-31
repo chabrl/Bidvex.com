@@ -287,11 +287,16 @@ async def process_ended_auctions():
         for auction in active_auctions:
             auction_id = auction["id"]
             
-            # Count active lots
+            # First check if lots are in separate collection
             active_lots_count = await db.lots.count_documents({
                 "auction_id": auction_id,
                 "lot_status": "active"
             })
+            
+            # If no separate lots exist, check embedded lots array
+            if active_lots_count == 0:
+                embedded_lots = auction.get("lots", [])
+                active_lots_count = sum(1 for lot in embedded_lots if lot.get("lot_status") == "active")
             
             if active_lots_count == 0:
                 # All lots have ended - close the auction
