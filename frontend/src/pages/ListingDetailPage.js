@@ -17,7 +17,7 @@ import { Clock, MapPin, Eye, User, DollarSign, MessageCircle, TrendingUp, Wifi, 
 import PromotionManagerModal from '../components/PromotionManagerModal';
 import WatchlistButton from '../components/WatchlistButton';
 import SocialShare from '../components/SocialShare';
-import MonsterBidButton from '../components/MonsterBidButton';
+import PowerBidButton from '../components/PowerBidButton';
 import AutoBidModal from '../components/AutoBidModal';
 import MessageSellerModal from '../components/MessageSellerModal';
 import RateSellerModal from '../components/RateSellerModal';
