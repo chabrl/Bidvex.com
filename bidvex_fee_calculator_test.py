@@ -252,8 +252,8 @@ class BidVexFeeCalculatorTester:
             individual_data = self.test_results["individual_seller"]
             business_data = self.test_results["business_seller"]
             
-            individual_total = individual_data["total_cost"]
-            business_total = business_data["total_cost"]
+            individual_total = individual_data["total"]
+            business_total = business_data["total"]
             
             tax_savings = business_total - individual_total
             savings_percentage = (tax_savings / business_total) * 100
