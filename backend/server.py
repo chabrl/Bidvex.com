@@ -1907,10 +1907,21 @@ async def get_marketplace_items(
     # Fetch all active auctions
     auctions = await db.multi_item_listings.find(query, {"_id": 0}).to_list(None)
     
+    # Cache seller tax status to avoid repeated DB lookups
+    seller_tax_cache = {}
+    
     # Decompose lots into individual items
     items = []
     
     for auction in auctions:
+        # Lookup seller's tax registration status (cached)
+        seller_id = auction.get("seller_id")
+        if seller_id not in seller_tax_cache:
+            seller = await db.users.find_one({"id": seller_id}, {"_id": 0, "is_tax_registered": 1})
+            seller_tax_cache[seller_id] = seller.get("is_tax_registered", False) if seller else False
+        
+        seller_is_business = seller_tax_cache[seller_id]
+        
         # Track impressions for promoted auctions
         if auction.get("is_promoted") and track_impression:
             await db.multi_item_listings.update_one(
