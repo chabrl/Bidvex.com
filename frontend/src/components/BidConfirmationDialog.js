@@ -127,7 +127,7 @@ const BidConfirmationDialog = ({
               {/* Buyer Premium */}
               <div className="flex justify-between items-center text-sm">
                 <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">Buyer's Premium (5%)</span>
+                  <span className="text-muted-foreground">Buyer&apos;s Premium (5%)</span>
                   <Info className="h-3 w-3 text-muted-foreground cursor-help" title="Standard platform fee" />
                 </div>
                 <span>${costBreakdown.buyer_premium?.toFixed(2)}</span>
