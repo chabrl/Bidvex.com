@@ -1991,6 +1991,7 @@ async def get_marketplace_items(
                 "parent_auction_title": auction.get("title"),
                 "total_lots_in_auction": len(auction.get("lots", [])),
                 "seller_id": auction.get("seller_id"),
+                "seller_is_business": auction.get("seller_is_business", False),  # For Private Sale badge
                 
                 # Location
                 "city": auction.get("city"),
