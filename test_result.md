@@ -1,3 +1,33 @@
+# BidVex Test Results - Updated Dec 31, 2025
+
+## Current Testing Focus: Foundation Fix + Twilio SMS Integration
+
+### Tasks Completed:
+1. **User Model Tax Fields Added** - `is_tax_registered`, `gst_number`, `qst_number` added to User Pydantic model with backward compatibility defaults
+2. **Boutique Test Drive Fixed** - Authentication errors resolved, all test users can now login
+3. **SMS Notification Service Created** - `/app/backend/services/sms_notification_service.py` with Twilio integration
+4. **Outbid SMS Notifications** - Integrated into both single-item and multi-lot bid placement
+5. **Auction Won SMS Notifications** - Added to `create_auction_won_conversation` function
+
+### Twilio Configuration:
+- Account SID: AC0ff805d4a46f0c167703dba42b140c6d
+- Auth Token: 1d35fc02052690b9584716ac97daa6d9  
+- Phone Number: +15005550006 (Twilio test number)
+
+### Test Environment:
+- Test Users: pioneer@bidvextest.com, challenger@bidvextest.com, individual@bidvextest.com, business@bidvextest.com (Password: TestPass123!)
+- Test Auctions: TEST-01 (Individual), TEST-02 (Business), TEST-03 (Individual), TEST-04 (Business)
+
+### Testing Required:
+1. Verify SMS service initializes correctly on backend startup
+2. Test outbid SMS triggers when a user is outbid
+3. Test auction won SMS triggers when auction ends
+4. Verify tax calculations work with new User model fields
+5. Verify "Boutique Test Drive" script passes completely
+
+---
+
+
 backend:
   - task: "Single-Item Anti-Sniping Extension"
     implemented: true
