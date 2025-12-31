@@ -448,6 +448,19 @@ test_plan:
   test_priority: "high_first"
 
 frontend:
+  - task: "BidVex Full Stress Test - High-Volume Seeded Data & Transparency Features"
+    implemented: true
+    working: false
+    file: "LotsMarketplacePage.js, ListingDetailPage.js, BidConfirmationDialog.js, PrivateSaleBadge.js, DecomposedMarketplace.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "testing"
+        comment: "❌ CRITICAL ISSUE - BidVex Full Stress Test revealed that all 50 seeded auctions have ended and been processed by the automated auction processing system. Key findings: 1) Seeded Data Status - All 50 auctions were successfully created across 4 categories (Electronics, Industrial, Collectibles, Furniture) with proper ~48% Individual Sellers (SEED-PRIV-*) / ~52% Business Sellers (SEED-COLL-*, SEED-ELEC-*, SEED-FURN-*, SEED-INDU-*) distribution. However, all auctions have status='ended' and were processed by the automated auction end processing system as shown in backend logs. 2) Frontend UI Testing - Lots Auction page (/lots) loads correctly but shows 'No lots found' because all auctions have ended. Items Marketplace page (/items) loads correctly but shows 'No items found' for the same reason. Search and filter functionality (search input, category filter, region filter) all work correctly. Navigation between pages works properly. 3) Transparency Features Implementation - BidConfirmationDialog.js component is properly implemented with cost breakdown (Hammer Price, Buyer's Premium, Tax on Item, Total Out-of-Pocket). PrivateSaleBadge.js component is properly implemented with green badge for individual sellers showing 'Private Sale: Save ~15% on Taxes!'. BusinessSellerBadge component is properly implemented for registered businesses. DecomposedMarketplace.js includes Private Sale badge logic for individual seller items. 4) Backend API Verification - Fee calculation API endpoints exist and are properly implemented (require authentication). Backend logs show proper auction processing with all SEED-* auctions marked as 'fully ended - all lots processed'. 5) Code Quality - No 'Monster Bid' text found anywhere in the application (✅ PASS). All transparency components use proper BidVex brand colors (blue #1E3A8A, cyan #06B6D4). 6) Test Environment Issue - The test request expected 50 active auctions for testing, but the automated auction processing system has ended all seeded auctions. This prevents live testing of bid confirmation dialog, private sale badges on active auctions, and marketplace functionality with real data. RECOMMENDATION: Main agent should create new active auctions with future end dates to enable proper stress testing of the transparency features."
+
+frontend:
   - task: "BidVex Frontend Transparency Features"
     implemented: true
     working: true
