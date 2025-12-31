@@ -302,7 +302,7 @@ class BidVexFeeCalculatorTester:
                     data = await response.json()
                     
                     # Verify response structure
-                    required_fields = ["gross_amount", "commission_rate", "commission_amount", "net_amount"]
+                    required_fields = ["hammer_price", "seller_commission", "seller_commission_percent", "net_payout"]
                     for field in required_fields:
                         assert field in data, f"Missing required field: {field}"
                     
@@ -310,14 +310,14 @@ class BidVexFeeCalculatorTester:
                     expected_commission = 1000 * 0.045  # 4.5%
                     expected_net = 1000 - expected_commission
                     
-                    assert abs(data["commission_amount"] - expected_commission) < 0.01, f"Free tier commission should be ${expected_commission:.2f}, got ${data['commission_amount']:.2f}"
-                    assert abs(data["net_amount"] - expected_net) < 0.01, f"Free tier net should be ${expected_net:.2f}, got ${data['net_amount']:.2f}"
+                    assert abs(data["seller_commission"] - expected_commission) < 0.01, f"Free tier commission should be ${expected_commission:.2f}, got ${data['seller_commission']:.2f}"
+                    assert abs(data["net_payout"] - expected_net) < 0.01, f"Free tier net should be ${expected_net:.2f}, got ${data['net_payout']:.2f}"
                     
                     print(f"✅ Free Tier Commission Calculation:")
-                    print(f"   - Gross Amount: ${data['gross_amount']:.2f}")
-                    print(f"   - Commission Rate: {data['commission_rate']:.1f}%")
-                    print(f"   - Commission Amount: ${data['commission_amount']:.2f}")
-                    print(f"   - Net Amount: ${data['net_amount']:.2f}")
+                    print(f"   - Gross Amount: ${data['hammer_price']:.2f}")
+                    print(f"   - Commission Rate: {data['seller_commission_percent']:.1f}%")
+                    print(f"   - Commission Amount: ${data['seller_commission']:.2f}")
+                    print(f"   - Net Amount: ${data['net_payout']:.2f}")
                 else:
                     print(f"❌ Failed to calculate seller net for free tier: {response.status}")
                     return False
