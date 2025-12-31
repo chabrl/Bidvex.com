@@ -368,6 +368,14 @@ const MultiItemListingDetailPage = () => {
                     <CardTitle className="text-3xl mb-4">{listing.title}</CardTitle>
                     <p className="text-muted-foreground mb-4">{listing.description}</p>
 
+                    {/* Private Sale / Business Seller Badge */}
+                    {sellerInfo && !sellerInfo.is_tax_registered && (
+                      <PrivateSaleBadge className="mb-4" />
+                    )}
+                    {sellerInfo && sellerInfo.is_tax_registered && (
+                      <BusinessSellerBadge variant="default" className="mb-4" />
+                    )}
+
                     {/* Auctioneer Info Section */}
                     {listing.seller_id && (
                       <div className="mb-6">
