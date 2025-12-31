@@ -318,38 +318,45 @@ class BidVexFoundationTester:
                     notifications_data = await response.json()
                     
                     print(f"✅ Notifications endpoint accessible")
-                    print(f"   - Response keys: {list(notifications_data.keys())}")
                     
-                    # Check if notifications array exists
-                    if "notifications" in notifications_data:
-                        notifications = notifications_data["notifications"]
-                        print(f"   - Total notifications: {len(notifications)}")
-                        
-                        # Check if we have any outbid notifications
-                        outbid_notifications = [n for n in notifications if n.get("type") == "outbid"]
-                        
-                        if outbid_notifications:
-                            notification = outbid_notifications[0]
-                            required_fields = ["id", "user_id", "type", "title", "message", "data", "read", "created_at"]
-                            
-                            missing_fields = []
-                            for field in required_fields:
-                                if field not in notification:
-                                    missing_fields.append(field)
-                            
-                            if missing_fields:
-                                print(f"⚠️  Missing fields in notification: {missing_fields}")
-                                print(f"   - Available fields: {list(notification.keys())}")
-                            else:
-                                print(f"✅ Outbid notification structure verified")
-                                print(f"   - Type: {notification['type']}")
-                                print(f"   - Title: {notification['title']}")
-                                print(f"   - Read: {notification['read']}")
+                    # Check if response is a list or dict
+                    if isinstance(notifications_data, list):
+                        notifications = notifications_data
+                        print(f"   - Response is a list with {len(notifications)} notifications")
+                    elif isinstance(notifications_data, dict):
+                        print(f"   - Response keys: {list(notifications_data.keys())}")
+                        if "notifications" in notifications_data:
+                            notifications = notifications_data["notifications"]
+                            print(f"   - Total notifications: {len(notifications)}")
                         else:
-                            print(f"✅ No outbid notifications found (expected if no recent bidding)")
+                            notifications = []
+                            print(f"   - No 'notifications' key found")
                     else:
-                        print(f"⚠️  No 'notifications' key in response")
-                        print(f"   - Available keys: {list(notifications_data.keys())}")
+                        print(f"   - Unexpected response type: {type(notifications_data)}")
+                        return False
+                    
+                    # Check if we have any outbid notifications
+                    outbid_notifications = [n for n in notifications if n.get("type") == "outbid"]
+                    
+                    if outbid_notifications:
+                        notification = outbid_notifications[0]
+                        required_fields = ["id", "user_id", "type", "title", "message", "data", "read", "created_at"]
+                        
+                        missing_fields = []
+                        for field in required_fields:
+                            if field not in notification:
+                                missing_fields.append(field)
+                        
+                        if missing_fields:
+                            print(f"⚠️  Missing fields in notification: {missing_fields}")
+                            print(f"   - Available fields: {list(notification.keys())}")
+                        else:
+                            print(f"✅ Outbid notification structure verified")
+                            print(f"   - Type: {notification['type']}")
+                            print(f"   - Title: {notification['title']}")
+                            print(f"   - Read: {notification['read']}")
+                    else:
+                        print(f"✅ No outbid notifications found (expected if no recent bidding)")
                     
                     return True
                     
