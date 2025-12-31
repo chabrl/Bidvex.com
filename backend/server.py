@@ -3297,6 +3297,25 @@ async def create_auction_won_conversation(
         except Exception as e:
             logger.warning(f"Could not send auction won notification: {e}")
         
+        # Send SMS notification to winner
+        try:
+            sms_service = get_sms_notification_service(db)
+            await sms_service.notify_auction_won(
+                user_id=winner_id,
+                listing_title=item_title,
+                winning_amount=final_price,
+                listing_id=listing_id
+            )
+            # Also notify seller that their item sold
+            await sms_service.notify_seller_auction_sold(
+                seller_id=seller_id,
+                listing_title=item_title,
+                sold_amount=final_price,
+                listing_id=listing_id
+            )
+        except Exception as sms_error:
+            logger.warning(f"📵 SMS auction won notification failed: {sms_error}")
+        
         return conversation_id
         
     except Exception as e:
