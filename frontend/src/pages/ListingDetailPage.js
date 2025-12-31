@@ -446,7 +446,7 @@ const ListingDetailPage = () => {
                         onBidPlaced={(amount) => {
                           fetchListing();
                           fetchBids();
-                          toast.success(`⚡ Monster Bid of $${amount.toFixed(2)} placed!`);
+                          toast.success(`⚡ Power Bid of $${amount.toFixed(2)} placed!`);
                         }}
                       />
                       
