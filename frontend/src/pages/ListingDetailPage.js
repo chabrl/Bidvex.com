@@ -322,6 +322,16 @@ const ListingDetailPage = () => {
                 </div>
               </div>
 
+              {/* Private Sale Badge - Show for individual sellers */}
+              {seller && !seller.is_tax_registered && (
+                <PrivateSaleBadge className="mb-4" />
+              )}
+              
+              {/* Business Seller Badge - Show for registered businesses */}
+              {seller && seller.is_tax_registered && (
+                <BusinessSellerBadge variant="default" className="mb-4" />
+              )}
+
               <Separator className="my-4" />
 
               <div className="space-y-4">
