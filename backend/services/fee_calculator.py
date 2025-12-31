@@ -81,10 +81,19 @@ class FeeCalculator:
         hammer_price: Decimal,
         buyer_tier: str = "free",
         region: str = "QC",
-        include_tax: bool = True
+        include_tax: bool = True,
+        seller_is_business: bool = False
     ) -> Dict:
         """
         Calculate buyer's total out-of-pocket cost
+        
+        CRITICAL TAX LOGIC:
+        - Individual Sellers (seller_is_business=False): 
+          * NO tax on hammer price (individuals cannot collect tax)
+          * Tax ONLY on buyer premium (BidVex is a business)
+        - Business Sellers (seller_is_business=True):
+          * Tax on hammer price (collected by seller via BidVex)
+          * Tax on buyer premium (BidVex's fee)
         
         Returns:
             {
@@ -93,8 +102,11 @@ class FeeCalculator:
                 "buyer_premium_percent": Decimal,
                 "subtotal": Decimal,
                 "tax": Decimal,
+                "tax_on_hammer": Decimal,
+                "tax_on_premium": Decimal,
                 "tax_breakdown": Dict,
-                "total": Decimal
+                "total": Decimal,
+                "seller_type": str
             }
         """
         hammer_price = Decimal(str(hammer_price))
@@ -104,61 +116,140 @@ class FeeCalculator:
         buyer_premium = hammer_price * buyer_premium_rate
         subtotal = hammer_price + buyer_premium
         
-        # Calculate tax
+        # Initialize tax variables
+        tax_on_hammer = Decimal("0")
+        tax_on_premium = Decimal("0")
         tax_amount = Decimal("0")
         tax_breakdown = {}
         
         if include_tax:
             tax_rates = TAX_RATES.get(region, TAX_RATES["QC"])
             
+            # CRITICAL: Tax logic based on seller type
+            if seller_is_business:
+                # Business Seller: Tax on BOTH hammer price and premium
+                taxable_amount = subtotal
+            else:
+                # Individual Seller: Tax ONLY on buyer premium (hammer price is tax-free)
+                taxable_amount = buyer_premium
+            
+            # Calculate taxes
             if "gst" in tax_rates and "qst" in tax_rates:
-                # Quebec: GST on subtotal, QST on subtotal + GST
-                gst = subtotal * tax_rates["gst"]
-                qst = (subtotal + gst) * tax_rates["qst"]
+                # Quebec: GST on taxable amount, QST on taxable amount + GST
+                gst = taxable_amount * tax_rates["gst"]
+                qst = (taxable_amount + gst) * tax_rates["qst"]
                 tax_amount = gst + qst
+                
+                # Break down tax between hammer and premium
+                if seller_is_business:
+                    # Tax applied to full subtotal
+                    hammer_ratio = hammer_price / subtotal
+                    tax_on_hammer = tax_amount * hammer_ratio
+                    tax_on_premium = tax_amount * (Decimal("1") - hammer_ratio)
+                else:
+                    # All tax is on premium only
+                    tax_on_premium = tax_amount
+                    tax_on_hammer = Decimal("0")
+                
                 tax_breakdown = {
                     "gst": float(gst),
                     "qst": float(qst),
                     "gst_rate": float(tax_rates["gst"]),
-                    "qst_rate": float(tax_rates["qst"])
+                    "qst_rate": float(tax_rates["qst"]),
+                    "tax_on_hammer": float(tax_on_hammer),
+                    "tax_on_premium": float(tax_on_premium)
                 }
             elif "hst" in tax_rates:
-                # Ontario: HST on subtotal
-                hst = subtotal * tax_rates["hst"]
+                # Ontario: HST on taxable amount
+                hst = taxable_amount * tax_rates["hst"]
                 tax_amount = hst
+                
+                if seller_is_business:
+                    hammer_ratio = hammer_price / subtotal
+                    tax_on_hammer = tax_amount * hammer_ratio
+                    tax_on_premium = tax_amount * (Decimal("1") - hammer_ratio)
+                else:
+                    tax_on_premium = tax_amount
+                    tax_on_hammer = Decimal("0")
+                
                 tax_breakdown = {
                     "hst": float(hst),
-                    "hst_rate": float(tax_rates["hst"])
+                    "hst_rate": float(tax_rates["hst"]),
+                    "tax_on_hammer": float(tax_on_hammer),
+                    "tax_on_premium": float(tax_on_premium)
                 }
             elif "gst" in tax_rates and "pst" in tax_rates:
-                # BC: GST + PST on subtotal
-                gst = subtotal * tax_rates["gst"]
-                pst = subtotal * tax_rates["pst"]
+                # BC: GST + PST on taxable amount
+                gst = taxable_amount * tax_rates["gst"]
+                pst = taxable_amount * tax_rates["pst"]
                 tax_amount = gst + pst
+                
+                if seller_is_business:
+                    hammer_ratio = hammer_price / subtotal
+                    tax_on_hammer = tax_amount * hammer_ratio
+                    tax_on_premium = tax_amount * (Decimal("1") - hammer_ratio)
+                else:
+                    tax_on_premium = tax_amount
+                    tax_on_hammer = Decimal("0")
+                
                 tax_breakdown = {
                     "gst": float(gst),
                     "pst": float(pst),
                     "gst_rate": float(tax_rates["gst"]),
-                    "pst_rate": float(tax_rates["pst"])
+                    "pst_rate": float(tax_rates["pst"]),
+                    "tax_on_hammer": float(tax_on_hammer),
+                    "tax_on_premium": float(tax_on_premium)
                 }
             elif "gst" in tax_rates:
-                # Alberta: GST only
-                gst = subtotal * tax_rates["gst"]
+                # Alberta: GST only on taxable amount
+                gst = taxable_amount * tax_rates["gst"]
                 tax_amount = gst
+                
+                if seller_is_business:
+                    hammer_ratio = hammer_price / subtotal
+                    tax_on_hammer = tax_amount * hammer_ratio
+                    tax_on_premium = tax_amount * (Decimal("1") - hammer_ratio)
+                else:
+                    tax_on_premium = tax_amount
+                    tax_on_hammer = Decimal("0")
+                
                 tax_breakdown = {
                     "gst": float(gst),
-                    "gst_rate": float(tax_rates["gst"])
+                    "gst_rate": float(tax_rates["gst"]),
+                    "tax_on_hammer": float(tax_on_hammer),
+                    "tax_on_premium": float(tax_on_premium)
                 }
             elif "vat" in tax_rates:
-                # EU: VAT on subtotal
-                vat = subtotal * tax_rates["vat"]
+                # EU: VAT on taxable amount
+                vat = taxable_amount * tax_rates["vat"]
                 tax_amount = vat
+                
+                if seller_is_business:
+                    hammer_ratio = hammer_price / subtotal
+                    tax_on_hammer = tax_amount * hammer_ratio
+                    tax_on_premium = tax_amount * (Decimal("1") - hammer_ratio)
+                else:
+                    tax_on_premium = tax_amount
+                    tax_on_hammer = Decimal("0")
+                
                 tax_breakdown = {
                     "vat": float(vat),
-                    "vat_rate": float(tax_rates["vat"])
+                    "vat_rate": float(tax_rates["vat"]),
+                    "tax_on_hammer": float(tax_on_hammer),
+                    "tax_on_premium": float(tax_on_premium)
                 }
         
         total = subtotal + tax_amount
+        
+        # Calculate savings for individual seller
+        savings = Decimal("0")
+        if not seller_is_business and include_tax:
+            # Calculate what tax WOULD have been on hammer price
+            tax_rates_data = TAX_RATES.get(region, TAX_RATES["QC"])
+            if "gst" in tax_rates_data and "qst" in tax_rates_data:
+                would_be_gst = hammer_price * tax_rates_data["gst"]
+                would_be_qst = (hammer_price + would_be_gst) * tax_rates_data["qst"]
+                savings = would_be_gst + would_be_qst
         
         return {
             "hammer_price": float(hammer_price),
@@ -166,10 +257,14 @@ class FeeCalculator:
             "buyer_premium_percent": float(buyer_premium_rate * 100),
             "subtotal": float(subtotal),
             "tax": float(tax_amount),
+            "tax_on_hammer": float(tax_on_hammer),
+            "tax_on_premium": float(tax_on_premium),
             "tax_breakdown": tax_breakdown,
             "total": float(total),
             "region": region,
-            "tier": buyer_tier
+            "tier": buyer_tier,
+            "seller_type": "business" if seller_is_business else "individual",
+            "tax_savings": float(savings) if savings > 0 else 0
         }
     
     @staticmethod
