@@ -26,6 +26,7 @@ import ShareButton from '../components/ShareButton';
 import MessageSellerModal from '../components/MessageSellerModal';
 import BidErrorGuide from '../components/BidErrorGuide';
 import VerificationRequiredModal from '../components/VerificationRequiredModal';
+import PrivateSaleBadge, { BusinessSellerBadge } from '../components/PrivateSaleBadge';
 import { extractErrorMessage } from '../utils/errorHandler';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
