@@ -22,6 +22,8 @@ import AutoBidModal from '../components/AutoBidModal';
 import MessageSellerModal from '../components/MessageSellerModal';
 import RateSellerModal from '../components/RateSellerModal';
 import AuctioneerInfo from '../components/AuctioneerInfo';
+import BidConfirmationDialog from '../components/BidConfirmationDialog';
+import PrivateSaleBadge, { BusinessSellerBadge } from '../components/PrivateSaleBadge';
 import Lightbox from 'yet-another-react-lightbox';
 import 'yet-another-react-lightbox/styles.css';
 import { useRealtimeBidding } from '../hooks/useRealtimeBidding';
