@@ -90,7 +90,7 @@ const BidConfirmationDialog = ({
             Confirm Your Bid
           </DialogTitle>
           <DialogDescription>
-            Review your total cost before placing your bid on "{listingTitle}"
+            Review your total cost before placing your bid on &quot;{listingTitle}&quot;
           </DialogDescription>
         </DialogHeader>
 
