@@ -8573,11 +8573,16 @@ from decimal import Decimal
 async def calculate_buyer_cost(
     amount: float,
     region: str = "QC",
+    seller_is_business: bool = False,
     current_user: User = Depends(get_current_user)
 ):
     """
     Calculate buyer's total out-of-pocket cost BEFORE bid confirmation
     Provides radical transparency on fees and taxes
+    
+    IMPORTANT: seller_is_business affects tax calculation:
+    - Individual sellers (False): Tax only on buyer premium (15% savings!)
+    - Business sellers (True): Tax on hammer price + premium
     """
     try:
         buyer_tier = current_user.subscription_tier or "free"
@@ -8585,13 +8590,23 @@ async def calculate_buyer_cost(
         calculation = calculate_buyer_total(
             amount=amount,
             tier=buyer_tier,
-            region=region
+            region=region,
+            seller_is_business=seller_is_business
         )
+        
+        explanation = f"Your total cost includes: ${calculation['hammer_price']:.2f} hammer price"
+        
+        if seller_is_business:
+            explanation += f" + ${calculation['buyer_premium']:.2f} buyer premium ({calculation['buyer_premium_percent']}%) + ${calculation['tax']:.2f} taxes = ${calculation['total']:.2f} total"
+        else:
+            explanation += f" (no tax on private sale!) + ${calculation['buyer_premium']:.2f} buyer premium ({calculation['buyer_premium_percent']}%) + ${calculation['tax_on_premium']:.2f} tax on premium = ${calculation['total']:.2f} total"
+            if calculation.get('tax_savings', 0) > 0:
+                explanation += f" | YOU SAVE ${calculation['tax_savings']:.2f} compared to business sellers!"
         
         return {
             "success": True,
             **calculation,
-            "explanation": f"Your total cost includes: ${calculation['hammer_price']:.2f} hammer price + ${calculation['buyer_premium']:.2f} buyer premium ({calculation['buyer_premium_percent']}%) + ${calculation['tax']:.2f} taxes = ${calculation['total']:.2f} total"
+            "explanation": explanation
         }
     
     except Exception as e:
