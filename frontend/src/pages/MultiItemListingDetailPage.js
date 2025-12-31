@@ -907,7 +907,7 @@ const MultiItemListingDetailPage = () => {
                             {/* Premium Bidding Options */}
                             {user && (
                               <div className="flex flex-wrap gap-2">
-                                <MonsterBidButton
+                                <PowerBidButton
                                   listingId={lot.id}
                                   currentBid={lot.current_price}
                                   minimumIncrement={getMinimumIncrement(lot.current_price)}
