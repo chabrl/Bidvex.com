@@ -83,7 +83,7 @@ export const BusinessSellerBadge = ({
         <ShieldCheck className="h-5 w-5 text-blue-600" />
         <div>
           <span className="font-medium text-blue-700">Registered Business Seller</span>
-          <p className="text-xs text-blue-500">Standard GST/QST applies</p>
+        <p className="text-xs text-blue-500">Standard GST/QST applies</p>
         </div>
       </div>
     </div>
