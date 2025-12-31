@@ -111,12 +111,26 @@ const ListingDetailPage = () => {
       return;
     }
 
+    const amount = parseFloat(bidAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast.error('Please enter a valid bid amount');
+      return;
+    }
+
+    // Show bid confirmation dialog with cost breakdown
+    setPendingBidAmount(amount);
+    setBidConfirmDialogOpen(true);
+  };
+
+  const confirmPlaceBid = async () => {
+    setPlacingBid(true);
     try {
       const response = await axios.post(`${API}/bids`, {
         listing_id: id,
-        amount: parseFloat(bidAmount),
+        amount: pendingBidAmount,
       });
       
+      setBidConfirmDialogOpen(false);
       toast.success('Bid placed successfully!');
       confetti({
         particleCount: 100,
@@ -135,6 +149,7 @@ const ListingDetailPage = () => {
       fetchListing();
       fetchBids();
       setBidAmount('');
+      setPendingBidAmount(0);
     } catch (error) {
       const errorMessage = extractErrorMessage(error);
       
@@ -149,6 +164,8 @@ const ListingDetailPage = () => {
       } else {
         toast.error(errorMessage || 'Failed to place bid');
       }
+    } finally {
+      setPlacingBid(false);
     }
   };
 
