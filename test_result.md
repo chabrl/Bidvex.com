@@ -1,30 +1,33 @@
 # BidVex Test Results - Updated Dec 31, 2025
 
-## Current Testing Focus: Frontend Transparency Features
+## Current Testing Focus: Full Stress Test - High-Volume Multi-Scenario Seeding
 
-### Completed Implementation:
-1. **User Model Tax Fields** - `is_tax_registered`, `gst_number`, `qst_number` added ✅
-2. **SMS Notification Service** - Twilio integration for outbid/auction won ✅
-3. **BidConfirmationDialog** - New component showing cost breakdown before bid ✅
-4. **PrivateSaleBadge** - Green badge for Individual sellers ✅
-5. **Seller Dashboard Net Payout** - Shows earnings after commission ✅
-6. **Marketplace Private Sale Badge** - Shows on decomposed item cards ✅
+### Seeding Complete:
+- **50 Active Auctions** across 4 categories (Electronics, Industrial, Collectibles, Furniture)
+- **48% Private Sale (Individual Sellers)** / 52% Business Sellers
+- **Bidding Battle Created** - Pioneer vs Challenger on high-value item with SMS triggers
+- **Varied End Times** - 14 days from now for stable testing
+
+### Test Sellers Created:
+**Individual Sellers (is_tax_registered: false)**
+- Alice Collector (alice.collector@bidvextest.com)
+- Bob Hobbyist (bob.hobbyist@bidvextest.com)
+- Carol Artist (carol.artist@bidvextest.com)
+- David Downsizer (david.downsizer@bidvextest.com)
+
+**Business Sellers (is_tax_registered: true)**
+- TechWorld Electronics Inc. (techworld@bidvextest.com)
+- Heavy Duty Equipment Ltd. (heavyduty@bidvextest.com)
+- Furniture Barn Quebec (furniturebarn@bidvextest.com)
+- Montreal Art Gallery (artgallery@bidvextest.com)
 
 ### Testing Required:
-1. Test the bid confirmation dialog shows cost breakdown
-2. Verify Private Sale badge appears for individual sellers
-3. Verify Business Seller badge appears for registered businesses
-4. Test Seller Dashboard shows Net Payout calculation
-5. Verify marketplace items show Private Sale badge for non-business sellers
-
-### Test Scenarios:
-- Login as test user (pioneer@bidvextest.com / TestPass123!)
-- Navigate to a listing and click "Place Bid"
-- Verify cost breakdown dialog appears with:
-  - Hammer Price
-  - Buyer's Premium (5%)
-  - Tax on Item ($0 for Private Sale, >$0 for Business)
-  - Total Out-of-Pocket
+1. Navigate to Lots Auction page - verify auctions display
+2. Click on individual seller auction - verify Private Sale badge
+3. Click on business seller auction - verify Business Seller badge
+4. Test bid placement - verify cost breakdown dialog
+5. Verify marketplace shows Private Sale badges on item cards
+6. Test search and filter functionality with 50 items
 
 ---
 
