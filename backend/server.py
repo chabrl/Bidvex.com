@@ -1417,6 +1417,7 @@ async def get_user_profile_summary(user_id: str):
             "account_type": user_doc.get("account_type", "personal"),
             "city": user_doc.get("address", "").split(",")[0] if user_doc.get("address") else None,
             "subscription_tier": user_doc.get("subscription_tier", "free"),
+            "is_tax_registered": user_doc.get("is_tax_registered", False),  # For Private Sale badge
             "stats": {
                 "total_auctions": total_auctions,
                 "completed_auctions": completed_auctions,
