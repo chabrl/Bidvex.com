@@ -1,149 +1,335 @@
-<analysis>**original_problem_statement:** The user's primary goal is to build out a premier auction platform, BidVex, and prepare it for a final launch. Over the course of the session, the user issued a series of directives to achieve this:
-
-1.  **Bug Fixes:** Resolve critical layout and visibility bugs on the homepage, specifically a layout collapse when sections are toggled and a visibility issue with the Hot Items animated section.
-2.  **Internationalization & Theming:** Implement full bilingual support (English/French) across the entire platform, including language persistence. Concurrently, fix all UI/UX issues in Dark Mode to ensure high contrast and readability.
-3.  **Database Sanitization:** Perform a controlled cleanup of the production database, removing all test data (users, listings, bids) while preserving essential configurations like admin accounts, site settings, and audit logs.
-4.  **Messaging Overhaul (Pro-Connect):** Redesign the messaging system into a professional, dual-pane SaaS-style dashboard with contextual headers, rich media attachments (images/PDFs), and real-time notifications.
-5.  **Final Launch Features:**
-    *   **Automated Handshake:** Automate the post-auction process by creating a message thread between the seller and winning bidder the moment an auction ends.
-    *   **Seller Analytics:** Build a dashboard for sellers to track key metrics like impressions, clicks, and bid velocity for their listings.
-    *   **Backend Stability:** Refactor the large  monolith into a modular, router-based architecture to improve stability and maintainability.
-6.  **Security Enhancement:** Implement a mandatory SMS-based 2FA verification step for all new user signups using Twilio.
+<analysis>**original_problem_statement:** The user wants to implement several major features and architectural changes to the BidVex auction platform. This includes:
+1.  **RAG AI Assistant:** A luxury auction specialist AI (Master Concierge) using OpenAI GPT-4, ChromaDB, and specific business logic for shipping, verification, and support escalation.
+2.  **Dynamic CMS:** A system for admins to dynamically edit footer content pages (How It Works, Privacy, etc.) with bilingual support and a rich text editor.
+3.  **Global Rebranding:** A complete removal of the Monster Bid branding, replacing it with BidVex or professional auction terminology like Power Bid.
+4.  **Disruptor Protocol (Fee/Tax Engine):** A major architectural overhaul to implement a transparent fee structure (5% buyer premium, 4.5% seller commission with subscription discounts) and a complex tax system that differentiates between non-tax-collecting Individual sellers and tax-collecting Business sellers.
+5.  **Boutique Test Drive:** A comprehensive QA test to validate the new fee/tax logic using dummy users and auctions.
+6.  **Twilio Integration:** Activation of SMS notifications for outbids, auction wins, and phone verification using provided Twilio credentials.
 
 **User's preferred language**: English
 
 **what currently exists?**
-The application is a feature-rich, full-stack auction platform with a highly polished and animated frontend.
-- **Frontend:** A modern React application featuring a dynamic, animated homepage. It now has full bilingual (EN/FR) support managed by  with language preference persisted in . Dark mode is fully functional and visually consistent. A completely redesigned, dual-pane messaging page () exists with real-time capabilities and file-upload stubs. A placeholder page for SMS verification () and a component for seller analytics have also been created.
-- **Backend:** A FastAPI server that has begun a significant refactoring process. The original  monolith now delegates logic to modular routers for , , and . Endpoints for file uploads in chat and seller analytics are in place. An APScheduler job runs to process ended auctions. The foundation for Twilio SMS verification is set up with a dedicated router and environment variables. The database has been cleaned of all test data.
+The application is a full-stack auction marketplace (BidVex) with a FastAPI backend, React frontend, and MongoDB database. Key features implemented in this session include:
+- A fully functional RAG-based AI assistant (Master Concierge) using , local embeddings, and a ChromaDB vector store.
+- A dynamic Content Management System (CMS) allowing an administrator to edit legal/content pages (How It Works, Privacy Policy, etc.) from the admin panel, with changes reflected instantly on the frontend. The system supports bilingual (EN/FR) content.
+- A successful rebranding effort has removed all instances of Monster Bid from the UI and backend logic, replacing it with BidVex and Power Bid.
+- The backend for a new, complex fee and tax engine has been implemented in . This logic correctly calculates costs based on user subscription tiers and differentiates between tax-collecting Business sellers and non-tax-collecting Individual sellers.
+- Test scripts (, ) have been created to set up a testing environment for the new tax logic, though the execution was not fully successful.
 
 **Last working item**:
--   **Last item agent was working:** Finalizing the launch readiness tasks, specifically implementing the **Mandatory SMS Verification (2FA) for User Signup**. The agent had just finished several foundational steps: installing Twilio, adding a new router (), creating a UI page (), updating the environment files, adding a  field to the user model, and successfully executing the requested database cleanup.
--   **Status:** IN PROGRESS
--   **Agent Testing Done:** N
--   **Which testing method agent to use?** Frontend testing agent. The test must cover the entire new user registration flow: signup -> redirect to  -> enter a valid OTP -> successful verification and access to the app -> attempt to enter an invalid OTP and see an error -> test the Resend Code functionality.
--   **User Testing Done:** N
+-   **Last item agent was working**: The agent received a request to integrate Twilio for SMS notifications (outbids, auction status, verification). It acknowledged the request and was about to begin implementation by adding the provided credentials to the environment variables.
+-   **Status**: NOT STARTED
+-   **Agent Testing Done**: N
+-   **Which testing method agent to use?**: backend testing agent
+-   **User Testing Done**: N
 
 **All Pending/In progress Issue list**:
-There are no outstanding bugs. The current focus is on completing the in-progress tasks.
+-   **Issue 1**: The Boutique Test Drive script failed during execution.
+    -   **Priority**: P1
+    -   **Description**: The  script, intended to validate the complex tax and fee logic, failed during the user authentication step ( command). The agent hypothesized a server restart was needed but did not debug or resolve the failure.
+    -   **Details**:
+        -   **Attempted fixes**: None. The agent moved on after the initial failure.
+        -   **Next debug checklist**:
+            1.  Restart the backend service with backend: stopped
+backend: started.
+            2.  Re-run the ============================================================
+🧪 BIDVEX BOUTIQUE TEST DRIVE - EXECUTION
+============================================================
+
+📋 Step 1: Setting up test environment...
+------------------------------------------------------------
+============================================================
+🧪 BIDVEX BOUTIQUE TEST DRIVE - SETUP
+============================================================
+
+📋 Step 1: Creating Test Users
+------------------------------------------------------------
+  ⚠️  User already exists: pioneer@bidvextest.com
+  ⚠️  User already exists: challenger@bidvextest.com
+  ⚠️  User already exists: individual@bidvextest.com
+  ⚠️  User already exists: business@bidvextest.com
+
+📋 Step 2: Creating Test Auctions
+------------------------------------------------------------
+  ⚠️  Auction already exists: TEST-01
+  ⚠️  Auction already exists: TEST-02
+  ⚠️  Auction already exists: TEST-03
+  ⚠️  Auction already exists: TEST-04
+
+============================================================
+✅ TEST ENVIRONMENT READY
+============================================================
+
+📊 TEST ACCOUNTS:
+------------------------------------------------------------
+User A (Pioneer):    pioneer@bidvextest.com    | TestPass123!
+User B (Challenger): challenger@bidvextest.com | TestPass123!
+Individual Seller:   individual@bidvextest.com | TestPass123!
+Business Seller:     business@bidvextest.com   | TestPass123!
+
+📦 TEST AUCTIONS:
+------------------------------------------------------------
+TEST-01: MacBook Pro M2 - 16GB RAM, 512GB SSD
+           👤 Individual | 🎉 No Tax on Item | $1000.00
+TEST-02: Industrial Cordless Drill Set - Professional Grade
+           🏢 Business | 💰 Tax Applies | $500.00
+TEST-03: Vintage Rolex Submariner - 1980s Classic
+           👤 Individual | 🎉 No Tax on Item | $5000.00
+TEST-04: Premium Office Furniture Set - Desk, Chair, Cabinet
+           🏢 Business | 💰 Tax Applies | $200.00
+
+🧪 READY FOR TESTING!
+============================================================
+
+📋 Step 2: Authenticating test users...
+------------------------------------------------------------
+Logging in User A (Pioneer)...
+  ❌ User A authentication failed script.
+            3.  If it fails again, check the backend logs (==> /var/log/supervisor/backend.err.log <==
+WARNING:  WatchFiles detected changes in 'server.py'. Reloading...
+INFO:apscheduler.scheduler:Adding job tentatively -- it will be properly scheduled when the scheduler starts
+INFO:apscheduler.scheduler:Adding job tentatively -- it will be properly scheduled when the scheduler starts
+
+==> /var/log/supervisor/backend.out.log <==) for authentication errors immediately after the  command runs.
+            4.  Ensure the test users (, ) exist in the database with correctly hashed passwords.
+            5.  Manually test the login for these users with a  command to isolate the issue.
+        -   **Why fix this issue and what will be achieved with the fix?**: This test is critical to validate that the complex, multi-scenario tax and fee logic works correctly end-to-end before integrating it into the frontend UI.
+        -   **Status**: BLOCKED
+        -   **Is recurring issue?**: N
+        -   **Should Test frontend/backend/both after fix?**: backend
+        -   **Blocked on other issue**: None
 
 **In progress Task List**:
--   **Task 1: Complete SMS Verification (2FA) Implementation (P0)**
-    -   **Where to resume:** The foundational files (, ) are created but contain minimal logic. The next steps are:
-        1.  In , implement the functions to call the Twilio API for sending an OTP to the user's phone number and verifying the code they submit.
-        2.  In , build out the UI with the 6-digit input, API call logic, error handling, and the Resend Code cooldown timer.
-        3.  Modify the frontend routing ( or a protected route component) to automatically redirect newly registered, unverified users to the  page.
-        4.  Secure backend endpoints (e.g., creating a listing, placing a bid) to require that the user's  status is .
-    -   **What will be achieved with this?** This will significantly enhance platform security and user trust by ensuring all accounts are tied to a verified phone number, a critical step before launch.
-    -   **Status:** IN PROGRESS
-    -   **Should Test frontend/backend/both after fix?** Both.
-    -   **Blocked on something:** The implementation requires the  and  to be correctly set in . The agent proceeded with placeholders and must now ensure these are populated to make live API calls.
+-   **Task 1**: Disruptor Protocol - Frontend Fee/Tax Transparency
+    -   **Priority**: P1
+    -   **Description**: Implement the frontend UI changes required for the new fee engine. The most critical part is updating the bidding component to call the  endpoint and display the Total Out-of-Pocket cost (Bid + Buyer's Premium + Taxes) to the user *before* they confirm their bid.
+    -   **Details**:
+        -   **Where to resume**: Modify the frontend components responsible for placing bids (likely in  and the  component).
+        -   **What will be achieved with this?**: This will fulfill the core Radical Transparency requirement of the new architecture.
+        -   **Status**: NOT STARTED
+        -   **Should Test frontend/backend/both after fix?**: frontend
+        -   **Blocked on something**: None
+
+-   **Task 2**: Individual vs. Business Seller - Frontend UI
+    -   **Priority**: P1
+    -   **Description**: Implement the frontend UI to reflect the new seller tax status logic. This involves displaying a Private Sale: No sales tax on hammer price notification on item pages where the seller is an individual (non-tax registered).
+    -   **Details**:
+        -   **Where to resume**: The backend  API needs to be updated to include the seller's tax registration status. Then, the frontend  component needs to be modified to conditionally render the Private Sale badge based on this data.
+        -   **What will be achieved with this?**: It makes the cost benefit of buying from individual sellers clear to buyers, a key business requirement.
+        -   **Status**: NOT STARTED
+        -   **Should Test frontend/backend/both after fix?**: both
+        -   **Blocked on something**: Depends on the Update User Model task in Upcoming Tasks.
 
 **Upcoming and Future Tasks**
--   **Upcoming Tasks:**
-    -   **Finalize Automated Handshake (P1):** The  job exists in . It needs to be fully wired to the  function to automatically create the chat thread when an auction concludes. End-to-end testing is required.
-    -   **Wire Seller Analytics Dashboard (P1):** The frontend component () and backend API () are created. The component now needs to be fully implemented to fetch and display the analytics data with charts. The backend needs logic to track impressions and clicks.
-    -   **Implement Push Notifications (P1):** Configure a Service Worker to enable browser push notifications for new messages and auction win events as per the user's request.
-    -   **Finalize Email Localization (P1):** Configure the SendGrid service to use the user's  to send localized email templates.
-
--   **Future Tasks:**
-    -   **Complete Backend Modularization Refactor (P2):** The refactor of  has started but is incomplete. Logic for auth, listings, users, admin settings, etc., still resides in the monolith and must be moved to dedicated router files to ensure stability and maintainability.
-    -   **Decompose Large Frontend Components (P2):**  remains a very large component. It should be broken down into smaller, more manageable sub-components (e.g., , ).
+-   **Upcoming Tasks**:
+    -   **P0: Twilio Integration**: Implement the full Twilio feature for sending SMS notifications for outbids, auction wins/losses, and phone number verification, using the credentials provided by the user. (Files: , new notification service).
+    -   **P1: Update User Model for Tax Registration**: Add the required fields to the backend User model to support differentiated tax logic. This was a missed step from a previous request. (File:  or wherever Pydantic models are defined).
+        -    (Default: False)
+        -   
+        -   
+-   **Future Tasks**:
+    -   **P2: Complete Disruptor Protocol Implementation**:
+        -   **Seller Trust Score**: Backend service to calculate score and a BidVex Trusted Seller badge on the frontend.
+        -   **Seller Dashboard**: UI overhaul to show Net Earnings, Pending Payouts, and a Tax Summary.
+        -   **Currency Switcher**: Frontend header toggle (CAD, USD, EUR) and integration with a currency conversion API.
+        -   **High-Stakes Bidding UI**: Pulsing red animation on the timer and live notifications.
+        -   **Public Bid History**: A new tab on lot pages showing an obfuscated, timestamped bid history.
 
 **Completed work in this session**
--   **Homepage Bug Fixes (DONE):** Resolved the layout collapse issue and fixed the Hot Items section's visibility and animations.
--   **Bilingual & Dark Mode Implementation (DONE):** Integrated  for full EN/FR translation with  persistence and refined all Dark Mode styles for optimal contrast and readability.
--   **Pro-Connect Messaging Suite (DONE):** Re-architected the messaging page into a professional, dual-pane UI with backend support for file attachments and real-time communication via WebSockets.
--   **Backend Refactor Initiation (DONE):** Started the modularization of  by creating separate routers for messages, analytics, and auctions.
--   **Database Sanitization (DONE):** Successfully executed a controlled cleanup of all test data from the database while preserving critical configurations.
--   **Seller Analytics Foundation (DONE):** Created the backend endpoint and frontend component for the Seller Analytics Dashboard.
--   **SMS Verification Foundation (DONE):** Set up the initial files, routes, and configuration for the Twilio 2FA implementation.
+-   **RAG AI Assistant**: Successfully implemented and integrated the Master Concierge AI assistant with a RAG pipeline using local embeddings.
+-   **Dynamic CMS for Content Pages**: Created a fully functional admin UI to edit footer pages with a rich text editor and bilingual support, with content displayed dynamically on the frontend.
+-   **Admin Login and UI Bug Fixes**:
+    -   Resolved an admin login failure by creating the admin account and correcting missing fields in the database.
+    -   Fixed a React crash on the Admin Logs page caused by rendering an object.
+    -   Fixed a data persistence issue in the new CMS admin panel.
+    -   Fixed 404 errors on footer links by correcting mismatched routes in the database.
+-   **How It Works Page Redesign**: Implemented a new, visually appealing design for the How It Works page based on a user-provided screenshot.
+-   **Monster Bid Global Rebranding**: Systematically removed all Monster Bid branding from the codebase and UI, replacing it with BidVex and Power Bid.
+-   **Fee & Tax Engine (Backend)**: Implemented the backend logic for the new transparent fee structure and the differentiated tax model for Individual vs. Business sellers.
 
 **Earlier issues found/mentioned but not fixed**
--   None.
+-   None. The agent addressed all reported issues, although some fixes (like the CMS) required multiple iterations after the user pointed out subsequent problems.
 
 **Known issue recurrence from previous fork**
--   None.
+-   None mentioned in the provided history.
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
--   **i18next:** The core library used for full-stack internationalization (EN/FR). Includes  for automatic language detection.
--   **localStorage:** Used to persist the user's language choice across sessions.
--   **FastAPI APIRouter:** The primary pattern used to begin breaking down the  monolith into modular, domain-specific backend components.
--   **Twilio API Integration:** The chosen method for implementing SMS-based 2FA (implementation in progress).
--   **CSS Variables:** Extensively used for theming, especially for implementing and refining Dark Mode.
+-   **Backend**: FastAPI, MongoDB, Pydantic models.
+-   **Frontend**: React, Tailwind CSS, Axios.
+-   **AI/RAG**: Retrieval-Augmented Generation using  for the LLM call (GPT-4),  for local embeddings, and  as the vector store.
+-   **Business Logic**: Complex, multi-variable fee and tax calculations are centralized in .
+-   **CMS**: A dynamic content system where the admin panel writes to a  collection in MongoDB, and the frontend reads from it to populate pages and the footer.
 
 **key DB schema**
--   **:** Modified to include a  field, which defaults to .
+-   **users**: {email, password_hash, role, name, phone, ..., **NEEDS is_tax_registered, gst_number, qst_number**}
+-   **listings**: {title, description, seller_id, ...}
+-   **site_config**: Stores a single document containing configurations for legal pages, including titles, content (EN/FR), and link settings (URL, type).
 
 **changes in tech stack**
--   **Frontend:** Added .
--   **Backend:** Added .
+-   Introduced  for interacting with LLMs.
+-   Introduced  for the vector database.
+-   Introduced  and  for local text embeddings.
 
 **All files of reference**
--    (New, needs implementation)
--    (New, needs implementation)
--    (New, needs full data tracking logic)
--    (New, needs data fetching/rendering)
--    (New, needs final wiring)
--    (Modified to include analytics tab)
--    (Heavily modified to support new routers)
--    (Heavily modified with new translations)
--    (Heavily modified to be fully translatable)
--    (Completely rewritten)
--    (Modified for Twilio credentials)
-
-**Areas that need refactoring**:
--   ** Monolith:** This remains the most significant piece of technical debt. The refactoring has begun, but a large amount of logic (auth, user profiles, listings, admin) still needs to be migrated to their own router files.
--   ** Component:** This file contains the logic for multiple distinct sections of the homepage. These should be extracted into their own smaller components (e.g., , ) for better organization and reusability.
-
-**key api endpoints**
--   **POST ** (New, pending implementation)
--   **POST ** (New, pending implementation)
--   **GET ** (New)
--   **POST ** (New, for handling auction conclusions)
--   **POST ** (New)
--   **GET ** (New)
+-   : **New file.** Central hub for all pricing, fee, and tax logic. Critical for all future transaction-related work.
+-   : **Heavily modified.** Contains new API endpoints for the AI assistant, CMS, and fee calculator.
+-    & : **New files.** Contain the core RAG implementation.
+-   : **New file.** The admin interface for the dynamic CMS.
+-   : **New file.** The generic component that renders content from the CMS.
+-   : **Modified.** Now fetches its links dynamically from the backend instead of being hardcoded.
+-   : **Modified.** Fixed a rendering bug to correctly display JSON details.
 
 **Critical Info for New Agent**
--   **Twilio Credentials Required:** The SMS verification feature is blocked until valid  and  are added to the  file. You will need to prompt the user for these if they are not available.
--   **Database is Clean:** The database was wiped of all test data. You will need to register a new user and create new listings to test most features.
--   **Backend Refactor is In Progress:** When adding new backend functionality, follow the established pattern of creating or adding to a modular  in the  directory, rather than adding more code to .
+-   The Disruptor Protocol is a major, multi-phase project. The backend for the fee/tax engine is complete, but it is **not yet integrated into the frontend**. You must update the bidding UI to show the final cost *before* a bid is placed.
+-   The tax logic is complex and differentiates between Individual and Business sellers. The backend logic exists in , but the required User model changes (, etc.) were **missed** and must be implemented.
+-   The Boutique Test Drive scripts ( and ) were created to test the tax logic but failed on execution. This test **must be fixed and passed** to validate the backend changes before proceeding with extensive frontend work.
+-   All AI assistant logic uses the  library and local embeddings, not direct OpenAI SDK calls for embeddings.
+-   The footer and its associated content pages (How It Works, Privacy, etc.) are now fully dynamic and controlled via the Admin Panel under .
 
-**documents and test_reports created in this job**
--    (Updated several times to reflect testing of new features and bug fixes).
+**documents and test reports created in this job**
+-   
+-   
+-   ============================================================
+🧪 BIDVEX BOUTIQUE TEST DRIVE - EXECUTION
+============================================================
+
+📋 Step 1: Setting up test environment...
+------------------------------------------------------------
+============================================================
+🧪 BIDVEX BOUTIQUE TEST DRIVE - SETUP
+============================================================
+
+📋 Step 1: Creating Test Users
+------------------------------------------------------------
+  ⚠️  User already exists: pioneer@bidvextest.com
+  ⚠️  User already exists: challenger@bidvextest.com
+  ⚠️  User already exists: individual@bidvextest.com
+  ⚠️  User already exists: business@bidvextest.com
+
+📋 Step 2: Creating Test Auctions
+------------------------------------------------------------
+  ⚠️  Auction already exists: TEST-01
+  ⚠️  Auction already exists: TEST-02
+  ⚠️  Auction already exists: TEST-03
+  ⚠️  Auction already exists: TEST-04
+
+============================================================
+✅ TEST ENVIRONMENT READY
+============================================================
+
+📊 TEST ACCOUNTS:
+------------------------------------------------------------
+User A (Pioneer):    pioneer@bidvextest.com    | TestPass123!
+User B (Challenger): challenger@bidvextest.com | TestPass123!
+Individual Seller:   individual@bidvextest.com | TestPass123!
+Business Seller:     business@bidvextest.com   | TestPass123!
+
+📦 TEST AUCTIONS:
+------------------------------------------------------------
+TEST-01: MacBook Pro M2 - 16GB RAM, 512GB SSD
+           👤 Individual | 🎉 No Tax on Item | $1000.00
+TEST-02: Industrial Cordless Drill Set - Professional Grade
+           🏢 Business | 💰 Tax Applies | $500.00
+TEST-03: Vintage Rolex Submariner - 1980s Classic
+           👤 Individual | 🎉 No Tax on Item | $5000.00
+TEST-04: Premium Office Furniture Set - Desk, Chair, Cabinet
+           🏢 Business | 💰 Tax Applies | $200.00
+
+🧪 READY FOR TESTING!
+============================================================
+
+📋 Step 2: Authenticating test users...
+------------------------------------------------------------
+Logging in User A (Pioneer)...
+  ❌ User A authentication failed
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User:** 🔐 Security Directive: Mandatory SMS Verification (2FA) for User Signup
-2.  **User:** 🚀 Final Launch Integration: Automated Handshake, Analytics & System Stability
-3.  **User:** 💬 UI/UX & Backend Directive: BidVex Pro-Connect Messaging Suite
-4.  **User:** 💾 Database Operations Directive: Production Environment Sanitization
-5.  **User:** Role: Senior Full-Stack Engineer / Localization Specialist. Order: Implement full English/French (EN/FR) parity...
-6.  **User:** Both fixes have been tested and verified as working. Let me provide a summary...
-7.  **User:** Role: Senior Frontend Engineer. Objective: Fix the Hot Items section visibility bug...
-8.  **User:** 🛠️ Bug Fix Directive: Homepage Layout Collapse & Background Continuity
-9.  **User (from previous handoff):** With your Twilio Verify Service SID now ready... (This initiated the 2FA work).
-10. **User (from previous handoff):** Please proceed with the cleanup... (This approved the database wipe).
+1.  **User**: Asks to implement Twilio integration with provided credentials for SMS notifications. **(PENDING)**
+2.  **Agent**: Acknowledges the Twilio request and states a plan to start.
+3.  **User**: Provides the Boutique Test Drive protocol to QA the new tax logic.
+4.  **Agent**: Implements the test setup and execution scripts, but the test fails. Reports partial success and moves on.
+5.  **User**: Specifies the tax logic for Individual vs. Business sellers.
+6.  **Agent**: Implements the backend logic for the tax differentiation and verifies it with a script.
+7.  **User**: Provides the Disruptor Protocol PRD for the new fee engine and architecture.
+8.  **Agent**: Implements the backend portion of the fee engine and verifies the API.
+9.  **User**: Provides the Monster Bid global rebranding directive.
+10. **Agent**: Successfully completes the global rebranding.
 
 **Project Health Check:**
--   **Broken:** The user signup flow is functionally incomplete. New users can create an account but will be blocked from proceeding until the SMS verification feature is fully implemented and wired into the user journey.
--   **Mocked:** The entire SMS verification flow is currently mocked or consists of placeholder files.
+-   **Broken**: The  script is non-functional and fails on user authentication. This blocks full validation of the new tax/fee engine.
+-   **Mocked**: No mocked components.
 
 **3rd Party Integrations**
--   **SendGrid:** Used for transactional emails.
--   **Twilio:** Integration in progress for SMS verification. Requires user-provided API keys (, ).
+-   **OpenAI GPT-4**: Used for the AI Assistant's reasoning capabilities, accessed via the  library — uses Emergent LLM Key.
+-   **Twilio**: Requested for SMS notifications. Integration is pending — requires User API Key.
+-   **MongoDB**: Primary database.
+-   **ChromaDB**: Vector store for the RAG system.
 
 **Testing status**
--   **Testing agent used after significant changes:** YES. Used for fixing homepage bugs, implementing the messaging suite, and verifying the i18n/dark mode changes.
--   **Troubleshoot agent used after agent stuck in loop:** NO.
--   **Test files created:** None.
--   **Known regressions:** None, but the new user registration flow is intentionally incomplete pending the 2FA implementation.
+-   **Testing agent used after significant changes**: NO (Agent used manual  or custom Python scripts for testing).
+-   **Troubleshoot agent used after agent stuck in loop**: NO
+-   **Test files created**: [, ============================================================
+🧪 BIDVEX BOUTIQUE TEST DRIVE - EXECUTION
+============================================================
+
+📋 Step 1: Setting up test environment...
+------------------------------------------------------------
+============================================================
+🧪 BIDVEX BOUTIQUE TEST DRIVE - SETUP
+============================================================
+
+📋 Step 1: Creating Test Users
+------------------------------------------------------------
+  ⚠️  User already exists: pioneer@bidvextest.com
+  ⚠️  User already exists: challenger@bidvextest.com
+  ⚠️  User already exists: individual@bidvextest.com
+  ⚠️  User already exists: business@bidvextest.com
+
+📋 Step 2: Creating Test Auctions
+------------------------------------------------------------
+  ⚠️  Auction already exists: TEST-01
+  ⚠️  Auction already exists: TEST-02
+  ⚠️  Auction already exists: TEST-03
+  ⚠️  Auction already exists: TEST-04
+
+============================================================
+✅ TEST ENVIRONMENT READY
+============================================================
+
+📊 TEST ACCOUNTS:
+------------------------------------------------------------
+User A (Pioneer):    pioneer@bidvextest.com    | TestPass123!
+User B (Challenger): challenger@bidvextest.com | TestPass123!
+Individual Seller:   individual@bidvextest.com | TestPass123!
+Business Seller:     business@bidvextest.com   | TestPass123!
+
+📦 TEST AUCTIONS:
+------------------------------------------------------------
+TEST-01: MacBook Pro M2 - 16GB RAM, 512GB SSD
+           👤 Individual | 🎉 No Tax on Item | $1000.00
+TEST-02: Industrial Cordless Drill Set - Professional Grade
+           🏢 Business | 💰 Tax Applies | $500.00
+TEST-03: Vintage Rolex Submariner - 1980s Classic
+           👤 Individual | 🎉 No Tax on Item | $5000.00
+TEST-04: Premium Office Furniture Set - Desk, Chair, Cabinet
+           🏢 Business | 💰 Tax Applies | $200.00
+
+🧪 READY FOR TESTING!
+============================================================
+
+📋 Step 2: Authenticating test users...
+------------------------------------------------------------
+Logging in User A (Pioneer)...
+  ❌ User A authentication failed]
+-   **Known regressions**: None.
 
 **Credentials to test flow:**
--   **Admin User:**  / 
--   **To test 2FA:** A new user account must be created.
+-   **Admin Email**: 
+-   **Admin Password**: 
 
 **What agent forgot to execute**
--   The agent correctly identified the need for the  and  but did not explicitly ask the user for them after receiving the . The implementation cannot be completed without these keys. The next agent must acquire them.</analysis>
+-   **Update User Model for Tax Status**: The user explicitly asked to Add a boolean field to the User Model:  along with  and . The agent implemented the calculation logic that *uses* this theoretical status but never actually added the fields to the user schema in the database or the Pydantic models. This is a critical missing piece for the tax feature to work.
+-   **Fully Debug and Complete the Boutique Test Drive**: The agent created the test scripts, saw them fail, and moved on. It did not resolve the authentication error, meaning the comprehensive test case provided by the user to validate the most complex piece of business logic was never actually completed.</analysis>
