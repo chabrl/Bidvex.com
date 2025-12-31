@@ -7203,7 +7203,7 @@ async def place_monster_bid(listing_id: str, amount: float, current_user: User =
         })
         
         return {
-            "message": "Monster Bid placed successfully!",
+            "message": "Power Bid placed successfully!",
             "bid_id": bid.id,
             "remaining_monster_bids": 0 if tier == "free" else "unlimited"
         }
