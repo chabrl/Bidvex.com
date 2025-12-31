@@ -340,18 +340,18 @@ class BidVexFeeCalculatorTester:
                     expected_commission = 1000 * 0.040  # 4.0%
                     expected_net = 1000 - expected_commission
                     
-                    assert abs(data["commission_amount"] - expected_commission) < 0.01, f"Premium tier commission should be ${expected_commission:.2f}, got ${data['commission_amount']:.2f}"
-                    assert abs(data["net_amount"] - expected_net) < 0.01, f"Premium tier net should be ${expected_net:.2f}, got ${data['net_amount']:.2f}"
+                    assert abs(data["seller_commission"] - expected_commission) < 0.01, f"Premium tier commission should be ${expected_commission:.2f}, got ${data['seller_commission']:.2f}"
+                    assert abs(data["net_payout"] - expected_net) < 0.01, f"Premium tier net should be ${expected_net:.2f}, got ${data['net_payout']:.2f}"
                     
                     print(f"✅ Premium Tier Commission Calculation:")
-                    print(f"   - Gross Amount: ${data['gross_amount']:.2f}")
-                    print(f"   - Commission Rate: {data['commission_rate']:.1f}%")
-                    print(f"   - Commission Amount: ${data['commission_amount']:.2f}")
-                    print(f"   - Net Amount: ${data['net_amount']:.2f}")
+                    print(f"   - Gross Amount: ${data['hammer_price']:.2f}")
+                    print(f"   - Commission Rate: {data['seller_commission_percent']:.1f}%")
+                    print(f"   - Commission Amount: ${data['seller_commission']:.2f}")
+                    print(f"   - Net Amount: ${data['net_payout']:.2f}")
                     
                     # Calculate premium savings
                     free_commission = 1000 * 0.045
-                    premium_commission = data['commission_amount']
+                    premium_commission = data['seller_commission']
                     savings = free_commission - premium_commission
                     
                     print(f"✅ Premium Subscription Savings: ${savings:.2f} (0.5% reduction)")
