@@ -1,29 +1,30 @@
 # BidVex Test Results - Updated Dec 31, 2025
 
-## Current Testing Focus: Foundation Fix + Twilio SMS Integration
+## Current Testing Focus: Frontend Transparency Features
 
-### Tasks Completed:
-1. **User Model Tax Fields Added** - `is_tax_registered`, `gst_number`, `qst_number` added to User Pydantic model with backward compatibility defaults
-2. **Boutique Test Drive Fixed** - Authentication errors resolved, all test users can now login
-3. **SMS Notification Service Created** - `/app/backend/services/sms_notification_service.py` with Twilio integration
-4. **Outbid SMS Notifications** - Integrated into both single-item and multi-lot bid placement
-5. **Auction Won SMS Notifications** - Added to `create_auction_won_conversation` function
-
-### Twilio Configuration:
-- Account SID: AC0ff805d4a46f0c167703dba42b140c6d
-- Auth Token: 1d35fc02052690b9584716ac97daa6d9  
-- Phone Number: +15005550006 (Twilio test number)
-
-### Test Environment:
-- Test Users: pioneer@bidvextest.com, challenger@bidvextest.com, individual@bidvextest.com, business@bidvextest.com (Password: TestPass123!)
-- Test Auctions: TEST-01 (Individual), TEST-02 (Business), TEST-03 (Individual), TEST-04 (Business)
+### Completed Implementation:
+1. **User Model Tax Fields** - `is_tax_registered`, `gst_number`, `qst_number` added ✅
+2. **SMS Notification Service** - Twilio integration for outbid/auction won ✅
+3. **BidConfirmationDialog** - New component showing cost breakdown before bid ✅
+4. **PrivateSaleBadge** - Green badge for Individual sellers ✅
+5. **Seller Dashboard Net Payout** - Shows earnings after commission ✅
+6. **Marketplace Private Sale Badge** - Shows on decomposed item cards ✅
 
 ### Testing Required:
-1. Verify SMS service initializes correctly on backend startup
-2. Test outbid SMS triggers when a user is outbid
-3. Test auction won SMS triggers when auction ends
-4. Verify tax calculations work with new User model fields
-5. Verify "Boutique Test Drive" script passes completely
+1. Test the bid confirmation dialog shows cost breakdown
+2. Verify Private Sale badge appears for individual sellers
+3. Verify Business Seller badge appears for registered businesses
+4. Test Seller Dashboard shows Net Payout calculation
+5. Verify marketplace items show Private Sale badge for non-business sellers
+
+### Test Scenarios:
+- Login as test user (pioneer@bidvextest.com / TestPass123!)
+- Navigate to a listing and click "Place Bid"
+- Verify cost breakdown dialog appears with:
+  - Hammer Price
+  - Buyer's Premium (5%)
+  - Tax on Item ($0 for Private Sale, >$0 for Business)
+  - Total Out-of-Pocket
 
 ---
 
