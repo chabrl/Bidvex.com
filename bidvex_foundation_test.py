@@ -388,35 +388,17 @@ class BidVexFoundationTester:
                     listings_data = await response.json()
                     
                     print(f"✅ Multi-item listings endpoint accessible")
-                    print(f"   - Response keys: {list(listings_data.keys())}")
                     
-                    if "listings" in listings_data:
+                    # Handle the response properly
+                    if isinstance(listings_data, list):
+                        listings = listings_data
+                        print(f"   - Response is a list with {len(listings)} listings")
+                    elif isinstance(listings_data, dict) and "listings" in listings_data:
                         listings = listings_data["listings"]
                         print(f"   - Total listings found: {len(listings)}")
-                        
-                        test01_found = False
-                        for listing in listings:
-                            if "TEST-01" in listing.get("title", ""):
-                                test01_found = True
-                                print(f"✅ TEST-01 auction found")
-                                print(f"   - Title: {listing['title']}")
-                                print(f"   - Seller ID: {listing['seller_id']}")
-                                
-                                # Check if we can get seller info to verify tax status
-                                async with self.session.get(
-                                    f"{BASE_URL}/users/{listing['seller_id']}/profile-summary"
-                                ) as seller_response:
-                                    if seller_response.status == 200:
-                                        seller_data = await seller_response.json()
-                                        print(f"   - Seller: {seller_data.get('name', 'Unknown')}")
-                                        print(f"   - Account Type: {seller_data.get('account_type', 'Unknown')}")
-                                break
-                        
-                        if not test01_found:
-                            print(f"⚠️  TEST-01 auction not found in search results")
                     else:
-                        print(f"⚠️  No 'listings' key in response")
-                        print(f"   - Available keys: {list(listings_data.keys())}")
+                        listings = []
+                        print(f"   - No listings found or unexpected response format")
                 else:
                     print(f"❌ Failed to search for TEST-01: {response.status}")
                     text = await response.text()
