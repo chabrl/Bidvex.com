@@ -7149,7 +7149,7 @@ async def get_user_wishlist(current_user: User = Depends(get_current_user)):
 
 @api_router.post("/bids/monster")
 async def place_monster_bid(listing_id: str, amount: float, current_user: User = Depends(get_current_user)):
-    """Place a Monster Bid that overrides standard increments"""
+    """Place a Power Bid that overrides standard increments"""
     try:
         # Get listing
         listing = await db.listings.find_one({"id": listing_id})
@@ -7160,17 +7160,17 @@ async def place_monster_bid(listing_id: str, amount: float, current_user: User =
         tier = current_user.subscription_tier
         monster_bids_used = current_user.monster_bids_used.get(listing_id, 0)
         
-        # Free tier: 1 monster bid per auction
+        # Free tier: 1 power bid per auction
         if tier == "free" and monster_bids_used >= 1:
             raise HTTPException(
                 status_code=403,
-                detail="Free tier allows only 1 Monster Bid per auction. Upgrade to Premium for unlimited Monster Bids."
+                detail="Free tier allows only 1 Power Bid per auction. Upgrade to BidVex Premium for unlimited Power Bids."
             )
         
         # Check if amount is higher than current bid
         current_bid = listing.get("current_bid", listing.get("starting_price", 0))
         if amount <= current_bid:
-            raise HTTPException(status_code=400, detail="Monster Bid must be higher than current bid")
+            raise HTTPException(status_code=400, detail="Power Bid must be higher than current bid")
         
         # Place the bid
         bid = Bid(
