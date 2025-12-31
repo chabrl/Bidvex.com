@@ -703,6 +703,21 @@ const ListingDetailPage = () => {
           index={photoIndex}
         />
       )}
+
+      {/* Bid Confirmation Dialog with Cost Breakdown */}
+      <BidConfirmationDialog
+        isOpen={bidConfirmDialogOpen}
+        onClose={() => {
+          setBidConfirmDialogOpen(false);
+          setPendingBidAmount(0);
+        }}
+        onConfirm={confirmPlaceBid}
+        bidAmount={pendingBidAmount}
+        listingTitle={listing?.title}
+        sellerIsBusiness={seller?.is_tax_registered || false}
+        region={listing?.region || 'QC'}
+        loading={placingBid}
+      />
     </div>
   );
 };
