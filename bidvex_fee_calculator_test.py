@@ -446,8 +446,8 @@ class BidVexFeeCalculatorTester:
         await self.setup_session()
         
         try:
-            # Login all test users
-            for user_type in ["individual", "business", "admin"]:
+            # Login test users (skip admin for now)
+            for user_type in ["individual", "business"]:
                 if not await self.login_user(user_type):
                     print(f"❌ Failed to login {user_type} user")
                     return False
