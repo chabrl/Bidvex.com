@@ -3908,6 +3908,19 @@ async def bid_on_lot(listing_id: str, lot_number: int, data: Dict[str, Any], cur
         }
         await db.notifications.insert_one(outbid_notification)
         logger.info(f"📢 Outbid notification created for user {previous_highest_bidder}")
+        
+        # Send SMS notification (async, non-blocking)
+        try:
+            sms_service = get_sms_notification_service(db)
+            await sms_service.notify_outbid(
+                user_id=previous_highest_bidder,
+                listing_title=f"{listing.get('title', 'Item')} - Lot #{lot_number}",
+                new_bid_amount=amount,
+                previous_bid_amount=previous_bid,
+                listing_id=listing_id
+            )
+        except Exception as sms_error:
+            logger.warning(f"📵 SMS outbid notification failed: {sms_error}")
     
     # Update monster bids used if applicable
     if bid_type == "monster":
