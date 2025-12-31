@@ -16,7 +16,7 @@ import {
 import Countdown from 'react-countdown';
 import Lightbox from 'react-image-lightbox';
 import 'react-image-lightbox/style.css';
-import MonsterBidButton from '../components/MonsterBidButton';
+import PowerBidButton from '../components/PowerBidButton';
 import AutoBidModal from '../components/AutoBidModal';
 import SubscriptionBadge from '../components/SubscriptionBadge';
 import WishlistHeartButton from '../components/WishlistHeartButton';
