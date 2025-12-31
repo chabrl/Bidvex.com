@@ -8707,6 +8707,7 @@ async def estimate_full_transaction(
         # Get tiers
         buyer_tier = "free"
         seller_tier = "free"
+        seller_is_business = False
         
         if buyer_id:
             buyer = await db.users.find_one({"id": buyer_id})
@@ -8717,13 +8718,15 @@ async def estimate_full_transaction(
             seller = await db.users.find_one({"id": seller_id})
             if seller:
                 seller_tier = seller.get("subscription_tier", "free")
+                seller_is_business = seller.get("is_tax_registered", False)
         
         # Calculate full transaction
         transaction = FeeCalculator.calculate_full_transaction(
             hammer_price=Decimal(str(hammer_price)),
             buyer_tier=buyer_tier,
             seller_tier=seller_tier,
-            region=region
+            region=region,
+            seller_is_business=seller_is_business
         )
         
         return {
