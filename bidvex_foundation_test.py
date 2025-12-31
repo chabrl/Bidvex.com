@@ -399,6 +399,18 @@ class BidVexFoundationTester:
                     else:
                         listings = []
                         print(f"   - No listings found or unexpected response format")
+                    
+                    test01_found = False
+                    for listing in listings:
+                        if "TEST-01" in listing.get("title", ""):
+                            test01_found = True
+                            print(f"✅ TEST-01 auction found")
+                            print(f"   - Title: {listing['title']}")
+                            print(f"   - Seller ID: {listing['seller_id']}")
+                            break
+                    
+                    if not test01_found:
+                        print(f"⚠️  TEST-01 auction not found in search results")
                 else:
                     print(f"❌ Failed to search for TEST-01: {response.status}")
                     text = await response.text()
