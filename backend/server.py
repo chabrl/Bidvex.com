@@ -8563,6 +8563,164 @@ async def seed_legal_pages(
         raise HTTPException(status_code=500, detail="Failed to seed legal pages")
 
 
+# ==================== FEE CALCULATION & TRANSPARENCY ENGINE ====================
+# Real-time cost calculation for radical transparency
+
+from services.fee_calculator import FeeCalculator, calculate_buyer_total, calculate_seller_net
+from decimal import Decimal
+
+@api_router.get("/fees/calculate-buyer-cost")
+async def calculate_buyer_cost(
+    amount: float,
+    region: str = "QC",
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Calculate buyer's total out-of-pocket cost BEFORE bid confirmation
+    Provides radical transparency on fees and taxes
+    """
+    try:
+        buyer_tier = current_user.subscription_tier or "free"
+        
+        calculation = calculate_buyer_total(
+            amount=amount,
+            tier=buyer_tier,
+            region=region
+        )
+        
+        return {
+            "success": True,
+            **calculation,
+            "explanation": f"Your total cost includes: ${calculation['hammer_price']:.2f} hammer price + ${calculation['buyer_premium']:.2f} buyer premium ({calculation['buyer_premium_percent']}%) + ${calculation['tax']:.2f} taxes = ${calculation['total']:.2f} total"
+        }
+    
+    except Exception as e:
+        logger.error(f"Error calculating buyer cost: {e}")
+        raise HTTPException(status_code=500, detail="Failed to calculate cost")
+
+@api_router.get("/fees/calculate-seller-net")
+async def calculate_seller_net_endpoint(
+    amount: float,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Calculate seller's net payout after commission
+    Shows transparent commission deduction
+    """
+    try:
+        seller_tier = current_user.subscription_tier or "free"
+        
+        calculation = calculate_seller_net(
+            amount=amount,
+            tier=seller_tier
+        )
+        
+        return {
+            "success": True,
+            **calculation,
+            "explanation": f"You will receive: ${calculation['hammer_price']:.2f} - ${calculation['seller_commission']:.2f} commission ({calculation['seller_commission_percent']}%) = ${calculation['net_payout']:.2f} net payout"
+        }
+    
+    except Exception as e:
+        logger.error(f"Error calculating seller net: {e}")
+        raise HTTPException(status_code=500, detail="Failed to calculate net")
+
+@api_router.get("/fees/subscription-benefits")
+async def get_subscription_benefits():
+    """
+    Public endpoint showing fee benefits for each subscription tier
+    """
+    return {
+        "success": True,
+        "tiers": {
+            "free": {
+                "name": "Starter (Free)",
+                "price": "$0",
+                "buyer_premium": "5%",
+                "seller_commission": "4.5%",
+                "features": [
+                    "Basic bidding",
+                    "1 Power Bid per auction",
+                    "Standard support"
+                ]
+            },
+            "premium": {
+                "name": "BidVex Premium",
+                "price": "$9.99/month",
+                "buyer_premium": "5%",
+                "seller_commission": "4.0%",
+                "discount": "0.5% seller discount",
+                "features": [
+                    "Unlimited Power Bids",
+                    "0.5% lower seller fees",
+                    "Priority support",
+                    "Advanced filters"
+                ]
+            },
+            "vip": {
+                "name": "BidVex VIP",
+                "price": "$29.99/month",
+                "buyer_premium": "4.0%",
+                "seller_commission": "4.0%",
+                "discount": "1% buyer discount + 0.5% seller discount",
+                "features": [
+                    "Unlimited Power Bids",
+                    "1% lower buyer fees",
+                    "0.5% lower seller fees",
+                    "24h early access to auctions",
+                    "Advanced analytics dashboard",
+                    "VIP badge",
+                    "Dedicated support"
+                ]
+            }
+        }
+    }
+
+@api_router.post("/fees/estimate-transaction")
+async def estimate_full_transaction(
+    hammer_price: float,
+    buyer_id: Optional[str] = None,
+    seller_id: Optional[str] = None,
+    region: str = "QC",
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Estimate complete transaction costs for both buyer and seller
+    Used by admins and for transaction previews
+    """
+    try:
+        # Get tiers
+        buyer_tier = "free"
+        seller_tier = "free"
+        
+        if buyer_id:
+            buyer = await db.users.find_one({"id": buyer_id})
+            if buyer:
+                buyer_tier = buyer.get("subscription_tier", "free")
+        
+        if seller_id:
+            seller = await db.users.find_one({"id": seller_id})
+            if seller:
+                seller_tier = seller.get("subscription_tier", "free")
+        
+        # Calculate full transaction
+        transaction = FeeCalculator.calculate_full_transaction(
+            hammer_price=Decimal(str(hammer_price)),
+            buyer_tier=buyer_tier,
+            seller_tier=seller_tier,
+            region=region
+        )
+        
+        return {
+            "success": True,
+            **transaction
+        }
+    
+    except Exception as e:
+        logger.error(f"Error estimating transaction: {e}")
+        raise HTTPException(status_code=500, detail="Failed to estimate transaction")
+
+
 # Include all API routes - MUST be after all routes are defined
 app.include_router(api_router)
 
