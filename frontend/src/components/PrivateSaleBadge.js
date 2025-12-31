@@ -52,7 +52,7 @@ const PrivateSaleBadge = ({
           </p>
           <div className="flex items-center gap-2 mt-2 text-xs text-green-500">
             <ShieldCheck className="h-4 w-4" />
-            <span>GST/QST only applies to the buyer's premium</span>
+            <span>GST/QST only applies to the buyer&apos;s premium</span>
           </div>
         </div>
       </div>
