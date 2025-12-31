@@ -46,6 +46,9 @@ const ListingDetailPage = () => {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [photoIndex, setPhotoIndex] = useState(0);
   const [featureFlags, setFeatureFlags] = useState({ enable_buy_now: true });
+  const [bidConfirmDialogOpen, setBidConfirmDialogOpen] = useState(false);
+  const [pendingBidAmount, setPendingBidAmount] = useState(0);
+  const [placingBid, setPlacingBid] = useState(false);
   
   // Real-time bidding hook - provides instant updates via WebSocket
   const {
