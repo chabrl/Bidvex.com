@@ -36,7 +36,7 @@ const MarketplacePage = () => {
                   <ShoppingBag className="h-8 w-8 text-cyan-400" />
                 </div>
                 <h1 className="text-3xl md:text-4xl font-bold text-white">
-                  {t('marketplace.title', 'Marketplace')}
+                  {t('marketplace.title', 'Active Auctions')}
                 </h1>
               </div>
               <p className="text-blue-100/80 max-w-2xl text-lg">
