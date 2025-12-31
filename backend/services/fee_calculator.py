@@ -303,13 +303,14 @@ class FeeCalculator:
         hammer_price: Decimal,
         buyer_tier: str = "free",
         seller_tier: str = "free",
-        region: str = "QC"
+        region: str = "QC",
+        seller_is_business: bool = False
     ) -> Dict:
         """
         Calculate complete transaction breakdown for buyer and seller
         """
         buyer_calc = FeeCalculator.calculate_buyer_total(
-            hammer_price, buyer_tier, region
+            hammer_price, buyer_tier, region, True, seller_is_business
         )
         seller_calc = FeeCalculator.calculate_seller_net(
             hammer_price, seller_tier
@@ -319,7 +320,8 @@ class FeeCalculator:
             "hammer_price": float(hammer_price),
             "buyer": buyer_calc,
             "seller": seller_calc,
-            "platform_revenue": buyer_calc["buyer_premium"] + seller_calc["seller_commission"]
+            "platform_revenue": buyer_calc["buyer_premium"] + seller_calc["seller_commission"],
+            "seller_type": "business" if seller_is_business else "individual"
         }
 
 
