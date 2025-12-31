@@ -3763,11 +3763,11 @@ async def bid_on_lot(listing_id: str, lot_number: int, data: Dict[str, Any], cur
         if tier == "free" and monster_bids_used >= 1:
             raise HTTPException(
                 status_code=403,
-                detail="Free tier allows only 1 Monster Bid per auction"
+                detail="Free tier allows only 1 Power Bid per auction"
             )
         
         if amount <= current_price:
-            raise HTTPException(status_code=400, detail="Monster Bid must be higher than current price")
+            raise HTTPException(status_code=400, detail="Power Bid must be higher than current price")
     
     # Calculate minimum bid with helpful error message
     min_increment = get_minimum_increment(listing, current_price) if bid_type == "normal" else 1
