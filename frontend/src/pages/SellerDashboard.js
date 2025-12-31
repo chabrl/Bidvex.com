@@ -253,4 +253,63 @@ const StatCard = ({ icon, title, value, color }) => (
   </Card>
 );
 
+/**
+ * NetPayoutCard - Shows seller's net earnings after BidVex commission
+ * Implements "Seller Dashboard Net Payout" from the Disruptor Protocol
+ * 
+ * Commission rates:
+ * - Free tier: 4.5%
+ * - Premium tier: 4.0%
+ * - VIP tier: 4.0%
+ */
+const NetPayoutCard = ({ totalSales = 0, commissionRate = 0.045, subscriptionTier = 'free' }) => {
+  // Calculate commission based on subscription tier
+  const getCommissionRate = () => {
+    switch (subscriptionTier) {
+      case 'premium':
+      case 'vip':
+        return 0.04; // 4% for premium/VIP
+      default:
+        return 0.045; // 4.5% for free tier
+    }
+  };
+
+  const effectiveRate = getCommissionRate();
+  const commissionAmount = totalSales * effectiveRate;
+  const netPayout = totalSales - commissionAmount;
+
+  return (
+    <Card className="glassmorphism border-2 border-green-200 dark:border-green-900/50">
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="p-3 rounded-xl bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30">
+            <Wallet className="h-6 w-6 text-green-600" />
+          </div>
+          <div className="group relative">
+            <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+            <div className="absolute right-0 top-6 w-64 bg-gray-900 text-white text-xs p-3 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
+              <p className="font-semibold mb-1">Net Payout Calculation</p>
+              <p>Total Sales: ${totalSales.toFixed(2)}</p>
+              <p>Commission ({(effectiveRate * 100).toFixed(1)}%): -${commissionAmount.toFixed(2)}</p>
+              <p className="border-t border-gray-700 mt-1 pt-1 font-semibold">
+                Your Bank: ${netPayout.toFixed(2)}
+              </p>
+            </div>
+          </div>
+        </div>
+        <p className="text-2xl font-bold mb-1 text-green-600">${netPayout.toFixed(2)}</p>
+        <p className="text-sm text-muted-foreground">Net Payout</p>
+        <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+          <span>After {(effectiveRate * 100).toFixed(1)}% commission</span>
+          {subscriptionTier !== 'free' && (
+            <Badge className="bg-green-100 text-green-700 text-xs ml-1">
+              {subscriptionTier} rate
+            </Badge>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 export default SellerDashboard;
