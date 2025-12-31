@@ -122,7 +122,7 @@ const SellerDashboard = () => {
           <SellerAnalyticsDashboard />
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
           <StatCard
             icon={<Package className="h-6 w-6" />}
             title={t('dashboard.seller.activeListings')}
@@ -146,6 +146,12 @@ const SellerDashboard = () => {
             title={t('dashboard.seller.totalSales')}
             value={`$${dashboard?.total_sales?.toFixed(2) || '0.00'}`}
             color="purple"
+          />
+          {/* Net Payout Card - Shows what seller will receive after commission */}
+          <NetPayoutCard 
+            totalSales={dashboard?.total_sales || 0}
+            commissionRate={user?.is_tax_registered || user?.account_type === 'business' ? 0.04 : 0.045}
+            subscriptionTier={user?.subscription_tier || 'free'}
           />
         </div>
 
