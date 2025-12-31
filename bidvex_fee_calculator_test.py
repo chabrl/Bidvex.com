@@ -145,7 +145,7 @@ class BidVexFeeCalculatorTester:
                     data = await response.json()
                     
                     # Verify response structure
-                    required_fields = ["hammer_price", "buyers_premium", "tax_on_hammer", "tax_on_premium", "total_cost"]
+                    required_fields = ["hammer_price", "buyer_premium", "tax_on_hammer", "tax_on_premium", "total"]
                     for field in required_fields:
                         assert field in data, f"Missing required field: {field}"
                     
@@ -157,9 +157,9 @@ class BidVexFeeCalculatorTester:
                     
                     # Calculate expected values
                     hammer_price = data["hammer_price"]
-                    buyers_premium = data["buyers_premium"]
+                    buyers_premium = data["buyer_premium"]
                     tax_on_premium = data["tax_on_premium"]
-                    total_cost = data["total_cost"]
+                    total_cost = data["total"]
                     
                     print(f"✅ Individual Seller Fee Calculation:")
                     print(f"   - Hammer Price: ${hammer_price:.2f}")
@@ -167,6 +167,7 @@ class BidVexFeeCalculatorTester:
                     print(f"   - Tax on Hammer: ${data['tax_on_hammer']:.2f} (should be $0.00)")
                     print(f"   - Tax on Premium: ${tax_on_premium:.2f}")
                     print(f"   - Total Cost: ${total_cost:.2f}")
+                    print(f"   - Tax Savings: ${data.get('tax_savings', 0):.2f}")
                     
                     # Store for comparison
                     self.test_results["individual_seller"] = data
