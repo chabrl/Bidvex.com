@@ -2184,6 +2184,43 @@ async def place_bid(bid_data: BidCreate, current_user: User = Depends(get_curren
         broadcast_data
     )
     
+    # ========== OUTBID NOTIFICATION (Single-Item) ==========
+    # Notify previous highest bidder via in-app notification + SMS
+    previous_highest_bidder = listing.get("highest_bidder_id")
+    previous_highest_bid = listing.get("current_price", 0)
+    
+    if previous_highest_bidder and previous_highest_bidder != current_user.id:
+        # Create in-app notification
+        outbid_notification = {
+            "id": str(uuid.uuid4()),
+            "user_id": previous_highest_bidder,
+            "type": "outbid",
+            "title": "You've been outbid! 🔔",
+            "message": f"Someone placed a higher bid of ${bid_data.amount:.2f} on '{listing.get('title', 'Item')}'. Tap to bid again.",
+            "data": {
+                "listing_id": bid_data.listing_id,
+                "current_bid": bid_data.amount,
+                "listing_title": listing.get("title")
+            },
+            "read": False,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.notifications.insert_one(outbid_notification)
+        logger.info(f"📢 Outbid notification created for user {previous_highest_bidder}")
+        
+        # Send SMS notification (async, non-blocking)
+        try:
+            sms_service = get_sms_notification_service(db)
+            await sms_service.notify_outbid(
+                user_id=previous_highest_bidder,
+                listing_title=listing.get("title", "Item"),
+                new_bid_amount=bid_data.amount,
+                previous_bid_amount=previous_highest_bid,
+                listing_id=bid_data.listing_id
+            )
+        except Exception as sms_error:
+            logger.warning(f"📵 SMS outbid notification failed: {sms_error}")
+    
     logger.info(f"Bid placed: listing={bid_data.listing_id}, bidder={current_user.id}, amount={bid_data.amount}, extension={extension_applied}")
     
     # Return bid with extension info
