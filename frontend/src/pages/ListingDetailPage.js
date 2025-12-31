@@ -439,7 +439,7 @@ const ListingDetailPage = () => {
                   <div className="space-y-3 pt-2">
                     <Separator />
                     <div className="flex gap-2">
-                      <MonsterBidButton
+                      <PowerBidButton
                         listingId={listing.id}
                         currentBid={listing.current_price}
                         minimumIncrement={1}
