@@ -540,7 +540,7 @@ const ProfileSettingsPage = () => {
                         <tr className="border-b hover:bg-gray-50 dark:hover:bg-gray-900/50">
                           <td className="p-4 flex items-center gap-2">
                             <Zap className="h-4 w-4 text-purple-600" />
-                            Monster Bids per Auction
+                            Power Bids per Auction
                           </td>
                           <td className="text-center p-4">
                             <span className="font-semibold">1</span>
