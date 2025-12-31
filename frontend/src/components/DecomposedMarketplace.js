@@ -12,7 +12,8 @@ import {
   TrendingUp, 
   Star,
   Sparkles,
-  MapPin 
+  MapPin,
+  User
 } from 'lucide-react';
 import { toast } from 'sonner';
 
