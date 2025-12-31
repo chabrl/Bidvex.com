@@ -324,9 +324,9 @@ class FeeCalculator:
 
 
 # Helper function for quick calculations
-def calculate_buyer_total(amount: float, tier: str = "free", region: str = "QC") -> Dict:
+def calculate_buyer_total(amount: float, tier: str = "free", region: str = "QC", seller_is_business: bool = False) -> Dict:
     """Quick helper to calculate buyer total"""
-    return FeeCalculator.calculate_buyer_total(Decimal(str(amount)), tier, region)
+    return FeeCalculator.calculate_buyer_total(Decimal(str(amount)), tier, region, True, seller_is_business)
 
 
 def calculate_seller_net(amount: float, tier: str = "free") -> Dict:
