@@ -123,6 +123,15 @@ const MultiItemListingDetailPage = () => {
       if (response.data.lots.length > 0) {
         setActiveLotId(response.data.lots[0].lot_number);
       }
+      // Fetch seller info for tax status badge
+      if (response.data.seller_id) {
+        try {
+          const sellerRes = await axios.get(`${API}/users/${response.data.seller_id}/public`);
+          setSellerInfo(sellerRes.data);
+        } catch (e) {
+          console.log('Could not fetch seller info for tax badge');
+        }
+      }
     } catch (error) {
       console.error('Failed to fetch listing:', error);
       toast.error('Failed to load listing');
