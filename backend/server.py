@@ -613,7 +613,7 @@ class User(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     email: EmailStr
     name: str
-    account_type: str
+    account_type: str = "personal"  # personal or business - default to personal for backwards compatibility
     role: Optional[str] = None  # admin, superadmin, or None for regular users
     phone: str
     phone_verified: bool = False
@@ -645,6 +645,10 @@ class User(BaseModel):
         "show_phone": True,
         "show_address": True
     })
+    # Tax registration fields for Individual vs Business seller tax logic
+    is_tax_registered: bool = False  # True for business sellers who collect GST/QST
+    gst_number: Optional[str] = None  # GST/HST Registration Number (e.g., 123456789RT0001)
+    qst_number: Optional[str] = None  # Quebec Sales Tax Number (e.g., 1234567890TQ0001)
 
 class UserLogin(BaseModel):
     email: EmailStr
