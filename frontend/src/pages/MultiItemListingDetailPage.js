@@ -126,7 +126,7 @@ const MultiItemListingDetailPage = () => {
       // Fetch seller info for tax status badge
       if (response.data.seller_id) {
         try {
-          const sellerRes = await axios.get(`${API}/users/${response.data.seller_id}/public`);
+          const sellerRes = await axios.get(`${API}/users/${response.data.seller_id}/profile-summary`);
           setSellerInfo(sellerRes.data);
         } catch (e) {
           console.log('Could not fetch seller info for tax badge');
