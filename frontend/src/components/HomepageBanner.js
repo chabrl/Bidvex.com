@@ -149,7 +149,7 @@ const HomepageBanner = () => {
                 >
                   <Button
                     onClick={banners[currentSlide].cta1.action}
-                    className="gradient-button text-white border-0 text-lg px-8 py-6 rounded-full shadow-lg hover:shadow-xl"
+                    className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white border-0 text-lg px-8 py-6 rounded-full shadow-lg hover:shadow-xl hover:from-blue-700 hover:to-cyan-600"
                   >
                     {banners[currentSlide].cta1.text}
                   </Button>
@@ -158,7 +158,7 @@ const HomepageBanner = () => {
                     <Button
                       onClick={banners[currentSlide].cta2.action}
                       variant="outline"
-                      className="text-lg px-8 py-6 rounded-full border-2 border-white text-white hover:bg-white hover:text-primary shadow-lg"
+                      className="text-lg px-8 py-6 rounded-full border-2 border-white bg-white/10 backdrop-blur-sm text-white hover:bg-white hover:text-blue-900 shadow-lg"
                     >
                       {banners[currentSlide].cta2.text}
                     </Button>
