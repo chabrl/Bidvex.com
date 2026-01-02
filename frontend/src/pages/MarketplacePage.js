@@ -35,25 +35,25 @@ const MarketplacePage = () => {
                 <div className="p-3 bg-cyan-500/20 backdrop-blur rounded-xl border border-cyan-400/30">
                   <ShoppingBag className="h-8 w-8 text-cyan-300" />
                 </div>
-                <h1 className="text-3xl md:text-4xl font-bold text-white drop-shadow-lg">
+                <h1 className="text-3xl md:text-4xl font-bold drop-shadow-lg" style={{ color: '#FFFFFF' }}>
                   {t('marketplace.title', 'Active Auctions')}
                 </h1>
               </div>
-              <p className="text-blue-100 max-w-2xl text-lg drop-shadow-md">
+              <p className="max-w-2xl text-lg drop-shadow-md" style={{ color: '#BFDBFE' }}>
                 {t('marketplace.subtitle', 'Browse individual items from estate sales and multi-lot auctions. Each item has its own countdown timer and bidding.')}
               </p>
             </div>
             
             <div className="flex flex-wrap gap-2">
-              <Badge className="bg-white/10 backdrop-blur text-white border-cyan-400/30 px-4 py-2">
+              <Badge className="bg-white/10 backdrop-blur border-cyan-400/30 px-4 py-2" style={{ color: '#FFFFFF' }}>
                 <Sparkles className="h-4 w-4 mr-2 text-yellow-400" />
                 {t('marketplace.featuredFirst', 'Featured First')}
               </Badge>
-              <Badge className="bg-green-500/20 backdrop-blur text-green-300 border-green-400/30 px-4 py-2">
+              <Badge className="bg-green-500/20 backdrop-blur border-green-400/30 px-4 py-2" style={{ color: '#86EFAC' }}>
                 <User className="h-4 w-4 mr-2" />
                 {t('marketplace.privateSaleTax', 'Private Sale = Tax Savings!')}
               </Badge>
-              <Badge className="bg-cyan-500/20 backdrop-blur text-cyan-300 border-cyan-400/30 px-4 py-2">
+              <Badge className="bg-cyan-500/20 backdrop-blur border-cyan-400/30 px-4 py-2" style={{ color: '#67E8F9' }}>
                 <Zap className="h-4 w-4 mr-2" />
                 {t('marketplace.quickBid', 'Quick Bid')}
               </Badge>
