@@ -1447,3 +1447,83 @@ button.outline-button,
 }
 
 /* Cache buster timestamp: 20250102183900 */
+
+/* ============================================
+   EXTRA BRUTE-FORCE FIXES - v2.2
+   ============================================ */
+
+/* CARD TITLE - Force black text */
+[class*="CardTitle"],
+.card-title,
+h1, h2, h3, h4, h5, h6 {
+  color: #1a1a1a !important;
+}
+
+.dark [class*="CardTitle"],
+.dark .card-title,
+.dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
+  color: #ffffff !important;
+}
+
+/* Override for hero sections that need white */
+.gradient-hero h1,
+.gradient-hero h2,
+[style*="gradient"] h1,
+[data-hero] h1 {
+  color: #ffffff !important;
+}
+
+/* BADGE OUTLINE - Force visible border and text */
+[class*="Badge"][class*="outline"],
+.badge-outline {
+  color: #374151 !important;
+  border-color: #d1d5db !important;
+  background-color: transparent !important;
+}
+
+.dark [class*="Badge"][class*="outline"],
+.dark .badge-outline {
+  color: #e5e7eb !important;
+  border-color: #4b5563 !important;
+}
+
+/* SPAN TEXT in cards */
+[class*="Card"] span,
+[class*="card"] span {
+  color: inherit !important;
+}
+
+/* MUTED FOREGROUND - Force gray */
+.text-muted-foreground {
+  color: #6b7280 !important;
+}
+
+/* All SVG icons in navbar */
+nav svg,
+[data-testid="main-navbar"] svg,
+header svg {
+  color: #1a1a1a !important;
+  stroke: currentColor !important;
+}
+
+.dark nav svg,
+.dark [data-testid="main-navbar"] svg,
+.dark header svg {
+  color: #f1f5f9 !important;
+}
+
+/* Stats grid background */
+.bg-muted {
+  background-color: #f1f5f9 !important;
+}
+
+.dark .bg-muted {
+  background-color: #1e293b !important;
+}
+
+/* PRIMARY color text */
+.text-primary {
+  color: #2563eb !important;
+}
+
+/* Cache buster: 20250102185500 */
