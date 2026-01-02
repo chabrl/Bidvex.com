@@ -149,20 +149,27 @@ const Navbar = () => {
                 size="icon" 
                 onClick={toggleTheme} 
                 data-testid="theme-toggle-btn"
-                className="transition-transform hover:scale-110 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="transition-transform hover:scale-110 hover:bg-slate-100 dark:hover:bg-slate-800"
+                style={{ color: '#1a1a1a' }}
               >
                 {theme === 'light' ? (
-                  <Moon className="h-5 w-5" />
+                  <Moon className="h-5 w-5" style={{ color: '#1a1a1a' }} />
                 ) : (
-                  <Sun className="h-5 w-5" />
+                  <Sun className="h-5 w-5" style={{ color: '#f1f5f9' }} />
                 )}
               </Button>
 
               {/* Language Selector */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" data-testid="language-toggle-btn" className="text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
-                    <Globe className="h-5 w-5" />
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    data-testid="language-toggle-btn" 
+                    className="hover:bg-slate-100 dark:hover:bg-slate-800"
+                    style={{ color: '#1a1a1a' }}
+                  >
+                    <Globe className="h-5 w-5" style={{ color: '#1a1a1a' }} />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-40">
