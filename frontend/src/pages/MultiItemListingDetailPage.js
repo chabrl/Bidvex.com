@@ -607,16 +607,16 @@ const MultiItemListingDetailPage = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                       <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
-                        <span>{listing.city}, {listing.region}</span>
+                        <MapPin className="h-4 w-4" style={{ color: '#6b7280' }} />
+                        <span style={{ color: '#374151' }}>{listing.city}, {listing.region}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Package className="h-4 w-4 text-muted-foreground" />
-                        <span>{listing.category}</span>
+                        <Package className="h-4 w-4" style={{ color: '#6b7280' }} />
+                        <span style={{ color: '#374151' }}>{listing.category}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span>
+                        <Calendar className="h-4 w-4" style={{ color: '#6b7280' }} />
+                        <span style={{ color: '#374151' }}>
                           {!auctionEnded ? (
                             <>
                               Ends in: <Countdown date={new Date(listing.auction_end_date)} />
@@ -631,13 +631,13 @@ const MultiItemListingDetailPage = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted rounded-lg">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-lg" style={{ backgroundColor: '#f1f5f9' }}>
                   <div className="text-center">
-                    <p className="text-2xl font-bold text-primary">{listing.total_lots}</p>
-                    <p className="text-sm text-muted-foreground">Total Lots</p>
+                    <p className="text-2xl font-bold" style={{ color: '#2563eb' }}>{listing.total_lots}</p>
+                    <p className="text-sm" style={{ color: '#6b7280' }}>Total Lots</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-2xl font-bold text-primary">${totalStartingValue.toFixed(2)}</p>
+                    <p className="text-2xl font-bold" style={{ color: '#2563eb' }}>${totalStartingValue.toFixed(2)}</p>
                     <p className="text-sm text-muted-foreground">Total Starting Value</p>
                   </div>
                   <div className="text-center">
