@@ -301,50 +301,56 @@ const HowItWorksPage = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Shield className="h-8 w-8 text-white" />
-              </div>
-              <h3 className="text-xl font-bold mb-2">
-                {language === 'fr' ? 'Sécurisé & Fiable' : 'Safe & Secure'}
-              </h3>
-              <p className="text-gray-600">
-                {language === 'fr' 
-                  ? 'Vérification obligatoire et traitement des paiements cryptés'
-                  : 'Mandatory verification and encrypted payment processing'
-                }
-              </p>
-            </div>
+            <Card className="text-center p-8 bg-white dark:bg-slate-800 shadow-lg hover:shadow-xl transition-shadow">
+              <CardContent className="flex flex-col items-center justify-center p-0">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Shield className="h-8 w-8 text-white" />
+                </div>
+                <h3 className="text-xl font-bold mb-3 text-gray-900 dark:text-white">
+                  {language === 'fr' ? 'Sécurisé & Fiable' : 'Safe & Secure'}
+                </h3>
+                <p className="text-gray-600 dark:text-gray-300">
+                  {language === 'fr' 
+                    ? 'Vérification obligatoire et traitement des paiements cryptés'
+                    : 'Mandatory verification and encrypted payment processing'
+                  }
+                </p>
+              </CardContent>
+            </Card>
 
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Clock className="h-8 w-8 text-white" />
-              </div>
-              <h3 className="text-xl font-bold mb-2">
-                {language === 'fr' ? 'Enchères Équitables' : 'Fair Bidding'}
-              </h3>
-              <p className="text-gray-600">
-                {language === 'fr' 
-                  ? "Protection anti-sniping pour garantir que tout le monde ait une chance"
-                  : 'Anti-sniping protection ensures everyone gets a fair shot'
-                }
-              </p>
-            </div>
+            <Card className="text-center p-8 bg-white dark:bg-slate-800 shadow-lg hover:shadow-xl transition-shadow">
+              <CardContent className="flex flex-col items-center justify-center p-0">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Clock className="h-8 w-8 text-white" />
+                </div>
+                <h3 className="text-xl font-bold mb-3 text-gray-900 dark:text-white">
+                  {language === 'fr' ? 'Enchères Équitables' : 'Fair Bidding'}
+                </h3>
+                <p className="text-gray-600 dark:text-gray-300">
+                  {language === 'fr' 
+                    ? "Protection anti-sniping pour garantir que tout le monde ait une chance"
+                    : 'Anti-sniping protection ensures everyone gets a fair shot'
+                  }
+                </p>
+              </CardContent>
+            </Card>
 
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Sparkles className="h-8 w-8 text-white" />
-              </div>
-              <h3 className="text-xl font-bold mb-2">
-                {language === 'fr' ? 'Objets Uniques' : 'Unique Items'}
-              </h3>
-              <p className="text-gray-600">
-                {language === 'fr' 
-                  ? "Des milliers d'articles uniques de vendeurs de confiance"
-                  : 'Thousands of unique items from trusted sellers worldwide'
-                }
-              </p>
-            </div>
+            <Card className="text-center p-8 bg-white dark:bg-slate-800 shadow-lg hover:shadow-xl transition-shadow">
+              <CardContent className="flex flex-col items-center justify-center p-0">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Sparkles className="h-8 w-8 text-white" />
+                </div>
+                <h3 className="text-xl font-bold mb-3 text-gray-900 dark:text-white">
+                  {language === 'fr' ? 'Objets Uniques' : 'Unique Items'}
+                </h3>
+                <p className="text-gray-600 dark:text-gray-300">
+                  {language === 'fr' 
+                    ? "Des milliers d'articles uniques de vendeurs de confiance"
+                    : 'Thousands of unique items from trusted sellers worldwide'
+                  }
+                </p>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>
