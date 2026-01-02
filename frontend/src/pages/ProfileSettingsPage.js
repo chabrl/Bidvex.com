@@ -394,38 +394,38 @@ const ProfileSettingsPage = () => {
           <TabsContent value="notifications">
             <Card className="glassmorphism">
               <CardHeader>
-                <CardTitle>Notification Preferences</CardTitle>
-                <CardDescription>Choose how you want to be notified</CardDescription>
+                <CardTitle className="text-slate-900 dark:text-white">Notification Preferences</CardTitle>
+                <CardDescription className="text-slate-600 dark:text-slate-400">Choose how you want to be notified</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
                     <div>
-                      <p className="font-medium">Email Notifications</p>
-                      <p className="text-sm text-muted-foreground">Receive updates via email</p>
+                      <p className="font-medium text-slate-900 dark:text-white">Email Notifications</p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">Receive updates via email</p>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch defaultChecked className="data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-slate-300 dark:data-[state=unchecked]:bg-slate-600" />
                   </div>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
                     <div>
-                      <p className="font-medium">Bid Notifications</p>
-                      <p className="text-sm text-muted-foreground">Get notified when someone bids on your items</p>
+                      <p className="font-medium text-slate-900 dark:text-white">Bid Notifications</p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">Get notified when someone bids on your items</p>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch defaultChecked className="data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-slate-300 dark:data-[state=unchecked]:bg-slate-600" />
                   </div>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
                     <div>
-                      <p className="font-medium">Message Notifications</p>
-                      <p className="text-sm text-muted-foreground">Get notified of new messages</p>
+                      <p className="font-medium text-slate-900 dark:text-white">Message Notifications</p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">Get notified of new messages</p>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch defaultChecked className="data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-slate-300 dark:data-[state=unchecked]:bg-slate-600" />
                   </div>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
                     <div>
-                      <p className="font-medium">Auction Wins</p>
-                      <p className="text-sm text-muted-foreground">Get notified when you win an auction</p>
+                      <p className="font-medium text-slate-900 dark:text-white">Auction Wins</p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">Get notified when you win an auction</p>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch defaultChecked className="data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-slate-300 dark:data-[state=unchecked]:bg-slate-600" />
                   </div>
                 </div>
               </CardContent>
