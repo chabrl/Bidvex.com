@@ -609,7 +609,7 @@ const ItemCard = ({ item, onQuickBid, trackClick }) => {
         </div>
       </Link>
 
-      <CardContent className="p-4 space-y-3">
+      <CardContent className="p-4 space-y-3" style={{ '--item-title-color': '#1a1a1a' }} data-testid="item-card">
         {/* Title */}
         <Link
           to={`/lots/${item.auction_id}`}
