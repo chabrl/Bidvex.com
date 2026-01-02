@@ -32,14 +32,14 @@ const MarketplacePage = () => {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <div className="flex items-center gap-3 mb-3">
-                <div className="p-3 bg-white/10 backdrop-blur rounded-xl">
-                  <ShoppingBag className="h-8 w-8 text-cyan-400" />
+                <div className="p-3 bg-cyan-500/20 backdrop-blur rounded-xl border border-cyan-400/30">
+                  <ShoppingBag className="h-8 w-8 text-cyan-300" />
                 </div>
-                <h1 className="text-3xl md:text-4xl font-bold text-white">
+                <h1 className="text-3xl md:text-4xl font-bold text-white drop-shadow-lg">
                   {t('marketplace.title', 'Active Auctions')}
                 </h1>
               </div>
-              <p className="text-blue-100/80 max-w-2xl text-lg">
+              <p className="text-blue-100 max-w-2xl text-lg drop-shadow-md">
                 {t('marketplace.subtitle', 'Browse individual items from estate sales and multi-lot auctions. Each item has its own countdown timer and bidding.')}
               </p>
             </div>
