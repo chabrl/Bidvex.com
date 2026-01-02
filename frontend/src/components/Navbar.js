@@ -73,7 +73,7 @@ const Navbar = () => {
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
           scrolled 
             ? 'glassmorphism shadow-md' 
-            : 'bg-transparent'
+            : 'bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm shadow-sm'
         }`}
         data-testid="main-navbar"
       >
@@ -128,7 +128,7 @@ const Navbar = () => {
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="hidden md:flex"
+                className="hidden md:flex text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
                 onClick={() => setSearchOpen(!searchOpen)}
               >
                 <Search className="h-5 w-5" />
@@ -137,7 +137,7 @@ const Navbar = () => {
               {/* Messages */}
               {user && (
                 <Link to="/messages" data-testid="messages-link">
-                  <Button variant="ghost" size="icon" className="relative">
+                  <Button variant="ghost" size="icon" className="relative text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
                     <MessageCircle className="h-5 w-5" />
                   </Button>
                 </Link>
@@ -149,7 +149,7 @@ const Navbar = () => {
                 size="icon" 
                 onClick={toggleTheme} 
                 data-testid="theme-toggle-btn"
-                className="transition-transform hover:scale-110"
+                className="transition-transform hover:scale-110 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 {theme === 'light' ? (
                   <Moon className="h-5 w-5" />
@@ -161,7 +161,7 @@ const Navbar = () => {
               {/* Language Selector */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" data-testid="language-toggle-btn">
+                  <Button variant="ghost" size="icon" data-testid="language-toggle-btn" className="text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
                     <Globe className="h-5 w-5" />
                   </Button>
                 </DropdownMenuTrigger>
