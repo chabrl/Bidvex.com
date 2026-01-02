@@ -638,11 +638,11 @@ const MultiItemListingDetailPage = () => {
                   </div>
                   <div className="text-center">
                     <p className="text-2xl font-bold" style={{ color: '#2563eb' }}>${totalStartingValue.toFixed(2)}</p>
-                    <p className="text-sm text-muted-foreground">Total Starting Value</p>
+                    <p className="text-sm" style={{ color: '#6b7280' }}>Total Starting Value</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-2xl font-bold text-green-600">${totalCurrentValue.toFixed(2)}</p>
-                    <p className="text-sm text-muted-foreground">Current Total Value</p>
+                    <p className="text-2xl font-bold" style={{ color: '#16a34a' }}>${totalCurrentValue.toFixed(2)}</p>
+                    <p className="text-sm" style={{ color: '#6b7280' }}>Current Total Value</p>
                   </div>
                 </div>
               </CardContent>
@@ -650,7 +650,7 @@ const MultiItemListingDetailPage = () => {
 
             {/* View Mode Toggle */}
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold">Available Lots</h2>
+              <h2 className="text-2xl font-bold" style={{ color: '#1a1a1a' }}>Available Lots</h2>
               <div className="flex gap-2">
                 <Button
                   variant={viewMode === 'grid' ? 'default' : 'outline'}
