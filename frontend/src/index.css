@@ -1278,3 +1278,172 @@ select:focus {
     display: none !important;
   }
 }
+
+/* ============================================
+   BRUTE-FORCE CONTRAST FIXES - v2.1
+   Hard-coded colors to override any caching
+   ============================================ */
+
+/* NAVBAR ICONS - Force dark color in light mode */
+nav button svg,
+nav a svg,
+[data-testid="main-navbar"] button svg,
+[data-testid="main-navbar"] a svg {
+  color: #1a1a1a !important;
+  stroke: #1a1a1a !important;
+}
+
+/* NAVBAR ICONS - Force light color in dark mode */
+.dark nav button svg,
+.dark nav a svg,
+.dark [data-testid="main-navbar"] button svg,
+.dark [data-testid="main-navbar"] a svg {
+  color: #f1f5f9 !important;
+  stroke: #f1f5f9 !important;
+}
+
+/* ITEM CARD TITLES - Force visibility */
+.item-card-title,
+[data-testid="item-card"] h3,
+.marketplace-item h3 {
+  color: #1a1a1a !important;
+  font-weight: 600 !important;
+  opacity: 1 !important;
+}
+
+.dark .item-card-title,
+.dark [data-testid="item-card"] h3,
+.dark .marketplace-item h3 {
+  color: #ffffff !important;
+}
+
+/* CARD TITLES IN GENERAL */
+[class*="CardContent"] h3,
+[class*="card-content"] h3 {
+  color: #1a1a1a !important;
+}
+
+.dark [class*="CardContent"] h3,
+.dark [class*="card-content"] h3 {
+  color: #ffffff !important;
+}
+
+/* HERO SECTION TITLES - Always white on gradient */
+.hero-title,
+[data-hero-title],
+.gradient-hero h1 {
+  color: #ffffff !important;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.3) !important;
+}
+
+/* LOT COUNT AND CATEGORY TEXT */
+.lot-count,
+.category-badge,
+[data-lot-info] {
+  color: #374151 !important;
+  font-weight: 500 !important;
+}
+
+.dark .lot-count,
+.dark .category-badge,
+.dark [data-lot-info] {
+  color: #e5e7eb !important;
+}
+
+/* SWITCH/TOGGLE - Force visibility with border */
+[role="switch"],
+[data-state="unchecked"],
+[data-state="checked"] {
+  border: 2px solid #d1d5db !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+}
+
+[data-state="checked"] {
+  background-color: #2563eb !important;
+  border-color: #2563eb !important;
+}
+
+[data-state="unchecked"] {
+  background-color: #e5e7eb !important;
+  border-color: #d1d5db !important;
+}
+
+.dark [data-state="unchecked"] {
+  background-color: #4b5563 !important;
+  border-color: #6b7280 !important;
+}
+
+/* SWITCH THUMB - Always white */
+[role="switch"] span,
+[data-state] > span {
+  background-color: #ffffff !important;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+}
+
+/* BADGE TEXT - Force visibility */
+[class*="Badge"],
+[class*="badge"] {
+  font-weight: 600 !important;
+  opacity: 1 !important;
+}
+
+/* MUTED TEXT - Force visible gray */
+.text-muted-foreground,
+[class*="muted"] {
+  color: #6b7280 !important;
+}
+
+.dark .text-muted-foreground,
+.dark [class*="muted"] {
+  color: #9ca3af !important;
+}
+
+/* BUTTON TEXT - Force visibility */
+button span,
+button {
+  opacity: 1 !important;
+}
+
+/* ACTIVE AUCTIONS TITLE - Brute force white */
+[data-testid="marketplace-page"] h1,
+.marketplace-hero h1 {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
+}
+
+/* LOCATION TEXT */
+.location-text,
+[data-location] {
+  color: #6b7280 !important;
+}
+
+.dark .location-text,
+.dark [data-location] {
+  color: #9ca3af !important;
+}
+
+/* PRICE TEXT - Gradient visible */
+.price-display,
+[data-price] {
+  background: linear-gradient(to right, #2563eb, #06b6d4) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  color: transparent !important;
+  font-weight: 700 !important;
+}
+
+/* VIEW/QUICK BID BUTTON TEXT */
+button.outline-button,
+[variant="outline"] {
+  color: #374151 !important;
+  border-color: #d1d5db !important;
+}
+
+.dark button.outline-button,
+.dark [variant="outline"] {
+  color: #e5e7eb !important;
+  border-color: #4b5563 !important;
+}
+
+/* Cache buster timestamp: 20250102183900 */
