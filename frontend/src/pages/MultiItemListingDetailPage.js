@@ -347,14 +347,14 @@ const MultiItemListingDetailPage = () => {
                   <div className="flex-1">
                     <div className="flex gap-2 items-center mb-2 justify-between">
                       <div className="flex gap-2 items-center">
-                        <Package className="h-6 w-6 text-primary" />
+                        <Package className="h-6 w-6" style={{ color: '#2563eb' }} />
                         <Badge 
                           variant={isPreviewMode ? "secondary" : auctionEnded ? "secondary" : "default"}
                           className={isPreviewMode ? "bg-amber-500 text-white" : ""}
                         >
                           {isPreviewMode ? 'Coming Soon' : auctionEnded ? 'Auction Ended' : 'Active Auction'}
                         </Badge>
-                        <Badge variant="outline">{listing.total_lots} Lots</Badge>
+                        <Badge variant="outline" style={{ color: '#374151', borderColor: '#d1d5db' }}>{listing.total_lots} Lots</Badge>
                       </div>
                       {user && (
                         <WishlistHeartButton
@@ -365,8 +365,8 @@ const MultiItemListingDetailPage = () => {
                         />
                       )}
                     </div>
-                    <CardTitle className="text-3xl mb-4">{listing.title}</CardTitle>
-                    <p className="text-muted-foreground mb-4">{listing.description}</p>
+                    <CardTitle className="text-3xl mb-4" style={{ color: '#1a1a1a', fontWeight: 700 }}>{listing.title}</CardTitle>
+                    <p className="mb-4" style={{ color: '#6b7280' }}>{listing.description}</p>
 
                     {/* Private Sale / Business Seller Badge */}
                     {sellerInfo && !sellerInfo.is_tax_registered && (
