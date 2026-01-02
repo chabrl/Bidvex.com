@@ -71,7 +71,7 @@ const BidErrorGuide = ({ compact = false, className = '' }) => {
           variant="ghost"
           size="sm"
           onClick={() => setIsOpen(!isOpen)}
-          className="gap-2 text-muted-foreground hover:text-primary"
+          className="gap-2 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
         >
           <HelpCircle className="h-4 w-4" />
           {t('bidErrorGuide.title')}
@@ -79,29 +79,29 @@ const BidErrorGuide = ({ compact = false, className = '' }) => {
         </Button>
 
         {isOpen && (
-          <Card className="absolute z-50 w-96 mt-2 right-0 shadow-lg border-2">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <HelpCircle className="h-4 w-4 text-primary" />
+          <Card className="absolute z-[100] w-80 sm:w-96 mt-2 right-0 shadow-2xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+            <CardHeader className="pb-3 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/30 dark:to-cyan-900/30 rounded-t-lg">
+              <CardTitle className="text-sm flex items-center gap-2 text-blue-900 dark:text-blue-100">
+                <HelpCircle className="h-4 w-4 text-blue-600" />
                 {t('bidErrorGuide.title')}
               </CardTitle>
-              <CardDescription className="text-xs">
+              <CardDescription className="text-xs text-slate-600 dark:text-slate-400">
                 {t('bidErrorGuide.subtitle')}
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2 max-h-96 overflow-y-auto">
+            <CardContent className="space-y-2 max-h-64 sm:max-h-96 overflow-y-auto p-3">
               {errorCategories.map((error) => (
                 <div
                   key={error.key}
-                  className="p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors"
+                  className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-600"
                 >
                   <div className="flex items-start gap-2 mb-1">
                     {error.icon}
                     <div className="flex-1">
-                      <p className="text-sm font-semibold">
+                      <p className="text-sm font-semibold text-slate-900 dark:text-white">
                         {t(`bidErrorGuide.errors.${error.key}.title`)}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
                         {t(`bidErrorGuide.errors.${error.key}.solution`)}
                       </p>
                     </div>
@@ -109,8 +109,8 @@ const BidErrorGuide = ({ compact = false, className = '' }) => {
                 </div>
               ))}
               
-              <div className="pt-2 border-t">
-                <p className="text-xs text-muted-foreground italic">
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+                <p className="text-xs text-slate-500 dark:text-slate-400 italic">
                   {t('bidErrorGuide.helpText')}
                 </p>
               </div>
