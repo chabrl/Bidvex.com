@@ -616,15 +616,23 @@ const ItemCard = ({ item, onQuickBid, trackClick }) => {
           onClick={() => trackClick(item.id)}
           className="block"
         >
-          <h3 className="font-semibold text-lg line-clamp-2 text-slate-900 dark:text-white hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">
+          <h3 
+            className="font-semibold text-lg line-clamp-2 item-card-title hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors"
+            style={{ color: 'var(--item-title-color, #1a1a1a)', fontWeight: 600 }}
+            data-testid="item-title"
+          >
             {item.title}
           </h3>
         </Link>
 
         {/* Location */}
         {item.city && (
-          <div className="flex items-center text-sm text-slate-600 dark:text-slate-400">
-            <MapPin className="h-3.5 w-3.5 mr-1" />
+          <div 
+            className="flex items-center text-sm location-text"
+            style={{ color: '#6b7280' }}
+            data-location="true"
+          >
+            <MapPin className="h-3.5 w-3.5 mr-1" style={{ color: '#6b7280' }} />
             {item.city}, {item.region}
           </div>
         )}
@@ -632,7 +640,7 @@ const ItemCard = ({ item, onQuickBid, trackClick }) => {
         {/* Tax Savings Banner (Private Sale) */}
         {isPrivateSale && (
           <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-3 py-2 text-xs">
-            <span className="font-medium text-green-700 dark:text-green-400">
+            <span className="font-medium" style={{ color: '#15803d' }}>
               🎉 Save ~15% - No tax on item price!
             </span>
           </div>
