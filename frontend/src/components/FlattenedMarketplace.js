@@ -616,14 +616,14 @@ const ItemCard = ({ item, onQuickBid, trackClick }) => {
           onClick={() => trackClick(item.id)}
           className="block"
         >
-          <h3 className="font-semibold text-lg line-clamp-2 hover:text-cyan-600 transition-colors">
+          <h3 className="font-semibold text-lg line-clamp-2 text-slate-900 dark:text-white hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">
             {item.title}
           </h3>
         </Link>
 
         {/* Location */}
         {item.city && (
-          <div className="flex items-center text-sm text-muted-foreground">
+          <div className="flex items-center text-sm text-slate-600 dark:text-slate-400">
             <MapPin className="h-3.5 w-3.5 mr-1" />
             {item.city}, {item.region}
           </div>
@@ -641,7 +641,7 @@ const ItemCard = ({ item, onQuickBid, trackClick }) => {
         {/* Pricing */}
         <div className="space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground uppercase tracking-wider">Current Bid</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">Current Bid</span>
             <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
               ${(item.current_price || item.starting_price || 0).toFixed(2)}
             </span>
@@ -649,8 +649,8 @@ const ItemCard = ({ item, onQuickBid, trackClick }) => {
 
           {item.buy_now_enabled && item.buy_now_price && (
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Buy Now</span>
-              <span className="font-semibold text-green-600">
+              <span className="text-slate-600 dark:text-slate-400">Buy Now</span>
+              <span className="font-semibold text-green-600 dark:text-green-400">
                 ${item.buy_now_price.toFixed(2)}
               </span>
             </div>
@@ -658,11 +658,11 @@ const ItemCard = ({ item, onQuickBid, trackClick }) => {
         </div>
 
         {/* Parent Auction Link */}
-        <div className="text-xs text-muted-foreground pt-1 border-t">
+        <div className="text-xs text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-200 dark:border-slate-700">
           Lot #{item.lot_number} of{' '}
           <Link
             to={`/lots/${item.auction_id}`}
-            className="text-cyan-600 hover:underline inline-flex items-center gap-1"
+            className="text-cyan-600 dark:text-cyan-400 hover:underline inline-flex items-center gap-1"
           >
             {item.parent_auction_title}
             <ExternalLink className="h-3 w-3" />
@@ -679,7 +679,7 @@ const ItemCard = ({ item, onQuickBid, trackClick }) => {
             Quick Bid
           </Button>
           <Link to={`/lots/${item.auction_id}`} className="flex-1">
-            <Button variant="outline" className="w-full">
+            <Button variant="outline" className="w-full border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200">
               <Eye className="h-4 w-4 mr-1" />
               View
             </Button>
