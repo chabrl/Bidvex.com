@@ -192,16 +192,16 @@ const Navbar = () => {
                       variant="ghost" 
                       size="icon" 
                       data-testid="user-menu-btn"
-                      className="relative"
+                      className="relative hover:bg-slate-100 dark:hover:bg-slate-800"
                     >
                       {user.picture ? (
                         <img 
                           src={user.picture} 
                           alt={user.name} 
-                          className="h-8 w-8 rounded-full ring-2 ring-primary/20" 
+                          className="h-8 w-8 rounded-full ring-2 ring-blue-500/30" 
                         />
                       ) : (
-                        <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+                        <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center shadow-md">
                           <User className="h-4 w-4 text-white" />
                         </div>
                       )}
