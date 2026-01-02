@@ -66,12 +66,12 @@ const BidErrorGuide = ({ compact = false, className = '' }) => {
   // Compact version (tooltip-like)
   if (compact) {
     return (
-      <div className={`relative inline-block ${className}`}>
+      <div className={`relative ${className}`}>
         <Button
-          variant="ghost"
+          variant="outline"
           size="sm"
           onClick={() => setIsOpen(!isOpen)}
-          className="gap-2 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+          className="gap-2 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-600 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300"
         >
           <HelpCircle className="h-4 w-4" />
           {t('bidErrorGuide.title')}
@@ -79,21 +79,21 @@ const BidErrorGuide = ({ compact = false, className = '' }) => {
         </Button>
 
         {isOpen && (
-          <Card className="absolute z-[100] w-80 sm:w-96 mt-2 right-0 shadow-2xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-            <CardHeader className="pb-3 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/30 dark:to-cyan-900/30 rounded-t-lg">
+          <Card className="absolute z-[200] w-[calc(100vw-2rem)] sm:w-96 mt-2 left-0 sm:left-auto sm:right-0 shadow-2xl border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900">
+            <CardHeader className="pb-3 bg-gradient-to-r from-blue-100 to-cyan-100 dark:from-blue-900/40 dark:to-cyan-900/40 rounded-t-lg border-b border-slate-200 dark:border-slate-700">
               <CardTitle className="text-sm flex items-center gap-2 text-blue-900 dark:text-blue-100">
-                <HelpCircle className="h-4 w-4 text-blue-600" />
+                <HelpCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                 {t('bidErrorGuide.title')}
               </CardTitle>
-              <CardDescription className="text-xs text-slate-600 dark:text-slate-400">
+              <CardDescription className="text-xs text-slate-700 dark:text-slate-300">
                 {t('bidErrorGuide.subtitle')}
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2 max-h-64 sm:max-h-96 overflow-y-auto p-3">
+            <CardContent className="space-y-2 max-h-48 sm:max-h-72 overflow-y-auto p-3">
               {errorCategories.map((error) => (
                 <div
                   key={error.key}
-                  className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-600"
+                  className="p-3 bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors border border-slate-300 dark:border-slate-600"
                 >
                   <div className="flex items-start gap-2 mb-1">
                     {error.icon}
@@ -101,7 +101,7 @@ const BidErrorGuide = ({ compact = false, className = '' }) => {
                       <p className="text-sm font-semibold text-slate-900 dark:text-white">
                         {t(`bidErrorGuide.errors.${error.key}.title`)}
                       </p>
-                      <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                      <p className="text-xs text-slate-700 dark:text-slate-300 mt-1">
                         {t(`bidErrorGuide.errors.${error.key}.solution`)}
                       </p>
                     </div>
@@ -109,8 +109,8 @@ const BidErrorGuide = ({ compact = false, className = '' }) => {
                 </div>
               ))}
               
-              <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
-                <p className="text-xs text-slate-500 dark:text-slate-400 italic">
+              <div className="pt-2 border-t border-slate-300 dark:border-slate-600">
+                <p className="text-xs text-slate-600 dark:text-slate-400 italic">
                   {t('bidErrorGuide.helpText')}
                 </p>
               </div>
