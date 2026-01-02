@@ -128,17 +128,23 @@ const Navbar = () => {
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="hidden md:flex text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="hidden md:flex hover:bg-slate-100 dark:hover:bg-slate-800"
                 onClick={() => setSearchOpen(!searchOpen)}
+                style={{ color: '#1a1a1a' }}
               >
-                <Search className="h-5 w-5" />
+                <Search className="h-5 w-5" style={{ color: '#1a1a1a' }} />
               </Button>
 
               {/* Messages */}
               {user && (
                 <Link to="/messages" data-testid="messages-link">
-                  <Button variant="ghost" size="icon" className="relative text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
-                    <MessageCircle className="h-5 w-5" />
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="relative hover:bg-slate-100 dark:hover:bg-slate-800"
+                    style={{ color: '#1a1a1a' }}
+                  >
+                    <MessageCircle className="h-5 w-5" style={{ color: '#1a1a1a' }} />
                   </Button>
                 </Link>
               )}
