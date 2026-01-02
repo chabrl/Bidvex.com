@@ -338,10 +338,10 @@ const FlattenedMarketplace = ({
           ))}
         </div>
       ) : items.length === 0 ? (
-        <div className="text-center py-16 bg-gray-50 dark:bg-slate-800 rounded-xl">
-          <Package className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold mb-2">No items found</h3>
-          <p className="text-muted-foreground mb-4">
+        <div className="text-center py-16 bg-slate-50 dark:bg-slate-800 rounded-xl">
+          <Package className="h-16 w-16 text-slate-400 dark:text-slate-500 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold mb-2 text-slate-900 dark:text-white">No items found</h3>
+          <p className="text-slate-600 dark:text-slate-400 mb-4">
             Try adjusting your filters or search terms
           </p>
           <Button onClick={() => setFilters({
@@ -352,7 +352,7 @@ const FlattenedMarketplace = ({
             condition: '',
             sort: '-promoted',
             private_sales_only: false
-          })}>
+          })} className="bg-blue-600 text-white hover:bg-blue-700">
             Clear All Filters
           </Button>
         </div>
