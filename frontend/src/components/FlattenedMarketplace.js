@@ -223,11 +223,11 @@ const FlattenedMarketplace = ({
               <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
                 {t('marketplace.browseItems', 'Browse Individual Items')}
               </h1>
-              <p className="text-muted-foreground">
+              <p className="text-slate-600 dark:text-slate-400">
                 {t('marketplace.itemsFromAuctions', 'Individual lots from active auctions')}
               </p>
             </div>
-            <Badge className="bg-green-100 text-green-700 border-green-200">
+            <Badge className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-700">
               {total} items
             </Badge>
           </div>
