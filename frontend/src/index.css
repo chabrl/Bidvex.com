@@ -1527,3 +1527,122 @@ header svg {
 }
 
 /* Cache buster: 20250102185500 */
+
+/* ============================================
+   LOTS MARKETPLACE & GLOBAL FIXES - v2.3
+   ============================================ */
+
+/* SELECT DROPDOWNS - Force visible text */
+select,
+select option {
+  color: #1a1a1a !important;
+}
+
+.dark select,
+.dark select option {
+  color: #f1f5f9 !important;
+}
+
+/* INPUT PLACEHOLDERS */
+input::placeholder {
+  color: #9ca3af !important;
+  opacity: 1 !important;
+}
+
+/* CARD TITLES - Brute force */
+[data-testid="listing-card"] h3,
+[data-testid="item-card"] h3,
+[data-testid="listing-content"] h3 {
+  color: #1a1a1a !important;
+  font-weight: 600 !important;
+}
+
+.dark [data-testid="listing-card"] h3,
+.dark [data-testid="item-card"] h3,
+.dark [data-testid="listing-content"] h3 {
+  color: #ffffff !important;
+}
+
+/* BADGE TEXT - Always visible */
+[class*="Badge"] {
+  font-weight: 600 !important;
+}
+
+/* LOT COUNT BADGE */
+[data-testid="listing-card"] [class*="Badge"],
+.lot-count-badge {
+  color: #ffffff !important;
+}
+
+/* LOCATION TEXT */
+[data-testid="listing-content"] > div {
+  color: #6b7280 !important;
+}
+
+/* MARKET INSIGHT BAR */
+.market-insight strong {
+  font-weight: 700 !important;
+}
+
+/* HEADER PROFILE & SELL BUTTON */
+[data-testid="user-menu-btn"],
+nav button:has(svg) {
+  color: #1a1a1a !important;
+}
+
+.dark [data-testid="user-menu-btn"],
+.dark nav button:has(svg) {
+  color: #f1f5f9 !important;
+}
+
+/* SELL BUTTON TEXT */
+nav a[href*="sell"] span,
+nav button span {
+  color: inherit !important;
+}
+
+/* BREADCRUMBS */
+nav[aria-label="breadcrumb"] a,
+nav[aria-label="breadcrumb"] span,
+.breadcrumb a,
+.breadcrumb span {
+  color: #374151 !important;
+}
+
+.dark nav[aria-label="breadcrumb"] a,
+.dark nav[aria-label="breadcrumb"] span,
+.dark .breadcrumb a,
+.dark .breadcrumb span {
+  color: #d1d5db !important;
+}
+
+/* FILTER SELECT STYLING */
+select:focus {
+  outline: none !important;
+  ring: 2px solid #3b82f6 !important;
+}
+
+/* LOT INDEX SIDEBAR - Mobile collapsible */
+@media (max-width: 768px) {
+  .lot-index-sidebar {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    max-height: 40vh !important;
+    overflow-y: auto !important;
+    background: white !important;
+    border-top-left-radius: 16px !important;
+    border-top-right-radius: 16px !important;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.15) !important;
+    transform: translateY(100%) !important;
+    transition: transform 0.3s ease !important;
+    z-index: 50 !important;
+  }
+  
+  .lot-index-sidebar.open {
+    transform: translateY(0) !important;
+  }
+}
+
+/* Cache buster: 20250102190500 */
