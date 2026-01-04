@@ -106,50 +106,40 @@ const ProfileSettingsPage = () => {
         </h1>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          {/* Professional Tab Navigation */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-            <TabsList className="flex w-full p-0 bg-transparent border-b border-slate-200 dark:border-slate-700 overflow-x-auto">
-              <TabsTrigger 
-                value="profile" 
-                data-testid="profile-tab" 
-                className="flex items-center gap-2 px-6 py-4 min-w-fit"
-                style={{ color: activeTab === 'profile' ? '#2563eb' : '#64748b', fontWeight: activeTab === 'profile' ? 600 : 500 }}
-              >
-                <User className="h-5 w-5 flex-shrink-0" style={{ color: activeTab === 'profile' ? '#2563eb' : '#64748b' }} />
-                <span>{t('profile.profileTab')}</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="payment" 
-                data-testid="payment-tab" 
-                className="flex items-center gap-2 px-6 py-4 min-w-fit"
-                style={{ color: activeTab === 'payment' ? '#2563eb' : '#64748b', fontWeight: activeTab === 'payment' ? 600 : 500 }}
-              >
-                <CreditCard className="h-5 w-5 flex-shrink-0" style={{ color: activeTab === 'payment' ? '#2563eb' : '#64748b' }} />
-                <span>{t('profile.paymentTab')}</span>
-                {!user?.has_payment_method && (
-                  <span className="ml-1 w-2 h-2 rounded-full bg-red-500 animate-pulse" title="Action required"></span>
-                )}
-              </TabsTrigger>
-              <TabsTrigger 
-                value="subscription" 
-                data-testid="subscription-tab" 
-                className="flex items-center gap-2 px-6 py-4 min-w-fit"
-                style={{ color: activeTab === 'subscription' ? '#2563eb' : '#64748b', fontWeight: activeTab === 'subscription' ? 600 : 500 }}
-              >
-                <Crown className="h-5 w-5 flex-shrink-0" style={{ color: activeTab === 'subscription' ? '#2563eb' : '#64748b' }} />
-                <span>Subscription</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="notifications" 
-                data-testid="notifications-tab" 
-                className="flex items-center gap-2 px-6 py-4 min-w-fit"
-                style={{ color: activeTab === 'notifications' ? '#2563eb' : '#64748b', fontWeight: activeTab === 'notifications' ? 600 : 500 }}
-              >
-                <Bell className="h-5 w-5 flex-shrink-0" style={{ color: activeTab === 'notifications' ? '#2563eb' : '#64748b' }} />
-                <span>{t('profile.notificationsTab')}</span>
-              </TabsTrigger>
-            </TabsList>
-          </div>
+          {/* Professional Tab Navigation - Flat Design */}
+          <TabsList className="flex w-full bg-transparent border-b-2 border-slate-200 dark:border-slate-700">
+            <TabsTrigger 
+              value="profile" 
+              data-testid="profile-tab"
+            >
+              <User className="h-[18px] w-[18px]" />
+              {t('profile.profileTab')}
+            </TabsTrigger>
+            <TabsTrigger 
+              value="payment" 
+              data-testid="payment-tab"
+            >
+              <CreditCard className="h-[18px] w-[18px]" />
+              {t('profile.paymentTab')}
+              {!user?.has_payment_method && (
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" title="Action required"></span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger 
+              value="subscription" 
+              data-testid="subscription-tab"
+            >
+              <Crown className="h-[18px] w-[18px]" />
+              Subscription
+            </TabsTrigger>
+            <TabsTrigger 
+              value="notifications" 
+              data-testid="notifications-tab"
+            >
+              <Bell className="h-[18px] w-[18px]" />
+              {t('profile.notificationsTab')}
+            </TabsTrigger>
+          </TabsList>
 
           {/* Trust Status Card */}
           <Card className="bg-gradient-to-r from-slate-50 to-cyan-50 dark:from-slate-900 dark:to-cyan-900/20 border-slate-200 dark:border-slate-700">
