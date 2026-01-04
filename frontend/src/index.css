@@ -1764,3 +1764,83 @@ select:focus {
 }
 
 /* Cache buster: 20250104154500 */
+
+/* ============================================
+   CLEAN FLAT TABS - v2.5
+   ============================================ */
+
+/* Remove ALL shadows and 3D effects from tabs */
+[role="tablist"],
+[role="tab"] {
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+
+/* Tab List - Simple bottom border */
+[role="tablist"] {
+  border-bottom: 2px solid #e2e8f0 !important;
+  padding: 0 !important;
+  gap: 0 !important;
+}
+
+.dark [role="tablist"] {
+  border-bottom-color: #334155 !important;
+}
+
+/* Individual Tab - Flat Design */
+[role="tab"] {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+  margin-bottom: -2px !important;
+  padding: 12px 20px !important;
+  color: #64748b !important;
+  font-weight: 500 !important;
+  font-size: 14px !important;
+  transition: color 0.2s, border-color 0.2s !important;
+}
+
+/* Tab Hover */
+[role="tab"]:hover {
+  color: #1e293b !important;
+  background: transparent !important;
+}
+
+.dark [role="tab"]:hover {
+  color: #e2e8f0 !important;
+}
+
+/* Active Tab - Blue underline only */
+[role="tab"][data-state="active"] {
+  color: #2563eb !important;
+  font-weight: 600 !important;
+  border-bottom-color: #2563eb !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.dark [role="tab"][data-state="active"] {
+  color: #60a5fa !important;
+  border-bottom-color: #60a5fa !important;
+}
+
+/* Remove any ::after pseudo elements */
+[role="tab"]::after,
+[role="tab"]::before {
+  display: none !important;
+}
+
+/* Tab Icons */
+[role="tab"] svg {
+  width: 18px !important;
+  height: 18px !important;
+  opacity: 0.8 !important;
+}
+
+[role="tab"][data-state="active"] svg {
+  opacity: 1 !important;
+}
+
+/* Cache buster: 20250104155500 */
