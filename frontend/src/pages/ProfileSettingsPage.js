@@ -99,29 +99,57 @@ const ProfileSettingsPage = () => {
   };
 
   return (
-    <div className="min-h-screen py-8 px-4" data-testid="profile-settings-page">
+    <div className="min-h-screen py-8 px-4 bg-slate-50 dark:bg-slate-900" data-testid="profile-settings-page">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">{t('profile.accountSettings')}</h1>
+        <h1 className="text-3xl font-bold mb-6" style={{ color: '#1a1a1a' }}>
+          {t('profile.accountSettings')}
+        </h1>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="flex flex-wrap w-full gap-1 h-auto p-1">
-            <TabsTrigger value="profile" data-testid="profile-tab" className="flex-1 min-w-[120px] whitespace-nowrap">
-              <User className="mr-2 h-4 w-4 flex-shrink-0" />
-              <span className="truncate">{t('profile.profileTab')}</span>
-            </TabsTrigger>
-            <TabsTrigger value="payment" data-testid="payment-tab" className="flex-1 min-w-[140px] whitespace-nowrap">
-              <CreditCard className="mr-2 h-4 w-4 flex-shrink-0" />
-              <span className="truncate">{t('profile.paymentTab')}</span>
-            </TabsTrigger>
-            <TabsTrigger value="subscription" data-testid="subscription-tab" className="flex-1 min-w-[130px] whitespace-nowrap">
-              <Crown className="mr-2 h-4 w-4 flex-shrink-0" />
-              <span className="truncate">Subscription</span>
-            </TabsTrigger>
-            <TabsTrigger value="notifications" data-testid="notifications-tab" className="flex-1 min-w-[130px] whitespace-nowrap">
-              <Bell className="mr-2 h-4 w-4 flex-shrink-0" />
-              <span className="truncate">{t('profile.notificationsTab')}</span>
-            </TabsTrigger>
-          </TabsList>
+          {/* Professional Tab Navigation */}
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <TabsList className="flex w-full p-0 bg-transparent border-b border-slate-200 dark:border-slate-700 overflow-x-auto">
+              <TabsTrigger 
+                value="profile" 
+                data-testid="profile-tab" 
+                className="flex items-center gap-2 px-6 py-4 min-w-fit"
+                style={{ color: activeTab === 'profile' ? '#2563eb' : '#64748b', fontWeight: activeTab === 'profile' ? 600 : 500 }}
+              >
+                <User className="h-5 w-5 flex-shrink-0" style={{ color: activeTab === 'profile' ? '#2563eb' : '#64748b' }} />
+                <span>{t('profile.profileTab')}</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="payment" 
+                data-testid="payment-tab" 
+                className="flex items-center gap-2 px-6 py-4 min-w-fit"
+                style={{ color: activeTab === 'payment' ? '#2563eb' : '#64748b', fontWeight: activeTab === 'payment' ? 600 : 500 }}
+              >
+                <CreditCard className="h-5 w-5 flex-shrink-0" style={{ color: activeTab === 'payment' ? '#2563eb' : '#64748b' }} />
+                <span>{t('profile.paymentTab')}</span>
+                {!user?.has_payment_method && (
+                  <span className="ml-1 w-2 h-2 rounded-full bg-red-500 animate-pulse" title="Action required"></span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger 
+                value="subscription" 
+                data-testid="subscription-tab" 
+                className="flex items-center gap-2 px-6 py-4 min-w-fit"
+                style={{ color: activeTab === 'subscription' ? '#2563eb' : '#64748b', fontWeight: activeTab === 'subscription' ? 600 : 500 }}
+              >
+                <Crown className="h-5 w-5 flex-shrink-0" style={{ color: activeTab === 'subscription' ? '#2563eb' : '#64748b' }} />
+                <span>Subscription</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="notifications" 
+                data-testid="notifications-tab" 
+                className="flex items-center gap-2 px-6 py-4 min-w-fit"
+                style={{ color: activeTab === 'notifications' ? '#2563eb' : '#64748b', fontWeight: activeTab === 'notifications' ? 600 : 500 }}
+              >
+                <Bell className="h-5 w-5 flex-shrink-0" style={{ color: activeTab === 'notifications' ? '#2563eb' : '#64748b' }} />
+                <span>{t('profile.notificationsTab')}</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Trust Status Card */}
           <Card className="bg-gradient-to-r from-slate-50 to-cyan-50 dark:from-slate-900 dark:to-cyan-900/20 border-slate-200 dark:border-slate-700">
@@ -132,10 +160,10 @@ const ProfileSettingsPage = () => {
                     <Shield className="h-5 w-5 text-white" />
                   </div>
                   <div>
-                    <p className="font-medium text-slate-900 dark:text-white">
+                    <p className="font-medium" style={{ color: '#1a1a1a' }}>
                       {t('profile.trustStatus') || 'Trust Status'}
                     </p>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                    <p className="text-sm" style={{ color: '#64748b' }}>
                       {t('profile.completeVerification') || 'Complete verification to bid and sell'}
                     </p>
                   </div>
