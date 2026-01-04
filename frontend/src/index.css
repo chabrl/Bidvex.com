@@ -1646,3 +1646,121 @@ select:focus {
 }
 
 /* Cache buster: 20250102190500 */
+
+/* ============================================
+   PROFESSIONAL TABS STYLING - v2.4
+   ============================================ */
+
+/* Hide scrollbar but allow scrolling */
+.scrollbar-hide {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none !important;
+}
+
+/* Tab Navigation - Professional Styling */
+[role="tablist"] {
+  background: transparent !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+}
+
+/* Tab Trigger Base Styling */
+[role="tab"] {
+  color: #64748b !important;
+  font-weight: 500 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  position: relative !important;
+  padding: 16px 24px !important;
+}
+
+/* Tab Trigger Hover */
+[role="tab"]:hover {
+  color: #1a1a1a !important;
+  background: rgba(241, 245, 249, 0.5) !important;
+}
+
+.dark [role="tab"]:hover {
+  color: #ffffff !important;
+  background: rgba(51, 65, 85, 0.5) !important;
+}
+
+/* Tab Trigger Active State */
+[role="tab"][data-state="active"] {
+  color: #2563eb !important;
+  font-weight: 600 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Bottom Accent Bar for Active Tab */
+[role="tab"][data-state="active"]::after {
+  content: "" !important;
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 3px !important;
+  background: #2563eb !important;
+  border-radius: 3px 3px 0 0 !important;
+}
+
+.dark [role="tab"][data-state="active"] {
+  color: #60a5fa !important;
+}
+
+.dark [role="tab"][data-state="active"]::after {
+  background: #60a5fa !important;
+}
+
+/* Tab Icons */
+[role="tab"] svg {
+  width: 20px !important;
+  height: 20px !important;
+  flex-shrink: 0 !important;
+}
+
+/* Mobile Tab Scrolling */
+@media (max-width: 640px) {
+  [role="tablist"] {
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  
+  [role="tab"] {
+    padding: 12px 16px !important;
+    font-size: 14px !important;
+  }
+}
+
+/* Notification Dot */
+.notification-dot {
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 50% !important;
+  background: #ef4444 !important;
+  animation: pulse 2s infinite !important;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Account Settings Page Title */
+[data-testid="profile-settings-page"] h1 {
+  color: #1a1a1a !important;
+  font-weight: 700 !important;
+}
+
+.dark [data-testid="profile-settings-page"] h1 {
+  color: #ffffff !important;
+}
+
+/* Cache buster: 20250104154500 */
