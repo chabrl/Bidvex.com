@@ -3517,14 +3517,16 @@ async def create_multi_item_listing(listing_data: MultiItemListingCreate, curren
         logger.info(f"📣 Seller promoted listing: tier={promotion_tier}, ends={promotion_end}")
     
     # Calculate staggered lot_end_time (1 minute per lot)
-    # Start from auction_start_date if provided, otherwise use current time
-    auction_start = listing_data.auction_start_date or now
+    # Start from auction_end_date and stagger each lot by 1 minute
+    # Each lot ends: auction_end_date + (lot_number * 1 minute)
+    auction_end = listing_data.auction_end_date
     lots_with_end_time = []
     
     for idx, lot in enumerate(listing_data.lots):
         lot_dict = lot.model_dump()
-        # Each lot ends 1 minute after the previous one (index 0 = start + 1 min, index 1 = start + 2 min, etc.)
-        lot_dict['lot_end_time'] = auction_start + timedelta(minutes=idx + 1)
+        # Each lot ends at staggered intervals from the auction end date
+        # Lot 0 = auction_end + 0 min, Lot 1 = auction_end + 1 min, etc.
+        lot_dict['lot_end_time'] = auction_end + timedelta(minutes=idx)
         lots_with_end_time.append(lot_dict)
     
     listing = MultiItemListing(
