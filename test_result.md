@@ -441,3 +441,20 @@ https://bidding-platform-20.preview.emergentagent.com
 - ✅ **Visual implementation confirmed** - Professional styling and color coding working
 - ✅ **Functionality verified** - Conditional rendering and data display working correctly
 - ✅ **Ready for production use** - No blocking issues found
+
+---
+
+## NEW FEE ENGINE, SUBSCRIPTION LOGIC, AND SEARCH PRIORITY TESTING - January 8, 2026
+
+### Test Objectives
+1. Test NEW "Buyer's Premium Display" Section (BLUE info box with 5% premium, 3.5% for Premium Members)
+2. Test Search/Ranking Priority (Featured items first, items ending soon higher)
+3. Test Auction Terms Agreement Persistence (one-time acceptance across lots in same auction)
+4. Test Fee Calculator API endpoint (/api/fee-calculator)
+5. Verify Est. Total Out-of-Pocket calculation
+
+### Test Credentials
+- Admin: charbel@admin.bazario.com / Admin123!
+
+### Live URL
+- https://bidding-platform-20.preview.emergentagent.com
