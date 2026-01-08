@@ -6406,10 +6406,15 @@ async def generate_lots_won_invoice(
     if not lots_won:
         raise HTTPException(status_code=400, detail="No lots won by this buyer")
     
+    # Calculate fees using the Unified Fee Engine
+    buyer_subscription = buyer.get('subscription_tier', 'free')
+    hammer_total = sum(lot['hammer_price'] for lot in lots_won)
+    buyer_fees = calculate_buyer_fees(hammer_total, buyer_subscription)
+    
     # Generate invoice number
     invoice_number = await generate_invoice_number(auction_id)
     
-    # Prepare data for template
+    # Prepare data for template with subscription-aware fees
     template_data = {
         "invoice_number": invoice_number,
         "buyer": {
@@ -6417,7 +6422,9 @@ async def generate_lots_won_invoice(
             "company_name": buyer.get('company_name'),
             "billing_address": buyer.get('billing_address', buyer.get('address')),
             "phone": buyer['phone'],
-            "email": buyer['email']
+            "email": buyer['email'],
+            "subscription_tier": buyer_subscription,
+            "is_premium": buyer_subscription in ['premium', 'vip']
         },
         "paddle_number": paddle_record['paddle_number'],
         "auction": {
@@ -6428,7 +6435,12 @@ async def generate_lots_won_invoice(
             "auction_end_date": datetime.fromisoformat(auction['auction_end_date']) if isinstance(auction['auction_end_date'], str) else auction['auction_end_date']
         },
         "lots": lots_won,
-        "premium_percentage": auction.get('premium_percentage', 5.0),
+        # Fee Engine values
+        "premium_percentage": buyer_fees.fee_percentage,  # Subscription-adjusted
+        "premium_amount": buyer_fees.fee_amount,
+        "standard_premium_rate": 5.0,
+        "discount_applied": buyer_fees.discount_applied,
+        "is_premium_member": buyer_fees.is_premium_member,
         "tax_rate_gst": auction.get('tax_rate_gst', 5.0),
         "tax_rate_qst": auction.get('tax_rate_qst', 9.975),
         "payment_deadline": "Within 3 business days",
