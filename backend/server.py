@@ -650,6 +650,8 @@ class User(BaseModel):
     is_tax_registered: bool = False  # True for business sellers who collect GST/QST
     gst_number: Optional[str] = None  # GST/HST Registration Number (e.g., 123456789RT0001)
     qst_number: Optional[str] = None  # Quebec Sales Tax Number (e.g., 1234567890TQ0001)
+    # Auction Terms Agreement tracking
+    auction_agreements: Dict[str, datetime] = Field(default_factory=dict)  # {auction_id: agreement_timestamp}
 
 class UserLogin(BaseModel):
     email: EmailStr
