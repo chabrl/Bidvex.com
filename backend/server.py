@@ -7581,6 +7581,140 @@ async def get_user_auto_bids(current_user: User = Depends(get_current_user)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# ==================== GDPR/PIPEDA DATA RIGHTS ENDPOINTS ====================
+
+@api_router.post("/user/request-data-deletion")
+async def request_data_deletion(reason: Optional[str] = None, current_user: User = Depends(get_current_user)):
+    """
+    Request account and data deletion (GDPR Right to be Forgotten / PIPEDA)
+    Creates a deletion request that will be processed within 30 days
+    """
+    try:
+        # Create deletion request record
+        deletion_request = {
+            "id": str(uuid4()),
+            "user_id": current_user.id,
+            "user_email": current_user.email,
+            "user_name": current_user.name,
+            "reason": reason,
+            "status": "pending",  # pending, processing, completed, cancelled
+            "requested_at": datetime.now(timezone.utc).isoformat(),
+            "process_by": (datetime.now(timezone.utc) + timedelta(days=30)).isoformat(),
+            "completed_at": None
+        }
+        
+        await db.data_deletion_requests.insert_one(deletion_request)
+        
+        # Mark user account as pending deletion
+        await db.users.update_one(
+            {"id": current_user.id},
+            {
+                "$set": {
+                    "deletion_requested": True,
+                    "deletion_request_date": datetime.now(timezone.utc).isoformat()
+                }
+            }
+        )
+        
+        logger.info(f"Data deletion request created for user {current_user.id}")
+        
+        return {
+            "success": True,
+            "message": "Data deletion request submitted successfully",
+            "request_id": deletion_request["id"],
+            "process_by": deletion_request["process_by"],
+            "details": "Your request will be processed within 30 days as per GDPR/PIPEDA regulations. You will receive a confirmation email once completed."
+        }
+    except Exception as e:
+        logger.error(f"Error creating data deletion request: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to submit deletion request")
+
+@api_router.get("/user/data-deletion-status")
+async def get_data_deletion_status(current_user: User = Depends(get_current_user)):
+    """Check the status of any pending data deletion requests"""
+    try:
+        request = await db.data_deletion_requests.find_one(
+            {"user_id": current_user.id, "status": {"$in": ["pending", "processing"]}},
+            {"_id": 0}
+        )
+        
+        if request:
+            return {
+                "has_pending_request": True,
+                "request": request
+            }
+        else:
+            return {
+                "has_pending_request": False,
+                "request": None
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/user/cancel-data-deletion")
+async def cancel_data_deletion(current_user: User = Depends(get_current_user)):
+    """Cancel a pending data deletion request"""
+    try:
+        result = await db.data_deletion_requests.update_one(
+            {"user_id": current_user.id, "status": "pending"},
+            {
+                "$set": {
+                    "status": "cancelled",
+                    "cancelled_at": datetime.now(timezone.utc).isoformat()
+                }
+            }
+        )
+        
+        if result.modified_count > 0:
+            # Remove deletion flag from user
+            await db.users.update_one(
+                {"id": current_user.id},
+                {"$unset": {"deletion_requested": "", "deletion_request_date": ""}}
+            )
+            return {"success": True, "message": "Data deletion request cancelled"}
+        else:
+            return {"success": False, "message": "No pending deletion request found"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/user/export-data")
+async def export_user_data(current_user: User = Depends(get_current_user)):
+    """
+    Export all user data (GDPR Right to Access / PIPEDA)
+    Returns all personal data stored about the user
+    """
+    try:
+        # Collect all user data
+        user_data = await db.users.find_one({"id": current_user.id}, {"_id": 0, "password": 0})
+        bids = await db.bids.find({"bidder_id": current_user.id}, {"_id": 0}).to_list(1000)
+        listings = await db.listings.find({"seller_id": current_user.id}, {"_id": 0}).to_list(100)
+        multi_listings = await db.multi_item_listings.find({"seller_id": current_user.id}, {"_id": 0}).to_list(100)
+        messages = await db.messages.find(
+            {"$or": [{"sender_id": current_user.id}, {"receiver_id": current_user.id}]},
+            {"_id": 0}
+        ).to_list(500)
+        
+        export_data = {
+            "export_date": datetime.now(timezone.utc).isoformat(),
+            "user_id": current_user.id,
+            "personal_information": user_data,
+            "bidding_history": bids,
+            "listings_created": listings,
+            "multi_item_auctions": multi_listings,
+            "messages": messages,
+            "data_categories": [
+                "Account Information",
+                "Bidding Activity",
+                "Listing Data",
+                "Communication Records"
+            ]
+        }
+        
+        return export_data
+    except Exception as e:
+        logger.error(f"Error exporting user data: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to export data")
+
 # ==================== AUCTION INCREMENT ENDPOINTS ====================
 
 @api_router.get("/multi-item-listings/{listing_id}/increment-info")
