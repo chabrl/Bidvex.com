@@ -3884,6 +3884,93 @@ async def export_auction_terms_pdf(listing_id: str):
         logger.error(f"Error generating auction terms PDF: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to generate PDF: {str(e)}")
 
+# =========================================
+# AUCTION AGREEMENT PERSISTENCE
+# =========================================
+@api_router.post("/multi-item-listings/{listing_id}/accept-terms")
+async def accept_auction_terms(listing_id: str, current_user: User = Depends(get_current_user)):
+    """
+    Record that a user has accepted the auction terms for a specific auction.
+    Once accepted, the user won't be prompted again for any lot in this auction.
+    """
+    # Verify listing exists
+    listing = await db.multi_item_listings.find_one({"id": listing_id}, {"_id": 0, "id": 1, "title": 1})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    
+    # Update user's auction_agreements
+    agreement_key = f"auction_agreements.{listing_id}"
+    await db.users.update_one(
+        {"id": current_user.id},
+        {"$set": {agreement_key: datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    return {
+        "success": True,
+        "message": "Auction terms accepted",
+        "auction_id": listing_id,
+        "accepted_at": datetime.now(timezone.utc).isoformat()
+    }
+
+@api_router.get("/multi-item-listings/{listing_id}/terms-status")
+async def get_auction_terms_status(listing_id: str, current_user: User = Depends(get_current_user)):
+    """
+    Check if the user has already accepted terms for this auction.
+    """
+    user = await db.users.find_one({"id": current_user.id}, {"_id": 0, "auction_agreements": 1})
+    auction_agreements = user.get("auction_agreements", {}) if user else {}
+    
+    has_accepted = listing_id in auction_agreements
+    accepted_at = auction_agreements.get(listing_id) if has_accepted else None
+    
+    return {
+        "auction_id": listing_id,
+        "has_accepted": has_accepted,
+        "accepted_at": accepted_at
+    }
+
+# =========================================
+# FEE CALCULATION ENDPOINT
+# =========================================
+@api_router.get("/fee-calculator")
+async def calculate_fees_endpoint(
+    hammer_price: float,
+    user_type: str = "buyer",  # "buyer" or "seller"
+    current_user: User = Depends(get_current_user_optional)
+):
+    """
+    Calculate fees for a given hammer price based on user's subscription tier.
+    Returns detailed fee breakdown for transparency.
+    """
+    subscription_tier = current_user.subscription_tier if current_user else "free"
+    
+    if user_type == "buyer":
+        fees = calculate_buyer_fees(hammer_price, subscription_tier)
+        return {
+            "user_type": "buyer",
+            "hammer_price": hammer_price,
+            "buyers_premium_percentage": fees.fee_percentage,
+            "buyers_premium_amount": fees.fee_amount,
+            "total_out_of_pocket": fees.total_amount,
+            "is_premium_member": fees.is_premium_member,
+            "discount_applied": fees.discount_applied,
+            "standard_rate": "5%",
+            "premium_rate": "3.5%"
+        }
+    else:
+        fees = calculate_seller_fees(hammer_price, subscription_tier)
+        return {
+            "user_type": "seller",
+            "hammer_price": hammer_price,
+            "commission_percentage": fees.fee_percentage,
+            "commission_amount": fees.fee_amount,
+            "net_payout": fees.total_amount,
+            "is_premium_member": fees.is_premium_member,
+            "discount_applied": fees.discount_applied,
+            "standard_rate": "4%",
+            "premium_rate": "2.5%"
+        }
+
 @api_router.post("/multi-item-listings/{listing_id}/lots/{lot_number}/bid")
 async def bid_on_lot(listing_id: str, lot_number: int, data: Dict[str, Any], current_user: User = Depends(get_current_user)):
     listing = await db.multi_item_listings.find_one({"id": listing_id}, {"_id": 0})
