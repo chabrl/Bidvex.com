@@ -82,24 +82,36 @@ const DynamicLegalPage = ({ pageKey, fallbackTitle, fallbackContent }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white py-12">
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white dark:from-slate-900 dark:to-slate-800 py-12">
       <div className="container mx-auto px-4 max-w-4xl">
-        <Card className="shadow-lg">
+        <Card className="shadow-lg border-2 border-slate-200 dark:border-slate-700">
           <CardContent className="p-8 md:p-12">
-            {/* Title */}
-            <h1 className="text-4xl font-bold mb-6 text-gray-900">
+            {/* Title - High Contrast */}
+            <h1 className="text-4xl font-bold mb-6 text-slate-900 dark:text-white">
               {content?.title || fallbackTitle}
             </h1>
 
-            {/* Dynamic HTML Content */}
+            {/* Dynamic HTML Content - High Contrast Styling */}
             <div 
-              className="prose prose-lg max-w-none prose-headings:text-gray-900 prose-p:text-gray-700 prose-a:text-blue-600 prose-strong:text-gray-900"
+              className="prose prose-lg max-w-none 
+                prose-headings:text-slate-900 dark:prose-headings:text-white
+                prose-h1:text-slate-900 dark:prose-h1:text-white
+                prose-h2:text-slate-900 dark:prose-h2:text-white
+                prose-h3:text-slate-800 dark:prose-h3:text-slate-100
+                prose-p:text-slate-700 dark:prose-p:text-slate-300
+                prose-li:text-slate-700 dark:prose-li:text-slate-300
+                prose-strong:text-slate-900 dark:prose-strong:text-white prose-strong:font-bold
+                prose-a:text-blue-600 dark:prose-a:text-blue-400
+                [&_strong]:font-bold [&_strong]:text-slate-900 dark:[&_strong]:text-white
+                [&_.highlight]:bg-yellow-100 dark:[&_.highlight]:bg-yellow-900/30 [&_.highlight]:px-1 [&_.highlight]:rounded
+                [&_.fee-percentage]:font-bold [&_.fee-percentage]:text-blue-700 dark:[&_.fee-percentage]:text-blue-400
+                [&_.deadline]:font-bold [&_.deadline]:text-red-700 dark:[&_.deadline]:text-red-400"
               dangerouslySetInnerHTML={{ __html: content?.content || fallbackContent }}
             />
 
             {/* Timestamp */}
-            <div className="mt-12 pt-6 border-t border-gray-200">
-              <p className="text-sm text-muted-foreground">
+            <div className="mt-12 pt-6 border-t border-slate-200 dark:border-slate-700">
+              <p className="text-sm text-slate-600 dark:text-slate-400">
                 Last updated: {new Date().toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US')}
               </p>
             </div>
