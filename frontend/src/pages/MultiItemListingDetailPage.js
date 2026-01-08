@@ -11,8 +11,10 @@ import {
   Package, Clock, MapPin, User, Calendar, 
   ArrowLeft, Gavel, AlertCircle, TrendingUp,
   Grid as GridIcon, List as ListIcon, Menu, X, Flame, Heart, Info,
-  Zap, ShoppingCart, Loader2
+  Zap, ShoppingCart, Loader2, Truck, Building2, Shield, DollarSign,
+  Scale, Wrench, HardHat, CheckCircle, XCircle, FileText
 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import Countdown from 'react-countdown';
 import Lightbox from 'react-image-lightbox';
 import 'react-image-lightbox/style.css';
