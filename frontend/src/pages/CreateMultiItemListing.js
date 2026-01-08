@@ -1831,14 +1831,14 @@ const CreateMultiItemListing = () => {
                   />
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Utilisez la barre d'outils pour formater vos termes.
+                  Utilisez la barre d&apos;outils pour formater vos termes.
                 </p>
               </div>
             )}
 
             <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
               <p className="text-sm text-blue-800 dark:text-blue-200">
-                💡 <strong>Tip:</strong> If you leave this blank, buyers will see "No terms provided by seller" on the auction page.
+                💡 <strong>Tip:</strong> If you leave this blank, buyers will see &quot;No terms provided by seller&quot; on the auction page.
               </p>
             </div>
           </CardContent>
