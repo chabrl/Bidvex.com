@@ -495,6 +495,35 @@ label span,
   color: inherit !important;
 }
 
+/* ============================================
+   DARK MODE HEADING & TEXT VISIBILITY FIXES
+   ============================================ */
+
+/* Force all CardTitle headings to be visible in dark mode */
+.dark [class*="CardTitle"],
+.dark .card-title,
+.dark h1, .dark h2, .dark h3, .dark h4 {
+  color: #f8fafc !important; /* Slate-50 */
+}
+
+/* Shipping Options and other section headings */
+.dark [class*="CardHeader"] h3,
+.dark [class*="CardHeader"] [class*="Title"] {
+  color: #f1f5f9 !important;
+}
+
+/* Ensure description text is visible in dark mode */
+.dark p,
+.dark span:not([class*="bg-"]):not([class*="text-white"]):not([class*="text-green"]):not([class*="text-blue"]):not([class*="text-red"]):not([class*="text-cyan"]) {
+  color: #cbd5e1; /* Slate-300 */
+}
+
+/* Lot Index sidebar in dark mode */
+.dark .lot-index-item,
+.dark [class*="lot-index"] {
+  color: #e2e8f0;
+}
+
 /* Dark mode dropdown menus */
 .dark [role="menu"],
 .dark [data-radix-popper-content-wrapper] > div {
