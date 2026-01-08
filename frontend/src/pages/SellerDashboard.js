@@ -155,6 +155,65 @@ const SellerDashboard = () => {
           />
         </div>
 
+        {/* Fee Structure & 14-Day Payment Rule Info */}
+        <Card className="border-2 border-blue-200 dark:border-blue-700 bg-gradient-to-r from-blue-50 to-slate-50 dark:from-blue-900/20 dark:to-slate-800/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2 text-blue-800 dark:text-blue-300">
+              <Shield className="h-5 w-5" />
+              Fee Structure & Payment Rules
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Seller Commission */}
+              <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-blue-200 dark:border-blue-700">
+                <div className="flex items-center gap-2 mb-2">
+                  <DollarSign className="h-5 w-5 text-blue-600" />
+                  <span className="font-semibold text-slate-900 dark:text-white">Your Commission</span>
+                </div>
+                <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                  {user?.subscription_tier === 'premium' || user?.subscription_tier === 'vip' ? '2.5%' : '4%'}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  {user?.subscription_tier === 'premium' || user?.subscription_tier === 'vip' 
+                    ? '✨ Premium discount applied!' 
+                    : 'Standard rate (2.5% with Premium)'}
+                </p>
+              </div>
+
+              {/* 14-Day Payment Rule */}
+              <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border-2 border-red-300 dark:border-red-700">
+                <div className="flex items-center gap-2 mb-2">
+                  <Clock className="h-5 w-5 text-red-600 dark:text-red-400" />
+                  <span className="font-semibold text-red-800 dark:text-red-300">Payment Deadline</span>
+                </div>
+                <p className="text-2xl font-bold text-red-700 dark:text-red-300">14 Days</p>
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                  Fees must be settled after auction close
+                </p>
+              </div>
+
+              {/* Late Payment Warning */}
+              <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-300 dark:border-amber-700">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                  <span className="font-semibold text-amber-800 dark:text-amber-300">Late Penalty</span>
+                </div>
+                <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">2%/month</p>
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  Interest on overdue balances
+                </p>
+              </div>
+            </div>
+            
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-4 text-center">
+              <a href="/terms" className="text-blue-600 dark:text-blue-400 hover:underline">
+                View complete Terms & Conditions →
+              </a>
+            </p>
+          </CardContent>
+        </Card>
+
         <Card className="glassmorphism">
           <CardHeader>
             <CardTitle>Your Listings</CardTitle>
