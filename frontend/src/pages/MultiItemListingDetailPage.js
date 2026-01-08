@@ -522,6 +522,257 @@ const MultiItemListingDetailPage = () => {
                       </Card>
                     )}
 
+                    {/* =========================================== */}
+                    {/* SELLER OBLIGATIONS - PUBLIC DISPLAY */}
+                    {/* =========================================== */}
+                    
+                    {/* 1. Financial & Refund Sidebar */}
+                    {listing.seller_obligations && (
+                      <Card className="mb-6 border-2 border-blue-200 dark:border-blue-700 bg-gradient-to-br from-blue-50 to-slate-50 dark:from-blue-900/20 dark:to-slate-900/20 shadow-lg">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-lg flex items-center gap-2 text-blue-800 dark:text-blue-300">
+                            <DollarSign className="h-5 w-5" />
+                            Financial & Payment Terms
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          {/* Currency Exchange Rate */}
+                          {listing.seller_obligations.custom_exchange_rate && (
+                            <div className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-blue-200 dark:border-blue-700">
+                              <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Payment Basis</p>
+                              <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
+                                1 USD = {listing.seller_obligations.custom_exchange_rate} CAD
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Refund Status Badge */}
+                          <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+                            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Refund Policy</span>
+                            {listing.seller_obligations.refund_policy === 'non_refundable' ? (
+                              <Badge className="bg-red-600 text-white border-0 font-bold px-3 py-1">
+                                <XCircle className="h-3.5 w-3.5 mr-1" />
+                                Final Sale - Non-Refundable
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-green-600 text-white border-0 font-bold px-3 py-1">
+                                <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                                Refundable (See Terms)
+                              </Badge>
+                            )}
+                          </div>
+
+                          {/* Removal Deadline */}
+                          {listing.seller_obligations.removal_deadline_days && (
+                            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-300 dark:border-amber-700">
+                              <div className="flex items-center gap-2">
+                                <Calendar className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                                <div>
+                                  <p className="text-xs text-amber-600 dark:text-amber-400 uppercase tracking-wider">Removal Deadline</p>
+                                  <p className="font-bold text-amber-800 dark:text-amber-200">
+                                    {listing.seller_obligations.removal_deadline_days} Days after auction close
+                                  </p>
+                                  {listing.seller_obligations.removal_deadline_custom && (
+                                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                      Note: {listing.seller_obligations.removal_deadline_custom}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* 2. Logistics & Facility Infobox */}
+                    {listing.seller_obligations && (
+                      <Card className="mb-6 border-2 border-purple-200 dark:border-purple-700 bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 shadow-lg">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-lg flex items-center gap-2 text-purple-800 dark:text-purple-300">
+                            <Building2 className="h-5 w-5" />
+                            Logistics & Facility
+                          </CardTitle>
+                          <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">
+                            📋 Official Site Capabilities Report
+                          </p>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          {/* Facility Address */}
+                          {listing.seller_obligations.facility_address && (
+                            <div className="flex items-start gap-3 p-3 bg-white dark:bg-slate-800 rounded-lg border border-purple-200 dark:border-purple-700">
+                              <MapPin className="h-5 w-5 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-0.5" />
+                              <div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">Pickup Location</p>
+                                <p className="font-semibold text-slate-800 dark:text-slate-200">{listing.seller_obligations.facility_address}</p>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Site Capabilities Grid */}
+                          <div className="grid grid-cols-2 gap-3">
+                            {/* Overhead Crane */}
+                            {listing.seller_obligations.has_overhead_crane && (
+                              <div className="flex items-center gap-2 p-3 bg-green-100 dark:bg-green-900/30 rounded-lg border border-green-300 dark:border-green-700">
+                                <span className="text-2xl">🏗️</span>
+                                <div>
+                                  <p className="font-semibold text-green-800 dark:text-green-300 text-sm">Overhead Crane</p>
+                                  {listing.seller_obligations.crane_capacity && (
+                                    <p className="text-xs text-green-600 dark:text-green-400">{listing.seller_obligations.crane_capacity} tons</p>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Loading Dock */}
+                            {listing.seller_obligations.has_loading_dock && (
+                              <div className="flex items-center gap-2 p-3 bg-green-100 dark:bg-green-900/30 rounded-lg border border-green-300 dark:border-green-700">
+                                <span className="text-2xl">🚛</span>
+                                <div>
+                                  <p className="font-semibold text-green-800 dark:text-green-300 text-sm">Loading Dock</p>
+                                  {listing.seller_obligations.loading_dock_type && (
+                                    <p className="text-xs text-green-600 dark:text-green-400 capitalize">{listing.seller_obligations.loading_dock_type} dock</p>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Forklift */}
+                            {listing.seller_obligations.has_forklift_available && (
+                              <div className="flex items-center gap-2 p-3 bg-green-100 dark:bg-green-900/30 rounded-lg border border-green-300 dark:border-green-700">
+                                <span className="text-2xl">🚜</span>
+                                <p className="font-semibold text-green-800 dark:text-green-300 text-sm">Forklift Available</p>
+                              </div>
+                            )}
+
+                            {/* Scale on Site */}
+                            {listing.seller_obligations.has_scale_on_site && (
+                              <div className="flex items-center gap-2 p-3 bg-green-100 dark:bg-green-900/30 rounded-lg border border-green-300 dark:border-green-700">
+                                <span className="text-2xl">⚖️</span>
+                                <p className="font-semibold text-green-800 dark:text-green-300 text-sm">Scale on Site</p>
+                              </div>
+                            )}
+
+                            {/* Tailgate Access */}
+                            {listing.seller_obligations.has_tailgate_access && (
+                              <div className="flex items-center gap-2 p-3 bg-green-100 dark:bg-green-900/30 rounded-lg border border-green-300 dark:border-green-700">
+                                <span className="text-2xl">🚛</span>
+                                <p className="font-semibold text-green-800 dark:text-green-300 text-sm">Tailgate Access</p>
+                              </div>
+                            )}
+
+                            {/* Ground Level Only */}
+                            {listing.seller_obligations.ground_level_loading_only && (
+                              <div className="flex items-center gap-2 p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg border border-blue-300 dark:border-blue-700">
+                                <span className="text-2xl">📦</span>
+                                <p className="font-semibold text-blue-800 dark:text-blue-300 text-sm">Ground Level Only</p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* PPE/Safety Requirements */}
+                          {listing.seller_obligations.authorized_personnel_only && (
+                            <div className="p-4 bg-amber-100 dark:bg-amber-900/30 rounded-lg border-2 border-amber-400 dark:border-amber-600">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="text-2xl">🛡️</span>
+                                <p className="font-bold text-amber-800 dark:text-amber-300">PPE/ID Required for Entry</p>
+                              </div>
+                              {listing.seller_obligations.safety_requirements && (
+                                <p className="text-sm text-amber-700 dark:text-amber-400 ml-8">
+                                  {listing.seller_obligations.safety_requirements}
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Warning: Tailgate Truck Required */}
+                          {listing.seller_obligations.ground_level_loading_only && !listing.seller_obligations.has_loading_dock && (
+                            <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-lg border-2 border-orange-400 dark:border-orange-600">
+                              <p className="font-bold text-orange-700 dark:text-orange-300 flex items-center gap-2">
+                                <AlertCircle className="h-5 w-5" />
+                                ⚠️ Note: Requires Tailgate Truck for Pickup
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Shipping/Rigging Status */}
+                          <div className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                                <Truck className="h-4 w-4" />
+                                Seller Provides Shipping/Rigging
+                              </span>
+                              {listing.seller_obligations.provides_shipping === 'yes' ? (
+                                <Badge className="bg-green-600 text-white border-0">Yes</Badge>
+                              ) : (
+                                <Badge className="bg-slate-500 text-white border-0">Buyer Pickup</Badge>
+                              )}
+                            </div>
+                            {listing.seller_obligations.provides_shipping === 'yes' && listing.seller_obligations.shipping_details && (
+                              <p className="text-sm text-slate-600 dark:text-slate-400 mt-2 pl-6">
+                                {listing.seller_obligations.shipping_details}
+                              </p>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* 3. Shipping & Logistics Tab Content */}
+                    {listing.seller_obligations && (listing.seller_obligations.additional_site_notes || listing.seller_obligations.shipping_details) && (
+                      <Card className="mb-6 border-2 border-slate-200 dark:border-slate-700">
+                        <CardHeader className="pb-3 bg-slate-50 dark:bg-slate-800/50">
+                          <CardTitle className="text-lg flex items-center gap-2 text-slate-800 dark:text-slate-200">
+                            <FileText className="h-5 w-5" />
+                            Seller&apos;s Specific Terms
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4 pt-4">
+                          {/* Additional Site Notes */}
+                          {listing.seller_obligations.additional_site_notes && (
+                            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
+                              <p className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">📝 Additional Site Notes:</p>
+                              <p className="text-sm text-slate-700 dark:text-slate-300">
+                                {listing.seller_obligations.additional_site_notes}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Rigging/Shipping Details */}
+                          {listing.seller_obligations.provides_shipping === 'yes' && listing.seller_obligations.shipping_details && (
+                            <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
+                              <p className="text-sm font-semibold text-green-800 dark:text-green-300 mb-2">🚚 Rigging/Shipping Details:</p>
+                              <p className="text-sm text-slate-700 dark:text-slate-300">
+                                Seller provides rigging: <strong>Yes</strong> - {listing.seller_obligations.shipping_details}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Refund Terms */}
+                          {listing.seller_obligations.refund_policy === 'refundable' && listing.seller_obligations.refund_terms && (
+                            <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-700">
+                              <p className="text-sm font-semibold text-purple-800 dark:text-purple-300 mb-2">💰 Refund Terms:</p>
+                              <p className="text-sm text-slate-700 dark:text-slate-300">
+                                {listing.seller_obligations.refund_terms}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Legal Shield Disclaimer */}
+                          <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-lg border-2 border-slate-300 dark:border-slate-600 mt-4">
+                            <div className="flex items-start gap-3">
+                              <Shield className="h-5 w-5 text-slate-600 dark:text-slate-400 flex-shrink-0 mt-0.5" />
+                              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                                <strong>Bidder Agreement:</strong> By bidding on this item, you agree to the removal deadlines 
+                                and facility requirements specified by the seller above. Failure to comply with pickup 
+                                deadlines may result in storage fees or forfeiture of the item.
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
                     {/* Auction Terms & Conditions - Enhanced with Show More/Less and Agreement */}
                     {(listing.auction_terms_en || listing.auction_terms_fr) && (
                       <Card className="mb-6 border-2 border-primary/20">
