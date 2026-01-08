@@ -97,16 +97,28 @@ const CreateMultiItemListing = () => {
 
   // NEW: Seller Obligations State
   const [sellerObligations, setSellerObligations] = useState({
+    // Dynamic Currency Exchange
+    customExchangeRate: '', // Seller enters manually (e.g., "1.42")
     // Logistics
     providesShipping: 'no', // 'yes' or 'no'
     shippingDetails: '',
     // Removal Deadline
     removalDeadline: '',
     removalDeadlineDays: '7',
-    // Site Capabilities
+    // Site Capabilities - Basic
     facilityAddress: '',
     hasTailgateAccess: false,
     hasForkliftAvailable: false,
+    // Site Capabilities - Professional
+    hasLoadingDock: false,
+    loadingDockType: '', // 'high' or 'standard'
+    hasOverheadCrane: false,
+    craneCapacity: '', // in tons
+    groundLevelLoadingOnly: false,
+    hasScaleOnSite: false,
+    authorizedPersonnelOnly: false,
+    safetyRequirements: '', // e.g., "Hard hat, safety vest required"
+    additionalSiteNotes: '', // e.g., "Enter through Gate 4"
     // Refund Policy
     refundPolicy: 'non_refundable', // 'non_refundable' or 'refundable'
     refundTerms: '',
