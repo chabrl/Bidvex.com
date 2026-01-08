@@ -431,6 +431,70 @@ label span,
   font-weight: 600 !important;
 }
 
+/* ============================================
+   BADGE VISIBILITY - HIGH CONTRAST FIXES
+   ============================================ */
+
+/* Default badges - ensure text is always visible */
+[data-slot="badge"],
+.inline-flex.items-center.rounded-md {
+  font-weight: 600 !important;
+}
+
+/* Outline variant badges - force black text in light mode */
+.border-transparent:not(.bg-primary):not(.bg-secondary):not(.bg-destructive),
+[class*="variant-outline"],
+.text-foreground.border {
+  color: #1a1a1a !important;
+  border-color: #374151 !important;
+}
+
+.dark .border-transparent:not(.bg-primary):not(.bg-secondary):not(.bg-destructive),
+.dark [class*="variant-outline"],
+.dark .text-foreground.border {
+  color: #ffffff !important;
+  border-color: #94a3b8 !important;
+}
+
+/* Lot count badges specifically */
+.lots-count-badge {
+  color: #1e293b !important;
+  background-color: #f1f5f9 !important;
+  border-color: #475569 !important;
+  font-weight: 700 !important;
+}
+
+.dark .lots-count-badge {
+  color: #f8fafc !important;
+  background-color: #334155 !important;
+  border-color: #64748b !important;
+}
+
+/* Active auction badge - always blue with white text */
+.auction-status-badge {
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  border-color: #2563eb !important;
+}
+
+/* Mobile menu and hamburger icons */
+.md\\:hidden button svg,
+.mobile-menu-icon {
+  color: #0f172a !important;
+}
+
+.dark .md\\:hidden button svg,
+.dark .mobile-menu-icon {
+  color: #f8fafc !important;
+}
+
+/* Ensure all badge text inside badges is visible */
+[class*="Badge"] span,
+.badge-text {
+  color: inherit !important;
+}
+
 /* Dark mode dropdown menus */
 .dark [role="menu"],
 .dark [data-radix-popper-content-wrapper] > div {
