@@ -350,11 +350,18 @@ const MultiItemListingDetailPage = () => {
                         <Package className="h-6 w-6" style={{ color: '#2563eb' }} />
                         <Badge 
                           variant={isPreviewMode ? "secondary" : auctionEnded ? "secondary" : "default"}
-                          className={isPreviewMode ? "bg-amber-500 text-white" : ""}
+                          className={`${isPreviewMode ? "bg-amber-500 text-white font-bold" : auctionEnded ? "bg-slate-500 text-white font-bold" : "bg-blue-600 text-white font-bold"} auction-status-badge`}
+                          style={{ color: '#ffffff', fontWeight: 700 }}
                         >
                           {isPreviewMode ? 'Coming Soon' : auctionEnded ? 'Auction Ended' : 'Active Auction'}
                         </Badge>
-                        <Badge variant="outline" style={{ color: '#374151', borderColor: '#d1d5db' }}>{listing.total_lots} Lots</Badge>
+                        <Badge 
+                          variant="outline" 
+                          className="lots-count-badge font-bold"
+                          style={{ color: '#1a1a1a', borderColor: '#374151', fontWeight: 700 }}
+                        >
+                          {listing.total_lots} Lots
+                        </Badge>
                       </div>
                       {user && (
                         <WishlistHeartButton
