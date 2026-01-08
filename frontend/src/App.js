@@ -214,6 +214,7 @@ const App = () => {
           <AIAssistant />
           <MessageNotificationListener />
           <Toaster position="top-right" />
+          <CookieConsentBanner />
             <MobileBottomNav />
           </div>
         </FeatureFlagsProvider>
