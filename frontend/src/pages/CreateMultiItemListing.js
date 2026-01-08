@@ -1557,23 +1557,30 @@ const CreateMultiItemListing = () => {
           </CardHeader>
           <CardContent className="space-y-6 pt-6">
             
-            {/* Currency Exchange Reference */}
-            <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                  <DollarSign className="h-5 w-5 text-green-700 dark:text-green-400" />
+            {/* Dynamic Currency Exchange - Manual Input */}
+            <div className="space-y-3">
+              <Label className="flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
+                <DollarSign className="h-4 w-4 text-green-600" />
+                Custom Exchange Rate (Cross-Border Sales) *
+              </Label>
+              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border-2 border-green-200 dark:border-green-700">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="font-medium text-slate-700 dark:text-slate-300">1 USD =</span>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    placeholder="e.g., 1.42"
+                    value={sellerObligations.customExchangeRate}
+                    onChange={(e) => setSellerObligations(prev => ({ ...prev, customExchangeRate: e.target.value }))}
+                    className="w-32 text-lg font-bold text-center border-2 border-green-400 focus:ring-green-500 focus:border-green-500"
+                    required
+                  />
+                  <span className="font-medium text-slate-700 dark:text-slate-300">CAD</span>
                 </div>
-                <div>
-                  <p className="font-semibold text-slate-900 dark:text-white">
-                    Transaction Basis
-                  </p>
-                  <p className="text-lg font-bold text-green-700 dark:text-green-400">
-                    1 USD = 1.42 CAD
-                  </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Reference exchange rate for cross-border transactions
-                  </p>
-                </div>
+                <p className="text-xs text-green-700 dark:text-green-400 mt-3">
+                  ⚠️ Enter the rate you will use for this transaction. <strong>This rate will be locked once the auction goes live.</strong>
+                </p>
               </div>
             </div>
 
@@ -1640,48 +1647,178 @@ const CreateMultiItemListing = () => {
               </div>
             </div>
 
-            {/* Site Capabilities / Facility Details */}
-            <div className="space-y-3">
-              <Label className="flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
-                <Building2 className="h-4 w-4 text-purple-600" />
-                Facility Details
+            {/* =========================================== */}
+            {/* EXPANDED FACILITY DETAILS - Professional */}
+            {/* =========================================== */}
+            <div className="space-y-4">
+              <Label className="flex items-center gap-2 font-semibold text-slate-900 dark:text-white text-lg">
+                <Building2 className="h-5 w-5 text-purple-600" />
+                Professional Facility Details
               </Label>
               
-              <div className="space-y-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+              <div className="space-y-4 p-5 bg-purple-50 dark:bg-purple-900/20 rounded-xl border-2 border-purple-200 dark:border-purple-700">
+                {/* Facility Address */}
                 <div className="space-y-2">
-                  <Label className="text-sm text-slate-700 dark:text-slate-300">Facility Address</Label>
+                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Facility Address *</Label>
                   <Input
                     placeholder="Enter pickup/facility address..."
                     value={sellerObligations.facilityAddress}
                     onChange={(e) => setSellerObligations(prev => ({ ...prev, facilityAddress: e.target.value }))}
-                    className="border-slate-300 focus:ring-purple-500"
+                    className="border-purple-300 focus:ring-purple-500 focus:border-purple-500"
+                    required
                   />
                 </div>
-                
-                <div className="flex flex-wrap gap-4 pt-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={sellerObligations.hasTailgateAccess}
-                      onChange={(e) => setSellerObligations(prev => ({ ...prev, hasTailgateAccess: e.target.checked }))}
-                      className="w-5 h-5 accent-purple-600"
-                    />
-                    <span className="font-medium text-slate-700 dark:text-slate-300">
-                      🚛 Tailgate Truck Access
-                    </span>
-                  </label>
+
+                {/* Professional Facility Options - Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3">
                   
-                  <label className="flex items-center gap-2 cursor-pointer">
+                  {/* Loading Dock */}
+                  <div className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-purple-200 dark:border-purple-700">
+                    <label className="flex items-center gap-2 cursor-pointer mb-2">
+                      <input
+                        type="checkbox"
+                        checked={sellerObligations.hasLoadingDock}
+                        onChange={(e) => setSellerObligations(prev => ({ ...prev, hasLoadingDock: e.target.checked }))}
+                        className="w-5 h-5 accent-purple-600"
+                      />
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                        🚚 Loading Dock Available
+                      </span>
+                    </label>
+                    {sellerObligations.hasLoadingDock && (
+                      <select
+                        value={sellerObligations.loadingDockType}
+                        onChange={(e) => setSellerObligations(prev => ({ ...prev, loadingDockType: e.target.value }))}
+                        className="w-full mt-2 px-3 py-2 text-sm border rounded-lg bg-purple-50 dark:bg-slate-700"
+                      >
+                        <option value="">Select Dock Type</option>
+                        <option value="high">High Dock (48&quot; standard)</option>
+                        <option value="standard">Standard Dock</option>
+                        <option value="adjustable">Adjustable Height</option>
+                      </select>
+                    )}
+                  </div>
+
+                  {/* Overhead Crane */}
+                  <div className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-purple-200 dark:border-purple-700">
+                    <label className="flex items-center gap-2 cursor-pointer mb-2">
+                      <input
+                        type="checkbox"
+                        checked={sellerObligations.hasOverheadCrane}
+                        onChange={(e) => setSellerObligations(prev => ({ ...prev, hasOverheadCrane: e.target.checked }))}
+                        className="w-5 h-5 accent-purple-600"
+                      />
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                        🏗️ Overhead Crane Access
+                      </span>
+                    </label>
+                    {sellerObligations.hasOverheadCrane && (
+                      <Input
+                        type="number"
+                        placeholder="Capacity (tons)"
+                        value={sellerObligations.craneCapacity}
+                        onChange={(e) => setSellerObligations(prev => ({ ...prev, craneCapacity: e.target.value }))}
+                        className="mt-2 text-sm"
+                      />
+                    )}
+                  </div>
+
+                  {/* Ground Level Loading */}
+                  <div className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-purple-200 dark:border-purple-700">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={sellerObligations.groundLevelLoadingOnly}
+                        onChange={(e) => setSellerObligations(prev => ({ ...prev, groundLevelLoadingOnly: e.target.checked }))}
+                        className="w-5 h-5 accent-purple-600"
+                      />
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                        📦 Ground Level Loading Only
+                      </span>
+                    </label>
+                  </div>
+
+                  {/* Scale on Site */}
+                  <div className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-purple-200 dark:border-purple-700">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={sellerObligations.hasScaleOnSite}
+                        onChange={(e) => setSellerObligations(prev => ({ ...prev, hasScaleOnSite: e.target.checked }))}
+                        className="w-5 h-5 accent-purple-600"
+                      />
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                        ⚖️ Scale on Site (Scrap/Heavy Loads)
+                      </span>
+                    </label>
+                  </div>
+
+                  {/* Tailgate Access */}
+                  <div className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-purple-200 dark:border-purple-700">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={sellerObligations.hasTailgateAccess}
+                        onChange={(e) => setSellerObligations(prev => ({ ...prev, hasTailgateAccess: e.target.checked }))}
+                        className="w-5 h-5 accent-purple-600"
+                      />
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                        🚛 Tailgate Truck Access
+                      </span>
+                    </label>
+                  </div>
+
+                  {/* Forklift Available */}
+                  <div className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-purple-200 dark:border-purple-700">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={sellerObligations.hasForkliftAvailable}
+                        onChange={(e) => setSellerObligations(prev => ({ ...prev, hasForkliftAvailable: e.target.checked }))}
+                        className="w-5 h-5 accent-purple-600"
+                      />
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                        🏗️ Forklift Available
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Authorized Personnel & Safety */}
+                <div className="p-4 mt-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-300 dark:border-amber-700">
+                  <label className="flex items-center gap-2 cursor-pointer mb-3">
                     <input
                       type="checkbox"
-                      checked={sellerObligations.hasForkliftAvailable}
-                      onChange={(e) => setSellerObligations(prev => ({ ...prev, hasForkliftAvailable: e.target.checked }))}
-                      className="w-5 h-5 accent-purple-600"
+                      checked={sellerObligations.authorizedPersonnelOnly}
+                      onChange={(e) => setSellerObligations(prev => ({ ...prev, authorizedPersonnelOnly: e.target.checked }))}
+                      className="w-5 h-5 accent-amber-600"
                     />
-                    <span className="font-medium text-slate-700 dark:text-slate-300">
-                      🏗️ Forklift Available
+                    <span className="font-semibold text-amber-800 dark:text-amber-300">
+                      🔒 Authorized Personnel Only (ID/Safety Gear Required)
                     </span>
                   </label>
+                  {sellerObligations.authorizedPersonnelOnly && (
+                    <Input
+                      placeholder="Specify requirements (e.g., Hard hat, safety vest, steel-toe boots)"
+                      value={sellerObligations.safetyRequirements}
+                      onChange={(e) => setSellerObligations(prev => ({ ...prev, safetyRequirements: e.target.value }))}
+                      className="border-amber-300 focus:ring-amber-500"
+                    />
+                  )}
+                </div>
+
+                {/* Additional Site Notes */}
+                <div className="space-y-2 mt-4">
+                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    📝 Additional Site Notes
+                  </Label>
+                  <Textarea
+                    placeholder="e.g., Enter through Gate 4; Appointment required 24h in advance; Limited parking available"
+                    value={sellerObligations.additionalSiteNotes}
+                    onChange={(e) => setSellerObligations(prev => ({ ...prev, additionalSiteNotes: e.target.value }))}
+                    rows={3}
+                    className="border-purple-200 focus:ring-purple-500 focus:border-purple-500"
+                  />
                 </div>
               </div>
             </div>
@@ -1750,35 +1887,83 @@ const CreateMultiItemListing = () => {
             </div>
 
             {/* =========================================== */}
-            {/* SELLER COMMITMENT BLOCK */}
+            {/* SELLER COMMITMENT BLOCK - "The Legal Shield" */}
             {/* =========================================== */}
-            <div className="mt-8 p-6 bg-gradient-to-r from-blue-100 to-slate-100 dark:from-blue-900/40 dark:to-slate-800/40 rounded-xl border-2 border-blue-300 dark:border-blue-700">
-              <label className="flex items-start gap-4 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={sellerObligations.sellerAgreementConfirmed}
-                  onChange={(e) => setSellerObligations(prev => ({ ...prev, sellerAgreementConfirmed: e.target.checked }))}
-                  className="w-6 h-6 mt-1 accent-blue-600 flex-shrink-0"
-                  required
-                />
-                <div>
-                  <p className="font-bold text-lg text-blue-900 dark:text-blue-200 mb-2">
-                    Seller Commitment *
-                  </p>
-                  <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-                    By listing this item, I certify that all location, logistics, and refund information 
-                    provided is <strong>accurate and binding</strong>. I understand that providing false or 
-                    misleading information may result in penalties and removal from the platform.
-                  </p>
+            <div className="mt-8 space-y-4">
+              {/* Why This Matters - Info Box */}
+              <div className="p-5 bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-900/30 dark:to-blue-900/30 rounded-xl border-2 border-indigo-200 dark:border-indigo-700">
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="p-2 bg-indigo-100 dark:bg-indigo-800 rounded-lg flex-shrink-0">
+                    <Shield className="h-5 w-5 text-indigo-700 dark:text-indigo-300" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-indigo-900 dark:text-indigo-200 text-lg mb-1">
+                      🛡️ Why This Agreement Matters
+                    </h4>
+                    <p className="text-sm text-indigo-700 dark:text-indigo-300">
+                      <strong>Important:</strong> This agreement serves as your legal contract with the buyer. 
+                      Providing accurate details protects you from disputes and ensures a smooth payout.
+                    </p>
+                  </div>
                 </div>
-              </label>
-              
-              {!sellerObligations.sellerAgreementConfirmed && (
-                <p className="mt-3 text-sm text-amber-700 dark:text-amber-400 flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4" />
-                  You must confirm the seller commitment to proceed
-                </p>
-              )}
+
+                {/* Examples */}
+                <div className="space-y-3 pl-12">
+                  <div className="p-3 bg-white dark:bg-slate-800 rounded-lg border-l-4 border-blue-500">
+                    <p className="text-sm text-slate-700 dark:text-slate-300">
+                      <strong className="text-blue-700 dark:text-blue-400">📦 Logistics Example:</strong> If you state 
+                      &quot;Forklift Available&quot; and cannot provide one at pickup, you may be liable for the 
+                      buyer&apos;s specialized transport costs.
+                    </p>
+                  </div>
+                  
+                  <div className="p-3 bg-white dark:bg-slate-800 rounded-lg border-l-4 border-red-500">
+                    <p className="text-sm text-slate-700 dark:text-slate-300">
+                      <strong className="text-red-700 dark:text-red-400">💰 Refunds Example:</strong> Explicitly marking 
+                      an item &quot;Non-Refundable&quot; protects your sale if a buyer has &quot;buyer&apos;s remorse&quot; 
+                      after winning.
+                    </p>
+                  </div>
+                  
+                  <div className="p-3 bg-white dark:bg-slate-800 rounded-lg border-l-4 border-orange-500">
+                    <p className="text-sm text-slate-700 dark:text-slate-300">
+                      <strong className="text-orange-700 dark:text-orange-400">📅 Removal Example:</strong> Setting a 
+                      7-day removal deadline allows you to legally charge storage fees or relist the item if the 
+                      buyer fails to pick it up on time.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Seller Commitment Checkbox */}
+              <div className="p-6 bg-gradient-to-r from-blue-100 to-slate-100 dark:from-blue-900/40 dark:to-slate-800/40 rounded-xl border-2 border-blue-300 dark:border-blue-700">
+                <label className="flex items-start gap-4 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={sellerObligations.sellerAgreementConfirmed}
+                    onChange={(e) => setSellerObligations(prev => ({ ...prev, sellerAgreementConfirmed: e.target.checked }))}
+                    className="w-6 h-6 mt-1 accent-blue-600 flex-shrink-0"
+                    required
+                  />
+                  <div>
+                    <p className="font-bold text-lg text-blue-900 dark:text-blue-200 mb-2">
+                      ✅ Seller Commitment *
+                    </p>
+                    <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                      By listing this item, I certify that all location, logistics, and refund information 
+                      provided is <strong>accurate and binding</strong>. I understand that providing false or 
+                      misleading information may result in penalties, dispute liability, and removal from the platform.
+                    </p>
+                  </div>
+                </label>
+                
+                {!sellerObligations.sellerAgreementConfirmed && (
+                  <p className="mt-3 text-sm text-amber-700 dark:text-amber-400 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    You must confirm the seller commitment to proceed
+                  </p>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
