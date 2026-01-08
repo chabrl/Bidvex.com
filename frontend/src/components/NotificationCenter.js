@@ -254,10 +254,10 @@ const NotificationCenter = () => {
         variant="ghost"
         size="icon"
         onClick={() => setIsOpen(!isOpen)}
-        className="relative"
+        className="relative navbar-icon-btn hover:bg-slate-100 dark:hover:bg-slate-800"
         data-testid="notification-bell"
       >
-        <Bell className={`h-5 w-5 transition-transform ${isOpen ? 'scale-110' : ''}`} />
+        <Bell className={`h-5 w-5 transition-transform navbar-icon text-slate-900 dark:text-slate-100 ${isOpen ? 'scale-110' : ''}`} />
         
         {/* Unread Badge */}
         {unreadCount > 0 && (
