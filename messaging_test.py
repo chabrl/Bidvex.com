@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = "https://lotfocus.preview.emergentagent.com/api"
+BASE_URL = "https://bidding-platform-20.preview.emergentagent.com/api"
 ADMIN_EMAIL = "admin@bazario.com"
 ADMIN_PASSWORD = "Admin123!"
 TEST_USER_EMAIL = "testuser@bazario.com"

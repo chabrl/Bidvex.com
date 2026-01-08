@@ -8,7 +8,7 @@ import aiohttp
 import json
 from datetime import datetime, timezone, timedelta
 
-BASE_URL = "https://lotfocus.preview.emergentagent.com/api"
+BASE_URL = "https://bidding-platform-20.preview.emergentagent.com/api"
 
 async def test_personal_account_vip():
     """Test that personal account VIP users cannot create multi-item listings"""
