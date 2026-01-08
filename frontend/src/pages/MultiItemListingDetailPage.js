@@ -57,8 +57,44 @@ const MultiItemListingDetailPage = () => {
   const [verificationModalOpen, setVerificationModalOpen] = useState(false);
   const [verificationAction, setVerificationAction] = useState('bid');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [termsAcceptedPersistent, setTermsAcceptedPersistent] = useState(false);
   const [sellerInfo, setSellerInfo] = useState(null);
   const lotRefs = useRef({});
+
+  // Check if user has already accepted terms for this auction
+  useEffect(() => {
+    const checkTermsStatus = async () => {
+      if (user && id) {
+        try {
+          const response = await axios.get(`${API}/multi-item-listings/${id}/terms-status`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          });
+          if (response.data.has_accepted) {
+            setAgreedToTerms(true);
+            setTermsAcceptedPersistent(true);
+          }
+        } catch (error) {
+          // Silently fail - user hasn't accepted yet
+        }
+      }
+    };
+    checkTermsStatus();
+  }, [user, id]);
+
+  // Function to accept terms and persist to database
+  const acceptAuctionTerms = async () => {
+    if (!user) return;
+    try {
+      await axios.post(`${API}/multi-item-listings/${id}/accept-terms`, {}, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      setAgreedToTerms(true);
+      setTermsAcceptedPersistent(true);
+      toast.success('Terms accepted for this auction');
+    } catch (error) {
+      toast.error('Failed to save terms acceptance');
+    }
+  };
 
   useEffect(() => {
     fetchListing();
