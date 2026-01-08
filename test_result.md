@@ -86,3 +86,28 @@
 - Date picker is DATE ONLY (no time selector) as requested
 - Validation messages are clear and user-friendly
 - All form elements are functional and properly styled
+
+---
+
+## LIVE URL VERIFICATION - January 8, 2026
+
+### Cache Busting Implemented
+- Added `Cache-Control: no-cache, no-store, must-revalidate` meta tags to index.html
+- Added `Pragma: no-cache` and `Expires: 0` headers
+- CSS version comment added for tracking: `BidVex CSS v2.0.1`
+
+### Cascaded Regional Filter - ALREADY IMPLEMENTED
+Location: `/app/frontend/src/pages/LotsMarketplacePage.js`
+
+**Features:**
+- Country dropdown: Canada, United States
+- Province/State dropdown: Dynamically populated based on selected country
+- City dropdown: Dynamically populated based on selected province
+- Proper disabled states when parent not selected
+- Clear cascade on parent change (selecting new country clears province and city)
+
+### Live URL
+https://bidding-platform-20.preview.emergentagent.com
+
+### Test Credentials
+- Admin: charbel@admin.bazario.com / Admin123!
