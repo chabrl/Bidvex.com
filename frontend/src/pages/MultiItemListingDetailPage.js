@@ -357,8 +357,7 @@ const MultiItemListingDetailPage = () => {
                         </Badge>
                         <Badge 
                           variant="outline" 
-                          className="lots-count-badge font-bold"
-                          style={{ color: '#1a1a1a', borderColor: '#374151', fontWeight: 700 }}
+                          className="lots-count-badge font-bold text-slate-800 dark:text-slate-100 border-slate-400 dark:border-slate-500 bg-slate-100 dark:bg-slate-700"
                         >
                           {listing.total_lots} Lots
                         </Badge>
