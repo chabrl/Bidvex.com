@@ -297,10 +297,14 @@ const Navbar = () => {
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="md:hidden"
+                className="md:hidden navbar-icon-btn hover:bg-slate-100 dark:hover:bg-slate-800"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               >
-                {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+                {mobileMenuOpen ? (
+                  <X className="h-5 w-5 navbar-icon text-slate-900 dark:text-slate-100" />
+                ) : (
+                  <Menu className="h-5 w-5 navbar-icon text-slate-900 dark:text-slate-100" />
+                )}
               </Button>
             </div>
           </div>
