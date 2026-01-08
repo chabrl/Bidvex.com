@@ -1114,6 +1114,27 @@ async def get_current_user(request: Request, credentials: Optional[HTTPAuthoriza
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+async def get_current_user_optional(request: Request, credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> Optional[User]:
+    """Optional authentication - returns None if not authenticated instead of raising an error"""
+    token = None
+    if "session_token" in request.cookies:
+        token = request.cookies["session_token"]
+    elif credentials:
+        token = credentials.credentials
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, jwt_secret, algorithms=["HS256"])
+        user_id = payload.get("sub")
+        if not user_id:
+            return None
+        user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
+        if not user_doc:
+            return None
+        return User(**user_doc)
+    except JWTError:
+        return None
+
 @api_router.post("/auth/register", response_model=TokenResponse)
 async def register(user_data: UserCreate, request: Request):
     existing = await db.users.find_one({"email": user_data.email})
