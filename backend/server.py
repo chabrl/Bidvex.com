@@ -893,6 +893,8 @@ class MultiItemListing(BaseModel):
     # Auction terms (rich text HTML content)
     auction_terms_en: Optional[str] = None  # English auction terms
     auction_terms_fr: Optional[str] = None  # French auction terms
+    # Seller obligations - collected in Step 4
+    seller_obligations: Optional[Dict[str, Any]] = None  # Complete seller obligations data
 
 class PaymentTransaction(BaseModel):
     model_config = ConfigDict(extra="ignore")
