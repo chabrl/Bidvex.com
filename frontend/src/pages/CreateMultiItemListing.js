@@ -1170,8 +1170,40 @@ const CreateMultiItemListing = () => {
     </div>
   );
 
-  // Step 4: Documents, Shipping, Visit
+  // Step 4: Documents, Shipping, Visit, & Seller Obligations
   const renderStep4 = () => {
+    // Validate visit date against auction end date
+    const validateVisitDate = (dateValue) => {
+      if (!dateValue || !formData.auction_end_date) {
+        setVisitDateError('');
+        return true;
+      }
+      
+      const visitDate = new Date(dateValue);
+      const auctionEndDate = new Date(formData.auction_end_date);
+      
+      if (visitDate >= auctionEndDate) {
+        setVisitDateError('Inspection dates must occur while the auction is active.');
+        return false;
+      }
+      
+      setVisitDateError('');
+      return true;
+    };
+
+    // Get maximum allowed date for visit (day before auction ends)
+    const getMaxVisitDate = () => {
+      if (!formData.auction_end_date) return '';
+      const endDate = new Date(formData.auction_end_date);
+      endDate.setDate(endDate.getDate() - 1);
+      return endDate.toISOString().split('T')[0];
+    };
+
+    // Get minimum date (today)
+    const getMinVisitDate = () => {
+      return new Date().toISOString().split('T')[0];
+    };
+
     const handleFileUpload = async (docType, event) => {
       const file = event.target.files[0];
       if (!file) return;
