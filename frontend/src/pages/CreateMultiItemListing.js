@@ -507,7 +507,24 @@ const CreateMultiItemListing = () => {
           catalogue: documents.catalogue
         },
         shipping_info: shippingInfo.available ? shippingInfo : null,
-        visit_availability: visitAvailability.offered ? visitAvailability : null,
+        visit_availability: visitAvailability.offered ? {
+          ...visitAvailability,
+          dates: visitAvailability.dates // Now in YYYY-MM-DD format
+        } : null,
+        // Seller Obligations
+        seller_obligations: {
+          provides_shipping: sellerObligations.providesShipping,
+          shipping_details: sellerObligations.shippingDetails,
+          removal_deadline_days: parseInt(sellerObligations.removalDeadlineDays),
+          removal_deadline_custom: sellerObligations.removalDeadline,
+          facility_address: sellerObligations.facilityAddress,
+          has_tailgate_access: sellerObligations.hasTailgateAccess,
+          has_forklift_available: sellerObligations.hasForkliftAvailable,
+          refund_policy: sellerObligations.refundPolicy,
+          refund_terms: sellerObligations.refundTerms,
+          agreement_confirmed: sellerObligations.sellerAgreementConfirmed,
+          agreement_timestamp: new Date().toISOString()
+        },
         auction_terms_en: auctionTerms.en || null,
         auction_terms_fr: auctionTerms.fr || null,
         // Promotion tier
