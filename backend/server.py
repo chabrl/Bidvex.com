@@ -662,6 +662,60 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     user: User
 
+# =========================================
+# UNIFIED FEE ENGINE
+# =========================================
+class FeeCalculation(BaseModel):
+    """Fee calculation result for buyers and sellers"""
+    base_amount: float
+    fee_percentage: float
+    fee_amount: float
+    total_amount: float
+    is_premium_member: bool
+    discount_applied: float
+
+def calculate_buyer_fees(hammer_price: float, subscription_tier: str = "free") -> FeeCalculation:
+    """
+    Calculate buyer's premium based on subscription tier.
+    Standard: 5% | Premium/VIP: 3.5% (1.5% discount)
+    """
+    base_percentage = 5.0
+    discount = 1.5 if subscription_tier in ["premium", "vip"] else 0.0
+    final_percentage = base_percentage - discount
+    
+    fee_amount = hammer_price * (final_percentage / 100)
+    total_amount = hammer_price + fee_amount
+    
+    return FeeCalculation(
+        base_amount=hammer_price,
+        fee_percentage=final_percentage,
+        fee_amount=round(fee_amount, 2),
+        total_amount=round(total_amount, 2),
+        is_premium_member=subscription_tier in ["premium", "vip"],
+        discount_applied=discount
+    )
+
+def calculate_seller_fees(hammer_price: float, subscription_tier: str = "free") -> FeeCalculation:
+    """
+    Calculate seller's commission based on subscription tier.
+    Standard: 4% | Premium/VIP: 2.5% (1.5% discount)
+    """
+    base_percentage = 4.0
+    discount = 1.5 if subscription_tier in ["premium", "vip"] else 0.0
+    final_percentage = base_percentage - discount
+    
+    fee_amount = hammer_price * (final_percentage / 100)
+    net_payout = hammer_price - fee_amount
+    
+    return FeeCalculation(
+        base_amount=hammer_price,
+        fee_percentage=final_percentage,
+        fee_amount=round(fee_amount, 2),
+        total_amount=round(net_payout, 2),  # For seller, total is net payout
+        is_premium_member=subscription_tier in ["premium", "vip"],
+        discount_applied=discount
+    )
+
 class ListingCreate(BaseModel):
     title: str
     description: str
