@@ -33,24 +33,24 @@ const PrivateSaleBadge = ({
 
   // Default: Full banner style
   return (
-    <div className={`bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-4 ${className}`}>
+    <div className={`bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30 border-2 border-green-300 dark:border-green-600 rounded-xl p-4 ${className}`}>
       <div className="flex items-start gap-3">
-        <div className="p-2 bg-green-100 rounded-lg">
-          <Sparkles className="h-6 w-6 text-green-600" />
+        <div className="p-2 bg-green-100 dark:bg-green-800 rounded-lg">
+          <Sparkles className="h-6 w-6 text-green-600 dark:text-green-400" />
         </div>
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <h4 className="font-bold text-green-700 text-lg">🎉 Private Sale</h4>
+            <h4 className="font-bold text-green-700 dark:text-green-300 text-lg">🎉 Private Sale</h4>
             {showSavingsPercentage && (
               <Badge className="bg-green-600 text-white border-0 text-xs">
                 Save ~15% on Taxes!
               </Badge>
             )}
           </div>
-          <p className="text-sm text-green-600">
+          <p className="text-sm text-green-600 dark:text-green-400">
             This item is from an individual seller. <strong>No sales tax on the hammer price!</strong>
           </p>
-          <div className="flex items-center gap-2 mt-2 text-xs text-green-500">
+          <div className="flex items-center gap-2 mt-2 text-xs text-green-500 dark:text-green-400">
             <ShieldCheck className="h-4 w-4" />
             <span>GST/QST only applies to the buyer&apos;s premium</span>
           </div>
