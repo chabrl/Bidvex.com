@@ -450,6 +450,11 @@ const CreateMultiItemListing = () => {
       }
       
       // Validate Seller Obligations
+      if (!sellerObligations.customExchangeRate || parseFloat(sellerObligations.customExchangeRate) <= 0) {
+        toast.error('Please enter a valid custom exchange rate');
+        return false;
+      }
+      
       if (!sellerObligations.providesShipping) {
         toast.error('Please select a shipping/logistics option');
         return false;
@@ -457,6 +462,11 @@ const CreateMultiItemListing = () => {
       
       if (sellerObligations.providesShipping === 'yes' && !sellerObligations.shippingDetails.trim()) {
         toast.error('Please provide shipping details');
+        return false;
+      }
+      
+      if (!sellerObligations.facilityAddress.trim()) {
+        toast.error('Please enter a facility address');
         return false;
       }
       
