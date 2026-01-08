@@ -523,17 +523,34 @@ const CreateMultiItemListing = () => {
           ...visitAvailability,
           dates: visitAvailability.dates // Now in YYYY-MM-DD format
         } : null,
-        // Seller Obligations
+        // Seller Obligations - Complete
         seller_obligations: {
+          // Dynamic Currency Exchange
+          custom_exchange_rate: parseFloat(sellerObligations.customExchangeRate) || null,
+          // Logistics
           provides_shipping: sellerObligations.providesShipping,
           shipping_details: sellerObligations.shippingDetails,
+          // Removal Deadline
           removal_deadline_days: parseInt(sellerObligations.removalDeadlineDays),
           removal_deadline_custom: sellerObligations.removalDeadline,
+          // Basic Facility
           facility_address: sellerObligations.facilityAddress,
           has_tailgate_access: sellerObligations.hasTailgateAccess,
           has_forklift_available: sellerObligations.hasForkliftAvailable,
+          // Professional Facility
+          has_loading_dock: sellerObligations.hasLoadingDock,
+          loading_dock_type: sellerObligations.loadingDockType,
+          has_overhead_crane: sellerObligations.hasOverheadCrane,
+          crane_capacity: sellerObligations.craneCapacity ? parseFloat(sellerObligations.craneCapacity) : null,
+          ground_level_loading_only: sellerObligations.groundLevelLoadingOnly,
+          has_scale_on_site: sellerObligations.hasScaleOnSite,
+          authorized_personnel_only: sellerObligations.authorizedPersonnelOnly,
+          safety_requirements: sellerObligations.safetyRequirements,
+          additional_site_notes: sellerObligations.additionalSiteNotes,
+          // Refund Policy
           refund_policy: sellerObligations.refundPolicy,
           refund_terms: sellerObligations.refundTerms,
+          // Agreement
           agreement_confirmed: sellerObligations.sellerAgreementConfirmed,
           agreement_timestamp: new Date().toISOString()
         },
