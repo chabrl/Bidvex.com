@@ -128,11 +128,10 @@ const Navbar = () => {
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="hidden md:flex hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="hidden md:flex hover:bg-slate-100 dark:hover:bg-slate-800 navbar-icon-btn"
                 onClick={() => setSearchOpen(!searchOpen)}
-                style={{ color: '#1a1a1a' }}
               >
-                <Search className="h-5 w-5" style={{ color: '#1a1a1a' }} />
+                <Search className="h-5 w-5 navbar-icon text-slate-900 dark:text-slate-100" />
               </Button>
 
               {/* Messages */}
@@ -141,10 +140,9 @@ const Navbar = () => {
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="relative hover:bg-slate-100 dark:hover:bg-slate-800"
-                    style={{ color: '#1a1a1a' }}
+                    className="relative hover:bg-slate-100 dark:hover:bg-slate-800 navbar-icon-btn"
                   >
-                    <MessageCircle className="h-5 w-5" style={{ color: '#1a1a1a' }} />
+                    <MessageCircle className="h-5 w-5 navbar-icon text-slate-900 dark:text-slate-100" />
                   </Button>
                 </Link>
               )}
@@ -155,13 +153,12 @@ const Navbar = () => {
                 size="icon" 
                 onClick={toggleTheme} 
                 data-testid="theme-toggle-btn"
-                className="transition-transform hover:scale-110 hover:bg-slate-100 dark:hover:bg-slate-800"
-                style={{ color: '#1a1a1a' }}
+                className="transition-transform hover:scale-110 hover:bg-slate-100 dark:hover:bg-slate-800 navbar-icon-btn"
               >
                 {theme === 'light' ? (
-                  <Moon className="h-5 w-5" style={{ color: '#1a1a1a' }} />
+                  <Moon className="h-5 w-5 navbar-icon text-slate-900" />
                 ) : (
-                  <Sun className="h-5 w-5" style={{ color: '#f1f5f9' }} />
+                  <Sun className="h-5 w-5 navbar-icon text-slate-100" />
                 )}
               </Button>
 
@@ -172,10 +169,9 @@ const Navbar = () => {
                     variant="ghost" 
                     size="icon" 
                     data-testid="language-toggle-btn" 
-                    className="hover:bg-slate-100 dark:hover:bg-slate-800"
-                    style={{ color: '#1a1a1a' }}
+                    className="hover:bg-slate-100 dark:hover:bg-slate-800 navbar-icon-btn"
                   >
-                    <Globe className="h-5 w-5" style={{ color: '#1a1a1a' }} />
+                    <Globe className="h-5 w-5 navbar-icon text-slate-900 dark:text-slate-100" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-40">

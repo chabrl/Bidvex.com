@@ -342,6 +342,95 @@
   color: #22D3EE;
 }
 
+/* ============================================
+   CRITICAL LIGHT MODE VISIBILITY FIXES
+   WCAG 2.1 AA Compliant - 4.5:1 Contrast Ratio
+   ============================================ */
+
+/* Force high contrast for all header/navbar icons in Light Mode */
+nav button svg,
+nav a svg,
+.navbar-icon,
+[data-testid="main-navbar"] svg {
+  color: #0f172a !important; /* Slate-900 - Black for maximum contrast */
+}
+
+/* Dark mode navbar icons - White */
+.dark nav button svg,
+.dark nav a svg,
+.dark .navbar-icon,
+.dark [data-testid="main-navbar"] svg {
+  color: #f1f5f9 !important; /* Slate-100 - White for dark backgrounds */
+}
+
+/* Status Badges - Bold and high contrast */
+.status-badge,
+[data-testid*="badge"],
+.badge-lots,
+.lots-count-badge {
+  color: #1a1a1a !important;
+  font-weight: 700 !important;
+}
+
+/* Dark mode status badges */
+.dark .status-badge,
+.dark [data-testid*="badge"],
+.dark .badge-lots,
+.dark .lots-count-badge {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+/* Notification Toggle Labels - Force visibility */
+.notification-label,
+.toggle-label-text,
+label span,
+.switch-label {
+  color: #1f2937 !important; /* Gray-900 */
+  font-weight: 500 !important;
+}
+
+.dark .notification-label,
+.dark .toggle-label-text,
+.dark label span,
+.dark .switch-label {
+  color: #f9fafb !important; /* Gray-50 */
+  font-weight: 500 !important;
+}
+
+/* Item count badges (e.g., "0 Lots") */
+.item-count-badge,
+[class*="Lots"] {
+  color: light-dark(#1a1a1a, #ffffff);
+  font-weight: 700;
+}
+
+/* Active Auction Badge - Always visible */
+.active-auction-badge,
+.auction-status-badge {
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  border: none !important;
+}
+
+/* Ensure all text in cards is visible */
+.card-title,
+[data-testid="item-title"],
+[data-testid="listing-content"] h3,
+.item-card-title {
+  color: #0f172a !important; /* Slate-900 for light mode */
+  font-weight: 600 !important;
+}
+
+.dark .card-title,
+.dark [data-testid="item-title"],
+.dark [data-testid="listing-content"] h3,
+.dark .item-card-title {
+  color: #f8fafc !important; /* Slate-50 for dark mode */
+  font-weight: 600 !important;
+}
+
 /* Dark mode dropdown menus */
 .dark [role="menu"],
 .dark [data-radix-popper-content-wrapper] > div {
