@@ -419,6 +419,48 @@ const CreateMultiItemListing = () => {
       return true;
     }
 
+    // Step 4 validation: Visit date and Seller Agreement
+    if (step === 4) {
+      // Validate visit date if offered
+      if (visitAvailability.offered) {
+        if (!visitAvailability.dates) {
+          toast.error('Please select an inspection date');
+          return false;
+        }
+        
+        const visitDate = new Date(visitAvailability.dates);
+        const auctionEndDate = new Date(formData.auction_end_date);
+        
+        if (visitDate >= auctionEndDate) {
+          toast.error('Inspection dates must occur while the auction is active');
+          return false;
+        }
+      }
+      
+      // Validate Seller Obligations
+      if (!sellerObligations.providesShipping) {
+        toast.error('Please select a shipping/logistics option');
+        return false;
+      }
+      
+      if (sellerObligations.providesShipping === 'yes' && !sellerObligations.shippingDetails.trim()) {
+        toast.error('Please provide shipping details');
+        return false;
+      }
+      
+      if (sellerObligations.refundPolicy === 'refundable' && !sellerObligations.refundTerms.trim()) {
+        toast.error('Please specify refund terms');
+        return false;
+      }
+      
+      if (!sellerObligations.sellerAgreementConfirmed) {
+        toast.error('Please confirm the Seller Commitment to proceed');
+        return false;
+      }
+      
+      return true;
+    }
+
     return true;
   };
 
