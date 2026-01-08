@@ -869,23 +869,48 @@ const MultiItemListingDetailPage = () => {
                             </div>
                           )}
 
-                          {/* Agreement Checkbox - Prominent and Required */}
-                          <div className="mt-6 p-4 bg-primary/5 border-2 border-primary/20 rounded-lg">
-                            <label className="flex items-start gap-3 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={agreedToTerms}
-                                onChange={(e) => setAgreedToTerms(e.target.checked)}
-                                className="mt-1 h-5 w-5 rounded border-primary text-primary focus:ring-primary cursor-pointer"
-                              />
-                              <span className="text-sm font-medium leading-tight">
-                                {t('auction.agreeToTerms', "I have read and agree to the auction's Terms & Conditions")} *
-                              </span>
-                            </label>
-                            {!agreedToTerms && (
-                              <p className="text-xs text-muted-foreground mt-2 ml-8">
-                                ⚠️ {t('auction.mustAgreeBeforeBid', 'You must agree to the terms before placing a bid')}
-                              </p>
+                          {/* Agreement Checkbox - Persistent One-Time Click */}
+                          <div className={`mt-6 p-4 rounded-lg border-2 ${
+                            termsAcceptedPersistent 
+                              ? 'bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700' 
+                              : 'bg-primary/5 border-primary/20'
+                          }`}>
+                            {termsAcceptedPersistent ? (
+                              <div className="flex items-center gap-3">
+                                <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+                                <div>
+                                  <p className="text-sm font-semibold text-green-700 dark:text-green-300">
+                                    ✅ Terms Accepted for This Auction
+                                  </p>
+                                  <p className="text-xs text-green-600 dark:text-green-400">
+                                    You can bid on any lot in this auction without re-accepting terms.
+                                  </p>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <label className="flex items-start gap-3 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={agreedToTerms}
+                                    onChange={(e) => {
+                                      setAgreedToTerms(e.target.checked);
+                                      if (e.target.checked) {
+                                        acceptAuctionTerms();
+                                      }
+                                    }}
+                                    className="mt-1 h-5 w-5 rounded border-primary text-primary focus:ring-primary cursor-pointer"
+                                  />
+                                  <span className="text-sm font-medium leading-tight">
+                                    {t('auction.agreeToTerms', "I have read and agree to the auction's Terms & Conditions")} *
+                                  </span>
+                                </label>
+                                {!agreedToTerms && (
+                                  <p className="text-xs text-muted-foreground mt-2 ml-8">
+                                    ⚠️ {t('auction.mustAgreeBeforeBid', 'You must agree to the terms before placing a bid')}
+                                  </p>
+                                )}
+                              </>
                             )}
                           </div>
                         </CardContent>
