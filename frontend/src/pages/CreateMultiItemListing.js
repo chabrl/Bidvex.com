@@ -11,7 +11,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { toast } from 'sonner';
 import { 
   Plus, Trash2, Upload, Loader2, ChevronLeft, ChevronRight, 
-  FileText, Image as ImageIcon, CheckCircle, AlertCircle, Edit2 
+  FileText, Image as ImageIcon, CheckCircle, AlertCircle, Edit2,
+  Calendar as CalendarIcon, Truck, Clock, MapPin as MapPinIcon, RefreshCcw, 
+  Building2, DollarSign, Shield, AlertTriangle
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { useDropzone } from 'react-dropzone';
