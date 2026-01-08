@@ -874,9 +874,9 @@ class MultiItemListing(BaseModel):
     # Analytics for promoted listings
     total_impressions: int = 0  # Total views in search results
     total_clicks: int = 0  # Total clicks to detail page
-    # Invoice configuration
-    premium_percentage: float = 5.0  # Buyer's premium (5%)
-    commission_rate: float = 0.0      # Seller commission (0% - no commission charged)
+    # Invoice configuration - UNIFIED FEE ENGINE
+    premium_percentage: float = 5.0  # Buyer's premium (5% standard, 3.5% for Premium members)
+    commission_rate: float = 4.0      # Seller commission (4% standard, 2.5% for Premium members)
     tax_rate_gst: float = 5.0         # GST (5%) - CAD only
     tax_rate_qst: float = 9.975       # QST (9.975%) - CAD only
     payment_deadline: Optional[datetime] = None
