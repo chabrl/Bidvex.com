@@ -1384,45 +1384,331 @@ const CreateMultiItemListing = () => {
           </CardContent>
         </Card>
 
-        {/* Visit Availability Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Visit Before Auction</CardTitle>
+        {/* Visit Before Auction Section - REDESIGNED */}
+        <Card className="border-2 border-amber-200 dark:border-amber-700">
+          <CardHeader className="bg-amber-50 dark:bg-amber-900/20">
+            <CardTitle className="flex items-center gap-2 text-amber-800 dark:text-amber-300">
+              <CalendarIcon className="h-5 w-5" />
+              Visit Before Auction (Pre-Inspection)
+            </CardTitle>
+            <p className="text-sm text-amber-700 dark:text-amber-400">
+              Allow buyers to inspect items before bidding. Dates must be scheduled during the active auction period.
+            </p>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 pt-6">
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
                 id="visit-offered"
                 checked={visitAvailability.offered}
                 onChange={(e) => setVisitAvailability(prev => ({ ...prev, offered: e.target.checked }))}
-                className="w-4 h-4"
+                className="w-5 h-5 accent-amber-500"
               />
-              <Label htmlFor="visit-offered">Allow buyers to schedule a visit?</Label>
+              <Label htmlFor="visit-offered" className="text-base font-medium cursor-pointer">
+                Allow buyers to schedule a visit?
+              </Label>
             </div>
 
             {visitAvailability.offered && (
-              <div className="space-y-4 ml-6 p-4 border rounded-lg">
-                <div>
-                  <Label>Available Dates</Label>
+              <div className="space-y-4 ml-6 p-4 border-2 border-amber-100 dark:border-amber-800 rounded-lg bg-white dark:bg-slate-800">
+                {/* Date Picker - Date Only (No Time) */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
+                    <CalendarIcon className="h-4 w-4 text-amber-600" />
+                    Inspection Date *
+                  </Label>
                   <Input
-                    placeholder="e.g., Nov 15-20, 2025"
+                    type="date"
                     value={visitAvailability.dates}
-                    onChange={(e) => setVisitAvailability(prev => ({ ...prev, dates: e.target.value }))}
+                    onChange={(e) => {
+                      setVisitAvailability(prev => ({ ...prev, dates: e.target.value }));
+                      validateVisitDate(e.target.value);
+                    }}
+                    min={getMinVisitDate()}
+                    max={getMaxVisitDate()}
+                    className={`w-full text-lg font-medium ${
+                      visitDateError 
+                        ? 'border-red-500 focus:ring-red-500 focus:border-red-500' 
+                        : 'border-amber-300 focus:ring-amber-500 focus:border-amber-500'
+                    }`}
+                    required={visitAvailability.offered}
                   />
+                  
+                  {/* Date Validation Error */}
+                  {visitDateError && (
+                    <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/30 border border-red-300 dark:border-red-700 rounded-lg">
+                      <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0" />
+                      <p className="text-sm font-medium text-red-700 dark:text-red-300">
+                        {visitDateError}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Helper Text */}
+                  {!visitDateError && formData.auction_end_date && (
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      ℹ️ Auction ends: {new Date(formData.auction_end_date).toLocaleDateString()}. 
+                      Inspection must be scheduled before this date.
+                    </p>
+                  )}
                 </div>
 
-                <div>
-                  <Label>Instructions</Label>
+                {/* Instructions */}
+                <div className="space-y-2">
+                  <Label className="font-semibold text-slate-900 dark:text-white">
+                    Visit Instructions
+                  </Label>
                   <Textarea
-                    placeholder="Provide instructions for scheduling (e.g., contact info, time slots)"
+                    placeholder="Provide instructions for scheduling (e.g., contact info, time slots, what to expect)..."
                     value={visitAvailability.instructions}
                     onChange={(e) => setVisitAvailability(prev => ({ ...prev, instructions: e.target.value }))}
                     rows={3}
+                    className="border-amber-200 focus:ring-amber-500 focus:border-amber-500"
                   />
                 </div>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* =========================================== */}
+        {/* CONSOLIDATED SELLER AGREEMENT BLOCK */}
+        {/* =========================================== */}
+        <Card className="border-2 border-blue-300 dark:border-blue-700 shadow-lg">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-slate-50 dark:from-blue-900/30 dark:to-slate-900/30">
+            <CardTitle className="flex items-center gap-2 text-blue-800 dark:text-blue-300 text-xl">
+              <Shield className="h-6 w-6" />
+              Seller Obligations & Agreement
+            </CardTitle>
+            <p className="text-sm text-blue-700 dark:text-blue-400">
+              Complete the following mandatory information to list your auction.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-6 pt-6">
+            
+            {/* Currency Exchange Reference */}
+            <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                  <DollarSign className="h-5 w-5 text-green-700 dark:text-green-400" />
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-900 dark:text-white">
+                    Transaction Basis
+                  </p>
+                  <p className="text-lg font-bold text-green-700 dark:text-green-400">
+                    1 USD = 1.42 CAD
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Reference exchange rate for cross-border transactions
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Logistics - Shipping/Rigging */}
+            <div className="space-y-3">
+              <Label className="flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
+                <Truck className="h-4 w-4 text-blue-600" />
+                Logistics (Shipping/Rigging) *
+              </Label>
+              <select
+                value={sellerObligations.providesShipping}
+                onChange={(e) => setSellerObligations(prev => ({ ...prev, providesShipping: e.target.value }))}
+                className="w-full px-4 py-3 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+              >
+                <option value="">-- Select Option --</option>
+                <option value="yes">Yes - Seller Provides Shipping/Rigging</option>
+                <option value="no">No - Buyer Responsible for Pickup</option>
+              </select>
+              
+              {sellerObligations.providesShipping === 'yes' && (
+                <Textarea
+                  placeholder="Provide shipping details, costs, carriers used, rigging capabilities..."
+                  value={sellerObligations.shippingDetails}
+                  onChange={(e) => setSellerObligations(prev => ({ ...prev, shippingDetails: e.target.value }))}
+                  rows={3}
+                  className="border-blue-200 focus:ring-blue-500 focus:border-blue-500"
+                  required
+                />
+              )}
+            </div>
+
+            {/* Removal Deadline */}
+            <div className="space-y-3">
+              <Label className="flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
+                <Clock className="h-4 w-4 text-orange-600" />
+                Deadline for Item Removal *
+              </Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-slate-600 dark:text-slate-400">Items must be picked up within</span>
+                  <select
+                    value={sellerObligations.removalDeadlineDays}
+                    onChange={(e) => setSellerObligations(prev => ({ ...prev, removalDeadlineDays: e.target.value }))}
+                    className="px-3 py-2 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 font-medium focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="3">3 days</option>
+                    <option value="5">5 days</option>
+                    <option value="7">7 days</option>
+                    <option value="10">10 days</option>
+                    <option value="14">14 days</option>
+                    <option value="30">30 days</option>
+                  </select>
+                  <span className="text-sm text-slate-600 dark:text-slate-400">of auction close</span>
+                </div>
+                <Input
+                  type="text"
+                  placeholder="Or specify custom deadline..."
+                  value={sellerObligations.removalDeadline}
+                  onChange={(e) => setSellerObligations(prev => ({ ...prev, removalDeadline: e.target.value }))}
+                  className="border-slate-300 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* Site Capabilities / Facility Details */}
+            <div className="space-y-3">
+              <Label className="flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
+                <Building2 className="h-4 w-4 text-purple-600" />
+                Facility Details
+              </Label>
+              
+              <div className="space-y-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+                <div className="space-y-2">
+                  <Label className="text-sm text-slate-700 dark:text-slate-300">Facility Address</Label>
+                  <Input
+                    placeholder="Enter pickup/facility address..."
+                    value={sellerObligations.facilityAddress}
+                    onChange={(e) => setSellerObligations(prev => ({ ...prev, facilityAddress: e.target.value }))}
+                    className="border-slate-300 focus:ring-purple-500"
+                  />
+                </div>
+                
+                <div className="flex flex-wrap gap-4 pt-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={sellerObligations.hasTailgateAccess}
+                      onChange={(e) => setSellerObligations(prev => ({ ...prev, hasTailgateAccess: e.target.checked }))}
+                      className="w-5 h-5 accent-purple-600"
+                    />
+                    <span className="font-medium text-slate-700 dark:text-slate-300">
+                      🚛 Tailgate Truck Access
+                    </span>
+                  </label>
+                  
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={sellerObligations.hasForkliftAvailable}
+                      onChange={(e) => setSellerObligations(prev => ({ ...prev, hasForkliftAvailable: e.target.checked }))}
+                      className="w-5 h-5 accent-purple-600"
+                    />
+                    <span className="font-medium text-slate-700 dark:text-slate-300">
+                      🏗️ Forklift Available
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Refund Policy */}
+            <div className="space-y-3">
+              <Label className="flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
+                <RefreshCcw className="h-4 w-4 text-red-600" />
+                Refund Policy *
+              </Label>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label 
+                  className={`flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                    sellerObligations.refundPolicy === 'non_refundable'
+                      ? 'border-red-500 bg-red-50 dark:bg-red-900/20'
+                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-400'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="refundPolicy"
+                    value="non_refundable"
+                    checked={sellerObligations.refundPolicy === 'non_refundable'}
+                    onChange={(e) => setSellerObligations(prev => ({ ...prev, refundPolicy: e.target.value }))}
+                    className="w-5 h-5 accent-red-600"
+                  />
+                  <div>
+                    <span className="font-bold text-red-700 dark:text-red-400">Non-Refundable</span>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">All sales are final</p>
+                  </div>
+                </label>
+                
+                <label 
+                  className={`flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                    sellerObligations.refundPolicy === 'refundable'
+                      ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-400'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="refundPolicy"
+                    value="refundable"
+                    checked={sellerObligations.refundPolicy === 'refundable'}
+                    onChange={(e) => setSellerObligations(prev => ({ ...prev, refundPolicy: e.target.value }))}
+                    className="w-5 h-5 accent-green-600"
+                  />
+                  <div>
+                    <span className="font-bold text-green-700 dark:text-green-400">Refundable</span>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">Terms apply</p>
+                  </div>
+                </label>
+              </div>
+              
+              {sellerObligations.refundPolicy === 'refundable' && (
+                <Textarea
+                  placeholder="Specify refund terms and conditions..."
+                  value={sellerObligations.refundTerms}
+                  onChange={(e) => setSellerObligations(prev => ({ ...prev, refundTerms: e.target.value }))}
+                  rows={2}
+                  className="border-green-200 focus:ring-green-500"
+                  required
+                />
+              )}
+            </div>
+
+            {/* =========================================== */}
+            {/* SELLER COMMITMENT BLOCK */}
+            {/* =========================================== */}
+            <div className="mt-8 p-6 bg-gradient-to-r from-blue-100 to-slate-100 dark:from-blue-900/40 dark:to-slate-800/40 rounded-xl border-2 border-blue-300 dark:border-blue-700">
+              <label className="flex items-start gap-4 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={sellerObligations.sellerAgreementConfirmed}
+                  onChange={(e) => setSellerObligations(prev => ({ ...prev, sellerAgreementConfirmed: e.target.checked }))}
+                  className="w-6 h-6 mt-1 accent-blue-600 flex-shrink-0"
+                  required
+                />
+                <div>
+                  <p className="font-bold text-lg text-blue-900 dark:text-blue-200 mb-2">
+                    Seller Commitment *
+                  </p>
+                  <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                    By listing this item, I certify that all location, logistics, and refund information 
+                    provided is <strong>accurate and binding</strong>. I understand that providing false or 
+                    misleading information may result in penalties and removal from the platform.
+                  </p>
+                </div>
+              </label>
+              
+              {!sellerObligations.sellerAgreementConfirmed && (
+                <p className="mt-3 text-sm text-amber-700 dark:text-amber-400 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  You must confirm the seller commitment to proceed
+                </p>
+              )}
+            </div>
           </CardContent>
         </Card>
 
