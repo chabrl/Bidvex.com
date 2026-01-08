@@ -93,6 +93,28 @@ const CreateMultiItemListing = () => {
     instructions: '' // Additional instructions for scheduling
   });
 
+  // NEW: Seller Obligations State
+  const [sellerObligations, setSellerObligations] = useState({
+    // Logistics
+    providesShipping: 'no', // 'yes' or 'no'
+    shippingDetails: '',
+    // Removal Deadline
+    removalDeadline: '',
+    removalDeadlineDays: '7',
+    // Site Capabilities
+    facilityAddress: '',
+    hasTailgateAccess: false,
+    hasForkliftAvailable: false,
+    // Refund Policy
+    refundPolicy: 'non_refundable', // 'non_refundable' or 'refundable'
+    refundTerms: '',
+    // Agreement Confirmation
+    sellerAgreementConfirmed: false
+  });
+
+  // Visit date validation error
+  const [visitDateError, setVisitDateError] = useState('');
+
   useEffect(() => {
     // Check if user can create multi-lot auctions based on feature flag
     if (user && !canCreateMultiLot(user)) {
