@@ -2074,14 +2074,32 @@ async def get_marketplace_items(
             
             items.append(item)
     
-    # Sorting logic
+    # Sorting logic - UPDATED HIERARCHY
+    # Level 1: is_featured (pinned)
+    # Level 2: Ending soon (last 60 minutes climb to top)
+    # Level 3: Standard results
+    now = datetime.now(timezone.utc)
+    
     if sort == "-promoted":
         # Promoted items first (by tier), then by created_at
         promotion_weight = {"premium": 3, "standard": 2, "basic": 1, None: 0}
+        
+        def get_urgency_score(item):
+            """Items in last 60 minutes get urgency boost"""
+            if item.get("auction_end_date"):
+                end_time = datetime.fromisoformat(item["auction_end_date"].replace("Z", "+00:00")) if isinstance(item["auction_end_date"], str) else item["auction_end_date"]
+                if end_time.tzinfo is None:
+                    end_time = end_time.replace(tzinfo=timezone.utc)
+                time_remaining = (end_time - now).total_seconds()
+                if 0 < time_remaining <= 3600:  # Within 60 minutes
+                    return 1000 - time_remaining  # Higher score for less time
+            return 0
+        
         items.sort(
             key=lambda x: (
-                -promotion_weight.get(x.get("promotion_tier"), 0),  # Promoted first
-                -1 if x.get("is_featured") else 0,  # Featured second
+                -1 if x.get("is_featured") else 0,  # Level 1: Featured FIRST (pinned)
+                -get_urgency_score(x),  # Level 2: Urgency (last 60 min)
+                -promotion_weight.get(x.get("promotion_tier"), 0),  # Then promoted
                 -(x.get("created_at").timestamp() if isinstance(x.get("created_at"), datetime) else 0)  # Newest
             )
         )
@@ -2090,8 +2108,12 @@ async def get_marketplace_items(
     elif sort == "-price":
         items.sort(key=lambda x: -x.get("current_price", 0))
     elif sort == "ending_soon":
+        # Updated: Featured first, then by end time
         items.sort(
-            key=lambda x: datetime.fromisoformat(x["auction_end_date"]) if x.get("auction_end_date") else datetime.max
+            key=lambda x: (
+                0 if x.get("is_featured") else 1,  # Featured first
+                datetime.fromisoformat(x["auction_end_date"].replace("Z", "+00:00")) if x.get("auction_end_date") else datetime.max
+            )
         )
     else:  # Default: newest first
         items.sort(
