@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calculator, TrendingUp, History, Sparkles, ArrowRight } from 'lucide-react';
+import { Calculator, TrendingUp, History, Sparkles, ArrowRight, ToggleLeft, ToggleRight, Lightbulb } from 'lucide-react';
 import { Card, CardContent } from './ui/card';
 import { Slider } from './ui/slider';
 import { useAuth } from '../contexts/AuthContext';
@@ -13,13 +13,16 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
  * - Fetches user's 12-month transaction volume
  * - Calculates personalized savings for Premium/VIP
  * - Fallback to manual slider for non-logged users
+ * - "What If" toggle to project future savings with hypothetical volume
  */
 const PersonalizedSavingsCalculator = ({ currentTier = 'free' }) => {
   const { user } = useAuth();
   const [annualVolume, setAnnualVolume] = useState([50000]);
+  const [whatIfVolume, setWhatIfVolume] = useState([100000]); // Hypothetical volume for "What If" mode
   const [userStats, setUserStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [usePersonalized, setUsePersonalized] = useState(false);
+  const [whatIfMode, setWhatIfMode] = useState(false); // Toggle between real stats and "What If"
 
   // Fetch user's transaction history
   useEffect(() => {
@@ -50,7 +53,8 @@ const PersonalizedSavingsCalculator = ({ currentTier = 'free' }) => {
     fetchUserStats();
   }, [user]);
 
-  const volume = annualVolume[0];
+  // Determine active volume based on mode
+  const volume = whatIfMode ? whatIfVolume[0] : annualVolume[0];
 
   // Fee rates by tier (NO CAP)
   const feeRates = {
@@ -131,25 +135,61 @@ const PersonalizedSavingsCalculator = ({ currentTier = 'free' }) => {
             </div>
           </div>
 
-          {/* Volume Slider (only show for non-personalized) */}
-          {!usePersonalized && (
+          {/* "What If" Toggle for Personalized Users */}
+          {user && usePersonalized && userStats && (
+            <div className="mb-6 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-xl border border-indigo-200 dark:border-indigo-700">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Lightbulb className="h-5 w-5 text-indigo-600" />
+                  <span className="font-medium text-indigo-900 dark:text-indigo-100">
+                    {whatIfMode ? 'What If Mode' : 'My Real Stats'}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setWhatIfMode(!whatIfMode)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white dark:bg-slate-800 border-2 border-indigo-300 dark:border-indigo-600 hover:border-indigo-500 transition-colors"
+                  data-testid="what-if-toggle"
+                >
+                  {whatIfMode ? (
+                    <>
+                      <ToggleRight className="h-5 w-5 text-indigo-600" />
+                      <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">Switch to Real</span>
+                    </>
+                  ) : (
+                    <>
+                      <ToggleLeft className="h-5 w-5 text-slate-400" />
+                      <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Try "What If"</span>
+                    </>
+                  )}
+                </button>
+              </div>
+              {whatIfMode && (
+                <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-2">
+                  Project your savings for next year with hypothetical transaction volume
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Volume Slider - Show for non-personalized OR "What If" mode */}
+          {(!usePersonalized || whatIfMode) && (
             <div className="mb-8">
               <div className="flex items-center justify-between mb-3">
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Estimated Annual Volume
+                  {whatIfMode ? 'Projected Annual Volume (Next Year)' : 'Estimated Annual Volume'}
                 </label>
                 <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                   {formatCurrency(volume)}
                 </span>
               </div>
               <Slider
-                value={annualVolume}
-                onValueChange={setAnnualVolume}
+                value={whatIfMode ? whatIfVolume : annualVolume}
+                onValueChange={whatIfMode ? setWhatIfVolume : setAnnualVolume}
                 max={500000}
                 min={1000}
                 step={1000}
                 className="w-full"
-                data-testid="savings-volume-slider"
+                data-testid={whatIfMode ? "what-if-volume-slider" : "savings-volume-slider"}
               />
               <div className="flex justify-between text-xs text-slate-400 mt-2">
                 <span>$1K</span>
@@ -157,6 +197,11 @@ const PersonalizedSavingsCalculator = ({ currentTier = 'free' }) => {
                 <span>$250K</span>
                 <span>$500K</span>
               </div>
+              {whatIfMode && userStats && (
+                <p className="text-xs text-center text-indigo-500 mt-2">
+                  Your current volume: {formatCurrency(userStats.annual_volume)} → Projected: {formatCurrency(whatIfVolume[0])}
+                </p>
+              )}
             </div>
           )}
 
