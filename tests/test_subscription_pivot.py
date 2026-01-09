@@ -110,92 +110,88 @@ class TestFeeCalculation:
     def test_buyer_fee_calculation_free_tier(self):
         """Test buyer fee calculation for free tier (5%)"""
         response = requests.get(
-            f"{BASE_URL}/api/fees/calculate-buyer",
-            params={"hammer_price": 1000, "subscription_tier": "free"}
+            f"{BASE_URL}/api/fees/calculate-buyer-cost",
+            params={"hammer_price": 1000, "tier": "free"}
         )
         assert response.status_code == 200, f"Expected 200, got {response.status_code}"
         data = response.json()
         
         # Free tier: 5% buyer premium
-        assert data.get("fee_percentage") == 5.0, f"Expected 5.0%, got {data.get('fee_percentage')}"
-        assert data.get("fee_amount") == 50.0, f"Expected $50 fee, got ${data.get('fee_amount')}"
-        assert data.get("total_amount") == 1050.0, f"Expected $1050 total, got ${data.get('total_amount')}"
+        assert data.get("buyer_premium_percent") == 5.0, f"Expected 5.0%, got {data.get('buyer_premium_percent')}"
+        assert data.get("buyer_premium") == 50.0, f"Expected $50 fee, got ${data.get('buyer_premium')}"
         print("✅ Free tier buyer fee calculation correct: 5% = $50 on $1000")
     
     def test_buyer_fee_calculation_premium_tier(self):
         """Test buyer fee calculation for premium tier (3.5%)"""
         response = requests.get(
-            f"{BASE_URL}/api/fees/calculate-buyer",
-            params={"hammer_price": 1000, "subscription_tier": "premium"}
+            f"{BASE_URL}/api/fees/calculate-buyer-cost",
+            params={"hammer_price": 1000, "tier": "premium"}
         )
         assert response.status_code == 200, f"Expected 200, got {response.status_code}"
         data = response.json()
         
         # Premium tier: 3.5% buyer premium
-        assert data.get("fee_percentage") == 3.5, f"Expected 3.5%, got {data.get('fee_percentage')}"
-        assert data.get("fee_amount") == 35.0, f"Expected $35 fee, got ${data.get('fee_amount')}"
-        assert data.get("total_amount") == 1035.0, f"Expected $1035 total, got ${data.get('total_amount')}"
+        assert data.get("buyer_premium_percent") == 3.5, f"Expected 3.5%, got {data.get('buyer_premium_percent')}"
+        assert data.get("buyer_premium") == 35.0, f"Expected $35 fee, got ${data.get('buyer_premium')}"
         print("✅ Premium tier buyer fee calculation correct: 3.5% = $35 on $1000")
     
     def test_buyer_fee_calculation_vip_tier(self):
         """Test buyer fee calculation for VIP tier (3%)"""
         response = requests.get(
-            f"{BASE_URL}/api/fees/calculate-buyer",
-            params={"hammer_price": 1000, "subscription_tier": "vip"}
+            f"{BASE_URL}/api/fees/calculate-buyer-cost",
+            params={"hammer_price": 1000, "tier": "vip"}
         )
         assert response.status_code == 200, f"Expected 200, got {response.status_code}"
         data = response.json()
         
         # VIP tier: 3% buyer premium
-        assert data.get("fee_percentage") == 3.0, f"Expected 3.0%, got {data.get('fee_percentage')}"
-        assert data.get("fee_amount") == 30.0, f"Expected $30 fee, got ${data.get('fee_amount')}"
-        assert data.get("total_amount") == 1030.0, f"Expected $1030 total, got ${data.get('total_amount')}"
+        assert data.get("buyer_premium_percent") == 3.0, f"Expected 3.0%, got {data.get('buyer_premium_percent')}"
+        assert data.get("buyer_premium") == 30.0, f"Expected $30 fee, got ${data.get('buyer_premium')}"
         print("✅ VIP tier buyer fee calculation correct: 3% = $30 on $1000")
     
     def test_seller_fee_calculation_free_tier(self):
         """Test seller fee calculation for free tier (4%)"""
         response = requests.get(
-            f"{BASE_URL}/api/fees/calculate-seller",
-            params={"hammer_price": 1000, "subscription_tier": "free"}
+            f"{BASE_URL}/api/fees/calculate-seller-net",
+            params={"hammer_price": 1000, "tier": "free"}
         )
         assert response.status_code == 200, f"Expected 200, got {response.status_code}"
         data = response.json()
         
         # Free tier: 4% seller commission
-        assert data.get("fee_percentage") == 4.0, f"Expected 4.0%, got {data.get('fee_percentage')}"
-        assert data.get("fee_amount") == 40.0, f"Expected $40 fee, got ${data.get('fee_amount')}"
-        # For seller, total_amount is net payout
-        assert data.get("total_amount") == 960.0, f"Expected $960 net payout, got ${data.get('total_amount')}"
+        assert data.get("seller_commission_percent") == 4.0, f"Expected 4.0%, got {data.get('seller_commission_percent')}"
+        assert data.get("seller_commission") == 40.0, f"Expected $40 fee, got ${data.get('seller_commission')}"
+        assert data.get("net_payout") == 960.0, f"Expected $960 net payout, got ${data.get('net_payout')}"
         print("✅ Free tier seller fee calculation correct: 4% = $40 on $1000, net $960")
     
     def test_seller_fee_calculation_premium_tier(self):
         """Test seller fee calculation for premium tier (2.5%)"""
         response = requests.get(
-            f"{BASE_URL}/api/fees/calculate-seller",
-            params={"hammer_price": 1000, "subscription_tier": "premium"}
+            f"{BASE_URL}/api/fees/calculate-seller-net",
+            params={"hammer_price": 1000, "tier": "premium"}
         )
         assert response.status_code == 200, f"Expected 200, got {response.status_code}"
         data = response.json()
         
         # Premium tier: 2.5% seller commission
-        assert data.get("fee_percentage") == 2.5, f"Expected 2.5%, got {data.get('fee_percentage')}"
-        assert data.get("fee_amount") == 25.0, f"Expected $25 fee, got ${data.get('fee_amount')}"
-        assert data.get("total_amount") == 975.0, f"Expected $975 net payout, got ${data.get('total_amount')}"
+        assert data.get("seller_commission_percent") == 2.5, f"Expected 2.5%, got {data.get('seller_commission_percent')}"
+        assert data.get("seller_commission") == 25.0, f"Expected $25 fee, got ${data.get('seller_commission')}"
+        assert data.get("net_payout") == 975.0, f"Expected $975 net payout, got ${data.get('net_payout')}"
         print("✅ Premium tier seller fee calculation correct: 2.5% = $25 on $1000, net $975")
     
     def test_seller_fee_calculation_vip_tier(self):
         """Test seller fee calculation for VIP tier (2%)"""
         response = requests.get(
-            f"{BASE_URL}/api/fees/calculate-seller",
-            params={"hammer_price": 1000, "subscription_tier": "vip"}
+            f"{BASE_URL}/api/fees/calculate-seller-net",
+            params={"hammer_price": 1000, "tier": "vip"}
         )
         assert response.status_code == 200, f"Expected 200, got {response.status_code}"
         data = response.json()
         
         # VIP tier: 2% seller commission
-        assert data.get("fee_percentage") == 2.0, f"Expected 2.0%, got {data.get('fee_percentage')}"
-        assert data.get("fee_amount") == 20.0, f"Expected $20 fee, got ${data.get('fee_amount')}"
-        assert data.get("total_amount") == 980.0, f"Expected $980 net payout, got ${data.get('total_amount')}"
+        assert data.get("seller_commission_percent") == 2.0, f"Expected 2.0%, got {data.get('seller_commission_percent')}"
+        assert data.get("seller_commission") == 20.0, f"Expected $20 fee, got ${data.get('seller_commission')}"
+        assert data.get("net_payout") == 980.0, f"Expected $980 net payout, got ${data.get('net_payout')}"
         print("✅ VIP tier seller fee calculation correct: 2% = $20 on $1000, net $980")
 
 
