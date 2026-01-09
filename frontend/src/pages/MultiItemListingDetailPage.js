@@ -164,6 +164,8 @@ const MultiItemListingDetailPage = () => {
       setListing(response.data);
       if (response.data.lots.length > 0) {
         setActiveLotId(response.data.lots[0].lot_number);
+        // Auto-select first lot for bid history display
+        setSelectedLot(response.data.lots[0]);
       }
       // Fetch seller info for tax status badge
       if (response.data.seller_id) {
