@@ -199,6 +199,11 @@ const MultiItemListingDetailPage = () => {
     if (ref) {
       ref.scrollIntoView({ behavior: 'smooth', block: 'start' });
       setActiveLotId(lotNumber);
+      // Set selectedLot for bid history display
+      const lot = listing?.lots?.find(l => l.lot_number === lotNumber);
+      if (lot) {
+        setSelectedLot(lot);
+      }
     }
     if (window.innerWidth < 768) {
       setShowLotIndex(false);
