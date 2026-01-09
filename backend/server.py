@@ -1662,6 +1662,115 @@ async def get_user_ratings(user_id: str):
         logger.error(f"Error fetching user ratings: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch ratings")
 
+# ============= SELLER TRUST SCORE ENDPOINT =============
+
+@api_router.get("/sellers/{seller_id}/trust-score")
+async def get_seller_trust_score(seller_id: str):
+    """
+    Get comprehensive trust score for a seller.
+    
+    Trust Score is calculated from:
+    - Automated metrics: pickup speed, payment completion
+    - Buyer ratings: 1-5 stars from post-transaction feedback
+    
+    Returns:
+    - overall_score: 0-5 star rating
+    - total_ratings: number of ratings
+    - metrics breakdown: pickup_speed, item_accuracy, communication
+    - is_trusted: True if score >= 4.5
+    """
+    try:
+        # Get all ratings for this seller
+        ratings_cursor = db.ratings.find({"target_user_id": seller_id})
+        ratings = await ratings_cursor.to_list(length=None)
+        
+        # Get automated metrics from completed transactions
+        # Find auctions where this seller's items were marked as "picked_up"
+        completed_transactions_cursor = db.handshakes.find({
+            "seller_id": seller_id,
+            "status": "picked_up"
+        })
+        completed_transactions = await completed_transactions_cursor.to_list(length=None)
+        
+        # Calculate automated pickup speed score
+        pickup_scores = []
+        for transaction in completed_transactions:
+            # Calculate days between auction end and pickup
+            if transaction.get("marked_picked_up_at") and transaction.get("auction_end_date"):
+                try:
+                    pickup_date = datetime.fromisoformat(transaction["marked_picked_up_at"].replace("Z", "+00:00"))
+                    auction_end = datetime.fromisoformat(transaction["auction_end_date"].replace("Z", "+00:00"))
+                    days_to_pickup = (pickup_date - auction_end).days
+                    
+                    # Score based on pickup speed (faster = better)
+                    if days_to_pickup <= 3:
+                        pickup_scores.append(5)
+                    elif days_to_pickup <= 7:
+                        pickup_scores.append(4)
+                    elif days_to_pickup <= 14:
+                        pickup_scores.append(3)
+                    else:
+                        pickup_scores.append(2)
+                except:
+                    pass
+        
+        # Calculate average metrics
+        avg_pickup_speed = sum(pickup_scores) / len(pickup_scores) if pickup_scores else 0
+        
+        # Get rating-based metrics
+        metric_scores = {
+            "pickup_speed": [],
+            "item_accuracy": [],
+            "communication": []
+        }
+        
+        for r in ratings:
+            if r.get("metrics"):
+                for key in metric_scores.keys():
+                    if r["metrics"].get(key):
+                        metric_scores[key].append(r["metrics"][key])
+        
+        # Calculate averages for each metric
+        avg_item_accuracy = sum(metric_scores["item_accuracy"]) / len(metric_scores["item_accuracy"]) if metric_scores["item_accuracy"] else 0
+        avg_communication = sum(metric_scores["communication"]) / len(metric_scores["communication"]) if metric_scores["communication"] else 0
+        
+        # Use automated pickup speed if no rating-based data
+        final_pickup_speed = (
+            sum(metric_scores["pickup_speed"]) / len(metric_scores["pickup_speed"])
+            if metric_scores["pickup_speed"]
+            else avg_pickup_speed
+        )
+        
+        # Calculate overall score (weighted average)
+        if ratings:
+            # If we have ratings, use them
+            overall_from_ratings = sum(r["rating"] for r in ratings) / len(ratings)
+            overall_score = round(overall_from_ratings, 2)
+        elif completed_transactions:
+            # If no ratings but completed transactions, use automated metrics
+            overall_score = round(avg_pickup_speed, 2)
+        else:
+            # New seller, no data
+            overall_score = 0
+        
+        return {
+            "seller_id": seller_id,
+            "overall_score": overall_score,
+            "total_ratings": len(ratings),
+            "total_transactions": len(completed_transactions),
+            "metrics": {
+                "pickup_speed": round(final_pickup_speed, 2),
+                "item_accuracy": round(avg_item_accuracy, 2),
+                "communication": round(avg_communication, 2)
+            },
+            "is_trusted": overall_score >= 4.5,
+            "badge": "BidVex Trusted Seller" if overall_score >= 4.5 else None
+        }
+        
+    except Exception as e:
+        logger.error(f"Error calculating seller trust score: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to calculate trust score")
+
 # ============= SELLER PROFILE ENDPOINTS =============
 
 @api_router.get("/sellers/{seller_id}")
