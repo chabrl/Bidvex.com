@@ -4015,7 +4015,7 @@ async def bid_on_lot(listing_id: str, lot_number: int, data: Dict[str, Any], cur
         raise HTTPException(status_code=400, detail="Cannot bid on your own listing")
     
     amount = data.get("amount")
-    bid_type = data.get("bid_type", "normal")  # normal, monster, auto
+    bid_type = data.get("bid_type", "normal")  # normal, auto (monster bids removed)
     lots = listing["lots"]
     
     lot_index = next((i for i, lot in enumerate(lots) if lot["lot_number"] == lot_number), None)
@@ -4024,30 +4024,15 @@ async def bid_on_lot(listing_id: str, lot_number: int, data: Dict[str, Any], cur
     
     current_price = lots[lot_index]["current_price"]
     
-    # Validate increment (skip for monster bids)
-    if bid_type == "normal":
-        min_increment = get_minimum_increment(listing, current_price)
-        if amount < current_price + min_increment:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Bid must be at least ${current_price + min_increment:.2f} (minimum increment: ${min_increment:.2f})"
-            )
-    elif bid_type == "monster":
-        # Validate monster bid eligibility
-        tier = current_user.subscription_tier
-        monster_bids_used = current_user.monster_bids_used.get(listing_id, 0)
-        
-        if tier == "free" and monster_bids_used >= 1:
-            raise HTTPException(
-                status_code=403,
-                detail="Free tier allows only 1 Power Bid per auction"
-            )
-        
-        if amount <= current_price:
-            raise HTTPException(status_code=400, detail="Power Bid must be higher than current price")
+    # Validate increment for all bids
+    min_increment = get_minimum_increment(listing, current_price)
+    if amount < current_price + min_increment:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Bid must be at least ${current_price + min_increment:.2f} (minimum increment: ${min_increment:.2f})"
+        )
     
     # Calculate minimum bid with helpful error message
-    min_increment = get_minimum_increment(listing, current_price) if bid_type == "normal" else 1
     min_bid = current_price + min_increment
     
     if amount <= current_price:
@@ -4157,20 +4142,11 @@ async def bid_on_lot(listing_id: str, lot_number: int, data: Dict[str, Any], cur
         except Exception as sms_error:
             logger.warning(f"📵 SMS outbid notification failed: {sms_error}")
     
-    # Update monster bids used if applicable
-    if bid_type == "monster":
-        monster_bids_used_dict = current_user.monster_bids_used.copy()
-        monster_bids_used_dict[listing_id] = monster_bids_used_dict.get(listing_id, 0) + 1
-        await db.users.update_one(
-            {"id": current_user.id},
-            {"$set": {"monster_bids_used": monster_bids_used_dict}}
-        )
-    
     # Return response with clean bid data (original bid dict without MongoDB _id)
     response = {
         "message": "Bid placed successfully",
         "bid": bid,  # Original dict, not mutated by MongoDB
-        "minimum_next_bid": current_price + get_minimum_increment(listing, amount) if bid_type == "normal" else None,
+        "minimum_next_bid": current_price + get_minimum_increment(listing, amount),
         "extension_applied": extension_applied,
         "extension_count": lots[lot_index].get("extension_count", 0)
     }
