@@ -148,6 +148,9 @@ const Navbar = () => {
                 </Link>
               )}
 
+              {/* Currency Toggle (USD/CAD) */}
+              <CurrencyToggle className="hidden md:flex" />
+
               {/* Theme Toggle */}
               <Button 
                 variant="ghost" 
