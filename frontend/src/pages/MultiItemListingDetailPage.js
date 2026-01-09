@@ -29,7 +29,9 @@ import MessageSellerModal from '../components/MessageSellerModal';
 import BidErrorGuide from '../components/BidErrorGuide';
 import VerificationRequiredModal from '../components/VerificationRequiredModal';
 import PrivateSaleBadge, { BusinessSellerBadge } from '../components/PrivateSaleBadge';
+import PublicBidHistory from '../components/PublicBidHistory';
 import { extractErrorMessage } from '../utils/errorHandler';
+import { useCurrency } from '../contexts/CurrencyContext';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
