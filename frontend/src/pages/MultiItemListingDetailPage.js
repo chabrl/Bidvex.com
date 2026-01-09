@@ -1421,55 +1421,29 @@ const MultiItemListingDetailPage = () => {
         </div>
       </div>
 
-      {/* Floating FAB (Mobile) - Enhanced with pulse animation */}
+      {/* Floating FAB (Mobile) - Uses Sheet for drawer */}
       <div className="lg:hidden fixed bottom-20 right-6 z-50">
-        <Button
-          size="lg"
-          onClick={() => setShowLotIndex(!showLotIndex)}
-          className="gradient-button text-white border-0 shadow-lg rounded-full w-14 h-14 p-0 animate-pulse-subtle hover:scale-110 transition-transform duration-200"
-          style={{
-            animation: showLotIndex ? 'none' : 'pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) 3'
-          }}
-        >
-          {showLotIndex ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-        </Button>
-      </div>
-
-      {/* Mobile Lot Index Overlay - Enhanced with backdrop blur and smooth transitions */}
-      {showLotIndex && (
-        <div 
-          className="lg:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity duration-200"
-          onClick={() => setShowLotIndex(false)}
-          style={{
-            animation: 'fadeIn 200ms ease-in-out'
-          }}
-        >
-          <div 
-            className="absolute bottom-0 left-0 right-0 bg-background rounded-t-2xl shadow-2xl max-h-[70vh] overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              animation: 'slideUp 200ms ease-out'
-            }}
-          >
-            {/* Drag indicator */}
-            <div className="flex justify-center pt-3 pb-2">
-              <div className="w-12 h-1 bg-muted-foreground/30 rounded-full"></div>
-            </div>
-            
-            <div className="px-6 pb-6 overflow-y-auto" style={{ maxHeight: 'calc(70vh - 60px)' }}>
-              <div className="flex items-center justify-between mb-4 sticky top-0 bg-background py-2">
-                <h3 className="text-lg font-bold">Lot Index</h3>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowLotIndex(false)}
-                  className="hover:bg-muted"
-                >
-                  <X className="h-5 w-5" />
-                </Button>
-              </div>
-              <div className="space-y-2">
-                {listing.lots.map((lot) => (
+        <Sheet open={showLotIndex} onOpenChange={setShowLotIndex}>
+          <SheetTrigger asChild>
+            <Button
+              size="lg"
+              className="gradient-button text-white border-0 shadow-lg rounded-full w-14 h-14 p-0 hover:scale-110 transition-transform duration-200"
+              data-testid="mobile-lot-index-fab"
+            >
+              <Menu className="h-6 w-6" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="bottom" className="h-[70vh] rounded-t-2xl">
+            <SheetHeader className="pb-4">
+              <SheetTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5 text-primary" />
+                Lot Index ({listing.lots.length} lots)
+              </SheetTitle>
+            </SheetHeader>
+            <div className="overflow-y-auto space-y-2 pr-2" style={{ maxHeight: 'calc(70vh - 100px)' }}>
+              {listing.lots.map((lot) => {
+                const lotIsHighStakes = isHighStakes(lot.current_price);
+                return (
                   <div
                     key={lot.lot_number}
                     onClick={() => {
@@ -1479,27 +1453,53 @@ const MultiItemListingDetailPage = () => {
                     className={`p-3 rounded-lg cursor-pointer transition-all duration-200 ${
                       activeLotId === lot.lot_number
                         ? 'bg-gradient-to-r from-[#009BFF] to-[#0056A6] text-white shadow-md'
-                        : 'bg-muted hover:bg-muted/80 hover:shadow-sm'
+                        : lotIsHighStakes 
+                          ? 'bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-400 hover:shadow-md'
+                          : 'bg-muted hover:bg-muted/80 hover:shadow-sm'
                     }`}
+                    data-testid={`mobile-lot-item-${lot.lot_number}`}
                   >
                     <div className="flex items-start justify-between mb-1">
-                      <p className="font-semibold text-sm">Lot #{lot.lot_number}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-sm">Lot #{lot.lot_number}</p>
+                        {lotIsHighStakes && (
+                          <Badge className="bg-gradient-to-r from-amber-500 to-red-500 text-white text-xs px-1.5 py-0">
+                            HIGH STAKES
+                          </Badge>
+                        )}
+                      </div>
                       {hasActiveBids(lot) && (
-                        <Flame className="h-4 w-4 text-amber-400" />
+                        <Flame className={`h-4 w-4 ${activeLotId === lot.lot_number ? 'text-white' : 'text-amber-500'}`} />
                       )}
                     </div>
                     <p className="text-xs truncate mb-1">{lot.title}</p>
                     <div className="flex items-center justify-between text-xs">
                       <span>Qty: {lot.quantity}</span>
-                      <span className="font-semibold">${lot.current_price.toFixed(2)}</span>
+                      <span className={`font-bold ${lotIsHighStakes && activeLotId !== lot.lot_number ? 'text-amber-600' : ''}`}>
+                        ${lot.current_price.toFixed(2)}
+                      </span>
                     </div>
+                    {lot.lot_end_time && !auctionEnded && (
+                      <div className="flex items-center gap-1 text-xs mt-1">
+                        <Clock className="h-3 w-3" />
+                        <Countdown 
+                          date={new Date(lot.lot_end_time)}
+                          renderer={({ hours, minutes, seconds, completed }) => (
+                            completed ? <span className="text-red-400 font-bold">Ended</span> : 
+                            <span className={`font-mono ${lotIsHighStakes ? 'text-red-500 font-bold' : ''}`}>
+                              {hours}h {minutes}m {seconds}s
+                            </span>
+                          )}
+                        />
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
-          </div>
-        </div>
-      )}
+          </SheetContent>
+        </Sheet>
+      </div>
 
       {/* Image Lightbox */}
       {lightboxOpen && lightboxImages.length > 0 && (
