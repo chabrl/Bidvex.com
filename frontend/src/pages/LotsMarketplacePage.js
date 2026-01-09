@@ -7,10 +7,13 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { 
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose, SheetFooter 
+} from '../components/ui/sheet';
+import { 
   Search, Package, Clock, MapPin, Layers, Grid as GridIcon, 
   List as ListIcon, Tag, Star, TrendingUp, Sparkles, Filter,
   ChevronDown, X, BarChart3, DollarSign, Users, Zap, Eye,
-  Building2, Globe, Map
+  Building2, Globe, Map, SlidersHorizontal
 } from 'lucide-react';
 import Countdown from 'react-countdown';
 import WishlistHeartButton from '../components/WishlistHeartButton';
