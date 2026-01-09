@@ -40,6 +40,7 @@ const MultiItemListingDetailPage = () => {
   const { user } = useAuth();
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { formatPrice, currency } = useCurrency();
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [bidAmounts, setBidAmounts] = useState({});
@@ -61,6 +62,7 @@ const MultiItemListingDetailPage = () => {
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [termsAcceptedPersistent, setTermsAcceptedPersistent] = useState(false);
   const [sellerInfo, setSellerInfo] = useState(null);
+  const [showBidHistory, setShowBidHistory] = useState(false);
   const lotRefs = useRef({});
 
   // Check if user has already accepted terms for this auction
