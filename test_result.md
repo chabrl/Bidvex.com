@@ -60,7 +60,7 @@
 4. `final_functionality_test.png` - Interactive elements confirmed
 
 ### Live URL Performance
-- **URL**: https://bidding-platform-20.preview.emergentagent.com
+- **URL**: https://clean-power-bids.preview.emergentagent.com
 - **Response time**: Fast loading across all pages
 - **Stability**: No crashes or errors during testing
 - **Cross-page navigation**: Working smoothly
@@ -274,7 +274,7 @@ Location: `/app/frontend/src/pages/LotsMarketplacePage.js`
 - Clear cascade on parent change (selecting new country clears province and city)
 
 ### Live URL
-https://bidding-platform-20.preview.emergentagent.com
+https://clean-power-bids.preview.emergentagent.com
 
 ### Test Credentials
 - Admin: charbel@admin.bazario.com / Admin123!
@@ -288,7 +288,7 @@ https://bidding-platform-20.preview.emergentagent.com
 **❌ SELLER OBLIGATIONS SECTIONS NOT FOUND ON PUBLIC LOT DETAIL PAGE**
 
 #### 1. Navigation & Access
-- ✅ **Live URL accessible** - https://bidding-platform-20.preview.emergentagent.com
+- ✅ **Live URL accessible** - https://clean-power-bids.preview.emergentagent.com
 - ✅ **Lots marketplace loaded** - Found 50 auctions (5 lots) in All Regions
 - ✅ **Lot detail page accessible** - Successfully navigated to specific lot: /lots/8b46c78a-3e22-4233-be13-ce709f1d3ee6
 
@@ -354,7 +354,7 @@ https://bidding-platform-20.preview.emergentagent.com
 **✅ SELLER OBLIGATIONS SECTIONS NOW DISPLAYING SUCCESSFULLY ON LIVE URL**
 
 #### 1. Navigation & Access
-- ✅ **Live URL accessible** - https://bidding-platform-20.preview.emergentagent.com/lots
+- ✅ **Live URL accessible** - https://clean-power-bids.preview.emergentagent.com/lots
 - ✅ **Lots marketplace loaded** - Found 50 auctions (5 lots) in All Regions
 - ✅ **Lot detail pages accessible** - Successfully tested multiple listings with seller obligations data
 
@@ -457,7 +457,7 @@ https://bidding-platform-20.preview.emergentagent.com
 - Admin: charbel@admin.bazario.com / Admin123!
 
 ### Live URL
-- https://bidding-platform-20.preview.emergentagent.com
+- https://clean-power-bids.preview.emergentagent.com
 
 ### Test Results Summary
 

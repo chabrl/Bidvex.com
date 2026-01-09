@@ -12,7 +12,7 @@ from typing import Dict, Any, Optional, List
 import os
 
 # Configuration
-BASE_URL = "https://bidding-platform-20.preview.emergentagent.com/api"
+BASE_URL = "https://clean-power-bids.preview.emergentagent.com/api"
 
 # Test users
 ADMIN_EMAIL = "admin@admin.bazario.com"

@@ -9,7 +9,7 @@ import aiohttp
 import json
 from datetime import datetime
 
-BASE_URL = "https://bidding-platform-20.preview.emergentagent.com/api"
+BASE_URL = "https://clean-power-bids.preview.emergentagent.com/api"
 
 async def test_sorting_fix():
     async with aiohttp.ClientSession() as session:
