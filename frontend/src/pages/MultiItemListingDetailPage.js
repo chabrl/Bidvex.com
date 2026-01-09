@@ -1024,13 +1024,19 @@ const MultiItemListingDetailPage = () => {
 
             {/* Lots Display */}
             <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-6' : 'space-y-6'}>
-              {listing.lots.map((lot) => (
+              {listing.lots.map((lot) => {
+                // Calculate if this is a high-stakes lot (>$10,000 USD)
+                const lotIsHighStakes = isHighStakes(lot.current_price);
+                
+                return (
                 <Card 
                   key={lot.lot_number} 
                   ref={(el) => (lotRefs.current[lot.lot_number] = el)}
-                  className={`border-2 hover:border-primary transition-colors cursor-pointer ${
+                  className={`border-2 hover:border-primary transition-all cursor-pointer ${
                     hasActiveBids(lot) ? 'border-amber-300 shadow-amber-100' : ''
-                  } ${activeLotId === lot.lot_number ? 'ring-2 ring-blue-500' : ''}`}
+                  } ${activeLotId === lot.lot_number ? 'ring-2 ring-blue-500' : ''} ${
+                    lotIsHighStakes ? getHighStakesCardStyles(lot.current_price) : ''
+                  }`}
                   onClick={() => {
                     setActiveLotId(lot.lot_number);
                     setSelectedLot(lot);
@@ -1038,6 +1044,11 @@ const MultiItemListingDetailPage = () => {
                   data-testid={`lot-card-${lot.lot_number}`}
                 >
                   <CardContent className="pt-6">
+                    {/* High Stakes Timer - Shows for items over $10K */}
+                    {lotIsHighStakes && lot.lot_end_time && !auctionEnded && (
+                      <HighStakesTimer endDate={lot.lot_end_time} currentBidUSD={lot.current_price} />
+                    )}
+                    
                     <div className={viewMode === 'grid' ? 'space-y-4' : 'flex gap-6'}>
                       {/* Images */}
                       {lot.images && lot.images.length > 0 && (
@@ -1080,6 +1091,8 @@ const MultiItemListingDetailPage = () => {
                                   Active Bidding
                                 </Badge>
                               )}
+                              {/* High Stakes Badge */}
+                              {lotIsHighStakes && <HighStakesIndicator currentBidUSD={lot.current_price} />}
                             </div>
                           </div>
                           
