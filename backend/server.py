@@ -809,7 +809,7 @@ class BuyNowTransaction(BaseModel):
     transaction_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     payment_status: str = "pending"  # pending, completed, failed
     payment_method: Optional[str] = None
-    bid_type: str = "normal"  # normal, monster, auto
+    bid_type: str = "normal"  # normal, auto (monster bids removed)
 
 class Bid(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -817,7 +817,7 @@ class Bid(BaseModel):
     listing_id: str
     bidder_id: str
     amount: float
-    bid_type: str = "normal"  # normal, monster, auto
+    bid_type: str = "normal"  # normal, auto (monster bids removed)
     auto_bid_max: Optional[float] = None  # For auto-bid bot
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
