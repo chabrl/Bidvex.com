@@ -564,16 +564,34 @@ const ProfileSettingsPage = () => {
                           <td className="p-4 flex items-center gap-2">
                             <DollarSign className="h-4 w-4 text-green-600" />
                             Seller Commission
-                            Power Bids per Auction
                           </td>
                           <td className="text-center p-4">
-                            <span className="font-semibold">1</span>
+                            <span className="font-semibold">4%</span>
                           </td>
                           <td className="text-center p-4 bg-purple-50/50 dark:bg-purple-900/10">
-                            <span className="font-semibold">Unlimited</span>
+                            <span className="font-semibold text-green-600">2.5%</span>
+                            <span className="text-xs text-green-600 block">Save 1.5%</span>
                           </td>
                           <td className="text-center p-4 bg-yellow-50/50 dark:bg-yellow-900/10">
-                            <span className="font-semibold">Unlimited</span>
+                            <span className="font-semibold text-green-600">2%</span>
+                            <span className="text-xs text-green-600 block">Save 2%</span>
+                          </td>
+                        </tr>
+                        <tr className="border-b hover:bg-gray-50 dark:hover:bg-gray-900/50">
+                          <td className="p-4 flex items-center gap-2">
+                            <DollarSign className="h-4 w-4 text-blue-600" />
+                            Buyer's Premium
+                          </td>
+                          <td className="text-center p-4">
+                            <span className="font-semibold">5%</span>
+                          </td>
+                          <td className="text-center p-4 bg-purple-50/50 dark:bg-purple-900/10">
+                            <span className="font-semibold text-green-600">3.5%</span>
+                            <span className="text-xs text-green-600 block">Save 1.5%</span>
+                          </td>
+                          <td className="text-center p-4 bg-yellow-50/50 dark:bg-yellow-900/10">
+                            <span className="font-semibold text-green-600">3%</span>
+                            <span className="text-xs text-green-600 block">Save 2%</span>
                           </td>
                         </tr>
                         <tr className="border-b hover:bg-gray-50 dark:hover:bg-gray-900/50">
