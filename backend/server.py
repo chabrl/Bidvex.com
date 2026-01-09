@@ -2876,7 +2876,7 @@ async def add_payment_method(data: PaymentMethodCreate, current_user: User = Dep
             payment_method=data.payment_method_id,
             customer=current_user.id,
             confirm=True,
-            return_url='https://clean-power-bids.preview.emergentagent.com'
+            return_url='https://highstakes-auction.preview.emergentagent.com'
         )
         
         is_verified = intent.status == 'succeeded' or intent.status == 'requires_capture'
@@ -2989,7 +2989,7 @@ async def get_affiliate_stats(current_user: User = Depends(get_current_user)):
     
     return {
         "affiliate_code": current_user.affiliate_code,
-        "referral_link": f"https://clean-power-bids.preview.emergentagent.com/auth?ref={current_user.affiliate_code}",
+        "referral_link": f"https://highstakes-auction.preview.emergentagent.com/auth?ref={current_user.affiliate_code}",
         "total_referrals": total_referrals,
         "active_referrals": active_referrals,
         "total_earnings": total_earnings,

@@ -11,7 +11,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = "https://clean-power-bids.preview.emergentagent.com/api"
+BASE_URL = "https://highstakes-auction.preview.emergentagent.com/api"
 TEST_USER_EMAIL = "currency.tester@bazario.com"
 TEST_USER_PASSWORD = "CurrencyTest123!"
 TEST_USER_NAME = "Currency Tester"

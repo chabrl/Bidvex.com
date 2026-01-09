@@ -1,0 +1,2116 @@
+<analysis>**original_problem_statement:** The user's goal is to evolve the BidVex auction platform. The project has moved through several major directives:
+
+1.  **MASTER DIRECTIVE (Completed):** A strategic pivot to a new subscription revenue model. This involved purging the Power Bids feature, transitioning to yearly billing (9.99/year Premium, 99.99/year VIP), and implementing a new tiered, percentage-based fee engine with no maximum cap.
+2.  **PHASE 2 DIRECTIVE (Completed):** Focused on mobile optimization and conversion tools. This included making the marketplace filter sidebar responsive for mobile and adding an interactive Fee Savings Calculator to the subscription page to demonstrate value.
+3.  **DISRUPTOR PROTOCOL (Completed):** Aimed at enhancing transparency and user experience. This involved a major visual overhaul of the subscription page to a modern glassmorphism card layout, adding a site-wide USD/CAD currency switcher, implementing a public bid history tab on lot pages, and personalizing the savings calculator using the user's actual transaction history.
+4.  **FINAL SPRINT (Current Task):** The active directive focuses on implementing High-Stakes visual triggers for expensive items, building a Seller Trust Score system, and enabling item-level AI indexing for the RAG assistant.
+
+**User's preferred language**: English
+
+**what currently exists?**
+The application is a full-stack auction platform with a FastAPI backend, React frontend, and MongoDB database. Key features implemented in this session include:
+-   A complete subscription system with yearly billing, integrated with Stripe.
+-   A dynamic, uncapped, percentage-based fee engine tied to user subscription tiers.
+-   A fully redesigned, modern subscription management page featuring glassmorphism cards and a personalized savings calculator.
+-   A site-wide currency switcher (USD/CAD) with user preference persistence.
+-   A public bid history tab on lot detail pages.
+-   A mobile-responsive filter drawer on the main marketplace page.
+-   The Power Bids feature has been entirely purged from the codebase and database.
+-   Seller tier badges (Premium/VIP) are displayed on lot pages.
+
+**Last working item**:
+-   **Last item agent was working**: The agent had just begun the FINAL SPRINT directive. The work involved exploring the existing codebase to understand the RAG AI assistant () and the pre-existing seller rating models in  before starting implementation of the new features.
+-   **Status**: NOT STARTED
+-   **Agent Testing Done**: N
+-   **Which testing method agent to use?**: both
+-   **User Testing Done**: N
+
+**All Pending/In progress Issue list**:
+-   None. All issues identified by the testing agent during the session have been resolved.
+
+**In progress Task List**:
+-   **Task 1: Implement FINAL SPRINT Directive (P0)**
+    -   **Where to resume**: The agent needs to begin implementing the features outlined in the FINAL SPRINT directive, starting with the High-Stakes Bidding UI, as the initial code exploration is complete.
+    -   **What will be achieved with this?**: This will add psychological urgency for high-value items, build buyer trust through a seller rating system, make the AI assistant more intelligent, and enhance the subscription conversion tools.
+    -   **Status**: NOT STARTED
+    -   **Should Test frontend/backend/both after fix?**: both
+    -   **Blocked on something**: No.
+
+**Upcoming and Future Tasks**
+-   **Upcoming Tasks**:
+    -   **P0: High-Stakes Bidding UI**: Implement pulsing borders and a red urgency timer for items with bids over 0,000.
+    -   **P0: Seller Trust Score System**: Implement a 1-5 star rating system for sellers based on shipping speed, item accuracy, and communication, and display it on their profile and lot pages.
+    -   **P0: RAG AI Indexing (Item Level)**: Update the AI assistant to read and answer questions based on the specific Seller Obligations for each lot.
+    -   **P0: Calculator Personalization (What If Toggle)**: Add a toggle to the savings calculator to switch between My Real Stats and a hypothetical What If scenario.
+    -   **P1: Implement Lot Index Mobile Responsiveness on Detail Page**: The sidebar on  that lists individual lots within an auction needs to be converted into a collapsible drawer on mobile viewports. This was requested in the initial handoff but was missed.
+
+-   **Future Tasks**:
+    -   None. All previously defined future tasks have been completed or promoted to the current sprint.
+
+**Completed work in this session**
+-   **MASTER DIRECTIVE Implementation (DONE)**:
+    -   Purged the Power Bids feature completely from the frontend, backend, and database models.
+    -   Switched all subscription plans to yearly billing with updated pricing (9.99, 99.99).
+    -   Implemented the new dynamic, uncapped fee engine (Free: 4/5%, Premium: 2.5/3.5%, VIP: 2/3%).
+-   **PHASE 2 Implementation (DONE)**:
+    -   Made the filters on the  responsive via a collapsible mobile drawer ( component).
+    -   Added an interactive Fee Savings Calculator to the subscription page.
+-   **DISRUPTOR PROTOCOL Implementation (DONE)**:
+    -   Redesigned the subscription page using a modern, three-card glassmorphism layout ().
+    -   Implemented a global USD/CAD currency switcher using a React Context () and a toggle in the navbar.
+    -   Added a  component to the lot detail page.
+    -   Created a backend endpoint () and a  component to show savings based on user history.
+-   **Bug Fix (DONE)**: Resolved an issue where the  component was not rendering by correctly setting the  state on the .
+
+**Earlier issues found/mentioned but not fixed**
+-   None.
+
+**Known issue recurrence from previous fork**
+-   None.
+
+**Code Architecture**
+
+
+**Key Technical Concepts**
+-   **Global State Management**: Utilized React's Context API to manage the site-wide currency preference ().
+-   **Responsive UI Design**: Implemented responsive layouts using Tailwind CSS media queries and Shadcn UI's  component for a mobile drawer.
+-   **Component-Driven UI Redesign**: Replaced a large, monolithic subscription table with smaller, reusable, and more modern components (, ).
+-   **Full-Stack Feature Removal**: Systematically purged the Power Bids feature by removing frontend components, backend API endpoints, database model fields, and associated logic.
+-   **Testing-Driven Debugging**: Effectively used the  to identify bugs (e.g.,  being null) and fixed them based on the test report.
+
+**key DB schema**
+-   **users**: A field to store  will be needed to persist the currency toggle choice across sessions. A  field was removed.
+-   A rating system model and logic were found to exist in  and should be leveraged for the Seller Trust Score feature.
+
+**changes in tech stack**
+-   None.
+
+**All files of reference**
+-   **New Components**: , , , , , .
+-   **Heavily Modified Files**: , , , .
+-   **Key System Files**:  (to add Context Provider),  (for new fee logic).
+
+**Areas that need refactoring**:
+-   The CSS might still contain some  tags or global overrides that could be refactored into the theme for better maintainability.
+
+**key api endpoints**
+-   **NEW**:  (GET): Provides historical transaction data for the personalized savings calculator.
+-   **REMOVED**:  (POST)
+-   **MODIFIED**: All subscription and fee-related endpoints to reflect yearly billing and the new uncapped fee structure.
+
+**Critical Info for New Agent**
+-   **Priority**: The FINAL SPRINT directive is P0. All tasks within it should be addressed first.
+-   **Existing Seller Rating**: Before building the Seller Trust Score from scratch, thoroughly investigate the existing rating models and API endpoints found in . The agent has already confirmed they exist.
+-   **Screenshot Tool Issues**: The agent consistently faced session expirations and cookie modal issues when using the . For verifying authenticated routes or multi-step flows, direct navigation to specific URLs with known data and using the  is a more reliable strategy.
+-   **Missed Task**: The mobile responsiveness for the lot index sidebar on  is still pending from the original project requirements and is listed as a P1 task.
+
+**documents and test reports created in this job**
+-   
+-   
+-   
+-   
+
+**Last 10 User Messages and any pending HUMAN messages**
+-   **Msg 382 (PENDING):** Provided the FINAL SPRINT directive to implement a High-Stakes Bidding UI, Seller Trust Score, item-level AI indexing, and a What If toggle for the calculator. This is the current, active task.
+-   **Msg 241 (Completed):** Provided the DISRUPTOR PROTOCOL directive (Trendy UI, Currency Switcher, Bid History).
+-   **Msg 176 (Completed):** Provided the PHASE 2 directive (Mobile responsive marketplace, fee savings calculator).
+-   **Msg 5 (Completed):** Provided the MASTER DIRECTIVE and confirmed the plan to purge Power Bids and update subscriptions/fees.
+
+**Project Health Check:**
+-   **Broken**: None
+-   **Mocked**: None
+
+**3rd Party Integrations**
+-   **OpenAI GPT-4**: For the AI Assistant via  — uses Emergent LLM Key.
+-   **Twilio**: For SMS notifications — uses User API Key.
+-   **Stripe**: For payments, successfully updated for yearly subscriptions.
+-   **MongoDB**: Primary database.
+-   **ChromaDB**: Vector store for the RAG system.
+
+**Testing status**
+-   **Testing agent used after significant changes**: YES. The agent used the testing agent after every major phase of implementation, successfully interpreting the results and fixing the bugs found.
+-   **Troubleshoot agent used after agent stuck in loop**: NO
+-   **Test files created**: The testing agent created test files, but they are not user-facing. No persistent test files like ============================= test session starts ==============================
+platform linux -- Python 3.11.14, pytest-8.4.2, pluggy-1.6.0
+rootdir: /app
+plugins: anyio-4.11.0, langsmith-0.5.1
+collected 62 items
+
+backend/test_email_service.py FFFFFFFFF                                  [ 14%]
+backend/test_password_reset_email.py F                                   [ 16%]
+backend/test_production_templates.py EEEEEEE                             [ 27%]
+bid_placement_test.py F                                                  [ 29%]
+sorting_test.py F                                                        [ 30%]
+tests/test_phase2_mobile_fees.py FF....FFFF..F...                        [ 56%]
+tests/test_phase3_disruptor_protocol.py ..........                       [ 72%]
+tests/test_subscription_pivot.py FFFFFFFFFFFFFFFFF                       [100%]
+
+==================================== ERRORS ====================================
+________________ ERROR at setup of test_authentication_template ________________
+file /app/backend/test_production_templates.py, line 46
+  async def test_authentication_template(email_service, test_email):
+      """Test Authentication category template (Welcome, Password Reset, etc.)"""
+      print_header("Testing Authentication Template (d-e0ee403fbd8646db8011339cf2eeac30)")
+
+      try:
+          result = await email_service.send_email(
+              to=test_email,
+              template_id=EmailTemplates.WELCOME,
+              dynamic_data={
+                  'first_name': 'Test',
+                  'full_name': 'Test User',
+                  'email': test_email,
+                  'login_url': 'https://bidvex.com/auth',
+                  'explore_url': 'https://bidvex.com/marketplace',
+                  'account_type': 'Personal'
+              },
+              language='en'
+          )
+
+          if result['success']:
+              print_success(f"Welcome email sent successfully")
+              print_info(f"Message ID: {result['message_id']}")
+              print_info(f"Status Code: {result['status_code']}")
+              return True
+          else:
+              print_error(f"Failed: {result['error']}")
+              return False
+      except Exception as e:
+          print_error(f"Exception: {str(e)}")
+          return False
+E       fixture 'email_service' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/app/backend/test_production_templates.py:46
+___________________ ERROR at setup of test_bidding_template ____________________
+file /app/backend/test_production_templates.py, line 77
+  async def test_bidding_template(email_service, test_email):
+      """Test Bidding category template (Bid Placed, Outbid, Won, Lost)"""
+      print_header("Testing Bidding Template (d-13806757fbd24818b24bc520074ea979)")
+
+      try:
+          result = await email_service.send_email(
+              to=test_email,
+              template_id=EmailTemplates.BID_PLACED,
+              dynamic_data={
+                  'first_name': 'Test',
+                  'listing_title': 'Vintage Watch',
+                  'listing_url': 'https://bidvex.com/listing/123',
+                  'bid_amount': '150.00',
+                  'currency': 'CAD',
+                  'listing_image': 'https://images.unsplash.com/photo-1523170335258-f5ed11844a49',
+                  'auction_end_date': '2025-12-31',
+                  'current_high_bid': '150.00'
+              },
+              language='en'
+          )
+
+          if result['success']:
+              print_success(f"Bid confirmation sent successfully")
+              print_info(f"Message ID: {result['message_id']}")
+              print_info(f"Status Code: {result['status_code']}")
+              return True
+          else:
+              print_error(f"Failed: {result['error']}")
+              return False
+      except Exception as e:
+          print_error(f"Exception: {str(e)}")
+          return False
+E       fixture 'email_service' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/app/backend/test_production_templates.py:77
+_______________ ERROR at setup of test_auction_updates_template ________________
+file /app/backend/test_production_templates.py, line 110
+  async def test_auction_updates_template(email_service, test_email):
+      """Test Auction Updates category template (Ending Soon, Started, Cancelled)"""
+      print_header("Testing Auction Updates Template (d-f22625d31ef74262887e3a8f96934bc1)")
+
+      try:
+          result = await email_service.send_email(
+              to=test_email,
+              template_id=EmailTemplates.AUCTION_ENDING_SOON,
+              dynamic_data={
+                  'first_name': 'Test',
+                  'auction_title': 'Estate Sale Collection',
+                  'auction_url': 'https://bidvex.com/auction/456',
+                  'end_time': '2025-11-22 15:00:00',
+                  'current_bid': '250.00',
+                  'currency': 'CAD'
+              },
+              language='en'
+          )
+
+          if result['success']:
+              print_success(f"Auction ending notification sent successfully")
+              print_info(f"Message ID: {result['message_id']}")
+              print_info(f"Status Code: {result['status_code']}")
+              return True
+          else:
+              print_error(f"Failed: {result['error']}")
+              return False
+      except Exception as e:
+          print_error(f"Exception: {str(e)}")
+          return False
+E       fixture 'email_service' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/app/backend/test_production_templates.py:110
+_____________ ERROR at setup of test_seller_notifications_template _____________
+file /app/backend/test_production_templates.py, line 141
+  async def test_seller_notifications_template(email_service, test_email):
+      """Test Seller Notifications category template (New Bid, Approved, Sold)"""
+      print_header("Testing Seller Notifications Template (d-794b529ec05e407da60b26113e0c4ea1)")
+
+      try:
+          result = await email_service.send_email(
+              to=test_email,
+              template_id=EmailTemplates.NEW_BID_RECEIVED,
+              dynamic_data={
+                  'first_name': 'Test',
+                  'listing_title': 'Antique Vase',
+                  'listing_url': 'https://bidvex.com/listing/789',
+                  'bid_amount': '300.00',
+                  'currency': 'CAD',
+                  'bidder_name': 'John Doe',
+                  'total_bids': '5'
+              },
+              language='en'
+          )
+
+          if result['success']:
+              print_success(f"Seller notification sent successfully")
+              print_info(f"Message ID: {result['message_id']}")
+              print_info(f"Status Code: {result['status_code']}")
+              return True
+          else:
+              print_error(f"Failed: {result['error']}")
+              return False
+      except Exception as e:
+          print_error(f"Exception: {str(e)}")
+          return False
+E       fixture 'email_service' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/app/backend/test_production_templates.py:141
+__________________ ERROR at setup of test_financial_template ___________________
+file /app/backend/test_production_templates.py, line 173
+  async def test_financial_template(email_service, test_email):
+      """Test Financial category template (Invoice, Payment, Refund)"""
+      print_header("Testing Financial Template (d-a8cb13c061e3449394e900b406e9a391)")
+
+      try:
+          result = await email_service.send_email(
+              to=test_email,
+              template_id=EmailTemplates.INVOICE,
+              dynamic_data={
+                  'first_name': 'Test',
+                  'invoice_number': 'BV-2025-001',
+                  'invoice_date': '2025-11-21',
+                  'total_amount': '450.00',
+                  'currency': 'CAD',
+                  'items': [
+                      {'name': 'Vintage Watch', 'amount': '150.00'},
+                      {'name': 'Antique Vase', 'amount': '300.00'}
+                  ],
+                  'subtotal': '450.00',
+                  'tax': '67.49',
+                  'shipping': '0.00',
+                  'invoice_pdf_url': 'https://bidvex.com/invoices/001.pdf',
+                  'payment_method': 'Credit Card'
+              },
+              language='en'
+          )
+
+          if result['success']:
+              print_success(f"Invoice email sent successfully")
+              print_info(f"Message ID: {result['message_id']}")
+              print_info(f"Status Code: {result['status_code']}")
+              return True
+          else:
+              print_error(f"Failed: {result['error']}")
+              return False
+      except Exception as e:
+          print_error(f"Exception: {str(e)}")
+          return False
+E       fixture 'email_service' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/app/backend/test_production_templates.py:173
+________________ ERROR at setup of test_communication_template _________________
+file /app/backend/test_production_templates.py, line 212
+  async def test_communication_template(email_service, test_email):
+      """Test Communication category template (New Message)"""
+      print_header("Testing Communication Template (d-3153ed45d6764d0687e69c85ffddcb10)")
+
+      try:
+          result = await email_service.send_email(
+              to=test_email,
+              template_id=EmailTemplates.NEW_MESSAGE,
+              dynamic_data={
+                  'first_name': 'Test',
+                  'sender_name': 'Jane Smith',
+                  'message_preview': 'Hello! I have a question about the vintage watch you listed...',
+                  'messages_url': 'https://bidvex.com/messages',
+                  'sender_profile_url': 'https://bidvex.com/seller/123'
+              },
+              language='en'
+          )
+
+          if result['success']:
+              print_success(f"Message notification sent successfully")
+              print_info(f"Message ID: {result['message_id']}")
+              print_info(f"Status Code: {result['status_code']}")
+              return True
+          else:
+              print_error(f"Failed: {result['error']}")
+              return False
+      except Exception as e:
+          print_error(f"Exception: {str(e)}")
+          return False
+E       fixture 'email_service' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/app/backend/test_production_templates.py:212
+____________________ ERROR at setup of test_admin_template _____________________
+file /app/backend/test_production_templates.py, line 242
+  async def test_admin_template(email_service, test_email):
+      """Test Admin category template (Report Received, Account Suspended)"""
+      print_header("Testing Admin Template (d-94d4a5d7855b4fa38badae9cf12ded41)")
+
+      try:
+          result = await email_service.send_email(
+              to=test_email,
+              template_id=EmailTemplates.REPORT_RECEIVED,
+              dynamic_data={
+                  'first_name': 'Admin',
+                  'report_type': 'Spam',
+                  'reported_item': 'Listing #456',
+                  'reporter_name': 'John Doe',
+                  'report_reason': 'This listing appears to be spam',
+                  'admin_url': 'https://bidvex.com/admin/reports/123'
+              },
+              language='en'
+          )
+
+          if result['success']:
+              print_success(f"Admin notification sent successfully")
+              print_info(f"Message ID: {result['message_id']}")
+              print_info(f"Status Code: {result['status_code']}")
+              return True
+          else:
+              print_error(f"Failed: {result['error']}")
+              return False
+      except Exception as e:
+          print_error(f"Exception: {str(e)}")
+          return False
+E       fixture 'email_service' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/app/backend/test_production_templates.py:242
+=================================== FAILURES ===================================
+_________________________ test_service_initialization __________________________
+async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted
+______________________________ test_data_builders ______________________________
+async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted
+__________________________ test_send_email_validation __________________________
+async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted
+_____________________________ test_simulated_send ______________________________
+async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted
+_______________________________ test_bulk_email ________________________________
+async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted
+____________________________ test_helper_functions _____________________________
+async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted
+_______________________________ test_retry_logic _______________________________
+async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted
+_________________________ test_template_configuration __________________________
+async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted
+___________________________ test_webhook_processing ____________________________
+async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted
+________________________ test_password_reset_email_data ________________________
+async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted
+______________________________ test_bid_placement ______________________________
+async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted
+_______________________________ test_sorting_fix _______________________________
+async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted
+_________ TestNoCapFeeVerification.test_buyer_fees_100k_item_free_tier _________
+
+self = <tests.test_phase2_mobile_fees.TestNoCapFeeVerification object at 0xfd4a2d5377d0>
+
+    def test_buyer_fees_100k_item_free_tier(self):
+        """$100,000 item should show $5,000 buyer premium (5%) for free tier"""
+>       response = requests.get(f"{BASE_URL}/api/fees/preview", params={
+            "hammer_price": 100000,
+            "subscription_tier": "free",
+            "fee_type": "buyer"
+        })
+
+tests/test_phase2_mobile_fees.py:25: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/root/.venv/lib/python3.11/site-packages/requests/api.py:73: in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:59: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:575: in request
+    prep = self.prepare_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:484: in prepare_request
+    p.prepare(
+/root/.venv/lib/python3.11/site-packages/requests/models.py:367: in prepare
+    self.prepare_url(url, params)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <PreparedRequest [GET]>, url = '/api/fees/preview'
+params = OrderedDict([('hammer_price', 100000), ('subscription_tier', 'free'), ('fee_type', 'buyer')])
+
+    def prepare_url(self, url, params):
+        """Prepares the given HTTP URL."""
+        #: Accept objects that have string representations.
+        #: We're unable to blindly call unicode/str functions
+        #: as this will include the bytestring indicator (b'')
+        #: on python 3.x.
+        #: https://github.com/psf/requests/pull/2238
+        if isinstance(url, bytes):
+            url = url.decode("utf8")
+        else:
+            url = str(url)
+    
+        # Remove leading whitespaces from url
+        url = url.lstrip()
+    
+        # Don't do any URL preparation for non-HTTP schemes like `mailto`,
+        # `data` etc to work around exceptions from `url_parse`, which
+        # handles RFC 3986 only.
+        if ":" in url and not url.lower().startswith("http"):
+            self.url = url
+            return
+    
+        # Support for unicode domain names and paths.
+        try:
+            scheme, auth, host, port, path, query, fragment = parse_url(url)
+        except LocationParseError as e:
+            raise InvalidURL(*e.args)
+    
+        if not scheme:
+>           raise MissingSchema(
+                f"Invalid URL {url!r}: No scheme supplied. "
+                f"Perhaps you meant https://{url}?"
+            )
+E           requests.exceptions.MissingSchema: Invalid URL '/api/fees/preview': No scheme supplied. Perhaps you meant https:///api/fees/preview?
+
+/root/.venv/lib/python3.11/site-packages/requests/models.py:438: MissingSchema
+________ TestNoCapFeeVerification.test_seller_fees_100k_item_free_tier _________
+
+self = <tests.test_phase2_mobile_fees.TestNoCapFeeVerification object at 0xfd4a2d535690>
+
+    def test_seller_fees_100k_item_free_tier(self):
+        """$100,000 item should show $4,000 seller commission (4%) for free tier"""
+>       response = requests.get(f"{BASE_URL}/api/fees/preview", params={
+            "hammer_price": 100000,
+            "subscription_tier": "free",
+            "fee_type": "seller"
+        })
+
+tests/test_phase2_mobile_fees.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/root/.venv/lib/python3.11/site-packages/requests/api.py:73: in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:59: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:575: in request
+    prep = self.prepare_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:484: in prepare_request
+    p.prepare(
+/root/.venv/lib/python3.11/site-packages/requests/models.py:367: in prepare
+    self.prepare_url(url, params)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <PreparedRequest [GET]>, url = '/api/fees/preview'
+params = OrderedDict([('hammer_price', 100000), ('subscription_tier', 'free'), ('fee_type', 'seller')])
+
+    def prepare_url(self, url, params):
+        """Prepares the given HTTP URL."""
+        #: Accept objects that have string representations.
+        #: We're unable to blindly call unicode/str functions
+        #: as this will include the bytestring indicator (b'')
+        #: on python 3.x.
+        #: https://github.com/psf/requests/pull/2238
+        if isinstance(url, bytes):
+            url = url.decode("utf8")
+        else:
+            url = str(url)
+    
+        # Remove leading whitespaces from url
+        url = url.lstrip()
+    
+        # Don't do any URL preparation for non-HTTP schemes like `mailto`,
+        # `data` etc to work around exceptions from `url_parse`, which
+        # handles RFC 3986 only.
+        if ":" in url and not url.lower().startswith("http"):
+            self.url = url
+            return
+    
+        # Support for unicode domain names and paths.
+        try:
+            scheme, auth, host, port, path, query, fragment = parse_url(url)
+        except LocationParseError as e:
+            raise InvalidURL(*e.args)
+    
+        if not scheme:
+>           raise MissingSchema(
+                f"Invalid URL {url!r}: No scheme supplied. "
+                f"Perhaps you meant https://{url}?"
+            )
+E           requests.exceptions.MissingSchema: Invalid URL '/api/fees/preview': No scheme supplied. Perhaps you meant https:///api/fees/preview?
+
+/root/.venv/lib/python3.11/site-packages/requests/models.py:438: MissingSchema
+_______ TestSubscriptionBenefitsAPI.test_subscription_benefits_endpoint ________
+
+self = <tests.test_phase2_mobile_fees.TestSubscriptionBenefitsAPI object at 0xfd4a2d3a48d0>
+
+    def test_subscription_benefits_endpoint(self):
+        """Verify subscription benefits API returns correct data"""
+>       response = requests.get(f"{BASE_URL}/api/subscription/benefits")
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_phase2_mobile_fees.py:106: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/root/.venv/lib/python3.11/site-packages/requests/api.py:73: in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:59: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:575: in request
+    prep = self.prepare_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:484: in prepare_request
+    p.prepare(
+/root/.venv/lib/python3.11/site-packages/requests/models.py:367: in prepare
+    self.prepare_url(url, params)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <PreparedRequest [GET]>, url = '/api/subscription/benefits'
+params = OrderedDict()
+
+    def prepare_url(self, url, params):
+        """Prepares the given HTTP URL."""
+        #: Accept objects that have string representations.
+        #: We're unable to blindly call unicode/str functions
+        #: as this will include the bytestring indicator (b'')
+        #: on python 3.x.
+        #: https://github.com/psf/requests/pull/2238
+        if isinstance(url, bytes):
+            url = url.decode("utf8")
+        else:
+            url = str(url)
+    
+        # Remove leading whitespaces from url
+        url = url.lstrip()
+    
+        # Don't do any URL preparation for non-HTTP schemes like `mailto`,
+        # `data` etc to work around exceptions from `url_parse`, which
+        # handles RFC 3986 only.
+        if ":" in url and not url.lower().startswith("http"):
+            self.url = url
+            return
+    
+        # Support for unicode domain names and paths.
+        try:
+            scheme, auth, host, port, path, query, fragment = parse_url(url)
+        except LocationParseError as e:
+            raise InvalidURL(*e.args)
+    
+        if not scheme:
+>           raise MissingSchema(
+                f"Invalid URL {url!r}: No scheme supplied. "
+                f"Perhaps you meant https://{url}?"
+            )
+E           requests.exceptions.MissingSchema: Invalid URL '/api/subscription/benefits': No scheme supplied. Perhaps you meant https:///api/subscription/benefits?
+
+/root/.venv/lib/python3.11/site-packages/requests/models.py:438: MissingSchema
+_________________ TestHealthAndBasicAPIs.test_health_endpoint __________________
+
+self = <tests.test_phase2_mobile_fees.TestHealthAndBasicAPIs object at 0xfd4a2d3f6b50>
+
+    def test_health_endpoint(self):
+        """Verify API is running"""
+>       response = requests.get(f"{BASE_URL}/api/health")
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_phase2_mobile_fees.py:134: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/root/.venv/lib/python3.11/site-packages/requests/api.py:73: in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:59: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:575: in request
+    prep = self.prepare_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:484: in prepare_request
+    p.prepare(
+/root/.venv/lib/python3.11/site-packages/requests/models.py:367: in prepare
+    self.prepare_url(url, params)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <PreparedRequest [GET]>, url = '/api/health', params = OrderedDict()
+
+    def prepare_url(self, url, params):
+        """Prepares the given HTTP URL."""
+        #: Accept objects that have string representations.
+        #: We're unable to blindly call unicode/str functions
+        #: as this will include the bytestring indicator (b'')
+        #: on python 3.x.
+        #: https://github.com/psf/requests/pull/2238
+        if isinstance(url, bytes):
+            url = url.decode("utf8")
+        else:
+            url = str(url)
+    
+        # Remove leading whitespaces from url
+        url = url.lstrip()
+    
+        # Don't do any URL preparation for non-HTTP schemes like `mailto`,
+        # `data` etc to work around exceptions from `url_parse`, which
+        # handles RFC 3986 only.
+        if ":" in url and not url.lower().startswith("http"):
+            self.url = url
+            return
+    
+        # Support for unicode domain names and paths.
+        try:
+            scheme, auth, host, port, path, query, fragment = parse_url(url)
+        except LocationParseError as e:
+            raise InvalidURL(*e.args)
+    
+        if not scheme:
+>           raise MissingSchema(
+                f"Invalid URL {url!r}: No scheme supplied. "
+                f"Perhaps you meant https://{url}?"
+            )
+E           requests.exceptions.MissingSchema: Invalid URL '/api/health': No scheme supplied. Perhaps you meant https:///api/health?
+
+/root/.venv/lib/python3.11/site-packages/requests/models.py:438: MissingSchema
+_______________ TestHealthAndBasicAPIs.test_categories_endpoint ________________
+
+self = <tests.test_phase2_mobile_fees.TestHealthAndBasicAPIs object at 0xfd4a2d3f78d0>
+
+    def test_categories_endpoint(self):
+        """Verify categories endpoint works"""
+>       response = requests.get(f"{BASE_URL}/api/categories")
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_phase2_mobile_fees.py:140: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/root/.venv/lib/python3.11/site-packages/requests/api.py:73: in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:59: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:575: in request
+    prep = self.prepare_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:484: in prepare_request
+    p.prepare(
+/root/.venv/lib/python3.11/site-packages/requests/models.py:367: in prepare
+    self.prepare_url(url, params)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <PreparedRequest [GET]>, url = '/api/categories', params = OrderedDict()
+
+    def prepare_url(self, url, params):
+        """Prepares the given HTTP URL."""
+        #: Accept objects that have string representations.
+        #: We're unable to blindly call unicode/str functions
+        #: as this will include the bytestring indicator (b'')
+        #: on python 3.x.
+        #: https://github.com/psf/requests/pull/2238
+        if isinstance(url, bytes):
+            url = url.decode("utf8")
+        else:
+            url = str(url)
+    
+        # Remove leading whitespaces from url
+        url = url.lstrip()
+    
+        # Don't do any URL preparation for non-HTTP schemes like `mailto`,
+        # `data` etc to work around exceptions from `url_parse`, which
+        # handles RFC 3986 only.
+        if ":" in url and not url.lower().startswith("http"):
+            self.url = url
+            return
+    
+        # Support for unicode domain names and paths.
+        try:
+            scheme, auth, host, port, path, query, fragment = parse_url(url)
+        except LocationParseError as e:
+            raise InvalidURL(*e.args)
+    
+        if not scheme:
+>           raise MissingSchema(
+                f"Invalid URL {url!r}: No scheme supplied. "
+                f"Perhaps you meant https://{url}?"
+            )
+E           requests.exceptions.MissingSchema: Invalid URL '/api/categories': No scheme supplied. Perhaps you meant https:///api/categories?
+
+/root/.venv/lib/python3.11/site-packages/requests/models.py:438: MissingSchema
+___________ TestHealthAndBasicAPIs.test_multi_item_listings_endpoint ___________
+
+self = <tests.test_phase2_mobile_fees.TestHealthAndBasicAPIs object at 0xfd4a2d3f5250>
+
+    def test_multi_item_listings_endpoint(self):
+        """Verify multi-item listings endpoint works"""
+>       response = requests.get(f"{BASE_URL}/api/multi-item-listings")
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_phase2_mobile_fees.py:148: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/root/.venv/lib/python3.11/site-packages/requests/api.py:73: in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:59: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:575: in request
+    prep = self.prepare_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:484: in prepare_request
+    p.prepare(
+/root/.venv/lib/python3.11/site-packages/requests/models.py:367: in prepare
+    self.prepare_url(url, params)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <PreparedRequest [GET]>, url = '/api/multi-item-listings'
+params = OrderedDict()
+
+    def prepare_url(self, url, params):
+        """Prepares the given HTTP URL."""
+        #: Accept objects that have string representations.
+        #: We're unable to blindly call unicode/str functions
+        #: as this will include the bytestring indicator (b'')
+        #: on python 3.x.
+        #: https://github.com/psf/requests/pull/2238
+        if isinstance(url, bytes):
+            url = url.decode("utf8")
+        else:
+            url = str(url)
+    
+        # Remove leading whitespaces from url
+        url = url.lstrip()
+    
+        # Don't do any URL preparation for non-HTTP schemes like `mailto`,
+        # `data` etc to work around exceptions from `url_parse`, which
+        # handles RFC 3986 only.
+        if ":" in url and not url.lower().startswith("http"):
+            self.url = url
+            return
+    
+        # Support for unicode domain names and paths.
+        try:
+            scheme, auth, host, port, path, query, fragment = parse_url(url)
+        except LocationParseError as e:
+            raise InvalidURL(*e.args)
+    
+        if not scheme:
+>           raise MissingSchema(
+                f"Invalid URL {url!r}: No scheme supplied. "
+                f"Perhaps you meant https://{url}?"
+            )
+E           requests.exceptions.MissingSchema: Invalid URL '/api/multi-item-listings': No scheme supplied. Perhaps you meant https:///api/multi-item-listings?
+
+/root/.venv/lib/python3.11/site-packages/requests/models.py:438: MissingSchema
+_______ TestFeeCalculationLogic.test_premium_tier_buyer_fee_calculation ________
+
+self = <tests.test_phase2_mobile_fees.TestFeeCalculationLogic object at 0xfd4a2d3f4690>
+
+    def test_premium_tier_buyer_fee_calculation(self):
+        """Premium tier: 3.5% buyer premium (1.5% discount from 5%)"""
+        test_cases = [
+            (1000, 35),      # $1,000 -> $35
+            (10000, 350),    # $10,000 -> $350
+            (100000, 3500),  # $100,000 -> $3,500
+            (500000, 17500), # $500,000 -> $17,500
+        ]
+    
+        for hammer_price, expected_fee in test_cases:
+            calculated_fee = hammer_price * 0.035
+>           assert calculated_fee == expected_fee, \
+                f"Premium tier buyer fee for ${hammer_price}: expected ${expected_fee}, got ${calculated_fee}"
+E           AssertionError: Premium tier buyer fee for $10000: expected $350, got $350.00000000000006
+E           assert 350.00000000000006 == 350
+
+tests/test_phase2_mobile_fees.py:204: AssertionError
+__________ TestPowerBidsRemoval.test_power_bids_endpoint_returns_404 ___________
+
+self = <tests.test_subscription_pivot.TestPowerBidsRemoval object at 0xfd4a2d3dbcd0>
+
+    def test_power_bids_endpoint_returns_404(self):
+        """Power Bids (monster bids) endpoint should return 404 Not Found"""
+>       response = requests.post(
+            f"{BASE_URL}/api/bids/monster",
+            params={"listing_id": "test-listing", "amount": 100}
+        )
+
+tests/test_subscription_pivot.py:20: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/root/.venv/lib/python3.11/site-packages/requests/api.py:115: in post
+    return request("post", url, data=data, json=json, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:59: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:575: in request
+    prep = self.prepare_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:484: in prepare_request
+    p.prepare(
+/root/.venv/lib/python3.11/site-packages/requests/models.py:367: in prepare
+    self.prepare_url(url, params)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <PreparedRequest [POST]>, url = '/api/bids/monster'
+params = OrderedDict([('listing_id', 'test-listing'), ('amount', 100)])
+
+    def prepare_url(self, url, params):
+        """Prepares the given HTTP URL."""
+        #: Accept objects that have string representations.
+        #: We're unable to blindly call unicode/str functions
+        #: as this will include the bytestring indicator (b'')
+        #: on python 3.x.
+        #: https://github.com/psf/requests/pull/2238
+        if isinstance(url, bytes):
+            url = url.decode("utf8")
+        else:
+            url = str(url)
+    
+        # Remove leading whitespaces from url
+        url = url.lstrip()
+    
+        # Don't do any URL preparation for non-HTTP schemes like `mailto`,
+        # `data` etc to work around exceptions from `url_parse`, which
+        # handles RFC 3986 only.
+        if ":" in url and not url.lower().startswith("http"):
+            self.url = url
+            return
+    
+        # Support for unicode domain names and paths.
+        try:
+            scheme, auth, host, port, path, query, fragment = parse_url(url)
+        except LocationParseError as e:
+            raise InvalidURL(*e.args)
+    
+        if not scheme:
+>           raise MissingSchema(
+                f"Invalid URL {url!r}: No scheme supplied. "
+                f"Perhaps you meant https://{url}?"
+            )
+E           requests.exceptions.MissingSchema: Invalid URL '/api/bids/monster': No scheme supplied. Perhaps you meant https:///api/bids/monster?
+
+/root/.venv/lib/python3.11/site-packages/requests/models.py:438: MissingSchema
+_____ TestSubscriptionBenefits.test_subscription_benefits_endpoint_success _____
+
+self = <tests.test_subscription_pivot.TestSubscriptionBenefits object at 0xfd4a2d3d8950>
+
+    def test_subscription_benefits_endpoint_success(self):
+        """Subscription benefits endpoint should return 200"""
+>       response = requests.get(f"{BASE_URL}/api/fees/subscription-benefits")
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_subscription_pivot.py:33: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/root/.venv/lib/python3.11/site-packages/requests/api.py:73: in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:59: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:575: in request
+    prep = self.prepare_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:484: in prepare_request
+    p.prepare(
+/root/.venv/lib/python3.11/site-packages/requests/models.py:367: in prepare
+    self.prepare_url(url, params)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <PreparedRequest [GET]>, url = '/api/fees/subscription-benefits'
+params = OrderedDict()
+
+    def prepare_url(self, url, params):
+        """Prepares the given HTTP URL."""
+        #: Accept objects that have string representations.
+        #: We're unable to blindly call unicode/str functions
+        #: as this will include the bytestring indicator (b'')
+        #: on python 3.x.
+        #: https://github.com/psf/requests/pull/2238
+        if isinstance(url, bytes):
+            url = url.decode("utf8")
+        else:
+            url = str(url)
+    
+        # Remove leading whitespaces from url
+        url = url.lstrip()
+    
+        # Don't do any URL preparation for non-HTTP schemes like `mailto`,
+        # `data` etc to work around exceptions from `url_parse`, which
+        # handles RFC 3986 only.
+        if ":" in url and not url.lower().startswith("http"):
+            self.url = url
+            return
+    
+        # Support for unicode domain names and paths.
+        try:
+            scheme, auth, host, port, path, query, fragment = parse_url(url)
+        except LocationParseError as e:
+            raise InvalidURL(*e.args)
+    
+        if not scheme:
+>           raise MissingSchema(
+                f"Invalid URL {url!r}: No scheme supplied. "
+                f"Perhaps you meant https://{url}?"
+            )
+E           requests.exceptions.MissingSchema: Invalid URL '/api/fees/subscription-benefits': No scheme supplied. Perhaps you meant https:///api/fees/subscription-benefits?
+
+/root/.venv/lib/python3.11/site-packages/requests/models.py:438: MissingSchema
+______ TestSubscriptionBenefits.test_subscription_benefits_has_all_tiers _______
+
+self = <tests.test_subscription_pivot.TestSubscriptionBenefits object at 0xfd4a2d3d8310>
+
+    def test_subscription_benefits_has_all_tiers(self):
+        """Should have free, premium, and vip tiers"""
+>       response = requests.get(f"{BASE_URL}/api/fees/subscription-benefits")
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_subscription_pivot.py:41: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/root/.venv/lib/python3.11/site-packages/requests/api.py:73: in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:59: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:575: in request
+    prep = self.prepare_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:484: in prepare_request
+    p.prepare(
+/root/.venv/lib/python3.11/site-packages/requests/models.py:367: in prepare
+    self.prepare_url(url, params)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <PreparedRequest [GET]>, url = '/api/fees/subscription-benefits'
+params = OrderedDict()
+
+    def prepare_url(self, url, params):
+        """Prepares the given HTTP URL."""
+        #: Accept objects that have string representations.
+        #: We're unable to blindly call unicode/str functions
+        #: as this will include the bytestring indicator (b'')
+        #: on python 3.x.
+        #: https://github.com/psf/requests/pull/2238
+        if isinstance(url, bytes):
+            url = url.decode("utf8")
+        else:
+            url = str(url)
+    
+        # Remove leading whitespaces from url
+        url = url.lstrip()
+    
+        # Don't do any URL preparation for non-HTTP schemes like `mailto`,
+        # `data` etc to work around exceptions from `url_parse`, which
+        # handles RFC 3986 only.
+        if ":" in url and not url.lower().startswith("http"):
+            self.url = url
+            return
+    
+        # Support for unicode domain names and paths.
+        try:
+            scheme, auth, host, port, path, query, fragment = parse_url(url)
+        except LocationParseError as e:
+            raise InvalidURL(*e.args)
+    
+        if not scheme:
+>           raise MissingSchema(
+                f"Invalid URL {url!r}: No scheme supplied. "
+                f"Perhaps you meant https://{url}?"
+            )
+E           requests.exceptions.MissingSchema: Invalid URL '/api/fees/subscription-benefits': No scheme supplied. Perhaps you meant https:///api/fees/subscription-benefits?
+
+/root/.venv/lib/python3.11/site-packages/requests/models.py:438: MissingSchema
+_____________ TestSubscriptionBenefits.test_premium_yearly_pricing _____________
+
+self = <tests.test_subscription_pivot.TestSubscriptionBenefits object at 0xfd4a2d3d9110>
+
+    def test_premium_yearly_pricing(self):
+        """Premium tier should show $99.99/year"""
+>       response = requests.get(f"{BASE_URL}/api/fees/subscription-benefits")
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_subscription_pivot.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/root/.venv/lib/python3.11/site-packages/requests/api.py:73: in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:59: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:575: in request
+    prep = self.prepare_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:484: in prepare_request
+    p.prepare(
+/root/.venv/lib/python3.11/site-packages/requests/models.py:367: in prepare
+    self.prepare_url(url, params)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <PreparedRequest [GET]>, url = '/api/fees/subscription-benefits'
+params = OrderedDict()
+
+    def prepare_url(self, url, params):
+        """Prepares the given HTTP URL."""
+        #: Accept objects that have string representations.
+        #: We're unable to blindly call unicode/str functions
+        #: as this will include the bytestring indicator (b'')
+        #: on python 3.x.
+        #: https://github.com/psf/requests/pull/2238
+        if isinstance(url, bytes):
+            url = url.decode("utf8")
+        else:
+            url = str(url)
+    
+        # Remove leading whitespaces from url
+        url = url.lstrip()
+    
+        # Don't do any URL preparation for non-HTTP schemes like `mailto`,
+        # `data` etc to work around exceptions from `url_parse`, which
+        # handles RFC 3986 only.
+        if ":" in url and not url.lower().startswith("http"):
+            self.url = url
+            return
+    
+        # Support for unicode domain names and paths.
+        try:
+            scheme, auth, host, port, path, query, fragment = parse_url(url)
+        except LocationParseError as e:
+            raise InvalidURL(*e.args)
+    
+        if not scheme:
+>           raise MissingSchema(
+                f"Invalid URL {url!r}: No scheme supplied. "
+                f"Perhaps you meant https://{url}?"
+            )
+E           requests.exceptions.MissingSchema: Invalid URL '/api/fees/subscription-benefits': No scheme supplied. Perhaps you meant https:///api/fees/subscription-benefits?
+
+/root/.venv/lib/python3.11/site-packages/requests/models.py:438: MissingSchema
+_______________ TestSubscriptionBenefits.test_vip_yearly_pricing _______________
+
+self = <tests.test_subscription_pivot.TestSubscriptionBenefits object at 0xfd4a2d3d8fd0>
+
+    def test_vip_yearly_pricing(self):
+        """VIP tier should show $299.99/year"""
+>       response = requests.get(f"{BASE_URL}/api/fees/subscription-benefits")
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_subscription_pivot.py:63: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/root/.venv/lib/python3.11/site-packages/requests/api.py:73: in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:59: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:575: in request
+    prep = self.prepare_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:484: in prepare_request
+    p.prepare(
+/root/.venv/lib/python3.11/site-packages/requests/models.py:367: in prepare
+    self.prepare_url(url, params)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <PreparedRequest [GET]>, url = '/api/fees/subscription-benefits'
+params = OrderedDict()
+
+    def prepare_url(self, url, params):
+        """Prepares the given HTTP URL."""
+        #: Accept objects that have string representations.
+        #: We're unable to blindly call unicode/str functions
+        #: as this will include the bytestring indicator (b'')
+        #: on python 3.x.
+        #: https://github.com/psf/requests/pull/2238
+        if isinstance(url, bytes):
+            url = url.decode("utf8")
+        else:
+            url = str(url)
+    
+        # Remove leading whitespaces from url
+        url = url.lstrip()
+    
+        # Don't do any URL preparation for non-HTTP schemes like `mailto`,
+        # `data` etc to work around exceptions from `url_parse`, which
+        # handles RFC 3986 only.
+        if ":" in url and not url.lower().startswith("http"):
+            self.url = url
+            return
+    
+        # Support for unicode domain names and paths.
+        try:
+            scheme, auth, host, port, path, query, fragment = parse_url(url)
+        except LocationParseError as e:
+            raise InvalidURL(*e.args)
+    
+        if not scheme:
+>           raise MissingSchema(
+                f"Invalid URL {url!r}: No scheme supplied. "
+                f"Perhaps you meant https://{url}?"
+            )
+E           requests.exceptions.MissingSchema: Invalid URL '/api/fees/subscription-benefits': No scheme supplied. Perhaps you meant https:///api/fees/subscription-benefits?
+
+/root/.venv/lib/python3.11/site-packages/requests/models.py:438: MissingSchema
+____________________ TestFeePercentages.test_free_tier_fees ____________________
+
+self = <tests.test_subscription_pivot.TestFeePercentages object at 0xfd4a2d3daf10>
+
+    def test_free_tier_fees(self):
+        """Free tier: 4% seller / 5% buyer"""
+>       response = requests.get(f"{BASE_URL}/api/fees/subscription-benefits")
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_subscription_pivot.py:78: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/root/.venv/lib/python3.11/site-packages/requests/api.py:73: in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:59: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:575: in request
+    prep = self.prepare_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:484: in prepare_request
+    p.prepare(
+/root/.venv/lib/python3.11/site-packages/requests/models.py:367: in prepare
+    self.prepare_url(url, params)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <PreparedRequest [GET]>, url = '/api/fees/subscription-benefits'
+params = OrderedDict()
+
+    def prepare_url(self, url, params):
+        """Prepares the given HTTP URL."""
+        #: Accept objects that have string representations.
+        #: We're unable to blindly call unicode/str functions
+        #: as this will include the bytestring indicator (b'')
+        #: on python 3.x.
+        #: https://github.com/psf/requests/pull/2238
+        if isinstance(url, bytes):
+            url = url.decode("utf8")
+        else:
+            url = str(url)
+    
+        # Remove leading whitespaces from url
+        url = url.lstrip()
+    
+        # Don't do any URL preparation for non-HTTP schemes like `mailto`,
+        # `data` etc to work around exceptions from `url_parse`, which
+        # handles RFC 3986 only.
+        if ":" in url and not url.lower().startswith("http"):
+            self.url = url
+            return
+    
+        # Support for unicode domain names and paths.
+        try:
+            scheme, auth, host, port, path, query, fragment = parse_url(url)
+        except LocationParseError as e:
+            raise InvalidURL(*e.args)
+    
+        if not scheme:
+>           raise MissingSchema(
+                f"Invalid URL {url!r}: No scheme supplied. "
+                f"Perhaps you meant https://{url}?"
+            )
+E           requests.exceptions.MissingSchema: Invalid URL '/api/fees/subscription-benefits': No scheme supplied. Perhaps you meant https:///api/fees/subscription-benefits?
+
+/root/.venv/lib/python3.11/site-packages/requests/models.py:438: MissingSchema
+__________________ TestFeePercentages.test_premium_tier_fees ___________________
+
+self = <tests.test_subscription_pivot.TestFeePercentages object at 0xfd4a2d44fb90>
+
+    def test_premium_tier_fees(self):
+        """Premium tier: 2.5% seller / 3.5% buyer"""
+>       response = requests.get(f"{BASE_URL}/api/fees/subscription-benefits")
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_subscription_pivot.py:88: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/root/.venv/lib/python3.11/site-packages/requests/api.py:73: in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:59: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:575: in request
+    prep = self.prepare_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:484: in prepare_request
+    p.prepare(
+/root/.venv/lib/python3.11/site-packages/requests/models.py:367: in prepare
+    self.prepare_url(url, params)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <PreparedRequest [GET]>, url = '/api/fees/subscription-benefits'
+params = OrderedDict()
+
+    def prepare_url(self, url, params):
+        """Prepares the given HTTP URL."""
+        #: Accept objects that have string representations.
+        #: We're unable to blindly call unicode/str functions
+        #: as this will include the bytestring indicator (b'')
+        #: on python 3.x.
+        #: https://github.com/psf/requests/pull/2238
+        if isinstance(url, bytes):
+            url = url.decode("utf8")
+        else:
+            url = str(url)
+    
+        # Remove leading whitespaces from url
+        url = url.lstrip()
+    
+        # Don't do any URL preparation for non-HTTP schemes like `mailto`,
+        # `data` etc to work around exceptions from `url_parse`, which
+        # handles RFC 3986 only.
+        if ":" in url and not url.lower().startswith("http"):
+            self.url = url
+            return
+    
+        # Support for unicode domain names and paths.
+        try:
+            scheme, auth, host, port, path, query, fragment = parse_url(url)
+        except LocationParseError as e:
+            raise InvalidURL(*e.args)
+    
+        if not scheme:
+>           raise MissingSchema(
+                f"Invalid URL {url!r}: No scheme supplied. "
+                f"Perhaps you meant https://{url}?"
+            )
+E           requests.exceptions.MissingSchema: Invalid URL '/api/fees/subscription-benefits': No scheme supplied. Perhaps you meant https:///api/fees/subscription-benefits?
+
+/root/.venv/lib/python3.11/site-packages/requests/models.py:438: MissingSchema
+____________________ TestFeePercentages.test_vip_tier_fees _____________________
+
+self = <tests.test_subscription_pivot.TestFeePercentages object at 0xfd4a2d44fad0>
+
+    def test_vip_tier_fees(self):
+        """VIP tier: 2% seller / 3% buyer"""
+>       response = requests.get(f"{BASE_URL}/api/fees/subscription-benefits")
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_subscription_pivot.py:98: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/root/.venv/lib/python3.11/site-packages/requests/api.py:73: in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:59: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:575: in request
+    prep = self.prepare_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:484: in prepare_request
+    p.prepare(
+/root/.venv/lib/python3.11/site-packages/requests/models.py:367: in prepare
+    self.prepare_url(url, params)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <PreparedRequest [GET]>, url = '/api/fees/subscription-benefits'
+params = OrderedDict()
+
+    def prepare_url(self, url, params):
+        """Prepares the given HTTP URL."""
+        #: Accept objects that have string representations.
+        #: We're unable to blindly call unicode/str functions
+        #: as this will include the bytestring indicator (b'')
+        #: on python 3.x.
+        #: https://github.com/psf/requests/pull/2238
+        if isinstance(url, bytes):
+            url = url.decode("utf8")
+        else:
+            url = str(url)
+    
+        # Remove leading whitespaces from url
+        url = url.lstrip()
+    
+        # Don't do any URL preparation for non-HTTP schemes like `mailto`,
+        # `data` etc to work around exceptions from `url_parse`, which
+        # handles RFC 3986 only.
+        if ":" in url and not url.lower().startswith("http"):
+            self.url = url
+            return
+    
+        # Support for unicode domain names and paths.
+        try:
+            scheme, auth, host, port, path, query, fragment = parse_url(url)
+        except LocationParseError as e:
+            raise InvalidURL(*e.args)
+    
+        if not scheme:
+>           raise MissingSchema(
+                f"Invalid URL {url!r}: No scheme supplied. "
+                f"Perhaps you meant https://{url}?"
+            )
+E           requests.exceptions.MissingSchema: Invalid URL '/api/fees/subscription-benefits': No scheme supplied. Perhaps you meant https:///api/fees/subscription-benefits?
+
+/root/.venv/lib/python3.11/site-packages/requests/models.py:438: MissingSchema
+___________ TestFeeCalculation.test_buyer_fee_calculation_free_tier ____________
+
+self = <tests.test_subscription_pivot.TestFeeCalculation object at 0xfd4a2d58ca50>
+
+    def test_buyer_fee_calculation_free_tier(self):
+        """Test buyer fee calculation for free tier (5%)"""
+>       response = requests.get(
+            f"{BASE_URL}/api/fees/calculate-buyer-cost",
+            params={"hammer_price": 1000, "tier": "free"}
+        )
+
+tests/test_subscription_pivot.py:112: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/root/.venv/lib/python3.11/site-packages/requests/api.py:73: in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:59: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:575: in request
+    prep = self.prepare_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:484: in prepare_request
+    p.prepare(
+/root/.venv/lib/python3.11/site-packages/requests/models.py:367: in prepare
+    self.prepare_url(url, params)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <PreparedRequest [GET]>, url = '/api/fees/calculate-buyer-cost'
+params = OrderedDict([('hammer_price', 1000), ('tier', 'free')])
+
+    def prepare_url(self, url, params):
+        """Prepares the given HTTP URL."""
+        #: Accept objects that have string representations.
+        #: We're unable to blindly call unicode/str functions
+        #: as this will include the bytestring indicator (b'')
+        #: on python 3.x.
+        #: https://github.com/psf/requests/pull/2238
+        if isinstance(url, bytes):
+            url = url.decode("utf8")
+        else:
+            url = str(url)
+    
+        # Remove leading whitespaces from url
+        url = url.lstrip()
+    
+        # Don't do any URL preparation for non-HTTP schemes like `mailto`,
+        # `data` etc to work around exceptions from `url_parse`, which
+        # handles RFC 3986 only.
+        if ":" in url and not url.lower().startswith("http"):
+            self.url = url
+            return
+    
+        # Support for unicode domain names and paths.
+        try:
+            scheme, auth, host, port, path, query, fragment = parse_url(url)
+        except LocationParseError as e:
+            raise InvalidURL(*e.args)
+    
+        if not scheme:
+>           raise MissingSchema(
+                f"Invalid URL {url!r}: No scheme supplied. "
+                f"Perhaps you meant https://{url}?"
+            )
+E           requests.exceptions.MissingSchema: Invalid URL '/api/fees/calculate-buyer-cost': No scheme supplied. Perhaps you meant https:///api/fees/calculate-buyer-cost?
+
+/root/.venv/lib/python3.11/site-packages/requests/models.py:438: MissingSchema
+__________ TestFeeCalculation.test_buyer_fee_calculation_premium_tier __________
+
+self = <tests.test_subscription_pivot.TestFeeCalculation object at 0xfd4a2d58d210>
+
+    def test_buyer_fee_calculation_premium_tier(self):
+        """Test buyer fee calculation for premium tier (3.5%)"""
+>       response = requests.get(
+            f"{BASE_URL}/api/fees/calculate-buyer-cost",
+            params={"hammer_price": 1000, "tier": "premium"}
+        )
+
+tests/test_subscription_pivot.py:126: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/root/.venv/lib/python3.11/site-packages/requests/api.py:73: in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:59: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:575: in request
+    prep = self.prepare_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:484: in prepare_request
+    p.prepare(
+/root/.venv/lib/python3.11/site-packages/requests/models.py:367: in prepare
+    self.prepare_url(url, params)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <PreparedRequest [GET]>, url = '/api/fees/calculate-buyer-cost'
+params = OrderedDict([('hammer_price', 1000), ('tier', 'premium')])
+
+    def prepare_url(self, url, params):
+        """Prepares the given HTTP URL."""
+        #: Accept objects that have string representations.
+        #: We're unable to blindly call unicode/str functions
+        #: as this will include the bytestring indicator (b'')
+        #: on python 3.x.
+        #: https://github.com/psf/requests/pull/2238
+        if isinstance(url, bytes):
+            url = url.decode("utf8")
+        else:
+            url = str(url)
+    
+        # Remove leading whitespaces from url
+        url = url.lstrip()
+    
+        # Don't do any URL preparation for non-HTTP schemes like `mailto`,
+        # `data` etc to work around exceptions from `url_parse`, which
+        # handles RFC 3986 only.
+        if ":" in url and not url.lower().startswith("http"):
+            self.url = url
+            return
+    
+        # Support for unicode domain names and paths.
+        try:
+            scheme, auth, host, port, path, query, fragment = parse_url(url)
+        except LocationParseError as e:
+            raise InvalidURL(*e.args)
+    
+        if not scheme:
+>           raise MissingSchema(
+                f"Invalid URL {url!r}: No scheme supplied. "
+                f"Perhaps you meant https://{url}?"
+            )
+E           requests.exceptions.MissingSchema: Invalid URL '/api/fees/calculate-buyer-cost': No scheme supplied. Perhaps you meant https:///api/fees/calculate-buyer-cost?
+
+/root/.venv/lib/python3.11/site-packages/requests/models.py:438: MissingSchema
+____________ TestFeeCalculation.test_buyer_fee_calculation_vip_tier ____________
+
+self = <tests.test_subscription_pivot.TestFeeCalculation object at 0xfd4a2d58eed0>
+
+    def test_buyer_fee_calculation_vip_tier(self):
+        """Test buyer fee calculation for VIP tier (3%)"""
+>       response = requests.get(
+            f"{BASE_URL}/api/fees/calculate-buyer-cost",
+            params={"hammer_price": 1000, "tier": "vip"}
+        )
+
+tests/test_subscription_pivot.py:140: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/root/.venv/lib/python3.11/site-packages/requests/api.py:73: in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:59: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:575: in request
+    prep = self.prepare_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:484: in prepare_request
+    p.prepare(
+/root/.venv/lib/python3.11/site-packages/requests/models.py:367: in prepare
+    self.prepare_url(url, params)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <PreparedRequest [GET]>, url = '/api/fees/calculate-buyer-cost'
+params = OrderedDict([('hammer_price', 1000), ('tier', 'vip')])
+
+    def prepare_url(self, url, params):
+        """Prepares the given HTTP URL."""
+        #: Accept objects that have string representations.
+        #: We're unable to blindly call unicode/str functions
+        #: as this will include the bytestring indicator (b'')
+        #: on python 3.x.
+        #: https://github.com/psf/requests/pull/2238
+        if isinstance(url, bytes):
+            url = url.decode("utf8")
+        else:
+            url = str(url)
+    
+        # Remove leading whitespaces from url
+        url = url.lstrip()
+    
+        # Don't do any URL preparation for non-HTTP schemes like `mailto`,
+        # `data` etc to work around exceptions from `url_parse`, which
+        # handles RFC 3986 only.
+        if ":" in url and not url.lower().startswith("http"):
+            self.url = url
+            return
+    
+        # Support for unicode domain names and paths.
+        try:
+            scheme, auth, host, port, path, query, fragment = parse_url(url)
+        except LocationParseError as e:
+            raise InvalidURL(*e.args)
+    
+        if not scheme:
+>           raise MissingSchema(
+                f"Invalid URL {url!r}: No scheme supplied. "
+                f"Perhaps you meant https://{url}?"
+            )
+E           requests.exceptions.MissingSchema: Invalid URL '/api/fees/calculate-buyer-cost': No scheme supplied. Perhaps you meant https:///api/fees/calculate-buyer-cost?
+
+/root/.venv/lib/python3.11/site-packages/requests/models.py:438: MissingSchema
+___________ TestFeeCalculation.test_seller_fee_calculation_free_tier ___________
+
+self = <tests.test_subscription_pivot.TestFeeCalculation object at 0xfd4a2d58d390>
+
+    def test_seller_fee_calculation_free_tier(self):
+        """Test seller fee calculation for free tier (4%)"""
+>       response = requests.get(
+            f"{BASE_URL}/api/fees/calculate-seller-net",
+            params={"hammer_price": 1000, "tier": "free"}
+        )
+
+tests/test_subscription_pivot.py:154: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/root/.venv/lib/python3.11/site-packages/requests/api.py:73: in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:59: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:575: in request
+    prep = self.prepare_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:484: in prepare_request
+    p.prepare(
+/root/.venv/lib/python3.11/site-packages/requests/models.py:367: in prepare
+    self.prepare_url(url, params)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <PreparedRequest [GET]>, url = '/api/fees/calculate-seller-net'
+params = OrderedDict([('hammer_price', 1000), ('tier', 'free')])
+
+    def prepare_url(self, url, params):
+        """Prepares the given HTTP URL."""
+        #: Accept objects that have string representations.
+        #: We're unable to blindly call unicode/str functions
+        #: as this will include the bytestring indicator (b'')
+        #: on python 3.x.
+        #: https://github.com/psf/requests/pull/2238
+        if isinstance(url, bytes):
+            url = url.decode("utf8")
+        else:
+            url = str(url)
+    
+        # Remove leading whitespaces from url
+        url = url.lstrip()
+    
+        # Don't do any URL preparation for non-HTTP schemes like `mailto`,
+        # `data` etc to work around exceptions from `url_parse`, which
+        # handles RFC 3986 only.
+        if ":" in url and not url.lower().startswith("http"):
+            self.url = url
+            return
+    
+        # Support for unicode domain names and paths.
+        try:
+            scheme, auth, host, port, path, query, fragment = parse_url(url)
+        except LocationParseError as e:
+            raise InvalidURL(*e.args)
+    
+        if not scheme:
+>           raise MissingSchema(
+                f"Invalid URL {url!r}: No scheme supplied. "
+                f"Perhaps you meant https://{url}?"
+            )
+E           requests.exceptions.MissingSchema: Invalid URL '/api/fees/calculate-seller-net': No scheme supplied. Perhaps you meant https:///api/fees/calculate-seller-net?
+
+/root/.venv/lib/python3.11/site-packages/requests/models.py:438: MissingSchema
+_________ TestFeeCalculation.test_seller_fee_calculation_premium_tier __________
+
+self = <tests.test_subscription_pivot.TestFeeCalculation object at 0xfd4a2d58eb50>
+
+    def test_seller_fee_calculation_premium_tier(self):
+        """Test seller fee calculation for premium tier (2.5%)"""
+>       response = requests.get(
+            f"{BASE_URL}/api/fees/calculate-seller-net",
+            params={"hammer_price": 1000, "tier": "premium"}
+        )
+
+tests/test_subscription_pivot.py:169: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/root/.venv/lib/python3.11/site-packages/requests/api.py:73: in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:59: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:575: in request
+    prep = self.prepare_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:484: in prepare_request
+    p.prepare(
+/root/.venv/lib/python3.11/site-packages/requests/models.py:367: in prepare
+    self.prepare_url(url, params)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <PreparedRequest [GET]>, url = '/api/fees/calculate-seller-net'
+params = OrderedDict([('hammer_price', 1000), ('tier', 'premium')])
+
+    def prepare_url(self, url, params):
+        """Prepares the given HTTP URL."""
+        #: Accept objects that have string representations.
+        #: We're unable to blindly call unicode/str functions
+        #: as this will include the bytestring indicator (b'')
+        #: on python 3.x.
+        #: https://github.com/psf/requests/pull/2238
+        if isinstance(url, bytes):
+            url = url.decode("utf8")
+        else:
+            url = str(url)
+    
+        # Remove leading whitespaces from url
+        url = url.lstrip()
+    
+        # Don't do any URL preparation for non-HTTP schemes like `mailto`,
+        # `data` etc to work around exceptions from `url_parse`, which
+        # handles RFC 3986 only.
+        if ":" in url and not url.lower().startswith("http"):
+            self.url = url
+            return
+    
+        # Support for unicode domain names and paths.
+        try:
+            scheme, auth, host, port, path, query, fragment = parse_url(url)
+        except LocationParseError as e:
+            raise InvalidURL(*e.args)
+    
+        if not scheme:
+>           raise MissingSchema(
+                f"Invalid URL {url!r}: No scheme supplied. "
+                f"Perhaps you meant https://{url}?"
+            )
+E           requests.exceptions.MissingSchema: Invalid URL '/api/fees/calculate-seller-net': No scheme supplied. Perhaps you meant https:///api/fees/calculate-seller-net?
+
+/root/.venv/lib/python3.11/site-packages/requests/models.py:438: MissingSchema
+___________ TestFeeCalculation.test_seller_fee_calculation_vip_tier ____________
+
+self = <tests.test_subscription_pivot.TestFeeCalculation object at 0xfd4a2d58e250>
+
+    def test_seller_fee_calculation_vip_tier(self):
+        """Test seller fee calculation for VIP tier (2%)"""
+>       response = requests.get(
+            f"{BASE_URL}/api/fees/calculate-seller-net",
+            params={"hammer_price": 1000, "tier": "vip"}
+        )
+
+tests/test_subscription_pivot.py:184: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/root/.venv/lib/python3.11/site-packages/requests/api.py:73: in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:59: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:575: in request
+    prep = self.prepare_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:484: in prepare_request
+    p.prepare(
+/root/.venv/lib/python3.11/site-packages/requests/models.py:367: in prepare
+    self.prepare_url(url, params)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <PreparedRequest [GET]>, url = '/api/fees/calculate-seller-net'
+params = OrderedDict([('hammer_price', 1000), ('tier', 'vip')])
+
+    def prepare_url(self, url, params):
+        """Prepares the given HTTP URL."""
+        #: Accept objects that have string representations.
+        #: We're unable to blindly call unicode/str functions
+        #: as this will include the bytestring indicator (b'')
+        #: on python 3.x.
+        #: https://github.com/psf/requests/pull/2238
+        if isinstance(url, bytes):
+            url = url.decode("utf8")
+        else:
+            url = str(url)
+    
+        # Remove leading whitespaces from url
+        url = url.lstrip()
+    
+        # Don't do any URL preparation for non-HTTP schemes like `mailto`,
+        # `data` etc to work around exceptions from `url_parse`, which
+        # handles RFC 3986 only.
+        if ":" in url and not url.lower().startswith("http"):
+            self.url = url
+            return
+    
+        # Support for unicode domain names and paths.
+        try:
+            scheme, auth, host, port, path, query, fragment = parse_url(url)
+        except LocationParseError as e:
+            raise InvalidURL(*e.args)
+    
+        if not scheme:
+>           raise MissingSchema(
+                f"Invalid URL {url!r}: No scheme supplied. "
+                f"Perhaps you meant https://{url}?"
+            )
+E           requests.exceptions.MissingSchema: Invalid URL '/api/fees/calculate-seller-net': No scheme supplied. Perhaps you meant https:///api/fees/calculate-seller-net?
+
+/root/.venv/lib/python3.11/site-packages/requests/models.py:438: MissingSchema
+___________ TestAutoBidBotAvailability.test_premium_has_auto_bid_bot ___________
+
+self = <tests.test_subscription_pivot.TestAutoBidBotAvailability object at 0xfd4a2d58e090>
+
+    def test_premium_has_auto_bid_bot(self):
+        """Premium tier should include Auto-Bid Bot feature"""
+>       response = requests.get(f"{BASE_URL}/api/fees/subscription-benefits")
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_subscription_pivot.py:203: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/root/.venv/lib/python3.11/site-packages/requests/api.py:73: in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:59: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:575: in request
+    prep = self.prepare_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:484: in prepare_request
+    p.prepare(
+/root/.venv/lib/python3.11/site-packages/requests/models.py:367: in prepare
+    self.prepare_url(url, params)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <PreparedRequest [GET]>, url = '/api/fees/subscription-benefits'
+params = OrderedDict()
+
+    def prepare_url(self, url, params):
+        """Prepares the given HTTP URL."""
+        #: Accept objects that have string representations.
+        #: We're unable to blindly call unicode/str functions
+        #: as this will include the bytestring indicator (b'')
+        #: on python 3.x.
+        #: https://github.com/psf/requests/pull/2238
+        if isinstance(url, bytes):
+            url = url.decode("utf8")
+        else:
+            url = str(url)
+    
+        # Remove leading whitespaces from url
+        url = url.lstrip()
+    
+        # Don't do any URL preparation for non-HTTP schemes like `mailto`,
+        # `data` etc to work around exceptions from `url_parse`, which
+        # handles RFC 3986 only.
+        if ":" in url and not url.lower().startswith("http"):
+            self.url = url
+            return
+    
+        # Support for unicode domain names and paths.
+        try:
+            scheme, auth, host, port, path, query, fragment = parse_url(url)
+        except LocationParseError as e:
+            raise InvalidURL(*e.args)
+    
+        if not scheme:
+>           raise MissingSchema(
+                f"Invalid URL {url!r}: No scheme supplied. "
+                f"Perhaps you meant https://{url}?"
+            )
+E           requests.exceptions.MissingSchema: Invalid URL '/api/fees/subscription-benefits': No scheme supplied. Perhaps you meant https:///api/fees/subscription-benefits?
+
+/root/.venv/lib/python3.11/site-packages/requests/models.py:438: MissingSchema
+_____________ TestAutoBidBotAvailability.test_vip_has_auto_bid_bot _____________
+
+self = <tests.test_subscription_pivot.TestAutoBidBotAvailability object at 0xfd4a2d58f050>
+
+    def test_vip_has_auto_bid_bot(self):
+        """VIP tier should include Auto-Bid Bot feature"""
+>       response = requests.get(f"{BASE_URL}/api/fees/subscription-benefits")
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_subscription_pivot.py:214: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/root/.venv/lib/python3.11/site-packages/requests/api.py:73: in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:59: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:575: in request
+    prep = self.prepare_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:484: in prepare_request
+    p.prepare(
+/root/.venv/lib/python3.11/site-packages/requests/models.py:367: in prepare
+    self.prepare_url(url, params)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <PreparedRequest [GET]>, url = '/api/fees/subscription-benefits'
+params = OrderedDict()
+
+    def prepare_url(self, url, params):
+        """Prepares the given HTTP URL."""
+        #: Accept objects that have string representations.
+        #: We're unable to blindly call unicode/str functions
+        #: as this will include the bytestring indicator (b'')
+        #: on python 3.x.
+        #: https://github.com/psf/requests/pull/2238
+        if isinstance(url, bytes):
+            url = url.decode("utf8")
+        else:
+            url = str(url)
+    
+        # Remove leading whitespaces from url
+        url = url.lstrip()
+    
+        # Don't do any URL preparation for non-HTTP schemes like `mailto`,
+        # `data` etc to work around exceptions from `url_parse`, which
+        # handles RFC 3986 only.
+        if ":" in url and not url.lower().startswith("http"):
+            self.url = url
+            return
+    
+        # Support for unicode domain names and paths.
+        try:
+            scheme, auth, host, port, path, query, fragment = parse_url(url)
+        except LocationParseError as e:
+            raise InvalidURL(*e.args)
+    
+        if not scheme:
+>           raise MissingSchema(
+                f"Invalid URL {url!r}: No scheme supplied. "
+                f"Perhaps you meant https://{url}?"
+            )
+E           requests.exceptions.MissingSchema: Invalid URL '/api/fees/subscription-benefits': No scheme supplied. Perhaps you meant https:///api/fees/subscription-benefits?
+
+/root/.venv/lib/python3.11/site-packages/requests/models.py:438: MissingSchema
+__________ TestAutoBidBotAvailability.test_free_tier_no_auto_bid_bot ___________
+
+self = <tests.test_subscription_pivot.TestAutoBidBotAvailability object at 0xfd4a2d3c0250>
+
+    def test_free_tier_no_auto_bid_bot(self):
+        """Free tier should NOT include Auto-Bid Bot feature"""
+>       response = requests.get(f"{BASE_URL}/api/fees/subscription-benefits")
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_subscription_pivot.py:225: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/root/.venv/lib/python3.11/site-packages/requests/api.py:73: in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:59: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:575: in request
+    prep = self.prepare_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:484: in prepare_request
+    p.prepare(
+/root/.venv/lib/python3.11/site-packages/requests/models.py:367: in prepare
+    self.prepare_url(url, params)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <PreparedRequest [GET]>, url = '/api/fees/subscription-benefits'
+params = OrderedDict()
+
+    def prepare_url(self, url, params):
+        """Prepares the given HTTP URL."""
+        #: Accept objects that have string representations.
+        #: We're unable to blindly call unicode/str functions
+        #: as this will include the bytestring indicator (b'')
+        #: on python 3.x.
+        #: https://github.com/psf/requests/pull/2238
+        if isinstance(url, bytes):
+            url = url.decode("utf8")
+        else:
+            url = str(url)
+    
+        # Remove leading whitespaces from url
+        url = url.lstrip()
+    
+        # Don't do any URL preparation for non-HTTP schemes like `mailto`,
+        # `data` etc to work around exceptions from `url_parse`, which
+        # handles RFC 3986 only.
+        if ":" in url and not url.lower().startswith("http"):
+            self.url = url
+            return
+    
+        # Support for unicode domain names and paths.
+        try:
+            scheme, auth, host, port, path, query, fragment = parse_url(url)
+        except LocationParseError as e:
+            raise InvalidURL(*e.args)
+    
+        if not scheme:
+>           raise MissingSchema(
+                f"Invalid URL {url!r}: No scheme supplied. "
+                f"Perhaps you meant https://{url}?"
+            )
+E           requests.exceptions.MissingSchema: Invalid URL '/api/fees/subscription-benefits': No scheme supplied. Perhaps you meant https:///api/fees/subscription-benefits?
+
+/root/.venv/lib/python3.11/site-packages/requests/models.py:438: MissingSchema
+=============================== warnings summary ===============================
+../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+tests/test_phase3_disruptor_protocol.py::TestAuthentication::test_admin_login
+  /root/.venv/lib/python3.11/site-packages/_pytest/python.py:161: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_phase3_disruptor_protocol.py::TestAuthentication::test_admin_login returned <class 'str'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED backend/test_email_service.py::test_service_initialization - Failed: a...
+FAILED backend/test_email_service.py::test_data_builders - Failed: async def ...
+FAILED backend/test_email_service.py::test_send_email_validation - Failed: as...
+FAILED backend/test_email_service.py::test_simulated_send - Failed: async def...
+FAILED backend/test_email_service.py::test_bulk_email - Failed: async def fun...
+FAILED backend/test_email_service.py::test_helper_functions - Failed: async d...
+FAILED backend/test_email_service.py::test_retry_logic - Failed: async def fu...
+FAILED backend/test_email_service.py::test_template_configuration - Failed: a...
+FAILED backend/test_email_service.py::test_webhook_processing - Failed: async...
+FAILED backend/test_password_reset_email.py::test_password_reset_email_data
+FAILED bid_placement_test.py::test_bid_placement - Failed: async def function...
+FAILED sorting_test.py::test_sorting_fix - Failed: async def functions are no...
+FAILED tests/test_phase2_mobile_fees.py::TestNoCapFeeVerification::test_buyer_fees_100k_item_free_tier
+FAILED tests/test_phase2_mobile_fees.py::TestNoCapFeeVerification::test_seller_fees_100k_item_free_tier
+FAILED tests/test_phase2_mobile_fees.py::TestSubscriptionBenefitsAPI::test_subscription_benefits_endpoint
+FAILED tests/test_phase2_mobile_fees.py::TestHealthAndBasicAPIs::test_health_endpoint
+FAILED tests/test_phase2_mobile_fees.py::TestHealthAndBasicAPIs::test_categories_endpoint
+FAILED tests/test_phase2_mobile_fees.py::TestHealthAndBasicAPIs::test_multi_item_listings_endpoint
+FAILED tests/test_phase2_mobile_fees.py::TestFeeCalculationLogic::test_premium_tier_buyer_fee_calculation
+FAILED tests/test_subscription_pivot.py::TestPowerBidsRemoval::test_power_bids_endpoint_returns_404
+FAILED tests/test_subscription_pivot.py::TestSubscriptionBenefits::test_subscription_benefits_endpoint_success
+FAILED tests/test_subscription_pivot.py::TestSubscriptionBenefits::test_subscription_benefits_has_all_tiers
+FAILED tests/test_subscription_pivot.py::TestSubscriptionBenefits::test_premium_yearly_pricing
+FAILED tests/test_subscription_pivot.py::TestSubscriptionBenefits::test_vip_yearly_pricing
+FAILED tests/test_subscription_pivot.py::TestFeePercentages::test_free_tier_fees
+FAILED tests/test_subscription_pivot.py::TestFeePercentages::test_premium_tier_fees
+FAILED tests/test_subscription_pivot.py::TestFeePercentages::test_vip_tier_fees
+FAILED tests/test_subscription_pivot.py::TestFeeCalculation::test_buyer_fee_calculation_free_tier
+FAILED tests/test_subscription_pivot.py::TestFeeCalculation::test_buyer_fee_calculation_premium_tier
+FAILED tests/test_subscription_pivot.py::TestFeeCalculation::test_buyer_fee_calculation_vip_tier
+FAILED tests/test_subscription_pivot.py::TestFeeCalculation::test_seller_fee_calculation_free_tier
+FAILED tests/test_subscription_pivot.py::TestFeeCalculation::test_seller_fee_calculation_premium_tier
+FAILED tests/test_subscription_pivot.py::TestFeeCalculation::test_seller_fee_calculation_vip_tier
+FAILED tests/test_subscription_pivot.py::TestAutoBidBotAvailability::test_premium_has_auto_bid_bot
+FAILED tests/test_subscription_pivot.py::TestAutoBidBotAvailability::test_vip_has_auto_bid_bot
+FAILED tests/test_subscription_pivot.py::TestAutoBidBotAvailability::test_free_tier_no_auto_bid_bot
+ERROR backend/test_production_templates.py::test_authentication_template
+ERROR backend/test_production_templates.py::test_bidding_template
+ERROR backend/test_production_templates.py::test_auction_updates_template
+ERROR backend/test_production_templates.py::test_seller_notifications_template
+ERROR backend/test_production_templates.py::test_financial_template
+ERROR backend/test_production_templates.py::test_communication_template
+ERROR backend/test_production_templates.py::test_admin_template
+============= 36 failed, 19 passed, 2 warnings, 7 errors in 4.84s ============== were created by the main agent.
+-   **Known regressions**: None.
+
+**Credentials to test flow:**
+-   **Admin Email**: 
+-   **Admin Password**: 
+-   **Test User 1**:  (Individual Seller)
+-   **Test User 2**:  (Business Seller)
+-   **Test User Password**:  (for both test users)
+
+**What agent forgot to execute**
+-   **Lot Index Mobile Responsiveness on Detail Page**: The original handoff summary specified making the Lot Index sidebar on the  a collapsible drawer for mobile. The agent made the filter section on the  responsive, but not the lot list sidebar on the detail page. This task remains outstanding.</analysis>
