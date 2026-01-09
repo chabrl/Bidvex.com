@@ -13,151 +13,102 @@ Build a full-featured auction platform named BidVex with real-time bidding, subs
 - **SMS**: Twilio for verification
 - **AI Assistant**: OpenAI GPT-4 via Emergent LLM Key
 
-## Current Status: MASTER DIRECTIVE COMPLETED ✅
+## Current Status: PHASE 2 COMPLETED ✅
 
-### Completed Work (January 2026)
+---
 
-#### 1. Power Bids Feature Purge ✅
+## Phase 1 - MASTER DIRECTIVE (COMPLETED ✅)
+
+### 1. Power Bids Feature Purge ✅
 - Deleted `/app/frontend/src/components/PowerBidButton.js`
-- Removed PowerBidButton imports from:
-  - `ListingDetailPage.js`
-  - `MultiItemListingDetailPage.js`
+- Removed PowerBidButton imports from all pages
 - Removed `/api/bids/monster` endpoint from `server.py`
 - Removed `monster_bids_used` field from User model
-- Cleaned up leftover 'monster' references in toast messages
 
-#### 2. Yearly Billing Migration ✅
+### 2. Yearly Billing Migration ✅
 - **Premium Tier**: $99.99/year (was $9.99/month)
 - **VIP Tier**: $299.99/year (was $29.99/month)
 - Added "2 Months Free!" marketing message
-- Updated `ProfileSettingsPage.js` subscription table
-- Updated `SubscriptionManager.js` admin panel (365-day subscriptions)
-- Updated `/api/fees/subscription-benefits` endpoint
+- Added "BEST VALUE" badge on Premium plan
 
-#### 3. Tiered Fee Engine (NO CAP) ✅
-- **Free Tier**: 4% Seller Commission / 5% Buyer's Premium
-- **Premium Tier**: 2.5% Seller / 3.5% Buyer (1.5% reduction)
-- **VIP Tier**: 2% Seller / 3% Buyer (2% reduction)
-- Updated `services/fee_calculator.py`
-- Updated `calculate_buyer_fees()` and `calculate_seller_fees()` in server.py
-- Updated `SellerDashboard.js` to display correct commission rates
-
-#### 4. UI/UX Updates ✅
-- Added "BEST VALUE" badge on Premium plan header
-- Added Seller Tier Badges (`SellerTierBadge.js` component):
-  - Premium: Silver/Platinum shield theme
-  - VIP: Gold/Diamond crown theme
-- Displays on lot detail pages next to seller info
-- Updated subscription comparison table with new fee percentages
-
-#### 5. Previous Completed Work
-- Critical UI/UX visibility fixes (ghost text issues)
-- Seller Obligations flow (creation and display)
-- Fee Engine v1 and agreement persistence
-- Bilingual Legal pages (T&C, Privacy Policy)
-- Cookie consent banner
-- Data deletion endpoint (GDPR/PIPEDA)
-- Cascaded regional filters
+### 3. Tiered Fee Engine (NO CAP) ✅
+| Tier | Seller Commission | Buyer's Premium | Combined |
+|------|------------------|-----------------|----------|
+| Free | 4% | 5% | 9% |
+| Premium | 2.5% | 3.5% | 6% |
+| VIP | 2% | 3% | 5% |
 
 ---
 
-## P1 - Upcoming Tasks
+## Phase 2 - Mobile Optimization & Conversion Tools (COMPLETED ✅)
 
-### Lot Index Mobile Responsiveness
-- Convert sidebar to collapsible drawer on mobile viewports
-- Improve buyer experience on smaller devices
-- Affects: `MultiItemListingDetailPage.js`
+### 1. Mobile Responsive Lot Index ✅
+- **Implemented**: Collapsible Side Drawer for screens < 768px
+- **Trigger**: "Filters" button at top of mobile screen
+- **Contains**: Location (Country/Province/City), Category, Price Range, Sort By, Tax-Free Toggle
+- **Desktop**: Filters remain inline for viewport >= 768px
+- **File**: `LotsMarketplacePage.js` using Shadcn Sheet component
+
+### 2. Fee Savings Calculator ✅
+- **Placement**: Below subscription comparison table in Profile Settings
+- **Features**:
+  - Interactive slider ($1,000 - $500,000 range)
+  - Real-time calculations for all tiers
+  - ROI display showing subscription payback multiplier
+  - Insight message for free tier users
+- **Example Output**: "$50K volume → VIP saves $2,000/year (6.7x ROI)"
+- **File**: `ProfileSettingsPage.js` (FeeSavingsCalculator component)
+
+### 3. No-Cap Fee Verification ✅
+- Tested $100,000 item: $5,000 buyer premium (5%), $4,000 seller commission (4%)
+- Tested $500,000 item: $25,000 buyer premium (5%) - NO CAP applied
+- All calculations percentage-based with no maximum limit
+
+### 4. Seller Tier Badges ✅
+- **Premium Sellers**: Silver/Platinum shield badge
+- **VIP Sellers**: Gold/Diamond crown badge
+- **Display Location**: Next to seller name on lot detail pages
+- **File**: `SellerTierBadge.js` component
 
 ---
 
-## P2 - Future/Backlog Tasks
+## Upcoming Tasks (P2)
 
 ### RAG AI Indexing Update
 - Index AI assistant at individual item level
 - Enable specific lot queries
 
 ### Disruptor Protocol Features
-1. **Seller Trust Score**
-   - "BidVex Trusted Seller" badge
-   - Historical transaction analysis
-
-2. **Currency Switcher**
-   - CAD, USD, EUR support
-   - Backend conversion API
-   - Frontend header selector
-
-3. **High-Stakes Bidding UI**
-   - Pulsing timer in final minutes
-   - Visual tension cues
-
-4. **Public Bid History**
-   - Tab on lot detail pages
-   - Transparency feature
+1. **Seller Trust Score** - "BidVex Trusted Seller" badge
+2. **Currency Switcher** - CAD, USD, EUR with conversion API
+3. **High-Stakes Bidding UI** - Pulsing timer in final minutes
+4. **Public Bid History** - Transparency tab on lot pages
 
 ---
 
-## Key API Endpoints
+## Key Files Modified This Session
 
-### Fee Calculation
-- `GET /api/fees/subscription-benefits` - Public tier info
-- `GET /api/fee-calculator` - Calculate fees by tier
-- `POST /api/fees/calculate-buyer-cost` - Buyer total
-- `POST /api/fees/calculate-seller-net` - Seller payout
+### Phase 1 Files:
+- `backend/server.py` - Fee engine, subscription status, removed Power Bids
+- `backend/services/fee_calculator.py` - New percentage-based fees
+- `frontend/src/pages/ProfileSettingsPage.js` - Yearly pricing, fee table
+- `frontend/src/pages/SellerDashboard.js` - Updated commission display
+- `frontend/src/components/SellerTierBadge.js` - NEW component
 
-### Subscriptions
-- `GET /api/subscription/status` - User's current tier
-
-### Removed Endpoints
-- `POST /api/bids/monster` - **REMOVED** (Power Bids)
-
----
-
-## Database Schema Updates
-
-### Users Collection
-- Removed: `monster_bids_used: Dict[str, int]`
-- Updated subscription fields for yearly billing
-
-### Fee Structure (in multi_item_listings)
-```json
-{
-  "buyer_premium_percentage": 5.0,
-  "seller_commission_percentage": 4.0
-}
-```
+### Phase 2 Files:
+- `frontend/src/pages/LotsMarketplacePage.js` - Mobile filter drawer (Sheet component)
+- `frontend/src/pages/ProfileSettingsPage.js` - FeeSavingsCalculator component
+- `frontend/src/pages/MultiItemListingDetailPage.js` - Seller tier badge integration
 
 ---
+
+## Test Reports
+- `/app/test_reports/iteration_1.json` - Phase 1 MASTER DIRECTIVE tests
+- `/app/test_reports/iteration_2.json` - Phase 2 Mobile & Calculator tests
 
 ## Test Credentials
 - **Admin**: `charbel@admin.bazario.com` / `Admin123!`
-- **Test User 1**: `pioneer@bidvextest.com` (Individual Seller)
-- **Test User 2**: `challenger@bidvextest.com` (Business Seller)
-- **Password**: `test123`
-
----
-
-## Tech Stack
-- Frontend: React 18, Tailwind CSS, Shadcn/UI
-- Backend: FastAPI, Python 3.11
-- Database: MongoDB (Motor async driver)
-- Auth: JWT tokens
-- Payments: Stripe
-- Email: SendGrid
-- SMS: Twilio
-- AI: OpenAI GPT-4 (Emergent LLM Key)
-
----
-
-## Files Modified in This Session
-1. `/app/backend/server.py` - Fee engine, subscription status, removed Power Bids
-2. `/app/backend/services/fee_calculator.py` - New percentage-based fees
-3. `/app/frontend/src/pages/ProfileSettingsPage.js` - Yearly pricing, fee table
-4. `/app/frontend/src/pages/ListingDetailPage.js` - Removed PowerBid import
-5. `/app/frontend/src/pages/MultiItemListingDetailPage.js` - Removed PowerBid import, added SellerTierBadge
-6. `/app/frontend/src/pages/SellerDashboard.js` - Updated commission display
-7. `/app/frontend/src/pages/admin/SubscriptionManager.js` - Yearly revenue calc
-8. `/app/frontend/src/components/SellerTierBadge.js` - NEW component
-9. `/app/frontend/src/components/PowerBidButton.js` - DELETED
+- **Test Users**: `pioneer@bidvextest.com`, `challenger@bidvextest.com` / `test123`
 
 ---
 
