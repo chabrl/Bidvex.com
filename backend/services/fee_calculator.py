@@ -1,32 +1,36 @@
 """
 BidVex Fee & Cost Calculation Engine
 Handles buyer premiums, seller commissions, taxes, and subscription-based discounts
+Updated: Percentage-based fees with NO maximum cap
 """
 
 from typing import Dict, Tuple
 from decimal import Decimal
 
-# Global fee constants
+# Global fee constants - No cap, percentage-based
 DEFAULT_BUYER_PREMIUM = Decimal("0.05")  # 5%
-DEFAULT_SELLER_COMMISSION = Decimal("0.045")  # 4.5%
+DEFAULT_SELLER_COMMISSION = Decimal("0.04")  # 4%
 
-# Subscription tier fee structure
+# Subscription tier fee structure - Updated for yearly billing
+# Free: 4% Seller / 5% Buyer
+# Premium: 2.5% Seller / 3.5% Buyer (1.5% reduction)
+# VIP: 2% Seller / 3% Buyer (2% reduction)
 SUBSCRIPTION_FEES = {
     "free": {
         "buyer_premium": Decimal("0.05"),  # 5%
-        "seller_commission": Decimal("0.045")  # 4.5%
+        "seller_commission": Decimal("0.04")  # 4%
     },
     "starter": {
         "buyer_premium": Decimal("0.05"),  # 5%
-        "seller_commission": Decimal("0.045")  # 4.5%
+        "seller_commission": Decimal("0.04")  # 4%
     },
     "premium": {
-        "buyer_premium": Decimal("0.05"),  # 5%
-        "seller_commission": Decimal("0.04")  # 4.0% (0.5% discount)
+        "buyer_premium": Decimal("0.035"),  # 3.5% (1.5% discount)
+        "seller_commission": Decimal("0.025")  # 2.5% (1.5% discount)
     },
     "vip": {
-        "buyer_premium": Decimal("0.04"),  # 4.0%
-        "seller_commission": Decimal("0.04")  # 4.0%
+        "buyer_premium": Decimal("0.03"),  # 3.0% (2% discount)
+        "seller_commission": Decimal("0.02")  # 2.0% (2% discount)
     }
 }
 
