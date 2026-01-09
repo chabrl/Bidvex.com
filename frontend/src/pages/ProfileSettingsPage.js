@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Switch } from '../components/ui/switch';
 import { toast } from 'sonner';
-import { User, CreditCard, Bell, MapPin, Loader2, Plus, Trash2, Globe, DollarSign, Crown, Star, Check, X, Zap, Bot, TrendingUp, Shield, Phone } from 'lucide-react';
+import { User, CreditCard, Bell, MapPin, Loader2, Plus, Trash2, Globe, DollarSign, Crown, Star, Check, X, Bot, TrendingUp, Shield, Phone } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import AvatarUpload from '../components/AvatarUpload';
