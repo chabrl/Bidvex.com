@@ -9,13 +9,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Switch } from '../components/ui/switch';
 import { toast } from 'sonner';
-import { User, CreditCard, Bell, MapPin, Loader2, Plus, Trash2, Globe, DollarSign, Crown, Star, Check, X, Bot, TrendingUp, Shield, Phone, Calculator } from 'lucide-react';
+import { User, CreditCard, Bell, MapPin, Loader2, Plus, Trash2, Globe, DollarSign, Crown, Star, Check, X, Bot, TrendingUp, Shield, Phone } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { Slider } from '../components/ui/slider';
 import AvatarUpload from '../components/AvatarUpload';
 import SubscriptionBadge from '../components/SubscriptionBadge';
 import TrustBadge from '../components/TrustBadge';
+import TrendySubscriptionCards from '../components/TrendySubscriptionCards';
+import PersonalizedSavingsCalculator from '../components/PersonalizedSavingsCalculator';
 import { useTranslation } from 'react-i18next';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
