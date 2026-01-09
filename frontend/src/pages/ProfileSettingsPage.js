@@ -523,21 +523,26 @@ const ProfileSettingsPage = () => {
                             <div className="flex flex-col items-center gap-2">
                               <SubscriptionBadge tier="free" size="small" />
                               <span className="text-lg font-bold">$0</span>
-                              <span className="text-xs text-muted-foreground">/month</span>
+                              <span className="text-xs text-muted-foreground">/year</span>
                             </div>
                           </th>
-                          <th className="text-center p-4 font-semibold bg-purple-50 dark:bg-purple-900/20">
-                            <div className="flex flex-col items-center gap-2">
+                          <th className="text-center p-4 font-semibold bg-purple-50 dark:bg-purple-900/20 relative">
+                            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-black text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap">
+                              BEST VALUE
+                            </div>
+                            <div className="flex flex-col items-center gap-2 pt-2">
                               <SubscriptionBadge tier="premium" size="small" />
-                              <span className="text-lg font-bold">$9.99</span>
-                              <span className="text-xs text-muted-foreground">/month</span>
+                              <span className="text-lg font-bold">$99.99</span>
+                              <span className="text-xs text-muted-foreground">/year</span>
+                              <span className="text-xs text-green-600 font-medium">2 Months Free!</span>
                             </div>
                           </th>
                           <th className="text-center p-4 font-semibold bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20">
                             <div className="flex flex-col items-center gap-2">
                               <SubscriptionBadge tier="vip" size="small" />
-                              <span className="text-lg font-bold">$29.99</span>
-                              <span className="text-xs text-muted-foreground">/month</span>
+                              <span className="text-lg font-bold">$299.99</span>
+                              <span className="text-xs text-muted-foreground">/year</span>
+                              <span className="text-xs text-green-600 font-medium">2 Months Free!</span>
                             </div>
                           </th>
                         </tr>
@@ -557,7 +562,8 @@ const ProfileSettingsPage = () => {
                         </tr>
                         <tr className="border-b hover:bg-gray-50 dark:hover:bg-gray-900/50">
                           <td className="p-4 flex items-center gap-2">
-                            <Zap className="h-4 w-4 text-purple-600" />
+                            <DollarSign className="h-4 w-4 text-green-600" />
+                            Seller Commission
                             Power Bids per Auction
                           </td>
                           <td className="text-center p-4">
