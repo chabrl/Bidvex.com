@@ -66,7 +66,7 @@ const SellerDashboard = () => {
             <h1 className="text-3xl font-bold mb-2">{t('dashboard.seller.title')}</h1>
             <p className="text-sm text-muted-foreground">
               {user.account_type === 'business' ? t('dashboard.seller.businessAccount') : t('dashboard.seller.personalAccount')} - 
-              {t('dashboard.seller.commissionRate')}: {user.account_type === 'business' ? '4.5%' : '5%'}
+              {t('dashboard.seller.commissionRate')}: {user.subscription_tier === 'vip' ? '2%' : user.subscription_tier === 'premium' ? '2.5%' : '4%'}
             </p>
           </div>
           <div className="flex gap-2">
@@ -150,7 +150,6 @@ const SellerDashboard = () => {
           {/* Net Payout Card - Shows what seller will receive after commission */}
           <NetPayoutCard 
             totalSales={dashboard?.total_sales || 0}
-            commissionRate={user?.is_tax_registered || user?.account_type === 'business' ? 0.04 : 0.045}
             subscriptionTier={user?.subscription_tier || 'free'}
           />
         </div>
@@ -172,12 +171,14 @@ const SellerDashboard = () => {
                   <span className="font-semibold text-slate-900 dark:text-white">Your Commission</span>
                 </div>
                 <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                  {user?.subscription_tier === 'premium' || user?.subscription_tier === 'vip' ? '2.5%' : '4%'}
+                  {user?.subscription_tier === 'vip' ? '2%' : user?.subscription_tier === 'premium' ? '2.5%' : '4%'}
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  {user?.subscription_tier === 'premium' || user?.subscription_tier === 'vip' 
-                    ? '✨ Premium discount applied!' 
-                    : 'Standard rate (2.5% with Premium)'}
+                  {user?.subscription_tier === 'vip' 
+                    ? '✨ VIP discount (2% savings)!' 
+                    : user?.subscription_tier === 'premium'
+                    ? '✨ Premium discount (1.5% savings)!'
+                    : 'Standard rate (Upgrade for savings!)'}
                 </p>
               </div>
 
@@ -316,20 +317,21 @@ const StatCard = ({ icon, title, value, color }) => (
  * NetPayoutCard - Shows seller's net earnings after BidVex commission
  * Implements "Seller Dashboard Net Payout" from the Disruptor Protocol
  * 
- * Commission rates:
- * - Free tier: 4.5%
- * - Premium tier: 4.0%
- * - VIP tier: 4.0%
+ * Commission rates (NO CAP - percentage only):
+ * - Free tier: 4%
+ * - Premium tier: 2.5% (1.5% savings)
+ * - VIP tier: 2% (2% savings)
  */
-const NetPayoutCard = ({ totalSales = 0, commissionRate = 0.045, subscriptionTier = 'free' }) => {
+const NetPayoutCard = ({ totalSales = 0, subscriptionTier = 'free' }) => {
   // Calculate commission based on subscription tier
   const getCommissionRate = () => {
     switch (subscriptionTier) {
-      case 'premium':
       case 'vip':
-        return 0.04; // 4% for premium/VIP
+        return 0.02; // 2% for VIP
+      case 'premium':
+        return 0.025; // 2.5% for premium
       default:
-        return 0.045; // 4.5% for free tier
+        return 0.04; // 4% for free tier
     }
   };
 
