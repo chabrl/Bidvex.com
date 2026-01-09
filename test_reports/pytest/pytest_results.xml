@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="6" skipped="0" tests="17" time="0.728" timestamp="2026-01-09T02:52:55.873121+00:00" hostname="agent-env-52d15a3b-dded-4f84-b10f-1b94f522a41b"><testcase classname="tests.test_subscription_pivot.TestPowerBidsRemoval" name="test_power_bids_endpoint_returns_404" time="0.063" /><testcase classname="tests.test_subscription_pivot.TestSubscriptionBenefits" name="test_subscription_benefits_endpoint_success" time="0.040" /><testcase classname="tests.test_subscription_pivot.TestSubscriptionBenefits" name="test_subscription_benefits_has_all_tiers" time="0.035" /><testcase classname="tests.test_subscription_pivot.TestSubscriptionBenefits" name="test_premium_yearly_pricing" time="0.037" /><testcase classname="tests.test_subscription_pivot.TestSubscriptionBenefits" name="test_vip_yearly_pricing" time="0.036" /><testcase classname="tests.test_subscription_pivot.TestFeePercentages" name="test_free_tier_fees" time="0.040" /><testcase classname="tests.test_subscription_pivot.TestFeePercentages" name="test_premium_tier_fees" time="0.037" /><testcase classname="tests.test_subscription_pivot.TestFeePercentages" name="test_vip_tier_fees" time="0.036" /><testcase classname="tests.test_subscription_pivot.TestFeeCalculation" name="test_buyer_fee_calculation_free_tier" time="0.035"><failure message="AssertionError: Expected 200, got 404&#10;assert 404 == 200&#10; +  where 404 = &lt;Response [404]&gt;.status_code">tests/test_subscription_pivot.py:116: in test_buyer_fee_calculation_free_tier
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+E   AssertionError: Expected 200, got 404
+E   assert 404 == 200
+E    +  where 404 = &lt;Response [404]&gt;.status_code</failure></testcase><testcase classname="tests.test_subscription_pivot.TestFeeCalculation" name="test_buyer_fee_calculation_premium_tier" time="0.034"><failure message="AssertionError: Expected 200, got 404&#10;assert 404 == 200&#10; +  where 404 = &lt;Response [404]&gt;.status_code">tests/test_subscription_pivot.py:131: in test_buyer_fee_calculation_premium_tier
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+E   AssertionError: Expected 200, got 404
+E   assert 404 == 200
+E    +  where 404 = &lt;Response [404]&gt;.status_code</failure></testcase><testcase classname="tests.test_subscription_pivot.TestFeeCalculation" name="test_buyer_fee_calculation_vip_tier" time="0.034"><failure message="AssertionError: Expected 200, got 404&#10;assert 404 == 200&#10; +  where 404 = &lt;Response [404]&gt;.status_code">tests/test_subscription_pivot.py:146: in test_buyer_fee_calculation_vip_tier
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+E   AssertionError: Expected 200, got 404
+E   assert 404 == 200
+E    +  where 404 = &lt;Response [404]&gt;.status_code</failure></testcase><testcase classname="tests.test_subscription_pivot.TestFeeCalculation" name="test_seller_fee_calculation_free_tier" time="0.033"><failure message="AssertionError: Expected 200, got 404&#10;assert 404 == 200&#10; +  where 404 = &lt;Response [404]&gt;.status_code">tests/test_subscription_pivot.py:161: in test_seller_fee_calculation_free_tier
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+E   AssertionError: Expected 200, got 404
+E   assert 404 == 200
+E    +  where 404 = &lt;Response [404]&gt;.status_code</failure></testcase><testcase classname="tests.test_subscription_pivot.TestFeeCalculation" name="test_seller_fee_calculation_premium_tier" time="0.035"><failure message="AssertionError: Expected 200, got 404&#10;assert 404 == 200&#10; +  where 404 = &lt;Response [404]&gt;.status_code">tests/test_subscription_pivot.py:177: in test_seller_fee_calculation_premium_tier
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+E   AssertionError: Expected 200, got 404
+E   assert 404 == 200
+E    +  where 404 = &lt;Response [404]&gt;.status_code</failure></testcase><testcase classname="tests.test_subscription_pivot.TestFeeCalculation" name="test_seller_fee_calculation_vip_tier" time="0.038"><failure message="AssertionError: Expected 200, got 404&#10;assert 404 == 200&#10; +  where 404 = &lt;Response [404]&gt;.status_code">tests/test_subscription_pivot.py:192: in test_seller_fee_calculation_vip_tier
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+E   AssertionError: Expected 200, got 404
+E   assert 404 == 200
+E    +  where 404 = &lt;Response [404]&gt;.status_code</failure></testcase><testcase classname="tests.test_subscription_pivot.TestAutoBidBotAvailability" name="test_premium_has_auto_bid_bot" time="0.036" /><testcase classname="tests.test_subscription_pivot.TestAutoBidBotAvailability" name="test_vip_has_auto_bid_bot" time="0.040" /><testcase classname="tests.test_subscription_pivot.TestAutoBidBotAvailability" name="test_free_tier_no_auto_bid_bot" time="0.035" /></testsuite></testsuites>
