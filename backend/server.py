@@ -7773,30 +7773,38 @@ async def get_increment_info(listing_id: str):
 
 @api_router.get("/subscription/status")
 async def get_subscription_status(current_user: User = Depends(get_current_user)):
-    """Get user's subscription status and features"""
+    """Get user's subscription status and features - Yearly billing, no Power Bids"""
     tier = current_user.subscription_tier
     
     features = {
         "free": {
             "tier": "Free",
-            "monster_bids_per_auction": 1,
+            "buyer_premium": "5%",
+            "seller_commission": "4%",
             "auto_bid_bot": False,
             "priority_notifications": False,
-            "early_access": False
+            "early_access": False,
+            "promotion_days": 0
         },
         "premium": {
             "tier": "Premium",
-            "monster_bids_per_auction": "unlimited",
+            "buyer_premium": "3.5%",
+            "seller_commission": "2.5%",
             "auto_bid_bot": True,
             "priority_notifications": True,
-            "early_access": False
+            "early_access": False,
+            "promotion_days": 3,
+            "price": "$99.99/year"
         },
         "vip": {
             "tier": "VIP",
-            "monster_bids_per_auction": "unlimited",
+            "buyer_premium": "3%",
+            "seller_commission": "2%",
             "auto_bid_bot": True,
             "priority_notifications": True,
-            "early_access": True
+            "early_access": True,
+            "promotion_days": 7,
+            "price": "$299.99/year"
         }
     }
     
