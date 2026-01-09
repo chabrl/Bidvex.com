@@ -30,6 +30,9 @@ import BidErrorGuide from '../components/BidErrorGuide';
 import VerificationRequiredModal from '../components/VerificationRequiredModal';
 import PrivateSaleBadge, { BusinessSellerBadge } from '../components/PrivateSaleBadge';
 import PublicBidHistory from '../components/PublicBidHistory';
+import { HighStakesIndicator, HighStakesTimer, getHighStakesCardStyles, isHighStakes } from '../components/HighStakesBidCard';
+import { TrustScoreDisplay, TrustBadge } from '../components/SellerTrustScore';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../components/ui/sheet';
 import { extractErrorMessage } from '../utils/errorHandler';
 import { useCurrency } from '../contexts/CurrencyContext';
 
