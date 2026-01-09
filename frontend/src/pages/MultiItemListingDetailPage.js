@@ -818,6 +818,16 @@ const MultiItemListingDetailPage = () => {
                       </Card>
                     )}
 
+                    {/* Public Bid History - Transparency Feature */}
+                    {selectedLot && (
+                      <PublicBidHistory 
+                        listingId={listing.id}
+                        lotNumber={selectedLot.lot_number}
+                        currentPrice={selectedLot.current_price}
+                        sellerExchangeRate={listing.seller_obligations?.custom_exchange_rate}
+                      />
+                    )}
+
                     {/* Auction Terms & Conditions - Enhanced with Show More/Less and Agreement */}
                     {(listing.auction_terms_en || listing.auction_terms_fr) && (
                       <Card className="mb-6 border-2 border-primary/20">
