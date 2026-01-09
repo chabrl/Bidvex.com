@@ -7448,71 +7448,7 @@ async def get_user_wishlist(current_user: User = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=str(e))
 
 # ==================== PREMIUM BIDDING FEATURES ====================
-
-@api_router.post("/bids/monster")
-async def place_monster_bid(listing_id: str, amount: float, current_user: User = Depends(get_current_user)):
-    """Place a Power Bid that overrides standard increments"""
-    try:
-        # Get listing
-        listing = await db.listings.find_one({"id": listing_id})
-        if not listing:
-            raise HTTPException(status_code=404, detail="Listing not found")
-        
-        # Check subscription tier
-        tier = current_user.subscription_tier
-        monster_bids_used = current_user.monster_bids_used.get(listing_id, 0)
-        
-        # Free tier: 1 power bid per auction
-        if tier == "free" and monster_bids_used >= 1:
-            raise HTTPException(
-                status_code=403,
-                detail="Free tier allows only 1 Power Bid per auction. Upgrade to BidVex Premium for unlimited Power Bids."
-            )
-        
-        # Check if amount is higher than current bid
-        current_bid = listing.get("current_bid", listing.get("starting_price", 0))
-        if amount <= current_bid:
-            raise HTTPException(status_code=400, detail="Power Bid must be higher than current bid")
-        
-        # Place the bid
-        bid = Bid(
-            listing_id=listing_id,
-            bidder_id=current_user.id,
-            amount=amount,
-            bid_type="monster"
-        )
-        await db.bids.insert_one(bid.model_dump())
-        
-        # Update listing
-        await db.listings.update_one(
-            {"id": listing_id},
-            {"$set": {"current_bid": amount, "highest_bidder": current_user.id}}
-        )
-        
-        # Update user's monster bids used
-        monster_bids_used_dict = current_user.monster_bids_used.copy()
-        monster_bids_used_dict[listing_id] = monster_bids_used + 1
-        await db.users.update_one(
-            {"id": current_user.id},
-            {"$set": {"monster_bids_used": monster_bids_used_dict}}
-        )
-        
-        # Broadcast to websocket
-        await manager.broadcast(listing_id, {
-            "type": "monster_bid",
-            "amount": amount,
-            "bidder": current_user.name
-        })
-        
-        return {
-            "message": "Power Bid placed successfully!",
-            "bid_id": bid.id,
-            "remaining_monster_bids": 0 if tier == "free" else "unlimited"
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+# NOTE: Power Bids (Monster Bids) feature has been removed as part of the 2025 subscription pivot
 
 @api_router.post("/bids/auto-bid")
 async def setup_auto_bid(listing_id: str, max_bid: float, current_user: User = Depends(get_current_user)):
