@@ -632,12 +632,11 @@ class User(BaseModel):
     location_confidence_score: Optional[int] = None  # 0-100
     affiliate_code: Optional[str] = None
     billing_address: Optional[str] = None  # For invoicing
-    # Premium subscription fields
+    # Premium subscription fields - Yearly billing
     subscription_tier: str = "free"  # free, premium, vip
     subscription_status: str = "active"  # active, cancelled, expired
     subscription_start_date: Optional[datetime] = None
     subscription_end_date: Optional[datetime] = None
-    monster_bids_used: Dict[str, int] = Field(default_factory=dict)  # {auction_id: count}
     # Seller profile fields
     bio: Optional[str] = None  # Seller bio (max 500 chars)
     bio_fr: Optional[str] = None  # French bio (max 500 chars)
@@ -677,11 +676,18 @@ class FeeCalculation(BaseModel):
 def calculate_buyer_fees(hammer_price: float, subscription_tier: str = "free") -> FeeCalculation:
     """
     Calculate buyer's premium based on subscription tier.
-    Standard: 5% | Premium/VIP: 3.5% (1.5% discount)
+    NO CAP - Percentage-based fees only
+    Free: 5% | Premium: 3.5% (1.5% discount) | VIP: 3% (2% discount)
     """
-    base_percentage = 5.0
-    discount = 1.5 if subscription_tier in ["premium", "vip"] else 0.0
-    final_percentage = base_percentage - discount
+    if subscription_tier == "vip":
+        final_percentage = 3.0
+        discount = 2.0
+    elif subscription_tier == "premium":
+        final_percentage = 3.5
+        discount = 1.5
+    else:
+        final_percentage = 5.0
+        discount = 0.0
     
     fee_amount = hammer_price * (final_percentage / 100)
     total_amount = hammer_price + fee_amount
@@ -698,11 +704,18 @@ def calculate_buyer_fees(hammer_price: float, subscription_tier: str = "free") -
 def calculate_seller_fees(hammer_price: float, subscription_tier: str = "free") -> FeeCalculation:
     """
     Calculate seller's commission based on subscription tier.
-    Standard: 4% | Premium/VIP: 2.5% (1.5% discount)
+    NO CAP - Percentage-based fees only
+    Free: 4% | Premium: 2.5% (1.5% discount) | VIP: 2% (2% discount)
     """
-    base_percentage = 4.0
-    discount = 1.5 if subscription_tier in ["premium", "vip"] else 0.0
-    final_percentage = base_percentage - discount
+    if subscription_tier == "vip":
+        final_percentage = 2.0
+        discount = 2.0
+    elif subscription_tier == "premium":
+        final_percentage = 2.5
+        discount = 1.5
+    else:
+        final_percentage = 4.0
+        discount = 0.0
     
     fee_amount = hammer_price * (final_percentage / 100)
     net_payout = hammer_price - fee_amount
