@@ -397,10 +397,223 @@ const LotsMarketplacePage = () => {
         </div>
       </div>
 
-      {/* Filters Section */}
+      {/* Filters Section - Desktop: Inline | Mobile: Drawer */}
       <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-16 z-40">
         <div className="container mx-auto max-w-7xl px-4 py-4">
-          <div className="flex flex-wrap items-center gap-3">
+          
+          {/* Mobile Filter Button */}
+          <div className="md:hidden flex items-center justify-between gap-3 mb-0">
+            <Sheet open={mobileFilterOpen} onOpenChange={setMobileFilterOpen}>
+              <SheetTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className="flex-1 justify-center gap-2 border-2 hover:bg-blue-50 hover:border-blue-300"
+                  data-testid="mobile-filter-button"
+                >
+                  <SlidersHorizontal className="h-5 w-5" style={{ color: '#2563eb' }} />
+                  <span style={{ color: '#1a1a1a', fontWeight: 600 }}>Filters</span>
+                  {activeFilterCount > 0 && (
+                    <Badge className="bg-blue-600 text-white border-0 ml-1">
+                      {activeFilterCount}
+                    </Badge>
+                  )}
+                </Button>
+              </SheetTrigger>
+              
+              <SheetContent side="left" className="w-[85%] sm:w-[400px] overflow-y-auto">
+                <SheetHeader className="pb-4 border-b">
+                  <SheetTitle className="flex items-center gap-2 text-xl">
+                    <SlidersHorizontal className="h-5 w-5 text-blue-600" />
+                    Filter Auctions
+                  </SheetTitle>
+                </SheetHeader>
+                
+                <div className="py-6 space-y-6">
+                  {/* Location Filters */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-blue-600" />
+                      Location
+                    </h3>
+                    
+                    {/* Country */}
+                    <div>
+                      <label className="text-sm text-slate-600 dark:text-slate-400 mb-1.5 block">Country</label>
+                      <select
+                        value={selectedCountry}
+                        onChange={(e) => handleCountryChange(e.target.value)}
+                        className="w-full appearance-none px-4 py-3 border-2 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        style={{ color: '#1a1a1a', borderColor: '#d1d5db' }}
+                      >
+                        <option value="">All Countries</option>
+                        {Object.keys(REGIONS_DATA).map(country => (
+                          <option key={country} value={country}>{country}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    {/* Province */}
+                    <div>
+                      <label className="text-sm text-slate-600 dark:text-slate-400 mb-1.5 block">Province/State</label>
+                      <select
+                        value={selectedProvince}
+                        onChange={(e) => handleProvinceChange(e.target.value)}
+                        disabled={!selectedCountry}
+                        className="w-full appearance-none px-4 py-3 border-2 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
+                        style={{ color: '#1a1a1a', borderColor: '#d1d5db' }}
+                      >
+                        <option value="">All Provinces</option>
+                        {availableProvinces.map(province => (
+                          <option key={province} value={province}>{province}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    {/* City */}
+                    <div>
+                      <label className="text-sm text-slate-600 dark:text-slate-400 mb-1.5 block">City</label>
+                      <select
+                        value={selectedCity}
+                        onChange={(e) => setSelectedCity(e.target.value)}
+                        disabled={!selectedProvince}
+                        className="w-full appearance-none px-4 py-3 border-2 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
+                        style={{ color: '#1a1a1a', borderColor: '#d1d5db' }}
+                      >
+                        <option value="">All Cities</option>
+                        {availableCities.map(city => (
+                          <option key={city} value={city}>{city}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  
+                  {/* Category Filter */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                      <Tag className="h-4 w-4 text-blue-600" />
+                      Category
+                    </h3>
+                    <select
+                      value={filters.category}
+                      onChange={(e) => handleFilterChange('category', e.target.value)}
+                      className="w-full appearance-none px-4 py-3 border-2 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      style={{ color: '#1a1a1a', borderColor: '#d1d5db' }}
+                    >
+                      <option value="">All Categories</option>
+                      {categories.map((cat) => (
+                        <option key={cat.id} value={cat.name_en}>{cat.name_en}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  {/* Price Range */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-green-600" />
+                      Price Range
+                    </h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-sm text-slate-600 dark:text-slate-400 mb-1.5 block">Min Price</label>
+                        <Input
+                          type="number"
+                          placeholder="$0"
+                          value={filters.min_price}
+                          onChange={(e) => handleFilterChange('min_price', e.target.value)}
+                          className="border-2"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm text-slate-600 dark:text-slate-400 mb-1.5 block">Max Price</label>
+                        <Input
+                          type="number"
+                          placeholder="No limit"
+                          value={filters.max_price}
+                          onChange={(e) => handleFilterChange('max_price', e.target.value)}
+                          className="border-2"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Sort */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-blue-600" />
+                      Sort By
+                    </h3>
+                    <select
+                      value={filters.sort}
+                      onChange={(e) => handleFilterChange('sort', e.target.value)}
+                      className="w-full appearance-none px-4 py-3 border-2 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      style={{ color: '#1a1a1a', borderColor: '#d1d5db' }}
+                    >
+                      <option value="-featured">⭐ Featured First</option>
+                      <option value="auction_end_date">⏰ Ending Soon</option>
+                      <option value="-created_at">🆕 Newest First</option>
+                      <option value="starting_price">💰 Price: Low to High</option>
+                      <option value="-starting_price">💎 Price: High to Low</option>
+                    </select>
+                  </div>
+                  
+                  {/* Tax-Free Toggle */}
+                  <div className="space-y-4">
+                    <Button
+                      variant={filters.private_sales_only ? 'default' : 'outline'}
+                      onClick={() => handleFilterChange('private_sales_only', !filters.private_sales_only)}
+                      className={`w-full py-6 ${filters.private_sales_only 
+                        ? 'bg-green-600 hover:bg-green-700 text-white border-green-600' 
+                        : 'border-2 hover:bg-green-50 hover:border-green-300'
+                      }`}
+                      style={!filters.private_sales_only ? { color: '#15803d', borderColor: '#86efac' } : {}}
+                    >
+                      {filters.private_sales_only ? '✓ ' : ''}Tax-Free Sales Only
+                      <Badge className="ml-2 bg-white/20 text-inherit border-0">Save 15%</Badge>
+                    </Button>
+                  </div>
+                </div>
+                
+                <SheetFooter className="pt-4 border-t gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={clearAllFilters}
+                    className="flex-1 text-red-500 border-red-200 hover:bg-red-50"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Clear All
+                  </Button>
+                  <SheetClose asChild>
+                    <Button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
+                      Apply Filters
+                    </Button>
+                  </SheetClose>
+                </SheetFooter>
+              </SheetContent>
+            </Sheet>
+            
+            {/* View Mode Toggle - Mobile */}
+            <div className="flex gap-1 border-2 rounded-lg p-1" style={{ borderColor: '#e5e7eb' }}>
+              <Button
+                variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('grid')}
+                className={viewMode === 'grid' ? 'bg-blue-600 text-white' : ''}
+              >
+                <GridIcon className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('list')}
+                className={viewMode === 'list' ? 'bg-blue-600 text-white' : ''}
+              >
+                <ListIcon className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Desktop Filters - Hidden on Mobile */}
+          <div className="hidden md:flex flex-wrap items-center gap-3">
             
             {/* Country Filter */}
             <div className="relative">
