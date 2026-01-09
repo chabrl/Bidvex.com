@@ -455,6 +455,11 @@ const MultiItemListingDetailPage = () => {
                           )}
                         </div>
                         <AuctioneerInfo sellerId={listing.seller_id} variant="full" />
+                        
+                        {/* Seller Trust Score Display */}
+                        <div className="mt-4">
+                          <TrustScoreDisplay sellerId={listing.seller_id} variant="compact" showBadge={true} />
+                        </div>
                       </div>
                     )}
 
