@@ -9,9 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Switch } from '../components/ui/switch';
 import { toast } from 'sonner';
-import { User, CreditCard, Bell, MapPin, Loader2, Plus, Trash2, Globe, DollarSign, Crown, Star, Check, X, Bot, TrendingUp, Shield, Phone } from 'lucide-react';
+import { User, CreditCard, Bell, MapPin, Loader2, Plus, Trash2, Globe, DollarSign, Crown, Star, Check, X, Bot, TrendingUp, Shield, Phone, Calculator } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { Slider } from '../components/ui/slider';
 import AvatarUpload from '../components/AvatarUpload';
 import SubscriptionBadge from '../components/SubscriptionBadge';
 import TrustBadge from '../components/TrustBadge';
@@ -19,6 +20,143 @@ import { useTranslation } from 'react-i18next';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const stripePromise = loadStripe('pk_test_51QEYhKP5VxaDuxPQiPLqHBcPrU7VrDu0YnPRCd5RPBSH9QdPQmOTmDo5r9mglvLbJ0P3WfCqxZ5c6Wb8fh0xdvl800nZdMLCqZ');
+
+/**
+ * FeeSavingsCalculator - Interactive calculator showing subscription tier savings
+ * Demonstrates the value of Premium (1.5% savings) and VIP (2% savings) tiers
+ */
+const FeeSavingsCalculator = ({ currentTier = 'free' }) => {
+  const [annualVolume, setAnnualVolume] = useState([50000]); // Default $50,000
+  const volume = annualVolume[0];
+
+  // Fee rates by tier
+  const feeRates = {
+    free: { buyer: 0.05, seller: 0.04 },
+    premium: { buyer: 0.035, seller: 0.025 },
+    vip: { buyer: 0.03, seller: 0.02 }
+  };
+
+  // Calculate fees for each tier
+  const calculateFees = (vol, tier) => {
+    const rates = feeRates[tier];
+    return vol * (rates.buyer + rates.seller);
+  };
+
+  const freeFees = calculateFees(volume, 'free');
+  const premiumFees = calculateFees(volume, 'premium');
+  const vipFees = calculateFees(volume, 'vip');
+
+  const premiumSavings = freeFees - premiumFees;
+  const vipSavings = freeFees - vipFees;
+
+  // ROI calculation
+  const premiumROI = (premiumSavings / 99.99).toFixed(1);
+  const vipROI = (vipSavings / 299.99).toFixed(1);
+
+  // Format currency
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
+
+  return (
+    <div className="mt-8 p-6 bg-gradient-to-br from-blue-50 via-cyan-50 to-purple-50 dark:from-slate-800 dark:via-slate-800 dark:to-slate-800 rounded-xl border-2 border-blue-200 dark:border-blue-800" data-testid="fee-savings-calculator">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="p-2 bg-blue-600 rounded-lg">
+          <Calculator className="h-6 w-6 text-white" />
+        </div>
+        <div>
+          <h3 className="text-xl font-bold text-slate-900 dark:text-white">Fee Savings Calculator</h3>
+          <p className="text-sm text-slate-600 dark:text-slate-400">See how much you could save with a subscription</p>
+        </div>
+      </div>
+
+      {/* Volume Slider */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-3">
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            Estimated Annual Transaction Volume
+          </label>
+          <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+            {formatCurrency(volume)}
+          </span>
+        </div>
+        <Slider
+          value={annualVolume}
+          onValueChange={setAnnualVolume}
+          max={500000}
+          min={1000}
+          step={1000}
+          className="w-full"
+          data-testid="volume-slider"
+        />
+        <div className="flex justify-between text-xs text-slate-500 mt-2">
+          <span>$1,000</span>
+          <span>$100K</span>
+          <span>$250K</span>
+          <span>$500K</span>
+        </div>
+      </div>
+
+      {/* Results Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Free Tier */}
+        <div className={`p-4 rounded-lg border-2 ${currentTier === 'free' ? 'border-slate-400 bg-slate-100 dark:bg-slate-700' : 'border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-600'}`}>
+          <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Free Tier Fees</p>
+          <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(freeFees)}</p>
+          <p className="text-xs text-slate-500 mt-1">9% combined (4% seller + 5% buyer)</p>
+        </div>
+
+        {/* Premium Tier */}
+        <div className={`p-4 rounded-lg border-2 ${currentTier === 'premium' ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/30' : 'border-purple-200 bg-white dark:bg-slate-800 dark:border-purple-700'}`}>
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-sm font-medium text-purple-700 dark:text-purple-300">Premium Tier</p>
+            <span className="text-xs bg-purple-100 dark:bg-purple-800 text-purple-700 dark:text-purple-200 px-2 py-0.5 rounded-full">$99.99/yr</span>
+          </div>
+          <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">{formatCurrency(premiumFees)}</p>
+          <div className="mt-2 p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+            <p className="text-sm font-bold text-green-700 dark:text-green-400">
+              Save {formatCurrency(premiumSavings)}/year
+            </p>
+            <p className="text-xs text-green-600 dark:text-green-500">
+              {premiumROI}x return on subscription!
+            </p>
+          </div>
+        </div>
+
+        {/* VIP Tier */}
+        <div className={`p-4 rounded-lg border-2 ${currentTier === 'vip' ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/30' : 'border-amber-200 bg-white dark:bg-slate-800 dark:border-amber-700'}`}>
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-sm font-medium text-amber-700 dark:text-amber-300">VIP Tier</p>
+            <span className="text-xs bg-amber-100 dark:bg-amber-800 text-amber-700 dark:text-amber-200 px-2 py-0.5 rounded-full">$299.99/yr</span>
+          </div>
+          <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{formatCurrency(vipFees)}</p>
+          <div className="mt-2 p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+            <p className="text-sm font-bold text-green-700 dark:text-green-400">
+              Save {formatCurrency(vipSavings)}/year
+            </p>
+            <p className="text-xs text-green-600 dark:text-green-500">
+              {vipROI}x return on subscription!
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Insight Message */}
+      {volume >= 10000 && currentTier === 'free' && (
+        <div className="mt-6 p-4 bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 rounded-lg border border-green-300 dark:border-green-700">
+          <p className="text-sm font-semibold text-green-800 dark:text-green-200">
+            💡 <strong>With VIP, you save {formatCurrency(vipSavings)} in fees per year.</strong> Your subscription pays for itself <strong>{vipROI}x over!</strong>
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const ProfileSettingsPage = () => {
   const { user, updateUserPreferences, refreshUser } = useAuth();
