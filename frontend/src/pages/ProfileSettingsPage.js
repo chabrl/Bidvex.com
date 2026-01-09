@@ -653,7 +653,8 @@ const ProfileSettingsPage = () => {
                           <Star className="h-6 w-6" />
                           <div>
                             <p className="font-bold text-lg">Upgrade to Premium</p>
-                            <p className="text-sm opacity-90">$9.99/month</p>
+                            <p className="text-sm opacity-90">$99.99/year</p>
+                            <p className="text-xs opacity-75">2 Months Free! Billed annually</p>
                           </div>
                         </div>
                       </Button>
@@ -665,7 +666,8 @@ const ProfileSettingsPage = () => {
                           <Crown className="h-6 w-6" />
                           <div>
                             <p className="font-bold text-lg">Upgrade to VIP</p>
-                            <p className="text-sm opacity-90">$29.99/month</p>
+                            <p className="text-sm opacity-90">$299.99/year</p>
+                            <p className="text-xs opacity-75">2 Months Free! Billed annually</p>
                           </div>
                         </div>
                       </Button>
@@ -680,7 +682,8 @@ const ProfileSettingsPage = () => {
                         <Crown className="h-6 w-6" />
                         <div>
                           <p className="font-bold text-lg">Upgrade to VIP</p>
-                          <p className="text-sm opacity-90">$29.99/month</p>
+                          <p className="text-sm opacity-90">$299.99/year</p>
+                          <p className="text-xs opacity-75">2 Months Free! Billed annually</p>
                         </div>
                       </div>
                     </Button>
