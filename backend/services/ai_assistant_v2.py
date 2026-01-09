@@ -93,8 +93,18 @@ Remember: You are not just an assistant - you are the Master Concierge, the face
             self.kb = None
     
     async def chat(self, user_message: str, user_id: Optional[str] = None, 
-                   chat_history: List[Dict] = None, language: str = "en") -> Dict[str, Any]:
-        """Process user message and generate response"""
+                   chat_history: List[Dict] = None, language: str = "en",
+                   lot_id: Optional[str] = None, listing_id: Optional[str] = None) -> Dict[str, Any]:
+        """Process user message and generate response
+        
+        Args:
+            user_message: The user's question
+            user_id: Optional user ID for personalization
+            chat_history: Previous messages in conversation
+            language: Preferred response language (en/fr)
+            lot_id: Optional lot number for lot-specific queries
+            listing_id: Optional listing ID for lot-specific queries
+        """
         try:
             # Detect language if not provided
             if not language or language not in ['en', 'fr']:
@@ -105,6 +115,15 @@ Remember: You are not just an assistant - you are the Master Concierge, the face
             if self.kb:
                 kb_results = self.kb.search(user_message, n_results=3)
                 context = self._format_knowledge_context(kb_results)
+            
+            # Fetch lot-specific seller obligations if listing_id provided
+            lot_context = ""
+            if listing_id:
+                lot_context = await self._get_lot_obligations_context(listing_id, lot_id)
+            
+            # Combine contexts
+            if lot_context:
+                context = f"{lot_context}\n\n{context}" if context else lot_context
             
             # Build enhanced message with context
             enhanced_message = user_message
@@ -177,6 +196,107 @@ Please answer the user's question using the context provided above. If the conte
             context_parts.append(result['content'][:800])  # Limit length
         
         return "\n".join(context_parts)
+    
+    async def _get_lot_obligations_context(self, listing_id: str, lot_number: Optional[str] = None) -> str:
+        """
+        Fetch and format seller obligations from a specific listing for RAG context.
+        
+        This allows the AI to answer questions like:
+        - "Does this location have a crane?"
+        - "Is forklift available at this site?"
+        - "What are the pickup requirements?"
+        """
+        try:
+            listing = await self.db.multi_item_listings.find_one({"id": listing_id})
+            
+            if not listing:
+                return ""
+            
+            obligations = listing.get("seller_obligations", {})
+            if not obligations:
+                return ""
+            
+            # Build natural language context from seller obligations
+            context_parts = ["\n[LOT-SPECIFIC SELLER OBLIGATIONS - VERIFIED DATA]"]
+            context_parts.append(f"Auction: {listing.get('title', 'N/A')}")
+            context_parts.append(f"Location: {listing.get('city', 'N/A')}, {listing.get('region', 'N/A')}")
+            
+            # Facility address
+            if obligations.get("facility_address"):
+                context_parts.append(f"Pickup Address: {obligations['facility_address']}")
+            
+            # Equipment and capabilities (critical for buyer questions)
+            context_parts.append("\n**Site Capabilities:**")
+            
+            if obligations.get("has_overhead_crane"):
+                crane_cap = obligations.get("crane_capacity", "capacity not specified")
+                context_parts.append(f"- Overhead Crane: YES (Capacity: {crane_cap} tons)")
+            else:
+                context_parts.append("- Overhead Crane: NO - Not available at this site")
+            
+            if obligations.get("has_loading_dock"):
+                dock_type = obligations.get("loading_dock_type", "standard")
+                context_parts.append(f"- Loading Dock: YES ({dock_type} dock)")
+            else:
+                context_parts.append("- Loading Dock: NO - Ground level loading only")
+            
+            if obligations.get("has_forklift_available"):
+                context_parts.append("- Forklift: YES - Available on site")
+            else:
+                context_parts.append("- Forklift: NO - Buyer must provide")
+            
+            if obligations.get("has_scale_on_site"):
+                context_parts.append("- Scale: YES - Weighing available on site")
+            else:
+                context_parts.append("- Scale: NO")
+            
+            if obligations.get("has_tailgate_access"):
+                context_parts.append("- Tailgate Access: YES")
+            
+            if obligations.get("ground_level_loading_only"):
+                context_parts.append("- IMPORTANT: Ground level loading ONLY - Tailgate truck may be required")
+            
+            # Safety requirements
+            if obligations.get("authorized_personnel_only"):
+                safety_req = obligations.get("safety_requirements", "PPE required")
+                context_parts.append(f"\n**Safety Requirements:** {safety_req}")
+                context_parts.append("- ID and safety gear required for site access")
+            
+            # Shipping/Rigging
+            context_parts.append("\n**Shipping & Rigging:**")
+            if obligations.get("provides_shipping") == "yes":
+                shipping_details = obligations.get("shipping_details", "Contact seller for details")
+                context_parts.append(f"- Seller provides shipping/rigging: YES - {shipping_details}")
+            else:
+                context_parts.append("- Seller provides shipping/rigging: NO - Buyer must arrange pickup")
+            
+            # Financial terms
+            context_parts.append("\n**Financial Terms:**")
+            if obligations.get("custom_exchange_rate"):
+                context_parts.append(f"- Exchange Rate: 1 USD = {obligations['custom_exchange_rate']} CAD")
+            
+            refund_policy = obligations.get("refund_policy", "non_refundable")
+            if refund_policy == "non_refundable":
+                context_parts.append("- Refund Policy: FINAL SALE - Non-refundable")
+            else:
+                refund_terms = obligations.get("refund_terms", "See auction terms")
+                context_parts.append(f"- Refund Policy: Refundable - {refund_terms}")
+            
+            # Removal deadline
+            if obligations.get("removal_deadline_days"):
+                context_parts.append(f"- Removal Deadline: {obligations['removal_deadline_days']} days after auction close")
+                if obligations.get("removal_deadline_custom"):
+                    context_parts.append(f"  Note: {obligations['removal_deadline_custom']}")
+            
+            # Additional notes
+            if obligations.get("additional_site_notes"):
+                context_parts.append(f"\n**Additional Site Notes:** {obligations['additional_site_notes']}")
+            
+            return "\n".join(context_parts)
+            
+        except Exception as e:
+            logger.error(f"Error fetching lot obligations: {e}")
+            return ""
     
     def _parse_response(self, content: str, language: str, needs_verification: bool = False) -> Dict:
         """Parse response for rich content (action buttons, product cards)"""
