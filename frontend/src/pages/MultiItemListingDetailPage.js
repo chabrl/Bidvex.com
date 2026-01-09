@@ -420,11 +420,16 @@ const MultiItemListingDetailPage = () => {
                       <BusinessSellerBadge variant="default" className="mb-4" />
                     )}
 
-                    {/* Auctioneer Info Section */}
+                    {/* Auctioneer Info Section with Seller Tier Badge */}
                     {listing.seller_id && (
                       <div className="mb-6">
                         <div className="flex items-center justify-between mb-2">
-                          <p className="text-sm text-muted-foreground">Hosted by</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm text-muted-foreground">Hosted by</p>
+                            {sellerInfo?.subscription_tier && (
+                              <SellerTierBadge tier={sellerInfo.subscription_tier} size="small" />
+                            )}
+                          </div>
                           {user && user.id !== listing.seller_id && (
                             <Button
                               size="sm"
