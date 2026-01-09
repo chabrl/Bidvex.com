@@ -95,7 +95,7 @@ Build a full-featured auction platform named BidVex with real-time bidding, subs
 - `/app/test_reports/iteration_3.json` - Phase 3 DISRUPTOR PROTOCOL
 
 ## Test Credentials
-- **Admin**: `charbel@admin.bazario.com` / `Admin123!`
+- **Admin**: `charbeladmin@bidvex.com` / `Admin123!`
 - **Test Users**: `pioneer@bidvextest.com`, `challenger@bidvextest.com` / `test123`
 
 ---
