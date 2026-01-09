@@ -8,7 +8,7 @@
 3. Verify UI visibility in both light/dark modes
 
 ### Test Credentials
-- Admin: charbel@admin.bazario.com / Admin123!
+- Admin: charbeladmin@bidvex.com / Admin123!
 - Test User: pioneer@bidvextest.com / test123
 
 ---
@@ -20,7 +20,7 @@
 **✅ ALL CORE FEATURES WORKING ON LIVE URL**
 
 #### 1. Login & Authentication
-- ✅ **Admin login successful** with credentials: charbel@admin.bazario.com / Admin123!
+- ✅ **Admin login successful** with credentials: charbeladmin@bidvex.com / Admin123!
 - ✅ **Authentication flow working** - proper redirect after login
 - ✅ **Session management working** - user stays logged in across pages
 
@@ -126,7 +126,7 @@
 **✅ ALL ENHANCED FEATURES WORKING CORRECTLY ON LIVE URL**
 
 #### 1. Login & Navigation
-- ✅ **Admin login successful** with credentials: charbel@admin.bazario.com / Admin123!
+- ✅ **Admin login successful** with credentials: charbeladmin@bidvex.com / Admin123!
 - ✅ **Navigation to create-multi-item-listing successful**
 - ✅ **Successfully completed Steps 1-3 to reach Step 4**
 
@@ -206,7 +206,7 @@
 **✅ ALL NEW FEATURES WORKING CORRECTLY**
 
 #### 1. Login & Navigation
-- ✅ Admin login successful with credentials: charbel@admin.bazario.com / Admin123!
+- ✅ Admin login successful with credentials: charbeladmin@bidvex.com / Admin123!
 - ✅ Navigation to `/create-multi-item-listing` successful
 - ✅ All steps 1-3 completed successfully to reach Step 4
 
@@ -277,7 +277,7 @@ Location: `/app/frontend/src/pages/LotsMarketplacePage.js`
 https://launchapp-4.preview.emergentagent.com
 
 ### Test Credentials
-- Admin: charbel@admin.bazario.com / Admin123!
+- Admin: charbeladmin@bidvex.com / Admin123!
 
 ---
 
@@ -454,7 +454,7 @@ https://launchapp-4.preview.emergentagent.com
 5. Verify Est. Total Out-of-Pocket calculation
 
 ### Test Credentials
-- Admin: charbel@admin.bazario.com / Admin123!
+- Admin: charbeladmin@bidvex.com / Admin123!
 
 ### Live URL
 - https://launchapp-4.preview.emergentagent.com
@@ -696,7 +696,7 @@ https://launchapp-4.preview.emergentagent.com
 - ✅ **Button implementation working** - Proper security flow requiring authentication
 
 #### 4. Data Deletion API (Backend) - IMPLEMENTATION READY ✅
-- ✅ **Admin login credentials working** - charbel@admin.bazario.com / Admin123!
+- ✅ **Admin login credentials working** - charbeladmin@bidvex.com / Admin123!
 - ✅ **Backend API structure exists** for data export/deletion
 - ✅ **Security measures in place** - Requires admin authentication
 - ✅ **Proper authentication flow** - Users must login to access deletion features
