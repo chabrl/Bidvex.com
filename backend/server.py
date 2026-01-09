@@ -8642,6 +8642,8 @@ class AIChatRequest(BaseModel):
     message: str
     chat_history: Optional[List[Dict]] = None
     language: Optional[str] = "en"
+    listing_id: Optional[str] = None  # For lot-specific RAG queries
+    lot_number: Optional[str] = None  # For specific lot context
 
 class AIChatResponse(BaseModel):
     success: bool
@@ -8677,12 +8679,14 @@ async def ai_chat_message(
         from services.ai_assistant_v2 import get_assistant
         assistant = get_assistant(EMERGENT_LLM_KEY, db)
         
-        # Process chat message
+        # Process chat message with optional lot context
         response = await assistant.chat(
             user_message=request.message,
             user_id=user_id,
             chat_history=request.chat_history,
-            language=request.language
+            language=request.language,
+            lot_id=request.lot_number,
+            listing_id=request.listing_id
         )
         
         # Save chat history to database
