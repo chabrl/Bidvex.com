@@ -9080,6 +9080,7 @@ async def calculate_seller_net_endpoint(
 async def get_subscription_benefits():
     """
     Public endpoint showing fee benefits for each subscription tier
+    Updated: Yearly billing, NO cap fees, no Power Bids
     """
     return {
         "success": True,
@@ -9088,39 +9089,45 @@ async def get_subscription_benefits():
                 "name": "Starter (Free)",
                 "price": "$0",
                 "buyer_premium": "5%",
-                "seller_commission": "4.5%",
+                "seller_commission": "4%",
                 "features": [
                     "Basic bidding",
-                    "1 Power Bid per auction",
-                    "Standard support"
+                    "Standard support",
+                    "Wishlist access"
                 ]
             },
             "premium": {
                 "name": "BidVex Premium",
-                "price": "$9.99/month",
-                "buyer_premium": "5%",
-                "seller_commission": "4.0%",
-                "discount": "0.5% seller discount",
+                "price": "$99.99/year",
+                "price_note": "2 Months Free! Billed annually",
+                "buyer_premium": "3.5%",
+                "seller_commission": "2.5%",
+                "discount": "1.5% buyer discount + 1.5% seller discount",
                 "features": [
-                    "Unlimited Power Bids",
-                    "0.5% lower seller fees",
-                    "Priority support",
-                    "Advanced filters"
+                    "1.5% lower buyer fees (5% → 3.5%)",
+                    "1.5% lower seller fees (4% → 2.5%)",
+                    "Auto-Bid Bot",
+                    "Priority notifications",
+                    "Premium Seller badge",
+                    "3-day listing promotion"
                 ]
             },
             "vip": {
                 "name": "BidVex VIP",
-                "price": "$29.99/month",
-                "buyer_premium": "4.0%",
-                "seller_commission": "4.0%",
-                "discount": "1% buyer discount + 0.5% seller discount",
+                "price": "$299.99/year",
+                "price_note": "2 Months Free! Billed annually",
+                "buyer_premium": "3%",
+                "seller_commission": "2%",
+                "discount": "2% buyer discount + 2% seller discount",
                 "features": [
-                    "Unlimited Power Bids",
-                    "1% lower buyer fees",
-                    "0.5% lower seller fees",
+                    "2% lower buyer fees (5% → 3%)",
+                    "2% lower seller fees (4% → 2%)",
+                    "Auto-Bid Bot",
+                    "Priority notifications",
+                    "VIP Seller badge",
+                    "7-day listing promotion",
                     "24h early access to auctions",
                     "Advanced analytics dashboard",
-                    "VIP badge",
                     "Dedicated support"
                 ]
             }
