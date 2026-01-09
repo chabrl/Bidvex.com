@@ -20,6 +20,7 @@ import Lightbox from 'react-image-lightbox';
 import 'react-image-lightbox/style.css';
 import AutoBidModal from '../components/AutoBidModal';
 import SubscriptionBadge from '../components/SubscriptionBadge';
+import SellerTierBadge from '../components/SellerTierBadge';
 import WishlistHeartButton from '../components/WishlistHeartButton';
 import AuctioneerInfo from '../components/AuctioneerInfo';
 import WatchlistButton from '../components/WatchlistButton';
