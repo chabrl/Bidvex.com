@@ -1345,7 +1345,8 @@ const MultiItemListingDetailPage = () => {
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+              );
+              })}
             </div>
 
             {/* Location Info */}
