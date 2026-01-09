@@ -45,7 +45,7 @@ const SubscriptionManager = () => {
     const free = userList.filter(u => (u.subscription_tier || 'free') === 'free').length;
     const premium = userList.filter(u => u.subscription_tier === 'premium').length;
     const vip = userList.filter(u => u.subscription_tier === 'vip').length;
-    const revenue = (premium * 9.99) + (vip * 29.99);
+    const revenue = (premium * 99.99) + (vip * 299.99);
 
     setStats({
       total: userList.length,
@@ -62,7 +62,7 @@ const SubscriptionManager = () => {
         subscription_tier: newTier,
         subscription_status: 'active',
         subscription_start_date: new Date().toISOString(),
-        subscription_end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
+        subscription_end_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString() // 365 days (yearly)
       });
       
       toast.success(`User subscription updated to ${newTier.toUpperCase()}`);
@@ -156,12 +156,12 @@ const SubscriptionManager = () => {
         <CardContent className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-green-700 dark:text-green-300 mb-1">Monthly Recurring Revenue (MRR)</p>
+              <p className="text-sm text-green-700 dark:text-green-300 mb-1">Annual Recurring Revenue (ARR)</p>
               <p className="text-4xl font-bold text-green-700 dark:text-green-300">
                 ${stats.revenue.toFixed(2)}
               </p>
               <p className="text-sm text-green-600 dark:text-green-400 mt-2">
-                Based on current subscriptions: {stats.premium} Premium ($9.99) + {stats.vip} VIP ($29.99)
+                Based on current subscriptions: {stats.premium} Premium ($99.99/yr) + {stats.vip} VIP ($299.99/yr)
               </p>
             </div>
             <TrendingUp className="h-12 w-12 text-green-500" />
