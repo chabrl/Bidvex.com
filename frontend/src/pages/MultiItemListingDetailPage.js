@@ -18,7 +18,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import Countdown from 'react-countdown';
 import Lightbox from 'react-image-lightbox';
 import 'react-image-lightbox/style.css';
-import PowerBidButton from '../components/PowerBidButton';
 import AutoBidModal from '../components/AutoBidModal';
 import SubscriptionBadge from '../components/SubscriptionBadge';
 import WishlistHeartButton from '../components/WishlistHeartButton';
@@ -1270,14 +1269,6 @@ const MultiItemListingDetailPage = () => {
                             {/* Premium Bidding Options */}
                             {user && (
                               <div className="flex flex-wrap gap-2">
-                                <PowerBidButton
-                                  listingId={lot.id}
-                                  currentBid={lot.current_price}
-                                  minimumIncrement={getMinimumIncrement(lot.current_price)}
-                                  onBidPlaced={(amount) => {
-                                    fetchListing();
-                                  }}
-                                />
                                 <AutoBidModal
                                   listingId={lot.id}
                                   currentBid={lot.current_price}

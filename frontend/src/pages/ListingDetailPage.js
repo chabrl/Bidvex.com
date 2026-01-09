@@ -17,7 +17,6 @@ import { Clock, MapPin, Eye, User, DollarSign, MessageCircle, TrendingUp, Wifi, 
 import PromotionManagerModal from '../components/PromotionManagerModal';
 import WatchlistButton from '../components/WatchlistButton';
 import SocialShare from '../components/SocialShare';
-import PowerBidButton from '../components/PowerBidButton';
 import AutoBidModal from '../components/AutoBidModal';
 import MessageSellerModal from '../components/MessageSellerModal';
 import RateSellerModal from '../components/RateSellerModal';
@@ -471,17 +470,6 @@ const ListingDetailPage = () => {
                   <div className="space-y-3 pt-2">
                     <Separator />
                     <div className="flex gap-2">
-                      <PowerBidButton
-                        listingId={listing.id}
-                        currentBid={listing.current_price}
-                        minimumIncrement={1}
-                        onBidPlaced={(amount) => {
-                          fetchListing();
-                          fetchBids();
-                          toast.success(`⚡ Power Bid of $${amount.toFixed(2)} placed!`);
-                        }}
-                      />
-                      
                       <AutoBidModal
                         listingId={listing.id}
                         currentBid={listing.current_price}
