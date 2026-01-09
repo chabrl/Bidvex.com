@@ -4527,14 +4527,14 @@ async def get_conversation_online_status(conversation_id: str, current_user: Use
 
 @api_router.get("/admin/users")
 async def admin_get_users(current_user: User = Depends(get_current_user), limit: int = 100, skip: int = 0):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     users = await db.users.find({}, {"_id": 0, "password": 0}).skip(skip).limit(limit).to_list(limit)
     return users
 
 @api_router.put("/admin/users/{user_id}/status")
 async def admin_update_user_status(user_id: str, data: Dict[str, str], current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com") and current_user.role != "admin":
+    if not current_user.email.endswith("@bidvex.com") and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     await db.users.update_one({"id": user_id}, {"$set": {"status": data.get("status")}})
     return {"message": "User status updated"}
@@ -4559,7 +4559,7 @@ async def get_public_feature_flags():
 @api_router.get("/admin/marketplace-settings")
 async def get_admin_marketplace_settings(current_user: User = Depends(get_current_user)):
     """Get current marketplace settings (admin only)."""
-    if current_user.role != "admin" and not current_user.email.endswith("@admin.bazario.com"):
+    if current_user.role != "admin" and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     settings = await get_marketplace_settings()
@@ -4571,7 +4571,7 @@ async def update_marketplace_settings(
     current_user: User = Depends(get_current_user)
 ):
     """Update marketplace settings (admin only). Changes take effect immediately."""
-    if current_user.role != "admin" and not current_user.email.endswith("@admin.bazario.com"):
+    if current_user.role != "admin" and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     # Get current settings for comparison
@@ -4666,7 +4666,7 @@ async def update_marketplace_settings(
 @api_router.post("/admin/marketplace-settings/restore-defaults")
 async def restore_marketplace_defaults(current_user: User = Depends(get_current_user)):
     """Restore marketplace settings to factory defaults (admin only)."""
-    if current_user.role != "admin" and not current_user.email.endswith("@admin.bazario.com"):
+    if current_user.role != "admin" and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     # Get current settings before reset for audit
@@ -4718,7 +4718,7 @@ async def restore_marketplace_defaults(current_user: User = Depends(get_current_
 @api_router.get("/admin/email-templates")
 async def get_admin_email_templates(current_user: User = Depends(get_current_user)):
     """Get all email templates with categories (admin only)."""
-    if current_user.role != "admin" and not current_user.email.endswith("@admin.bazario.com"):
+    if current_user.role != "admin" and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     templates = await get_email_templates()
@@ -4762,7 +4762,7 @@ async def update_email_templates(
     current_user: User = Depends(get_current_user)
 ):
     """Update email template IDs (admin only)."""
-    if current_user.role != "admin" and not current_user.email.endswith("@admin.bazario.com"):
+    if current_user.role != "admin" and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     templates = await get_email_templates()
@@ -4823,7 +4823,7 @@ async def search_email_templates(
     current_user: User = Depends(get_current_user)
 ):
     """Search email templates by name or ID (admin only)."""
-    if current_user.role != "admin" and not current_user.email.endswith("@admin.bazario.com"):
+    if current_user.role != "admin" and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     templates = await get_email_templates()
@@ -4861,7 +4861,7 @@ async def get_email_template_audit_log(
     current_user: User = Depends(get_current_user)
 ):
     """Get audit log of email template changes (admin only)."""
-    if current_user.role != "admin" and not current_user.email.endswith("@admin.bazario.com"):
+    if current_user.role != "admin" and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     logs = await db.admin_action_logs.find(
@@ -4873,21 +4873,21 @@ async def get_email_template_audit_log(
 
 @api_router.get("/admin/reports")
 async def admin_get_reports(current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     reports = await db.reports.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
     return reports
 
 @api_router.get("/admin/listings/pending")
 async def admin_get_pending_listings(current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     listings = await db.listings.find({"status": "pending"}, {"_id": 0}).sort("created_at", -1).to_list(100)
     return [Listing(**listing) for listing in listings]
 
 @api_router.put("/admin/listings/{listing_id}/moderate")
 async def admin_moderate_listing(listing_id: str, data: Dict[str, str], current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     action = data.get("action")
@@ -4904,14 +4904,14 @@ async def admin_moderate_listing(listing_id: str, data: Dict[str, str], current_
 
 @api_router.get("/admin/transactions")
 async def admin_get_transactions(current_user: User = Depends(get_current_user), limit: int = 50):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     transactions = await db.payment_transactions.find({}, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
     return transactions
 
 @api_router.get("/admin/analytics")
 async def admin_get_analytics(current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     active_listings = await db.listings.count_documents({"status": "active"})
@@ -4934,14 +4934,14 @@ async def admin_get_analytics(current_user: User = Depends(get_current_user)):
 # PROMOTION MANAGEMENT
 @api_router.get("/admin/promotions")
 async def admin_get_promotions(current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     promotions = await db.promotions.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
     return promotions
 
 @api_router.post("/admin/promotions/create")
 async def admin_create_promotion(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     promotion = {
@@ -4958,7 +4958,7 @@ async def admin_create_promotion(data: Dict[str, Any], current_user: User = Depe
 
 @api_router.delete("/admin/promotions/{promotion_id}")
 async def admin_delete_promotion(promotion_id: str, current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     promotion = await db.promotions.find_one({"id": promotion_id})
@@ -4969,7 +4969,7 @@ async def admin_delete_promotion(promotion_id: str, current_user: User = Depends
 
 @api_router.put("/admin/listings/{listing_id}/feature")
 async def admin_feature_listing(listing_id: str, data: Dict[str, bool], current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     is_featured = data.get("is_featured", False)
@@ -4979,7 +4979,7 @@ async def admin_feature_listing(listing_id: str, data: Dict[str, bool], current_
 # CATEGORY MANAGEMENT
 @api_router.post("/admin/categories")
 async def admin_create_category(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     category = {
@@ -4995,7 +4995,7 @@ async def admin_create_category(data: Dict[str, Any], current_user: User = Depen
 
 @api_router.put("/admin/categories/{category_id}")
 async def admin_update_category(category_id: str, data: Dict[str, Any], current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     await db.categories.update_one({"id": category_id}, {"$set": data})
@@ -5003,7 +5003,7 @@ async def admin_update_category(category_id: str, data: Dict[str, Any], current_
 
 @api_router.delete("/admin/categories/{category_id}")
 async def admin_delete_category(category_id: str, current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     await db.categories.delete_one({"id": category_id})
@@ -5012,7 +5012,7 @@ async def admin_delete_category(category_id: str, current_user: User = Depends(g
 # AUCTION LIFECYCLE CONTROL
 @api_router.get("/admin/auctions")
 async def admin_get_auctions(status: str = None, current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     query = {}
@@ -5024,7 +5024,7 @@ async def admin_get_auctions(status: str = None, current_user: User = Depends(ge
 
 @api_router.put("/admin/auctions/{listing_id}/pause")
 async def admin_pause_auction(listing_id: str, current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     await db.listings.update_one({"id": listing_id}, {"$set": {"status": "paused"}})
@@ -5032,7 +5032,7 @@ async def admin_pause_auction(listing_id: str, current_user: User = Depends(get_
 
 @api_router.put("/admin/auctions/{listing_id}/resume")
 async def admin_resume_auction(listing_id: str, current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     await db.listings.update_one({"id": listing_id}, {"$set": {"status": "active"}})
@@ -5040,7 +5040,7 @@ async def admin_resume_auction(listing_id: str, current_user: User = Depends(get
 
 @api_router.put("/admin/auctions/{listing_id}/extend")
 async def admin_extend_auction(listing_id: str, data: Dict[str, Any], current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     new_end_date = data.get("new_end_date")
@@ -5049,7 +5049,7 @@ async def admin_extend_auction(listing_id: str, data: Dict[str, Any], current_us
 
 @api_router.delete("/admin/auctions/{listing_id}/cancel")
 async def admin_cancel_auction(listing_id: str, current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     await db.listings.update_one({"id": listing_id}, {"$set": {"status": "cancelled"}})
@@ -5058,7 +5058,7 @@ async def admin_cancel_auction(listing_id: str, current_user: User = Depends(get
 # AFFILIATE PROGRAM MANAGEMENT
 @api_router.get("/admin/affiliates")
 async def admin_get_affiliates(current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     affiliates = await db.affiliates.find({}, {"_id": 0}).to_list(100)
@@ -5066,7 +5066,7 @@ async def admin_get_affiliates(current_user: User = Depends(get_current_user)):
 
 @api_router.put("/admin/users/{user_id}/affiliate")
 async def admin_set_affiliate_status(user_id: str, data: Dict[str, bool], current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     is_affiliate = data.get("is_affiliate", False)
@@ -5086,7 +5086,7 @@ async def admin_set_affiliate_status(user_id: str, data: Dict[str, bool], curren
 
 @api_router.get("/admin/affiliate/payouts")
 async def admin_get_payout_requests(current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     payouts = await db.payout_requests.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
@@ -5094,7 +5094,7 @@ async def admin_get_payout_requests(current_user: User = Depends(get_current_use
 
 @api_router.put("/admin/affiliate/payouts/{payout_id}/approve")
 async def admin_approve_payout(payout_id: str, current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     await db.payout_requests.update_one({"id": payout_id}, {"$set": {"status": "approved"}})
@@ -5107,7 +5107,7 @@ async def admin_approve_payout(payout_id: str, current_user: User = Depends(get_
 # ENHANCED USER MANAGEMENT
 @api_router.get("/admin/users/filter")
 async def admin_filter_users(account_type: str = None, current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     query = {}
@@ -5119,7 +5119,7 @@ async def admin_filter_users(account_type: str = None, current_user: User = Depe
 
 @api_router.put("/admin/users/{user_id}/verify")
 async def admin_verify_user(user_id: str, data: Dict[str, bool], current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     is_verified = data.get("is_verified", False)
@@ -5128,7 +5128,7 @@ async def admin_verify_user(user_id: str, data: Dict[str, bool], current_user: U
 
 @api_router.get("/admin/analytics/users")
 async def admin_user_analytics(current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     personal_users = await db.users.count_documents({"account_type": "personal"})
@@ -5143,7 +5143,7 @@ async def admin_user_analytics(current_user: User = Depends(get_current_user)):
 # LOTS AUCTION MODERATION
 @api_router.get("/admin/lots/pending")
 async def admin_get_pending_lots(current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     lots = await db.multi_item_listings.find({"status": "pending"}, {"_id": 0}).sort("created_at", -1).to_list(100)
@@ -5151,7 +5151,7 @@ async def admin_get_pending_lots(current_user: User = Depends(get_current_user))
 
 @api_router.put("/admin/lots/{lot_id}/moderate")
 async def admin_moderate_lot(lot_id: str, data: Dict[str, str], current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     action = data.get("action")
@@ -5167,7 +5167,7 @@ async def admin_moderate_lot(lot_id: str, data: Dict[str, str], current_user: Us
 # REPORT ENHANCEMENTS
 @api_router.put("/admin/reports/{report_id}/update")
 async def admin_update_report(report_id: str, data: Dict[str, Any], current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     update_data = {}
@@ -5185,7 +5185,7 @@ async def admin_update_report(report_id: str, data: Dict[str, Any], current_user
 
 @api_router.get("/admin/reports/filter")
 async def admin_filter_reports(category: str = None, severity: str = None, status: str = None, current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     query = {}
@@ -5202,7 +5202,7 @@ async def admin_filter_reports(category: str = None, severity: str = None, statu
 # ADVANCED ANALYTICS
 @api_router.get("/admin/analytics/revenue")
 async def admin_revenue_analytics(current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     # Get transactions from last 30 days grouped by date
@@ -5222,7 +5222,7 @@ async def admin_revenue_analytics(current_user: User = Depends(get_current_user)
 
 @api_router.get("/admin/analytics/listings")
 async def admin_listing_analytics(current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     active = await db.listings.count_documents({"status": "active"})
@@ -5244,7 +5244,7 @@ async def admin_listing_analytics(current_user: User = Depends(get_current_user)
 # MESSAGING OVERSIGHT
 @api_router.get("/admin/messages/flagged")
 async def admin_get_flagged_messages(current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     messages = await db.messages.find({"flagged": True}, {"_id": 0}).sort("created_at", -1).to_list(100)
@@ -5252,7 +5252,7 @@ async def admin_get_flagged_messages(current_user: User = Depends(get_current_us
 
 @api_router.delete("/admin/messages/{message_id}")
 async def admin_delete_message(message_id: str, current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     await db.messages.delete_one({"id": message_id})
@@ -5260,7 +5260,7 @@ async def admin_delete_message(message_id: str, current_user: User = Depends(get
 
 @api_router.put("/admin/users/{user_id}/messaging")
 async def admin_suspend_messaging(user_id: str, data: Dict[str, bool], current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     messaging_suspended = data.get("suspended", False)
@@ -5270,7 +5270,7 @@ async def admin_suspend_messaging(user_id: str, data: Dict[str, bool], current_u
 # ADMIN ACTION LOGS
 @api_router.post("/admin/logs")
 async def admin_create_log(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     log = {
@@ -5288,7 +5288,7 @@ async def admin_create_log(data: Dict[str, Any], current_user: User = Depends(ge
 
 @api_router.get("/admin/logs")
 async def admin_get_logs(action_type: str = None, limit: int = 100, current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     query = {}
@@ -5301,7 +5301,7 @@ async def admin_get_logs(action_type: str = None, limit: int = 100, current_user
 # PLATFORM ANNOUNCEMENTS
 @api_router.get("/admin/announcements")
 async def admin_get_announcements(current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     announcements = await db.announcements.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
@@ -5309,7 +5309,7 @@ async def admin_get_announcements(current_user: User = Depends(get_current_user)
 
 @api_router.post("/admin/announcements")
 async def admin_create_announcement(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     announcement = {
@@ -5327,7 +5327,7 @@ async def admin_create_announcement(data: Dict[str, Any], current_user: User = D
 
 @api_router.delete("/admin/announcements/{announcement_id}")
 async def admin_delete_announcement(announcement_id: str, current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     await db.announcements.delete_one({"id": announcement_id})
@@ -5377,7 +5377,7 @@ async def calculate_trust_score(user_id: str) -> int:
 
 @api_router.get("/admin/trust-safety/scores")
 async def get_trust_scores(current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     users = await db.users.find({}, {"_id": 0, "password": 0}).to_list(100)
@@ -5397,7 +5397,7 @@ async def get_trust_scores(current_user: User = Depends(get_current_user)):
 
 @api_router.get("/admin/trust-safety/fraud-flags")
 async def get_fraud_flags(current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     flags = []
@@ -5453,7 +5453,7 @@ async def get_fraud_flags(current_user: User = Depends(get_current_user)):
 
 @api_router.get("/admin/trust-safety/collusion-patterns")
 async def detect_collusion(current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     patterns = []
@@ -5492,7 +5492,7 @@ async def detect_collusion(current_user: User = Depends(get_current_user)):
 
 @api_router.post("/admin/trust-safety/verify-requirement")
 async def enforce_verification_requirement(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     requirement_type = data.get("type")  # "email" or "phone"
@@ -5512,7 +5512,7 @@ EMERGENT_LLM_KEY = "sk-emergent-45818088307Fa1bB23"
 
 @api_router.post("/admin/trust-safety/analyze-content")
 async def analyze_content_ai(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     content = data.get("content")
@@ -5556,7 +5556,7 @@ Respond in JSON format."""
 
 @api_router.post("/admin/trust-safety/scan-listing")
 async def scan_listing_ai(listing_id: str, current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
@@ -5611,7 +5611,7 @@ Provide risk assessment in JSON format with risk_level, issues, and recommendati
 
 @api_router.post("/admin/trust-safety/scan-messages")
 async def scan_messages_ai(conversation_id: str, current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     messages = await db.messages.find({"conversation_id": conversation_id}, {"_id": 0}).to_list(100)
@@ -5645,7 +5645,7 @@ async def scan_messages_ai(conversation_id: str, current_user: User = Depends(ge
 
 @api_router.get("/admin/trust-safety/behavioral-analysis")
 async def behavioral_analysis(user_id: str, current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     user = await db.users.find_one({"id": user_id})
@@ -5702,7 +5702,7 @@ async def behavioral_analysis(user_id: str, current_user: User = Depends(get_cur
 
 @api_router.post("/admin/trust-safety/auto-action")
 async def execute_auto_action(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     user_id = data.get("user_id")
@@ -7350,7 +7350,7 @@ async def review_currency_appeal(
     Returns:
         Success message
     """
-    if not current_user.email.endswith("@admin.bazario.com"):
+    if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     if status not in ["approved", "rejected"]:
@@ -7971,7 +7971,7 @@ async def get_public_site_config():
 @api_router.get("/admin/site-config")
 async def get_admin_site_config(current_user: User = Depends(get_current_user)):
     """Get full site configuration (admin only)."""
-    if current_user.role != "admin" and not current_user.email.endswith("@admin.bazario.com"):
+    if current_user.role != "admin" and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     config = await get_site_config()
@@ -7991,7 +7991,7 @@ async def update_site_branding(
     current_user: User = Depends(get_current_user)
 ):
     """Update site branding settings (admin only)."""
-    if current_user.role != "admin" and not current_user.email.endswith("@admin.bazario.com"):
+    if current_user.role != "admin" and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     # Get current config
@@ -8058,7 +8058,7 @@ async def update_homepage_layout(
     current_user: User = Depends(get_current_user)
 ):
     """Update homepage layout settings (admin only)."""
-    if current_user.role != "admin" and not current_user.email.endswith("@admin.bazario.com"):
+    if current_user.role != "admin" and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     current_config = await get_site_config()
@@ -8120,7 +8120,7 @@ async def update_homepage_layout(
 @api_router.get("/admin/hero-banners")
 async def get_hero_banners(current_user: User = Depends(get_current_user)):
     """Get all hero banners (admin only)."""
-    if current_user.role != "admin" and not current_user.email.endswith("@admin.bazario.com"):
+    if current_user.role != "admin" and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     banners = await db.hero_banners.find({}, {"_id": 0}).sort("order", 1).to_list(100)
@@ -8133,7 +8133,7 @@ async def create_hero_banner(
     current_user: User = Depends(get_current_user)
 ):
     """Create a new hero banner (admin only)."""
-    if current_user.role != "admin" and not current_user.email.endswith("@admin.bazario.com"):
+    if current_user.role != "admin" and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     # Get next order number
@@ -8187,7 +8187,7 @@ async def update_hero_banner(
     current_user: User = Depends(get_current_user)
 ):
     """Update a hero banner (admin only)."""
-    if current_user.role != "admin" and not current_user.email.endswith("@admin.bazario.com"):
+    if current_user.role != "admin" and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     existing = await db.hero_banners.find_one({"id": banner_id})
@@ -8230,7 +8230,7 @@ async def delete_hero_banner(
     current_user: User = Depends(get_current_user)
 ):
     """Delete a hero banner (admin only)."""
-    if current_user.role != "admin" and not current_user.email.endswith("@admin.bazario.com"):
+    if current_user.role != "admin" and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     existing = await db.hero_banners.find_one({"id": banner_id})
