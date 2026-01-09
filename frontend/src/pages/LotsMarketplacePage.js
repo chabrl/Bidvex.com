@@ -51,6 +51,7 @@ const LotsMarketplacePage = () => {
   const [categories, setCategories] = useState([]);
   const [viewMode, setViewMode] = useState('grid');
   const [showFilters, setShowFilters] = useState(false);
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   
   // Regional filter state
   const [selectedCountry, setSelectedCountry] = useState('');
@@ -67,6 +68,19 @@ const LotsMarketplacePage = () => {
     max_price: '',
     private_sales_only: false,
   });
+
+  // Count active filters for badge display
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.category) count++;
+    if (filters.currency) count++;
+    if (filters.min_price || filters.max_price) count++;
+    if (filters.private_sales_only) count++;
+    if (selectedCountry) count++;
+    if (selectedProvince) count++;
+    if (selectedCity) count++;
+    return count;
+  }, [filters, selectedCountry, selectedProvince, selectedCity]);
 
   // Market stats
   const [marketStats, setMarketStats] = useState({
