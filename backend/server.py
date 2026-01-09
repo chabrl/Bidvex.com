@@ -3965,6 +3965,7 @@ async def get_auction_terms_status(listing_id: str, current_user: User = Depends
 
 # =========================================
 # FEE CALCULATION ENDPOINT
+# Updated: Percentage-based fees with NO cap
 # =========================================
 @api_router.get("/fee-calculator")
 async def calculate_fees_endpoint(
@@ -3975,6 +3976,7 @@ async def calculate_fees_endpoint(
     """
     Calculate fees for a given hammer price based on user's subscription tier.
     Returns detailed fee breakdown for transparency.
+    NO CAP - Percentage-based fees only.
     """
     subscription_tier = current_user.subscription_tier if current_user else "free"
     
@@ -3989,7 +3991,8 @@ async def calculate_fees_endpoint(
             "is_premium_member": fees.is_premium_member,
             "discount_applied": fees.discount_applied,
             "standard_rate": "5%",
-            "premium_rate": "3.5%"
+            "premium_rate": "3.5%",
+            "vip_rate": "3%"
         }
     else:
         fees = calculate_seller_fees(hammer_price, subscription_tier)
@@ -4002,7 +4005,8 @@ async def calculate_fees_endpoint(
             "is_premium_member": fees.is_premium_member,
             "discount_applied": fees.discount_applied,
             "standard_rate": "4%",
-            "premium_rate": "2.5%"
+            "premium_rate": "2.5%",
+            "vip_rate": "2%"
         }
 
 @api_router.post("/multi-item-listings/{listing_id}/lots/{lot_number}/bid")
