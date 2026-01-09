@@ -1025,9 +1025,14 @@ const MultiItemListingDetailPage = () => {
                 <Card 
                   key={lot.lot_number} 
                   ref={(el) => (lotRefs.current[lot.lot_number] = el)}
-                  className={`border-2 hover:border-primary transition-colors ${
+                  className={`border-2 hover:border-primary transition-colors cursor-pointer ${
                     hasActiveBids(lot) ? 'border-amber-300 shadow-amber-100' : ''
-                  }`}
+                  } ${activeLotId === lot.lot_number ? 'ring-2 ring-blue-500' : ''}`}
+                  onClick={() => {
+                    setActiveLotId(lot.lot_number);
+                    setSelectedLot(lot);
+                  }}
+                  data-testid={`lot-card-${lot.lot_number}`}
                 >
                   <CardContent className="pt-6">
                     <div className={viewMode === 'grid' ? 'space-y-4' : 'flex gap-6'}>
