@@ -1,10 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Home, Search, ArrowLeft } from 'lucide-react';
 
 const NotFoundPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   return (
@@ -17,13 +19,13 @@ const NotFoundPage = () => {
           {/* Error Message */}
           <div className="space-y-3">
             <h1 className="text-4xl font-bold text-foreground">
-              Page Not Found
+              {t('errors.pageNotFound', 'Page Not Found')}
             </h1>
             <p className="text-lg text-muted-foreground">
-              Oops! The page you're looking for doesn't exist.
+              {t('errors.oops', 'Oops! The page you\'re looking for doesn\'t exist.')}
             </p>
             <p className="text-sm text-muted-foreground">
-              The auction you're searching for may have ended, been removed, or the link may be incorrect.
+              {t('errors.auctionMissing', 'The auction you\'re searching for may have ended, been removed, or the link may be incorrect.')}
             </p>
           </div>
 
@@ -35,7 +37,7 @@ const NotFoundPage = () => {
               className="gradient-button text-white"
             >
               <Home className="mr-2 h-5 w-5" />
-              Go to Homepage
+              {t('errors.goHome', 'Go to Homepage')}
             </Button>
             <Button 
               size="lg"
@@ -43,7 +45,7 @@ const NotFoundPage = () => {
               onClick={() => navigate(-1)}
             >
               <ArrowLeft className="mr-2 h-5 w-5" />
-              Go Back
+              {t('common.back', 'Go Back')}
             </Button>
             <Button 
               size="lg"
@@ -51,14 +53,14 @@ const NotFoundPage = () => {
               onClick={() => navigate('/marketplace')}
             >
               <Search className="mr-2 h-5 w-5" />
-              Browse Auctions
+              {t('hero.browseAuctions', 'Browse Auctions')}
             </Button>
           </div>
 
           {/* Help Text */}
           <div className="pt-8 border-t">
             <p className="text-sm text-muted-foreground">
-              Need help? <a href="/contact" className="text-primary hover:underline">Contact Support</a>
+              {t('errors.needHelp', 'Need help?')} <a href="/contact" className="text-primary hover:underline">{t('paymentSuccess.contactSupport', 'Contact Support')}</a>
             </p>
           </div>
         </CardContent>
