@@ -17,8 +17,6 @@ import {
 } from './ui/dropdown-menu';
 import SellOptionsModal from './SellOptionsModal';
 import NotificationCenter from './NotificationCenter';
-import CurrencyToggle from './CurrencyToggle';
-
 const Navbar = () => {
   const { t, i18n } = useTranslation();
   const { user, logout, updateUserPreferences } = useAuth();
