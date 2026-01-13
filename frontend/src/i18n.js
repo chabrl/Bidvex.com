@@ -1732,8 +1732,11 @@ const resources = {
         viewOrder: 'Voir Détails de Commande',
         downloadInvoice: 'Télécharger Facture',
         backToDashboard: 'Retour au Tableau de Bord',
+        backToMarketplace: 'Retour au Marché',
         continueShop: 'Continuer vos Achats',
         contactSupport: 'Contacter le Support',
+        processing: 'Traitement du Paiement',
+        pleaseWait: 'Veuillez patienter pendant que nous confirmons votre paiement...',
       },
 
         newBid: 'Nouvelle enchère sur votre article',
