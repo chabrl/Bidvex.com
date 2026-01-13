@@ -63,7 +63,7 @@ const Navbar = () => {
   const navLinks = [
     { path: '/', label: t('nav.home'), icon: Home },
     { path: '/marketplace', label: t('nav.marketplace'), icon: ShoppingBag },
-    { path: '/lots', label: t('nav.lots', 'Lots Auction'), icon: Gavel },
+    { path: '/lots', label: t('nav.lotsAuction'), icon: Gavel },
   ];
 
   return (
