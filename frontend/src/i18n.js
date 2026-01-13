@@ -957,8 +957,11 @@ const resources = {
         viewOrder: 'View Order Details',
         downloadInvoice: 'Download Invoice',
         backToDashboard: 'Back to Dashboard',
+        backToMarketplace: 'Return to Marketplace',
         continueShop: 'Continue Shopping',
         contactSupport: 'Contact Support',
+        processing: 'Processing Payment',
+        pleaseWait: 'Please wait while we confirm your payment...',
       },
 
     },
