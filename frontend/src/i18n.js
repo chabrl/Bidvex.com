@@ -1471,6 +1471,10 @@ const resources = {
         unauthorized: "Vous n'êtes pas autorisé à effectuer cette action",
         notFound: 'Ressource non trouvée',
         serverError: 'Erreur serveur. Veuillez réessayer plus tard.',
+        paymentError: 'Erreur de Paiement',
+        paymentErrorDesc: 'Une erreur s\'est produite lors du traitement de votre paiement. Veuillez réessayer ou contacter le support.',
+        verificationTimeout: 'Délai de Vérification du Paiement',
+        timeoutDesc: 'Nous confirmons toujours votre paiement. Veuillez vérifier votre email pour confirmation ou contacter le support.',
       },
 
       // Notifications
