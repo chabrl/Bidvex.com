@@ -696,6 +696,271 @@ const resources = {
         backToMarketplace: 'Back to Marketplace',
         continueShopping: 'Continue Shopping',
       },
+
+
+      // Create Multi-Item Listing
+      createListing: {
+        title: 'Create Multi-Item Listing',
+        stepLabels: {
+          basic: 'Basic Info',
+          lots: 'Lots',
+          bidding: 'Bidding Rules',
+          details: 'Details',
+          review: 'Review',
+        },
+        
+        // Step 1 - Basic Info
+        auctionTitle: 'Auction Title',
+        auctionTitlePlaceholder: 'e.g., Industrial Equipment Liquidation Sale',
+        description: 'Description',
+        descriptionPlaceholder: 'Describe the overall auction and what buyers can expect...',
+        category: 'Category',
+        selectCategory: 'Select a category',
+        location: 'Location',
+        city: 'City',
+        region: 'Province/State',
+        auctionEndDate: 'Auction End Date',
+        currency: 'Currency',
+        incrementOption: 'Bid Increment Option',
+        tiered: 'Tiered (Advanced)',
+        simplified: 'Simplified (Fixed)',
+        
+        // Step 2 - Lots
+        numberOfLots: 'Number of Lots to Generate',
+        generateLots: 'Generate Lots',
+        uploadMethod: 'Upload Method',
+        manual: 'Manual Entry',
+        csvUpload: 'CSV Upload',
+        imagesBulk: 'Bulk Images',
+        lotNumber: 'Lot #',
+        lotTitle: 'Lot Title',
+        lotDescription: 'Lot Description',
+        quantity: 'Quantity',
+        startingPrice: 'Starting Price',
+        condition: 'Condition',
+        conditionNew: 'New',
+        conditionLikeNew: 'Like New',
+        conditionGood: 'Good',
+        conditionFair: 'Fair',
+        conditionPoor: 'Poor',
+        conditionForParts: 'For Parts',
+        images: 'Images',
+        uploadImages: 'Upload Images',
+        buyNowOption: 'Buy Now Option',
+        buyNowPrice: 'Buy Now Price',
+        buyNowEnabled: 'Enable Buy Now',
+        buyNowDisabled: 'Disable Buy Now',
+        buyNowWarning: 'Buy Now price must be at least 20% higher than starting bid',
+        pricingMode: 'Pricing Mode',
+        fixed: 'Fixed Price per Lot',
+        multiplied: 'Price Multiplied by Quantity',
+        
+        // Step 3 - Bidding Rules
+        incrementSchedule: 'Bid Increment Schedule',
+        priceRange: 'Price Range',
+        increment: 'Increment',
+        addTier: 'Add Tier',
+        removeTier: 'Remove Tier',
+        
+        // Step 4 - Documents & Details
+        documents: 'Documents',
+        termsConditions: 'Terms & Conditions',
+        importantInfo: 'Important Information',
+        catalogue: 'Catalogue',
+        uploadDocument: 'Upload Document',
+        shipping: 'Shipping Options',
+        shippingAvailable: 'Seller Provides Shipping',
+        shippingDetails: 'Shipping Details',
+        visitBeforeAuction: 'Visit Before Auction',
+        allowVisits: 'Allow buyers to schedule a visit?',
+        inspectionDate: 'Inspection Date',
+        inspectionDateWarning: 'Inspection dates must occur while the auction is active',
+        
+        // Seller Obligations
+        sellerObligations: 'Seller Obligations',
+        currencyExchange: 'Currency Exchange',
+        exchangeRate: 'Exchange Rate',
+        exchangeRatePlaceholder: 'e.g., 1.42',
+        exchangeRateHelper: 'Enter the rate you will use for this transaction',
+        logistics: 'Logistics',
+        logisticsYes: 'Yes, I provide shipping/rigging',
+        logisticsNo: 'No, buyer arranges pickup',
+        logisticsDetails: 'Logistics Details',
+        removalDeadline: 'Removal Deadline',
+        days: 'days',
+        customDays: 'Custom (specify)',
+        facilityAddress: 'Facility Address',
+        facilityCapabilities: 'Professional Facility Details',
+        loadingDock: 'Loading Dock Available',
+        overheadCrane: 'Overhead Crane Access',
+        groundLevel: 'Ground Level Loading Only',
+        scaleOnSite: 'Scale on Site',
+        tailgate: 'Tailgate Truck Access',
+        forklift: 'Forklift Available',
+        authorizedOnly: 'Authorized Personnel Only',
+        craneCapacity: 'Crane Capacity (tons)',
+        safetyRequirements: 'Safety Requirements',
+        additionalNotes: 'Additional Site Notes',
+        refundPolicy: 'Refund Policy',
+        nonRefundable: 'Non-Refundable (Final Sale)',
+        refundable: 'Refundable (See Terms)',
+        refundTerms: 'Refund Terms',
+        sellerCommitment: 'Seller Commitment',
+        agreeToObligations: 'I agree to honor the obligations stated above',
+        
+        // Step 5 - Review & Submit
+        reviewSubmit: 'Review & Submit',
+        summary: 'Auction Summary',
+        totalLots: 'Total Lots',
+        estimatedValue: 'Estimated Total Value',
+        promotionLevel: 'Promotion Level',
+        standard: 'Standard',
+        premium: 'Premium',
+        elite: 'Elite',
+        submitListing: 'Submit Listing',
+        saveDraft: 'Save as Draft',
+        
+        // Validation & Errors
+        requiredField: 'This field is required',
+        invalidPrice: 'Invalid price format',
+        invalidDate: 'Invalid date',
+        minPrice: 'Price must be at least',
+        maxLots: 'Maximum {{max}} lots allowed',
+        uploadFailed: 'Upload failed',
+        
+        // Success Messages
+        listingCreated: 'Listing created successfully!',
+        draftSaved: 'Draft saved successfully',
+        lotAdded: 'Lot added',
+        lotRemoved: 'Lot removed',
+        imageUploaded: 'Image uploaded',
+      },
+
+      // Seller Tools & Features
+      seller: {
+        dashboard: 'Seller Dashboard',
+        myListings: 'My Listings',
+        activeListings: 'Active Listings',
+        draftListings: 'Draft Listings',
+        completedListings: 'Completed Listings',
+        archivedListings: 'Archived Listings',
+        createNewListing: 'Create New Listing',
+        editListing: 'Edit Listing',
+        deleteListing: 'Delete Listing',
+        duplicateListing: 'Duplicate Listing',
+        viewAnalytics: 'View Analytics',
+        
+        // Stats
+        totalRevenue: 'Total Revenue',
+        totalSales: 'Total Sales',
+        averageSale: 'Average Sale Price',
+        conversionRate: 'Conversion Rate',
+        activeAuctions: 'Active Auctions',
+        totalListings: 'Total Listings',
+        pendingPayments: 'Pending Payments',
+        
+        // Fee Structure
+        feeStructure: 'Fee Structure',
+        yourCommissionRate: 'Your Commission Rate',
+        standardRate: 'Standard Rate (4%)',
+        premiumRate: 'Premium Rate (2.5%)',
+        vipRate: 'VIP Rate (2%)',
+        settlementDeadline: 'Settlement Deadline',
+        fourteenDays: '14 Days',
+        latePaymentPenalty: 'Late Payment Penalty',
+        twoPercentMonthly: '2% Monthly',
+        
+        // Actions
+        viewTerms: 'View Complete Terms & Conditions',
+        manageListing: 'Manage Listing',
+        viewBids: 'View Bids',
+        contactBuyers: 'Contact Buyers',
+        exportData: 'Export Data',
+      },
+
+      // Buyer Tools
+      buyer: {
+        dashboard: 'Buyer Dashboard',
+        myBids: 'My Bids',
+        activeBids: 'Active Bids',
+        wonAuctions: 'Won Auctions',
+        watchlist: 'Watchlist',
+        bidHistory: 'Bid History',
+        
+        // Stats
+        totalSpent: 'Total Spent',
+        itemsWon: 'Items Won',
+        activelyBidding: 'Actively Bidding',
+        savedForLater: 'Saved for Later',
+        
+        // Bid Status
+        winning: 'Winning',
+        outbid: 'Outbid',
+        won: 'Won',
+        lost: 'Lost',
+        pending: 'Pending Payment',
+        paid: 'Paid',
+        
+        // Actions
+        payNow: 'Pay Now',
+        viewInvoice: 'View Invoice',
+        trackShipment: 'Track Shipment',
+        contactSeller: 'Contact Seller',
+        leaveFeedback: 'Leave Feedback',
+      },
+
+      // Affiliate Program
+      affiliate: {
+        dashboard: 'Affiliate Dashboard',
+        overview: 'Overview',
+        referralLink: 'Your Referral Link',
+        copyLink: 'Copy Link',
+        linkCopied: 'Link copied to clipboard',
+        shareOn: 'Share on',
+        
+        // Stats
+        totalClicks: 'Total Clicks',
+        conversions: 'Conversions',
+        earnings: 'Earnings',
+        pendingCommission: 'Pending Commission',
+        paidCommission: 'Paid Commission',
+        conversionRate: 'Conversion Rate',
+        
+        // Referrals
+        referrals: 'Referrals',
+        activeReferrals: 'Active Referrals',
+        totalReferrals: 'Total Referrals',
+        referralName: 'Name',
+        signupDate: 'Signup Date',
+        status: 'Status',
+        commission: 'Commission',
+        
+        // Actions
+        viewReport: 'View Report',
+        requestPayout: 'Request Payout',
+        payoutHistory: 'Payout History',
+      },
+
+      // Payment Success
+      paymentSuccess: {
+        title: 'Payment Successful!',
+        thankYou: 'Thank you for your purchase',
+        orderConfirmed: 'Your order has been confirmed',
+        orderNumber: 'Order Number',
+        paymentMethod: 'Payment Method',
+        amountPaid: 'Amount Paid',
+        transactionId: 'Transaction ID',
+        whatNext: 'What happens next?',
+        step1: 'You will receive a confirmation email shortly',
+        step2: 'The seller will be notified of your payment',
+        step3: 'Coordinate pickup or delivery with the seller',
+        viewOrder: 'View Order Details',
+        downloadInvoice: 'Download Invoice',
+        backToDashboard: 'Back to Dashboard',
+        continueShop: 'Continue Shopping',
+        contactSupport: 'Contact Support',
+      },
+
     },
   },
   fr: {
