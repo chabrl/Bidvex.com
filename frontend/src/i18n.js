@@ -1468,6 +1468,271 @@ const resources = {
 
       // Notifications
       notifications: {
+
+
+      // Créer une annonce multi-lots
+      createListing: {
+        title: 'Créer une Enchère Multi-Lots',
+        stepLabels: {
+          basic: 'Info de Base',
+          lots: 'Lots',
+          bidding: 'Règles d\'Enchères',
+          details: 'Détails',
+          review: 'Révision',
+        },
+        
+        // Étape 1 - Info de Base
+        auctionTitle: 'Titre de l\'Enchère',
+        auctionTitlePlaceholder: 'ex., Liquidation d\'Équipement Industriel',
+        description: 'Description',
+        descriptionPlaceholder: 'Décrivez l\'enchère générale et ce à quoi les acheteurs peuvent s\'attendre...',
+        category: 'Catégorie',
+        selectCategory: 'Sélectionner une catégorie',
+        location: 'Emplacement',
+        city: 'Ville',
+        region: 'Province/État',
+        auctionEndDate: 'Date de Fin d\'Enchère',
+        currency: 'Devise',
+        incrementOption: 'Option de Pas d\'Enchère',
+        tiered: 'Échelonné (Avancé)',
+        simplified: 'Simplifié (Fixe)',
+        
+        // Étape 2 - Lots
+        numberOfLots: 'Nombre de Lots à Générer',
+        generateLots: 'Générer les Lots',
+        uploadMethod: 'Méthode de Téléversement',
+        manual: 'Saisie Manuelle',
+        csvUpload: 'Téléverser CSV',
+        imagesBulk: 'Images en Masse',
+        lotNumber: 'Lot #',
+        lotTitle: 'Titre du Lot',
+        lotDescription: 'Description du Lot',
+        quantity: 'Quantité',
+        startingPrice: 'Mise à Prix',
+        condition: 'État',
+        conditionNew: 'Neuf',
+        conditionLikeNew: 'Comme Neuf',
+        conditionGood: 'Bon',
+        conditionFair: 'Acceptable',
+        conditionPoor: 'Pauvre',
+        conditionForParts: 'Pour Pièces',
+        images: 'Images',
+        uploadImages: 'Téléverser Images',
+        buyNowOption: 'Option Achat Immédiat',
+        buyNowPrice: 'Prix d\'Achat Immédiat',
+        buyNowEnabled: 'Activer Achat Immédiat',
+        buyNowDisabled: 'Désactiver Achat Immédiat',
+        buyNowWarning: 'Le prix d\'achat immédiat doit être au moins 20% plus élevé que la mise à prix',
+        pricingMode: 'Mode de Tarification',
+        fixed: 'Prix Fixe par Lot',
+        multiplied: 'Prix Multiplié par Quantité',
+        
+        // Étape 3 - Règles d'Enchères
+        incrementSchedule: 'Échelle de Pas d\'Enchère',
+        priceRange: 'Fourchette de Prix',
+        increment: 'Pas',
+        addTier: 'Ajouter Palier',
+        removeTier: 'Retirer Palier',
+        
+        // Étape 4 - Documents et Détails
+        documents: 'Documents',
+        termsConditions: 'Termes et Conditions',
+        importantInfo: 'Informations Importantes',
+        catalogue: 'Catalogue',
+        uploadDocument: 'Téléverser Document',
+        shipping: 'Options d\'Expédition',
+        shippingAvailable: 'Le Vendeur Fournit l\'Expédition',
+        shippingDetails: 'Détails d\'Expédition',
+        visitBeforeAuction: 'Visite Avant l\'Enchère',
+        allowVisits: 'Permettre aux acheteurs de planifier une visite?',
+        inspectionDate: 'Date d\'Inspection',
+        inspectionDateWarning: 'Les dates d\'inspection doivent avoir lieu pendant que l\'enchère est active',
+        
+        // Obligations du Vendeur
+        sellerObligations: 'Obligations du Vendeur',
+        currencyExchange: 'Taux de Change',
+        exchangeRate: 'Taux de Change',
+        exchangeRatePlaceholder: 'ex., 1,42',
+        exchangeRateHelper: 'Entrez le taux que vous utiliserez pour cette transaction',
+        logistics: 'Logistique',
+        logisticsYes: 'Oui, je fournis l\'expédition/gréage',
+        logisticsNo: 'Non, l\'acheteur organise le ramassage',
+        logisticsDetails: 'Détails Logistiques',
+        removalDeadline: 'Délai de Retrait',
+        days: 'jours',
+        customDays: 'Personnalisé (spécifier)',
+        facilityAddress: 'Adresse de l\'Installation',
+        facilityCapabilities: 'Détails Professionnels de l\'Installation',
+        loadingDock: 'Quai de Chargement Disponible',
+        overheadCrane: 'Accès Grue Aérienne',
+        groundLevel: 'Chargement au Niveau du Sol Seulement',
+        scaleOnSite: 'Balance sur Place',
+        tailgate: 'Accès Camion Hayon',
+        forklift: 'Chariot Élévateur Disponible',
+        authorizedOnly: 'Personnel Autorisé Seulement',
+        craneCapacity: 'Capacité de Grue (tonnes)',
+        safetyRequirements: 'Exigences de Sécurité',
+        additionalNotes: 'Notes Supplémentaires sur le Site',
+        refundPolicy: 'Politique de Remboursement',
+        nonRefundable: 'Non Remboursable (Vente Finale)',
+        refundable: 'Remboursable (Voir Conditions)',
+        refundTerms: 'Conditions de Remboursement',
+        sellerCommitment: 'Engagement du Vendeur',
+        agreeToObligations: 'J\'accepte d\'honorer les obligations énoncées ci-dessus',
+        
+        // Étape 5 - Révision et Soumission
+        reviewSubmit: 'Révision et Soumission',
+        summary: 'Résumé de l\'Enchère',
+        totalLots: 'Total de Lots',
+        estimatedValue: 'Valeur Totale Estimée',
+        promotionLevel: 'Niveau de Promotion',
+        standard: 'Standard',
+        premium: 'Premium',
+        elite: 'Élite',
+        submitListing: 'Soumettre l\'Annonce',
+        saveDraft: 'Sauvegarder comme Brouillon',
+        
+        // Validation et Erreurs
+        requiredField: 'Ce champ est requis',
+        invalidPrice: 'Format de prix invalide',
+        invalidDate: 'Date invalide',
+        minPrice: 'Le prix doit être au moins',
+        maxLots: 'Maximum {{max}} lots autorisés',
+        uploadFailed: 'Échec du téléversement',
+        
+        // Messages de Succès
+        listingCreated: 'Annonce créée avec succès!',
+        draftSaved: 'Brouillon sauvegardé avec succès',
+        lotAdded: 'Lot ajouté',
+        lotRemoved: 'Lot retiré',
+        imageUploaded: 'Image téléversée',
+      },
+
+      // Outils et Fonctionnalités Vendeur
+      seller: {
+        dashboard: 'Tableau de Bord Vendeur',
+        myListings: 'Mes Annonces',
+        activeListings: 'Annonces Actives',
+        draftListings: 'Brouillons',
+        completedListings: 'Annonces Complétées',
+        archivedListings: 'Annonces Archivées',
+        createNewListing: 'Créer Nouvelle Annonce',
+        editListing: 'Modifier l\'Annonce',
+        deleteListing: 'Supprimer l\'Annonce',
+        duplicateListing: 'Dupliquer l\'Annonce',
+        viewAnalytics: 'Voir Analytique',
+        
+        // Statistiques
+        totalRevenue: 'Revenu Total',
+        totalSales: 'Ventes Totales',
+        averageSale: 'Prix de Vente Moyen',
+        conversionRate: 'Taux de Conversion',
+        activeAuctions: 'Enchères Actives',
+        totalListings: 'Total d\'Annonces',
+        pendingPayments: 'Paiements en Attente',
+        
+        // Structure de Frais
+        feeStructure: 'Structure de Frais',
+        yourCommissionRate: 'Votre Taux de Commission',
+        standardRate: 'Taux Standard (4%)',
+        premiumRate: 'Taux Premium (2,5%)',
+        vipRate: 'Taux VIP (2%)',
+        settlementDeadline: 'Délai de Règlement',
+        fourteenDays: '14 Jours',
+        latePaymentPenalty: 'Pénalité de Retard',
+        twoPercentMonthly: '2% Mensuel',
+        
+        // Actions
+        viewTerms: 'Voir Conditions Complètes',
+        manageListing: 'Gérer l\'Annonce',
+        viewBids: 'Voir les Enchères',
+        contactBuyers: 'Contacter les Acheteurs',
+        exportData: 'Exporter les Données',
+      },
+
+      // Outils Acheteur
+      buyer: {
+        dashboard: 'Tableau de Bord Acheteur',
+        myBids: 'Mes Enchères',
+        activeBids: 'Enchères Actives',
+        wonAuctions: 'Enchères Remportées',
+        watchlist: 'Liste de Surveillance',
+        bidHistory: 'Historique d\'Enchères',
+        
+        // Statistiques
+        totalSpent: 'Total Dépensé',
+        itemsWon: 'Articles Remportés',
+        activelyBidding: 'Enchères en Cours',
+        savedForLater: 'Sauvegardé pour Plus Tard',
+        
+        // Statut d'Enchère
+        winning: 'Gagnant',
+        outbid: 'Surenchéri',
+        won: 'Remporté',
+        lost: 'Perdu',
+        pending: 'Paiement en Attente',
+        paid: 'Payé',
+        
+        // Actions
+        payNow: 'Payer Maintenant',
+        viewInvoice: 'Voir Facture',
+        trackShipment: 'Suivre l\'Expédition',
+        contactSeller: 'Contacter le Vendeur',
+        leaveFeedback: 'Laisser un Avis',
+      },
+
+      // Programme d'Affiliation
+      affiliate: {
+        dashboard: 'Tableau de Bord Affilié',
+        overview: 'Aperçu',
+        referralLink: 'Votre Lien de Parrainage',
+        copyLink: 'Copier le Lien',
+        linkCopied: 'Lien copié dans le presse-papiers',
+        shareOn: 'Partager sur',
+        
+        // Statistiques
+        totalClicks: 'Total de Clics',
+        conversions: 'Conversions',
+        earnings: 'Gains',
+        pendingCommission: 'Commission en Attente',
+        paidCommission: 'Commission Payée',
+        conversionRate: 'Taux de Conversion',
+        
+        // Parrainages
+        referrals: 'Parrainages',
+        activeReferrals: 'Parrainages Actifs',
+        totalReferrals: 'Total de Parrainages',
+        referralName: 'Nom',
+        signupDate: 'Date d\'Inscription',
+        status: 'Statut',
+        commission: 'Commission',
+        
+        // Actions
+        viewReport: 'Voir Rapport',
+        requestPayout: 'Demander Paiement',
+        payoutHistory: 'Historique des Paiements',
+      },
+
+      // Succès du Paiement
+      paymentSuccess: {
+        title: 'Paiement Réussi!',
+        thankYou: 'Merci pour votre achat',
+        orderConfirmed: 'Votre commande a été confirmée',
+        orderNumber: 'Numéro de Commande',
+        paymentMethod: 'Mode de Paiement',
+        amountPaid: 'Montant Payé',
+        transactionId: 'ID de Transaction',
+        whatNext: 'Que se passe-t-il ensuite?',
+        step1: 'Vous recevrez un email de confirmation sous peu',
+        step2: 'Le vendeur sera notifié de votre paiement',
+        step3: 'Coordonnez le ramassage ou la livraison avec le vendeur',
+        viewOrder: 'Voir Détails de Commande',
+        downloadInvoice: 'Télécharger Facture',
+        backToDashboard: 'Retour au Tableau de Bord',
+        continueShop: 'Continuer vos Achats',
+        contactSupport: 'Contacter le Support',
+      },
+
         newBid: 'Nouvelle enchère sur votre article',
         outbid: 'Vous avez été surenchéri',
         auctionEnding: "L'enchère se termine bientôt",
