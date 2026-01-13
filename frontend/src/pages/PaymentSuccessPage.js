@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -9,6 +10,7 @@ import confetti from 'canvas-confetti';
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const PaymentSuccessPage = () => {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [status, setStatus] = useState('processing');
@@ -71,9 +73,9 @@ const PaymentSuccessPage = () => {
           {status === 'processing' && (
             <>
               <Loader2 className="h-16 w-16 mx-auto text-primary animate-spin" />
-              <h2 className="text-2xl font-bold">Processing Payment</h2>
+              <h2 className="text-2xl font-bold">{t('paymentSuccess.processing', 'Processing Payment')}</h2>
               <p className="text-muted-foreground">
-                Please wait while we confirm your payment...
+                {t('paymentSuccess.pleaseWait', 'Please wait while we confirm your payment...')}
               </p>
             </>
           )}
@@ -81,14 +83,14 @@ const PaymentSuccessPage = () => {
           {status === 'success' && (
             <>
               <CheckCircle2 className="h-16 w-16 mx-auto text-green-500" data-testid="success-icon" />
-              <h2 className="text-2xl font-bold">Payment Successful!</h2>
+              <h2 className="text-2xl font-bold">{t('paymentSuccess.title')}</h2>
               <p className="text-muted-foreground">
-                Congratulations on your purchase! The seller will be notified and will contact you shortly.
+                {t('paymentSuccess.thankYou')}. {t('paymentSuccess.step2')}
               </p>
               {paymentInfo && (
                 <div className="bg-accent/20 rounded-lg p-4 text-sm space-y-1">
-                  <p><span className="font-medium">Amount:</span> ${(paymentInfo.amount_total / 100).toFixed(2)}</p>
-                  <p><span className="font-medium">Status:</span> {paymentInfo.payment_status}</p>
+                  <p><span className="font-medium">{t('paymentSuccess.amountPaid')}:</span> ${(paymentInfo.amount_total / 100).toFixed(2)}</p>
+                  <p><span className="font-medium">{t('common.status', 'Status')}:</span> {paymentInfo.payment_status}</p>
                 </div>
               )}
               <div className="flex flex-col sm:flex-row gap-3">
@@ -97,14 +99,14 @@ const PaymentSuccessPage = () => {
                   className="gradient-button text-white border-0 flex-1"
                   data-testid="view-dashboard-btn"
                 >
-                  View My Purchases
+                  {t('paymentSuccess.viewOrder')}
                 </Button>
                 <Button
                   variant="outline"
                   onClick={() => navigate('/marketplace')}
                   className="flex-1"
                 >
-                  Continue Shopping
+                  {t('paymentSuccess.continueShop')}
                 </Button>
               </div>
             </>
@@ -113,15 +115,15 @@ const PaymentSuccessPage = () => {
           {status === 'error' && (
             <>
               <AlertCircle className="h-16 w-16 mx-auto text-red-500" />
-              <h2 className="text-2xl font-bold">Payment Error</h2>
+              <h2 className="text-2xl font-bold">{t('errors.paymentError', 'Payment Error')}</h2>
               <p className="text-muted-foreground">
-                There was an error processing your payment. Please try again or contact support.
+                {t('errors.paymentErrorDesc', 'There was an error processing your payment. Please try again or contact support.')}
               </p>
               <Button
                 onClick={() => navigate('/marketplace')}
                 className="gradient-button text-white border-0 w-full"
               >
-                Return to Marketplace
+                {t('paymentSuccess.backToMarketplace')}
               </Button>
             </>
           )}
@@ -129,15 +131,15 @@ const PaymentSuccessPage = () => {
           {status === 'timeout' && (
             <>
               <AlertCircle className="h-16 w-16 mx-auto text-orange-500" />
-              <h2 className="text-2xl font-bold">Payment Verification Timeout</h2>
+              <h2 className="text-2xl font-bold">{t('errors.verificationTimeout', 'Payment Verification Timeout')}</h2>
               <p className="text-muted-foreground">
-                We're still confirming your payment. Please check your email for confirmation or contact support.
+                {t('errors.timeoutDesc', 'We\'re still confirming your payment. Please check your email for confirmation or contact support.')}
               </p>
               <Button
                 onClick={() => navigate('/buyer/dashboard')}
                 className="gradient-button text-white border-0 w-full"
               >
-                Go to Dashboard
+                {t('paymentSuccess.backToDashboard')}
               </Button>
             </>
           )}
