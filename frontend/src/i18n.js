@@ -526,6 +526,10 @@ const resources = {
         unauthorized: 'You are not authorized to perform this action',
         notFound: 'Resource not found',
         serverError: 'Server error. Please try again later.',
+        paymentError: 'Payment Error',
+        paymentErrorDesc: 'There was an error processing your payment. Please try again or contact support.',
+        verificationTimeout: 'Payment Verification Timeout',
+        timeoutDesc: 'We\'re still confirming your payment. Please check your email for confirmation or contact support.',
       },
 
       // Notifications
