@@ -1480,6 +1480,11 @@ const resources = {
         paymentErrorDesc: 'Une erreur s\'est produite lors du traitement de votre paiement. Veuillez réessayer ou contacter le support.',
         verificationTimeout: 'Délai de Vérification du Paiement',
         timeoutDesc: 'Nous confirmons toujours votre paiement. Veuillez vérifier votre email pour confirmation ou contacter le support.',
+        pageNotFound: 'Page Non Trouvée',
+        oops: 'Oups! La page que vous recherchez n\'existe pas.',
+        auctionMissing: 'L\'enchère que vous recherchez peut avoir pris fin, été supprimée, ou le lien peut être incorrect.',
+        goHome: 'Aller à l\'Accueil',
+        needHelp: 'Besoin d\'aide?',
       },
 
       // Notifications
