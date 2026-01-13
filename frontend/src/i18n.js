@@ -530,6 +530,11 @@ const resources = {
         paymentErrorDesc: 'There was an error processing your payment. Please try again or contact support.',
         verificationTimeout: 'Payment Verification Timeout',
         timeoutDesc: 'We\'re still confirming your payment. Please check your email for confirmation or contact support.',
+        pageNotFound: 'Page Not Found',
+        oops: 'Oops! The page you\'re looking for doesn\'t exist.',
+        auctionMissing: 'The auction you\'re searching for may have ended, been removed, or the link may be incorrect.',
+        goHome: 'Go to Homepage',
+        needHelp: 'Need help?',
       },
 
       // Notifications
