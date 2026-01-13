@@ -49,7 +49,7 @@ const HomepageBanner = () => {
   useEffect(() => {
     const fetchBanners = async () => {
       try {
-        const response = await axios.get(`${API}/banners`);
+        const response = await axios.get(`${API}/banners/active`);
         if (response.data.banners && response.data.banners.length > 0) {
           // Transform API banners to component format
           const transformedBanners = response.data.banners
