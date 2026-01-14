@@ -623,20 +623,20 @@ const CreateMultiItemListing = () => {
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="description">Description *</Label>
+        <Label htmlFor="description">{t('createListing.description')} *</Label>
         <Textarea 
           id="description" 
           name="description" 
           value={formData.description} 
           onChange={handleChange} 
           rows={4} 
-          placeholder="Describe the overall auction..."
+          placeholder={t('createListing.descriptionPlaceholder')}
           required 
         />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="category">Category *</Label>
+          <Label htmlFor="category">{t('createListing.category')} *</Label>
           <select 
             id="category" 
             name="category" 
@@ -645,7 +645,7 @@ const CreateMultiItemListing = () => {
             required 
             className="w-full px-3 py-2 border border-input rounded-md bg-background"
           >
-            <option value="">Select Category</option>
+            <option value="">{t('createListing.selectCategory')}</option>
             {categories.map(cat => (
               <option key={cat.id} value={cat.name_en}>{cat.name_en}</option>
             ))}
