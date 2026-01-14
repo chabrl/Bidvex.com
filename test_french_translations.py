@@ -32,6 +32,7 @@ class FrenchTranslationTester:
             locale='fr-FR'
         )
         self.page = await self.context.new_page()
+        self.page.set_default_timeout(60000)  # 60 second timeout
         
         # Capture console logs
         def handle_console(msg):
