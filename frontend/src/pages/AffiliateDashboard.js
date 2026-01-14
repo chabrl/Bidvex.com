@@ -12,7 +12,7 @@ import { DollarSign, Users, TrendingUp, Copy, ExternalLink, Download } from 'luc
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const AffiliateDashboard = () => {
-  const { t, i18n } = useTranslation();
+  const { t, i18n, ready } = useTranslation();
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
