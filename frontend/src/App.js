@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { useTranslation, I18nextProvider } from 'react-i18next';
+import i18n from './i18n';
 import { useAuth } from './contexts/AuthContext';
 import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
 import { SiteConfigProvider } from './contexts/SiteConfigContext';
