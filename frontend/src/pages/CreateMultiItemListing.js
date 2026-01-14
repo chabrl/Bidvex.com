@@ -2042,7 +2042,7 @@ const CreateMultiItemListing = () => {
                   />
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Use the toolbar to format your terms. Supports headings, bold, italic, underline, lists, and links.
+                  {t("createListing.termsToolbarHelp")}
                 </p>
               </div>
             )}
@@ -2050,7 +2050,7 @@ const CreateMultiItemListing = () => {
             {/* French Editor */}
             {activeTermsLang === 'fr' && (
               <div>
-                <Label>Termes et Conditions (Français)</Label>
+                <Label>{t("createListing.termsFrench")}</Label>
                 <div className="mt-2">
                   <RichTextEditor
                     content={auctionTerms.fr}
@@ -2059,7 +2059,7 @@ const CreateMultiItemListing = () => {
                   />
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Utilisez la barre d&apos;outils pour formater vos termes.
+                  {t("createListing.termsToolbarHelpFr")}
                 </p>
               </div>
             )}
