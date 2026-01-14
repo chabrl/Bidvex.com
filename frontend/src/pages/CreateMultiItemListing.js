@@ -1012,15 +1012,16 @@ const CreateMultiItemListing = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Title *</Label>
+                    <Label>{t('createListing.lotTitle')} *</Label>
                     <Input 
                       value={lot.title} 
                       onChange={(e) => handleLotChange(actualIndex, 'title', e.target.value)} 
+                      placeholder={t('createListing.lotTitlePlaceholder')}
                       required 
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Quantity *</Label>
+                    <Label>{t('createListing.quantity')} *</Label>
                     <Input 
                       type="number" 
                       min="1" 
@@ -1036,11 +1037,12 @@ const CreateMultiItemListing = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Description * (20-500 characters)</Label>
+                  <Label>{t('createListing.lotDescription')} * (20-500 {t('createListing.characters', 'characters')})</Label>
                   <Textarea 
                     value={lot.description} 
                     onChange={(e) => handleLotChange(actualIndex, 'description', e.target.value)} 
-                    rows={2} 
+                    rows={2}
+                    placeholder={t('createListing.lotDescPlaceholder')}
                     required 
                   />
                   <div className="flex justify-between text-xs">
