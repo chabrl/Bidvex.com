@@ -813,7 +813,7 @@ const CreateMultiItemListing = () => {
   const renderStep2 = () => (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h3 className="text-xl font-semibold">Add Lots ({lots.length}/500)</h3>
+        <h3 className="text-xl font-semibold">{t('createListing.stepLabels.lots')} ({lots.length}/500)</h3>
         {lots.length >= 450 && lots.length < 500 && (
           <div className="flex items-center text-amber-500">
             <AlertCircle className="h-4 w-4 mr-1" />
