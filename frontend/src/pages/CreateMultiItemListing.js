@@ -1634,7 +1634,7 @@ const CreateMultiItemListing = () => {
               
               {sellerObligations.providesShipping === 'yes' && (
                 <Textarea
-                  placeholder="Provide shipping details, costs, carriers used, rigging capabilities..."
+                  placeholder={t("createListing.shippingDetailsPlaceholder")}
                   value={sellerObligations.shippingDetails}
                   onChange={(e) => setSellerObligations(prev => ({ ...prev, shippingDetails: e.target.value }))}
                   rows={3}
@@ -1670,7 +1670,7 @@ const CreateMultiItemListing = () => {
                 </div>
                 <Input
                   type="text"
-                  placeholder="Or specify custom deadline..."
+                  placeholder={t("createListing.customDeadlinePlaceholder")}
                   value={sellerObligations.removalDeadline}
                   onChange={(e) => setSellerObligations(prev => ({ ...prev, removalDeadline: e.target.value }))}
                   className="border-slate-300 focus:ring-blue-500"
@@ -1830,7 +1830,7 @@ const CreateMultiItemListing = () => {
                   </label>
                   {sellerObligations.authorizedPersonnelOnly && (
                     <Input
-                      placeholder="Specify requirements (e.g., Hard hat, safety vest, steel-toe boots)"
+                      placeholder={t("createListing.safetyRequirementsPlaceholder")}
                       value={sellerObligations.safetyRequirements}
                       onChange={(e) => setSellerObligations(prev => ({ ...prev, safetyRequirements: e.target.value }))}
                       className="border-amber-300 focus:ring-amber-500"
