@@ -1109,7 +1109,7 @@ const CreateMultiItemListing = () => {
                   
                   {lot.buy_now_enabled && (
                     <div className="space-y-2">
-                      <Label className="text-sm">Buy Now Price ($) *</Label>
+                      <Label className="text-sm">{t('createListing.buyNowPrice')} ($) *</Label>
                       <div className="flex items-center gap-2">
                         <span className="text-muted-foreground">$</span>
                         <Input 
