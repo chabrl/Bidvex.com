@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -10,6 +11,7 @@ import { DollarSign, Users, TrendingUp, Copy, ExternalLink, Download } from 'luc
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const AffiliateDashboard = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -25,7 +27,7 @@ const AffiliateDashboard = () => {
       setStats(response.data);
     } catch (error) {
       console.error('Failed to fetch affiliate stats:', error);
-      toast.error('Failed to load affiliate data');
+      toast.error(t('affiliate.loadFailed', 'Failed to load affiliate data'));
     } finally {
       setLoading(false);
     }
@@ -34,18 +36,18 @@ const AffiliateDashboard = () => {
   const copyReferralLink = () => {
     if (stats?.referral_link) {
       navigator.clipboard.writeText(stats.referral_link);
-      toast.success('Referral link copied to clipboard!');
+      toast.success(t('affiliate.linkCopied'));
     }
   };
 
   const handleWithdraw = async () => {
     if (!withdrawAmount || parseFloat(withdrawAmount) <= 0) {
-      toast.error('Please enter a valid amount');
+      toast.error(t('affiliate.enterValidAmount', 'Please enter a valid amount'));
       return;
     }
 
     if (parseFloat(withdrawAmount) > stats?.pending_earnings) {
-      toast.error('Insufficient balance');
+      toast.error(t('affiliate.insufficientBalance', 'Insufficient balance'));
       return;
     }
 
@@ -54,11 +56,11 @@ const AffiliateDashboard = () => {
         amount: parseFloat(withdrawAmount),
         method: 'bank_transfer'
       });
-      toast.success('Withdrawal request submitted!');
+      toast.success(t('affiliate.withdrawalSubmitted', 'Withdrawal request submitted!'));
       setWithdrawAmount('');
       fetchAffiliateStats();
     } catch (error) {
-      toast.error('Failed to submit withdrawal request');
+      toast.error(t('affiliate.withdrawalFailed', 'Failed to submit withdrawal request'));
     }
   };
 
@@ -74,205 +76,168 @@ const AffiliateDashboard = () => {
     <div className="min-h-screen py-8 px-4" data-testid="affiliate-dashboard">
       <div className="max-w-7xl mx-auto space-y-8">
         <div>
-          <h1 className="text-3xl font-bold mb-2">Affiliate Program</h1>
-          <p className="text-muted-foreground">Earn 3% commission on every sale from your referrals</p>
+          <h1 className="text-3xl font-bold mb-2">{t('affiliate.dashboard')}</h1>
+          <p className="text-muted-foreground">{t('affiliate.description', 'Earn 3% commission on every sale from your referrals')}</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatCard
-            icon={<DollarSign className="h-6 w-6" />}
-            title="Total Earnings"
-            value={`$${stats?.total_earnings?.toFixed(2) || '0.00'}`}
-            color="green"
-          />
-          <StatCard
-            icon={<TrendingUp className="h-6 w-6" />}
-            title="Pending"
-            value={`$${stats?.pending_earnings?.toFixed(2) || '0.00'}`}
-            color="orange"
-          />
-          <StatCard
-            icon={<Download className="h-6 w-6" />}
-            title="Paid Out"
-            value={`$${stats?.paid_earnings?.toFixed(2) || '0.00'}`}
-            color="blue"
-          />
-          <StatCard
-            icon={<Users className="h-6 w-6" />}
-            title="Total Referrals"
-            value={stats?.total_referrals || 0}
-            color="purple"
-          />
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">{t('affiliate.totalClicks')}</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats?.total_clicks || 0}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">{t('affiliate.conversions')}</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats?.total_referrals || 0}</div>
+              <p className="text-xs text-muted-foreground">
+                {stats?.conversion_rate || 0}% {t('affiliate.conversionRate')}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">{t('affiliate.pendingCommission')}</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">${(stats?.pending_earnings || 0).toFixed(2)}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">{t('affiliate.paidCommission')}</CardTitle>
+              <DollarSign className="h-4 w-4 text-green-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">${(stats?.paid_earnings || 0).toFixed(2)}</div>
+            </CardContent>
+          </Card>
         </div>
 
-        <Card className="glassmorphism">
+        {/* Referral Link */}
+        <Card>
           <CardHeader>
-            <CardTitle>Your Referral Link</CardTitle>
-            <CardDescription>Share this link to earn commissions</CardDescription>
+            <CardTitle>{t('affiliate.referralLink')}</CardTitle>
+            <CardDescription>{t('affiliate.shareDesc', 'Share this link to earn commission')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex gap-2">
               <Input
                 value={stats?.referral_link || ''}
                 readOnly
-                className="flex-1"
-                data-testid="referral-link-input"
+                className="font-mono text-sm"
               />
-              <Button variant="outline" onClick={copyReferralLink} data-testid="copy-link-btn">
-                <Copy className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" onClick={() => window.open(stats?.referral_link, '_blank')}>
-                <ExternalLink className="h-4 w-4" />
+              <Button onClick={copyReferralLink} variant="outline">
+                <Copy className="h-4 w-4 mr-2" />
+                {t('affiliate.copyLink')}
               </Button>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Your affiliate code: <span className="font-mono font-bold">{stats?.affiliate_code}</span>
-            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(stats?.referral_link || '')}`, '_blank')}
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                {t('affiliate.shareOn')} Twitter
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(stats?.referral_link || '')}`, '_blank')}
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                {t('affiliate.shareOn')} Facebook
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="glassmorphism">
+        {/* Referrals Table */}
+        <Card>
           <CardHeader>
-            <CardTitle>Withdraw Earnings</CardTitle>
-            <CardDescription>
-              Available balance: ${stats?.pending_earnings?.toFixed(2) || '0.00'}
-            </CardDescription>
+            <CardTitle>{t('affiliate.referrals')}</CardTitle>
+            <CardDescription>{t('affiliate.referralsDesc', 'Track your referred users and earnings')}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2">{t('affiliate.referralName')}</th>
+                    <th className="text-left py-2">{t('affiliate.signupDate')}</th>
+                    <th className="text-left py-2">{t('affiliate.status')}</th>
+                    <th className="text-left py-2">{t('affiliate.commission')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats?.referrals && stats.referrals.length > 0 ? (
+                    stats.referrals.map((ref, idx) => (
+                      <tr key={idx} className="border-b">
+                        <td className="py-2">{ref.name}</td>
+                        <td className="py-2">{new Date(ref.signup_date).toLocaleDateString()}</td>
+                        <td className="py-2">
+                          <span className={`px-2 py-1 rounded text-xs ${
+                            ref.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {ref.status}
+                          </span>
+                        </td>
+                        <td className="py-2">${(ref.commission || 0).toFixed(2)}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="4" className="text-center py-8 text-muted-foreground">
+                        {t('affiliate.noReferrals', 'No referrals yet. Start sharing your link!')}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Withdrawal */}
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('affiliate.requestPayout')}</CardTitle>
+            <CardDescription>{t('affiliate.payoutDesc', 'Request withdrawal of your pending commission')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex gap-2">
               <Input
                 type="number"
-                step="0.01"
-                min="0"
-                max={stats?.pending_earnings || 0}
-                placeholder="Enter amount"
+                placeholder={t('affiliate.enterAmount', 'Enter amount')}
                 value={withdrawAmount}
                 onChange={(e) => setWithdrawAmount(e.target.value)}
-                data-testid="withdraw-amount-input"
+                max={stats?.pending_earnings || 0}
               />
-              <Button
-                onClick={handleWithdraw}
-                disabled={!withdrawAmount || parseFloat(withdrawAmount) <= 0}
-                className="gradient-button text-white border-0"
-                data-testid="withdraw-btn"
-              >
-                Request Withdrawal
+              <Button onClick={handleWithdraw} className="gradient-button text-white">
+                {t('affiliate.requestPayout')}
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Withdrawals are processed within 3-5 business days
+              {t('affiliate.availableBalance', 'Available balance')}: ${(stats?.pending_earnings || 0).toFixed(2)}
             </p>
-          </CardContent>
-        </Card>
-
-        <Card className="glassmorphism">
-          <CardHeader>
-            <CardTitle>Earnings History</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {stats?.earnings_history && stats.earnings_history.length > 0 ? (
-              <div className="space-y-2">
-                {stats.earnings_history.map((earning) => (
-                  <div key={earning.id} className="flex justify-between items-center p-3 border rounded-lg">
-                    <div>
-                      <p className="font-medium">${earning.commission_amount?.toFixed(2)}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {new Date(earning.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        earning.status === 'paid'
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                          : 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300'
-                      }`}>
-                      {earning.status}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                No earnings yet. Start sharing your referral link!
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="glassmorphism">
-          <CardHeader>
-            <CardTitle>Your Referrals</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {stats?.referrals && stats.referrals.length > 0 ? (
-              <div className="space-y-2">
-                {stats.referrals.map((referral) => (
-                  <div key={referral.id} className="flex justify-between items-center p-3 border rounded-lg">
-                    <div>
-                      <p className="font-medium">Referral #{referral.id.slice(0, 8)}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Joined: {new Date(referral.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        referral.status === 'active'
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                          : 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300'
-                      }`}>
-                      {referral.status}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                No referrals yet. Start inviting friends!
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="glassmorphism">
-          <CardHeader>
-            <CardTitle>How It Works</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-3">
-              <Step number="1" title="Share Your Link" description="Share your unique referral link with friends and followers" />
-              <Step number="2" title="They Sign Up" description="When someone signs up using your link, they become your referral" />
-              <Step number="3" title="Earn Commission" description="You earn 3% commission on every sale they make on BidVex" />
-              <Step number="4" title="Get Paid" description="Withdraw your earnings via bank transfer or use as bidding credits" />
-            </div>
           </CardContent>
         </Card>
       </div>
     </div>
   );
 };
-
-const StatCard = ({ icon, title, value, color }) => (
-  <Card className="glassmorphism">
-    <CardContent className="p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div className={`p-3 rounded-xl bg-${color}-100 dark:bg-${color}-900/20 text-${color}-600`}>
-          {icon}
-        </div>
-      </div>
-      <p className="text-2xl font-bold mb-1">{value}</p>
-      <p className="text-sm text-muted-foreground">{title}</p>
-    </CardContent>
-  </Card>
-);
-
-const Step = ({ number, title, description }) => (
-  <div className="flex gap-4">
-    <div className="gradient-bg w-8 h-8 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">
-      {number}
-    </div>
-    <div>
-      <p className="font-semibold">{title}</p>
-      <p className="text-sm text-muted-foreground">{description}</p>
-    </div>
-  </div>
-);
 
 export default AffiliateDashboard;
