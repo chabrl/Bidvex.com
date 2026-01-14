@@ -369,15 +369,15 @@ const CreateMultiItemListing = () => {
     const errors = {};
     
     if (lot.starting_price && (parseFloat(lot.starting_price) < 1 || parseFloat(lot.starting_price) > 10000)) {
-      errors.starting_price = 'Starting bid must be between 1 and 10,000 CAD';
+      errors.starting_price = t('createListing.startingPriceRange', 'Starting bid must be between 1 and 10,000 CAD');
     }
     
     if (lot.description && (lot.description.length < 20 || lot.description.length > 500)) {
-      errors.description = 'Description must be 20-500 characters';
+      errors.description = t('createListing.descriptionLength', 'Description must be 20-500 characters');
     }
     
     if (lot.quantity && (!Number.isInteger(parseFloat(lot.quantity)) || parseFloat(lot.quantity) < 1)) {
-      errors.quantity = 'Quantity must be a positive integer';
+      errors.quantity = t('createListing.quantityPositive', 'Quantity must be a positive integer');
     }
 
     // Buy Now price validation: must be at least 20% higher than starting price
@@ -387,7 +387,7 @@ const CreateMultiItemListing = () => {
       const minBuyNowPrice = startingPrice * 1.2; // 20% higher
       
       if (buyNowPrice < minBuyNowPrice) {
-        errors.buy_now_price = `Buy Now price must be at least $${minBuyNowPrice.toFixed(2)} (20% above starting price)`;
+        errors.buy_now_price = t('createListing.buyNowMinPrice', `Buy Now price must be at least $${minBuyNowPrice.toFixed(2)} (20% above starting price)`, { price: minBuyNowPrice.toFixed(2) });
       }
     }
 
