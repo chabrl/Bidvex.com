@@ -856,6 +856,7 @@ const resources = {
         lotAdded: 'Lot added',
         lotRemoved: 'Lot removed',
         imageUploaded: 'Image uploaded',
+        creating: 'Creating...',
       },
 
       // Seller Tools & Features
