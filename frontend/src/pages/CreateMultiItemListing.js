@@ -573,11 +573,11 @@ const CreateMultiItemListing = () => {
         is_promoted: promotionTier !== 'standard'
       };
       const response = await axios.post(`${API}/multi-item-listings`, payload);
-      toast.success('Multi-item listing created successfully!');
+      toast.success(t('createListing.listingCreated'));
       navigate(`/multi-item-listing/${response.data.id}`);
     } catch (error) {
       console.error('Failed:', error);
-      toast.error(error.response?.data?.detail || 'Failed to create listing');
+      toast.error(error.response?.data?.detail || t('createListing.createFailed', 'Failed to create listing'));
     } finally {
       setLoading(false);
     }
