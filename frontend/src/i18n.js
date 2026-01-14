@@ -835,6 +835,15 @@ const resources = {
         refundTerms: 'Refund Terms',
         sellerCommitment: 'Seller Commitment',
         agreeToObligations: 'I agree to honor the obligations stated above',
+        offerShipping: 'Offer Shipping?',
+        shippingMethods: 'Shipping Methods',
+        deliveryTime: 'Estimated Delivery Time',
+        deliveryTimePlaceholder: 'e.g., 3-5 business days',
+        dockType: 'Dock Type',
+        selectDockType: 'Select Dock Type',
+        highDock: 'High Dock (48" standard)',
+        standardDock: 'Standard Dock',
+        adjustableDock: 'Adjustable Height',
         
         // Step 5 - Review & Submit
         reviewSubmit: 'Review & Submit',
