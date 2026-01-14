@@ -399,7 +399,7 @@ const CreateMultiItemListing = () => {
     if (step === 1) {
       if (!formData.title || !formData.description || !formData.category || 
           !formData.city || !formData.region || !formData.location || !formData.auction_end_date) {
-        toast.error('Please fill all required fields');
+        toast.error(t('createListing.fillRequired', 'Please fill all required fields'));
         return false;
       }
       return true;
@@ -407,7 +407,7 @@ const CreateMultiItemListing = () => {
     
     if (step === 2) {
       if (lots.length === 0) {
-        toast.error('Please add at least one lot');
+        toast.error(t('createListing.addOneLot', 'Please add at least one lot'));
         return false;
       }
 
@@ -420,7 +420,7 @@ const CreateMultiItemListing = () => {
       });
 
       if (!allValid) {
-        toast.error('Please fix validation errors in lots');
+        toast.error(t('createListing.fixValidationErrors', 'Please fix validation errors in lots'));
         return false;
       }
 
