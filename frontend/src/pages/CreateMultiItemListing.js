@@ -1180,7 +1180,7 @@ const CreateMultiItemListing = () => {
 
   const renderStep3 = () => (
     <div className="space-y-6">
-      <h3 className="text-xl font-semibold">Review & Submit</h3>
+      <h3 className="text-xl font-semibold">{t('createListing.reviewSubmit')}</h3>
       
       {/* Summary */}
       <Card className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200">
@@ -1188,25 +1188,25 @@ const CreateMultiItemListing = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
             <div>
               <p className="text-2xl font-bold text-blue-600">{lots.length}</p>
-              <p className="text-sm text-muted-foreground">Total Lots</p>
+              <p className="text-sm text-muted-foreground">{t('createListing.totalLots')}</p>
             </div>
             <div>
               <p className="text-2xl font-bold text-blue-600">
                 {lots.reduce((sum, lot) => sum + parseInt(lot.quantity || 0), 0)}
               </p>
-              <p className="text-sm text-muted-foreground">Total Items</p>
+              <p className="text-sm text-muted-foreground">{t('createListing.totalItems')}</p>
             </div>
             <div>
               <p className="text-2xl font-bold text-blue-600">
                 ${lots.reduce((sum, lot) => sum + parseFloat(lot.starting_price || 0), 0).toFixed(2)}
               </p>
-              <p className="text-sm text-muted-foreground">Total Starting Value</p>
+              <p className="text-sm text-muted-foreground">{t('createListing.totalValue')}</p>
             </div>
             <div>
               <p className="text-2xl font-bold text-blue-600">
                 {lots.reduce((sum, lot) => sum + (lot.images?.length || 0), 0)}
               </p>
-              <p className="text-sm text-muted-foreground">Total Images</p>
+              <p className="text-sm text-muted-foreground">{t('createListing.totalImages')}</p>
             </div>
           </div>
         </CardContent>
