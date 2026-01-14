@@ -74,6 +74,14 @@ const AffiliateDashboard = () => {
     );
   }
 
+  if (!ready) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-muted-foreground">{t('common.loading', 'Loading...')}</div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen py-8 px-4" data-testid="affiliate-dashboard">
       <div className="max-w-7xl mx-auto space-y-8">
