@@ -1558,7 +1558,7 @@ const CreateMultiItemListing = () => {
                 {/* Instructions */}
                 <div className="space-y-2">
                   <Label className="font-semibold text-slate-900 dark:text-white">
-                    Visit Instructions
+                    {t("createListing.visitInstructions")}
                   </Label>
                   <Textarea
                     placeholder={t("createListing.visitInstructionsPlaceholder")}
