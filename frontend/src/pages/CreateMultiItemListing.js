@@ -731,7 +731,7 @@ const CreateMultiItemListing = () => {
       {/* Bid Increment Option */}
       <div className="space-y-2">
         <Label htmlFor="increment_option" className="flex items-center gap-2">
-          📊 Bid Increment Schedule
+          📊 {t('createListing.incrementSchedule')}
         </Label>
         <select
           id="increment_option"
@@ -740,8 +740,8 @@ const CreateMultiItemListing = () => {
           onChange={handleChange}
           className="w-full px-3 py-2 border border-input rounded-md bg-background"
         >
-          <option value="tiered">Option A: Tiered Schedule (Recommended)</option>
-          <option value="simplified">Option B: Simplified Schedule</option>
+          <option value="tiered">{t('createListing.tiered')}</option>
+          <option value="simplified">{t('createListing.simplified')}</option>
         </select>
         <div className="p-4 bg-gray-50 rounded-md border border-gray-200 text-sm">
           {formData.increment_option === 'tiered' ? (
