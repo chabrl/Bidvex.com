@@ -1059,7 +1059,7 @@ const CreateMultiItemListing = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Starting Bid (CAD) * (1-10,000)</Label>
+                    <Label>{t('createListing.startingPrice')} ({formData.currency}) * (1-10,000)</Label>
                     <Input 
                       type="number" 
                       step="0.01" 
@@ -1074,17 +1074,17 @@ const CreateMultiItemListing = () => {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label>Condition</Label>
+                    <Label>{t('createListing.condition')}</Label>
                     <select 
                       value={lot.condition} 
                       onChange={(e) => handleLotChange(actualIndex, 'condition', e.target.value)} 
                       className="w-full px-3 py-2 border border-input rounded-md bg-background"
                     >
-                      <option value="new">New</option>
-                      <option value="like_new">Like New</option>
-                      <option value="good">Good</option>
-                      <option value="fair">Fair</option>
-                      <option value="poor">Poor</option>
+                      <option value="new">{t('createListing.conditionNew')}</option>
+                      <option value="like_new">{t('createListing.conditionLikeNew')}</option>
+                      <option value="good">{t('createListing.conditionGood')}</option>
+                      <option value="fair">{t('createListing.conditionFair')}</option>
+                      <option value="poor">{t('createListing.conditionPoor')}</option>
                     </select>
                   </div>
                 </div>
@@ -1094,7 +1094,7 @@ const CreateMultiItemListing = () => {
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <span className="text-lg">⚡</span>
-                      <Label className="text-base font-semibold text-cyan-800 dark:text-cyan-200">Buy Now Option</Label>
+                      <Label className="text-base font-semibold text-cyan-800 dark:text-cyan-200">{t('createListing.buyNowOption')}</Label>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
