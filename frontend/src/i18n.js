@@ -1628,6 +1628,9 @@ const resources = {
         invalidDate: 'Date invalide',
         minPrice: 'Le prix doit être au moins',
         maxLots: 'Maximum {{max}} lots autorisés',
+        maxLotsReached: 'Maximum de 500 lots autorisés par annonce',
+        invalidLotCount: 'Veuillez entrer un nombre entre 1 et 500',
+        restrictedToBusinessAccounts: 'Les enchères multi-lots sont réservées aux comptes commerciaux. Veuillez mettre à niveau votre compte ou contacter le support.',
         uploadFailed: 'Échec du téléversement',
         
         // Messages de Succès
