@@ -1764,7 +1764,7 @@ const CreateMultiItemListing = () => {
                         className="w-5 h-5 accent-purple-600"
                       />
                       <span className="font-semibold text-slate-800 dark:text-slate-200">
-                        📦 Ground Level Loading Only
+                        📦 {t('createListing.groundLevel')}
                       </span>
                     </label>
                   </div>
@@ -1779,7 +1779,7 @@ const CreateMultiItemListing = () => {
                         className="w-5 h-5 accent-purple-600"
                       />
                       <span className="font-semibold text-slate-800 dark:text-slate-200">
-                        ⚖️ Scale on Site (Scrap/Heavy Loads)
+                        ⚖️ {t('createListing.scaleOnSite')}
                       </span>
                     </label>
                   </div>
@@ -1809,7 +1809,7 @@ const CreateMultiItemListing = () => {
                         className="w-5 h-5 accent-purple-600"
                       />
                       <span className="font-semibold text-slate-800 dark:text-slate-200">
-                        🏗️ Forklift Available
+                        🏗️ {t('createListing.forklift')}
                       </span>
                     </label>
                   </div>
@@ -1825,7 +1825,7 @@ const CreateMultiItemListing = () => {
                       className="w-5 h-5 accent-amber-600"
                     />
                     <span className="font-semibold text-amber-800 dark:text-amber-300">
-                      🔒 Authorized Personnel Only (ID/Safety Gear Required)
+                      🔒 {t('createListing.authorizedOnly')}
                     </span>
                   </label>
                   {sellerObligations.authorizedPersonnelOnly && (
