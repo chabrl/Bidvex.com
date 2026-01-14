@@ -1751,8 +1751,10 @@ const resources = {
       // Programme d'Affiliation
       affiliate: {
         dashboard: 'Tableau de Bord Affilié',
+        description: 'Gagnez 3% de commission sur chaque vente de vos parrainages',
         overview: 'Aperçu',
         referralLink: 'Votre Lien de Parrainage',
+        shareDesc: 'Partagez ce lien pour gagner des commissions',
         copyLink: 'Copier le Lien',
         linkCopied: 'Lien copié dans le presse-papiers',
         shareOn: 'Partager sur',
@@ -1767,17 +1769,29 @@ const resources = {
         
         // Parrainages
         referrals: 'Parrainages',
+        referralsDesc: 'Suivez vos utilisateurs parrainés et vos gains',
         activeReferrals: 'Parrainages Actifs',
         totalReferrals: 'Total de Parrainages',
         referralName: 'Nom',
         signupDate: 'Date d\'Inscription',
         status: 'Statut',
         commission: 'Commission',
+        noReferrals: 'Aucun parrainage pour le moment. Commencez à partager votre lien!',
         
         // Actions
         viewReport: 'Voir Rapport',
         requestPayout: 'Demander Paiement',
+        payoutDesc: 'Demander le retrait de votre commission en attente',
         payoutHistory: 'Historique des Paiements',
+        enterAmount: 'Entrer le montant',
+        availableBalance: 'Solde disponible',
+        
+        // Messages
+        loadFailed: 'Échec du chargement des données d\'affiliation',
+        enterValidAmount: 'Veuillez entrer un montant valide',
+        insufficientBalance: 'Solde insuffisant',
+        withdrawalSubmitted: 'Demande de retrait soumise!',
+        withdrawalFailed: 'Échec de la soumission de la demande de retrait',
       },
 
       // Succès du Paiement
