@@ -1435,7 +1435,7 @@ const CreateMultiItemListing = () => {
             {shippingInfo.available && (
               <div className="space-y-4 ml-6 p-4 border rounded-lg">
                 <div>
-                  <Label>Shipping Methods</Label>
+                  <Label>{t('createListing.shippingMethods')}</Label>
                   <div className="space-y-2 mt-2">
                     {['local_pickup', 'standard', 'express'].map(method => (
                       <div key={method} className="flex items-center gap-2">
