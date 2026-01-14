@@ -1794,7 +1794,7 @@ const CreateMultiItemListing = () => {
                         className="w-5 h-5 accent-purple-600"
                       />
                       <span className="font-semibold text-slate-800 dark:text-slate-200">
-                        🚛 Tailgate Truck Access
+                        🚛 {t("createListing.tailgate")}
                       </span>
                     </label>
                   </div>
