@@ -1223,10 +1223,10 @@ const CreateMultiItemListing = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
-          <div><strong>Title:</strong> {formData.title}</div>
-          <div><strong>Category:</strong> {formData.category}</div>
-          <div><strong>Location:</strong> {formData.city}, {formData.region}</div>
-          <div><strong>End Date:</strong> {new Date(formData.auction_end_date).toLocaleString()}</div>
+          <div><strong>{t("createListing.auctionTitle")}:</strong> {formData.title}</div>
+          <div><strong>{t("createListing.category")}:</strong> {formData.category}</div>
+          <div><strong>{t("createListing.location")}:</strong> {formData.city}, {formData.region}</div>
+          <div><strong>{t("createListing.auctionEndDate")}:</strong> {new Date(formData.auction_end_date).toLocaleString()}</div>
         </CardContent>
       </Card>
 
