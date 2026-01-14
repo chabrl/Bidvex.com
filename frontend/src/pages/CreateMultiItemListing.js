@@ -610,9 +610,9 @@ const CreateMultiItemListing = () => {
   // Render steps
   const renderStep1 = () => (
     <div className="space-y-4">
-      <h3 className="text-xl font-semibold mb-4">Basic Auction Details</h3>
+      <h3 className="text-xl font-semibold mb-4">{t('createListing.stepLabels.basic')}</h3>
       <div className="space-y-2">
-        <Label htmlFor="title">Listing Title *</Label>
+        <Label htmlFor="title">{t('createListing.auctionTitle')} *</Label>
         <Input 
           id="title" 
           name="title" 
