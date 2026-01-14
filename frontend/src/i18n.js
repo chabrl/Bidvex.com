@@ -1721,8 +1721,9 @@ const resources = {
         withdrawalFailed: 'Échec de la soumission de la demande de retrait',
       },
 
-      // Abonnements et Tarification
-      subscription: {
+      // Succès du Paiement
+      paymentSuccess: {
+        title: 'Paiement Réussi!',
         thankYou: 'Merci pour votre achat',
         orderConfirmed: 'Votre commande a été confirmée',
         orderNumber: 'Numéro de Commande',
@@ -1738,6 +1739,13 @@ const resources = {
         backToDashboard: 'Retour au Tableau de Bord',
         backToMarketplace: 'Retour au Marché',
         continueShop: 'Continuer vos Achats',
+        contactSupport: 'Contacter le Support',
+        processing: 'Traitement du Paiement',
+        pleaseWait: 'Veuillez patienter pendant que nous confirmons votre paiement...',
+      },
+
+      // Abonnements et Tarification
+      subscription: {
         contactSupport: 'Contacter le Support',
         processing: 'Traitement du Paiement',
         pleaseWait: 'Veuillez patienter pendant que nous confirmons votre paiement...',
