@@ -1654,6 +1654,7 @@ const resources = {
         lotAdded: 'Lot ajouté',
         lotRemoved: 'Lot retiré',
         imageUploaded: 'Image téléversée',
+        creating: 'Création en cours...',
       },
 
       // Outils et Fonctionnalités Vendeur
