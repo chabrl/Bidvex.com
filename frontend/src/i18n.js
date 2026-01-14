@@ -710,6 +710,7 @@ const resources = {
       // Create Multi-Item Listing
       createListing: {
         title: 'Create Multi-Item Listing',
+        subtitle: 'Create a grouped auction with multiple lots',
         stepLabels: {
           basic: 'Basic Info',
           lots: 'Lots',
