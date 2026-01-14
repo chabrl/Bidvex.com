@@ -1459,7 +1459,7 @@ const CreateMultiItemListing = () => {
                         {shippingInfo.methods.includes(method) && (
                           <Input
                             type="number"
-                            placeholder="Rate ($)"
+                            placeholder={t("createListing.ratePlaceholder")}
                             value={shippingInfo.rates[method] || ''}
                             onChange={(e) => setShippingInfo(prev => ({
                               ...prev,
