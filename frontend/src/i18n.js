@@ -819,6 +819,7 @@ const resources = {
         days: 'days',
         customDays: 'Custom (specify)',
         facilityAddress: 'Facility Address',
+        facilityAddressPlaceholder: 'Enter pickup/facility address...',
         facilityCapabilities: 'Professional Facility Details',
         loadingDock: 'Loading Dock Available',
         overheadCrane: 'Overhead Crane Access',
