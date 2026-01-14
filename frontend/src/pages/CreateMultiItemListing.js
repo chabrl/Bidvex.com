@@ -1690,9 +1690,9 @@ const CreateMultiItemListing = () => {
               <div className="space-y-4 p-5 bg-purple-50 dark:bg-purple-900/20 rounded-xl border-2 border-purple-200 dark:border-purple-700">
                 {/* Facility Address */}
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Facility Address *</Label>
+                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t('createListing.facilityAddress')} *</Label>
                   <Input
-                    placeholder="Enter pickup/facility address..."
+                    placeholder={t('createListing.facilityAddressPlaceholder', 'Enter pickup/facility address...')}
                     value={sellerObligations.facilityAddress}
                     onChange={(e) => setSellerObligations(prev => ({ ...prev, facilityAddress: e.target.value }))}
                     className="border-purple-300 focus:ring-purple-500 focus:border-purple-500"
@@ -1713,7 +1713,7 @@ const CreateMultiItemListing = () => {
                         className="w-5 h-5 accent-purple-600"
                       />
                       <span className="font-semibold text-slate-800 dark:text-slate-200">
-                        🚚 Loading Dock Available
+                        🚚 {t('createListing.loadingDock')}
                       </span>
                     </label>
                     {sellerObligations.hasLoadingDock && (
@@ -1722,10 +1722,10 @@ const CreateMultiItemListing = () => {
                         onChange={(e) => setSellerObligations(prev => ({ ...prev, loadingDockType: e.target.value }))}
                         className="w-full mt-2 px-3 py-2 text-sm border rounded-lg bg-purple-50 dark:bg-slate-700"
                       >
-                        <option value="">Select Dock Type</option>
-                        <option value="high">High Dock (48&quot; standard)</option>
-                        <option value="standard">Standard Dock</option>
-                        <option value="adjustable">Adjustable Height</option>
+                        <option value="">{t('createListing.selectDockType')}</option>
+                        <option value="high">{t('createListing.highDock')}</option>
+                        <option value="standard">{t('createListing.standardDock')}</option>
+                        <option value="adjustable">{t('createListing.adjustableDock')}</option>
                       </select>
                     )}
                   </div>
@@ -1740,13 +1740,13 @@ const CreateMultiItemListing = () => {
                         className="w-5 h-5 accent-purple-600"
                       />
                       <span className="font-semibold text-slate-800 dark:text-slate-200">
-                        🏗️ Overhead Crane Access
+                        🏗️ {t('createListing.overheadCrane')}
                       </span>
                     </label>
                     {sellerObligations.hasOverheadCrane && (
                       <Input
                         type="number"
-                        placeholder="Capacity (tons)"
+                        placeholder={t('createListing.craneCapacity')}
                         value={sellerObligations.craneCapacity}
                         onChange={(e) => setSellerObligations(prev => ({ ...prev, craneCapacity: e.target.value }))}
                         className="mt-2 text-sm"
