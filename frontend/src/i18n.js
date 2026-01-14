@@ -1589,6 +1589,7 @@ const resources = {
         lotTitlePlaceholder: 'Donnez un titre descriptif à ce lot',
         lotDescription: 'Description du Lot',
         lotDescPlaceholder: 'Décrivez ce lot en détail...',
+        characters: 'caractères',
         quantity: 'Quantité',
         startingPrice: 'Mise à Prix',
         condition: 'État',
