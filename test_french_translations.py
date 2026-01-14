@@ -134,8 +134,8 @@ class FrenchTranslationTester:
             
             # Navigate to create-multi-item-listing
             print(f"📍 Navigating to {BASE_URL}/create-multi-item-listing")
-            await self.page.goto(f"{BASE_URL}/create-multi-item-listing", wait_until='networkidle')
-            await self.page.wait_for_timeout(3000)
+            await self.page.goto(f"{BASE_URL}/create-multi-item-listing", wait_until='load', timeout=60000)
+            await self.page.wait_for_timeout(4000)
             
             # Get page HTML
             page_html = await self.page.content()
