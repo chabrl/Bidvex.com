@@ -838,6 +838,9 @@ const resources = {
         invalidDate: 'Invalid date',
         minPrice: 'Price must be at least',
         maxLots: 'Maximum {{max}} lots allowed',
+        maxLotsReached: 'Maximum 500 lots allowed per listing',
+        invalidLotCount: 'Please enter a number between 1 and 500',
+        restrictedToBusinessAccounts: 'Multi-lot auctions are restricted to business accounts. Please upgrade your account or contact support.',
         uploadFailed: 'Upload failed',
         
         // Success Messages
