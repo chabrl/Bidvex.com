@@ -1675,9 +1675,54 @@ const resources = {
         creating: 'Création en cours...',
       },
 
-      // Succès du Paiement
-      paymentSuccess: {
-        title: 'Paiement Réussi!',
+      // Programme d'Affiliation
+      affiliate: {
+        dashboard: 'Tableau de Bord Affilié',
+        description: 'Gagnez 3% de commission sur chaque vente de vos parrainages',
+        overview: 'Aperçu',
+        referralLink: 'Votre Lien de Parrainage',
+        shareDesc: 'Partagez ce lien pour gagner des commissions',
+        copyLink: 'Copier le Lien',
+        linkCopied: 'Lien copié dans le presse-papiers',
+        shareOn: 'Partager sur',
+        
+        // Statistiques
+        totalClicks: 'Total de Clics',
+        conversions: 'Conversions',
+        earnings: 'Gains',
+        pendingCommission: 'Commission en Attente',
+        paidCommission: 'Commission Payée',
+        conversionRate: 'Taux de Conversion',
+        
+        // Parrainages
+        referrals: 'Parrainages',
+        referralsDesc: 'Suivez vos utilisateurs parrainés et vos gains',
+        activeReferrals: 'Parrainages Actifs',
+        totalReferrals: 'Total de Parrainages',
+        referralName: 'Nom',
+        signupDate: 'Date d\'Inscription',
+        status: 'Statut',
+        commission: 'Commission',
+        noReferrals: 'Aucun parrainage pour le moment. Commencez à partager votre lien!',
+        
+        // Actions
+        viewReport: 'Voir Rapport',
+        requestPayout: 'Demander Paiement',
+        payoutDesc: 'Demander le retrait de votre commission en attente',
+        payoutHistory: 'Historique des Paiements',
+        enterAmount: 'Entrer le montant',
+        availableBalance: 'Solde disponible',
+        
+        // Messages
+        loadFailed: 'Échec du chargement des données d\'affiliation',
+        enterValidAmount: 'Veuillez entrer un montant valide',
+        insufficientBalance: 'Solde insuffisant',
+        withdrawalSubmitted: 'Demande de retrait soumise!',
+        withdrawalFailed: 'Échec de la soumission de la demande de retrait',
+      },
+
+      // Abonnements et Tarification
+      subscription: {
         thankYou: 'Merci pour votre achat',
         orderConfirmed: 'Votre commande a été confirmée',
         orderNumber: 'Numéro de Commande',
