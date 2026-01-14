@@ -131,6 +131,18 @@ const CreateMultiItemListing = () => {
   // Visit date validation error
   const [visitDateError, setVisitDateError] = useState('');
 
+  // CRITICAL FIX: Force i18n language sync on component mount
+  useEffect(() => {
+    const savedLang = localStorage.getItem('bidvex_language') || localStorage.getItem('i18nextLng') || 'en';
+    console.log('[CreateMultiItemListing] Mounting - Saved Lang:', savedLang, 'Current Lang:', i18n.language);
+    
+    if (i18n.language !== savedLang) {
+      console.log('[CreateMultiItemListing] Language mismatch! Forcing change to:', savedLang);
+      i18n.changeLanguage(savedLang);
+    }
+  }, [i18n]);
+
+
   useEffect(() => {
     // Check if user can create multi-lot auctions based on feature flag
     if (user && !canCreateMultiLot(user)) {
