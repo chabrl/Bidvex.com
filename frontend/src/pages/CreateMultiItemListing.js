@@ -1418,7 +1418,7 @@ const CreateMultiItemListing = () => {
         {/* Shipping Section */}
         <Card>
           <CardHeader>
-            <CardTitle>Shipping Options</CardTitle>
+            <CardTitle>{t('createListing.shipping')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-2">
@@ -1429,7 +1429,7 @@ const CreateMultiItemListing = () => {
                 onChange={(e) => setShippingInfo(prev => ({ ...prev, available: e.target.checked }))}
                 className="w-4 h-4"
               />
-              <Label htmlFor="shipping-available">Offer Shipping?</Label>
+              <Label htmlFor="shipping-available">{t("createListing.offerShipping")}</Label>
             </div>
 
             {shippingInfo.available && (
