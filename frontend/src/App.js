@@ -225,6 +225,7 @@ const App = () => {
         </CurrencyProvider>
       </SiteConfigProvider>
     </BrowserRouter>
+    </I18nextProvider>
   );
 };
 
