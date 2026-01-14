@@ -1936,6 +1936,9 @@ i18n
     interpolation: {
       escapeValue: false,
     },
+    react: {
+      useSuspense: false, // Disable Suspense to prevent hook rendering issues
+    },
     detection: {
       order: ['localStorage', 'navigator', 'htmlTag'],
       lookupLocalStorage: 'bidvex_language',
