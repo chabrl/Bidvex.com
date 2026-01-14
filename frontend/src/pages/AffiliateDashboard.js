@@ -12,24 +12,14 @@ import { DollarSign, Users, TrendingUp, Copy, ExternalLink, Download } from 'luc
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const AffiliateDashboard = () => {
-  const { t, i18n: i18nInstance } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [withdrawAmount, setWithdrawAmount] = useState('');
-  const [, forceUpdate] = useState({});
 
   useEffect(() => {
     fetchAffiliateStats();
-  }, []);
-
-  // Force re-render when language changes
-  useEffect(() => {
-    const handleLanguageChange = () => {
-      forceUpdate({});
-    };
-    i18n.on('languageChanged', handleLanguageChange);
-    return () => i18n.off('languageChanged', handleLanguageChange);
   }, []);
 
   const fetchAffiliateStats = async () => {
