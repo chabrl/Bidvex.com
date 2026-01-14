@@ -22,11 +22,12 @@ const AffiliateDashboard = () => {
     const savedLang = localStorage.getItem('bidvex_language') || localStorage.getItem('i18nextLng') || 'en';
     console.log('[AffiliateDashboard] Mounting - Saved Lang:', savedLang, 'Current Lang:', i18n.language);
     
-    if (i18n.language !== savedLang) {
-      console.log('[AffiliateDashboard] Language mismatch! Forcing change to:', savedLang);
-      i18n.changeLanguage(savedLang);
-    }
-  }, [i18n]);
+    // ALWAYS force language change to reload resources
+    console.log('[AffiliateDashboard] Forcing language reload to:', savedLang);
+    i18n.changeLanguage(savedLang).then(() => {
+      console.log('[AffiliateDashboard] Language changed successfully. Testing translation:', t('affiliate.dashboard'));
+    });
+  }, []); // Run only on mount
 
   useEffect(() => {
     fetchAffiliateStats();
