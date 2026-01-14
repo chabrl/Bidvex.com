@@ -167,7 +167,7 @@ const CreateMultiItemListing = () => {
 
   const addLot = () => {
     if (lots.length >= 500) {
-      toast.error('Maximum 500 lots allowed per listing');
+      toast.error(t('createListing.maxLotsReached', 'Maximum 500 lots allowed per listing'));
       return;
     }
     setLots([...lots, {
