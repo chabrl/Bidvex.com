@@ -1135,7 +1135,7 @@ const CreateMultiItemListing = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Images</Label>
+                  <Label>{t("createListing.images")}</Label>
                   <input 
                     type="file" 
                     accept="image/*" 
@@ -1246,11 +1246,11 @@ const CreateMultiItemListing = () => {
               <thead className="bg-muted sticky top-0">
                 <tr>
                   <th className="p-2 text-left">#</th>
-                  <th className="p-2 text-left">Title</th>
-                  <th className="p-2 text-left">Qty</th>
-                  <th className="p-2 text-left">Starting Bid</th>
-                  <th className="p-2 text-left">Condition</th>
-                  <th className="p-2 text-left">Images</th>
+                  <th className="p-2 text-left">{t("createListing.lotTitle")}</th>
+                  <th className="p-2 text-left">{t("createListing.quantity")}</th>
+                  <th className="p-2 text-left">{t("createListing.startingPrice")}</th>
+                  <th className="p-2 text-left">{t("createListing.condition")}</th>
+                  <th className="p-2 text-left">{t("createListing.images")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1396,7 +1396,7 @@ const CreateMultiItemListing = () => {
 
             {/* Catalogue */}
             <div>
-              <Label>Catalogue</Label>
+              <Label>{t("createListing.catalogue")}</Label>
               <div className="flex items-center gap-2 mt-2">
                 <Input
                   type="file"
