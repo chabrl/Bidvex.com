@@ -937,8 +937,10 @@ const resources = {
       // Affiliate Program
       affiliate: {
         dashboard: 'Affiliate Dashboard',
+        description: 'Earn 3% commission on every sale from your referrals',
         overview: 'Overview',
         referralLink: 'Your Referral Link',
+        shareDesc: 'Share this link to earn commission',
         copyLink: 'Copy Link',
         linkCopied: 'Link copied to clipboard',
         shareOn: 'Share on',
@@ -953,17 +955,29 @@ const resources = {
         
         // Referrals
         referrals: 'Referrals',
+        referralsDesc: 'Track your referred users and earnings',
         activeReferrals: 'Active Referrals',
         totalReferrals: 'Total Referrals',
         referralName: 'Name',
         signupDate: 'Signup Date',
         status: 'Status',
         commission: 'Commission',
+        noReferrals: 'No referrals yet. Start sharing your link!',
         
         // Actions
         viewReport: 'View Report',
         requestPayout: 'Request Payout',
+        payoutDesc: 'Request withdrawal of your pending commission',
         payoutHistory: 'Payout History',
+        enterAmount: 'Enter amount',
+        availableBalance: 'Available balance',
+        
+        // Messages
+        loadFailed: 'Failed to load affiliate data',
+        enterValidAmount: 'Please enter a valid amount',
+        insufficientBalance: 'Insufficient balance',
+        withdrawalSubmitted: 'Withdrawal request submitted!',
+        withdrawalFailed: 'Failed to submit withdrawal request',
       },
 
       // Payment Success
