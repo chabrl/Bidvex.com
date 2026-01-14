@@ -334,8 +334,8 @@ class FrenchTranslationTester:
         
         try:
             # Navigate to homepage first
-            await self.page.goto(BASE_URL, wait_until='networkidle')
-            await self.page.wait_for_timeout(2000)
+            await self.page.goto(BASE_URL, wait_until='load', timeout=60000)
+            await self.page.wait_for_timeout(3000)
             
             # Set French language in localStorage
             await self.set_french_language()
