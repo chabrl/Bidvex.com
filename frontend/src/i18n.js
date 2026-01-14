@@ -1659,6 +1659,7 @@ const resources = {
         days: 'jours',
         customDays: 'Personnalisé (spécifier)',
         facilityAddress: 'Adresse de l\'Installation',
+        facilityAddressPlaceholder: 'Entrez l\'adresse de ramassage/installation...',
         facilityCapabilities: 'Détails Professionnels de l\'Installation',
         loadingDock: 'Quai de Chargement Disponible',
         overheadCrane: 'Accès Grue Aérienne',
