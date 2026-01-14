@@ -1651,6 +1651,7 @@ const resources = {
         
         // Messages de Succès
         listingCreated: 'Annonce créée avec succès!',
+        createFailed: 'Échec de la création de l\'annonce',
         draftSaved: 'Brouillon sauvegardé avec succès',
         lotAdded: 'Lot ajouté',
         lotRemoved: 'Lot retiré',
