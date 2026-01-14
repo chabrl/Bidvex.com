@@ -136,11 +136,12 @@ const CreateMultiItemListing = () => {
     const savedLang = localStorage.getItem('bidvex_language') || localStorage.getItem('i18nextLng') || 'en';
     console.log('[CreateMultiItemListing] Mounting - Saved Lang:', savedLang, 'Current Lang:', i18n.language);
     
-    if (i18n.language !== savedLang) {
-      console.log('[CreateMultiItemListing] Language mismatch! Forcing change to:', savedLang);
-      i18n.changeLanguage(savedLang);
-    }
-  }, [i18n]);
+    // ALWAYS force language change to reload resources
+    console.log('[CreateMultiItemListing] Forcing language reload to:', savedLang);
+    i18n.changeLanguage(savedLang).then(() => {
+      console.log('[CreateMultiItemListing] Language changed successfully. Testing translation:', t('createListing.title'));
+    });
+  }, []); // Run only on mount
 
 
   useEffect(() => {
