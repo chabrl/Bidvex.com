@@ -652,7 +652,7 @@ const CreateMultiItemListing = () => {
           </select>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="auction_end_date">Auction End Date *</Label>
+          <Label htmlFor="auction_end_date">{t('createListing.auctionEndDate')} *</Label>
           <Input 
             id="auction_end_date" 
             name="auction_end_date" 
