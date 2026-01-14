@@ -341,8 +341,8 @@ class FrenchTranslationTester:
             await self.set_french_language()
             
             # Reload page to apply language
-            await self.page.reload(wait_until='networkidle')
-            await self.page.wait_for_timeout(2000)
+            await self.page.reload(wait_until='load', timeout=60000)
+            await self.page.wait_for_timeout(3000)
             
             # Login as admin
             if not await self.login_as_admin():
