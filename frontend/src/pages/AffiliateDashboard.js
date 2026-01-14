@@ -17,16 +17,16 @@ const AffiliateDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [withdrawAmount, setWithdrawAmount] = useState('');
 
-  // Debug i18n state
+  // CRITICAL FIX: Force i18n language sync on component mount
   useEffect(() => {
-    console.log('=== AffiliateDashboard i18n Debug ===');
-    console.log('i18n.language:', i18n.language);
-    console.log('localStorage bidvex_language:', localStorage.getItem('bidvex_language'));
-    console.log('ready:', ready);
-    console.log('t("affiliate.dashboard"):', t('affiliate.dashboard'));
-    console.log('t("affiliate.totalClicks"):', t('affiliate.totalClicks'));
-    console.log('=====================================');
-  }, [i18n.language, ready, t]);
+    const savedLang = localStorage.getItem('bidvex_language') || localStorage.getItem('i18nextLng') || 'en';
+    console.log('[AffiliateDashboard] Mounting - Saved Lang:', savedLang, 'Current Lang:', i18n.language);
+    
+    if (i18n.language !== savedLang) {
+      console.log('[AffiliateDashboard] Language mismatch! Forcing change to:', savedLang);
+      i18n.changeLanguage(savedLang);
+    }
+  }, [i18n]);
 
   useEffect(() => {
     fetchAffiliateStats();
