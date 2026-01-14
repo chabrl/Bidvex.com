@@ -134,7 +134,7 @@ const CreateMultiItemListing = () => {
   useEffect(() => {
     // Check if user can create multi-lot auctions based on feature flag
     if (user && !canCreateMultiLot(user)) {
-      toast.error('Multi-lot auctions are restricted to business accounts. Please upgrade your account or contact support.');
+      toast.error(t('createListing.restrictedToBusinessAccounts', 'Multi-lot auctions are restricted to business accounts. Please upgrade your account or contact support.'));
       navigate('/seller/dashboard');
     }
     fetchCategories();
