@@ -17,10 +17,11 @@ const AffiliateDashboard = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [withdrawAmount, setWithdrawAmount] = useState('');
+  const currentLanguage = i18n.language; // Track language to force re-renders
 
   useEffect(() => {
     fetchAffiliateStats();
-  }, []);
+  }, [currentLanguage]); // Re-fetch when language changes
 
   const fetchAffiliateStats = async () => {
     try {
