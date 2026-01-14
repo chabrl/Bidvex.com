@@ -1854,11 +1854,11 @@ const CreateMultiItemListing = () => {
               </div>
             </div>
 
-            {/* Refund Policy */}
+            {/* {t("createListing.refundPolicy")} */}
             <div className="space-y-3">
               <Label className="flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
                 <RefreshCcw className="h-4 w-4 text-red-600" />
-                Refund Policy *
+                {t("createListing.refundPolicy")} *
               </Label>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1878,8 +1878,8 @@ const CreateMultiItemListing = () => {
                     className="w-5 h-5 accent-red-600"
                   />
                   <div>
-                    <span className="font-bold text-red-700 dark:text-red-400">Non-Refundable</span>
-                    <p className="text-xs text-slate-600 dark:text-slate-400">All sales are final</p>
+                    <span className="font-bold text-red-700 dark:text-red-400">{t("createListing.nonRefundable")}</span>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">{t("createListing.allSalesFinal")}</p>
                   </div>
                 </label>
                 
@@ -1899,8 +1899,8 @@ const CreateMultiItemListing = () => {
                     className="w-5 h-5 accent-green-600"
                   />
                   <div>
-                    <span className="font-bold text-green-700 dark:text-green-400">Refundable</span>
-                    <p className="text-xs text-slate-600 dark:text-slate-400">Terms apply</p>
+                    <span className="font-bold text-green-700 dark:text-green-400">{t("createListing.refundable")}</span>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">{t("createListing.termsApply")}</p>
                   </div>
                 </label>
               </div>
