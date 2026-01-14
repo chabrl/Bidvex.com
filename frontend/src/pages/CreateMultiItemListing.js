@@ -1358,7 +1358,7 @@ const CreateMultiItemListing = () => {
           <CardContent className="space-y-4">
             {/* Terms & Conditions */}
             <div>
-              <Label>Terms & Conditions</Label>
+              <Label>{t('createListing.termsConditions')}</Label>
               <div className="flex items-center gap-2 mt-2">
                 <Input
                   type="file"
@@ -1377,7 +1377,7 @@ const CreateMultiItemListing = () => {
 
             {/* Important Information */}
             <div>
-              <Label>Important Information</Label>
+              <Label>{t('createListing.importantInfo')}</Label>
               <div className="flex items-center gap-2 mt-2">
                 <Input
                   type="file"
@@ -1474,7 +1474,7 @@ const CreateMultiItemListing = () => {
                 </div>
 
                 <div>
-                  <Label>Estimated Delivery Time</Label>
+                  <Label>{t('createListing.deliveryTime')}</Label>
                   <Input
                     placeholder="e.g., 3-5 business days"
                     value={shippingInfo.delivery_time}
