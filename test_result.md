@@ -110,25 +110,32 @@ AffiliateDashboard (after login):
 - ✅ AffiliateDashboard.js has useEffect with currentLanguage dependency (lines 22-24)
 
 ### Screenshots Captured
-1. `01_homepage_french.png` - Homepage with French navigation (Accueil, Marché, Enchères par Lots)
-2. `03_affiliate_dashboard_french.png` - AffiliateDashboard showing ENGLISH title (bug)
-3. `04_create_listing_validation_french.png` - CreateMultiItemListing page in French mode
-4. `05_affiliate_detailed_check.png` - Detailed i18n state investigation
-5. `06_after_manual_change.png` - After attempting manual language change
+1. `01_homepage_french_mode.png` - Homepage in English (language switch failed initially)
+2. `02_affiliate_dashboard_french.png` - AffiliateDashboard showing ENGLISH (BUG)
+3. `03_payment_success_french.png` - PaymentSuccess page with French error message
+4. `04_notfound_french.png` - NotFoundPage with French 404 message
+5. `05_create_listing_french.png` - CreateMultiItemListing with French "Suivant" button
+6. `06_homepage_after_french_set.png` - Homepage after manually setting French in localStorage
+7. `07_affiliate_dashboard_detailed.png` - Full page screenshot of AffiliateDashboard (ENGLISH)
 
 ### Issues Found
 
 **❌ CRITICAL ISSUE:**
-1. **AffiliateDashboard not translating to French**
-   - Page title shows "Affiliate Dashboard" instead of "Tableau de Bord Affilié"
-   - Mixed English/French content on the page
-   - Component not responding to language change events
-   - Affects user experience for French-speaking affiliates
+1. **AffiliateDashboard NOT translating to French**
+   - **Severity**: CRITICAL - Blocks Phase 1 completion
+   - **Impact**: French-speaking affiliates see 100% English interface
+   - **Evidence**: Despite localStorage='fr', all text remains in English
+   - **Status**: UNRESOLVED - Main agent's fix did NOT work
+   - **Page Title**: Shows "Affiliate Dashboard" instead of "Tableau de Bord Affilié"
+   - **All Stats**: Show English labels (Total Clicks, Pending Commission, Paid Commission)
+   - **All Sections**: Show English text (Your Referral Link, Copy Link, Share on)
+   - **Zero French text**: Not a single French translation appears on the page
 
-**⚠️ MINOR ISSUE:**
-2. **CreateMultiItemListing validation message not tested**
-   - Unable to trigger validation during test
-   - Cannot confirm if French error message displays correctly
+**✅ WORKING FEATURES:**
+2. **PaymentSuccess Page** - French error messages working correctly
+3. **NotFoundPage** - 100% French translation working
+4. **Homepage** - French navigation and hero text working
+5. **CreateMultiItemListing** - French buttons ("Suivant", "Retour") working
 
 ### Root Cause & Recommendations
 
