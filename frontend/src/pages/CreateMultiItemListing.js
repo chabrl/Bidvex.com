@@ -2243,10 +2243,10 @@ const CreateMultiItemListing = () => {
         <Card className="glassmorphism">
           <CardHeader>
             <CardTitle className="text-3xl font-bold text-center">
-              Multi-Lot Listing Wizard
+              {t('createListing.title')}
             </CardTitle>
             <p className="text-center text-muted-foreground">
-              Create a grouped auction with multiple lots
+              {t('createListing.subtitle', 'Create a grouped auction with multiple lots')}
             </p>
           </CardHeader>
           <CardContent>
