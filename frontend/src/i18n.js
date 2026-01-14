@@ -852,6 +852,7 @@ const resources = {
         
         // Success Messages
         listingCreated: 'Listing created successfully!',
+        createFailed: 'Failed to create listing',
         draftSaved: 'Draft saved successfully',
         lotAdded: 'Lot added',
         lotRemoved: 'Lot removed',
