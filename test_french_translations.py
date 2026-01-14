@@ -240,8 +240,8 @@ class FrenchTranslationTester:
             
             # Navigate to affiliate dashboard
             print(f"📍 Navigating to {BASE_URL}/affiliate")
-            await self.page.goto(f"{BASE_URL}/affiliate", wait_until='networkidle')
-            await self.page.wait_for_timeout(3000)
+            await self.page.goto(f"{BASE_URL}/affiliate", wait_until='load', timeout=60000)
+            await self.page.wait_for_timeout(4000)
             
             # Get page HTML
             page_html = await self.page.content()
