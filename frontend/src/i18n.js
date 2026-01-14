@@ -1673,6 +1673,15 @@ const resources = {
         refundTerms: 'Conditions de Remboursement',
         sellerCommitment: 'Engagement du Vendeur',
         agreeToObligations: 'J\'accepte d\'honorer les obligations énoncées ci-dessus',
+        offerShipping: 'Offrir l\'Expédition?',
+        shippingMethods: 'Méthodes d\'Expédition',
+        deliveryTime: 'Délai de Livraison Estimé',
+        deliveryTimePlaceholder: 'ex., 3-5 jours ouvrables',
+        dockType: 'Type de Quai',
+        selectDockType: 'Sélectionner le Type de Quai',
+        highDock: 'Quai Haut (48" standard)',
+        standardDock: 'Quai Standard',
+        adjustableDock: 'Hauteur Ajustable',
         
         // Étape 5 - Révision et Soumission
         reviewSubmit: 'Révision et Soumission',
