@@ -1,5 +1,145 @@
 # BidVex Test Results
 
+## Test Session: Internationalization (EN/FR) - AffiliateDashboard & Validation Messages Re-Test
+
+### Test Objectives
+1. Re-test French translations with focus on AffiliateDashboard
+2. Verify AffiliateDashboard shows "Tableau de Bord Affilié" (NOT "Affiliate Dashboard")
+3. Test CreateMultiItemListing validation messages in French
+4. Verify no English text leaks through in French mode
+5. Check browser console for i18n errors
+
+### Test Credentials
+- Test URL: https://launchapp-4.preview.emergentagent.com
+- Admin: charbeladmin@bidvex.com / Admin123!
+
+---
+
+## INTERNATIONALIZATION RE-TEST COMPLETED - January 14, 2026
+
+### Test Results Summary
+
+**❌ CRITICAL ISSUE FOUND: AffiliateDashboard NOT Translating to French**
+
+#### 1. Homepage French Navigation - WORKING ✅
+- ✅ **"Accueil" (Home)** - Correctly displayed in French mode
+- ✅ **"Marché" (Marketplace)** - Correctly displayed in French mode
+- ✅ **"Enchères par Lots" (Lots Auction)** - Correctly displayed in French mode
+- ✅ **Language switching functional** - French activated successfully
+- ✅ **localStorage persistence** - Language setting saved correctly
+
+#### 2. AffiliateDashboard French Translation - FAILING ❌
+- ❌ **Page Title: "Affiliate Dashboard"** - Should be "Tableau de Bord Affilié"
+- ❌ **English text present**: "Affiliate Dashboard", "Total Clicks", "Conversions"
+- ✅ **Some French text found**: "Total de Clics", "Commission" (mixed state)
+- ❌ **Component not re-rendering** when language changes
+- ❌ **i18n instance not available** on window object for debugging
+
+**Root Cause Analysis:**
+- Navigation bar correctly shows French: "Accueil", "Marché", "Enchères par Lots"
+- localStorage correctly set to 'fr'
+- AffiliateDashboard component uses `t('affiliate.dashboard')` correctly in code
+- **Issue**: Component is not re-rendering when language changes after login
+- The component likely renders with initial language and doesn't respond to language change events
+
+#### 3. CreateMultiItemListing Validation - INCONCLUSIVE ⚠️
+- ⚠️ **Validation message not triggered** during test
+- ✅ **French UI elements present**: "Suivant" button visible
+- ✅ **Navigation in French**: "Accueil", "Marché" visible
+- ⚠️ **Unable to confirm** if validation message shows "Veuillez remplir tous les champs requis"
+
+#### 4. Browser Console Check - CLEAN ✅
+- ✅ **No i18n errors** detected in page content
+- ✅ **No "Translation key not found"** errors
+- ✅ **No "Missing translation"** warnings
+- ✅ **Console logs clean** - no JavaScript errors related to i18n
+
+### Technical Investigation Results
+
+**i18n State Analysis:**
+```
+Homepage (French mode):
+  - localStorage bidvex_language: fr ✓
+  - localStorage i18nextLng: fr ✓
+  - Navigation: Accueil, Marché, Enchères par Lots ✓
+
+AffiliateDashboard (after login):
+  - localStorage bidvex_language: fr ✓
+  - localStorage i18nextLng: fr ✓
+  - Navigation: Accueil, Marché ✓
+  - Page Title: "Affiliate Dashboard" ✗ (should be French)
+  - i18n instance: NOT available on window ✗
+```
+
+**Translation Keys Verified in Code:**
+- ✅ `affiliate.dashboard: 'Tableau de Bord Affilié'` exists in i18n.js (line 1753)
+- ✅ `affiliate.totalClicks: 'Total de Clics'` exists in i18n.js
+- ✅ `createListing.fillRequired: 'Veuillez remplir tous les champs requis'` exists in i18n.js (line 1659)
+- ✅ AffiliateDashboard.js uses `t('affiliate.dashboard')` correctly (line 79)
+
+### Screenshots Captured
+1. `01_homepage_french.png` - Homepage with French navigation (Accueil, Marché, Enchères par Lots)
+2. `03_affiliate_dashboard_french.png` - AffiliateDashboard showing ENGLISH title (bug)
+3. `04_create_listing_validation_french.png` - CreateMultiItemListing page in French mode
+4. `05_affiliate_detailed_check.png` - Detailed i18n state investigation
+5. `06_after_manual_change.png` - After attempting manual language change
+
+### Issues Found
+
+**❌ CRITICAL ISSUE:**
+1. **AffiliateDashboard not translating to French**
+   - Page title shows "Affiliate Dashboard" instead of "Tableau de Bord Affilié"
+   - Mixed English/French content on the page
+   - Component not responding to language change events
+   - Affects user experience for French-speaking affiliates
+
+**⚠️ MINOR ISSUE:**
+2. **CreateMultiItemListing validation message not tested**
+   - Unable to trigger validation during test
+   - Cannot confirm if French error message displays correctly
+
+### Root Cause & Recommendations
+
+**Problem:**
+The AffiliateDashboard component is not re-rendering when the language changes. The component likely:
+1. Renders with the initial language on mount
+2. Does not subscribe to i18n language change events
+3. Does not re-render when localStorage language changes
+
+**Recommended Fix:**
+The AffiliateDashboard component (and potentially other dashboard components) needs to:
+1. Add a useEffect hook to listen for language changes
+2. Force re-render when language changes
+3. Or use i18n's `useSuspense` option to ensure translations are loaded before render
+
+**Code Fix Needed:**
+```javascript
+// In AffiliateDashboard.js, add:
+useEffect(() => {
+  const handleLanguageChange = () => {
+    // Force re-render or update state
+  };
+  i18n.on('languageChanged', handleLanguageChange);
+  return () => i18n.off('languageChanged', handleLanguageChange);
+}, []);
+```
+
+### Production Readiness Assessment
+- ❌ **NOT READY** - AffiliateDashboard French translation broken
+- ✅ **Navigation translations working** - Homepage, Marketplace, Lots Auction all translate correctly
+- ✅ **Language persistence working** - localStorage correctly saves language preference
+- ⚠️ **Validation messages untested** - Need to verify CreateMultiItemListing error messages
+
+### Testing Status - FAILED ❌
+- ❌ **AFFILIATE DASHBOARD FRENCH TRANSLATION FAILED** - Shows English instead of French
+- ✅ **NAVIGATION FRENCH TRANSLATIONS WORKING** - All nav items correctly translated
+- ⚠️ **VALIDATION MESSAGES INCONCLUSIVE** - Unable to trigger during test
+- ✅ **NO CONSOLE ERRORS** - Clean i18n implementation, just missing re-render logic
+
+---
+
+## PREVIOUS TEST SESSION
+
 ## Test Session: Internationalization (EN/FR) - "Lots Auction" Translation Fix
 
 ### Test Objectives
