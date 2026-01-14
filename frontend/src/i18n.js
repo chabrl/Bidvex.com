@@ -1545,7 +1545,17 @@ const resources = {
 
       // Notifications
       notifications: {
-
+        newBid: 'Nouvelle enchère sur votre article',
+        outbid: 'Vous avez été surenchéri',
+        auctionEnding: "L'enchère se termine bientôt",
+        auctionWon: "Félicitations! Vous avez remporté l'enchère",
+        auctionLost: "Enchère terminée - vous avez été surenchéri",
+        paymentReceived: 'Paiement reçu',
+        itemShipped: 'Article expédié',
+        messageReceived: 'Nouveau message reçu',
+        markAllRead: 'Marquer tout comme lu',
+        noNotifications: 'Aucune notification',
+      },
 
       // Créer une annonce multi-lots
       createListing: {
