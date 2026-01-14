@@ -1580,10 +1580,10 @@ const CreateMultiItemListing = () => {
           <CardHeader className="bg-gradient-to-r from-blue-50 to-slate-50 dark:from-blue-900/30 dark:to-slate-900/30">
             <CardTitle className="flex items-center gap-2 text-blue-800 dark:text-blue-300 text-xl">
               <Shield className="h-6 w-6" />
-              Seller Obligations & Agreement
+              {t("createListing.sellerObligationsTitle")}
             </CardTitle>
             <p className="text-sm text-blue-700 dark:text-blue-400">
-              Complete the following mandatory information to list your auction.
+              {t("createListing.sellerObligationsDesc")}
             </p>
           </CardHeader>
           <CardContent className="space-y-6 pt-6">
@@ -1592,7 +1592,7 @@ const CreateMultiItemListing = () => {
             <div className="space-y-3">
               <Label className="flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
                 <DollarSign className="h-4 w-4 text-green-600" />
-                Custom Exchange Rate (Cross-Border Sales) *
+                {t("createListing.customExchangeRate")} *
               </Label>
               <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border-2 border-green-200 dark:border-green-700">
                 <div className="flex flex-wrap items-center gap-3">
