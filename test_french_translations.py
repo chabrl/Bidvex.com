@@ -67,8 +67,8 @@ class FrenchTranslationTester:
             print(f"\n🔐 Logging in as admin: {ADMIN_EMAIL}")
             
             # Navigate to login page
-            await self.page.goto(f"{BASE_URL}/auth", wait_until='networkidle')
-            await self.page.wait_for_timeout(2000)
+            await self.page.goto(f"{BASE_URL}/auth", wait_until='load', timeout=60000)
+            await self.page.wait_for_timeout(3000)
             
             # Fill login form
             await self.page.fill('input[type="email"]', ADMIN_EMAIL)
