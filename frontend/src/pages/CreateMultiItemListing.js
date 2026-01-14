@@ -796,7 +796,7 @@ const CreateMultiItemListing = () => {
                 generateLots(value);
               }
             }} 
-            placeholder="e.g., 280"
+            placeholder={t("createListing.numberOfLotsPlaceholder")}
             className="w-32"
           />
           <span className="text-sm text-muted-foreground">
@@ -2055,7 +2055,7 @@ const CreateMultiItemListing = () => {
                   <RichTextEditor
                     content={auctionTerms.fr}
                     onChange={(value) => setAuctionTerms(prev => ({ ...prev, fr: value }))}
-                    placeholder="Entrez les termes et conditions de votre enchère en français..."
+                    placeholder={t("createListing.termsFrenchPlaceholder")}
                   />
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
