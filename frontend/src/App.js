@@ -157,11 +157,12 @@ const App = () => {
   }
 
   return (
-    <BrowserRouter>
-      <SiteConfigProvider>
-        <CurrencyProvider>
-        <FeatureFlagsProvider>
-          <ScrollToTop />
+    <I18nextProvider i18n={i18n}>
+      <BrowserRouter>
+        <SiteConfigProvider>
+          <CurrencyProvider>
+          <FeatureFlagsProvider>
+            <ScrollToTop />
         <div className="App min-h-screen bg-gradient-to-br from-blue-50 via-white to-teal-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
           <Navbar />
           <Routes>
