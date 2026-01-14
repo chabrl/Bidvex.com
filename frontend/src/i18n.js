@@ -1510,6 +1510,7 @@ const resources = {
       // Créer une annonce multi-lots
       createListing: {
         title: 'Créer une Enchère Multi-Lots',
+        subtitle: 'Créer une enchère groupée avec plusieurs lots',
         stepLabels: {
           basic: 'Info de Base',
           lots: 'Lots',
