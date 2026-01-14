@@ -1619,7 +1619,7 @@ const CreateMultiItemListing = () => {
             <div className="space-y-3">
               <Label className="flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
                 <Truck className="h-4 w-4 text-blue-600" />
-                Logistics (Shipping/Rigging) *
+                {t("createListing.logistics")} *
               </Label>
               <select
                 value={sellerObligations.providesShipping}
@@ -1627,9 +1627,9 @@ const CreateMultiItemListing = () => {
                 className="w-full px-4 py-3 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 required
               >
-                <option value="">-- Select Option --</option>
-                <option value="yes">Yes - Seller Provides Shipping/Rigging</option>
-                <option value="no">No - Buyer Responsible for Pickup</option>
+                <option value="">{t("common.selectOption")}</option>
+                <option value="yes">{t("createListing.logisticsYes")}</option>
+                <option value="no">{t("createListing.logisticsNo")}</option>
               </select>
               
               {sellerObligations.providesShipping === 'yes' && (
