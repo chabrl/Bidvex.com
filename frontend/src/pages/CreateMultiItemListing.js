@@ -1561,7 +1561,7 @@ const CreateMultiItemListing = () => {
                     Visit Instructions
                   </Label>
                   <Textarea
-                    placeholder="Provide instructions for scheduling (e.g., contact info, time slots, what to expect)..."
+                    placeholder={t("createListing.visitInstructionsPlaceholder")}
                     value={visitAvailability.instructions}
                     onChange={(e) => setVisitAvailability(prev => ({ ...prev, instructions: e.target.value }))}
                     rows={3}
@@ -1601,7 +1601,7 @@ const CreateMultiItemListing = () => {
                     type="number"
                     step="0.01"
                     min="0.01"
-                    placeholder="e.g., 1.42"
+                    placeholder={t("createListing.exchangeRatePlaceholder")}
                     value={sellerObligations.customExchangeRate}
                     onChange={(e) => setSellerObligations(prev => ({ ...prev, customExchangeRate: e.target.value }))}
                     className="w-32 text-lg font-bold text-center border-2 border-green-400 focus:ring-green-500 focus:border-green-500"
