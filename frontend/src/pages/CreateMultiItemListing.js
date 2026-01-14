@@ -1844,7 +1844,7 @@ const CreateMultiItemListing = () => {
                     📝 Additional Site Notes
                   </Label>
                   <Textarea
-                    placeholder="e.g., Enter through Gate 4; Appointment required 24h in advance; Limited parking available"
+                    placeholder={t("createListing.additionalNotesPlaceholder")}
                     value={sellerObligations.additionalSiteNotes}
                     onChange={(e) => setSellerObligations(prev => ({ ...prev, additionalSiteNotes: e.target.value }))}
                     rows={3}
@@ -1907,7 +1907,7 @@ const CreateMultiItemListing = () => {
               
               {sellerObligations.refundPolicy === 'refundable' && (
                 <Textarea
-                  placeholder="Specify refund terms and conditions..."
+                  placeholder={t("createListing.refundTermsPlaceholder")}
                   value={sellerObligations.refundTerms}
                   onChange={(e) => setSellerObligations(prev => ({ ...prev, refundTerms: e.target.value }))}
                   rows={2}
@@ -2038,7 +2038,7 @@ const CreateMultiItemListing = () => {
                   <RichTextEditor
                     content={auctionTerms.en}
                     onChange={(value) => setAuctionTerms(prev => ({ ...prev, en: value }))}
-                    placeholder="Enter your auction terms and conditions in English..."
+                    placeholder={t("createListing.termsEnglishPlaceholder")}
                   />
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
