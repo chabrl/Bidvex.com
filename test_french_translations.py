@@ -34,7 +34,12 @@ class FrenchTranslationTester:
         self.page = await self.context.new_page()
         
         # Capture console logs
-        self.page.on('console', lambda msg: self.console_logs.append(f"[{msg.type()}] {msg.text()}"))
+        def handle_console(msg):
+            try:
+                self.console_logs.append(f"[{msg.type}] {msg.text}")
+            except:
+                pass
+        self.page.on('console', handle_console)
         
     async def cleanup_browser(self):
         """Cleanup browser resources"""
