@@ -2033,7 +2033,7 @@ const CreateMultiItemListing = () => {
             {/* English Editor */}
             {activeTermsLang === 'en' && (
               <div>
-                <Label>English Terms & Conditions</Label>
+                <Label>{t("createListing.termsEnglish")}</Label>
                 <div className="mt-2">
                   <RichTextEditor
                     content={auctionTerms.en}
