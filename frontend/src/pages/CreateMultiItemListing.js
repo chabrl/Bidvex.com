@@ -839,7 +839,7 @@ const CreateMultiItemListing = () => {
               className={uploadMethod === 'manual' ? 'gradient-button text-white' : ''}
             >
               <Edit2 className="mr-2 h-4 w-4" />
-              Manual Entry
+              {t('createListing.manual')}
             </Button>
             <Button
               type="button"
@@ -848,7 +848,7 @@ const CreateMultiItemListing = () => {
               className={uploadMethod === 'csv' ? 'gradient-button text-white' : ''}
             >
               <FileText className="mr-2 h-4 w-4" />
-              CSV Upload
+              {t('createListing.csvUpload')}
             </Button>
             <Button
               type="button"
@@ -857,7 +857,7 @@ const CreateMultiItemListing = () => {
               className={uploadMethod === 'images' ? 'gradient-button text-white' : ''}
             >
               <ImageIcon className="mr-2 h-4 w-4" />
-              Bulk Images
+              {t('createListing.imagesBulk')}
             </Button>
           </div>
 
