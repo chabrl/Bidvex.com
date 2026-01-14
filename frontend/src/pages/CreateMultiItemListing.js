@@ -665,35 +665,35 @@ const CreateMultiItemListing = () => {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="city">City *</Label>
+          <Label htmlFor="city">{t('createListing.city')} *</Label>
           <Input 
             id="city" 
             name="city" 
             value={formData.city} 
             onChange={handleChange} 
-            placeholder="e.g., Toronto"
+            placeholder={t('createListing.cityPlaceholder', 'e.g., Montreal')}
             required 
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="region">Region *</Label>
+          <Label htmlFor="region">{t('createListing.region')} *</Label>
           <Input 
             id="region" 
             name="region" 
             value={formData.region} 
             onChange={handleChange} 
-            placeholder="e.g., Ontario"
+            placeholder={t('createListing.regionPlaceholder', 'e.g., Quebec')}
             required 
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="location">Location Details *</Label>
+          <Label htmlFor="location">{t('createListing.location')} *</Label>
           <Input 
             id="location" 
             name="location" 
             value={formData.location} 
             onChange={handleChange} 
-            placeholder="e.g., 123 Main St"
+            placeholder={t('createListing.locationPlaceholder', 'e.g., 123 Main St')}
             required 
           />
         </div>
