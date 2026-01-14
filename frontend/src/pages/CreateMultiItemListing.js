@@ -618,7 +618,7 @@ const CreateMultiItemListing = () => {
           name="title" 
           value={formData.title} 
           onChange={handleChange} 
-          placeholder="e.g., Estate Sale - Furniture Collection"
+          placeholder={t("createListing.auctionTitlePlaceholder")}
           required 
         />
       </div>
@@ -1476,7 +1476,7 @@ const CreateMultiItemListing = () => {
                 <div>
                   <Label>{t('createListing.deliveryTime')}</Label>
                   <Input
-                    placeholder="e.g., 3-5 business days"
+                    placeholder={t("createListing.deliveryTimePlaceholder")}
                     value={shippingInfo.delivery_time}
                     onChange={(e) => setShippingInfo(prev => ({ ...prev, delivery_time: e.target.value }))}
                   />
