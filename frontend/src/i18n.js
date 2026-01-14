@@ -750,6 +750,7 @@ const resources = {
         lotTitlePlaceholder: 'Give this lot a descriptive title',
         lotDescription: 'Lot Description',
         lotDescPlaceholder: 'Describe this lot in detail...',
+        characters: 'characters',
         quantity: 'Quantity',
         startingPrice: 'Starting Price',
         condition: 'Condition',
