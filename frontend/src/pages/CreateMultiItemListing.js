@@ -1659,12 +1659,12 @@ const CreateMultiItemListing = () => {
                     className="px-3 py-2 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 font-medium focus:ring-2 focus:ring-blue-500"
                     required
                   >
-                    <option value="3">3 days</option>
-                    <option value="5">5 days</option>
-                    <option value="7">7 days</option>
-                    <option value="10">10 days</option>
-                    <option value="14">14 days</option>
-                    <option value="30">30 days</option>
+                    <option value="3">{t("createListing.threeDays")}</option>
+                    <option value="5">{t("createListing.fiveDays")}</option>
+                    <option value="7">{t("createListing.sevenDays")}</option>
+                    <option value="10">{t("createListing.tenDays")}</option>
+                    <option value="14">{t("createListing.fourteenDays")}</option>
+                    <option value="30">{t("createListing.thirtyDays")}</option>
                   </select>
                   <span className="text-sm text-slate-600 dark:text-slate-400">{t("createListing.ofAuctionClose")}</span>
                 </div>
