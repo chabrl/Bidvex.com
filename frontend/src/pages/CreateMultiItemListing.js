@@ -1648,11 +1648,11 @@ const CreateMultiItemListing = () => {
             <div className="space-y-3">
               <Label className="flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
                 <Clock className="h-4 w-4 text-orange-600" />
-                Deadline for Item Removal *
+                {t("createListing.removalDeadline")} *
               </Label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-slate-600 dark:text-slate-400">Items must be picked up within</span>
+                  <span className="text-sm text-slate-600 dark:text-slate-400">{t("createListing.itemsPickupWithin")}</span>
                   <select
                     value={sellerObligations.removalDeadlineDays}
                     onChange={(e) => setSellerObligations(prev => ({ ...prev, removalDeadlineDays: e.target.value }))}
@@ -1666,7 +1666,7 @@ const CreateMultiItemListing = () => {
                     <option value="14">14 days</option>
                     <option value="30">30 days</option>
                   </select>
-                  <span className="text-sm text-slate-600 dark:text-slate-400">of auction close</span>
+                  <span className="text-sm text-slate-600 dark:text-slate-400">{t("createListing.ofAuctionClose")}</span>
                 </div>
                 <Input
                   type="text"
@@ -1684,7 +1684,7 @@ const CreateMultiItemListing = () => {
             <div className="space-y-4">
               <Label className="flex items-center gap-2 font-semibold text-slate-900 dark:text-white text-lg">
                 <Building2 className="h-5 w-5 text-purple-600" />
-                Professional Facility Details
+                {t("createListing.facilityCapabilities")}
               </Label>
               
               <div className="space-y-4 p-5 bg-purple-50 dark:bg-purple-900/20 rounded-xl border-2 border-purple-200 dark:border-purple-700">
