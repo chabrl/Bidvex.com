@@ -776,7 +776,7 @@ const CreateMultiItemListing = () => {
       {/* Number of Lots */}
       <div className="space-y-2 p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <Label htmlFor="numLots" className="flex items-center gap-2 text-lg font-semibold">
-          🧩 Number of Lots to Generate
+          🧩 {t('createListing.numberOfLots')}
         </Label>
         <p className="text-sm text-muted-foreground mb-2">
           Specify how many lots you want in this auction. Lot rows will be auto-generated as you type.
