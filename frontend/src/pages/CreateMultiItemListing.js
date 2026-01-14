@@ -1841,7 +1841,7 @@ const CreateMultiItemListing = () => {
                 {/* Additional Site Notes */}
                 <div className="space-y-2 mt-4">
                   <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    📝 Additional Site Notes
+                    {t("createListing.additionalNotes")}
                   </Label>
                   <Textarea
                     placeholder={t("createListing.additionalNotesPlaceholder")}
