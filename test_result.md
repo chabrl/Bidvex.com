@@ -140,27 +140,79 @@ AffiliateDashboard (after login):
 ### Root Cause & Recommendations
 
 **Problem:**
-The AffiliateDashboard component is not re-rendering when the language changes. The component likely:
-1. Renders with the initial language on mount
-2. Does not subscribe to i18n language change events
-3. Does not re-render when localStorage language changes
+The AffiliateDashboard component is NOT translating despite:
+1. ✅ Correct code implementation with `useTranslation()` hook
+2. ✅ useEffect with `currentLanguage` dependency
+3. ✅ All translation keys properly defined in i18n.js
+4. ✅ localStorage correctly set to 'fr'
+5. ✅ Other pages (Homepage, NotFoundPage, PaymentSuccess) translating correctly
 
-**Recommended Fix:**
-The AffiliateDashboard component (and potentially other dashboard components) needs to:
-1. Add a useEffect hook to listen for language changes
-2. Force re-render when language changes
-3. Or use i18n's `useSuspense` option to ensure translations are loaded before render
+**Possible Root Causes:**
+1. **useTranslation hook not initializing properly** - The hook may not be picking up the language from i18n instance
+2. **Component rendering before i18n initialization** - AffiliateDashboard may render before i18n loads French translations
+3. **i18n instance not shared correctly** - The component may be using a different i18n instance than the rest of the app
+4. **Suspense/loading issue** - React Suspense may not be configured for i18n in this component
+5. **Translation namespace issue** - The component may be looking in wrong namespace
 
-**Code Fix Needed:**
+**Recommended Fixes (Priority Order):**
+
+**FIX #1: Add Suspense wrapper to AffiliateDashboard**
 ```javascript
-// In AffiliateDashboard.js, add:
+// In App.js, wrap AffiliateDashboard route with Suspense
+<Route path="/affiliate" element={
+  <ProtectedRoute>
+    <Suspense fallback={<div>Loading...</div>}>
+      <AffiliateDashboard />
+    </Suspense>
+  </ProtectedRoute>
+} />
+```
+
+**FIX #2: Force re-render on language change**
+```javascript
+// In AffiliateDashboard.js, add state to force re-render
+const [, forceUpdate] = useState({});
+
 useEffect(() => {
   const handleLanguageChange = () => {
-    // Force re-render or update state
+    forceUpdate({}); // Force component re-render
+    fetchAffiliateStats();
   };
+  
   i18n.on('languageChanged', handleLanguageChange);
   return () => i18n.off('languageChanged', handleLanguageChange);
-}, []);
+}, [i18n]);
+```
+
+**FIX #3: Check i18n initialization**
+```javascript
+// In AffiliateDashboard.js, add initialization check
+const { t, i18n, ready } = useTranslation();
+
+if (!ready) {
+  return <div>Loading translations...</div>;
+}
+```
+
+**FIX #4: Debug i18n state**
+```javascript
+// Add console logs to debug
+useEffect(() => {
+  console.log('AffiliateDashboard - Current language:', i18n.language);
+  console.log('AffiliateDashboard - Translation test:', t('affiliate.dashboard'));
+}, [i18n.language, t]);
+```
+
+**FIX #5: Check if translations are loaded**
+```javascript
+// Verify translations are available
+useEffect(() => {
+  const hasTranslations = i18n.hasResourceBundle('fr', 'translation');
+  console.log('French translations loaded:', hasTranslations);
+  if (!hasTranslations) {
+    i18n.loadNamespaces('translation');
+  }
+}, [i18n]);
 ```
 
 ### Production Readiness Assessment
