@@ -23,6 +23,7 @@ import RichTextEditor from '../components/RichTextEditor';
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const CreateMultiItemListing = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { canCreateMultiLot } = useFeatureFlags();
   const navigate = useNavigate();
