@@ -1638,6 +1638,13 @@ const resources = {
         maxLotsReached: 'Maximum de 500 lots autorisés par annonce',
         invalidLotCount: 'Veuillez entrer un nombre entre 1 et 500',
         restrictedToBusinessAccounts: 'Les enchères multi-lots sont réservées aux comptes commerciaux. Veuillez mettre à niveau votre compte ou contacter le support.',
+        fillRequired: 'Veuillez remplir tous les champs requis',
+        addOneLot: 'Veuillez ajouter au moins un lot',
+        fixValidationErrors: 'Veuillez corriger les erreurs de validation dans les lots',
+        startingPriceRange: 'La mise à prix doit être entre 1 et 10 000 $ CAD',
+        descriptionLength: 'La description doit contenir entre 20 et 500 caractères',
+        quantityPositive: 'La quantité doit être un nombre entier positif',
+        buyNowMinPrice: 'Le prix d\'achat immédiat doit être d\'au moins {{price}} $ (20% au-dessus de la mise à prix)',
         uploadFailed: 'Échec du téléversement',
         
         // Messages de Succès
