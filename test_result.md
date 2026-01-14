@@ -82,21 +82,32 @@
 Homepage (French mode):
   - localStorage bidvex_language: fr ✓
   - localStorage i18nextLng: fr ✓
+  - document.documentElement.lang: fr ✓
   - Navigation: Accueil, Marché, Enchères par Lots ✓
+  - Hero: "Découvrir. Enchérir. Gagner." ✓
 
 AffiliateDashboard (after login):
   - localStorage bidvex_language: fr ✓
   - localStorage i18nextLng: fr ✓
-  - Navigation: Accueil, Marché ✓
-  - Page Title: "Affiliate Dashboard" ✗ (should be French)
+  - document.documentElement.lang: fr ✓
+  - Navigation: Accueil, Marché, Enchères par Lots ✓
+  - Page H1 Title: "Affiliate Dashboard" ✗ (should be "Tableau de Bord Affilié")
+  - Stats: ALL ENGLISH ✗
+  - Sections: ALL ENGLISH ✗
   - i18n instance: NOT available on window ✗
 ```
 
 **Translation Keys Verified in Code:**
-- ✅ `affiliate.dashboard: 'Tableau de Bord Affilié'` exists in i18n.js (line 1753)
-- ✅ `affiliate.totalClicks: 'Total de Clics'` exists in i18n.js
-- ✅ `createListing.fillRequired: 'Veuillez remplir tous les champs requis'` exists in i18n.js (line 1659)
-- ✅ AffiliateDashboard.js uses `t('affiliate.dashboard')` correctly (line 79)
+- ✅ `affiliate.dashboard: 'Tableau de Bord Affilié'` exists in i18n.js (line 1680)
+- ✅ `affiliate.totalClicks: 'Total de Clics'` exists in i18n.js (line 1690)
+- ✅ `affiliate.conversions: 'Conversions'` exists in i18n.js (line 1691)
+- ✅ `affiliate.pendingCommission: 'Commission en Attente'` exists in i18n.js (line 1693)
+- ✅ `affiliate.paidCommission: 'Commission Payée'` exists in i18n.js (line 1694)
+- ✅ `affiliate.referralLink: 'Votre Lien de Parrainage'` exists in i18n.js (line 1683)
+- ✅ `affiliate.copyLink: 'Copier le Lien'` exists in i18n.js (line 1685)
+- ✅ `affiliate.shareOn: 'Partager sur'` exists in i18n.js (line 1687)
+- ✅ AffiliateDashboard.js uses `t('affiliate.dashboard')` correctly (line 81)
+- ✅ AffiliateDashboard.js has useEffect with currentLanguage dependency (lines 22-24)
 
 ### Screenshots Captured
 1. `01_homepage_french.png` - Homepage with French navigation (Accueil, Marché, Enchères par Lots)
