@@ -17,11 +17,21 @@ const AffiliateDashboard = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [withdrawAmount, setWithdrawAmount] = useState('');
-  const currentLanguage = i18n.language; // Track language to force re-renders
+
+  // Debug i18n state
+  useEffect(() => {
+    console.log('=== AffiliateDashboard i18n Debug ===');
+    console.log('i18n.language:', i18n.language);
+    console.log('localStorage bidvex_language:', localStorage.getItem('bidvex_language'));
+    console.log('ready:', ready);
+    console.log('t("affiliate.dashboard"):', t('affiliate.dashboard'));
+    console.log('t("affiliate.totalClicks"):', t('affiliate.totalClicks'));
+    console.log('=====================================');
+  }, [i18n.language, ready, t]);
 
   useEffect(() => {
     fetchAffiliateStats();
-  }, [currentLanguage]); // Re-fetch when language changes
+  }, []);
 
   const fetchAffiliateStats = async () => {
     try {
