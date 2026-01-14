@@ -700,10 +700,10 @@ const CreateMultiItemListing = () => {
       </div>
       <div className="space-y-2">
         <Label htmlFor="currency" className="flex items-center gap-2">
-          💱 Currency
+          💱 {t('createListing.currency')}
           {user?.currency_locked && (
             <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-              🔒 Location-based
+              🔒 {t('currency.locked')}
             </span>
           )}
         </Label>
