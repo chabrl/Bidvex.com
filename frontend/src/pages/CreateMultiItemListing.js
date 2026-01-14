@@ -2269,7 +2269,7 @@ const CreateMultiItemListing = () => {
                 disabled={currentStep === 1 || loading}
               >
                 <ChevronLeft className="mr-2 h-4 w-4" />
-                Back
+                {t('common.back')}
               </Button>
 
               {currentStep < 5 ? (
@@ -2278,7 +2278,7 @@ const CreateMultiItemListing = () => {
                   onClick={goToNextStep}
                   className="gradient-button text-white border-0"
                 >
-                  Next
+                  {t('common.next')}
                   <ChevronRight className="ml-2 h-4 w-4" />
                 </Button>
               ) : (
@@ -2291,12 +2291,12 @@ const CreateMultiItemListing = () => {
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Creating...
+                      {t('createListing.creating', 'Creating...')}
                     </>
                   ) : (
                     <>
                       <CheckCircle className="mr-2 h-4 w-4" />
-                      Create Listing
+                      {t('createListing.submitListing')}
                     </>
                   )}
                 </Button>
