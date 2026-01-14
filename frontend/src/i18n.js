@@ -841,6 +841,13 @@ const resources = {
         maxLotsReached: 'Maximum 500 lots allowed per listing',
         invalidLotCount: 'Please enter a number between 1 and 500',
         restrictedToBusinessAccounts: 'Multi-lot auctions are restricted to business accounts. Please upgrade your account or contact support.',
+        fillRequired: 'Please fill all required fields',
+        addOneLot: 'Please add at least one lot',
+        fixValidationErrors: 'Please fix validation errors in lots',
+        startingPriceRange: 'Starting bid must be between 1 and 10,000 CAD',
+        descriptionLength: 'Description must be 20-500 characters',
+        quantityPositive: 'Quantity must be a positive integer',
+        buyNowMinPrice: 'Buy Now price must be at least ${{price}} (20% above starting price)',
         uploadFailed: 'Upload failed',
         
         // Success Messages
