@@ -193,7 +193,7 @@ const CreateMultiItemListing = () => {
   // Generate specified number of lots
   const generateLots = (count) => {
     if (count < 1 || count > 500) {
-      toast.error('Please enter a number between 1 and 500');
+      toast.error(t('createListing.invalidLotCount', 'Please enter a number between 1 and 500'));
       return;
     }
     
