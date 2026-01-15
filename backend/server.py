@@ -2106,8 +2106,20 @@ async def get_marketplace_items(
             {"description": {"$regex": search, "$options": "i"}}
         ]
     
-    # Fetch all active auctions
+    # Fetch all active auctions (multi-item)
     auctions = await db.multi_item_listings.find(query, {"_id": 0}).to_list(None)
+    
+    # Fetch single listings (non-multi-item)
+    single_query = {"status": "active"}
+    if category:
+        single_query["category"] = category
+    if search:
+        single_query["$or"] = [
+            {"title": {"$regex": search, "$options": "i"}},
+            {"description": {"$regex": search, "$options": "i"}}
+        ]
+    
+    single_listings = await db.listings.find(single_query, {"_id": 0}).to_list(None)
     
     # Cache seller tax status to avoid repeated DB lookups
     seller_tax_cache = {}
