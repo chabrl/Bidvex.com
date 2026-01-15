@@ -3,9 +3,8 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { 
-  Moon, Sun, Globe, User, LogOut, LayoutDashboard, 
-  MessageCircle, DollarSign, Shield, Menu, X, Search,
+import {
+  MessageCircle, DollarSign, Shield, Menu, X,
   Home, ShoppingBag, Gavel, ChevronDown
 } from 'lucide-react';
 import { Button } from './ui/button';
