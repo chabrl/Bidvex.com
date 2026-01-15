@@ -168,7 +168,7 @@ const SellerDashboard = () => {
               <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-blue-200 dark:border-blue-700">
                 <div className="flex items-center gap-2 mb-2">
                   <DollarSign className="h-5 w-5 text-blue-600" />
-                  <span className="font-semibold text-slate-900 dark:text-white">Your Commission</span>
+                  <span className="font-semibold text-slate-900 dark:text-white">{t('dashboard.seller.yourCommission')}</span>
                 </div>
                 <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
                   {user?.subscription_tier === 'vip' ? '2%' : user?.subscription_tier === 'premium' ? '2.5%' : '4%'}
