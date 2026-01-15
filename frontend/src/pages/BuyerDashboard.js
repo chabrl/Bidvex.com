@@ -145,7 +145,7 @@ const BuyerDashboard = () => {
                             {/* Bid Comparison - Clear Layout with Better Visual Hierarchy */}
                             <div className={`grid grid-cols-2 gap-4 p-4 rounded-lg ${isWinning ? 'bg-green-50 dark:bg-green-950/30' : 'bg-red-50 dark:bg-red-950/30'}`}>
                               <div>
-                                <p className="text-xs text-muted-foreground uppercase mb-1 font-semibold">Your Bid</p>
+                                <p className="text-xs text-muted-foreground uppercase mb-1 font-semibold">{t('dashboard.buyer.yourBid')}</p>
                                 <p className="text-2xl font-bold">${bid.amount.toFixed(2)}</p>
                               </div>
                               <div>
@@ -317,7 +317,7 @@ const BuyerDashboard = () => {
                             <h3 className="font-bold text-lg">{listing?.title}</h3>
                             <div className="grid grid-cols-2 gap-4">
                               <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                                <p className="text-xs text-muted-foreground uppercase mb-1 font-semibold">Your Bid</p>
+                                <p className="text-xs text-muted-foreground uppercase mb-1 font-semibold">{t('dashboard.buyer.yourBid')}</p>
                                 <p className="text-xl font-bold">${bid.amount.toFixed(2)}</p>
                               </div>
                               <div className="p-3 bg-red-50 dark:bg-red-950 rounded-lg">
