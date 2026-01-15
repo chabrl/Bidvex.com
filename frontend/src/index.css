@@ -244,6 +244,17 @@
     box-shadow: var(--shadow-lg);
     transform: translateY(-4px);
   }
+
+  /* ===== TARGETED CONTRAST FOR BLUE GRADIENT SECTIONS ===== */
+  .force-white-text,
+  .force-white-text h1,
+  .force-white-text h2,
+  .force-white-text h3,
+  .force-white-text p,
+  .force-white-text span {
+    color: #FFFFFF;
+  }
+
 }
 
 /* ============================================
