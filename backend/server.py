@@ -2229,6 +2229,84 @@ async def get_marketplace_items(
             
             items.append(item)
     
+    # Add single listings to items array
+    for listing in single_listings:
+        # Check price filters
+        current_price = listing.get("current_price", listing.get("starting_price", 0))
+        if min_price is not None and current_price < min_price:
+            continue
+        if max_price is not None and current_price > max_price:
+            continue
+        
+        # Check condition filter
+        if condition and listing.get("condition") != condition:
+            continue
+        
+        # Get seller tax status for Private Sale badge
+        seller_id = listing.get("seller_id")
+        if seller_id not in seller_tax_cache:
+            seller = await db.users.find_one({"id": seller_id}, {"_id": 0, "is_tax_registered": 1})
+            seller_tax_cache[seller_id] = seller.get("is_tax_registered", False) if seller else False
+        
+        seller_is_business = seller_tax_cache[seller_id]
+        
+        # Build item object compatible with marketplace format
+        item = {
+            "id": listing["id"],
+            "auction_id": None,  # Single listing, no parent auction
+            "lot_number": None,
+            "title": listing["title"],
+            "description": listing.get("description"),
+            "category": listing.get("category"),
+            "condition": listing.get("condition"),
+            "images": listing.get("images", []),
+            
+            # Pricing
+            "starting_price": listing.get("starting_price"),
+            "current_price": current_price,
+            "buy_now_price": listing.get("buy_now_price"),
+            "buy_now_enabled": listing.get("buy_now_price") is not None,
+            
+            # Quantity
+            "quantity": 1,
+            "available_quantity": 1,
+            "sold_quantity": 0,
+            
+            # Bidding
+            "bid_count": listing.get("bid_count", 0),
+            "highest_bidder_id": listing.get("highest_bidder_id"),
+            
+            # Timing
+            "auction_end_date": listing.get("auction_end_date"),
+            "extension_count": 0,
+            
+            # Status
+            "lot_status": listing.get("status", "active"),
+            "pricing_mode": "fixed",
+            
+            # Promotion
+            "is_promoted": listing.get("is_promoted", False),
+            "promotion_tier": listing.get("promotion_tier"),
+            "is_featured": listing.get("is_featured", False),
+            
+            # Parent context
+            "parent_auction_title": None,
+            "total_lots_in_auction": 0,
+            "seller_id": listing.get("seller_id"),
+            "seller_is_business": seller_is_business,
+            
+            # Location
+            "city": listing.get("city"),
+            "region": listing.get("region"),
+            "country": listing.get("country"),
+            
+            # Metadata
+            "created_at": listing.get("created_at")
+        }
+        
+        items.append(item)
+    
+    
     # Sorting logic - UPDATED HIERARCHY
     # Level 1: is_featured (pinned)
     # Level 2: Ending soon (last 60 minutes climb to top)
