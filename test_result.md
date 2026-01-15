@@ -1,5 +1,108 @@
 ---
 
+## AGENT COMMUNICATION - January 15, 2026 (19:58 UTC)
+
+### From: Testing Agent
+### To: Main Agent
+### Priority: CRITICAL - HOT ITEMS TITLE CONTRAST ISSUE IN LIGHT MODE
+
+**Subject: ❌ CRITICAL CONTRAST FAILURE - Hot Items Title Shows Dark Text on Dark Background in Light Mode**
+
+**TEST RESULTS SUMMARY:**
+
+**FINAL VERIFICATION TEST - Homepage Sections & Single Listings**
+
+**✅ PASSED TESTS:**
+1. ✅ Single listing "habibi" visible in marketplace with $5.00 price
+2. ✅ Hot Items section has correct dark blue gradient background
+3. ✅ Hot Items section works correctly in DARK MODE (white text on dark gradient)
+4. ✅ Just Listed section is fully theme-aware (dark text in light mode, white text in dark mode)
+5. ✅ Gradient backgrounds remain consistent across themes
+6. ✅ All other text elements have proper contrast
+
+**❌ CRITICAL FAILURE:**
+
+**Hot Items Title - Light Mode Contrast Issue:**
+- **Issue**: Hot Items title shows `rgb(26, 26, 26)` (DARK/BLACK text) on dark blue gradient background
+- **Expected**: `rgb(255, 255, 255)` (WHITE text) on dark blue gradient background
+- **CSS Class**: Element has `text-white` class but renders as dark text in light mode
+- **Impact**: CRITICAL - Dark text on dark background is unreadable
+- **Dark Mode**: Works correctly - shows white text `rgb(255, 255, 255)` ✅
+
+**TECHNICAL DETAILS:**
+
+**Hot Items Section (Light Mode):**
+```
+Title Element:
+  - CSS Classes: "text-3xl md:text-4xl font-bold text-white"
+  - Computed Color: rgb(26, 26, 26) ❌ (should be rgb(255, 255, 255))
+  - Text Content: "Hot Items"
+  
+Section Element:
+  - CSS Classes: "py-20 px-4 text-white relative overflow-hidden"
+  - Background: linear-gradient(135deg, rgb(30, 58, 138) 0%, rgb(15, 23, 42) 40%, rgb(6, 182, 212) 100%)
+  - Section Color: rgb(255, 255, 255) ✅
+  
+Description:
+  - Color: rgba(165, 243, 252, 0.8) ✅ (cyan/blue - correct)
+```
+
+**Hot Items Section (Dark Mode):**
+```
+Title Element:
+  - Computed Color: rgb(255, 255, 255) ✅ (WHITE - correct)
+```
+
+**ROOT CAUSE:**
+The `text-white` class on the Hot Items title is being overridden by global CSS or Tailwind's dark mode utilities in LIGHT MODE. The title should have white text in BOTH light and dark modes since it's on a dark gradient background, but it only shows white in dark mode.
+
+**RECOMMENDED FIX:**
+
+The Hot Items section has a fixed dark blue gradient background that doesn't change with theme. Therefore, the title should ALWAYS be white regardless of light/dark mode.
+
+**Option 1: Force white text with !important or higher specificity**
+```jsx
+<h2 className="text-3xl md:text-4xl font-bold text-white !text-white">
+  {t('homepage.hotItems')}
+</h2>
+```
+
+**Option 2: Use inline style to override**
+```jsx
+<h2 
+  className="text-3xl md:text-4xl font-bold" 
+  style={{ color: '#FFFFFF' }}
+>
+  {t('homepage.hotItems')}
+</h2>
+```
+
+**Option 3: Add a specific class that prevents dark mode override**
+```jsx
+<h2 className="text-3xl md:text-4xl font-bold text-white dark:text-white">
+  {t('homepage.hotItems')}
+</h2>
+```
+
+**SCREENSHOTS CAPTURED:**
+1. `/app/.screenshots/01_marketplace_habibi_listing.png` - Marketplace showing "habibi" listing with $5.00 price ✅
+2. `/app/.screenshots/hot_items_full_view.png` - Hot Items section in light mode showing dark text issue ❌
+3. `/app/.screenshots/just_listed_full_view.png` - Just Listed section in light mode (correct) ✅
+4. `/app/.screenshots/hot_items_dark_mode.png` - Hot Items section in dark mode (correct) ✅
+5. `/app/.screenshots/just_listed_dark_mode.png` - Just Listed section in dark mode (correct) ✅
+
+**PRODUCTION READINESS:**
+- ❌ **NOT READY** - Critical contrast issue in Hot Items section (light mode)
+- ✅ Marketplace listing display working correctly
+- ✅ Just Listed section theme-aware and working correctly
+- ✅ Dark mode implementation working correctly
+- ❌ **BLOCKER**: Hot Items title unreadable in light mode
+
+**RECOMMENDATION:**
+Main agent must fix the Hot Items title color in light mode. The title should be white in BOTH light and dark modes since it's always on a dark gradient background.
+
+---
+
 ## AGENT COMMUNICATION - January 15, 2026 (18:59 UTC)
 
 ### From: Testing Agent
