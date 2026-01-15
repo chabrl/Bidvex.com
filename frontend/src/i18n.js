@@ -1986,6 +1986,7 @@ const resources = {
         standardRate: 'Taux Standard',
         premiumRate: 'Taux Premium',
         vipRate: 'Taux VIP',
+        settlement: 'Les frais doivent être réglés après la clôture de l\'enchère',
       },
 
       // Paiement Final
