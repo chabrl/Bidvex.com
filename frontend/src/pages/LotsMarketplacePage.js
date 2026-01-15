@@ -324,7 +324,7 @@ const LotsMarketplacePage = () => {
           {/* Pricing */}
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs uppercase tracking-wider" style={{ color: '#9ca3af' }}>Starting From</p>
+              <p className="text-xs uppercase tracking-wider" style={{ color: '#9ca3af' }}>{t('marketplace.startingFrom')}</p>
               <p 
                 className="text-xl font-bold"
                 style={{ 
