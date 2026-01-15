@@ -411,7 +411,7 @@ const LotsMarketplacePage = () => {
                   data-testid="mobile-filter-button"
                 >
                   <SlidersHorizontal className="h-5 w-5" style={{ color: '#2563eb' }} />
-                  <span style={{ color: '#1a1a1a', fontWeight: 600 }}>Filters</span>
+                  <span style={{ color: '#1a1a1a', fontWeight: 600 }}>{t('marketplace.filters')}</span>
                   {activeFilterCount > 0 && (
                     <Badge className="bg-blue-600 text-white border-0 ml-1">
                       {activeFilterCount}
