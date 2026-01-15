@@ -186,11 +186,11 @@ const SellerDashboard = () => {
               <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border-2 border-red-300 dark:border-red-700">
                 <div className="flex items-center gap-2 mb-2">
                   <Clock className="h-5 w-5 text-red-600 dark:text-red-400" />
-                  <span className="font-semibold text-red-800 dark:text-red-300">Payment Deadline</span>
+                  <span className="font-semibold text-red-800 dark:text-red-300">{t('dashboard.seller.paymentDeadline')}</span>
                 </div>
-                <p className="text-2xl font-bold text-red-700 dark:text-red-300">14 Days</p>
+                <p className="text-2xl font-bold text-red-700 dark:text-red-300">{t('dashboard.seller.fourteenDays')}</p>
                 <p className="text-xs text-red-600 dark:text-red-400 mt-1">
-                  Fees must be settled after auction close
+                  {t('fees.settlement', 'Fees must be settled after auction close')}
                 </p>
               </div>
 
@@ -198,7 +198,7 @@ const SellerDashboard = () => {
               <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-300 dark:border-amber-700">
                 <div className="flex items-center gap-2 mb-2">
                   <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                  <span className="font-semibold text-amber-800 dark:text-amber-300">Late Penalty</span>
+                  <span className="font-semibold text-amber-800 dark:text-amber-300">{t('dashboard.seller.latePenalty')}</span>
                 </div>
                 <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">2%/month</p>
                 <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
