@@ -217,7 +217,7 @@ const SellerDashboard = () => {
 
         <Card className="glassmorphism">
           <CardHeader>
-            <CardTitle>Your Listings</CardTitle>
+            <CardTitle>{t('dashboard.seller.yourListings')}</CardTitle>
           </CardHeader>
           <CardContent>
             {dashboard?.listings && dashboard.listings.length > 0 ? (
