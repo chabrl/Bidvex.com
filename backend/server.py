@@ -3096,9 +3096,12 @@ async def get_affiliate_stats(current_user: User = Depends(get_current_user)):
     pending_earnings = sum(e.get("commission_amount", 0) for e in earnings if e.get("status") == "pending")
     paid_earnings = sum(e.get("commission_amount", 0) for e in earnings if e.get("status") == "paid")
     
+    # Get frontend URL from environment
+    frontend_url = os.environ.get('FRONTEND_URL', os.environ.get('REACT_APP_BACKEND_URL', 'http://localhost:3000'))
+    
     return {
         "affiliate_code": current_user.affiliate_code,
-        "referral_link": f"https://launchapp-4.preview.emergentagent.com/auth?ref={current_user.affiliate_code}",
+        "referral_link": f"{frontend_url}/auth?ref={current_user.affiliate_code}",
         "total_referrals": total_referrals,
         "active_referrals": active_referrals,
         "total_earnings": total_earnings,
