@@ -123,16 +123,6 @@ const Navbar = () => {
 
             {/* Right Side Actions */}
             <div className="flex items-center space-x-1">
-              {/* Search Button - Desktop */}
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="hidden md:flex hover:bg-slate-100 dark:hover:bg-slate-800 navbar-icon-btn"
-                onClick={() => setSearchOpen(!searchOpen)}
-              >
-                <Search className="h-5 w-5 navbar-icon text-slate-900 dark:text-slate-100" />
-              </Button>
-
               {/* Messages */}
               {user && (
                 <Link to="/messages" data-testid="messages-link">
