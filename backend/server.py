@@ -3321,7 +3321,7 @@ async def upload_message_attachment(
         f.write(contents)
     
     # Get the base URL for the file
-    base_url = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001")
+    base_url = os.environ.get("BACKEND_URL", os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001"))
     file_url = f"{base_url}/api/uploads/messages/{unique_filename}"
     
     # Create message with attachment
