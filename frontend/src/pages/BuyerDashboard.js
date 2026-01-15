@@ -78,8 +78,8 @@ const BuyerDashboard = () => {
           <CardContent>
             <Tabs defaultValue="all" className="space-y-4">
               <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="all">All Bids</TabsTrigger>
-                <TabsTrigger value="winning" className="text-green-600">Winning</TabsTrigger>
+                <TabsTrigger value="all">{t('dashboard.buyer.allBids')}</TabsTrigger>
+                <TabsTrigger value="winning" className="text-green-600">{t('dashboard.buyer.winning')}</TabsTrigger>
                 <TabsTrigger value="losing" className="text-red-600">Losing</TabsTrigger>
                 <TabsTrigger value="watching">Watching</TabsTrigger>
               </TabsList>
