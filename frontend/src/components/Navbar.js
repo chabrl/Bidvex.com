@@ -298,19 +298,6 @@ const Navbar = () => {
             </div>
           </div>
 
-          {/* Search Bar - Expandable */}
-          {searchOpen && (
-            <div className="hidden md:block pb-4 animate-slideUp">
-              <div className="relative max-w-xl mx-auto">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  placeholder="Search auctions, items, sellers..."
-                  className="pl-10 bg-background/50 backdrop-blur-sm"
-                  autoFocus
-                />
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Mobile Menu */}
