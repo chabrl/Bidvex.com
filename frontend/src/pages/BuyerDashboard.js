@@ -73,7 +73,7 @@ const BuyerDashboard = () => {
 
         <Card className="glassmorphism">
           <CardHeader>
-            <CardTitle>My Bids Dashboard</CardTitle>
+            <CardTitle>{t('dashboard.buyer.myBidsTitle')}</CardTitle>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="all" className="space-y-4">
