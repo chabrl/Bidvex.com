@@ -145,6 +145,16 @@ const App = () => {
     }
   }, [user, processGoogleSession]);
 
+  // Performance: Enforce lazy loading on all images globally
+  useEffect(() => {
+    const images = document.querySelectorAll('img:not([loading])');
+    images.forEach(img => {
+      if (!img.getAttribute('loading')) {
+        img.setAttribute('loading', 'lazy');
+      }
+    });
+  }, []);
+
   if (sessionProcessing) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-teal-50 dark:from-gray-900 dark:to-gray-800">
