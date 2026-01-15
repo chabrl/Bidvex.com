@@ -433,19 +433,19 @@ const LotsMarketplacePage = () => {
                   <div className="space-y-4">
                     <h3 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                       <MapPin className="h-4 w-4 text-blue-600" />
-                      Location
+                      {t('marketplace.location')}
                     </h3>
                     
                     {/* Country */}
                     <div>
-                      <label className="text-sm text-slate-600 dark:text-slate-400 mb-1.5 block">Country</label>
+                      <label className="text-sm text-slate-600 dark:text-slate-400 mb-1.5 block">{t('marketplace.country')}</label>
                       <select
                         value={selectedCountry}
                         onChange={(e) => handleCountryChange(e.target.value)}
                         className="w-full appearance-none px-4 py-3 border-2 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         style={{ color: '#1a1a1a', borderColor: '#d1d5db' }}
                       >
-                        <option value="">All Countries</option>
+                        <option value="">{t('marketplace.allCountries')}</option>
                         {Object.keys(REGIONS_DATA).map(country => (
                           <option key={country} value={country}>{country}</option>
                         ))}
@@ -454,7 +454,7 @@ const LotsMarketplacePage = () => {
                     
                     {/* Province */}
                     <div>
-                      <label className="text-sm text-slate-600 dark:text-slate-400 mb-1.5 block">Province/State</label>
+                      <label className="text-sm text-slate-600 dark:text-slate-400 mb-1.5 block">{t('marketplace.provinceState')}</label>
                       <select
                         value={selectedProvince}
                         onChange={(e) => handleProvinceChange(e.target.value)}
@@ -462,7 +462,7 @@ const LotsMarketplacePage = () => {
                         className="w-full appearance-none px-4 py-3 border-2 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
                         style={{ color: '#1a1a1a', borderColor: '#d1d5db' }}
                       >
-                        <option value="">All Provinces</option>
+                        <option value="">{t('marketplace.allProvinces')}</option>
                         {availableProvinces.map(province => (
                           <option key={province} value={province}>{province}</option>
                         ))}
