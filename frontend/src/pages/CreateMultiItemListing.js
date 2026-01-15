@@ -141,6 +141,7 @@ const CreateMultiItemListing = () => {
     console.log('[CreateMultiItemListing] Forcing language reload to:', savedLang);
     i18n.changeLanguage(savedLang).then(() => {
       console.log('[CreateMultiItemListing] Language changed successfully. Testing translation:', t('createListing.title'));
+      setLanguageReady(true); // Mark language as ready after change completes
     });
   }, []); // Run only on mount
 
