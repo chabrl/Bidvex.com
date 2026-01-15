@@ -1806,25 +1806,6 @@ const resources = {
         pleaseWait: 'Veuillez patienter pendant que nous confirmons votre paiement...',
       },
 
-      // Abonnements et Tarification
-      subscription: {
-        contactSupport: 'Contacter le Support',
-        processing: 'Traitement du Paiement',
-        pleaseWait: 'Veuillez patienter pendant que nous confirmons votre paiement...',
-      },
-
-        newBid: 'Nouvelle enchère sur votre article',
-        outbid: 'Vous avez été surenchéri',
-        auctionEnding: "L'enchère se termine bientôt",
-        auctionWon: "Félicitations! Vous avez remporté l'enchère",
-        auctionLost: "Enchère terminée - vous avez été surenchéri",
-        paymentReceived: 'Paiement reçu',
-        itemShipped: 'Article expédié',
-        messageReceived: 'Nouveau message reçu',
-        markAllRead: 'Marquer tout comme lu',
-        noNotifications: 'Aucune notification',
-      },
-
       // Footer
       footer: {
         aboutUs: 'À propos',
