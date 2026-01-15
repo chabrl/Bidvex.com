@@ -518,10 +518,10 @@ const HotItemsSection = ({ items, navigate }) => {
               </div>
               
               <CardContent className="p-5">
-                <h3 className="font-semibold text-lg mb-3 line-clamp-1 text-white">{item.title}</h3>
+                <h3 className="font-semibold text-lg mb-3 line-clamp-1" style={{ color: '#FFFFFF' }}>{item.title}</h3>
                 <div className="flex justify-between items-end">
                   <div>
-                    <p className="text-xs text-cyan-200/70 uppercase tracking-wider font-medium">{t('homepage.currentBid')}</p>
+                    <p className="text-xs uppercase tracking-wider font-medium" style={{ color: 'rgba(165, 243, 252, 0.8)' }}>{t('homepage.currentBid')}</p>
                     <p className="text-2xl font-bold" style={{ color: '#22D3EE' }}>${item.current_price?.toFixed(2)}</p>
                   </div>
                   <Button 
