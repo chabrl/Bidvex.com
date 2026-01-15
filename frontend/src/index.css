@@ -246,6 +246,28 @@
   }
 }
 
+  /* ===== GLOBAL CONTRAST UTILITIES ===== */
+  /* Ensure white text on blue/dark backgrounds for accessibility */
+  .bg-blue-gradient,
+  .bg-gradient-to-r.from-blue-600,
+  .bg-gradient-to-br.from-blue-600,
+  [class*="from-[#1E3A8A]"],
+  [class*="to-[#06B6D4]"],
+  .bg-blue-900,
+  .bg-blue-800,
+  .bg-slate-900,
+  .bg-slate-800,
+  .dark .bg-slate-800 {
+    color: #FFFFFF !important;
+  }
+  
+  /* Force white text on gradient buttons */
+  .gradient-button,
+  .gradient-button * {
+    color: #FFFFFF !important;
+  }
+
+
 /* ============================================
    DARK MODE SPECIFIC ENHANCEMENTS
    ============================================ */
