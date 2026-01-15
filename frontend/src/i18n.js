@@ -707,6 +707,7 @@ const resources = {
         standardRate: 'Standard Rate',
         premiumRate: 'Premium Rate',
         vipRate: 'VIP Rate',
+        settlement: 'Fees must be settled after auction close',
       },
 
       // Checkout
