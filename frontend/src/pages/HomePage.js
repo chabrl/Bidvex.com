@@ -456,8 +456,8 @@ const HotItemsSection = ({ items, navigate }) => {
               <Flame className="h-8 w-8 text-white" />
             </div>
             <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-white">{t('homepage.hotItems')}</h2>
-              <p className="text-cyan-200/80">{t('homepage.hotItemsDesc')}</p>
+              <h2 className="text-3xl md:text-4xl font-bold" style={{ color: '#FFFFFF' }}>{t('homepage.hotItems')}</h2>
+              <p style={{ color: 'rgba(165, 243, 252, 0.9)' }}>{t('homepage.hotItemsDesc')}</p>
             </div>
           </div>
           <Button 
