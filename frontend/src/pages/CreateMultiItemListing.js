@@ -30,6 +30,7 @@ const CreateMultiItemListing = () => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  const [languageReady, setLanguageReady] = useState(false);
   
   // Step 1: Basic Info
   const [formData, setFormData] = useState({
