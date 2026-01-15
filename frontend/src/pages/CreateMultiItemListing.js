@@ -2254,6 +2254,15 @@ const CreateMultiItemListing = () => {
     );
   };
 
+  // Wait for language to be ready before rendering
+  if (!languageReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen py-8 px-4">
       <div className="max-w-6xl mx-auto">
