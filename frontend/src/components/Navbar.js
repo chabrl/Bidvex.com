@@ -26,7 +26,6 @@ const Navbar = () => {
   const [sellModalOpen, setSellModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
 
   // Handle scroll effect
   useEffect(() => {
