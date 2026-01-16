@@ -245,13 +245,13 @@ PRIVACY_POLICY_EN = """
     <p>If you have any questions about this Privacy Policy or wish to exercise your data protection rights, please contact us:</p>
     <div class="contact-card">
       <h3 style="font-weight: bold; margin-bottom: 1rem;">BidVex Data Protection Officer</h3>
-      <p><strong>Email:</strong> <a href="mailto:privacy@bidvex.com" style="color: #2563eb;">privacy@bidvex.com</a></p>
+      <p><strong>Email:</strong> <a href="mailto:support@bidvex.com" style="color: #2563eb;">support@bidvex.com</a></p>
       <p style="margin-top: 0.5rem;"><strong>Mailing Address:</strong></p>
       <p style="margin-left: 1rem;">
         BidVex Legal Department<br />
-        123 Auction Street<br />
-        Montreal, Quebec, Canada<br />
-        H3B 2Y5
+        761 Chalifoux Street<br />
+        Sherbrooke, Quebec, Canada<br />
+        J1G 0A8
       </p>
     </div>
   </div>
