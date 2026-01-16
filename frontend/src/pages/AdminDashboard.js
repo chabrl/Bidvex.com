@@ -11,6 +11,7 @@ import { Switch } from '../components/ui/switch';
 import { toast } from 'sonner';
 import EnhancedUserManager from './admin/EnhancedUserManager';
 import LotsModeration from './admin/LotsModeration';
+import ManageAllAuctions from './admin/ManageAllAuctions';
 import AuctionControl from './admin/AuctionControl';
 import CategoryManager from './admin/CategoryManager';
 import PromotionManager from './admin/PromotionManager';
