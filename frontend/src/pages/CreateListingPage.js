@@ -434,10 +434,29 @@ const CreateListingPage = () => {
                 </CardContent>
               </Card>
 
+              {/* Final Seller Agreement - Mandatory Legal Checkbox */}
+              <div className="p-6 border-2 border-blue-600 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    id="finalAgreement"
+                    checked={finalAgreementAccepted}
+                    onChange={(e) => setFinalAgreementAccepted(e.target.checked)}
+                    className="mt-1 w-5 h-5 accent-blue-600 cursor-pointer"
+                  />
+                  <label htmlFor="finalAgreement" className="text-sm leading-relaxed cursor-pointer text-slate-900 dark:text-slate-100">
+                    <strong className="text-blue-900 dark:text-blue-300">{t('createListing.bindingAgreement', 'Binding Agreement to Sell')}:</strong>
+                    <p className="mt-2">
+                      {t('createListing.agreementText', 'I hereby certify that I am the legal owner or authorized agent of these items. I agree to sell the items to the highest bidder at the conclusion of the auction, regardless of the final price. I acknowledge that failing to honor a winning bid may result in account suspension and legal liability.')}
+                    </p>
+                  </label>
+                </div>
+              </div>
+
               <Button
                 type="submit"
                 className="w-full gradient-button text-white border-0"
-                disabled={loading}
+                disabled={loading || !finalAgreementAccepted}
                 data-testid="submit-listing-btn"
               >
                 {loading ? (
