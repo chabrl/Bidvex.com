@@ -586,6 +586,8 @@ const CreateMultiItemListing = () => {
         },
         auction_terms_en: auctionTerms.en || null,
         auction_terms_fr: auctionTerms.fr || null,
+        // Final Binding Agreement
+        agreement_accepted: finalAgreementAccepted,
         // Promotion tier
         promotion_tier: promotionTier !== 'standard' ? promotionTier : null,
         is_promoted: promotionTier !== 'standard'
