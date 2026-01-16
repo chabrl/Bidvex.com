@@ -3744,7 +3744,34 @@ async def upload_document(
         raise HTTPException(status_code=400, detail=f"Invalid base64 content: {str(e)}")
 
 @api_router.post("/multi-item-listings")
-async def create_multi_item_listing(listing_data: MultiItemListingCreate, current_user: User = Depends(get_current_user)):
+async def create_multi_item_listing(
+    listing_data: MultiItemListingCreate, 
+    current_user: User = Depends(get_current_user),
+    request: Request = None
+):
+    # ========== MANDATORY: SELLER BINDING AGREEMENT VALIDATION ==========
+    if not listing_data.agreement_accepted:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "type": "agreement_required",
+                "msg": "You must accept the binding agreement to sell before creating a listing. This agreement certifies you are the legal owner and will honor the winning bid.",
+                "field": "agreement_accepted"
+            }
+        )
+    
+    # Capture agreement metadata for legal audit trail
+    client_ip = request.client.host if request else "unknown"
+    user_agent = request.headers.get("user-agent", "unknown") if request else "unknown"
+    agreement_metadata = {
+        "accepted": True,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "ip_address": client_ip,
+        "user_agent": user_agent,
+        "user_id": current_user.id,
+        "user_email": current_user.email
+    }
+    
     # ========== ENFORCE MARKETPLACE SETTINGS ==========
     settings = await get_marketplace_settings()
     
