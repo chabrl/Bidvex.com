@@ -96,11 +96,23 @@ const EnhancedUserManager = () => {
         <Button variant={filter === 'business' ? 'default' : 'outline'} onClick={() => setFilter('business')} className={filter === 'business' ? 'gradient-button text-white border-0' : ''}>Business</Button>
       </div>
 
+      {/* Search Bar */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          type="text"
+          placeholder="Search by name, email, or user ID..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10 text-slate-900 dark:text-slate-100"
+        />
+      </div>
+
       <Card>
-        <CardHeader><CardTitle>Users ({users.length})</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Users ({filteredUsers.length}{searchQuery && ` of ${users.length}`})</CardTitle></CardHeader>
         <CardContent>
           <div className="space-y-2">
-            {users.map(user => (
+            {filteredUsers.map(user => (
               <div key={user.id} className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-4 border rounded-lg">
                 <div className="flex-1">
                   <p className="font-semibold">{user.name}</p>
