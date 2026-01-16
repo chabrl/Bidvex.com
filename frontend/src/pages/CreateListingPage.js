@@ -110,6 +110,8 @@ const CreateListingPage = () => {
         auction_end_date: new Date(formData.auction_end_date).toISOString(),
         shipping_info: shippingInfo.available ? shippingInfo : null,
         visit_availability: visitAvailability.offered ? visitAvailability : null,
+        // Mandatory Binding Agreement
+        agreement_accepted: finalAgreementAccepted,
       };
 
       const response = await axios.post(`${API}/listings`, payload);
