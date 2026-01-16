@@ -5075,6 +5075,175 @@ async def get_all_multi_listings_admin(current_user: User = Depends(get_current_
     return listings
 
 
+@api_router.post("/listings/{listing_id}/request-deletion")
+async def request_listing_deletion(
+    listing_id: str,
+    request_data: dict,
+    current_user: User = Depends(get_current_user)
+):
+    """Seller requests deletion of their listing"""
+    listing = await db.listings.find_one({"id": listing_id})
+    
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    
+    if listing["seller_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="Not your listing")
+    
+    # Create deletion request
+    deletion_request = {
+        "id": str(uuid.uuid4()),
+        "listing_id": listing_id,
+        "listing_type": "single",
+        "listing_title": listing["title"],
+        "seller_id": current_user.id,
+        "seller_name": current_user.name,
+        "seller_email": current_user.email,
+        "reason": request_data.get("reason"),
+        "status": "pending",
+        "requested_at": datetime.now(timezone.utc),
+        "reviewed_at": None,
+        "reviewed_by": None
+    }
+    
+    await db.deletion_requests.insert_one(deletion_request)
+    
+    # Update listing status to indicate pending deletion
+    await db.listings.update_one(
+        {"id": listing_id},
+        {"$set": {"deletion_request_pending": True}}
+    )
+    
+    return {"success": True, "message": "Deletion request submitted"}
+
+@api_router.post("/multi-item-listings/{listing_id}/request-deletion")
+async def request_multi_listing_deletion(
+    listing_id: str,
+    request_data: dict,
+    current_user: User = Depends(get_current_user)
+):
+    """Seller requests deletion of their multi-item listing"""
+    listing = await db.multi_item_listings.find_one({"id": listing_id})
+    
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    
+    if listing["seller_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="Not your listing")
+    
+    # Create deletion request
+    deletion_request = {
+        "id": str(uuid.uuid4()),
+        "listing_id": listing_id,
+        "listing_type": "multi",
+        "listing_title": listing["title"],
+        "total_lots": len(listing.get("lots", [])),
+        "seller_id": current_user.id,
+        "seller_name": current_user.name,
+        "seller_email": current_user.email,
+        "reason": request_data.get("reason"),
+        "status": "pending",
+        "requested_at": datetime.now(timezone.utc),
+        "reviewed_at": None,
+        "reviewed_by": None
+    }
+    
+    await db.deletion_requests.insert_one(deletion_request)
+    
+    # Update listing status
+    await db.multi_item_listings.update_one(
+        {"id": listing_id},
+        {"$set": {"deletion_request_pending": True}}
+    )
+    
+    return {"success": True, "message": "Deletion request submitted"}
+
+@api_router.get("/admin/deletion-requests")
+async def get_deletion_requests(current_user: User = Depends(get_current_user)):
+    """Admin: Get all pending deletion requests"""
+    if not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    requests = await db.deletion_requests.find(
+        {"status": "pending"},
+        {"_id": 0}
+    ).sort("requested_at", -1).to_list(None)
+    
+    return requests
+
+@api_router.post("/admin/deletion-requests/{request_id}/approve")
+async def approve_deletion_request(
+    request_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Admin: Approve and execute deletion request"""
+    if not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    request_doc = await db.deletion_requests.find_one({"id": request_id})
+    if not request_doc:
+        raise HTTPException(status_code=404, detail="Request not found")
+    
+    # Delete the actual listing
+    if request_doc["listing_type"] == "single":
+        await db.listings.delete_one({"id": request_doc["listing_id"]})
+    else:
+        await db.multi_item_listings.delete_one({"id": request_doc["listing_id"]})
+    
+    # Mark request as approved
+    await db.deletion_requests.update_one(
+        {"id": request_id},
+        {"$set": {
+            "status": "approved",
+            "reviewed_at": datetime.now(timezone.utc),
+            "reviewed_by": current_user.id,
+            "reviewed_by_email": current_user.email
+        }}
+    )
+    
+    return {"success": True, "message": "Listing deleted successfully"}
+
+@api_router.post("/admin/deletion-requests/{request_id}/reject")
+async def reject_deletion_request(
+    request_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Admin: Reject deletion request"""
+    if not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    request_doc = await db.deletion_requests.find_one({"id": request_id})
+    if not request_doc:
+        raise HTTPException(status_code=404, detail="Request not found")
+    
+    # Remove pending flag from listing
+    if request_doc["listing_type"] == "single":
+        await db.listings.update_one(
+            {"id": request_doc["listing_id"]},
+            {"$set": {"deletion_request_pending": False}}
+        )
+    else:
+        await db.multi_item_listings.update_one(
+            {"id": request_doc["listing_id"]},
+            {"$set": {"deletion_request_pending": False}}
+        )
+    
+    # Mark request as rejected
+    await db.deletion_requests.update_one(
+        {"id": request_id},
+        {"$set": {
+            "status": "rejected",
+            "reviewed_at": datetime.now(timezone.utc),
+            "reviewed_by": current_user.id,
+            "reviewed_by_email": current_user.email
+        }}
+    )
+    
+    return {"success": True, "message": "Deletion request rejected"}
+
+
+
+
 @api_router.get("/admin/listings/pending")
 async def admin_get_pending_listings(current_user: User = Depends(get_current_user)):
     if not current_user.email.endswith("@bidvex.com"):
