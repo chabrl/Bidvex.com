@@ -316,7 +316,7 @@ const SellerDashboard = () => {
                           onClick={() => handleDeleteListing(listing.id, isMultiItem)}
                           data-testid={`delete-listing-${listing.id}`}
                         >
-                          Delete
+                          {t('dashboard.seller.requestDeletion', 'Request Deletion')}
                         </Button>
                       </div>
                     </div>
