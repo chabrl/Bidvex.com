@@ -2336,7 +2336,7 @@ const CreateMultiItemListing = () => {
                   type="button"
                   onClick={handleSubmit}
                   className="gradient-button text-white border-0"
-                  disabled={loading}
+                  disabled={loading || !finalAgreementAccepted}
                 >
                   {loading ? (
                     <>
