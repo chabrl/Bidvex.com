@@ -220,9 +220,20 @@ const SellerDashboard = () => {
             <CardTitle>{t('dashboard.seller.yourListings')}</CardTitle>
           </CardHeader>
           <CardContent>
-            {dashboard?.listings && dashboard.listings.length > 0 ? (
+            {dashboard?.all_listings && dashboard.all_listings.length > 0 ? (
               <div className="space-y-4">
-                {dashboard.listings.map((listing) => (
+                {dashboard.all_listings.map((listing) => {
+                  // Check if this is a multi-item listing or single listing
+                  const isMultiItem = listing.lots && listing.lots.length > 0;
+                  const displayPrice = isMultiItem 
+                    ? listing.lots.reduce((sum, lot) => sum + (lot.starting_price || 0), 0)
+                    : listing.current_price;
+                  const totalBids = isMultiItem
+                    ? listing.lots.reduce((sum, lot) => sum + (lot.bid_count || 0), 0)
+                    : listing.bid_count;
+                  const itemCount = isMultiItem ? listing.lots.length : 1;
+                  
+                  return (
                   <div
                     key={listing.id}
                     className="flex flex-col sm:flex-row gap-4 p-4 border rounded-lg hover:bg-accent/50 transition-colors"
@@ -231,13 +242,22 @@ const SellerDashboard = () => {
                     <div className="w-full sm:w-24 h-24 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                       {listing.images && listing.images[0] ? (
                         <img src={listing.images[0]} alt={listing.title} className="w-full h-full object-cover" />
+                      ) : isMultiItem && listing.lots[0]?.images?.[0] ? (
+                        <img src={listing.lots[0].images[0]} alt={listing.title} className="w-full h-full object-cover" />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center">📦</div>
+                        <div className="w-full h-full flex items-center justify-center">
+                          {isMultiItem ? '📦' : '📦'}
+                        </div>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2 mb-2">
-                        <h3 className="font-semibold truncate">{listing.title}</h3>
+                        <div>
+                          <h3 className="font-semibold truncate">{listing.title}</h3>
+                          {isMultiItem && (
+                            <p className="text-xs text-muted-foreground">{itemCount} lots</p>
+                          )}
+                        </div>
                         <Badge variant={listing.status === 'active' ? 'default' : 'secondary'}>
                           {listing.status}
                         </Badge>
@@ -245,11 +265,11 @@ const SellerDashboard = () => {
                       <div className="flex flex-wrap gap-4 text-sm mb-2">
                         <span className="text-green-600 font-semibold">
                           <DollarSign className="h-3 w-3 inline mr-1" />
-                          ${listing.current_price.toFixed(2)}
+                          ${displayPrice.toFixed(2)}
                         </span>
                         <span className="text-blue-600">
                           <TrendingUp className="h-3 w-3 inline mr-1" />
-                          {listing.bid_count} bids
+                          {totalBids} bids
                         </span>
                         <span className="text-gray-600">
                           <Eye className="h-3 w-3 inline mr-1" />
@@ -264,14 +284,14 @@ const SellerDashboard = () => {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => navigate(`/listing/${listing.id}`)}
+                          onClick={() => navigate(isMultiItem ? `/lots/${listing.id}` : `/listing/${listing.id}`)}
                         >
                           View
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleDeleteListing(listing.id)}
+                          onClick={() => handleDeleteListing(listing.id, isMultiItem)}
                           data-testid={`delete-listing-${listing.id}`}
                         >
                           Delete
@@ -279,7 +299,8 @@ const SellerDashboard = () => {
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-12">
