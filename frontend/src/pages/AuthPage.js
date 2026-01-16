@@ -47,7 +47,8 @@ const AuthPage = () => {
       const from = location.state?.from?.pathname || '/marketplace';
       navigate(from, { replace: true });
     } catch (error) {
-      toast.error(error.response?.data?.detail || t('auth.authFailedMessage'));
+      const errorMessage = extractErrorMessage(error);
+      toast.error(errorMessage || t('auth.authFailedMessage'));
     } finally {
       setLoading(false);
     }
