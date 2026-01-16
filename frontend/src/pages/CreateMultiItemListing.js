@@ -131,6 +131,9 @@ const CreateMultiItemListing = () => {
 
   // Visit date validation error
   const [visitDateError, setVisitDateError] = useState('');
+  
+  // Final Seller Agreement (Binding Contract)
+  const [finalAgreementAccepted, setFinalAgreementAccepted] = useState(false);
 
   // CRITICAL FIX: Force i18n language sync on component mount
   useEffect(() => {
