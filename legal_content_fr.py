@@ -245,13 +245,13 @@ PRIVACY_POLICY_FR = """
     <p>Si vous avez des questions sur cette politique de confidentialité ou souhaitez exercer vos droits en matière de protection des données, veuillez nous contacter :</p>
     <div class="contact-card">
       <h3 style="font-weight: bold; margin-bottom: 1rem;">Délégué à la protection des données BidVex</h3>
-      <p><strong>Courriel :</strong> <a href="mailto:privacy@bidvex.com" style="color: #2563eb;">privacy@bidvex.com</a></p>
+      <p><strong>Courriel :</strong> <a href="mailto:support@bidvex.com" style="color: #2563eb;">support@bidvex.com</a></p>
       <p style="margin-top: 0.5rem;"><strong>Adresse postale :</strong></p>
       <p style="margin-left: 1rem;">
         BidVex Département juridique<br />
-        123 Rue des Enchères<br />
-        Montréal, Québec, Canada<br />
-        H3B 2Y5
+        761 rue Chalifoux<br />
+        Sherbrooke, Québec, Canada<br />
+        J1G 0A8
       </p>
     </div>
   </div>
