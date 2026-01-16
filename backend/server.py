@@ -1970,7 +1970,34 @@ async def update_profile(updates: Dict[str, Any], current_user: User = Depends(g
     return {"message": "Profile updated successfully"}
 
 @api_router.post("/listings", response_model=Listing)
-async def create_listing(listing_data: ListingCreate, current_user: User = Depends(get_current_user)):
+async def create_listing(
+    listing_data: ListingCreate, 
+    current_user: User = Depends(get_current_user),
+    request: Request = None
+):
+    # ========== MANDATORY: SELLER BINDING AGREEMENT VALIDATION ==========
+    if not listing_data.agreement_accepted:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "type": "agreement_required",
+                "msg": "You must accept the binding agreement to sell before creating a listing. This agreement certifies you are the legal owner and will honor the winning bid.",
+                "field": "agreement_accepted"
+            }
+        )
+    
+    # Capture agreement metadata for legal audit trail
+    client_ip = request.client.host if request else "unknown"
+    user_agent = request.headers.get("user-agent", "unknown") if request else "unknown"
+    agreement_metadata = {
+        "accepted": True,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "ip_address": client_ip,
+        "user_agent": user_agent,
+        "user_id": current_user.id,
+        "user_email": current_user.email
+    }
+    
     # ========== HIGH-TRUST GATEKEEPING ==========
     # Server-side verification check (unless admin)
     if current_user.role != 'admin':
