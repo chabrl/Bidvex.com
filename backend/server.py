@@ -2853,14 +2853,30 @@ async def create_category(category: Category, current_user: User = Depends(get_c
 
 @api_router.get("/dashboard/seller")
 async def get_seller_dashboard(current_user: User = Depends(get_current_user)):
+    # Fetch single listings
     listings = await db.listings.find({"seller_id": current_user.id}, {"_id": 0}).to_list(1000)
-    active_listings = [l for l in listings if l["status"] == "active"]
-    sold_listings = [l for l in listings if l["status"] == "sold"]
-    draft_listings = [l for l in listings if l["status"] == "draft"]
-    total_sales = sum(l["current_price"] for l in sold_listings)
+    
+    # Fetch multi-item listings
+    multi_listings = await db.multi_item_listings.find({"seller_id": current_user.id}, {"_id": 0}).to_list(1000)
+    
+    # Combine both types for dashboard display
+    all_listings = listings + multi_listings
+    
+    active_listings = [l for l in all_listings if l["status"] == "active"]
+    sold_listings = [l for l in all_listings if l["status"] == "sold"]
+    draft_listings = [l for l in all_listings if l["status"] == "draft"]
+    
+    # Calculate total sales from both types
+    total_sales = sum(l.get("current_price", 0) for l in sold_listings)
+    
     return {
-        "active_listings": len(active_listings), "sold_listings": len(sold_listings),
-        "draft_listings": len(draft_listings), "total_sales": total_sales, "listings": listings
+        "active_listings": len(active_listings),
+        "sold_listings": len(sold_listings),
+        "draft_listings": len(draft_listings),
+        "total_sales": total_sales,
+        "listings": listings,
+        "multi_item_listings": multi_listings,
+        "all_listings": all_listings  # Combined for easy display
     }
 
 @api_router.get("/dashboard/buyer")
