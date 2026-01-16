@@ -2028,6 +2028,10 @@ async def create_listing(
         visit_availability=listing_data.visit_availability
     )
     listing_dict = listing.model_dump()
+    
+    # Add legal agreement metadata
+    listing_dict["agreement_metadata"] = agreement_metadata
+    
     listing_dict["auction_end_date"] = listing_dict["auction_end_date"].isoformat()
     listing_dict["created_at"] = listing_dict["created_at"].isoformat()
     await db.listings.insert_one(listing_dict)
