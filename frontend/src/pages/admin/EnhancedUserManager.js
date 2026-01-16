@@ -11,6 +11,8 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const EnhancedUserManager = () => {
   const [users, setUsers] = useState([]);
+  const [filteredUsers, setFilteredUsers] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('all');
   const [analytics, setAnalytics] = useState({});
   const [loading, setLoading] = useState(true);
@@ -18,6 +20,21 @@ const EnhancedUserManager = () => {
   useEffect(() => {
     fetchData();
   }, [filter]);
+
+  useEffect(() => {
+    // Real-time search filtering
+    if (searchQuery.trim() === '') {
+      setFilteredUsers(users);
+    } else {
+      const query = searchQuery.toLowerCase();
+      const filtered = users.filter(user => 
+        user.name?.toLowerCase().includes(query) ||
+        user.email?.toLowerCase().includes(query) ||
+        user.id?.toLowerCase().includes(query)
+      );
+      setFilteredUsers(filtered);
+    }
+  }, [searchQuery, users]);
 
   const fetchData = async () => {
     try {
