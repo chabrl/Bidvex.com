@@ -3906,6 +3906,10 @@ async def create_multi_item_listing(
     )
     
     listing_dict = listing.model_dump()
+    
+    # Add legal agreement metadata
+    listing_dict["agreement_metadata"] = agreement_metadata
+    
     listing_dict["auction_end_date"] = listing_dict["auction_end_date"].isoformat()
     listing_dict["created_at"] = listing_dict["created_at"].isoformat()
     if listing_dict["auction_start_date"]:
