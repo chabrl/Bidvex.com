@@ -114,7 +114,8 @@ const CreateListingPage = () => {
       navigate(`/listing/${response.data.id}`);
     } catch (error) {
       console.error('Failed to create listing:', error);
-      toast.error(error.response?.data?.detail || 'Failed to create listing');
+      const errorMessage = extractErrorMessage(error);
+      toast.error(errorMessage || 'Failed to create listing');
     } finally {
       setLoading(false);
     }
