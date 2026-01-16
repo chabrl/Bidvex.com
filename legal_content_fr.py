@@ -413,12 +413,12 @@ TERMS_CONDITIONS_FR = """
   <h2 class="section-header">12. Coordonnées</h2>
   <div class="colored-box slate-box">
     <p><strong>BidVex Département juridique</strong></p>
-    <p>Courriel : <a href="mailto:legal@bidvex.com" style="color: #2563eb;">legal@bidvex.com</a></p>
+    <p>Courriel : <a href="mailto:support@bidvex.com" style="color: #2563eb;">support@bidvex.com</a></p>
     <p style="margin-top: 1rem;">
       <strong>Adresse :</strong><br />
-      123 Rue des Enchères<br />
-      Montréal, Québec, Canada<br />
-      H3B 2Y5
+      761 rue Chalifoux<br />
+      Sherbrooke, Québec, Canada<br />
+      J1G 0A8
     </p>
   </div>
 </div>
