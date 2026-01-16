@@ -466,6 +466,5 @@ const NetPayoutCard = ({ totalSales = 0, subscriptionTier = 'free' }) => {
     </Card>
   );
 };
-};
 
 export default SellerDashboard;
