@@ -259,6 +259,7 @@ const AdminDashboard = () => {
         switch (secondaryTab) {
           case 'users': return <EnhancedUserManager />;
           case 'lots': return <LotsModeration />;
+          case 'all-auctions': return <ManageAllAuctions />;
           case 'auctions': return <AuctionControl />;
           case 'categories': return <CategoryManager />;
           default: return <EnhancedUserManager />;
