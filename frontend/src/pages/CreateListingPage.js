@@ -45,6 +45,9 @@ const CreateListingPage = () => {
     dates: '',
     instructions: ''
   });
+  
+  // Final Seller Agreement (Binding Contract)
+  const [finalAgreementAccepted, setFinalAgreementAccepted] = useState(false);
 
   useEffect(() => {
     fetchCategories();
