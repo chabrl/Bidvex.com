@@ -773,9 +773,9 @@ const HowItWorksSection = ({ navigate }) => {
 
       <div className="relative max-w-5xl mx-auto text-center">
         <div className={`mb-12 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-          <Badge className="bg-white/10 backdrop-blur text-white border-cyan-400/30 mb-4">{t('homepage.gettingStarted')}</Badge>
-          <h2 className="text-3xl md:text-5xl font-bold mb-4 text-white">{t('homepage.howItWorksTitle')}</h2>
-          <p className="text-blue-200 max-w-2xl mx-auto">{t('homepage.startWinning')}</p>
+          <Badge className="bg-white/10 backdrop-blur border-cyan-400/30 mb-4" style={{ color: '#FFFFFF' }}>{t('homepage.gettingStarted')}</Badge>
+          <h2 className="text-3xl md:text-5xl font-bold mb-4" style={{ color: '#FFFFFF' }}>{t('homepage.howItWorksTitle')}</h2>
+          <p className="max-w-2xl mx-auto" style={{ color: 'rgba(191, 219, 254, 0.9)' }}>{t('homepage.startWinning')}</p>
         </div>
 
         <div className="grid md:grid-cols-3 gap-8 mb-12">
@@ -786,14 +786,14 @@ const HowItWorksSection = ({ navigate }) => {
               style={{ transitionDelay: `${(index + 1) * 150}ms` }}
             >
               <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/10 hover:bg-white/15 hover:border-cyan-400/30 transition-all">
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-8 h-8 bg-cyan-500 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-lg shadow-cyan-500/50">
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-8 h-8 bg-cyan-500 rounded-full flex items-center justify-center text-sm font-bold shadow-lg shadow-cyan-500/50" style={{ color: '#FFFFFF' }}>
                   {index + 1}
                 </div>
-                <div className="w-16 h-16 mx-auto mb-5 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30 text-white">
+                <div className="w-16 h-16 mx-auto mb-5 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30" style={{ color: '#FFFFFF' }}>
                   {step.icon}
                 </div>
-                <h3 className="text-xl font-bold mb-3 text-white">{step.title}</h3>
-                <p className="text-blue-100">{step.desc}</p>
+                <h3 className="text-xl font-bold mb-3" style={{ color: '#FFFFFF' }}>{step.title}</h3>
+                <p style={{ color: 'rgba(224, 242, 254, 0.9)' }}>{step.desc}</p>
               </div>
             </div>
           ))}
