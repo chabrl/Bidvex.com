@@ -38,10 +38,11 @@ const SellerDashboard = () => {
     }
   };
 
-  const handleDeleteListing = async (listingId) => {
+  const handleDeleteListing = async (listingId, isMultiItem = false) => {
     if (window.confirm(t('dashboard.seller.deleteListing'))) {
       try {
-        await axios.delete(`${API}/listings/${listingId}`);
+        const endpoint = isMultiItem ? `multi-item-listings/${listingId}` : `listings/${listingId}`;
+        await axios.delete(`${API}/${endpoint}`);
         toast.success(t('dashboard.seller.listingDeleted'));
         fetchDashboard();
       } catch (error) {
