@@ -338,6 +338,57 @@ const SellerDashboard = () => {
           </>
         )}
       </div>
+      
+      {/* Deletion Request Modal */}
+      {deletionRequestModal.open && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="text-red-600">
+                {t('dashboard.seller.requestDeletion', 'Request Deletion')}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                {t('dashboard.seller.deletionRequestDesc', 'Please provide a reason for requesting deletion. An admin will review your request.')}
+              </p>
+              <div>
+                <label className="text-sm font-medium mb-2 block text-slate-900 dark:text-slate-100">
+                  {t('dashboard.seller.reasonForDeletion', 'Reason for Deletion')} *
+                </label>
+                <textarea
+                  value={deletionReason}
+                  onChange={(e) => setDeletionReason(e.target.value)}
+                  placeholder={t('dashboard.seller.deletionReasonPlaceholder', 'Explain why you need to delete this auction (minimum 20 characters)...')}
+                  className="w-full px-3 py-2 border rounded-md min-h-[100px] text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800"
+                  minLength={20}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {deletionReason.length}/20 characters minimum
+                </p>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setDeletionRequestModal({ open: false, listing: null, isMultiItem: false });
+                    setDeletionReason('');
+                  }}
+                >
+                  {t('common.cancel', 'Cancel')}
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleSubmitDeletionRequest}
+                  disabled={deletionReason.trim().length < 20}
+                >
+                  {t('dashboard.seller.submitRequest', 'Submit Request')}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };
