@@ -5055,6 +5055,26 @@ async def admin_get_reports(current_user: User = Depends(get_current_user)):
     reports = await db.reports.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
     return reports
 
+
+@api_router.get("/admin/listings/all")
+async def get_all_listings_admin(current_user: User = Depends(get_current_user)):
+    """Admin: Get all single listings"""
+    if not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    listings = await db.listings.find({}, {"_id": 0}).sort("created_at", -1).to_list(None)
+    return listings
+
+@api_router.get("/admin/multi-item-listings/all")
+async def get_all_multi_listings_admin(current_user: User = Depends(get_current_user)):
+    """Admin: Get all multi-item listings"""
+    if not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    listings = await db.multi_item_listings.find({}, {"_id": 0}).sort("created_at", -1).to_list(None)
+    return listings
+
+
 @api_router.get("/admin/listings/pending")
 async def admin_get_pending_listings(current_user: User = Depends(get_current_user)):
     if not current_user.email.endswith("@bidvex.com"):
