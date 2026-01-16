@@ -21,6 +21,8 @@ const SellerDashboard = () => {
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('listings'); // 'listings' or 'analytics'
+  const [deletionRequestModal, setDeletionRequestModal] = useState({ open: false, listing: null, isMultiItem: false });
+  const [deletionReason, setDeletionReason] = useState('');
 
   useEffect(() => {
     fetchDashboard();
