@@ -907,6 +907,9 @@ class MultiItemListingCreate(BaseModel):
     visit_availability: Optional[Dict[str, Any]] = None  # {offered, dates, instructions}
     auction_terms_en: Optional[str] = None  # English auction terms (rich text HTML)
     auction_terms_fr: Optional[str] = None  # French auction terms (rich text HTML)
+    # Seller Agreement (Legal Compliance)
+    agreement_accepted: bool = False  # Must be True to create listing
+    agreement_metadata: Optional[Dict[str, Any]] = None  # {timestamp, ip_address, user_agent}
     # Promotion fields
     promotion_tier: Optional[str] = None  # 'premium' ($25), 'elite' ($50)
     is_promoted: bool = False
