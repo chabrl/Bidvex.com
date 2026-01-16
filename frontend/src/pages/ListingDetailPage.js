@@ -182,7 +182,8 @@ const ListingDetailPage = () => {
       
       window.location.href = response.data.url;
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Payment failed');
+      const errorMessage = extractErrorMessage(error);
+      toast.error(errorMessage || 'Payment failed');
     }
   };
 
