@@ -909,6 +909,10 @@ const resources = {
         lotRemoved: 'Lot removed',
         imageUploaded: 'Image uploaded',
         creating: 'Creating...',
+        
+        // Final Binding Agreement
+        bindingAgreement: 'Binding Agreement to Sell',
+        agreementText: 'I hereby certify that I am the legal owner or authorized agent of these items. I agree to sell the items to the highest bidder at the conclusion of the auction, regardless of the final price. I acknowledge that failing to honor a winning bid may result in account suspension and legal liability.',
       },
 
       // Seller Tools & Features
