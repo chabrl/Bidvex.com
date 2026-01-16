@@ -413,12 +413,12 @@ TERMS_CONDITIONS_EN = """
   <h2 class="section-header">12. Contact Information</h2>
   <div class="colored-box slate-box">
     <p><strong>BidVex Legal Department</strong></p>
-    <p>Email: <a href="mailto:legal@bidvex.com" style="color: #2563eb;">legal@bidvex.com</a></p>
+    <p>Email: <a href="mailto:support@bidvex.com" style="color: #2563eb;">support@bidvex.com</a></p>
     <p style="margin-top: 1rem;">
       <strong>Address:</strong><br />
-      123 Auction Street<br />
-      Montreal, Quebec, Canada<br />
-      H3B 2Y5
+      761 Chalifoux Street<br />
+      Sherbrooke, Quebec, Canada<br />
+      J1G 0A8
     </p>
   </div>
 </div>
