@@ -1786,6 +1786,10 @@ const resources = {
         lotRemoved: 'Lot retiré',
         imageUploaded: 'Image téléversée',
         creating: 'Création en cours...',
+        
+        // Accord Contraignant Final
+        bindingAgreement: 'Accord Contraignant de Vente',
+        agreementText: 'Je certifie par la présente que je suis le propriétaire légal ou l\'agent autorisé de ces articles. J\'accepte de vendre les articles au plus offrant à la fin de l\'enchère, quel que soit le prix final. Je reconnais que le fait de ne pas honorer une enchère gagnante peut entraîner la suspension de mon compte et une responsabilité légale.',
       },
 
       // Programme d'Affiliation
