@@ -41,15 +41,34 @@ const SellerDashboard = () => {
   };
 
   const handleDeleteListing = async (listingId, isMultiItem = false) => {
-    if (window.confirm(t('dashboard.seller.deleteListing'))) {
-      try {
-        const endpoint = isMultiItem ? `multi-item-listings/${listingId}` : `listings/${listingId}`;
-        await axios.delete(`${API}/${endpoint}`);
-        toast.success(t('dashboard.seller.listingDeleted'));
-        fetchDashboard();
-      } catch (error) {
-        toast.error(t('dashboard.seller.deleteFailed'));
-      }
+    // Sellers can only REQUEST deletion, not delete directly
+    setDeletionRequestModal({ 
+      open: true, 
+      listing: { id: listingId, isMultiItem },
+      isMultiItem 
+    });
+  };
+  
+  const handleSubmitDeletionRequest = async () => {
+    if (deletionReason.trim().length < 20) {
+      toast.error(t('dashboard.seller.deletionReasonTooShort', 'Please provide a reason (minimum 20 characters)'));
+      return;
+    }
+    
+    try {
+      const { listing, isMultiItem } = deletionRequestModal;
+      const endpoint = isMultiItem ? 'multi-item-listings' : 'listings';
+      
+      await axios.post(`${API}/${endpoint}/${listing.id}/request-deletion`, {
+        reason: deletionReason
+      });
+      
+      toast.success(t('dashboard.seller.deletionRequestSubmitted', 'Deletion request submitted. Admin will review shortly.'));
+      setDeletionRequestModal({ open: false, listing: null, isMultiItem: false });
+      setDeletionReason('');
+      fetchDashboard();
+    } catch (error) {
+      toast.error(t('dashboard.seller.deletionRequestFailed', 'Failed to submit deletion request'));
     }
   };
 
