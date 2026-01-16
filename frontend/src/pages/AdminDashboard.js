@@ -51,6 +51,7 @@ const SECONDARY_TABS = {
   marketplace: [
     { id: 'users', label: 'User Management', icon: '👥', lucideIcon: Users },
     { id: 'lots', label: 'Lots Moderation', icon: '📦', lucideIcon: Package },
+    { id: 'all-auctions', label: 'Manage All Auctions', icon: '🏛️', lucideIcon: Package },
     { id: 'auctions', label: 'Auction Control', icon: '🔨', lucideIcon: Gavel },
     { id: 'categories', label: 'Categories', icon: '📂', lucideIcon: Settings },
   ],
