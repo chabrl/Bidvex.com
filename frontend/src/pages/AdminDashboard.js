@@ -262,6 +262,7 @@ const AdminDashboard = () => {
           case 'users': return <EnhancedUserManager />;
           case 'lots': return <LotsModeration />;
           case 'all-auctions': return <ManageAllAuctions />;
+          case 'deletion-requests': return <DeletionRequestsManager />;
           case 'auctions': return <AuctionControl />;
           case 'categories': return <CategoryManager />;
           default: return <EnhancedUserManager />;
