@@ -594,7 +594,8 @@ const CreateMultiItemListing = () => {
       };
       const response = await axios.post(`${API}/multi-item-listings`, payload);
       toast.success(t('createListing.listingCreated'));
-      navigate(`/multi-item-listing/${response.data.id}`);
+      // Redirect to the created listing detail page
+      navigate(`/lots/${response.data.id}`);
     } catch (error) {
       console.error('Failed:', error);
       toast.error(error.response?.data?.detail || t('createListing.createFailed', 'Failed to create listing'));
