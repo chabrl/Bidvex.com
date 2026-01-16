@@ -53,6 +53,7 @@ const SECONDARY_TABS = {
     { id: 'users', label: 'User Management', icon: '👥', lucideIcon: Users },
     { id: 'lots', label: 'Lots Moderation', icon: '📦', lucideIcon: Package },
     { id: 'all-auctions', label: 'Manage All Auctions', icon: '🏛️', lucideIcon: Package },
+    { id: 'deletion-requests', label: 'Deletion Requests', icon: '🗑️', lucideIcon: AlertTriangle },
     { id: 'auctions', label: 'Auction Control', icon: '🔨', lucideIcon: Gavel },
     { id: 'categories', label: 'Categories', icon: '📂', lucideIcon: Settings },
   ],
