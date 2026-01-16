@@ -745,6 +745,9 @@ class ListingCreate(BaseModel):
     auction_end_date: datetime
     shipping_info: Optional[Dict[str, Any]] = None  # {available, methods, rates, delivery_time}
     visit_availability: Optional[Dict[str, Any]] = None  # {offered, dates, instructions}
+    # Seller Agreement (Legal Compliance)
+    agreement_accepted: bool = False  # Must be True to create listing
+    agreement_metadata: Optional[Dict[str, Any]] = None  # {timestamp, ip_address, user_agent}
 
 class AuctionRating(BaseModel):
     """
