@@ -765,17 +765,17 @@ const HowItWorksSection = ({ navigate }) => {
   ];
 
   return (
-    <section ref={ref} className="py-20 px-4 bg-gradient-to-br from-blue-900 via-slate-900 to-slate-900 relative overflow-hidden">
-      {/* Background */}
-      <div className="absolute inset-0 opacity-30">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-cyan-500 rounded-full blur-[200px]" />
+    <section ref={ref} className="py-20 px-4 bg-gradient-to-br from-blue-600 via-cyan-600 to-blue-700 dark:from-blue-900 dark:via-slate-900 dark:to-slate-900 text-white relative overflow-hidden">
+      {/* Background Effects */}
+      <div className="absolute inset-0 opacity-20 dark:opacity-30">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-cyan-300 dark:bg-cyan-500 rounded-full blur-[200px]" />
       </div>
 
       <div className="relative max-w-5xl mx-auto text-center">
         <div className={`mb-12 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-          <Badge className="bg-white/10 backdrop-blur border-cyan-400/30 mb-4 text-white font-semibold">{t('homepage.gettingStarted')}</Badge>
+          <Badge className="bg-white/20 backdrop-blur border-white/30 dark:border-cyan-400/30 mb-4 text-white font-semibold shadow-lg">{t('homepage.gettingStarted')}</Badge>
           <h2 className="text-3xl md:text-5xl font-bold mb-4 text-white drop-shadow-lg">{t('homepage.howItWorksTitle')}</h2>
-          <p className="max-w-2xl mx-auto text-lg text-blue-100 drop-shadow-md">{t('homepage.startWinning')}</p>
+          <p className="max-w-2xl mx-auto text-lg text-white/90 drop-shadow-md">{t('homepage.startWinning')}</p>
         </div>
 
         <div className="grid md:grid-cols-3 gap-8 mb-12">
@@ -785,15 +785,15 @@ const HowItWorksSection = ({ navigate }) => {
               className={`relative transition-all duration-700 hover:scale-105 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
               style={{ transitionDelay: `${(index + 1) * 150}ms` }}
             >
-              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/10 hover:bg-white/15 hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-500/20 transition-all">
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-10 h-10 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-lg shadow-cyan-500/50">
+              <div className="bg-white/15 dark:bg-white/10 backdrop-blur-md rounded-2xl p-8 border border-white/20 dark:border-white/10 hover:bg-white/25 dark:hover:bg-white/15 hover:border-white/40 dark:hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-400/30 dark:hover:shadow-cyan-500/20 transition-all">
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-10 h-10 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-lg shadow-cyan-400/60">
                   {index + 1}
                 </div>
-                <div className="w-16 h-16 mx-auto mb-5 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30 text-white">
+                <div className="w-16 h-16 mx-auto mb-5 rounded-xl bg-gradient-to-br from-white/30 to-white/10 dark:from-cyan-500 dark:to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-400/40 dark:shadow-cyan-500/30 text-white backdrop-blur-sm">
                   {step.icon}
                 </div>
-                <h3 className="text-xl font-bold mb-3 text-white">{step.title}</h3>
-                <p className="text-cyan-100 leading-relaxed">{step.desc}</p>
+                <h3 className="text-xl font-bold mb-3 text-white drop-shadow-md">{step.title}</h3>
+                <p className="text-white/95 leading-relaxed">{step.desc}</p>
               </div>
             </div>
           ))}
@@ -802,7 +802,7 @@ const HowItWorksSection = ({ navigate }) => {
         <div className={`transition-all duration-700 delay-500 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
           <Button 
             onClick={() => navigate('/how-it-works')}
-            className="btn-shine bg-gradient-to-r from-cyan-500 to-cyan-400 hover:from-cyan-400 hover:to-cyan-300 text-slate-900 font-bold px-10 py-6 text-lg shadow-xl shadow-cyan-500/30 hover:shadow-2xl hover:shadow-cyan-400/40 hover:-translate-y-1 transition-all whitespace-nowrap"
+            className="btn-shine bg-white hover:bg-white/90 text-blue-700 font-bold px-10 py-6 text-lg shadow-xl shadow-white/30 hover:shadow-2xl hover:shadow-white/40 hover:-translate-y-1 transition-all whitespace-nowrap"
           >
             {t('homepage.learnMore')}
             <ArrowRight className="ml-2 h-5 w-5" />
