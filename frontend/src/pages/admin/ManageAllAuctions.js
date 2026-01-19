@@ -299,6 +299,68 @@ const ManageAllAuctions = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Admin Deletion Warning Modal - Bilingual */}
+      {deleteModal.open && deleteModal.listing && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-2xl border-2 border-red-600">
+            <CardHeader className="bg-red-50 dark:bg-red-900/20">
+              <CardTitle className="text-red-600 flex items-center gap-2">
+                <AlertTriangle className="h-6 w-6" />
+                ⚠️ WARNING: Irreversible Action / AVERTISSEMENT : Action Irréversible
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              <div className="space-y-3 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-700">
+                <p className="font-semibold text-slate-900 dark:text-slate-100">English:</p>
+                <p className="text-sm text-slate-700 dark:text-slate-300">
+                  You are about to <strong>permanently delete</strong> a live auction. This action <strong>cannot be undone</strong>. 
+                  Deleting an active listing may result in <strong>loss of bidder trust</strong> and <strong>potential legal disputes</strong>. 
+                  Are you absolutely sure you wish to proceed?
+                </p>
+              </div>
+              
+              <div className="space-y-3 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-700">
+                <p className="font-semibold text-slate-900 dark:text-slate-100">Français:</p>
+                <p className="text-sm text-slate-700 dark:text-slate-300">
+                  Vous êtes sur le point de <strong>supprimer définitivement</strong> une enchère en cours. Cette action est <strong>permanente et irréversible</strong>. 
+                  La suppression d'une annonce active peut entraîner une <strong>perte de confiance des enchérisseurs</strong> et des <strong>litiges juridiques potentiels</strong>. 
+                  Êtes-vous absolument sûr de vouloir continuer ?
+                </p>
+              </div>
+
+              <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-700">
+                <p className="font-semibold text-red-900 dark:text-red-300 mb-2">
+                  Deleting: {deleteModal.listing.title}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Type: {deleteModal.listing.type === 'multi' ? `Multi-Item (${deleteModal.listing.lots?.length || 0} lots)` : 'Single Item'}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Status: {deleteModal.listing.status}
+                </p>
+              </div>
+
+              <div className="flex gap-2 justify-end pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => setDeleteModal({ open: false, listing: null })}
+                >
+                  Cancel / Annuler
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={confirmDelete}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Confirm Deletion / Confirmer la Suppression
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };
