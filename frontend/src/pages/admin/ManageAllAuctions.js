@@ -283,7 +283,7 @@ const ManageAllAuctions = () => {
                     <Button
                       size="sm"
                       variant="destructive"
-                      onClick={() => handleDelete(listing.id, listing.type === 'multi')}
+                      onClick={() => handleDelete(listing)}
                     >
                       <Trash2 className="h-4 w-4 mr-1" />
                       Delete
