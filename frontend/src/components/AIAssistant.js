@@ -113,10 +113,11 @@ const AIAssistant = () => {
       {!isOpen && (
         <Button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 rounded-full w-14 h-14 bg-gradient-to-br from-[#1E3A8A] to-[#06B6D4] hover:from-[#1E3A8A]/90 hover:to-[#06B6D4]/90 text-white border-0 shadow-lg z-50 transition-all hover:scale-110"
+          className="fixed bottom-24 right-6 md:bottom-6 md:right-6 rounded-full w-16 h-16 bg-gradient-to-br from-[#1E3A8A] to-[#06B6D4] hover:from-[#1E3A8A]/90 hover:to-[#06B6D4]/90 text-white border-2 border-white/20 shadow-2xl z-50 transition-all hover:scale-110 hover:shadow-cyan-500/50 hover:border-white/40"
           data-testid="ai-assistant-btn"
+          aria-label="Open BidVex Master Concierge"
         >
-          <MessageCircle className="h-6 w-6" />
+          <MessageCircle className="h-7 w-7" />
         </Button>
       )}
 
