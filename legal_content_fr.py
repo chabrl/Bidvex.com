@@ -158,6 +158,10 @@ PRIVACY_POLICY_FR = """
     <h2 class="section-header">🍪 5.0 Cookies et suivi</h2>
     <p>BidVex utilise des cookies pour améliorer votre expérience et analyser l'utilisation de la plateforme. Vous pouvez gérer vos préférences de cookies à tout moment.</p>
     
+    <h3 style="font-weight: bold; margin-top: 1.5rem; margin-bottom: 1rem;">Publicité et Cookies Tiers</h3>
+    <p>Nous utilisons des sociétés de publicité tierces, telles que Google, pour diffuser des annonces lorsque vous visitez notre site Web. Ces sociétés peuvent utiliser des témoins (cookies) pour diffuser des annonces basées sur les visites antérieures d'un utilisateur sur votre site Web ou d'autres sites Web. L'utilisation de cookies publicitaires par Google lui permet, ainsi qu'à ses partenaires, de diffuser des annonces à vos utilisateurs en fonction de leur visite sur vos sites et/ou d'autres sites sur Internet.</p>
+    <p style="margin-top: 0.5rem;">Vous pouvez désactiver la publicité personnalisée en consultant les <a href="https://www.google.com/settings/ads" target="_blank" style="color: #2563eb;">paramètres des annonces Google</a>.</p>
+    
     <table class="cookie-table">
       <thead>
         <tr>
