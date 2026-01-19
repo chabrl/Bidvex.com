@@ -63,6 +63,11 @@ const MarketplacePage = () => {
         </div>
       </div>
 
+      {/* Announcements Banner */}
+      <div className="container mx-auto max-w-7xl px-4">
+        <AnnouncementBanner />
+      </div>
+
       {/* Flattened Marketplace Component */}
       <FlattenedMarketplace 
         showFilters={true}
