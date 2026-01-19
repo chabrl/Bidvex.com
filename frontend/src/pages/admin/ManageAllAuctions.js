@@ -6,7 +6,7 @@ import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
-import { Package, Search, Edit2, Trash2, Pause, Archive, XCircle, Eye } from 'lucide-react';
+import { Package, Search, Edit2, Trash2, Pause, Archive, XCircle, Eye, AlertTriangle } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
