@@ -18,6 +18,7 @@ const ManageAllAuctions = () => {
   const [typeFilter, setTypeFilter] = useState('all'); // 'all', 'single', 'multi'
   const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active', 'draft', 'ended'
   const [loading, setLoading] = useState(true);
+  const [deleteModal, setDeleteModal] = useState({ open: false, listing: null });
 
   useEffect(() => {
     fetchAllListings();
