@@ -13,6 +13,7 @@ import {
   Zap, Play, ChevronRight, Timer
 } from 'lucide-react';
 import HomepageBanner from '../components/HomepageBanner';
+import AnnouncementBanner from '../components/AnnouncementBanner';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
