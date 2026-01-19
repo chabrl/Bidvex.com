@@ -5691,6 +5691,24 @@ async def admin_create_announcement(data: Dict[str, Any], current_user: User = D
     await db.announcements.insert_one(announcement)
     return announcement
 
+
+
+@api_router.get("/announcements/active")
+async def get_active_announcements():
+    """Public endpoint: Get all active announcements for display"""
+    current_time = datetime.now(timezone.utc)
+    
+    announcements = await db.announcements.find({
+        "is_active": True,
+        "$or": [
+            {"scheduled_for": None},
+            {"scheduled_for": {"$lte": current_time}}
+        ]
+    }, {"_id": 0}).sort("created_at", -1).to_list(10)
+    
+    return announcements
+
+
 @api_router.delete("/admin/announcements/{announcement_id}")
 async def admin_delete_announcement(announcement_id: str, current_user: User = Depends(get_current_user)):
     if not current_user.email.endswith("@bidvex.com"):
