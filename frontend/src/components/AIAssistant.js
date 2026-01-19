@@ -113,7 +113,7 @@ const AIAssistant = () => {
       {!isOpen && (
         <Button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-24 right-6 md:bottom-6 md:right-6 rounded-full w-16 h-16 bg-gradient-to-br from-[#1E3A8A] to-[#06B6D4] hover:from-[#1E3A8A]/90 hover:to-[#06B6D4]/90 text-white border-2 border-white/20 shadow-2xl z-50 transition-all hover:scale-110 hover:shadow-cyan-500/50 hover:border-white/40"
+          className="fixed bottom-32 right-6 md:bottom-8 md:right-8 rounded-full w-16 h-16 bg-gradient-to-br from-[#1E3A8A] to-[#06B6D4] hover:from-[#1E3A8A]/90 hover:to-[#06B6D4]/90 text-white border-2 border-white/20 shadow-2xl z-[100] transition-all hover:scale-110 hover:shadow-cyan-500/50 hover:border-white/40"
           data-testid="ai-assistant-btn"
           aria-label="Open BidVex Master Concierge"
         >
@@ -127,12 +127,12 @@ const AIAssistant = () => {
           <div className="md:hidden fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" onClick={() => setIsOpen(false)} />
           
           {/* Chatbot Card - Optimized for Mobile and Desktop */}
-          <div className="fixed bottom-0 md:bottom-6 md:right-6 left-0 right-0 md:left-auto md:w-96 z-50 flex flex-col rounded-t-3xl md:rounded-3xl overflow-hidden shadow-2xl border-2 border-white/10 max-h-[85vh] md:max-h-[600px]">
+          <div className="fixed bottom-20 md:bottom-8 md:right-8 left-4 right-4 md:left-auto md:w-[400px] z-[100] flex flex-col rounded-2xl overflow-hidden shadow-2xl border-2 border-white/10 bg-white dark:bg-slate-900 max-h-[calc(100vh-180px)] md:max-h-[600px]">
             {/* Header with BidVex branding */}
             <div className="p-4 flex justify-between items-center bg-gradient-to-br from-[#1E3A8A] to-[#06B6D4] text-white flex-shrink-0">
               <div>
-                <h3 className="font-bold text-lg">BidVex Master Concierge</h3>
-                <p className="text-xs text-white/80">Your Luxury Auction Specialist</p>
+                <h3 className="font-bold text-lg text-white">BidVex Master Concierge</h3>
+                <p className="text-xs text-white/90">Your Luxury Auction Specialist</p>
               </div>
               <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="text-white hover:bg-white/20 rounded-full">
                 <X className="h-5 w-5" />
@@ -140,14 +140,14 @@ const AIAssistant = () => {
             </div>
             
             {/* Messages Container - Scrollable */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-900 min-h-0">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-slate-800 min-h-0">
               {messages.map((msg, idx) => (
                 <div key={idx}>
                   <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[85%] rounded-2xl p-3 ${
+                    <div className={`max-w-[85%] rounded-2xl p-3 shadow-md ${
                       msg.role === 'user' 
-                        ? 'bg-gradient-to-br from-[#1E3A8A] to-[#06B6D4] text-white shadow-md' 
-                        : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm border border-gray-200 dark:border-gray-700'
+                        ? 'bg-gradient-to-br from-[#1E3A8A] to-[#06B6D4] text-white' 
+                        : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-gray-200 dark:border-gray-700'
                     }`}>
                       <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
                     </div>
