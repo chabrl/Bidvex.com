@@ -40,15 +40,20 @@ const ManageAllAuctions = () => {
     }
   };
 
-  const handleDelete = async (id, isMultiItem) => {
-    if (!window.confirm('Are you sure you want to delete this auction? This action cannot be undone.')) {
-      return;
-    }
-
+  const handleDelete = async (listing) => {
+    setDeleteModal({ open: true, listing });
+  };
+  
+  const confirmDelete = async () => {
+    const { listing } = deleteModal;
+    if (!listing) return;
+    
     try {
-      const endpoint = isMultiItem ? `multi-item-listings/${id}` : `listings/${id}`;
+      const isMultiItem = listing.type === 'multi';
+      const endpoint = isMultiItem ? `multi-item-listings/${listing.id}` : `listings/${listing.id}`;
       await axios.delete(`${API}/admin/${endpoint}`);
       toast.success('Auction deleted successfully');
+      setDeleteModal({ open: false, listing: null });
       fetchAllListings();
     } catch (error) {
       toast.error('Failed to delete auction');
