@@ -123,12 +123,13 @@ const AIAssistant = () => {
 
       {isOpen && (
         <>
-          {/* Mobile Bottom Sheet */}
-          <div className="md:hidden fixed inset-0 bg-black/50 z-50 backdrop-blur-sm" onClick={() => setIsOpen(false)} />
+          {/* Mobile Bottom Sheet Backdrop */}
+          <div className="md:hidden fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" onClick={() => setIsOpen(false)} />
           
-          <Card className="fixed bottom-0 md:bottom-6 md:right-6 left-0 right-0 md:left-auto md:w-96 h-[70vh] md:h-[600px] shadow-2xl z-50 flex flex-col rounded-t-3xl md:rounded-3xl border-0">
+          {/* Chatbot Card - Optimized for Mobile and Desktop */}
+          <div className="fixed bottom-0 md:bottom-6 md:right-6 left-0 right-0 md:left-auto md:w-96 z-50 flex flex-col rounded-t-3xl md:rounded-3xl overflow-hidden shadow-2xl border-2 border-white/10 max-h-[85vh] md:max-h-[600px]">
             {/* Header with BidVex branding */}
-            <div className="p-4 border-b flex justify-between items-center bg-gradient-to-br from-[#1E3A8A] to-[#06B6D4] text-white rounded-t-3xl md:rounded-t-3xl">
+            <div className="p-4 flex justify-between items-center bg-gradient-to-br from-[#1E3A8A] to-[#06B6D4] text-white flex-shrink-0">
               <div>
                 <h3 className="font-bold text-lg">BidVex Master Concierge</h3>
                 <p className="text-xs text-white/80">Your Luxury Auction Specialist</p>
@@ -138,8 +139,8 @@ const AIAssistant = () => {
               </Button>
             </div>
             
-            {/* Messages */}
-            <CardContent className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-900">
+            {/* Messages Container - Scrollable */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-900 min-h-0">
               {messages.map((msg, idx) => (
                 <div key={idx}>
                   <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -148,7 +149,7 @@ const AIAssistant = () => {
                         ? 'bg-gradient-to-br from-[#1E3A8A] to-[#06B6D4] text-white shadow-md' 
                         : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm border border-gray-200 dark:border-gray-700'
                     }`}>
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
                     </div>
                   </div>
                   
@@ -185,10 +186,10 @@ const AIAssistant = () => {
               )}
               
               <div ref={messagesEndRef} />
-            </CardContent>
+            </div>
             
-            {/* Input */}
-            <div className="p-4 border-t bg-white dark:bg-gray-800">
+            {/* Input Area - Fixed at Bottom */}
+            <div className="p-4 border-t bg-white dark:bg-gray-800 flex-shrink-0">
               <div className="flex gap-2">
                 <Input
                   placeholder="Ask me anything about BidVex..."
@@ -196,21 +197,21 @@ const AIAssistant = () => {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
                   disabled={isLoading}
-                  className="flex-1 border-gray-300 focus:border-[#06B6D4] focus:ring-[#06B6D4]"
+                  className="flex-1 border-gray-300 focus:border-[#06B6D4] focus:ring-[#06B6D4] text-slate-900 dark:text-slate-100"
                 />
                 <Button 
                   onClick={handleSend} 
                   disabled={isLoading || !input.trim()}
-                  className="bg-gradient-to-r from-[#1E3A8A] to-[#06B6D4] hover:from-[#1E3A8A]/90 hover:to-[#06B6D4]/90 text-white border-0 px-4"
+                  className="bg-gradient-to-r from-[#1E3A8A] to-[#06B6D4] hover:from-[#1E3A8A]/90 hover:to-[#06B6D4]/90 text-white border-0 px-4 flex-shrink-0"
                 >
                   {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 </Button>
               </div>
-              <p className="text-xs text-gray-500 mt-2 text-center">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
                 Powered by GPT-4 • Available 24/7
               </p>
             </div>
-          </Card>
+          </div>
         </>
       )}
     </>
