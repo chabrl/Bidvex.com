@@ -329,17 +329,6 @@ const Navbar = () => {
                   {t('nav.sell')}
                 </button>
               )}
-              
-              {/* Mobile Search */}
-              <div className="px-4 py-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    placeholder="Search..."
-                    className="pl-10"
-                  />
-                </div>
-              </div>
             </div>
           </div>
         )}
