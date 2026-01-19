@@ -283,6 +283,11 @@ const HomePage = () => {
         </section>
       )}
 
+      {/* Announcements */}
+      <div className="max-w-7xl mx-auto px-4">
+        <AnnouncementBanner />
+      </div>
+
       {/* ========== HOT ITEMS WITH LIVE ANIMATIONS ========== */}
       {isSectionVisible('hot_items') && (
         <HotItemsSection items={hotItems} navigate={navigate} />
