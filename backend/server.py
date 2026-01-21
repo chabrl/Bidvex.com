@@ -5698,11 +5698,11 @@ async def get_active_announcements():
     """Public endpoint: Get all active announcements for display"""
     current_time = datetime.now(timezone.utc)
     
+    # Query supports both 'status': 'active' and 'is_active': True formats
     announcements = await db.announcements.find({
-        "is_active": True,
         "$or": [
-            {"scheduled_for": None},
-            {"scheduled_for": {"$lte": current_time}}
+            {"status": "active"},
+            {"is_active": True}
         ]
     }, {"_id": 0}).sort("created_at", -1).to_list(10)
     
