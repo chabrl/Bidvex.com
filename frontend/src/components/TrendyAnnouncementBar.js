@@ -12,6 +12,11 @@ const TrendyAnnouncementBar = () => {
   const [dismissedIds, setDismissedIds] = useState([]);
   const [isPaused, setIsPaused] = useState(false);
 
+  // Calculate visible announcements
+  const visibleAnnouncements = announcements.filter(
+    announcement => !dismissedIds.includes(announcement.id)
+  );
+
   useEffect(() => {
     const dismissed = JSON.parse(localStorage.getItem('dismissedAnnouncements') || '[]');
     setDismissedIds(dismissed);
