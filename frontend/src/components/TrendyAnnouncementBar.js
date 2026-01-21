@@ -77,10 +77,6 @@ const TrendyAnnouncementBar = () => {
     setTimeout(() => setIsPaused(false), 10000);
   };
 
-  const visibleAnnouncements = announcements.filter(
-    announcement => !dismissedIds.includes(announcement.id)
-  );
-
   if (!isVisible || visibleAnnouncements.length === 0) {
     return null;
   }
