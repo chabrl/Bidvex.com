@@ -1,7 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import FlattenedMarketplace from '../components/FlattenedMarketplace';
-import AnnouncementBanner from '../components/AnnouncementBanner';
 import { Badge } from '../components/ui/badge';
 import { Package, Sparkles, User, Zap, ShoppingBag } from 'lucide-react';
 
