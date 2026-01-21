@@ -649,6 +649,18 @@ class User(BaseModel):
     is_tax_registered: bool = False  # True for business sellers who collect GST/QST
     gst_number: Optional[str] = None  # GST/HST Registration Number (e.g., 123456789RT0001)
     qst_number: Optional[str] = None  # Quebec Sales Tax Number (e.g., 1234567890TQ0001)
+    
+    # Canadian Tax Compliance (CRA Part XX - Platform Economy Reporting)
+    seller_type: str = "individual"  # "individual" or "business"
+    tax_id: Optional[str] = None  # SIN for individuals, BN for businesses
+    neq_number: Optional[str] = None  # Quebec Enterprise Number (mandatory for QC businesses)
+    date_of_birth: Optional[str] = None  # Mandatory for individual sellers (CRA reporting)
+    legal_business_name: Optional[str] = None  # Registered corporation name for businesses
+    registered_office_address: Optional[str] = None  # Business registered address
+    total_annual_sales: float = 0.0  # Track for $30,000 threshold monitoring
+    tax_verification_status: str = "pending"  # pending, verified, rejected
+    tax_onboarding_completed: bool = False  # True when tax interview completed
+    
     # Auction Terms Agreement tracking
     auction_agreements: Dict[str, datetime] = Field(default_factory=dict)  # {auction_id: agreement_timestamp}
 
