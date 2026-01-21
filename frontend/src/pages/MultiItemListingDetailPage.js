@@ -1117,55 +1117,65 @@ const MultiItemListingDetailPage = () => {
                           </div>
                         </div>
 
-                        <p className="text-muted-foreground mb-4">{lot.description}</p>
+                        <p className="text-muted-foreground mb-4 line-clamp-2">{lot.description}</p>
 
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                          <div>
-                            <p className="text-sm text-muted-foreground">Starting Price</p>
-                            <p className="text-lg font-semibold">${lot.starting_price.toFixed(2)}</p>
+                        {/* Simplified Price Display - Clean & Professional */}
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                          <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                            <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Opening Bid</p>
+                            <p className="text-xl font-bold text-slate-900 dark:text-slate-100">${lot.starting_price.toFixed(2)}</p>
                           </div>
-                          <div>
-                            <p className="text-sm text-muted-foreground">Current Price</p>
-                            <p className="text-lg font-semibold text-green-600">${lot.current_price.toFixed(2)}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-muted-foreground">Price Increase</p>
-                            <p className="text-lg font-semibold text-blue-600">
-                              <TrendingUp className="inline h-4 w-4 mr-1" />
-                              ${(lot.current_price - lot.starting_price).toFixed(2)}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-muted-foreground">Total Value</p>
-                            <p className="text-lg font-semibold">
-                              ${(lot.current_price * lot.quantity).toFixed(2)}
-                            </p>
+                          <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                            <p className="text-xs text-green-700 dark:text-green-400 uppercase tracking-wide mb-1">Current Bid</p>
+                            <p className="text-xl font-bold text-green-600 dark:text-green-400">${lot.current_price.toFixed(2)}</p>
                           </div>
                         </div>
 
-                        {/* Buyer's Premium Display - Fee Transparency */}
-                        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-3 mb-4">
-                          <div className="flex items-center justify-between flex-wrap gap-2">
-                            <div className="flex items-center gap-2">
-                              <DollarSign className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                              <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                                Buyer&apos;s Premium:
-                              </span>
-                              <span className="font-bold text-blue-700 dark:text-blue-300">
-                                5%
-                              </span>
-                              <span className="text-xs text-green-600 dark:text-green-400 font-medium bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded">
-                                (3.5% for Premium Members)
+                        {/* Fee Information - Expanded on Click */}
+                        <details className="mb-4">
+                          <summary className="cursor-pointer p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <DollarSign className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                                  View Fee Breakdown
+                                </span>
+                              </div>
+                              <span className="text-xs text-slate-500 dark:text-slate-400">Click to expand</span>
+                            </div>
+                          </summary>
+                          
+                          <div className="mt-2 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border space-y-3">
+                            {/* Tax Status */}
+                            <div className="flex items-center justify-between py-2 border-b border-slate-200 dark:border-slate-700">
+                              <span className="text-sm text-slate-700 dark:text-slate-300">Tax Status:</span>
+                              <span className="font-semibold text-slate-900 dark:text-slate-100">
+                                {listing.seller_is_business ? '✓ Taxable (GST/QST)' : '✗ Tax-Free (Private Sale)'}
                               </span>
                             </div>
-                            <div className="text-right">
-                              <p className="text-xs text-slate-500 dark:text-slate-400">Est. Total Out-of-Pocket:</p>
-                              <p className="text-sm font-bold text-blue-700 dark:text-blue-300">
+                            
+                            {/* Buyer's Premium */}
+                            <div className="flex items-center justify-between py-2 border-b border-slate-200 dark:border-slate-700">
+                              <span className="text-sm text-slate-700 dark:text-slate-300">Buyer&apos;s Premium:</span>
+                              <div className="text-right">
+                                <span className="font-bold text-blue-700 dark:text-blue-300">5%</span>
+                                <p className="text-xs text-green-600 dark:text-green-400">(3.5% for Premium, 3% for VIP)</p>
+                              </div>
+                            </div>
+                            
+                            {/* Estimated Total */}
+                            <div className="flex items-center justify-between py-2 bg-blue-100 dark:bg-blue-900/30 -mx-4 px-4 rounded">
+                              <span className="text-sm font-semibold text-blue-900 dark:text-blue-100">Est. Total Out-of-Pocket:</span>
+                              <span className="text-lg font-bold text-blue-700 dark:text-blue-300">
                                 ${(lot.current_price * 1.05).toFixed(2)}
-                              </p>
+                              </span>
                             </div>
+                            
+                            <p className="text-xs text-slate-500 dark:text-slate-400 italic">
+                              * Premium members save 1.5% on buyer&apos;s premium. Tax calculated at checkout if applicable.
+                            </p>
                           </div>
-                        </div>
+                        </details>
 
                         {/* Lot Countdown Timer */}
                         {lot.lot_end_time && !auctionEnded && (
