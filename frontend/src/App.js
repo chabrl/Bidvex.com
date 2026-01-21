@@ -9,6 +9,7 @@ import { CurrencyProvider } from './contexts/CurrencyContext';
 import { Toaster } from './components/ui/sonner';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
+import TrendyAnnouncementBar from './components/TrendyAnnouncementBar';
 import MobileBottomNav from './components/MobileBottomNav';
 import AIAssistant from './components/AIAssistant';
 import MessageNotificationListener from './components/MessageNotificationListener';
