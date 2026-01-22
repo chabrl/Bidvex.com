@@ -14,7 +14,8 @@ import SellerAnalyticsDashboard from '../components/SellerAnalyticsDashboard';
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const SellerDashboard = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language || 'en';
   const { user, token } = useAuth();
   const { canCreateMultiLot } = useFeatureFlags();
   const navigate = useNavigate();
