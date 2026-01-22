@@ -189,8 +189,32 @@ const SellerDashboard = () => {
           <NetPayoutCard 
             totalSales={dashboard?.total_sales || 0}
             subscriptionTier={user?.subscription_tier || 'free'}
+            taxVerified={user?.tax_verification_status === 'verified'}
           />
         </div>
+
+        {/* Tax Verification Warning */}
+        {user?.tax_verification_status !== 'verified' && user?.tax_onboarding_completed && (
+          <Card className="border-2 border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-6 w-6 text-yellow-600 flex-shrink-0" />
+                <div>
+                  <p className="font-semibold text-yellow-900 dark:text-yellow-100 mb-1">
+                    {lang === 'en' 
+                      ? 'Payouts Temporarily On Hold' 
+                      : 'Paiements Temporairement Suspendus'}
+                  </p>
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                    {lang === 'en'
+                      ? 'Your tax information has been submitted and is under review. Payouts will be enabled once verification is complete. You can continue selling in the meantime.'
+                      : 'Vos informations fiscales ont été soumises et sont en cours d\'examen. Les paiements seront activés une fois la vérification terminée. Vous pouvez continuer à vendre entre-temps.'}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Fee Structure & 14-Day Payment Rule Info */}
         <Card className="border-2 border-blue-200 dark:border-blue-700 bg-gradient-to-r from-blue-50 to-slate-50 dark:from-blue-900/20 dark:to-slate-800/20">
