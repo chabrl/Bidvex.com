@@ -129,6 +129,11 @@ const CreateListingPage = () => {
     }
   };
 
+  // Tax Onboarding Gatekeeper - CRA Part XX Compliance
+  if (user && !user.tax_onboarding_completed) {
+    return <TaxInterviewModal user={user} onComplete={() => window.location.reload()} />;
+  }
+
   return (
     <div className="min-h-screen py-8 px-4" data-testid="create-listing-page">
       <div className="max-w-3xl mx-auto">
