@@ -3433,6 +3433,63 @@ async def get_all_user_messages(
         {"receiver_id": current_user.id, "is_read": False},
         {"$set": {"is_read": True}}
     )
+
+
+@api_router.put("/users/me/tax-profile")
+async def update_tax_profile(
+    tax_data: Dict[str, Any],
+    current_user: User = Depends(get_current_user)
+):
+    """Update user's tax profile for CRA/Revenu Québec compliance"""
+    
+    # Validate required fields based on seller type
+    seller_type = tax_data.get('seller_type')
+    
+    if seller_type == 'individual':
+        required = ['tax_id', 'date_of_birth']
+        for field in required:
+            if not tax_data.get(field):
+                raise HTTPException(status_code=422, detail=f"Missing required field: {field}")
+    
+    elif seller_type == 'business':
+        required = ['tax_id', 'neq_number', 'gst_number', 'qst_number', 'legal_business_name']
+        for field in required:
+            if not tax_data.get(field):
+                raise HTTPException(status_code=422, detail=f"Missing required field: {field}")
+    
+    # Update user profile
+    update_data = {
+        "seller_type": seller_type,
+        "tax_id": tax_data.get('tax_id'),
+        "tax_onboarding_completed": True,
+        "tax_verification_status": "pending"
+    }
+    
+    if seller_type == 'individual':
+        update_data.update({
+            "date_of_birth": tax_data.get('date_of_birth'),
+            "address": tax_data.get('address'),
+            "is_tax_registered": False
+        })
+    else:
+        update_data.update({
+            "neq_number": tax_data.get('neq_number'),
+            "gst_number": tax_data.get('gst_number'),
+            "qst_number": tax_data.get('qst_number'),
+            "legal_business_name": tax_data.get('legal_business_name'),
+            "registered_office_address": tax_data.get('registered_office_address'),
+            "is_tax_registered": True,
+            "account_type": "business"
+        })
+    
+    await db.users.update_one(
+        {"id": current_user.id},
+        {"$set": update_data}
+    )
+    
+    return {"success": True, "message": "Tax profile updated successfully"}
+
+
     
     for msg in messages:
         if isinstance(msg.get("created_at"), str):
