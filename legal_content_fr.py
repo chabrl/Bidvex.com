@@ -320,15 +320,23 @@ TERMS_CONDITIONS_FR = """
     </p>
   </div>
 
-  <!-- Section 5.3 - Rabais membre Premium -->
+  <!-- Section 5.3 - Rabais membres Premium et VIP -->
   <div class="colored-box green-box">
-    <h3 style="font-size: 1.25rem; font-weight: bold; margin-bottom: 1rem;">5.3 Rabais membre Premium</h3>
+    <h3 style="font-size: 1.25rem; font-weight: bold; margin-bottom: 1rem;">5.3 Rabais membres Premium et VIP</h3>
     <p style="margin-bottom: 1rem;">
-      <strong>Rabais d'abonnement :</strong> Les membres Premium actifs reçoivent une réduction de <span class="fee-percentage-green">1,5%</span> sur leurs frais respectifs :
+      <strong>Rabais d'abonnement :</strong> Les membres Premium et VIP actifs reçoivent des frais réduits :
     </p>
-    <ul style="margin-left: 2rem;">
+    
+    <h4 style="font-weight: bold; margin-top: 1rem; margin-bottom: 0.5rem; color: #16a34a;">Membres Premium (réduction de 1,5%) :</h4>
+    <ul style="margin-left: 2rem; margin-bottom: 1rem;">
       <li><strong>Les vendeurs Premium paient <span class="fee-percentage-green">2,5%</span></strong> de commission (au lieu de 4%)</li>
       <li><strong>Les acheteurs Premium paient <span class="fee-percentage-green">3,5%</span></strong> de prime d'achat (au lieu de 5%)</li>
+    </ul>
+    
+    <h4 style="font-weight: bold; margin-top: 1rem; margin-bottom: 0.5rem; color: #16a34a;">Membres VIP Élite (réduction de 2%) :</h4>
+    <ul style="margin-left: 2rem;">
+      <li><strong>Les vendeurs VIP paient <span class="fee-percentage-green">2%</span></strong> de commission (au lieu de 4%)</li>
+      <li><strong>Les acheteurs VIP paient <span class="fee-percentage-green">3%</span></strong> de prime d'achat (au lieu de 5%)</li>
     </ul>
   </div>
 
