@@ -85,7 +85,23 @@ const SellerDashboard = () => {
       <div className="max-w-7xl mx-auto space-y-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold mb-2">{t('dashboard.seller.title')}</h1>
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="text-3xl font-bold">{t('dashboard.seller.title')}</h1>
+              {/* Tax Status Badge */}
+              {user.tax_onboarding_completed && (
+                <Badge className={
+                  user.tax_verification_status === 'verified' 
+                    ? 'bg-green-500 text-white'
+                    : user.tax_verification_status === 'action_required'
+                    ? 'bg-red-500 text-white'
+                    : 'bg-yellow-500 text-white'
+                }>
+                  {user.tax_verification_status === 'verified' && '🟢 Tax Verified'}
+                  {user.tax_verification_status === 'pending' && '🟡 Tax Pending'}
+                  {user.tax_verification_status === 'action_required' && '🔴 Tax Action Required'}
+                </Badge>
+              )}
+            </div>
             <p className="text-sm text-muted-foreground">
               {user.account_type === 'business' ? t('dashboard.seller.businessAccount') : t('dashboard.seller.personalAccount')} - 
               {t('dashboard.seller.commissionRate')}: {user.subscription_tier === 'vip' ? '2%' : user.subscription_tier === 'premium' ? '2.5%' : '4%'}
