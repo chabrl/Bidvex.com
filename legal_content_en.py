@@ -322,13 +322,21 @@ TERMS_CONDITIONS_EN = """
 
   <!-- Section 5.3 - Premium Member Discount -->
   <div class="colored-box green-box">
-    <h3 style="font-size: 1.25rem; font-weight: bold; margin-bottom: 1rem;">5.3 Premium Member Discount</h3>
+    <h3 style="font-size: 1.25rem; font-weight: bold; margin-bottom: 1rem;">5.3 Premium & VIP Member Discounts</h3>
     <p style="margin-bottom: 1rem;">
-      <strong>Subscription Discount:</strong> Active Premium Members receive a <span class="fee-percentage-green">1.5%</span> reduction on their respective fees:
+      <strong>Subscription Discounts:</strong> Active Premium and VIP Members receive reduced fees:
     </p>
-    <ul style="margin-left: 2rem;">
+    
+    <h4 style="font-weight: bold; margin-top: 1rem; margin-bottom: 0.5rem; color: #16a34a;">Premium Members (1.5% reduction):</h4>
+    <ul style="margin-left: 2rem; margin-bottom: 1rem;">
       <li><strong>Premium Sellers pay <span class="fee-percentage-green">2.5%</span></strong> commission (instead of 4%)</li>
       <li><strong>Premium Buyers pay <span class="fee-percentage-green">3.5%</span></strong> buyer's premium (instead of 5%)</li>
+    </ul>
+    
+    <h4 style="font-weight: bold; margin-top: 1rem; margin-bottom: 0.5rem; color: #16a34a;">VIP Elite Members (2% reduction):</h4>
+    <ul style="margin-left: 2rem;">
+      <li><strong>VIP Sellers pay <span class="fee-percentage-green">2%</span></strong> commission (instead of 4%)</li>
+      <li><strong>VIP Buyers pay <span class="fee-percentage-green">3%</span></strong> buyer's premium (instead of 5%)</li>
     </ul>
   </div>
 
