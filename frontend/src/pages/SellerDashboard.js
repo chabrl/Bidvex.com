@@ -456,7 +456,7 @@ const StatCard = ({ icon, title, value, color }) => (
  * - Premium tier: 2.5% (1.5% savings)
  * - VIP tier: 2% (2% savings)
  */
-const NetPayoutCard = ({ totalSales = 0, subscriptionTier = 'free' }) => {
+const NetPayoutCard = ({ totalSales = 0, subscriptionTier = 'free', taxVerified = false }) => {
   // Calculate commission based on subscription tier
   const getCommissionRate = () => {
     switch (subscriptionTier) {
