@@ -22,6 +22,7 @@ import AnalyticsDashboard from './admin/AnalyticsDashboard';
 import MessagingOversight from './admin/MessagingOversight';
 import TrustSafetyDashboard from './admin/TrustSafetyDashboard';
 import AnnouncementManager from './admin/AnnouncementManager';
+import AdminBannerManager from '../components/AdminBannerManager';
 import AdminLogs from './admin/AdminLogs';
 import CurrencyAppealsManager from './admin/CurrencyAppealsManager';
 import SubscriptionManager from './admin/SubscriptionManager';
