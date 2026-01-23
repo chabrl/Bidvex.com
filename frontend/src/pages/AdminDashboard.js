@@ -280,9 +280,9 @@ const AdminDashboard = () => {
         }
       case 'banners':
         switch (secondaryTab) {
-          case 'banner-manager': return <BannerManager />;
+          case 'banner-manager': return <AdminBannerManager />;
           case 'announcements': return <AnnouncementManager />;
-          default: return <BannerManager />;
+          default: return <AdminBannerManager />;
         }
       case 'analytics':
         switch (secondaryTab) {
