@@ -189,7 +189,7 @@ const HomepageBanner = () => {
             transition={{ duration: 0.5 }}
             className="absolute inset-0"
           >
-            {/* Background with gradient overlay */}
+            {/* Background image */}
             <div className="absolute inset-0">
               {activeBanners[currentSlide].image ? (
                 <>
@@ -199,7 +199,10 @@ const HomepageBanner = () => {
                     className="w-full h-full object-cover"
                     loading="lazy"
                   />
-                  <div className={`absolute inset-0 bg-gradient-to-r ${activeBanners[currentSlide].gradient || 'from-blue-600/80 via-blue-500/70 to-cyan-500/60'}`}></div>
+                  {/* Optional subtle gradient overlay for text readability - only if gradient field is set */}
+                  {activeBanners[currentSlide].gradient && (
+                    <div className={`absolute inset-0 bg-gradient-to-r ${activeBanners[currentSlide].gradient} opacity-40`}></div>
+                  )}
                 </>
               ) : (
                 <div className={`absolute inset-0 bg-gradient-to-r ${activeBanners[currentSlide].gradient || 'from-blue-600 via-blue-500 to-cyan-500'}`}></div>
