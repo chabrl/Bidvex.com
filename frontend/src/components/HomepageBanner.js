@@ -49,7 +49,10 @@ const HomepageBanner = () => {
   useEffect(() => {
     const fetchBanners = async () => {
       try {
-        const response = await axios.get(`${API}/banners/active`);
+        // Add cache-busting to ensure fresh data
+        const response = await axios.get(`${API}/banners/active?t=${Date.now()}`, {
+          headers: { 'Cache-Control': 'no-cache' }
+        });
         if (response.data.banners && response.data.banners.length > 0) {
           // Transform API banners to component format
           const transformedBanners = response.data.banners
