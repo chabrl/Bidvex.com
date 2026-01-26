@@ -959,12 +959,14 @@ def commission_invoice_template(data: Dict[str, Any], lang: str = "en") -> str:
         <div class="parties">
             <div class="party-box">
                 <h3>{t('from_service_provider', lang)}</h3>
-                <p><strong>BidVex Inc.</strong></p>
-                <p>123 Auction Street</p>
-                <p>Montreal, QC H1A 1A1</p>
+                <p><strong>{os.environ.get('PLATFORM_LEGAL_NAME', 'BidVex Inc.')}</strong></p>
+                <p>761 Chalifoux Street</p>
+                <p>Sherbrooke, QC J1G 0A8</p>
                 <p>Canada</p>
                 <p>{t('email', lang)}: billing@bidvex.com</p>
                 <p>{t('phone', lang)}: 1-800-BIDVEX</p>
+                <p><strong>GST #:</strong> {os.environ.get('PLATFORM_GST_NUMBER', 'Pending Registration')}</p>
+                <p><strong>QST #:</strong> {os.environ.get('PLATFORM_QST_NUMBER', 'Pending Registration')}</p>
             </div>
             <div class="party-box">
                 <h3>{t('to_consignor', lang)}</h3>
