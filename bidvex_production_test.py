@@ -512,13 +512,19 @@ class BidVexProductionTester:
             ) as response:
                 if response.status == 200:
                     data = await response.json()
+                    # Handle both list and dict responses
+                    if isinstance(data, list):
+                        flags = data
+                    else:
+                        flags = data.get('flags', [])
                     print(f"✅ Fraud flags retrieved successfully")
-                    print(f"   - Total flags: {len(data.get('flags', []))}")
+                    print(f"   - Total flags: {len(flags)}")
                     
                     # Check detection types
                     detection_types = set()
-                    for flag in data.get('flags', []):
-                        detection_types.add(flag.get('flag_type', 'unknown'))
+                    for flag in flags:
+                        if isinstance(flag, dict):
+                            detection_types.add(flag.get('flag_type', 'unknown'))
                     
                     print(f"   - Detection types: {', '.join(detection_types) if detection_types else 'None'}")
                     results["sub_tests"]["get_fraud_flags"] = True
