@@ -1811,7 +1811,7 @@ const resources = {
       // Programme d'Affiliation
       affiliate: {
         dashboard: 'Tableau de Bord Affilié',
-        description: 'Gagnez 3% de commission sur chaque vente de vos parrainages',
+        description: 'Gagnez 1,5% de commission sur chaque vente de vos parrainages',
         overview: 'Aperçu',
         referralLink: 'Votre Lien de Parrainage',
         shareDesc: 'Partagez ce lien pour gagner des commissions',
