@@ -29,6 +29,11 @@ def generate_affiliate_code(user_id: str) -> str:
     suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
     return f"BVX{prefix}{suffix}"
 
+
+# Affiliate Program Constants
+AFFILIATE_COMMISSION_RATE = 0.015  # 1.5% commission on referred sales
+
+
 import asyncio
 import aiohttp
 
