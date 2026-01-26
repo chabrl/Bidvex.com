@@ -999,7 +999,7 @@ const resources = {
       // Affiliate Program
       affiliate: {
         dashboard: 'Affiliate Dashboard',
-        description: 'Earn 3% commission on every sale from your referrals',
+        description: 'Earn 1.5% commission on every sale from your referrals',
         overview: 'Overview',
         referralLink: 'Your Referral Link',
         shareDesc: 'Share this link to earn commission',
