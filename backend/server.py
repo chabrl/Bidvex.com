@@ -19,6 +19,16 @@ from services.sms_notification_service import get_sms_notification_service
 import os
 import logging
 import uuid
+
+import random
+import string
+
+def generate_affiliate_code(user_id: str) -> str:
+    """Generate unique affiliate code: First 8 chars of UUID + random suffix"""
+    prefix = user_id[:8].upper()
+    suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+    return f"BVX{prefix}{suffix}"
+
 import asyncio
 import aiohttp
 
