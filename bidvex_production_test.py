@@ -599,8 +599,13 @@ class BidVexProductionTester:
             ) as response:
                 if response.status == 200:
                     data = await response.json()
+                    # Handle both list and dict responses
+                    if isinstance(data, list):
+                        conversations = data
+                    else:
+                        conversations = data.get('conversations', [])
                     print(f"✅ Messages retrieved successfully")
-                    print(f"   - Total conversations: {len(data.get('conversations', []))}")
+                    print(f"   - Total conversations: {len(conversations)}")
                     results["sub_tests"]["get_messages"] = True
                 else:
                     print(f"❌ Failed to get messages: {response.status}")
