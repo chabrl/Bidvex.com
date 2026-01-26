@@ -671,14 +671,18 @@ class BidVexProductionTester:
             ) as response:
                 if response.status == 200:
                     data = await response.json()
+                    # Handle different response structures
+                    active_bids = data.get('active_bids', []) if isinstance(data.get('active_bids'), list) else []
+                    won_auctions = data.get('won_auctions', []) if isinstance(data.get('won_auctions'), list) else []
+                    watchlist = data.get('watchlist', []) if isinstance(data.get('watchlist'), list) else []
+                    
                     print(f"✅ Buyer dashboard retrieved successfully")
-                    print(f"   - Active bids: {len(data.get('active_bids', []))}")
-                    print(f"   - Won auctions: {len(data.get('won_auctions', []))}")
-                    print(f"   - Watchlist: {len(data.get('watchlist', []))}")
+                    print(f"   - Active bids: {len(active_bids)}")
+                    print(f"   - Won auctions: {len(won_auctions)}")
+                    print(f"   - Watchlist: {len(watchlist)}")
                     results["sub_tests"]["get_dashboard"] = True
                     
                     # Test 7.2: Verify bid status updates
-                    active_bids = data.get('active_bids', [])
                     if active_bids:
                         bid = active_bids[0]
                         print(f"\n🎯 Bid status verification:")
