@@ -390,8 +390,13 @@ class BidVexProductionTester:
             ) as response:
                 if response.status == 200:
                     data = await response.json()
+                    # Handle both list and dict responses
+                    if isinstance(data, list):
+                        invoices = data
+                    else:
+                        invoices = data.get('invoices', [])
                     print(f"✅ Invoice list retrieved successfully")
-                    print(f"   - Total invoices: {len(data.get('invoices', []))}")
+                    print(f"   - Total invoices: {len(invoices)}")
                     results["sub_tests"]["get_invoices"] = True
                 else:
                     print(f"❌ Failed to get invoices: {response.status}")
