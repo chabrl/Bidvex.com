@@ -97,7 +97,7 @@ const AffiliateDashboard = () => {
       <div className="max-w-7xl mx-auto space-y-8">
         <div>
           <h1 className="text-3xl font-bold mb-2">{t('affiliate.dashboard')}</h1>
-          <p className="text-muted-foreground">{t('affiliate.description', 'Earn 3% commission on every sale from your referrals')}</p>
+          <p className="text-muted-foreground">{t('affiliate.description', 'Earn 1.5% commission on every sale from your referrals')}</p>
         </div>
 
         {/* Stats Grid */}
