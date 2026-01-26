@@ -1209,8 +1209,13 @@ async def register(user_data: UserCreate, request: Request):
         currency_locked=enforcement_data['currency_locked'],
         location_confidence_score=confidence_data['confidence_score']
     )
+    
+    # Auto-generate affiliate code for referral program
+    affiliate_code = generate_affiliate_code(user.id)
+    
     user_dict = user.model_dump()
     user_dict["password"] = hashed_pwd
+    user_dict["affiliate_code"] = affiliate_code  # Add affiliate code
     user_dict["created_at"] = user_dict["created_at"].isoformat()
     await db.users.insert_one(user_dict)
     
