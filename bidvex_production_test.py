@@ -194,13 +194,14 @@ class BidVexProductionTester:
             # Test 2.1: Buyer cost with business seller (taxable)
             print("\n💵 Testing GET /api/fees/calculate-buyer-cost (Business Seller - Taxable)...")
             params = {
-                "hammer_price": 1000.00,
+                "amount": 1000.00,
                 "seller_is_business": "true",
-                "subscription_tier": "free"
+                "region": "QC"
             }
             async with self.session.get(
                 f"{BASE_URL}/fees/calculate-buyer-cost",
-                params=params
+                params=params,
+                headers=self.get_headers(self.buyer_token)
             ) as response:
                 if response.status == 200:
                     data = await response.json()
@@ -229,18 +230,21 @@ class BidVexProductionTester:
                         results["sub_tests"]["business_seller_tax"] = False
                 else:
                     print(f"❌ Failed to calculate buyer cost: {response.status}")
+                    text = await response.text()
+                    print(f"   Response: {text}")
                     results["sub_tests"]["business_seller_tax"] = False
                     
             # Test 2.2: Buyer cost with individual seller (tax-free)
             print("\n💵 Testing GET /api/fees/calculate-buyer-cost (Individual Seller - Tax-Free)...")
             params = {
-                "hammer_price": 1000.00,
+                "amount": 1000.00,
                 "seller_is_business": "false",
-                "subscription_tier": "free"
+                "region": "QC"
             }
             async with self.session.get(
                 f"{BASE_URL}/fees/calculate-buyer-cost",
-                params=params
+                params=params,
+                headers=self.get_headers(self.buyer_token)
             ) as response:
                 if response.status == 200:
                     data = await response.json()
@@ -262,18 +266,21 @@ class BidVexProductionTester:
                         results["sub_tests"]["individual_seller_tax_free"] = False
                 else:
                     print(f"❌ Failed to calculate buyer cost: {response.status}")
+                    text = await response.text()
+                    print(f"   Response: {text}")
                     results["sub_tests"]["individual_seller_tax_free"] = False
                     
             # Test 2.3: Premium member discount (3.5% vs 5%)
             print("\n💎 Testing Premium Member Discount...")
             params = {
-                "hammer_price": 1000.00,
+                "amount": 1000.00,
                 "seller_is_business": "true",
-                "subscription_tier": "premium"
+                "region": "QC"
             }
             async with self.session.get(
                 f"{BASE_URL}/fees/calculate-buyer-cost",
-                params=params
+                params=params,
+                headers=self.get_headers(self.buyer_token)
             ) as response:
                 if response.status == 200:
                     data = await response.json()
@@ -290,18 +297,21 @@ class BidVexProductionTester:
                         results["sub_tests"]["premium_discount"] = False
                 else:
                     print(f"❌ Failed to test premium discount: {response.status}")
+                    text = await response.text()
+                    print(f"   Response: {text}")
                     results["sub_tests"]["premium_discount"] = False
                     
             # Test 2.4: VIP member discount (3% vs 5%)
             print("\n👑 Testing VIP Member Discount...")
             params = {
-                "hammer_price": 1000.00,
+                "amount": 1000.00,
                 "seller_is_business": "true",
-                "subscription_tier": "vip"
+                "region": "QC"
             }
             async with self.session.get(
                 f"{BASE_URL}/fees/calculate-buyer-cost",
-                params=params
+                params=params,
+                headers=self.get_headers(self.buyer_token)
             ) as response:
                 if response.status == 200:
                     data = await response.json()
@@ -318,18 +328,20 @@ class BidVexProductionTester:
                         results["sub_tests"]["vip_discount"] = False
                 else:
                     print(f"❌ Failed to test VIP discount: {response.status}")
+                    text = await response.text()
+                    print(f"   Response: {text}")
                     results["sub_tests"]["vip_discount"] = False
                     
             # Test 2.5: Seller commission calculation
             print("\n💼 Testing Seller Commission Calculation...")
             for tier, expected_rate in [("free", 4.0), ("premium", 2.5), ("vip", 2.0)]:
                 params = {
-                    "hammer_price": 1000.00,
-                    "subscription_tier": tier
+                    "amount": 1000.00
                 }
                 async with self.session.get(
                     f"{BASE_URL}/fees/calculate-seller-net",
-                    params=params
+                    params=params,
+                    headers=self.get_headers(self.seller_token)
                 ) as response:
                     if response.status == 200:
                         data = await response.json()
@@ -345,6 +357,8 @@ class BidVexProductionTester:
                             results["sub_tests"][f"seller_commission_{tier}"] = False
                     else:
                         print(f"❌ Failed to test {tier} commission: {response.status}")
+                        text = await response.text()
+                        print(f"   Response: {text}")
                         results["sub_tests"][f"seller_commission_{tier}"] = False
                         
             # Overall result
