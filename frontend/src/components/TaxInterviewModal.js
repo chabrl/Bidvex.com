@@ -515,8 +515,9 @@ const TaxInterviewModal = ({ user, onComplete, onCancel }) => {
               </div>
 
               <div className="flex gap-3">
-                <Button variant="outline" onClick={() => setStep(1)} className="flex-1">
-                  {lang === 'en' ? 'Back' : 'Retour'}
+                <Button variant="outline" onClick={handleExit} className="flex-1">
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  {lang === 'en' ? 'Cancel' : 'Annuler'}
                 </Button>
                 <Button
                   onClick={() => {
