@@ -318,6 +318,37 @@ const TaxInterviewModal = ({ user, onComplete }) => {
                   
                   <div>
                     <Label className="text-slate-900 dark:text-slate-100">
+                      {lang === 'en' ? 'Business Province/Territory' : 'Province/Territoire d\'Entreprise'} *
+                    </Label>
+                    <select
+                      value={formData.business_province}
+                      onChange={(e) => handleInputChange('business_province', e.target.value)}
+                      className="w-full px-3 py-2 border rounded-md text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800"
+                      required
+                    >
+                      <option value="">{lang === 'en' ? 'Select Province' : 'Sélectionner la Province'}</option>
+                      <option value="QC">Quebec (QC)</option>
+                      <option value="ON">Ontario (ON)</option>
+                      <option value="BC">British Columbia (BC)</option>
+                      <option value="AB">Alberta (AB)</option>
+                      <option value="MB">Manitoba (MB)</option>
+                      <option value="SK">Saskatchewan (SK)</option>
+                      <option value="NS">Nova Scotia (NS)</option>
+                      <option value="NB">New Brunswick (NB)</option>
+                      <option value="NL">Newfoundland and Labrador (NL)</option>
+                      <option value="PE">Prince Edward Island (PE)</option>
+                      <option value="YT">Yukon (YT)</option>
+                      <option value="NT">Northwest Territories (NT)</option>
+                      <option value="NU">Nunavut (NU)</option>
+                      <option value="FEDERAL">{lang === 'en' ? 'Federal Corporation' : 'Société Fédérale'}</option>
+                    </select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {lang === 'en' ? 'Province where business is registered' : 'Province où l\'entreprise est enregistrée'}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <Label className="text-slate-900 dark:text-slate-100">
                       {lang === 'en' ? 'Business Number (BN)' : 'Numéro d\'Entreprise (NE)'} *
                     </Label>
                     <Input
@@ -332,21 +363,24 @@ const TaxInterviewModal = ({ user, onComplete }) => {
                     </p>
                   </div>
                   
-                  <div>
-                    <Label className="text-slate-900 dark:text-slate-100">
-                      {lang === 'en' ? 'Quebec Enterprise Number (NEQ)' : 'Numéro d\'Entreprise du Québec (NEQ)'} *
-                    </Label>
-                    <Input
-                      value={formData.neq_number}
-                      onChange={(e) => handleInputChange('neq_number', e.target.value.replace(/\D/g, '').slice(0, 10))}
-                      placeholder="1234567890"
-                      maxLength={10}
-                      className="text-slate-900 dark:text-slate-100 font-mono"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {lang === 'en' ? '10-digit Quebec enterprise number' : 'Numéro d\'entreprise du Québec à 10 chiffres'}
-                    </p>
-                  </div>
+                  {/* NEQ - Quebec Only */}
+                  {(formData.business_province === 'QC' || formData.business_province === 'Quebec') && (
+                    <div>
+                      <Label className="text-slate-900 dark:text-slate-100">
+                        {lang === 'en' ? 'Quebec Enterprise Number (NEQ)' : 'Numéro d\'Entreprise du Québec (NEQ)'} *
+                      </Label>
+                      <Input
+                        value={formData.neq_number}
+                        onChange={(e) => handleInputChange('neq_number', e.target.value.replace(/\D/g, '').slice(0, 10))}
+                        placeholder="1234567890"
+                        maxLength={10}
+                        className="text-slate-900 dark:text-slate-100 font-mono"
+                      />
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                        {lang === 'en' ? '✓ Required for Quebec businesses only' : '✓ Requis uniquement pour les entreprises du Québec'}
+                      </p>
+                    </div>
+                  )}
                   
                   <div>
                     <Label className="text-slate-900 dark:text-slate-100">
@@ -358,19 +392,30 @@ const TaxInterviewModal = ({ user, onComplete }) => {
                       placeholder="123456789RT0001"
                       className="text-slate-900 dark:text-slate-100 font-mono"
                     />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {formData.business_province === 'ON' 
+                        ? (lang === 'en' ? 'HST number for Ontario' : 'Numéro TVH pour l\'Ontario')
+                        : (lang === 'en' ? 'GST/HST registration number' : 'Numéro d\'inscription TPS/TVH')}
+                    </p>
                   </div>
                   
-                  <div>
-                    <Label className="text-slate-900 dark:text-slate-100">
-                      {lang === 'en' ? 'QST Registration Number' : 'Numéro d\'inscription TVQ'} *
-                    </Label>
-                    <Input
-                      value={formData.qst_number}
-                      onChange={(e) => handleInputChange('qst_number', e.target.value)}
-                      placeholder="1234567890TQ0001"
-                      className="text-slate-900 dark:text-slate-100 font-mono"
-                    />
-                  </div>
+                  {/* QST - Quebec Only */}
+                  {(formData.business_province === 'QC' || formData.business_province === 'Quebec') && (
+                    <div>
+                      <Label className="text-slate-900 dark:text-slate-100">
+                        {lang === 'en' ? 'QST Registration Number' : 'Numéro d\'inscription TVQ'} *
+                      </Label>
+                      <Input
+                        value={formData.qst_number}
+                        onChange={(e) => handleInputChange('qst_number', e.target.value)}
+                        placeholder="1234567890TQ0001"
+                        className="text-slate-900 dark:text-slate-100 font-mono"
+                      />
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                        {lang === 'en' ? '✓ Required for Quebec businesses only' : '✓ Requis uniquement pour les entreprises du Québec'}
+                      </p>
+                    </div>
+                  )}
                   
                   <div>
                     <Label className="text-slate-900 dark:text-slate-100">
