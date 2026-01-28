@@ -539,6 +539,41 @@ const TaxInterviewModal = ({ user, onComplete, onCancel }) => {
           )}
         </CardContent>
       </Card>
+      
+      {/* Exit Confirmation Dialog */}
+      {showExitConfirm && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[80] p-4">
+          <Card className="w-full max-w-md border-2 border-yellow-500">
+            <CardHeader className="bg-yellow-50 dark:bg-yellow-900/20">
+              <CardTitle className="text-yellow-900 dark:text-yellow-100 flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5" />
+                {lang === 'en' ? 'Unsaved Changes' : 'Modifications Non Sauvegardées'}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <p className="text-slate-900 dark:text-slate-100 mb-4">
+                {lang === 'en' 
+                  ? 'You have unsaved tax information. If you exit now, your progress will be lost. Are you sure you want to leave?'
+                  : 'Vous avez des informations fiscales non sauvegardées. Si vous quittez maintenant, votre progression sera perdue. Êtes-vous sûr de vouloir partir?'}
+              </p>
+              <div className="flex gap-2 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowExitConfirm(false)}
+                >
+                  {lang === 'en' ? 'Stay' : 'Rester'}
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={confirmExit}
+                >
+                  {lang === 'en' ? 'Exit Without Saving' : 'Quitter Sans Sauvegarder'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
       </div>
     </div>
   );
