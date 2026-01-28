@@ -432,6 +432,7 @@ const TaxInterviewModal = ({ user, onComplete }) => {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 };
