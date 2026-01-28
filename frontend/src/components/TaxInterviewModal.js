@@ -24,6 +24,23 @@ const TaxInterviewModal = ({ user, onComplete, onCancel }) => {
   const [agreedToReport, setAgreedToReport] = useState(false);
   const [loading, setLoading] = useState(false);
   
+  const confirmExit = useCallback(() => {
+    if (onCancel) {
+      onCancel();
+    } else {
+      navigate('/'); // Redirect to homepage
+    }
+  }, [onCancel, navigate]);
+  
+  const handleExit = useCallback(() => {
+    // If user has entered data in step 2, confirm before exiting
+    if (step === 2 && (formData.legal_name || formData.legal_business_name)) {
+      setShowExitConfirm(true);
+    } else {
+      confirmExit();
+    }
+  }, [step, formData.legal_name, formData.legal_business_name, confirmExit]);
+  
   // ESC key to close modal
   useEffect(() => {
     const handleEsc = (e) => {
@@ -33,24 +50,7 @@ const TaxInterviewModal = ({ user, onComplete, onCancel }) => {
     };
     window.addEventListener('keydown', handleEsc);
     return () => window.removeEventListener('keydown', handleEsc);
-  }, [step]);
-  
-  const handleExit = () => {
-    // If user has entered data in step 2, confirm before exiting
-    if (step === 2 && (formData.legal_name || formData.legal_business_name)) {
-      setShowExitConfirm(true);
-    } else {
-      confirmExit();
-    }
-  };
-  
-  const confirmExit = () => {
-    if (onCancel) {
-      onCancel();
-    } else {
-      navigate('/'); // Redirect to homepage
-    }
-  };
+  }, [handleExit]);
   
   const [formData, setFormData] = useState({
     // Individual fields
