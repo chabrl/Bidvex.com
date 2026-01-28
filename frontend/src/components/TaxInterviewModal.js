@@ -18,39 +18,11 @@ const TaxInterviewModal = ({ user, onComplete, onCancel }) => {
   const navigate = useNavigate();
   const lang = i18n.language || 'en';
   
-  const [step, setStep] = useState(1); // 1: Type selection, 2: Data collection, 3: Confirmation
+  const [step, setStep] = useState(1);
   const [sellerType, setSellerType] = useState(null);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [agreedToReport, setAgreedToReport] = useState(false);
   const [loading, setLoading] = useState(false);
-  
-  const confirmExit = useCallback(() => {
-    if (onCancel) {
-      onCancel();
-    } else {
-      navigate('/'); // Redirect to homepage
-    }
-  }, [onCancel, navigate]);
-  
-  const handleExit = useCallback(() => {
-    // If user has entered data in step 2, confirm before exiting
-    if (step === 2 && (formData.legal_name || formData.legal_business_name)) {
-      setShowExitConfirm(true);
-    } else {
-      confirmExit();
-    }
-  }, [step, formData.legal_name, formData.legal_business_name, confirmExit]);
-  
-  // ESC key to close modal
-  useEffect(() => {
-    const handleEsc = (e) => {
-      if (e.key === 'Escape') {
-        handleExit();
-      }
-    };
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, [handleExit]);
   
   const [formData, setFormData] = useState({
     // Individual fields
@@ -62,12 +34,41 @@ const TaxInterviewModal = ({ user, onComplete, onCancel }) => {
     // Business fields
     legal_business_name: '',
     business_number: '',
-    business_province: '', // NEW: Province selection
+    business_province: '',
     neq_number: '',
     gst_number: '',
     qst_number: '',
     registered_office_address: '',
   });
+  
+  // Exit handlers - defined AFTER state
+  const confirmExit = () => {
+    if (onCancel) {
+      onCancel();
+    } else {
+      navigate('/');
+    }
+  };
+  
+  const handleExit = () => {
+    // If user has entered data in step 2, confirm before exiting
+    if (step === 2 && (formData.legal_name || formData.legal_business_name)) {
+      setShowExitConfirm(true);
+    } else {
+      confirmExit();
+    }
+  };
+  
+  // ESC key to close modal
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') {
+        handleExit();
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [step, formData.legal_name, formData.legal_business_name]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
