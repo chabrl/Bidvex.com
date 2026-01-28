@@ -113,17 +113,19 @@ const TaxInterviewModal = ({ user, onComplete }) => {
   const declarations = TAX_DECLARATIONS[lang];
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[70] p-4 overflow-y-auto">
-      <Card className="w-full max-w-3xl my-8">
-        <CardHeader className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white">
-          <div className="flex items-center gap-3">
-            <Shield className="h-8 w-8" />
-            <div>
-              <CardTitle className="text-2xl text-white">{declarations.title}</CardTitle>
-              <p className="text-sm text-white/90 mt-1">{declarations.subtitle}</p>
+    <div className="fixed inset-0 bg-black/80 z-[70] overflow-y-auto">
+      {/* Flexbox Container for Proper Centering */}
+      <div className="min-h-screen flex items-center justify-center p-4 py-8">
+        <Card className="w-full max-w-3xl my-auto">
+          <CardHeader className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white">
+            <div className="flex items-center gap-3">
+              <Shield className="h-8 w-8" />
+              <div>
+                <CardTitle className="text-2xl text-white">{declarations.title}</CardTitle>
+                <p className="text-sm text-white/90 mt-1">{declarations.subtitle}</p>
+              </div>
             </div>
-          </div>
-        </CardHeader>
+          </CardHeader>
         
         <CardContent className="p-6 space-y-6">
           {/* Step 1: Seller Type Selection */}
