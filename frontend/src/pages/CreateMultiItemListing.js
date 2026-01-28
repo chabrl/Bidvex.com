@@ -2272,7 +2272,13 @@ const CreateMultiItemListing = () => {
 
   // Tax Onboarding Gatekeeper - CRA Part XX Compliance
   if (user && !user.tax_onboarding_completed) {
-    return <TaxInterviewModal user={user} onComplete={() => window.location.reload()} />;
+    return (
+      <TaxInterviewModal 
+        user={user} 
+        onComplete={() => window.location.reload()}
+        onCancel={() => navigate('/seller/dashboard')}
+      />
+    );
   }
 
   return (
