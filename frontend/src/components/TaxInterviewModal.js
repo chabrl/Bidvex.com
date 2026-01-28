@@ -31,6 +31,7 @@ const TaxInterviewModal = ({ user, onComplete }) => {
     // Business fields
     legal_business_name: '',
     business_number: '',
+    business_province: '', // NEW: Province selection
     neq_number: '',
     gst_number: '',
     qst_number: '',
