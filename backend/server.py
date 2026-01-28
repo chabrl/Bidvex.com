@@ -3472,10 +3472,21 @@ async def update_tax_profile(
                 raise HTTPException(status_code=422, detail=f"Missing required field: {field}")
     
     elif seller_type == 'business':
-        required = ['tax_id', 'neq_number', 'gst_number', 'qst_number', 'legal_business_name']
+        required = ['tax_id', 'gst_number', 'legal_business_name', 'business_province']
         for field in required:
             if not tax_data.get(field):
                 raise HTTPException(status_code=422, detail=f"Missing required field: {field}")
+        
+        # Province-specific validation
+        business_province = tax_data.get('business_province', '')
+        is_quebec = business_province in ['QC', 'Quebec', 'Québec']
+        
+        if is_quebec:
+            # Quebec businesses MUST have NEQ and QST
+            if not tax_data.get('neq_number'):
+                raise HTTPException(status_code=422, detail="NEQ is required for Quebec businesses")
+            if not tax_data.get('qst_number'):
+                raise HTTPException(status_code=422, detail="QST registration number is required for Quebec businesses")
     
     # Update user profile
     update_data = {
