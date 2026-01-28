@@ -3504,11 +3504,12 @@ async def update_tax_profile(
         })
     else:
         update_data.update({
-            "neq_number": tax_data.get('neq_number'),
+            "neq_number": tax_data.get('neq_number'),  # Optional for non-QC
             "gst_number": tax_data.get('gst_number'),
-            "qst_number": tax_data.get('qst_number'),
+            "qst_number": tax_data.get('qst_number'),  # Optional for non-QC
             "legal_business_name": tax_data.get('legal_business_name'),
             "registered_office_address": tax_data.get('registered_office_address'),
+            "business_province": tax_data.get('business_province'),  # NEW
             "is_tax_registered": True,
             "account_type": "business"
         })
