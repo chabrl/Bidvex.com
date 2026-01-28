@@ -167,12 +167,24 @@ const TaxInterviewModal = ({ user, onComplete, onCancel }) => {
       <div className="min-h-screen flex items-center justify-center p-4 py-8">
         <Card className="w-full max-w-3xl my-auto">
           <CardHeader className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white">
-            <div className="flex items-center gap-3">
-              <Shield className="h-8 w-8" />
-              <div>
-                <CardTitle className="text-2xl text-white">{declarations.title}</CardTitle>
-                <p className="text-sm text-white/90 mt-1">{declarations.subtitle}</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Shield className="h-8 w-8" />
+                <div>
+                  <CardTitle className="text-2xl text-white">{declarations.title}</CardTitle>
+                  <p className="text-sm text-white/90 mt-1">{declarations.subtitle}</p>
+                </div>
               </div>
+              {/* Close Button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleExit}
+                className="text-white hover:bg-white/20 rounded-full flex-shrink-0"
+                aria-label="Close"
+              >
+                <X className="h-6 w-6" />
+              </Button>
             </div>
           </CardHeader>
         
