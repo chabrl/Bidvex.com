@@ -24,6 +24,34 @@ const TaxInterviewModal = ({ user, onComplete, onCancel }) => {
   const [agreedToReport, setAgreedToReport] = useState(false);
   const [loading, setLoading] = useState(false);
   
+  // ESC key to close modal
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') {
+        handleExit();
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [step]);
+  
+  const handleExit = () => {
+    // If user has entered data in step 2, confirm before exiting
+    if (step === 2 && (formData.legal_name || formData.legal_business_name)) {
+      setShowExitConfirm(true);
+    } else {
+      confirmExit();
+    }
+  };
+  
+  const confirmExit = () => {
+    if (onCancel) {
+      onCancel();
+    } else {
+      navigate('/'); // Redirect to homepage
+    }
+  };
+  
   const [formData, setFormData] = useState({
     // Individual fields
     legal_name: user?.name || '',
