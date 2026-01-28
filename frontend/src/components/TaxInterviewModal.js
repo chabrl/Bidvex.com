@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -7,17 +8,19 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Badge } from './ui/badge';
 import { toast } from 'sonner';
-import { Building2, User, Shield, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Building2, User, Shield, AlertTriangle, CheckCircle, X, ArrowLeft } from 'lucide-react';
 import { TAX_DECLARATIONS, TAX_FIELD_REQUIREMENTS } from '../utils/taxCompliance';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-const TaxInterviewModal = ({ user, onComplete }) => {
+const TaxInterviewModal = ({ user, onComplete, onCancel }) => {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const lang = i18n.language || 'en';
   
   const [step, setStep] = useState(1); // 1: Type selection, 2: Data collection, 3: Confirmation
   const [sellerType, setSellerType] = useState(null);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [agreedToReport, setAgreedToReport] = useState(false);
   const [loading, setLoading] = useState(false);
   
