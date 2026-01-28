@@ -55,17 +55,34 @@ const TaxInterviewModal = ({ user, onComplete }) => {
         return false;
       }
     } else if (sellerType === 'business') {
-      if (!formData.legal_business_name || !formData.business_number || 
-          !formData.neq_number || !formData.gst_number || !formData.qst_number) {
-        toast.error('Please fill all required business fields');
+      // Always required
+      if (!formData.legal_business_name || !formData.business_number || !formData.business_province) {
+        toast.error('Please fill all required fields: Business Name, Business Number, and Province');
         return false;
       }
       if (formData.business_number.replace(/\D/g, '').length !== 9) {
         toast.error('Business Number must be 9 digits');
         return false;
       }
-      if (formData.neq_number.replace(/\D/g, '').length !== 10) {
-        toast.error('NEQ must be 10 digits');
+      
+      // Province-specific requirements
+      const isQuebec = formData.business_province === 'QC' || formData.business_province === 'Quebec';
+      
+      if (isQuebec) {
+        // Quebec businesses MUST have NEQ and QST
+        if (!formData.neq_number || !formData.qst_number) {
+          toast.error('Quebec businesses must provide NEQ and QST registration numbers');
+          return false;
+        }
+        if (formData.neq_number.replace(/\D/g, '').length !== 10) {
+          toast.error('NEQ must be 10 digits');
+          return false;
+        }
+      }
+      
+      // GST/HST required for all provinces (format varies)
+      if (!formData.gst_number) {
+        toast.error('GST/HST registration number is required');
         return false;
       }
     }
