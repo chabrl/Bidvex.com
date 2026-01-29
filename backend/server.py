@@ -3692,11 +3692,6 @@ async def reset_tax_status(
     return {"success": True, "message": "Tax status reset - user can resubmit"}
 
 
-        if isinstance(msg.get("created_at"), str):
-            msg["created_at"] = datetime.fromisoformat(msg["created_at"])
-    
-    return [Message(**msg) for msg in messages]
-
 # ========== MESSAGING ATTACHMENTS & ITEM SHARING ==========
 
 @api_router.post("/messages/attachment")
