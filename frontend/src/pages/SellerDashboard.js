@@ -220,16 +220,16 @@ const SellerDashboard = () => {
         )}
 
         {/* Tax Information Management Card */}
-        {user?.tax_onboarding_completed && (
-          <Card className="border-2 border-blue-200 dark:border-blue-800">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Shield className="h-6 w-6 text-blue-600" />
-                  <CardTitle>
-                    {lang === 'en' ? 'Tax Information' : 'Informations Fiscales'}
-                  </CardTitle>
-                </div>
+        <Card className="border-2 border-blue-200 dark:border-blue-800">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Shield className="h-6 w-6 text-blue-600" />
+                <CardTitle>
+                  {lang === 'en' ? 'Tax Information' : 'Informations Fiscales'}
+                </CardTitle>
+              </div>
+              {user?.tax_onboarding_completed && (
                 <Badge className={
                   user.tax_verification_status === 'verified' 
                     ? 'bg-green-500 text-white'
@@ -241,54 +241,75 @@ const SellerDashboard = () => {
                   {user.tax_verification_status === 'pending' && (lang === 'en' ? 'Pending Review' : 'En Révision')}
                   {user.tax_verification_status === 'action_required' && (lang === 'en' ? 'Action Required' : 'Action Requise')}
                 </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-muted-foreground">
-                    {lang === 'en' ? 'Seller Type' : 'Type de Vendeur'}
-                  </p>
-                  <p className="font-semibold text-slate-900 dark:text-slate-100">
-                    {user.seller_type === 'business' 
-                      ? (lang === 'en' ? 'Registered Business' : 'Entreprise Enregistrée')
-                      : (lang === 'en' ? 'Individual Seller' : 'Vendeur Individuel')}
-                  </p>
-                </div>
-                {user.business_province && (
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {user?.tax_onboarding_completed ? (
+              <>
+                <div className="grid md:grid-cols-2 gap-4 text-sm">
                   <div>
                     <p className="text-muted-foreground">
-                      {lang === 'en' ? 'Province' : 'Province'}
+                      {lang === 'en' ? 'Seller Type' : 'Type de Vendeur'}
                     </p>
-                    <p className="font-semibold text-slate-900 dark:text-slate-100">{user.business_province}</p>
-                  </div>
-                )}
-                {user.legal_business_name && (
-                  <div className="md:col-span-2">
-                    <p className="text-muted-foreground">
-                      {lang === 'en' ? 'Legal Business Name' : 'Nom Légal de l\'Entreprise'}
+                    <p className="font-semibold text-slate-900 dark:text-slate-100">
+                      {user.seller_type === 'business' 
+                        ? (lang === 'en' ? 'Registered Business' : 'Entreprise Enregistrée')
+                        : (lang === 'en' ? 'Individual Seller' : 'Vendeur Individuel')}
                     </p>
-                    <p className="font-semibold text-slate-900 dark:text-slate-100">{user.legal_business_name}</p>
                   </div>
-                )}
-              </div>
-              
-              <Button
-                variant="outline"
-                onClick={() => setShowTaxModal(true)}
-                className="w-full"
-              >
-                {lang === 'en' ? 'Update Tax Information' : 'Mettre à Jour les Informations Fiscales'}
-              </Button>
-              
-              <p className="text-xs text-muted-foreground text-center">
-                {lang === 'en'
-                  ? 'Need to update your tax details? Click above to edit your information.'
-                  : 'Besoin de mettre à jour vos détails fiscaux? Cliquez ci-dessus pour modifier vos informations.'}
-              </p>
-            </CardContent>
-          </Card>
-        )}
+                  {user.business_province && (
+                    <div>
+                      <p className="text-muted-foreground">
+                        {lang === 'en' ? 'Province' : 'Province'}
+                      </p>
+                      <p className="font-semibold text-slate-900 dark:text-slate-100">{user.business_province}</p>
+                    </div>
+                  )}
+                  {user.legal_business_name && (
+                    <div className="md:col-span-2">
+                      <p className="text-muted-foreground">
+                        {lang === 'en' ? 'Legal Business Name' : 'Nom Légal de l\'Entreprise'}
+                      </p>
+                      <p className="font-semibold text-slate-900 dark:text-slate-100">{user.legal_business_name}</p>
+                    </div>
+                  )}
+                </div>
+                
+                <Button
+                  variant="outline"
+                  onClick={() => setShowTaxModal(true)}
+                  className="w-full"
+                >
+                  {lang === 'en' ? 'Update Tax Information' : 'Mettre à Jour les Informations Fiscales'}
+                </Button>
+                
+                <p className="text-xs text-muted-foreground text-center">
+                  {lang === 'en'
+                    ? 'Need to update your tax details? Click above to edit your information.'
+                    : 'Besoin de mettre à jour vos détails fiscaux? Cliquez ci-dessus pour modifier vos informations.'}
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
+                  <p className="text-sm text-blue-900 dark:text-blue-100 mb-3">
+                    {lang === 'en'
+                      ? '⚠️ Tax information required for CRA compliance. Complete your tax profile to continue selling and receive payouts.'
+                      : '⚠️ Informations fiscales requises pour la conformité ARC. Complétez votre profil fiscal pour continuer à vendre et recevoir des paiements.'}
+                  </p>
+                </div>
+                
+                <Button
+                  onClick={() => setShowTaxModal(true)}
+                  className="w-full gradient-button text-white"
+                >
+                  {lang === 'en' ? 'Complete Tax Profile' : 'Compléter le Profil Fiscal'}
+                </Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Fee Structure & 14-Day Payment Rule Info */}
         <Card className="border-2 border-blue-200 dark:border-blue-700 bg-gradient-to-r from-blue-50 to-slate-50 dark:from-blue-900/20 dark:to-slate-800/20">
