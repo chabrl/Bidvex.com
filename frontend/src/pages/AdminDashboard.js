@@ -13,6 +13,7 @@ import EnhancedUserManager from './admin/EnhancedUserManager';
 import LotsModeration from './admin/LotsModeration';
 import ManageAllAuctions from './admin/ManageAllAuctions';
 import DeletionRequestsManager from './admin/DeletionRequestsManager';
+import TaxVerificationQueue from './admin/TaxVerificationQueue';
 import AuctionControl from './admin/AuctionControl';
 import CategoryManager from './admin/CategoryManager';
 import PromotionManager from './admin/PromotionManager';
