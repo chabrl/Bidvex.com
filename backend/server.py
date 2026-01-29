@@ -3524,6 +3524,178 @@ async def update_tax_profile(
 
     
     for msg in messages:
+
+
+# ========== ADMIN TAX VERIFICATION SYSTEM (CRA COMPLIANCE) ==========
+
+@api_router.get("/admin/tax/pending")
+async def get_pending_tax_verifications(current_user: User = Depends(get_current_user)):
+    """Admin: Get all users with pending tax verification"""
+    if not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    users = await db.users.find({
+        "tax_verification_status": {"$in": ["pending", "pending_manual_review"]},
+        "tax_onboarding_completed": True
+    }, {"_id": 0}).sort("created_at", -1).to_list(None)
+    
+    # Mask sensitive data for display
+    for user in users:
+        if user.get("tax_id"):
+            # Mask SIN/BN - show only last 4 digits
+            user["tax_id_masked"] = "****" + user["tax_id"][-4:] if len(user["tax_id"]) >= 4 else "****"
+            del user["tax_id"]  # Remove actual value from response
+    
+    return users
+
+@api_router.get("/admin/tax/{user_id}")
+async def get_user_tax_details(user_id: str, current_user: User = Depends(get_current_user)):
+    """Admin: Get full tax details for a specific user (compliance officer only)"""
+    if not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Mask sensitive data unless super admin
+    is_super_admin = current_user.role == "admin" and current_user.email == "charbeladmin@bidvex.com"
+    
+    if not is_super_admin and user.get("tax_id"):
+        user["tax_id_masked"] = "****" + user["tax_id"][-4:]
+        del user["tax_id"]
+    
+    return user
+
+@api_router.post("/admin/tax/{user_id}/approve")
+async def approve_tax_verification(
+    user_id: str, 
+    approval_data: dict,
+    current_user: User = Depends(get_current_user),
+    request: Request = None
+):
+    """Admin: Approve user's tax information"""
+    if not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Create audit log
+    audit_log = {
+        "id": str(uuid.uuid4()),
+        "action": "tax_verification_approved",
+        "user_id": user_id,
+        "user_email": user["email"],
+        "admin_id": current_user.id,
+        "admin_email": current_user.email,
+        "admin_ip": request.client.host if request else "unknown",
+        "notes": approval_data.get("notes", ""),
+        "timestamp": datetime.now(timezone.utc),
+        "before_status": user.get("tax_verification_status"),
+        "after_status": "verified"
+    }
+    await db.tax_audit_logs.insert_one(audit_log)
+    
+    # Update user status
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {
+            "tax_verification_status": "verified",
+            "tax_verified_at": datetime.now(timezone.utc),
+            "tax_verified_by": current_user.id
+        }}
+    )
+    
+    # Send notification to user
+    # TODO: Email notification
+    
+    return {"success": True, "message": "Tax information approved"}
+
+@api_router.post("/admin/tax/{user_id}/reject")
+async def reject_tax_verification(
+    user_id: str,
+    rejection_data: dict,
+    current_user: User = Depends(get_current_user),
+    request: Request = None
+):
+    """Admin: Reject user's tax information"""
+    if not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    if not rejection_data.get("reason"):
+        raise HTTPException(status_code=422, detail="Rejection reason required")
+    
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Create audit log
+    audit_log = {
+        "id": str(uuid.uuid4()),
+        "action": "tax_verification_rejected",
+        "user_id": user_id,
+        "user_email": user["email"],
+        "admin_id": current_user.id,
+        "admin_email": current_user.email,
+        "admin_ip": request.client.host if request else "unknown",
+        "rejection_reason": rejection_data.get("reason"),
+        "notes": rejection_data.get("notes", ""),
+        "timestamp": datetime.now(timezone.utc),
+        "before_status": user.get("tax_verification_status"),
+        "after_status": "rejected"
+    }
+    await db.tax_audit_logs.insert_one(audit_log)
+    
+    # Update user status
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {
+            "tax_verification_status": "rejected",
+            "tax_rejection_reason": rejection_data.get("reason"),
+            "tax_rejected_at": datetime.now(timezone.utc),
+            "tax_rejected_by": current_user.id
+        }}
+    )
+    
+    # TODO: Email notification
+    
+    return {"success": True, "message": "Tax information rejected"}
+
+@api_router.post("/admin/tax/{user_id}/reset")
+async def reset_tax_status(
+    user_id: str,
+    current_user: User = Depends(get_current_user),
+    request: Request = None
+):
+    """Admin: Reset tax verification status to allow resubmission"""
+    if not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Audit log
+    audit_log = {
+        "id": str(uuid.uuid4()),
+        "action": "tax_status_reset",
+        "user_id": user_id,
+        "admin_id": current_user.id,
+        "admin_email": current_user.email,
+        "timestamp": datetime.now(timezone.utc)
+    }
+    await db.tax_audit_logs.insert_one(audit_log)
+    
+    # Reset status
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {
+            "tax_verification_status": "pending",
+            "tax_onboarding_completed": False
+        }}
+    )
+    
+    return {"success": True, "message": "Tax status reset - user can resubmit"}
+
+
         if isinstance(msg.get("created_at"), str):
             msg["created_at"] = datetime.fromisoformat(msg["created_at"])
     
