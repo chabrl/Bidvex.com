@@ -3522,10 +3522,6 @@ async def update_tax_profile(
     return {"success": True, "message": "Tax profile updated successfully"}
 
 
-    
-    for msg in messages:
-
-
 # ========== ADMIN TAX VERIFICATION SYSTEM (CRA COMPLIANCE) ==========
 
 @api_router.get("/admin/tax/pending")
