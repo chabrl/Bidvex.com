@@ -503,6 +503,18 @@ const SellerDashboard = () => {
           </Card>
         </div>
       )}
+      
+      {/* Tax Interview Modal - For Editing */}
+      {showTaxModal && (
+        <TaxInterviewModal 
+          user={user} 
+          onComplete={() => {
+            setShowTaxModal(false);
+            window.location.reload();
+          }}
+          onCancel={() => setShowTaxModal(false)}
+        />
+      )}
     </div>
   );
 };
