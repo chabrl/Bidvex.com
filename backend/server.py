@@ -8294,7 +8294,7 @@ async def request_data_deletion(reason: Optional[str] = None, current_user: User
     try:
         # Create deletion request record
         deletion_request = {
-            "id": str(uuid4()),
+            "id": str(uuid.uuid4()),
             "user_id": current_user.id,
             "user_email": current_user.email,
             "user_name": current_user.name,
