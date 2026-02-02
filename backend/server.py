@@ -40,17 +40,26 @@ import aiohttp
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-mongo_url = os.environ['MONGO_URL']
-db_name = os.environ['DB_NAME']
-jwt_secret = os.environ['JWT_SECRET']
-stripe_api_key = os.environ['STRIPE_API_KEY']
+# Add startup logging
+print("[SERVER] Starting BidVex backend initialization...", flush=True)
+
+mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
+db_name = os.environ.get('DB_NAME', 'bazario_db')
+jwt_secret = os.environ.get('JWT_SECRET', 'dev-secret-key-change-in-production')
+stripe_api_key = os.environ.get('STRIPE_API_KEY', '')
 google_maps_key = os.environ.get('GOOGLE_MAPS_API_KEY', '')
 
-client = AsyncIOMotorClient(mongo_url)
+print(f"[SERVER] Connecting to MongoDB: {mongo_url[:30]}...", flush=True)
+client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=5000)
 db = client[db_name]
+print(f"[SERVER] MongoDB client initialized for database: {db_name}", flush=True)
 
 import stripe
-stripe.api_key = stripe_api_key
+if stripe_api_key:
+    stripe.api_key = stripe_api_key
+    print("[SERVER] Stripe API key configured", flush=True)
+else:
+    print("[SERVER] WARNING: No Stripe API key configured", flush=True)
 
 # Fix for MongoDB ObjectId serialization in FastAPI
 from bson.objectid import ObjectId
