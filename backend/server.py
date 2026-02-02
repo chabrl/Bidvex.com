@@ -9319,8 +9319,8 @@ async def ai_chat_message(
         user_id = None
         if credentials:
             try:
-                user = decode_token(credentials.credentials)
-                user_id = user.get("sub")
+                payload = jwt.decode(credentials.credentials, jwt_secret, algorithms=["HS256"])
+                user_id = payload.get("sub")
             except:
                 pass  # Allow unauthenticated users to chat
         
