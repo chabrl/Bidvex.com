@@ -9481,8 +9481,8 @@ async def reload_knowledge_base(
         # Log action
         await db.admin_logs.insert_one({
             "action": "ai_knowledge_base_reload",
-            "admin_id": user.get("sub"),
-            "admin_email": user.get("email"),
+            "admin_id": payload.get("sub"),
+            "admin_email": user_doc.get("email"),
             "created_at": datetime.utcnow()
         })
         
