@@ -3555,7 +3555,8 @@ async def get_user_tax_details(user_id: str, current_user: User = Depends(get_cu
         raise HTTPException(status_code=404, detail="User not found")
     
     # Mask sensitive data unless super admin
-    is_super_admin = current_user.role == "admin" and current_user.email == "charbeladmin@bidvex.com"
+    admin_email = os.environ.get('ADMIN_EMAIL', 'admin@bidvex.com')
+    is_super_admin = current_user.role == "admin" and current_user.email == admin_email
     
     if not is_super_admin and user.get("tax_id"):
         user["tax_id_masked"] = "****" + user["tax_id"][-4:]
@@ -9931,6 +9932,12 @@ async def estimate_full_transaction(
 
 # Include all API routes - MUST be after all routes are defined
 app.include_router(api_router)
+
+# Root-level health endpoint for Emergent deployment health checks
+@app.get("/health")
+async def root_health():
+    """Root health endpoint for deployment health checks"""
+    return {"status": "healthy"}
 
 
 @app.on_event("shutdown")
