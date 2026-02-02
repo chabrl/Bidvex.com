@@ -9961,17 +9961,25 @@ async def shutdown_db_client():
 
 @app.on_event("startup")
 async def seed_categories():
-    existing_categories = await db.categories.count_documents({})
-    if existing_categories == 0:
-        categories = [
-            {"id": str(uuid.uuid4()), "name_en": "Electronics", "name_fr": "Électronique", "icon": "laptop"},
-            {"id": str(uuid.uuid4()), "name_en": "Fashion", "name_fr": "Mode", "icon": "shirt"},
-            {"id": str(uuid.uuid4()), "name_en": "Home & Garden", "name_fr": "Maison & Jardin", "icon": "home"},
-            {"id": str(uuid.uuid4()), "name_en": "Sports", "name_fr": "Sports", "icon": "dumbbell"},
-            {"id": str(uuid.uuid4()), "name_en": "Vehicles", "name_fr": "Véhicules", "icon": "car"},
-            {"id": str(uuid.uuid4()), "name_en": "Art & Collectibles", "name_fr": "Art & Objets de collection", "icon": "palette"},
-            {"id": str(uuid.uuid4()), "name_en": "Books & Media", "name_fr": "Livres & Médias", "icon": "book"},
-            {"id": str(uuid.uuid4()), "name_en": "Toys & Games", "name_fr": "Jouets & Jeux", "icon": "gamepad-2"},
-        ]
-        await db.categories.insert_many(categories)
-        logger.info("Categories seeded successfully")
+    try:
+        print("[SERVER] Checking database connection and seeding categories...", flush=True)
+        existing_categories = await db.categories.count_documents({})
+        print(f"[SERVER] Found {existing_categories} existing categories", flush=True)
+        if existing_categories == 0:
+            categories = [
+                {"id": str(uuid.uuid4()), "name_en": "Electronics", "name_fr": "Électronique", "icon": "laptop"},
+                {"id": str(uuid.uuid4()), "name_en": "Fashion", "name_fr": "Mode", "icon": "shirt"},
+                {"id": str(uuid.uuid4()), "name_en": "Home & Garden", "name_fr": "Maison & Jardin", "icon": "home"},
+                {"id": str(uuid.uuid4()), "name_en": "Sports", "name_fr": "Sports", "icon": "dumbbell"},
+                {"id": str(uuid.uuid4()), "name_en": "Vehicles", "name_fr": "Véhicules", "icon": "car"},
+                {"id": str(uuid.uuid4()), "name_en": "Art & Collectibles", "name_fr": "Art & Objets de collection", "icon": "palette"},
+                {"id": str(uuid.uuid4()), "name_en": "Books & Media", "name_fr": "Livres & Médias", "icon": "book"},
+                {"id": str(uuid.uuid4()), "name_en": "Toys & Games", "name_fr": "Jouets & Jeux", "icon": "gamepad-2"},
+            ]
+            await db.categories.insert_many(categories)
+            logger.info("Categories seeded successfully")
+            print("[SERVER] Categories seeded successfully", flush=True)
+        print("[SERVER] Startup complete - server is ready!", flush=True)
+    except Exception as e:
+        print(f"[SERVER] ERROR during startup: {e}", flush=True)
+        logger.error(f"Error during startup: {e}")
