@@ -9369,8 +9369,8 @@ async def get_ai_chat_history(
         raise HTTPException(status_code=401, detail="Not authenticated")
     
     try:
-        user = decode_token(credentials.credentials)
-        user_id = user.get("sub")
+        payload = jwt.decode(credentials.credentials, jwt_secret, algorithms=["HS256"])
+        user_id = payload.get("sub")
         
         # Get chat history from database
         history = await db.ai_chat_history.find(
@@ -9403,8 +9403,8 @@ async def clear_ai_chat_history(
         raise HTTPException(status_code=401, detail="Not authenticated")
     
     try:
-        user = decode_token(credentials.credentials)
-        user_id = user.get("sub")
+        payload = jwt.decode(credentials.credentials, jwt_secret, algorithms=["HS256"])
+        user_id = payload.get("sub")
         
         # Delete chat history
         result = await db.ai_chat_history.delete_many({"user_id": user_id})
