@@ -614,8 +614,14 @@ scheduler.add_job(
 # Start scheduler on app startup
 @app.on_event("startup")
 async def start_scheduler():
-    scheduler.start()
-    logger.info("🚀 APScheduler started - checking auctions every minute, transitions every 5 minutes")
+    try:
+        print("[SERVER] Starting APScheduler...", flush=True)
+        scheduler.start()
+        logger.info("🚀 APScheduler started - checking auctions every minute, transitions every 5 minutes")
+        print("[SERVER] APScheduler started successfully", flush=True)
+    except Exception as e:
+        print(f"[SERVER] ERROR starting scheduler: {e}", flush=True)
+        logger.error(f"Failed to start scheduler: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_scheduler():
