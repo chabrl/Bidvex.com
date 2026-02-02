@@ -9451,10 +9451,10 @@ async def reload_knowledge_base(
         raise HTTPException(status_code=401, detail="Not authenticated")
     
     try:
-        user = decode_token(credentials.credentials)
+        payload = jwt.decode(credentials.credentials, jwt_secret, algorithms=["HS256"])
         
         # Check admin role
-        user_doc = await db.users.find_one({"id": user.get("sub")})
+        user_doc = await db.users.find_one({"id": payload.get("sub")})
         if not user_doc or user_doc.get("role") != "admin":
             raise HTTPException(status_code=403, detail="Admin access required")
         
