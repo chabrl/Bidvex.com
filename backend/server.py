@@ -3907,7 +3907,7 @@ async def create_auction_won_conversation(
             conversation_id = existing["id"]
         else:
             # Create new conversation
-            conversation_id = str(uuid4())
+            conversation_id = str(uuid.uuid4())
             conversation = {
                 "id": conversation_id,
                 "participants": [seller_id, winner_id],
