@@ -6156,7 +6156,7 @@ async def enforce_verification_requirement(data: Dict[str, Any], current_user: U
 
 # PHASE 2: AI INTEGRATION
 
-EMERGENT_LLM_KEY = "sk-emergent-45818088307Fa1bB23"
+# Use environment variable for API key (already defined at line 9308)
 
 @api_router.post("/admin/trust-safety/analyze-content")
 async def analyze_content_ai(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
