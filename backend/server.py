@@ -3748,7 +3748,7 @@ async def upload_message_attachment(
     file_url = f"{base_url}/api/uploads/messages/{unique_filename}"
     
     # Create message with attachment
-    message_id = str(uuid4())
+    message_id = str(uuid.uuid4())
     message = {
         "id": message_id,
         "conversation_id": conversation_id,
