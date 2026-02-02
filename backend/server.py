@@ -3839,7 +3839,7 @@ async def share_item_details_in_chat(
     payment_status = transaction.get("status", "pending") if transaction else "pending"
     
     # Create item details message
-    message_id = str(uuid4())
+    message_id = str(uuid.uuid4())
     item_data = {
         "title": listing.get("title"),
         "description": listing.get("description", "")[:200],
@@ -3923,7 +3923,7 @@ async def create_auction_won_conversation(
         seller = await db.users.find_one({"id": seller_id}, {"_id": 0})
         
         # Create "Winning Handshake" system message
-        message_id = str(uuid4())
+        message_id = str(uuid.uuid4())
         system_message = {
             "id": message_id,
             "conversation_id": conversation_id,
