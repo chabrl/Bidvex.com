@@ -276,6 +276,8 @@ const AdminDashboard = () => {
           case 'categories': return <CategoryManager />;
           default: return <EnhancedUserManager />;
         }
+      case 'vehicles':
+        return <VehicleAdminManager />;
       case 'settings':
         switch (secondaryTab) {
           case 'site-content': return <SiteContentManager />;
