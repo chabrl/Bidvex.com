@@ -197,6 +197,7 @@ const VehicleCard = ({ vehicle, onClick }) => {
 const VehicleAuctionsPage = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   
   const [vehicles, setVehicles] = useState([]);
