@@ -333,6 +333,43 @@ const VehicleAuctionsPage = () => {
               <span className="text-slate-300">Title Guarantee</span>
             </div>
           </div>
+          
+          {/* Seller CTA Buttons */}
+          <div className="flex flex-wrap gap-4 mt-8 pt-6 border-t border-white/20">
+            <Button 
+              size="lg"
+              onClick={() => navigate('/vehicle-auctions/seller/register')}
+              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+              data-testid="become-seller-btn"
+            >
+              <DollarSign className="h-5 w-5 mr-2" />
+              Sell Your Vehicle
+            </Button>
+            {user && (
+              <>
+                <Button 
+                  variant="outline"
+                  size="lg"
+                  onClick={() => navigate('/vehicle-auctions/my-listings')}
+                  className="border-white/30 text-white hover:bg-white/10"
+                  data-testid="my-listings-btn"
+                >
+                  <Car className="h-5 w-5 mr-2" />
+                  My Listings
+                </Button>
+                <Button 
+                  variant="outline"
+                  size="lg"
+                  onClick={() => navigate('/vehicle-auctions/invoices')}
+                  className="border-white/30 text-white hover:bg-white/10"
+                  data-testid="my-invoices-btn"
+                >
+                  <FileText className="h-5 w-5 mr-2" />
+                  My Invoices
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
