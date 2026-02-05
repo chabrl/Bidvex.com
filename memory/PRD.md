@@ -122,22 +122,64 @@ Implemented Enterprise Vehicle Auction Module (Phase 1 & 2):
 
 ## Upcoming Tasks (Prioritized)
 
-### P0 - Critical
-- [x] Hero Banner Manager with full styling (DONE)
-- [ ] Verify production deployment
+### P0 - Critical (In Progress)
+- [x] Vehicle Auction Module Phase 1: Database & APIs (DONE)
+- [x] Vehicle Auction Module Phase 2: Seller System (DONE)
+- [ ] Vehicle Auction Module Phase 3: Vehicle Listing Flow (frontend)
+- [ ] Vehicle Auction Module Phase 4: Auction & Bidding Engine
+- [ ] Vehicle Auction Module Phase 5: Frontend UI
 
 ### P1 - High Priority
-- Enterprise Vehicle Auction Module
-- Advanced Banner Customization (carousel-specific features)
+- [ ] Hero Banner Title Color fix (verified working)
+- [ ] Verify production deployment
 
 ### P2 - Medium Priority
-- CRA Tax Reporting Engine (XML generator)
-- Refactor server.py into modular routers
-- Refactor i18n.js into namespaces
+- [ ] CRA Tax Reporting Engine (XML generator)
+- [ ] Refactor server.py into modular routers
+- [ ] Refactor i18n.js into namespaces
 
 ### P3 - Low Priority
-- UI for AI Guard Status
-- Legal Pages Layout Refresh
+- [ ] UI for AI Guard Status
+- [ ] Legal Pages Layout Refresh
+
+## Vehicle Auction API Endpoints (NEW)
+
+### VIN Decoder
+- `GET /api/vehicles/decode-vin/{vin}` - Decode VIN using NHTSA API
+
+### Vehicle Sellers
+- `POST /api/vehicle-sellers/register` - Register as vehicle seller
+- `GET /api/vehicle-sellers/me` - Get own seller profile
+- `POST /api/vehicle-sellers/documents` - Upload verification documents
+- `GET /api/vehicle-sellers/{id}/public` - Public seller profile with badges
+
+### Vehicle Listings
+- `POST /api/vehicles` - Create vehicle listing
+- `POST /api/vehicles/{id}/media` - Upload photos/videos
+- `POST /api/vehicles/{id}/submit` - Submit for approval
+- `GET /api/vehicles` - List public vehicle auctions
+- `GET /api/vehicles/{id}` - Get vehicle detail
+- `GET /api/vehicles/my/listings` - Seller's own listings
+
+### Bidding
+- `POST /api/vehicle-bids` - Place bid
+- `POST /api/vehicle-bids/deposit` - Pay bid deposit
+- `GET /api/vehicle-bids/my` - User's bid history
+- `POST /api/vehicles/{id}/accept-terms` - Accept legal terms
+
+### Admin
+- `GET /api/vehicle-admin/pending-sellers` - Pending seller verifications
+- `POST /api/vehicle-admin/sellers/{id}/approve` - Approve seller
+- `POST /api/vehicle-admin/sellers/{id}/reject` - Reject seller
+- `GET /api/vehicle-admin/pending-vehicles` - Pending vehicle approvals
+- `POST /api/vehicle-admin/vehicles/{id}/approve` - Approve vehicle
+- `POST /api/vehicle-admin/vehicles/{id}/reject` - Reject vehicle
+- `POST /api/vehicle-admin/vehicles/{id}/cancel` - Cancel auction
+- `POST /api/vehicle-admin/bids/{id}/remove` - Remove bid (with audit)
+- `GET /api/vehicle-admin/audit-logs` - Get audit logs
+
+### WebSocket
+- `WS /api/ws/vehicle/{id}` - Live auction updates
 
 ## Test Credentials
 - **Admin:** `charbeladmin@bidvex.com` / `Admin123!`
