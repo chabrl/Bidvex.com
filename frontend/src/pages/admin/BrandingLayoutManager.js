@@ -196,7 +196,7 @@ const BrandingLayoutManager = () => {
           Branding & Layout Manager
         </h2>
         <p className="text-muted-foreground">
-          Customize your site's appearance and homepage structure
+          Customize your site&apos;s appearance and homepage structure
         </p>
       </div>
 
@@ -309,7 +309,7 @@ const BrandingLayoutManager = () => {
                 <Type className="h-5 w-5" />
                 Typography
               </CardTitle>
-              <CardDescription>Choose your site's font family</CardDescription>
+              <CardDescription>Choose your site&apos;s font family</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
