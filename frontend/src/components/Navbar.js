@@ -63,6 +63,7 @@ const Navbar = () => {
     { path: '/', label: t('nav.home'), icon: Home },
     { path: '/marketplace', label: t('nav.marketplace'), icon: ShoppingBag },
     { path: '/lots', label: t('nav.lotsAuction'), icon: Gavel },
+    { path: '/vehicle-auctions', label: 'Vehicles', icon: Car },
   ];
 
   return (
