@@ -47,6 +47,8 @@ import VehicleDetailPage from './pages/vehicles/VehicleDetailPage';
 import CreateVehicleListingPage from './pages/vehicles/CreateVehicleListingPage';
 import SellerRegistrationPage from './pages/vehicles/SellerRegistrationPage';
 import MyVehicleListingsPage from './pages/vehicles/MyVehicleListingsPage';
+import VehicleInvoicesPage from './pages/vehicles/VehicleInvoicesPage';
+import SellerFinancialsPage from './pages/vehicles/SellerFinancialsPage';
 import { VehicleAuctionProvider } from './contexts/VehicleAuctionContext';
 
 import { registerServiceWorker } from './utils/pushNotifications';
