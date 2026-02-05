@@ -8806,13 +8806,22 @@ async def create_hero_banner(
     
     banner = {
         "id": str(uuid.uuid4()),
-        "title": banner_data.get("title", ""),
-        "subtitle": banner_data.get("subtitle", ""),
+        # Bilingual content fields
+        "title_en": banner_data.get("title_en", banner_data.get("title", "")),
+        "title_fr": banner_data.get("title_fr", ""),
+        "subtitle_en": banner_data.get("subtitle_en", banner_data.get("subtitle", "")),
+        "subtitle_fr": banner_data.get("subtitle_fr", ""),
+        "cta_text_en": banner_data.get("cta_text_en", banner_data.get("cta_text", "Learn More")),
+        "cta_text_fr": banner_data.get("cta_text_fr", "En savoir plus"),
+        # Legacy fields (for backwards compatibility)
+        "title": banner_data.get("title", banner_data.get("title_en", "")),
+        "subtitle": banner_data.get("subtitle", banner_data.get("subtitle_en", "")),
+        "cta_text": banner_data.get("cta_text", banner_data.get("cta_text_en", "Learn More")),
+        # Image fields
         "image_desktop": banner_data.get("image_desktop"),
         "image_mobile": banner_data.get("image_mobile"),
-        "cta_text": banner_data.get("cta_text", "Learn More"),
         "cta_link": banner_data.get("cta_link", "/marketplace"),
-        # Styling fields
+        # Styling fields - all independent
         "title_color": banner_data.get("title_color", "#FFFFFF"),
         "subtitle_color": banner_data.get("subtitle_color", "#FFFFFF"),
         "button_color": banner_data.get("button_color", "#FFFFFF"),
