@@ -362,7 +362,7 @@ const VehicleInvoicesPage = () => {
                 <Receipt className="h-16 w-16 text-slate-300 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-slate-600">No Invoices Found</h3>
                 <p className="text-slate-500 mt-1">
-                  You don't have any invoices in this category yet.
+                  You don&apos;t have any invoices in this category yet.
                 </p>
               </Card>
             ) : (
