@@ -341,7 +341,7 @@ const VehicleAuctionsPage = () => {
             <Button 
               size="lg"
               onClick={() => navigate('/vehicle-auctions/seller/register')}
-              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
               data-testid="become-seller-btn"
             >
               <DollarSign className="h-5 w-5 mr-2" />
@@ -350,20 +350,18 @@ const VehicleAuctionsPage = () => {
             {user && (
               <>
                 <Button 
-                  variant="outline"
                   size="lg"
                   onClick={() => navigate('/vehicle-auctions/my-listings')}
-                  className="border-white/30 text-white hover:bg-white/10"
+                  className="bg-white/10 border border-white/30 text-white hover:bg-white/20"
                   data-testid="my-listings-btn"
                 >
                   <Car className="h-5 w-5 mr-2" />
                   My Listings
                 </Button>
                 <Button 
-                  variant="outline"
                   size="lg"
                   onClick={() => navigate('/vehicle-auctions/invoices')}
-                  className="border-white/30 text-white hover:bg-white/10"
+                  className="bg-white/10 border border-white/30 text-white hover:bg-white/20"
                   data-testid="my-invoices-btn"
                 >
                   <FileText className="h-5 w-5 mr-2" />
