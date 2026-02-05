@@ -227,7 +227,8 @@ const VehicleAuctionsPage = () => {
       params.set('limit', '12');
       
       Object.entries(filters).forEach(([key, value]) => {
-        if (value) params.set(key, value);
+        // Skip "all" placeholder values and empty values
+        if (value && value !== 'all') params.set(key, value);
       });
       
       const response = await axios.get(`${API}/vehicles?${params}`);
