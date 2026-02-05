@@ -233,6 +233,20 @@ const App = () => {
           } />
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
           <Route path="/terms-of-service" element={<TermsOfServicePage />} />
+          
+          {/* Vehicle Auction Module (Standalone) */}
+          <Route path="/vehicle-auctions" element={<VehicleAuctionsPage />} />
+          <Route path="/vehicle-auctions/:id" element={<VehicleDetailPage />} />
+          <Route path="/vehicle-auctions/create" element={
+            <ProtectedRoute><CreateVehicleListingPage /></ProtectedRoute>
+          } />
+          <Route path="/vehicle-auctions/seller/register" element={
+            <ProtectedRoute><SellerRegistrationPage /></ProtectedRoute>
+          } />
+          <Route path="/vehicle-auctions/my-listings" element={
+            <ProtectedRoute><MyVehicleListingsPage /></ProtectedRoute>
+          } />
+          
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
           <Footer />
