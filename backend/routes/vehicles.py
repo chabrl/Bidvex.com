@@ -1327,3 +1327,375 @@ async def broadcast_bid_update(vehicle_id: str, bid_amount: float, bid_count: in
         "reserve_met": reserve_met,
         "timestamp": datetime.now(timezone.utc).isoformat()
     })
+
+
+# ============= PRICING & FINANCIAL ENDPOINTS =============
+
+@vehicle_router.get("/vehicles/{vehicle_id}/pricing-estimate")
+async def get_vehicle_pricing_estimate(
+    vehicle_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Get pricing estimate for a vehicle auction
+    Shows fees, taxes, and total for both buyer and seller
+    """
+    listing = await db.vehicle_listings.find_one({"id": vehicle_id}, {"_id": 0})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+    
+    # Get user subscription tier if logged in
+    buyer_tier = "basic"
+    seller_tier = "basic"
+    
+    if credentials:
+        try:
+            user = await get_current_user(credentials)
+            buyer_tier = user.get("subscription_tier", "basic")
+        except:
+            pass
+    
+    # Get seller subscription tier
+    seller = await db.vehicle_sellers.find_one({"id": listing["seller_id"]})
+    if seller:
+        seller_user = await db.users.find_one({"id": listing["seller_user_id"]})
+        if seller_user:
+            seller_tier = seller_user.get("subscription_tier", "basic")
+    
+    # Use current bid or starting price
+    estimate_price = listing.get("current_bid") or listing.get("starting_price", 0)
+    
+    return get_pricing_estimate(
+        estimate_price,
+        listing.get("location_province", "ON"),
+        buyer_tier,
+        seller_tier
+    )
+
+
+@vehicle_router.post("/vehicles/{vehicle_id}/pricing-breakdown")
+async def calculate_pricing_breakdown(
+    vehicle_id: str,
+    bid_amount: float,
+    user: dict = Depends(get_current_user)
+):
+    """
+    Calculate detailed pricing breakdown for a specific bid amount
+    Used before placing a bid to show exact costs
+    """
+    listing = await db.vehicle_listings.find_one({"id": vehicle_id}, {"_id": 0})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+    
+    # Get buyer's province from profile or use listing location
+    buyer_province = user.get("province") or listing.get("location_province", "ON")
+    
+    # Get buyer subscription tier
+    buyer_tier = get_subscription_tier(user)
+    
+    # Calculate full breakdown
+    breakdown = calculate_buyer_pricing(bid_amount, buyer_province, buyer_tier)
+    
+    return {
+        "bid_amount": bid_amount,
+        "vehicle_id": vehicle_id,
+        "breakdown": {
+            "hammer_price": float(breakdown.hammer_price),
+            "buyer_premium": {
+                "rate": f"{float(breakdown.buyer_premium_rate) * 100:.1f}%",
+                "amount": float(breakdown.buyer_premium)
+            },
+            "platform_fee": {
+                "rate": "2.5%",
+                "amount": float(breakdown.platform_fee)
+            },
+            "subtotal_before_tax": float(breakdown.subtotal_before_tax),
+            "taxes": {
+                "type": breakdown.tax_breakdown.tax_type,
+                "province": breakdown.tax_breakdown.province,
+                "gst": float(breakdown.tax_breakdown.gst_amount),
+                "pst": float(breakdown.tax_breakdown.pst_amount),
+                "qst": float(breakdown.tax_breakdown.qst_amount),
+                "hst": float(breakdown.tax_breakdown.hst_amount),
+                "total": float(breakdown.tax_breakdown.total_tax),
+                "rate": f"{float(breakdown.tax_breakdown.total_rate) * 100:.2f}%"
+            },
+            "total_payable": float(breakdown.total_payable),
+            "subscription_tier": breakdown.subscription_tier,
+            "subscription_discount": float(breakdown.discount_applied)
+        }
+    }
+
+
+# ============= INVOICE ENDPOINTS =============
+
+@vehicle_router.get("/vehicle-invoices/my")
+async def get_my_invoices(
+    invoice_type: str = None,
+    status: str = None,
+    user: dict = Depends(get_current_user)
+):
+    """Get all invoices for current user (as buyer or seller)"""
+    invoices = await get_invoices_for_user(db, user["id"], invoice_type, status)
+    return {"invoices": invoices}
+
+
+@vehicle_router.get("/vehicle-invoices/{invoice_id}")
+async def get_invoice(
+    invoice_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """Get detailed invoice by ID"""
+    invoice = await get_invoice_summary(db, invoice_id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    # Verify user has access
+    if invoice.get("buyer_id") != user["id"] and invoice.get("seller_id") != user["id"]:
+        # Check if admin
+        if user.get("role") not in ["admin", "super_admin"]:
+            raise HTTPException(status_code=403, detail="Access denied")
+    
+    return invoice
+
+
+@vehicle_router.post("/vehicle-invoices/{invoice_id}/pay")
+async def pay_invoice(
+    invoice_id: str,
+    payment_method: str,
+    user: dict = Depends(get_current_user)
+):
+    """
+    Process payment for an invoice
+    In production, this would integrate with Stripe/payment processor
+    """
+    invoice = await get_invoice_by_id(db, invoice_id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    # Verify buyer owns the invoice
+    if invoice.get("buyer_id") != user["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized to pay this invoice")
+    
+    if invoice.get("payment_status") == InvoiceStatus.PAID:
+        raise HTTPException(status_code=400, detail="Invoice already paid")
+    
+    # Calculate amount due
+    amount_due = invoice["total_amount"] + invoice.get("penalty_amount", 0) - invoice.get("paid_amount", 0)
+    
+    # In production: Create Stripe payment intent, process payment, etc.
+    # For now, simulate successful payment
+    result = await process_invoice_payment(
+        db,
+        invoice_id,
+        amount_due,
+        payment_method,
+        f"demo_txn_{uuid.uuid4()}"
+    )
+    
+    return result
+
+
+@vehicle_router.get("/vehicle-invoices/vehicle/{vehicle_id}")
+async def get_vehicle_invoices(
+    vehicle_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """Get all invoices related to a vehicle auction"""
+    invoices = await db.vehicle_invoices.find(
+        {"vehicle_id": vehicle_id},
+        {"_id": 0}
+    ).to_list(length=10)
+    
+    # Filter based on user access
+    accessible = []
+    for inv in invoices:
+        if inv.get("buyer_id") == user["id"] or inv.get("seller_id") == user["id"]:
+            accessible.append(inv)
+        elif user.get("role") in ["admin", "super_admin"]:
+            accessible.append(inv)
+    
+    return {"invoices": accessible}
+
+
+# ============= SELLER FINANCIAL ENDPOINTS =============
+
+@vehicle_router.get("/vehicle-sellers/me/financials")
+async def get_seller_financials(
+    seller: dict = Depends(get_vehicle_seller),
+    user: dict = Depends(get_current_user)
+):
+    """Get seller's financial overview including commission rates and payouts"""
+    # Get subscription tier
+    tier = get_subscription_tier(user)
+    
+    # Get pending settlements
+    pending_settlements = await db.vehicle_invoices.find({
+        "seller_id": user["id"],
+        "invoice_type": "seller_settlement",
+        "settlement_status": {"$in": ["pending_buyer_payment", "ready"]}
+    }, {"_id": 0}).to_list(length=100)
+    
+    # Get completed settlements
+    completed_settlements = await db.vehicle_invoices.find({
+        "seller_id": user["id"],
+        "invoice_type": "seller_settlement",
+        "settlement_status": "completed"
+    }, {"_id": 0}).sort("settled_at", -1).limit(20).to_list(length=20)
+    
+    # Calculate totals
+    pending_payout = sum(s.get("net_payout", 0) for s in pending_settlements)
+    total_earned = sum(s.get("net_payout", 0) for s in completed_settlements)
+    total_commission_paid = sum(s.get("seller_commission", 0) for s in completed_settlements)
+    
+    # Get commission rate info
+    from services.vehicle_pricing import SELLER_COMMISSION_RATES
+    commission_rate = float(SELLER_COMMISSION_RATES[tier]) * 100
+    basic_rate = float(SELLER_COMMISSION_RATES[SubscriptionTier.BASIC]) * 100
+    
+    return {
+        "subscription_tier": tier.value,
+        "commission_rate": f"{commission_rate:.1f}%",
+        "commission_savings": f"{basic_rate - commission_rate:.1f}%" if tier != SubscriptionTier.BASIC else "0%",
+        "financials": {
+            "pending_payout": pending_payout,
+            "total_earned": total_earned,
+            "total_commission_paid": total_commission_paid,
+            "pending_settlements_count": len(pending_settlements)
+        },
+        "pending_settlements": pending_settlements,
+        "recent_settlements": completed_settlements[:5]
+    }
+
+
+# ============= ADMIN FINANCIAL ENDPOINTS =============
+
+@vehicle_router.get("/vehicle-admin/invoices")
+async def admin_list_invoices(
+    status: str = None,
+    invoice_type: str = None,
+    limit: int = 50,
+    admin: dict = Depends(get_admin_user)
+):
+    """Admin: List all invoices with filters"""
+    query = {}
+    if status:
+        query["payment_status"] = status
+    if invoice_type:
+        query["invoice_type"] = invoice_type
+    
+    cursor = db.vehicle_invoices.find(query, {"_id": 0}).sort("created_at", -1).limit(limit)
+    invoices = await cursor.to_list(length=limit)
+    
+    # Get summary stats
+    total_pending = await db.vehicle_invoices.count_documents({"payment_status": "pending"})
+    total_overdue = await db.vehicle_invoices.count_documents({"payment_status": "overdue"})
+    total_paid = await db.vehicle_invoices.count_documents({"payment_status": "paid"})
+    
+    return {
+        "invoices": invoices,
+        "stats": {
+            "pending": total_pending,
+            "overdue": total_overdue,
+            "paid": total_paid
+        }
+    }
+
+
+@vehicle_router.post("/vehicle-admin/run-scheduler")
+async def admin_run_scheduler(admin: dict = Depends(get_admin_user)):
+    """
+    Admin: Manually trigger the auction scheduler
+    Processes ended auctions, activates scheduled ones, applies penalties
+    """
+    result = await run_auction_scheduler(db)
+    
+    await log_audit(
+        "system", "scheduler", "manual_run",
+        admin["id"], "admin",
+        new_value=result
+    )
+    
+    return {
+        "message": "Scheduler executed successfully",
+        "results": result
+    }
+
+
+@vehicle_router.post("/vehicle-admin/process-auction/{vehicle_id}")
+async def admin_process_auction(
+    vehicle_id: str,
+    admin: dict = Depends(get_admin_user)
+):
+    """Admin: Manually process a single ended auction"""
+    listing = await db.vehicle_listings.find_one({"id": vehicle_id})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+    
+    if listing["status"] != "active":
+        raise HTTPException(status_code=400, detail=f"Vehicle status is '{listing['status']}', not active")
+    
+    result = await process_ended_auction(db, listing)
+    
+    return {
+        "vehicle_id": result.vehicle_id,
+        "status": result.status,
+        "winner_id": result.winner_id,
+        "final_price": result.final_price,
+        "buyer_invoice_id": result.buyer_invoice_id,
+        "seller_invoice_id": result.seller_invoice_id,
+        "error": result.error
+    }
+
+
+@vehicle_router.get("/vehicle-admin/financial-summary")
+async def admin_financial_summary(admin: dict = Depends(get_admin_user)):
+    """Admin: Get overall financial summary"""
+    now = datetime.now(timezone.utc)
+    start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    # This month's buyer invoices
+    monthly_buyer_invoices = await db.vehicle_invoices.find({
+        "invoice_type": "buyer",
+        "created_at": {"$gte": start_of_month}
+    }).to_list(length=1000)
+    
+    monthly_revenue = sum(inv.get("platform_fee", 0) + inv.get("buyer_premium", 0) for inv in monthly_buyer_invoices)
+    monthly_tax_collected = sum(inv.get("tax_total", 0) for inv in monthly_buyer_invoices)
+    monthly_volume = sum(inv.get("hammer_price", 0) for inv in monthly_buyer_invoices)
+    
+    # All time stats
+    all_buyer_invoices = await db.vehicle_invoices.find({
+        "invoice_type": "buyer"
+    }).to_list(length=10000)
+    
+    total_revenue = sum(inv.get("platform_fee", 0) + inv.get("buyer_premium", 0) for inv in all_buyer_invoices)
+    total_volume = sum(inv.get("hammer_price", 0) for inv in all_buyer_invoices)
+    
+    # Outstanding amounts
+    pending_invoices = await db.vehicle_invoices.find({
+        "invoice_type": "buyer",
+        "payment_status": {"$in": ["pending", "overdue"]}
+    }).to_list(length=1000)
+    
+    outstanding_amount = sum(inv.get("total_amount", 0) + inv.get("penalty_amount", 0) - inv.get("paid_amount", 0) 
+                            for inv in pending_invoices)
+    
+    return {
+        "this_month": {
+            "revenue": monthly_revenue,
+            "tax_collected": monthly_tax_collected,
+            "volume": monthly_volume,
+            "transactions": len(monthly_buyer_invoices)
+        },
+        "all_time": {
+            "revenue": total_revenue,
+            "volume": total_volume,
+            "transactions": len(all_buyer_invoices)
+        },
+        "outstanding": {
+            "amount": outstanding_amount,
+            "invoices_count": len(pending_invoices)
+        }
+    }
+
