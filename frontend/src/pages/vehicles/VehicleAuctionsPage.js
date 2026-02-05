@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../../contexts/AuthContext';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from '../../components/ui/card';
@@ -23,7 +24,7 @@ import {
   Car, Search, Filter, Grid, List, Clock, MapPin, Gauge,
   Fuel, Settings2, Calendar, DollarSign, ChevronRight,
   Award, Shield, Zap, TrendingUp, Eye, Heart, RefreshCw,
-  ChevronDown, X, SlidersHorizontal, Sparkles
+  ChevronDown, X, SlidersHorizontal, Sparkles, FileText
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
