@@ -491,28 +491,49 @@ const HeroBannerEditor = () => {
               <div className="space-y-4">
                 <h4 className="font-semibold flex items-center gap-2 text-sm text-muted-foreground uppercase tracking-wide">
                   <Palette className="h-4 w-4" />
-                  Styling
+                  Colors
                 </h4>
 
-                {/* Colors */}
+                {/* Title & Subtitle Colors */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label>Text Color</Label>
+                    <Label>Title Color</Label>
                     <div className="flex items-center gap-2 mt-1">
                       <input
                         type="color"
-                        value={bannerForm.text_color}
-                        onChange={(e) => setBannerForm(prev => ({ ...prev, text_color: e.target.value }))}
+                        value={bannerForm.title_color || '#FFFFFF'}
+                        onChange={(e) => setBannerForm(prev => ({ ...prev, title_color: e.target.value }))}
                         className="w-10 h-10 rounded cursor-pointer border"
                       />
                       <Input
-                        value={bannerForm.text_color}
-                        onChange={(e) => setBannerForm(prev => ({ ...prev, text_color: e.target.value }))}
+                        value={bannerForm.title_color || '#FFFFFF'}
+                        onChange={(e) => setBannerForm(prev => ({ ...prev, title_color: e.target.value }))}
                         className="flex-1 font-mono text-sm"
                         maxLength={7}
                       />
                     </div>
                   </div>
+                  <div>
+                    <Label>Subtitle Color</Label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <input
+                        type="color"
+                        value={bannerForm.subtitle_color || '#FFFFFF'}
+                        onChange={(e) => setBannerForm(prev => ({ ...prev, subtitle_color: e.target.value }))}
+                        className="w-10 h-10 rounded cursor-pointer border"
+                      />
+                      <Input
+                        value={bannerForm.subtitle_color || '#FFFFFF'}
+                        onChange={(e) => setBannerForm(prev => ({ ...prev, subtitle_color: e.target.value }))}
+                        className="flex-1 font-mono text-sm"
+                        maxLength={7}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Overlay Colors */}
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>Overlay Color</Label>
                     <div className="flex items-center gap-2 mt-1">
@@ -530,14 +551,21 @@ const HeroBannerEditor = () => {
                       />
                     </div>
                   </div>
+                  <div>
+                    <Label className="flex items-center justify-between">
+                      <span>Overlay Opacity</span>
+                      <span className="text-muted-foreground">{Math.round(bannerForm.overlay_opacity * 100)}%</span>
+                    </Label>
+                    <Slider
+                      value={[bannerForm.overlay_opacity * 100]}
+                      onValueChange={(value) => setBannerForm(prev => ({ ...prev, overlay_opacity: value[0] / 100 }))}
+                      min={0}
+                      max={100}
+                      step={5}
+                      className="mt-3"
+                    />
+                  </div>
                 </div>
-
-                {/* Overlay Opacity */}
-                <div>
-                  <Label className="flex items-center justify-between">
-                    <span>Overlay Opacity</span>
-                    <span className="text-muted-foreground">{Math.round(bannerForm.overlay_opacity * 100)}%</span>
-                  </Label>
                   <Slider
                     value={[bannerForm.overlay_opacity * 100]}
                     onValueChange={(value) => setBannerForm(prev => ({ ...prev, overlay_opacity: value[0] / 100 }))}
