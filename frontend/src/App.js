@@ -40,6 +40,15 @@ import TermsOfServicePage from './pages/TermsOfServicePage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import PhoneVerificationPage from './pages/PhoneVerificationPage';
+
+// Vehicle Auction Module (Standalone)
+import VehicleAuctionsPage from './pages/vehicles/VehicleAuctionsPage';
+import VehicleDetailPage from './pages/vehicles/VehicleDetailPage';
+import CreateVehicleListingPage from './pages/vehicles/CreateVehicleListingPage';
+import SellerRegistrationPage from './pages/vehicles/SellerRegistrationPage';
+import MyVehicleListingsPage from './pages/vehicles/MyVehicleListingsPage';
+import { VehicleAuctionProvider } from './contexts/VehicleAuctionContext';
+
 import { registerServiceWorker } from './utils/pushNotifications';
 import './App.css';
 
