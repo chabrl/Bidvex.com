@@ -1720,3 +1720,321 @@ async def admin_financial_summary(admin: dict = Depends(get_admin_user)):
         }
     }
 
+
+# ============= STRIPE PAYMENT ENDPOINTS =============
+
+@vehicle_router.post("/vehicle-payments/invoice/{invoice_id}/checkout")
+async def create_invoice_checkout(
+    invoice_id: str,
+    request: Request,
+    user: dict = Depends(get_current_user)
+):
+    """
+    Create Stripe checkout session for invoice payment
+    Amount is determined server-side from invoice (not user-controllable)
+    """
+    payment_service = get_payment_service()
+    
+    # Get base URL from request
+    base_url = str(request.base_url)
+    
+    # Get origin URL from header (frontend sends this)
+    origin_url = request.headers.get("Origin") or request.headers.get("Referer", "").rstrip("/")
+    if not origin_url:
+        origin_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+    
+    try:
+        result = await payment_service.create_invoice_checkout(
+            db,
+            invoice_id,
+            user["id"],
+            base_url,
+            origin_url
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@vehicle_router.post("/vehicle-payments/deposit/{vehicle_id}/checkout")
+async def create_deposit_checkout(
+    vehicle_id: str,
+    request: Request,
+    user: dict = Depends(get_current_user)
+):
+    """
+    Create Stripe checkout session for bid deposit
+    Deposit amount is fixed per vehicle (server-side)
+    """
+    payment_service = get_payment_service()
+    
+    base_url = str(request.base_url)
+    origin_url = request.headers.get("Origin") or request.headers.get("Referer", "").rstrip("/")
+    if not origin_url:
+        origin_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+    
+    # Get deposit amount from listing (server-side)
+    listing = await db.vehicle_listings.find_one({"id": vehicle_id})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+    
+    deposit_amount = listing.get("deposit_amount", 500)
+    
+    try:
+        result = await payment_service.create_deposit_checkout(
+            db,
+            vehicle_id,
+            user["id"],
+            deposit_amount,
+            base_url,
+            origin_url
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@vehicle_router.get("/vehicle-payments/status/{session_id}")
+async def check_payment_status(
+    session_id: str,
+    request: Request
+):
+    """
+    Check Stripe checkout session status
+    Called by frontend after returning from Stripe
+    """
+    payment_service = get_payment_service()
+    base_url = str(request.base_url)
+    
+    try:
+        result = await payment_service.check_payment_status(db, session_id, base_url)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@vehicle_router.post("/webhook/stripe")
+async def stripe_webhook(request: Request):
+    """
+    Stripe webhook endpoint
+    Handles payment confirmations, refunds, etc.
+    """
+    try:
+        body = await request.body()
+        signature = request.headers.get("Stripe-Signature")
+        
+        payment_service = get_payment_service()
+        webhook_url = f"{request.base_url}api/webhook/stripe"
+        checkout = payment_service._get_checkout(webhook_url)
+        
+        # Handle webhook
+        event = await checkout.handle_webhook(body, signature)
+        
+        logger.info(f"Stripe webhook received: {event.event_type} - {event.session_id}")
+        
+        # Process based on event type
+        if event.event_type == "checkout.session.completed":
+            # Update payment status
+            await payment_service.check_payment_status(db, event.session_id, str(request.base_url))
+        
+        return {"received": True, "event_type": event.event_type}
+    except Exception as e:
+        logger.exception(f"Stripe webhook error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ============= DOCUMENT UPLOAD ENDPOINTS =============
+
+@vehicle_router.post("/vehicle-documents/upload")
+async def upload_seller_document(
+    document_type: str = Form(...),
+    description: str = Form(None),
+    file: UploadFile = File(...),
+    seller: dict = Depends(get_vehicle_seller),
+    user: dict = Depends(get_current_user)
+):
+    """
+    Upload a seller verification document
+    Supports PDF, JPG, PNG, WEBP (max 10MB)
+    """
+    # Validate document type
+    try:
+        doc_type = DocumentType(document_type)
+    except ValueError:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid document type. Valid types: {[d.value for d in DocumentType]}"
+        )
+    
+    # Read file content
+    content = await file.read()
+    
+    try:
+        document = await create_seller_document(
+            db,
+            seller["id"],
+            user["id"],
+            document_type,
+            content,
+            file.filename,
+            description
+        )
+        return {
+            "message": "Document uploaded successfully",
+            "document": document
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@vehicle_router.get("/vehicle-documents/my")
+async def get_my_documents(
+    document_type: str = None,
+    status: str = None,
+    seller: dict = Depends(get_vehicle_seller),
+    user: dict = Depends(get_current_user)
+):
+    """Get all documents for current seller"""
+    documents = await get_seller_documents(db, seller["id"], document_type, status)
+    
+    # Get verification status
+    verification = await check_seller_verification_status(db, seller["id"])
+    
+    return {
+        "documents": documents,
+        "verification_status": verification
+    }
+
+
+@vehicle_router.get("/vehicle-documents/required")
+async def get_required_documents(
+    seller: dict = Depends(get_vehicle_seller)
+):
+    """Get list of required documents based on seller type"""
+    seller_type = seller.get("seller_type", "private")
+    required = get_document_types_for_seller_type(seller_type)
+    
+    # Get already uploaded documents
+    existing = await get_seller_documents(db, seller["id"])
+    existing_types = {doc["document_type"] for doc in existing}
+    
+    # Mark which are already uploaded
+    for doc in required:
+        doc["uploaded"] = doc["type"] in existing_types
+    
+    return {
+        "seller_type": seller_type,
+        "required_documents": required
+    }
+
+
+@vehicle_router.get("/vehicle-documents/{document_id}")
+async def get_document(
+    document_id: str,
+    seller: dict = Depends(get_vehicle_seller),
+    user: dict = Depends(get_current_user)
+):
+    """Get document details by ID"""
+    document = await get_document_by_id(db, document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    # Verify ownership
+    if document["seller_id"] != seller["id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    return document
+
+
+# ============= ADMIN DOCUMENT ENDPOINTS =============
+
+@vehicle_router.get("/vehicle-admin/documents/pending")
+async def admin_get_pending_documents(
+    limit: int = 50,
+    admin: dict = Depends(get_admin_user)
+):
+    """Admin: Get all pending documents for review"""
+    documents = await get_pending_documents_for_admin(db, limit)
+    return {
+        "pending_count": len(documents),
+        "documents": documents
+    }
+
+
+@vehicle_router.post("/vehicle-admin/documents/{document_id}/approve")
+async def admin_approve_document(
+    document_id: str,
+    notes: str = None,
+    admin: dict = Depends(get_admin_user)
+):
+    """Admin: Approve a seller document"""
+    try:
+        document = await approve_document(db, document_id, admin["id"], notes)
+        return {
+            "message": "Document approved",
+            "document": document
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@vehicle_router.post("/vehicle-admin/documents/{document_id}/reject")
+async def admin_reject_document(
+    document_id: str,
+    reason: str,
+    admin: dict = Depends(get_admin_user)
+):
+    """Admin: Reject a seller document"""
+    if not reason:
+        raise HTTPException(status_code=400, detail="Rejection reason is required")
+    
+    try:
+        document = await reject_document(db, document_id, admin["id"], reason)
+        return {
+            "message": "Document rejected",
+            "document": document
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@vehicle_router.get("/vehicle-admin/documents/seller/{seller_id}")
+async def admin_get_seller_documents(
+    seller_id: str,
+    admin: dict = Depends(get_admin_user)
+):
+    """Admin: Get all documents for a specific seller"""
+    documents = await get_seller_documents(db, seller_id, include_archived=True)
+    verification = await check_seller_verification_status(db, seller_id)
+    
+    return {
+        "seller_id": seller_id,
+        "documents": documents,
+        "verification_status": verification
+    }
+
+
+# ============= SCHEDULER ADMIN ENDPOINTS =============
+
+@vehicle_router.get("/vehicle-admin/scheduler/status")
+async def admin_get_scheduler_status(admin: dict = Depends(get_admin_user)):
+    """Admin: Get scheduler status and job list"""
+    status = get_scheduler_status()
+    return status
+
+
+@vehicle_router.post("/vehicle-admin/scheduler/run/{job_id}")
+async def admin_run_scheduler_job(
+    job_id: str,
+    admin: dict = Depends(get_admin_user)
+):
+    """Admin: Manually trigger a specific scheduler job"""
+    result = await run_job_manually(job_id)
+    
+    await log_audit(
+        "scheduler", job_id, "manual_execution",
+        admin["id"], "admin",
+        new_value=result
+    )
+    
+    return result
