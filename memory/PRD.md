@@ -18,14 +18,15 @@ Backend: FastAPI (Python)
 Database: MongoDB
 Authentication: JWT + Emergent Google Auth
 AI: OpenAI GPT-4 via emergentintegrations
-Payments: Stripe
+Payments: Stripe (via emergentintegrations)
 Email: SendGrid
+Background Jobs: APScheduler
 ```
 
-## Current Status: ✅ VEHICLE AUCTION MODULE COMPLETE (ALL PHASES + FINANCIAL ENGINE)
+## Current Status: ✅ VEHICLE AUCTION MODULE COMPLETE (ALL PHASES + FINANCIAL ENGINE + AUTOMATION)
 
 ### Session Summary (Feb 5, 2026)
-Implemented complete Enterprise Vehicle Auction Module (Phase 1-6):
+Implemented complete Enterprise Vehicle Auction Module (Phase 1-7):
 
 **Phase 1 - Database & Core APIs: ✅**
 - Created standalone vehicle data models with full VIN validation
@@ -63,7 +64,7 @@ Implemented complete Enterprise Vehicle Auction Module (Phase 1-6):
 - Seller Registration with type selection
 - My Listings dashboard with stats
 
-**Phase 6 - Financial Engine: ✅ (NEW - Feb 5, 2026)**
+**Phase 6 - Financial Engine: ✅**
 - Complete BidVex Fee Structure:
   - Seller Commission: 4% (Basic), 2.5% (Premium), 2% (VIP Elite)
   - Buyer Premium: 5% (Basic), 3.5% (Premium), 3% (VIP Elite)
@@ -78,6 +79,26 @@ Implemented complete Enterprise Vehicle Auction Module (Phase 1-6):
   - Seller settlement documents
   - 14-day payment deadline
   - 2% monthly late penalty
+
+**Phase 7 - Stripe Payments, Scheduler & Document Upload: ✅ (NEW - Feb 5, 2026)**
+- Stripe Payment Integration:
+  - Invoice checkout (POST /api/vehicle-payments/invoice/{id}/checkout)
+  - Deposit checkout (POST /api/vehicle-payments/deposit/{id}/checkout)
+  - Payment status polling
+  - Webhook handling
+- Automated Scheduler (6 Jobs):
+  - process_ended_auctions (every minute)
+  - activate_scheduled_auctions (every minute)
+  - apply_late_penalties (daily at 00:05)
+  - cleanup_expired_deposits (hourly)
+  - cleanup_expired_sessions (hourly)
+  - daily_summary (daily at 23:55)
+- Seller Document Upload System:
+  - Document types: identity_front, identity_back, business_registration, dealer_license, etc.
+  - File validation (PDF, JPG, PNG, WEBP, max 10MB)
+  - Secure storage in /app/uploads/seller_documents/
+  - Admin review workflow with approve/reject
+  - Automatic verification status updates
 - Auction End Handler:
   - Automatic winner determination
   - Invoice generation on auction close
