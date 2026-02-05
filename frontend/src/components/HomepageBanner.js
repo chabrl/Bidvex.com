@@ -323,19 +323,29 @@ const HomepageBanner = () => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
                   style={{
-                    color: currentBanner.subtitle_color,
                     fontFamily: currentBanner.font_family,
-                    fontSize: getResponsiveFontSize(currentBanner.subtitle_font_size, true),
                     opacity: 0.9,
                   }}
                   className="md:text-lg"
                 >
                   {/* Desktop subtitle */}
-                  <span className="hidden md:inline" style={{ fontSize: currentBanner.subtitle_font_size }}>
+                  <span 
+                    className="hidden md:inline" 
+                    style={{ 
+                      fontSize: currentBanner.subtitle_font_size,
+                      color: currentBanner.subtitle_color,
+                    }}
+                  >
                     {displaySubtitle}
                   </span>
                   {/* Mobile subtitle */}
-                  <span className="md:hidden">
+                  <span 
+                    className="md:hidden"
+                    style={{
+                      fontSize: getResponsiveFontSize(currentBanner.subtitle_font_size, true),
+                      color: currentBanner.subtitle_color,
+                    }}
+                  >
                     {displaySubtitle}
                   </span>
                 </motion.p>
