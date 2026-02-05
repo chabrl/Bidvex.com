@@ -317,8 +317,8 @@ const HomepageBanner = () => {
                       onClick={() => handleCtaClick(currentBanner)}
                       className="text-base md:text-lg px-6 md:px-8 py-4 md:py-6 rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
                       style={{
-                        backgroundColor: currentBanner.title_color || currentBanner.text_color,
-                        color: currentBanner.overlay_color || '#000000',
+                        backgroundColor: currentBanner.button_color || '#FFFFFF',
+                        color: currentBanner.button_text_color || '#000000',
                       }}
                     >
                       {currentBanner.cta_text}
