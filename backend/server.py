@@ -8812,8 +8812,14 @@ async def create_hero_banner(
         "image_mobile": banner_data.get("image_mobile"),
         "cta_text": banner_data.get("cta_text", "Learn More"),
         "cta_link": banner_data.get("cta_link", "/marketplace"),
-        "overlay_opacity": banner_data.get("overlay_opacity", 0.3),
+        # Styling fields
         "text_color": banner_data.get("text_color", "#FFFFFF"),
+        "font_family": banner_data.get("font_family", "Inter"),
+        "title_font_size": banner_data.get("title_font_size", "48px"),
+        "subtitle_font_size": banner_data.get("subtitle_font_size", "18px"),
+        "overlay_color": banner_data.get("overlay_color", "#000000"),
+        "overlay_opacity": banner_data.get("overlay_opacity", 0.4),
+        # Status fields
         "active": banner_data.get("active", True),
         "start_date": banner_data.get("start_date"),
         "end_date": banner_data.get("end_date"),
