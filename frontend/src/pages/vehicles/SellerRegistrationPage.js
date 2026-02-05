@@ -204,10 +204,17 @@ const SellerRegistrationPage = () => {
               )}
               
               {existingSeller.verification_status === 'pending' && (
+                <div className="space-y-4">
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                     <p className="text-yellow-700 flex items-center gap-2">
                       <AlertTriangle className="h-5 w-5" />
-                      Your application is under review. This usually takes 1-2 business days.
+                      Your application is under review. Please upload required documents to speed up the process.
                     </p>
+                  </div>
+                  
+                  {/* Document Upload Section */}
+                  <SellerDocumentManager />
+                </div>
               )}
               
               {existingSeller.verification_status === 'rejected' && (
