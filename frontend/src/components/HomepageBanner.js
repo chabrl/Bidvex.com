@@ -7,6 +7,25 @@ import axios from 'axios';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
+// Convert hex to rgba
+const hexToRgba = (hex, alpha) => {
+  if (!hex || hex.length < 7) return `rgba(0, 0, 0, ${alpha})`;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+// Default banner styling
+const DEFAULT_STYLING = {
+  text_color: '#FFFFFF',
+  font_family: 'Inter',
+  title_font_size: '48px',
+  subtitle_font_size: '18px',
+  overlay_color: '#000000',
+  overlay_opacity: 0.4,
+};
+
 const HomepageBanner = () => {
   const navigate = useNavigate();
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -17,78 +36,68 @@ const HomepageBanner = () => {
   // Default banners (fallback if no banners from API)
   const defaultBanners = [
     {
-      id: 1,
+      id: 'default-1',
       title: "Discover. Bid. Win.",
       subtitle: "Experience the thrill of live auctions. Join thousands of bidders competing for unique items at unbeatable prices.",
-      image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1200&h=600&fit=crop",
-      cta1: { text: "Browse Auctions", action: () => navigate('/marketplace') },
-      cta2: { text: "How It Works", action: () => navigate('/how-it-works'), outline: true },
-      gradient: "from-blue-600 via-blue-500 to-cyan-500"
+      image_url: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1920&h=600&fit=crop",
+      cta_text: "Browse Auctions",
+      cta_link: "/marketplace",
+      ...DEFAULT_STYLING,
     },
     {
-      id: 2,
+      id: 'default-2',
       title: "Start Bidding Today",
       subtitle: "Discover rare finds and exclusive deals in our trusted marketplace",
-      image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1200&h=400&fit=crop",
-      cta1: { text: "Browse Auctions", action: () => navigate('/marketplace') },
-      cta2: { text: "How It Works", action: () => navigate('/how-it-works'), outline: true },
-      gradient: "from-blue-600 via-blue-500 to-cyan-500"
+      image_url: "https://images.unsplash.com/photo-1607083206869-4c7672e72a8a?w=1920&h=600&fit=crop",
+      cta_text: "Explore Now",
+      cta_link: "/marketplace",
+      ...DEFAULT_STYLING,
     },
-    {
-      id: 3,
-      title: "Sell Your Items",
-      subtitle: "Reach thousands of buyers and get the best price for your items",
-      image: "https://images.unsplash.com/photo-1607083206869-4c7672e72a8a?w=1200&h=400&fit=crop",
-      cta1: { text: "Create Listing", action: () => navigate('/create-listing') },
-      cta2: { text: "Learn More", action: () => navigate('/how-it-works'), outline: true },
-      gradient: "from-purple-600 via-purple-500 to-pink-500"
-    }
   ];
 
   // Fetch banners from API
   useEffect(() => {
     const fetchBanners = async () => {
       try {
-        // Add cache-busting to ensure fresh data
         const response = await axios.get(`${API}/banners/active?t=${Date.now()}`, {
           headers: { 'Cache-Control': 'no-cache' }
         });
-        if (response.data.banners && response.data.banners.length > 0) {
-          // Transform API banners to component format
+        
+        if (response.data?.hero_banners && response.data.hero_banners.length > 0) {
+          // Use hero_banners with full styling support
+          const transformedBanners = response.data.hero_banners
+            .sort((a, b) => (a.order || 0) - (b.order || 0))
+            .map(banner => ({
+              id: banner.id,
+              title: banner.title || '',
+              subtitle: banner.subtitle || '',
+              image_url: banner.image_desktop || banner.image_url || banner.image_mobile,
+              image_mobile: banner.image_mobile,
+              cta_text: banner.cta_text || 'Learn More',
+              cta_link: banner.cta_link || '/marketplace',
+              // Styling fields with defaults
+              text_color: banner.text_color || DEFAULT_STYLING.text_color,
+              font_family: banner.font_family || DEFAULT_STYLING.font_family,
+              title_font_size: banner.title_font_size || DEFAULT_STYLING.title_font_size,
+              subtitle_font_size: banner.subtitle_font_size || DEFAULT_STYLING.subtitle_font_size,
+              overlay_color: banner.overlay_color || DEFAULT_STYLING.overlay_color,
+              overlay_opacity: banner.overlay_opacity ?? DEFAULT_STYLING.overlay_opacity,
+            }));
+          
+          setBanners(transformedBanners);
+        } else if (response.data?.banners && response.data.banners.length > 0) {
+          // Fallback to regular banners
           const transformedBanners = response.data.banners
             .filter(b => b.is_active)
             .sort((a, b) => (b.priority || 0) - (a.priority || 0))
             .map(banner => ({
               id: banner.id,
-              title: banner.title,
-              subtitle: banner.subtitle || banner.description || "",
-              image: banner.image_url,
-              cta1: { 
-                text: banner.cta_text || "View More", 
-                action: () => {
-                  if (banner.cta_url) {
-                    if (banner.cta_url.startsWith('http')) {
-                      window.location.href = banner.cta_url;
-                    } else {
-                      navigate(banner.cta_url);
-                    }
-                  }
-                }
-              },
-              cta2: banner.cta2_text ? { 
-                text: banner.cta2_text, 
-                action: () => {
-                  if (banner.cta2_url) {
-                    if (banner.cta2_url.startsWith('http')) {
-                      window.location.href = banner.cta2_url;
-                    } else {
-                      navigate(banner.cta2_url);
-                    }
-                  }
-                },
-                outline: true 
-              } : null,
-              gradient: banner.gradient || "from-blue-600 via-blue-500 to-cyan-500"
+              title: banner.title || '',
+              subtitle: banner.subtitle || banner.description || '',
+              image_url: banner.image_url,
+              cta_text: banner.cta_text || 'View More',
+              cta_link: banner.cta_url || '/marketplace',
+              ...DEFAULT_STYLING,
             }));
           
           setBanners(transformedBanners);
@@ -123,14 +132,14 @@ const HomepageBanner = () => {
 
   // Auto-slide effect
   useEffect(() => {
-    if (!isAutoPlaying || loading) return;
+    if (!isAutoPlaying || loading || activeBanners.length <= 1) return;
     
     const interval = setInterval(() => {
       nextSlide();
-    }, 5000); // Change slide every 5 seconds
+    }, 5000);
 
     return () => clearInterval(interval);
-  }, [isAutoPlaying, nextSlide, loading]);
+  }, [isAutoPlaying, nextSlide, loading, activeBanners.length]);
 
   // Handle touch/swipe for mobile
   const [touchStart, setTouchStart] = useState(null);
@@ -163,16 +172,40 @@ const HomepageBanner = () => {
     }
   };
 
+  const handleCtaClick = (banner) => {
+    if (banner.cta_link) {
+      if (banner.cta_link.startsWith('http')) {
+        window.location.href = banner.cta_link;
+      } else {
+        navigate(banner.cta_link);
+      }
+    }
+  };
+
+  // Get responsive font sizes
+  const getResponsiveFontSize = (size, mobile = false) => {
+    if (!size) return mobile ? '28px' : '48px';
+    const numSize = parseInt(size);
+    if (mobile) {
+      // Scale down for mobile
+      return `${Math.max(20, numSize * 0.6)}px`;
+    }
+    return size;
+  };
+
   if (loading) {
     return (
-      <div className="relative w-full h-[400px] md:h-[500px] overflow-hidden rounded-2xl shadow-2xl mb-12 bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 flex items-center justify-center">
+      <div className="relative w-full h-[400px] md:h-[500px] overflow-hidden bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 flex items-center justify-center">
         <div className="text-white text-xl">Loading...</div>
       </div>
     );
   }
 
+  const currentBanner = activeBanners[currentSlide];
+  const overlayRgba = hexToRgba(currentBanner.overlay_color, currentBanner.overlay_opacity);
+
   return (
-    <div className="relative w-full h-[400px] md:h-[500px] overflow-hidden rounded-2xl shadow-2xl mb-12">
+    <div className="relative w-full h-[400px] md:h-[500px] lg:h-[600px] overflow-hidden">
       {/* Banner Slides */}
       <div
         className="relative w-full h-full"
@@ -191,117 +224,165 @@ const HomepageBanner = () => {
           >
             {/* Background image */}
             <div className="absolute inset-0">
-              {activeBanners[currentSlide].image ? (
+              {currentBanner.image_url ? (
                 <>
+                  {/* Desktop image */}
                   <img
-                    src={activeBanners[currentSlide].image}
-                    alt={activeBanners[currentSlide].title}
-                    className="w-full h-full object-cover"
+                    src={currentBanner.image_url}
+                    alt={currentBanner.title}
+                    className="hidden md:block w-full h-full object-cover"
                     loading="lazy"
                   />
-                  {/* Optional subtle gradient overlay for text readability - only if gradient field is set */}
-                  {activeBanners[currentSlide].gradient && (
-                    <div className={`absolute inset-0 bg-gradient-to-r ${activeBanners[currentSlide].gradient} opacity-40`}></div>
-                  )}
+                  {/* Mobile image (use mobile-specific or fall back to desktop) */}
+                  <img
+                    src={currentBanner.image_mobile || currentBanner.image_url}
+                    alt={currentBanner.title}
+                    className="md:hidden w-full h-full object-cover"
+                    loading="lazy"
+                  />
                 </>
               ) : (
-                <div className={`absolute inset-0 bg-gradient-to-r ${activeBanners[currentSlide].gradient || 'from-blue-600 via-blue-500 to-cyan-500'}`}></div>
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500" />
               )}
+              
+              {/* Dynamic Overlay */}
+              <div 
+                className="absolute inset-0"
+                style={{ backgroundColor: overlayRgba }}
+              />
             </div>
 
             {/* Content */}
-            <div className="relative z-10 h-full flex items-center px-8 md:px-16 max-w-7xl mx-auto">
-              <div className="max-w-2xl space-y-6">
+            <div className="relative z-10 h-full flex items-center px-6 md:px-12 lg:px-16 max-w-7xl mx-auto">
+              <div className="max-w-2xl space-y-4 md:space-y-6">
                 <motion.h2
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}
-                  className="text-4xl md:text-6xl font-bold text-white leading-tight"
+                  className="leading-tight"
+                  style={{
+                    color: currentBanner.text_color,
+                    fontFamily: currentBanner.font_family,
+                    fontSize: getResponsiveFontSize(currentBanner.title_font_size, true),
+                    fontWeight: 'bold',
+                  }}
                 >
-                  {activeBanners[currentSlide].title}
+                  {/* Desktop font size */}
+                  <span className="hidden md:inline" style={{ fontSize: currentBanner.title_font_size }}>
+                    {currentBanner.title}
+                  </span>
+                  {/* Mobile font size */}
+                  <span className="md:hidden">
+                    {currentBanner.title}
+                  </span>
                 </motion.h2>
                 
                 <motion.p
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
-                  className="text-lg md:text-xl text-white/90"
+                  style={{
+                    color: currentBanner.text_color,
+                    fontFamily: currentBanner.font_family,
+                    fontSize: getResponsiveFontSize(currentBanner.subtitle_font_size, true),
+                    opacity: 0.9,
+                  }}
+                  className="md:text-lg"
                 >
-                  {activeBanners[currentSlide].subtitle}
+                  {/* Desktop subtitle */}
+                  <span className="hidden md:inline" style={{ fontSize: currentBanner.subtitle_font_size }}>
+                    {currentBanner.subtitle}
+                  </span>
+                  {/* Mobile subtitle */}
+                  <span className="md:hidden">
+                    {currentBanner.subtitle}
+                  </span>
                 </motion.p>
 
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.4 }}
-                  className="flex flex-col sm:flex-row gap-4"
-                >
-                  <Button
-                    onClick={activeBanners[currentSlide].cta1.action}
-                    className="bg-white text-blue-900 border-0 text-lg px-8 py-6 rounded-full shadow-lg hover:shadow-xl hover:bg-blue-50 hover:scale-105 transition-all duration-300"
+                {currentBanner.cta_text && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
                   >
-                    {activeBanners[currentSlide].cta1.text}
-                  </Button>
-                  
-                  {activeBanners[currentSlide].cta2 && (
                     <Button
-                      onClick={activeBanners[currentSlide].cta2.action}
-                      variant="outline"
-                      className="text-lg px-8 py-6 rounded-full border-2 border-white bg-white/10 backdrop-blur-sm text-white hover:bg-white hover:text-blue-900 shadow-lg transition-all duration-300"
+                      onClick={() => handleCtaClick(currentBanner)}
+                      className="text-base md:text-lg px-6 md:px-8 py-4 md:py-6 rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
+                      style={{
+                        backgroundColor: currentBanner.text_color,
+                        color: currentBanner.overlay_color || '#000000',
+                      }}
                     >
-                      {activeBanners[currentSlide].cta2.text}
+                      {currentBanner.cta_text}
                     </Button>
-                  )}
-                </motion.div>
+                  </motion.div>
+                )}
               </div>
             </div>
           </motion.div>
         </AnimatePresence>
       </div>
 
-      {/* Navigation Arrows - Desktop */}
-      <div className="hidden md:flex absolute top-1/2 -translate-y-1/2 left-4 right-4 justify-between pointer-events-none">
-        <Button
-          onClick={prevSlide}
-          variant="ghost"
-          size="icon"
-          className="pointer-events-auto w-12 h-12 rounded-full bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white border border-white/30"
-        >
-          <ChevronLeft className="h-6 w-6" />
-        </Button>
-        <Button
-          onClick={nextSlide}
-          variant="ghost"
-          size="icon"
-          className="pointer-events-auto w-12 h-12 rounded-full bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white border border-white/30"
-        >
-          <ChevronRight className="h-6 w-6" />
-        </Button>
-      </div>
+      {/* Navigation Arrows - Desktop only, show only if multiple banners */}
+      {activeBanners.length > 1 && (
+        <div className="hidden md:flex absolute top-1/2 -translate-y-1/2 left-4 right-4 justify-between pointer-events-none">
+          <Button
+            onClick={prevSlide}
+            variant="ghost"
+            size="icon"
+            className="pointer-events-auto w-12 h-12 rounded-full bg-white/20 hover:bg-white/40 backdrop-blur-sm border border-white/30"
+            style={{ color: currentBanner.text_color }}
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </Button>
+          <Button
+            onClick={nextSlide}
+            variant="ghost"
+            size="icon"
+            className="pointer-events-auto w-12 h-12 rounded-full bg-white/20 hover:bg-white/40 backdrop-blur-sm border border-white/30"
+            style={{ color: currentBanner.text_color }}
+          >
+            <ChevronRight className="h-6 w-6" />
+          </Button>
+        </div>
+      )}
 
-      {/* Dots Indicator */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
-        {activeBanners.map((_, index) => (
-          <button
-            key={index}
-            onClick={() => goToSlide(index)}
-            className={`w-3 h-3 rounded-full transition-all ${
-              index === currentSlide
-                ? 'bg-white w-8'
-                : 'bg-white/50 hover:bg-white/75'
-            }`}
-            aria-label={`Go to slide ${index + 1}`}
-          />
-        ))}
-      </div>
+      {/* Dots Indicator - show only if multiple banners */}
+      {activeBanners.length > 1 && (
+        <div className="absolute bottom-4 md:bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
+          {activeBanners.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => goToSlide(index)}
+              className={`h-2 md:h-3 rounded-full transition-all ${
+                index === currentSlide
+                  ? 'w-6 md:w-8'
+                  : 'w-2 md:w-3 hover:opacity-100'
+              }`}
+              style={{
+                backgroundColor: currentBanner.text_color,
+                opacity: index === currentSlide ? 1 : 0.5,
+              }}
+              aria-label={`Go to slide ${index + 1}`}
+            />
+          ))}
+        </div>
+      )}
 
-      {/* Auto-play pause button */}
-      <button
-        onClick={() => setIsAutoPlaying(!isAutoPlaying)}
-        className="absolute top-4 right-4 bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white px-3 py-1 rounded-full text-sm border border-white/30 transition-colors"
-      >
-        {isAutoPlaying ? '⏸ Pause' : '▶ Play'}
-      </button>
+      {/* Auto-play pause button - show only if multiple banners */}
+      {activeBanners.length > 1 && (
+        <button
+          onClick={() => setIsAutoPlaying(!isAutoPlaying)}
+          className="absolute top-4 right-4 px-3 py-1 rounded-full text-sm border transition-colors backdrop-blur-sm"
+          style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.2)',
+            borderColor: 'rgba(255, 255, 255, 0.3)',
+            color: currentBanner.text_color,
+          }}
+        >
+          {isAutoPlaying ? '⏸ Pause' : '▶ Play'}
+        </button>
+      )}
     </div>
   );
 };
