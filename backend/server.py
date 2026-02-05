@@ -8986,13 +8986,27 @@ except ImportError as e:
 # Enterprise-grade vehicle auction system - completely separate from marketplace
 try:
     from routes.vehicles import vehicle_router, set_vehicle_db
+    from services.scheduler import init_scheduler as init_vehicle_scheduler, start_scheduler as start_vehicle_scheduler
     
     # Inject database into vehicle router
     set_vehicle_db(db)
     
+    # Initialize vehicle auction scheduler
+    init_vehicle_scheduler(db)
+    
     # Include vehicle router (already has /api prefix)
     app.include_router(vehicle_router)
     logger.info("✅ Vehicle Auction Module loaded (standalone)")
+    
+    # Start vehicle scheduler on app startup
+    @app.on_event("startup")
+    async def start_vehicle_auction_scheduler():
+        try:
+            start_vehicle_scheduler()
+            logger.info("🚗 Vehicle Auction Scheduler started")
+            print("[SERVER] Vehicle Auction Scheduler started", flush=True)
+        except Exception as e:
+            logger.error(f"Failed to start vehicle scheduler: {e}")
     
 except ImportError as e:
     logger.warning(f"⚠️ Could not load Vehicle Auction Module: {e}")
