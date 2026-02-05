@@ -38,7 +38,7 @@ class TestSchedulerAPIs:
             "password": ADMIN_PASSWORD
         })
         assert response.status_code == 200, f"Admin login failed: {response.text}"
-        self.admin_token = response.json().get("token")
+        self.admin_token = response.json().get("access_token")
         self.headers = {"Authorization": f"Bearer {self.admin_token}"}
     
     def test_scheduler_status_endpoint(self):
@@ -153,7 +153,7 @@ class TestDocumentUploadAPIs:
             "password": ADMIN_PASSWORD
         })
         assert response.status_code == 200, f"Login failed: {response.text}"
-        self.token = response.json().get("token")
+        self.token = response.json().get("access_token")
         self.headers = {"Authorization": f"Bearer {self.token}"}
     
     def test_get_required_documents(self):
@@ -269,7 +269,7 @@ class TestAdminDocumentAPIs:
             "password": ADMIN_PASSWORD
         })
         assert response.status_code == 200
-        self.admin_token = response.json().get("token")
+        self.admin_token = response.json().get("access_token")
         self.headers = {"Authorization": f"Bearer {self.admin_token}"}
     
     def test_get_pending_documents(self):
@@ -315,7 +315,7 @@ class TestStripePaymentAPIs:
             "password": ADMIN_PASSWORD
         })
         assert response.status_code == 200
-        self.token = response.json().get("token")
+        self.token = response.json().get("access_token")
         self.headers = {"Authorization": f"Bearer {self.token}"}
     
     def test_invoice_checkout_endpoint_exists(self):
@@ -390,7 +390,7 @@ class TestIntegrationScenarios:
             "password": ADMIN_PASSWORD
         })
         assert response.status_code == 200
-        self.token = response.json().get("token")
+        self.token = response.json().get("access_token")
         self.headers = {"Authorization": f"Bearer {self.token}"}
     
     def test_scheduler_and_job_execution_flow(self):
