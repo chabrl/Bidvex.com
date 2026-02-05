@@ -9,6 +9,7 @@ Build and maintain a sophisticated full-stack auction platform (BidVex) with:
 - Comprehensive admin panel
 - Canadian tax compliance system
 - Full bilingual support (EN/FR)
+- **Enterprise Vehicle Auction Module** (standalone, Copart/IAA quality)
 
 ## Architecture
 ```
@@ -21,31 +22,37 @@ Payments: Stripe
 Email: SendGrid
 ```
 
-## Current Status: BANNER MANAGER COMPLETE
+## Current Status: VEHICLE AUCTION MODULE PHASE 1-2 COMPLETE
 
 ### Session Summary (Feb 5, 2026)
-Implemented fully customizable Hero Banner Manager:
+Implemented Enterprise Vehicle Auction Module (Phase 1 & 2):
 
-**Backend Changes:**
-- Extended banner schema with styling fields (text_color, font_family, title/subtitle font sizes, overlay_color, overlay_opacity)
-- Updated create/update endpoints to support all styling fields
-- Enhanced /api/banners/active to return styling with defaults
+**Phase 1 - Database & Core APIs:**
+- Created standalone vehicle data models with full VIN validation
+- Integrated NHTSA VIN Decoder API (real, not mocked)
+- Vehicle listing schema with 30+ structured fields
+- Condition report system (mechanical, exterior, interior)
+- Media management (min 10 photos required)
 
-**Frontend Changes:**
-- Created new HeroBannerEditor component with:
-  - Color pickers for text and overlay
-  - Opacity slider (0-100%)
-  - Font family dropdown
-  - Font size selectors
-  - Live preview
-  - Image upload support
-- Updated HomepageBanner to render dynamic styles
+**Phase 2 - Seller System:**
+- Seller types: Private (1/month limit), Dealer (500/month), Auctioneer (500/month)
+- Document upload for verification
+- Admin approval workflow with audit logging
+- Seller badges (Licensed Dealer, Verified Auctioneer, Private Seller)
+- Monthly limit enforcement at backend level
 
-### Key Files Modified
-- `/app/backend/server.py` - Banner schema and API endpoints
-- `/app/frontend/src/components/admin/HeroBannerEditor.js` - NEW
-- `/app/frontend/src/components/HomepageBanner.js` - Dynamic styling
-- `/app/frontend/src/pages/admin/BrandingLayoutManager.js` - Integrated editor
+**New Files Created:**
+- `/app/backend/models/vehicle_models.py` - Pydantic models & enums
+- `/app/backend/services/vin_decoder.py` - NHTSA API integration
+- `/app/backend/routes/vehicles.py` - Full API router (45+ endpoints)
+
+**Database Collections:**
+- `vehicle_sellers` - Seller profiles & verification
+- `vehicle_listings` - Vehicle auctions (separate from marketplace)
+- `vehicle_bids` - Bidding records
+- `vehicle_bid_deposits` - Refundable deposits
+- `vehicle_legal_acceptances` - Terms acceptance audit
+- `vehicle_audit_logs` - Full admin audit trail
 
 ## Completed Features
 
