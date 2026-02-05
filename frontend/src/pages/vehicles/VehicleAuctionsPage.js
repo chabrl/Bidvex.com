@@ -22,7 +22,8 @@ import {
 import {
   Car, Search, Filter, Grid, List, Clock, MapPin, Gauge,
   Fuel, Settings2, Calendar, DollarSign, ChevronRight,
-  Award, Shield, Zap, TrendingUp, Eye, Heart, RefreshCw
+  Award, Shield, Zap, TrendingUp, Eye, Heart, RefreshCw,
+  ChevronDown, X, SlidersHorizontal, Sparkles
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
