@@ -8864,10 +8864,14 @@ async def update_hero_banner(
     if not existing:
         raise HTTPException(status_code=404, detail="Banner not found")
     
-    # Allowed update fields
-    allowed_fields = ["title", "subtitle", "image_desktop", "image_mobile", 
-                      "cta_text", "cta_link", "overlay_opacity", "text_color",
-                      "active", "start_date", "end_date", "order"]
+    # Allowed update fields - includes all styling options
+    allowed_fields = [
+        "title", "subtitle", "image_desktop", "image_mobile", 
+        "cta_text", "cta_link", 
+        "text_color", "font_family", "title_font_size", "subtitle_font_size",
+        "overlay_color", "overlay_opacity",
+        "active", "start_date", "end_date", "order"
+    ]
     
     update_data = {k: v for k, v in banner_data.items() if k in allowed_fields}
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
