@@ -8,10 +8,14 @@ Routes:
 - /api/vehicle-sellers/* - Seller management
 - /api/vehicle-bids/* - Bidding system
 - /api/vehicle-admin/* - Admin operations
+- /api/vehicle-invoices/* - Invoice management
+- /api/vehicle-payments/* - Payment processing
+- /api/vehicle-documents/* - Document uploads
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Request, WebSocket, WebSocketDisconnect, Query, UploadFile, File
+from fastapi import APIRouter, HTTPException, Depends, Request, WebSocket, WebSocketDisconnect, Query, UploadFile, File, Form
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import FileResponse
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone, timedelta
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -57,6 +61,23 @@ from services.vehicle_auction_handler import (
     process_ended_auction,
     process_all_ended_auctions,
     run_auction_scheduler
+)
+from services.vehicle_payment import get_payment_service
+from services.seller_documents import (
+    create_seller_document,
+    get_seller_documents,
+    get_document_by_id,
+    approve_document,
+    reject_document,
+    check_seller_verification_status,
+    get_pending_documents_for_admin,
+    get_document_types_for_seller_type,
+    DocumentType,
+    DocumentStatus
+)
+from services.scheduler import (
+    get_scheduler_status,
+    run_job_manually
 )
 
 logger = logging.getLogger(__name__)
