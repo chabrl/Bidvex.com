@@ -18,6 +18,8 @@ const hexToRgba = (hex, alpha) => {
 
 // Default banner styling
 const DEFAULT_STYLING = {
+  title_color: '#FFFFFF',
+  subtitle_color: '#FFFFFF',
   text_color: '#FFFFFF',
   font_family: 'Inter',
   title_font_size: '48px',
