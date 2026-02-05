@@ -76,7 +76,7 @@ class VINDecoderService:
                 try:
                     # Handle values like "4" or "4 cyl"
                     return int(''.join(filter(str.isdigit, val.split()[0])))
-                except:
+                except (ValueError, IndexError):
                     return None
             return None
         
@@ -85,7 +85,7 @@ class VINDecoderService:
             if val:
                 try:
                     return float(''.join(c for c in val if c.isdigit() or c == '.'))
-                except:
+                except ValueError:
                     return None
             return None
         

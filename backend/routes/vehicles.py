@@ -244,8 +244,7 @@ async def upload_seller_document(
     
     # In production, upload to cloud storage
     # For now, store as base64 or URL placeholder
-    import base64
-    content = await file.read()
+    await file.read()  # Read to validate file, content stored in cloud in production
     
     # For demo, we'll create a placeholder URL
     # In production, upload to S3/GCS and get real URL
@@ -1256,7 +1255,7 @@ class VehicleConnectionManager:
             for connection in self.active_connections[vehicle_id]:
                 try:
                     await connection.send_json(message)
-                except:
+                except Exception:
                     pass
 
 
