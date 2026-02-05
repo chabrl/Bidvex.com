@@ -6,7 +6,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { 
   Moon, Sun, Globe, User, LogOut, LayoutDashboard, 
   MessageCircle, DollarSign, Shield, Menu, X,
-  Home, ShoppingBag, Gavel, ChevronDown
+  Home, ShoppingBag, Gavel, ChevronDown, Car
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
