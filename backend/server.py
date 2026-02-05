@@ -8813,6 +8813,8 @@ async def create_hero_banner(
         "cta_text": banner_data.get("cta_text", "Learn More"),
         "cta_link": banner_data.get("cta_link", "/marketplace"),
         # Styling fields
+        "title_color": banner_data.get("title_color", "#FFFFFF"),
+        "subtitle_color": banner_data.get("subtitle_color", "#FFFFFF"),
         "text_color": banner_data.get("text_color", "#FFFFFF"),
         "font_family": banner_data.get("font_family", "Inter"),
         "title_font_size": banner_data.get("title_font_size", "48px"),
