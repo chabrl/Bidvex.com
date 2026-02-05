@@ -62,6 +62,9 @@ const SECONDARY_TABS = {
     { id: 'auctions', label: 'Auction Control', icon: '🔨', lucideIcon: Gavel },
     { id: 'categories', label: 'Categories', icon: '📂', lucideIcon: Settings },
   ],
+  vehicles: [
+    { id: 'vehicle-admin', label: 'Vehicle Administration', icon: '🚗', lucideIcon: Car },
+  ],
   settings: [
     { id: 'site-content', label: 'Site Content & Pages', icon: '📄', lucideIcon: FileText },
     { id: 'branding-layout', label: 'Branding & Layout', icon: '🎨', lucideIcon: Settings },
