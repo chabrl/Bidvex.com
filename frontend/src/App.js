@@ -248,6 +248,15 @@ const App = () => {
           <Route path="/vehicle-auctions/my-listings" element={
             <ProtectedRoute><MyVehicleListingsPage /></ProtectedRoute>
           } />
+          <Route path="/vehicle-auctions/invoices" element={
+            <ProtectedRoute><VehicleInvoicesPage /></ProtectedRoute>
+          } />
+          <Route path="/vehicle-auctions/invoices/:invoiceId" element={
+            <ProtectedRoute><VehicleInvoicesPage /></ProtectedRoute>
+          } />
+          <Route path="/vehicle-auctions/seller/financials" element={
+            <ProtectedRoute><SellerFinancialsPage /></ProtectedRoute>
+          } />
           
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
