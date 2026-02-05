@@ -292,7 +292,7 @@ const MyVehicleListingsPage = () => {
                 <h3 className="text-xl font-semibold mb-2">No Listings Found</h3>
                 <p className="text-slate-500 mb-6">
                   {activeTab === 'all' 
-                    ? "You haven't created any vehicle listings yet."
+                    ? "You haven&apos;t created any vehicle listings yet."
                     : `No ${activeTab} listings.`
                   }
                 </p>
