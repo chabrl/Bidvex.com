@@ -82,6 +82,8 @@ const HomepageBanner = () => {
               // Styling fields with defaults
               title_color: banner.title_color || banner.text_color || DEFAULT_STYLING.title_color,
               subtitle_color: banner.subtitle_color || banner.text_color || DEFAULT_STYLING.subtitle_color,
+              button_color: banner.button_color || DEFAULT_STYLING.button_color,
+              button_text_color: banner.button_text_color || DEFAULT_STYLING.button_text_color,
               text_color: banner.text_color || DEFAULT_STYLING.text_color,
               font_family: banner.font_family || DEFAULT_STYLING.font_family,
               title_font_size: banner.title_font_size || DEFAULT_STYLING.title_font_size,
