@@ -17,8 +17,9 @@ import { Textarea } from '../../components/ui/textarea';
 import { Badge } from '../../components/ui/badge';
 import {
   User, Building2, Gavel, CheckCircle, Upload, FileText, 
-  Shield, Star, Loader2, AlertTriangle, Info, Car
+  Shield, Star, Loader2, AlertTriangle, Info, Car, ArrowRight
 } from 'lucide-react';
+import SellerDocumentManager from '../../components/vehicles/SellerDocumentManager';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
