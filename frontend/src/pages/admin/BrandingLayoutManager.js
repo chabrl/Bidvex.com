@@ -50,11 +50,6 @@ const BrandingLayoutManager = () => {
   const [sections, setSections] = useState([]);
   const [originalSections, setOriginalSections] = useState([]);
   
-  // Hero banners state
-  const [banners, setBanners] = useState([]);
-  const [editingBanner, setEditingBanner] = useState(null);
-  const [showBannerForm, setShowBannerForm] = useState(false);
-  
   const fetchConfig = useCallback(async () => {
     try {
       setLoading(true);
@@ -75,11 +70,6 @@ const BrandingLayoutManager = () => {
         const sortedSections = [...data.homepage_layout.sections].sort((a, b) => a.order - b.order);
         setSections(sortedSections);
         setOriginalSections(sortedSections);
-      }
-      
-      // Set banners
-      if (data.hero_banners) {
-        setBanners(data.hero_banners);
       }
     } catch (error) {
       toast.error('Failed to load site configuration');
