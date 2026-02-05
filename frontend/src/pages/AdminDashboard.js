@@ -44,6 +44,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 // ========== PRIMARY NAVIGATION CATEGORIES ==========
 const PRIMARY_TABS = [
   { id: 'marketplace', label: 'Marketplace', icon: '🛒', lucideIcon: Package },
+  { id: 'vehicles', label: 'Vehicles', icon: '🚗', lucideIcon: Car },
   { id: 'settings', label: 'Settings', icon: '⚙️', lucideIcon: Settings },
   { id: 'banners', label: 'Banners', icon: '🎨', lucideIcon: Image },
   { id: 'analytics', label: 'Analytics', icon: '📊', lucideIcon: TrendingUp },
