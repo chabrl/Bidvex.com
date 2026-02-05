@@ -20,6 +20,8 @@ const hexToRgba = (hex, alpha) => {
 const DEFAULT_STYLING = {
   title_color: '#FFFFFF',
   subtitle_color: '#FFFFFF',
+  button_color: '#FFFFFF',
+  button_text_color: '#000000',
   text_color: '#FFFFFF',
   font_family: 'Inter',
   title_font_size: '48px',
