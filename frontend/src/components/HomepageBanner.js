@@ -265,7 +265,7 @@ const HomepageBanner = () => {
                   transition={{ delay: 0.2 }}
                   className="leading-tight"
                   style={{
-                    color: currentBanner.text_color,
+                    color: currentBanner.title_color || currentBanner.text_color,
                     fontFamily: currentBanner.font_family,
                     fontSize: getResponsiveFontSize(currentBanner.title_font_size, true),
                     fontWeight: 'bold',
@@ -286,7 +286,7 @@ const HomepageBanner = () => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
                   style={{
-                    color: currentBanner.text_color,
+                    color: currentBanner.subtitle_color || currentBanner.text_color,
                     fontFamily: currentBanner.font_family,
                     fontSize: getResponsiveFontSize(currentBanner.subtitle_font_size, true),
                     opacity: 0.9,
