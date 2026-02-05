@@ -335,169 +335,402 @@ const VehicleAuctionsPage = () => {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Filters Bar */}
-        <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm p-4 mb-6">
-          <div className="flex flex-wrap items-center gap-4">
-            {/* Sort */}
-            <Select value={filters.sort_by} onValueChange={(v) => handleFilterChange('sort_by', v)}>
-              <SelectTrigger className="w-40" data-testid="sort-select">
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="end_time">Ending Soon</SelectItem>
-                <SelectItem value="created_at">Newest</SelectItem>
-                <SelectItem value="current_bid">Price: Low to High</SelectItem>
-                <SelectItem value="year">Year: Newest</SelectItem>
-                <SelectItem value="mileage">Mileage: Low to High</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            {/* Vehicle Make Filter */}
-            <Select value={filters.make} onValueChange={(v) => handleFilterChange('make', v)}>
-              <SelectTrigger className="w-36" data-testid="make-filter">
-                <SelectValue placeholder="Make" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Makes</SelectItem>
-                <SelectItem value="Toyota">Toyota</SelectItem>
-                <SelectItem value="Honda">Honda</SelectItem>
-                <SelectItem value="Ford">Ford</SelectItem>
-                <SelectItem value="Chevrolet">Chevrolet</SelectItem>
-                <SelectItem value="BMW">BMW</SelectItem>
-                <SelectItem value="Mercedes-Benz">Mercedes-Benz</SelectItem>
-                <SelectItem value="Audi">Audi</SelectItem>
-                <SelectItem value="Nissan">Nissan</SelectItem>
-                <SelectItem value="Hyundai">Hyundai</SelectItem>
-                <SelectItem value="Kia">Kia</SelectItem>
-                <SelectItem value="Volkswagen">Volkswagen</SelectItem>
-                <SelectItem value="Mazda">Mazda</SelectItem>
-                <SelectItem value="Subaru">Subaru</SelectItem>
-                <SelectItem value="Tesla">Tesla</SelectItem>
-                <SelectItem value="Jeep">Jeep</SelectItem>
-                <SelectItem value="RAM">RAM</SelectItem>
-                <SelectItem value="GMC">GMC</SelectItem>
-                <SelectItem value="Lexus">Lexus</SelectItem>
-                <SelectItem value="Acura">Acura</SelectItem>
-                <SelectItem value="Infiniti">Infiniti</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            {/* Body Type */}
-            <Select value={filters.body_type} onValueChange={(v) => handleFilterChange('body_type', v)}>
-              <SelectTrigger className="w-36">
-                <SelectValue placeholder="Body Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="sedan">Sedan</SelectItem>
-                <SelectItem value="suv">SUV</SelectItem>
-                <SelectItem value="truck">Truck</SelectItem>
-                <SelectItem value="coupe">Coupe</SelectItem>
-                <SelectItem value="van">Van</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            {/* Province */}
-            <Select value={filters.province} onValueChange={(v) => handleFilterChange('province', v)}>
-              <SelectTrigger className="w-36">
-                <SelectValue placeholder="Province" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Provinces</SelectItem>
-                <SelectItem value="QC">Quebec</SelectItem>
-                <SelectItem value="ON">Ontario</SelectItem>
-                <SelectItem value="BC">British Columbia</SelectItem>
-                <SelectItem value="AB">Alberta</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            {/* More Filters Toggle */}
-            <Button 
-              variant="outline" 
-              onClick={() => setShowFilters(!showFilters)}
-              className="gap-2"
-            >
-              <Filter className="h-4 w-4" />
-              More Filters
-            </Button>
-            
-            {/* Clear Filters */}
-            <Button variant="ghost" onClick={clearFilters} className="gap-2">
-              <RefreshCw className="h-4 w-4" />
-              Clear
-            </Button>
-            
-            <div className="flex-1" />
-            
-            {/* View Toggle */}
-            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
-              <Button
-                variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('grid')}
-              >
-                <Grid className="h-4 w-4" />
-              </Button>
-              <Button
-                variant={viewMode === 'list' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('list')}
-              >
-                <List className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+        {/* Premium Filter Card */}
+        <div className="relative mb-8">
+          {/* Decorative gradient border */}
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 rounded-2xl opacity-20 blur-sm" />
           
-          {/* Extended Filters */}
-          <AnimatePresence>
-            {showFilters && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden"
-              >
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 mt-4 border-t">
-                  <div>
-                    <label className="text-sm text-slate-500 mb-1 block">Year From</label>
-                    <Input
-                      type="number"
-                      placeholder="2015"
-                      value={filters.year_min}
-                      onChange={(e) => handleFilterChange('year_min', e.target.value)}
-                    />
+          <Card className="relative bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-0 shadow-2xl rounded-2xl overflow-hidden">
+            {/* Header with gradient accent */}
+            <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                    <SlidersHorizontal className="h-5 w-5 text-white" />
                   </div>
                   <div>
-                    <label className="text-sm text-slate-500 mb-1 block">Year To</label>
-                    <Input
-                      type="number"
-                      placeholder="2024"
-                      value={filters.year_max}
-                      onChange={(e) => handleFilterChange('year_max', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm text-slate-500 mb-1 block">Min Price</label>
-                    <Input
-                      type="number"
-                      placeholder="$0"
-                      value={filters.price_min}
-                      onChange={(e) => handleFilterChange('price_min', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm text-slate-500 mb-1 block">Max Price</label>
-                    <Input
-                      type="number"
-                      placeholder="$100,000"
-                      value={filters.price_max}
-                      onChange={(e) => handleFilterChange('price_max', e.target.value)}
-                    />
+                    <h3 className="text-white font-semibold">Find Your Vehicle</h3>
+                    <p className="text-slate-400 text-sm">Search across {total} active auctions</p>
                   </div>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                
+                {/* View Toggle - Premium Style */}
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-400 text-sm mr-2">View:</span>
+                  <div className="flex items-center bg-slate-800 rounded-lg p-1">
+                    <button
+                      onClick={() => setViewMode('grid')}
+                      className={`p-2 rounded-md transition-all ${
+                        viewMode === 'grid' 
+                          ? 'bg-blue-500 text-white shadow-lg' 
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Grid className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => setViewMode('list')}
+                      className={`p-2 rounded-md transition-all ${
+                        viewMode === 'list' 
+                          ? 'bg-blue-500 text-white shadow-lg' 
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <List className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <CardContent className="p-6 space-y-6">
+              {/* Auction Status Pills */}
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-sm font-medium text-slate-500 dark:text-slate-400">Status:</span>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { id: 'all', label: 'All Auctions', icon: Sparkles },
+                    { id: 'ending_soon', label: 'Ending Soon', icon: Clock },
+                    { id: 'live', label: 'Live Now', icon: Zap },
+                    { id: 'no_reserve', label: 'No Reserve', icon: Award },
+                    { id: 'buy_now', label: 'Buy Now', icon: DollarSign },
+                  ].map((status) => {
+                    const Icon = status.icon;
+                    const isActive = filters.auction_status === status.id || (status.id === 'all' && !filters.auction_status);
+                    return (
+                      <button
+                        key={status.id}
+                        onClick={() => handleFilterChange('auction_status', status.id === 'all' ? '' : status.id)}
+                        className={`
+                          group flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium
+                          transition-all duration-200 ease-out
+                          ${isActive 
+                            ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25 scale-105' 
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 hover:scale-102'
+                          }
+                        `}
+                      >
+                        <Icon className={`h-4 w-4 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'}`} />
+                        {status.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              
+              {/* Main Filters Row */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                {/* Vehicle Make - Prominent Searchable */}
+                <div className="md:col-span-4">
+                  <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 block">
+                    Vehicle Make
+                  </label>
+                  <Select value={filters.make || 'all'} onValueChange={(v) => handleFilterChange('make', v)}>
+                    <SelectTrigger 
+                      className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 hover:border-blue-400 focus:border-blue-500 transition-colors rounded-xl"
+                      data-testid="make-filter"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Car className="h-5 w-5 text-blue-500" />
+                        <SelectValue placeholder="Select Make" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent className="max-h-80">
+                      <SelectItem value="all">
+                        <span className="flex items-center gap-2">
+                          <span className="text-lg">🚗</span> All Makes
+                        </span>
+                      </SelectItem>
+                      <div className="px-2 py-1.5 text-xs font-semibold text-slate-400 uppercase">Popular</div>
+                      <SelectItem value="Toyota"><span className="flex items-center gap-2">🇯🇵 Toyota</span></SelectItem>
+                      <SelectItem value="Honda"><span className="flex items-center gap-2">🇯🇵 Honda</span></SelectItem>
+                      <SelectItem value="Ford"><span className="flex items-center gap-2">🇺🇸 Ford</span></SelectItem>
+                      <SelectItem value="Chevrolet"><span className="flex items-center gap-2">🇺🇸 Chevrolet</span></SelectItem>
+                      <SelectItem value="Tesla"><span className="flex items-center gap-2">⚡ Tesla</span></SelectItem>
+                      <div className="px-2 py-1.5 text-xs font-semibold text-slate-400 uppercase">Luxury</div>
+                      <SelectItem value="BMW"><span className="flex items-center gap-2">🇩🇪 BMW</span></SelectItem>
+                      <SelectItem value="Mercedes-Benz"><span className="flex items-center gap-2">🇩🇪 Mercedes-Benz</span></SelectItem>
+                      <SelectItem value="Audi"><span className="flex items-center gap-2">🇩🇪 Audi</span></SelectItem>
+                      <SelectItem value="Lexus"><span className="flex items-center gap-2">🇯🇵 Lexus</span></SelectItem>
+                      <SelectItem value="Acura"><span className="flex items-center gap-2">🇯🇵 Acura</span></SelectItem>
+                      <SelectItem value="Infiniti"><span className="flex items-center gap-2">🇯🇵 Infiniti</span></SelectItem>
+                      <div className="px-2 py-1.5 text-xs font-semibold text-slate-400 uppercase">Other</div>
+                      <SelectItem value="Nissan">Nissan</SelectItem>
+                      <SelectItem value="Hyundai">Hyundai</SelectItem>
+                      <SelectItem value="Kia">Kia</SelectItem>
+                      <SelectItem value="Volkswagen">Volkswagen</SelectItem>
+                      <SelectItem value="Mazda">Mazda</SelectItem>
+                      <SelectItem value="Subaru">Subaru</SelectItem>
+                      <SelectItem value="Jeep">Jeep</SelectItem>
+                      <SelectItem value="RAM">RAM</SelectItem>
+                      <SelectItem value="GMC">GMC</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Body Type */}
+                <div className="md:col-span-2">
+                  <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 block">
+                    Body Type
+                  </label>
+                  <Select value={filters.body_type || 'all'} onValueChange={(v) => handleFilterChange('body_type', v)}>
+                    <SelectTrigger className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 hover:border-blue-400 rounded-xl">
+                      <SelectValue placeholder="All Types" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Types</SelectItem>
+                      <SelectItem value="sedan">🚗 Sedan</SelectItem>
+                      <SelectItem value="suv">🚙 SUV / Crossover</SelectItem>
+                      <SelectItem value="truck">🛻 Truck / Pickup</SelectItem>
+                      <SelectItem value="coupe">🏎️ Coupe</SelectItem>
+                      <SelectItem value="hatchback">🚘 Hatchback</SelectItem>
+                      <SelectItem value="van">🚐 Van / Minivan</SelectItem>
+                      <SelectItem value="convertible">🏎️ Convertible</SelectItem>
+                      <SelectItem value="wagon">🚗 Wagon</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Province */}
+                <div className="md:col-span-2">
+                  <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 block">
+                    Location
+                  </label>
+                  <Select value={filters.province || 'all'} onValueChange={(v) => handleFilterChange('province', v)}>
+                    <SelectTrigger className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 hover:border-blue-400 rounded-xl">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-slate-400" />
+                        <SelectValue placeholder="Province" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Provinces</SelectItem>
+                      <SelectItem value="ON">🍁 Ontario</SelectItem>
+                      <SelectItem value="QC">⚜️ Quebec</SelectItem>
+                      <SelectItem value="BC">🌲 British Columbia</SelectItem>
+                      <SelectItem value="AB">🏔️ Alberta</SelectItem>
+                      <SelectItem value="MB">Manitoba</SelectItem>
+                      <SelectItem value="SK">Saskatchewan</SelectItem>
+                      <SelectItem value="NS">Nova Scotia</SelectItem>
+                      <SelectItem value="NB">New Brunswick</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Sort */}
+                <div className="md:col-span-2">
+                  <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 block">
+                    Sort By
+                  </label>
+                  <Select value={filters.sort_by} onValueChange={(v) => handleFilterChange('sort_by', v)}>
+                    <SelectTrigger className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 hover:border-blue-400 rounded-xl" data-testid="sort-select">
+                      <SelectValue placeholder="Sort by" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="end_time">⏰ Ending Soon</SelectItem>
+                      <SelectItem value="created_at">✨ Newest Listed</SelectItem>
+                      <SelectItem value="current_bid">💰 Price: Low → High</SelectItem>
+                      <SelectItem value="year">📅 Year: Newest</SelectItem>
+                      <SelectItem value="mileage">🛣️ Mileage: Low → High</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* More Filters Button */}
+                <div className="md:col-span-2 flex items-end">
+                  <Button 
+                    variant="outline"
+                    onClick={() => setShowFilters(!showFilters)}
+                    className={`
+                      w-full h-12 rounded-xl border-2 transition-all duration-200
+                      ${showFilters 
+                        ? 'bg-blue-50 border-blue-500 text-blue-600 dark:bg-blue-900/30 dark:border-blue-400 dark:text-blue-400' 
+                        : 'border-slate-200 dark:border-slate-700 hover:border-blue-400'
+                      }
+                    `}
+                  >
+                    <Filter className="h-4 w-4 mr-2" />
+                    {showFilters ? 'Less Filters' : 'More Filters'}
+                    <ChevronDown className={`h-4 w-4 ml-2 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+                  </Button>
+                </div>
+              </div>
+              
+              {/* Extended Filters Panel */}
+              <AnimatePresence>
+                {showFilters && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="pt-6 border-t border-slate-200 dark:border-slate-700">
+                      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                        {/* Year Range */}
+                        <div className="col-span-2">
+                          <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 block">
+                            Year Range
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number"
+                              placeholder="From"
+                              value={filters.year_min}
+                              onChange={(e) => handleFilterChange('year_min', e.target.value)}
+                              className="h-10 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl"
+                            />
+                            <span className="text-slate-400">—</span>
+                            <Input
+                              type="number"
+                              placeholder="To"
+                              value={filters.year_max}
+                              onChange={(e) => handleFilterChange('year_max', e.target.value)}
+                              className="h-10 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl"
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* Price Range */}
+                        <div className="col-span-2">
+                          <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 block">
+                            Price Range (CAD)
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <div className="relative flex-1">
+                              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                              <Input
+                                type="number"
+                                placeholder="Min"
+                                value={filters.price_min}
+                                onChange={(e) => handleFilterChange('price_min', e.target.value)}
+                                className="h-10 pl-9 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl"
+                              />
+                            </div>
+                            <span className="text-slate-400">—</span>
+                            <div className="relative flex-1">
+                              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                              <Input
+                                type="number"
+                                placeholder="Max"
+                                value={filters.price_max}
+                                onChange={(e) => handleFilterChange('price_max', e.target.value)}
+                                className="h-10 pl-9 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Mileage */}
+                        <div>
+                          <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 block">
+                            Max Mileage
+                          </label>
+                          <Select value={filters.max_mileage || 'all'} onValueChange={(v) => handleFilterChange('max_mileage', v)}>
+                            <SelectTrigger className="h-10 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl">
+                              <SelectValue placeholder="Any" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Any Mileage</SelectItem>
+                              <SelectItem value="25000">Under 25,000 km</SelectItem>
+                              <SelectItem value="50000">Under 50,000 km</SelectItem>
+                              <SelectItem value="100000">Under 100,000 km</SelectItem>
+                              <SelectItem value="150000">Under 150,000 km</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        {/* Transmission */}
+                        <div>
+                          <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 block">
+                            Transmission
+                          </label>
+                          <Select value={filters.transmission || 'all'} onValueChange={(v) => handleFilterChange('transmission', v)}>
+                            <SelectTrigger className="h-10 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl">
+                              <SelectValue placeholder="Any" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Any</SelectItem>
+                              <SelectItem value="automatic">Automatic</SelectItem>
+                              <SelectItem value="manual">Manual</SelectItem>
+                              <SelectItem value="cvt">CVT</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              
+              {/* Active Filters & Clear */}
+              {(filters.make !== 'all' && filters.make) || 
+               (filters.body_type !== 'all' && filters.body_type) || 
+               (filters.province !== 'all' && filters.province) ||
+               filters.year_min || filters.year_max || 
+               filters.price_min || filters.price_max ? (
+                <div className="flex items-center gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+                  <span className="text-sm text-slate-500">Active Filters:</span>
+                  <div className="flex flex-wrap gap-2">
+                    {filters.make && filters.make !== 'all' && (
+                      <Badge 
+                        variant="secondary" 
+                        className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 hover:bg-blue-200 cursor-pointer"
+                        onClick={() => handleFilterChange('make', 'all')}
+                      >
+                        {filters.make} <X className="h-3 w-3 ml-1" />
+                      </Badge>
+                    )}
+                    {filters.body_type && filters.body_type !== 'all' && (
+                      <Badge 
+                        variant="secondary" 
+                        className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 hover:bg-purple-200 cursor-pointer"
+                        onClick={() => handleFilterChange('body_type', 'all')}
+                      >
+                        {filters.body_type} <X className="h-3 w-3 ml-1" />
+                      </Badge>
+                    )}
+                    {filters.province && filters.province !== 'all' && (
+                      <Badge 
+                        variant="secondary" 
+                        className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 hover:bg-green-200 cursor-pointer"
+                        onClick={() => handleFilterChange('province', 'all')}
+                      >
+                        {filters.province} <X className="h-3 w-3 ml-1" />
+                      </Badge>
+                    )}
+                    {(filters.year_min || filters.year_max) && (
+                      <Badge 
+                        variant="secondary" 
+                        className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 hover:bg-orange-200 cursor-pointer"
+                        onClick={() => { handleFilterChange('year_min', ''); handleFilterChange('year_max', ''); }}
+                      >
+                        Year: {filters.year_min || '*'} - {filters.year_max || '*'} <X className="h-3 w-3 ml-1" />
+                      </Badge>
+                    )}
+                    {(filters.price_min || filters.price_max) && (
+                      <Badge 
+                        variant="secondary" 
+                        className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 hover:bg-emerald-200 cursor-pointer"
+                        onClick={() => { handleFilterChange('price_min', ''); handleFilterChange('price_max', ''); }}
+                      >
+                        ${filters.price_min || '0'} - ${filters.price_max || '∞'} <X className="h-3 w-3 ml-1" />
+                      </Badge>
+                    )}
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={clearFilters}
+                    className="ml-auto text-slate-500 hover:text-red-500"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-1" /> Clear All
+                  </Button>
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
         </div>
 
         {/* Results */}
