@@ -1,6 +1,6 @@
 # BidVex Auction Platform - Product Requirements Document
 
-## Last Updated: February 2, 2026
+## Last Updated: February 5, 2026
 
 ## Original Problem Statement
 Build and maintain a sophisticated full-stack auction platform (BidVex) with:
@@ -21,20 +21,31 @@ Payments: Stripe
 Email: SendGrid
 ```
 
-## Current Status: DEPLOYMENT FIX COMPLETE
+## Current Status: BANNER MANAGER COMPLETE
 
-### Session Summary (Feb 2, 2026)
-Fixed critical deployment issues preventing production deployment:
+### Session Summary (Feb 5, 2026)
+Implemented fully customizable Hero Banner Manager:
 
-1. **Added root `/health` endpoint** - Required by Emergent deployment health checks
-2. **Fixed `decode_token` undefined errors** - 4 occurrences in AI chat endpoints
-3. **Removed hardcoded admin email** - Now uses `ADMIN_EMAIL` env var
-4. **Set CORS to `*`** - Allows requests from all origins
-5. **Removed duplicate hardcoded API key** - `EMERGENT_LLM_KEY` cleanup
+**Backend Changes:**
+- Extended banner schema with styling fields (text_color, font_family, title/subtitle font sizes, overlay_color, overlay_opacity)
+- Updated create/update endpoints to support all styling fields
+- Enhanced /api/banners/active to return styling with defaults
+
+**Frontend Changes:**
+- Created new HeroBannerEditor component with:
+  - Color pickers for text and overlay
+  - Opacity slider (0-100%)
+  - Font family dropdown
+  - Font size selectors
+  - Live preview
+  - Image upload support
+- Updated HomepageBanner to render dynamic styles
 
 ### Key Files Modified
-- `/app/backend/server.py` - Health endpoint, decode_token fixes, admin email fix
-- `/app/backend/.env` - CORS configuration
+- `/app/backend/server.py` - Banner schema and API endpoints
+- `/app/frontend/src/components/admin/HeroBannerEditor.js` - NEW
+- `/app/frontend/src/components/HomepageBanner.js` - Dynamic styling
+- `/app/frontend/src/pages/admin/BrandingLayoutManager.js` - Integrated editor
 
 ## Completed Features
 
@@ -50,72 +61,67 @@ Fixed critical deployment issues preventing production deployment:
 - Tax verification queue
 - Deletion request workflow
 - Announcement system
-- Banner manager
+- **Banner Manager with full styling control** (NEW)
 
 ### Canadian Tax Compliance ✅
 - Seller tax onboarding (Individual vs Business)
 - Province-aware logic (QC/non-QC)
-- NEQ/QST fields for Quebec businesses
 - Admin verification system
 - Binding seller agreement with audit trail
 
 ### Internationalization ✅
 - Full EN/FR translation
 - Bilingual legal documents
-- Language-aware forms
 
 ### Monetization ✅
 - Google AdSense integrated
 - Stripe payments configured
 
-## Environment Configuration
-
-### Backend (.env)
-```
-MONGO_URL=<mongodb-connection>
-DB_NAME=bazario_db
-JWT_SECRET=<secret>
-CORS_ORIGINS=*
-EMERGENT_LLM_KEY=<key>
-SENDGRID_API_KEY=<key>
-ADMIN_EMAIL=admin@bidvex.com
-```
-
-### Frontend (.env)
-```
-REACT_APP_BACKEND_URL=<emergent-backend-url>
+## Banner Schema (Extended)
+```json
+{
+  "id": "uuid",
+  "title": "string",
+  "subtitle": "string",
+  "image_desktop": "url/base64",
+  "image_mobile": "url/base64",
+  "cta_text": "string",
+  "cta_link": "string",
+  "text_color": "#FFFFFF",
+  "font_family": "Inter",
+  "title_font_size": "48px",
+  "subtitle_font_size": "18px",
+  "overlay_color": "#000000",
+  "overlay_opacity": 0.4,
+  "active": true,
+  "order": 0,
+  "created_at": "datetime",
+  "updated_at": "datetime"
+}
 ```
 
 ## API Endpoints
 
-### Health (Critical for Deployment)
-- `GET /health` - Root health check (NEW)
+### Banners
+- `GET /api/banners/active` - Public, returns active banners with styling
+- `GET /api/admin/hero-banners` - Admin, get all banners
+- `POST /api/admin/hero-banners` - Admin, create banner
+- `PUT /api/admin/hero-banners/{id}` - Admin, update banner
+- `DELETE /api/admin/hero-banners/{id}` - Admin, delete banner
+
+### Health
+- `GET /health` - Root health check
 - `GET /api/health` - API health check
-
-### Authentication
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `GET /api/auth/google`
-
-### Marketplace
-- `GET /api/marketplace/items`
-- `GET /api/listings/{id}`
-- `POST /api/listings/{id}/bid`
-
-### Admin
-- `GET /api/admin/tax/pending`
-- `POST /api/admin/tax/{userId}/approve`
-- `GET /api/announcements/active`
 
 ## Upcoming Tasks (Prioritized)
 
 ### P0 - Critical
-- [x] Fix deployment health check (DONE)
-- [ ] Verify production deployment works
+- [x] Hero Banner Manager with full styling (DONE)
+- [ ] Verify production deployment
 
 ### P1 - High Priority
 - Enterprise Vehicle Auction Module
-- Advanced Banner Customization
+- Advanced Banner Customization (carousel-specific features)
 
 ### P2 - Medium Priority
 - CRA Tax Reporting Engine (XML generator)
@@ -133,10 +139,3 @@ REACT_APP_BACKEND_URL=<emergent-backend-url>
 ## Known Issues
 - SendGrid API key is a placeholder (email won't send until configured)
 - Google Maps API key is a placeholder
-
-## Database Schema (Key Collections)
-- `users` - User accounts with tax_profile, affiliate_code
-- `listings` - Single-item auctions with agreement_metadata
-- `multi_item_listings` - Multi-item auctions
-- `site_config` - Legal pages, announcements, banners
-- `ai_chat_history` - Chatbot conversation history
