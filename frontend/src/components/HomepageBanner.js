@@ -78,6 +78,8 @@ const HomepageBanner = () => {
               cta_text: banner.cta_text || 'Learn More',
               cta_link: banner.cta_link || '/marketplace',
               // Styling fields with defaults
+              title_color: banner.title_color || banner.text_color || DEFAULT_STYLING.title_color,
+              subtitle_color: banner.subtitle_color || banner.text_color || DEFAULT_STYLING.subtitle_color,
               text_color: banner.text_color || DEFAULT_STYLING.text_color,
               font_family: banner.font_family || DEFAULT_STYLING.font_family,
               title_font_size: banner.title_font_size || DEFAULT_STYLING.title_font_size,
