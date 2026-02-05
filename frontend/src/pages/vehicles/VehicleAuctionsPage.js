@@ -430,7 +430,7 @@ const VehicleAuctionsPage = () => {
                   </label>
                   <Select value={filters.make || 'all'} onValueChange={(v) => handleFilterChange('make', v)}>
                     <SelectTrigger 
-                      className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 hover:border-blue-400 focus:border-blue-500 transition-colors rounded-xl"
+                      className="w-full h-12 bg-transparent border-2 border-slate-200 dark:border-slate-700 hover:border-blue-400 focus:border-blue-500 transition-colors rounded-xl"
                       data-testid="make-filter"
                     >
                       <div className="flex items-center gap-2">
@@ -438,7 +438,7 @@ const VehicleAuctionsPage = () => {
                         <SelectValue placeholder="Select Make" />
                       </div>
                     </SelectTrigger>
-                    <SelectContent className="max-h-80">
+                    <SelectContent className="max-h-80 bg-white dark:bg-slate-900">
                       <SelectItem value="all">
                         <span className="flex items-center gap-2">
                           <span className="text-lg">🚗</span> All Makes
@@ -477,10 +477,10 @@ const VehicleAuctionsPage = () => {
                     Body Type
                   </label>
                   <Select value={filters.body_type || 'all'} onValueChange={(v) => handleFilterChange('body_type', v)}>
-                    <SelectTrigger className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 hover:border-blue-400 rounded-xl">
+                    <SelectTrigger className="w-full h-12 bg-transparent border-2 border-slate-200 dark:border-slate-700 hover:border-blue-400 rounded-xl">
                       <SelectValue placeholder="All Types" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-white dark:bg-slate-900">
                       <SelectItem value="all">All Types</SelectItem>
                       <SelectItem value="sedan">🚗 Sedan</SelectItem>
                       <SelectItem value="suv">🚙 SUV / Crossover</SelectItem>
@@ -500,13 +500,13 @@ const VehicleAuctionsPage = () => {
                     Location
                   </label>
                   <Select value={filters.province || 'all'} onValueChange={(v) => handleFilterChange('province', v)}>
-                    <SelectTrigger className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 hover:border-blue-400 rounded-xl">
+                    <SelectTrigger className="w-full h-12 bg-transparent border-2 border-slate-200 dark:border-slate-700 hover:border-blue-400 rounded-xl">
                       <div className="flex items-center gap-2">
                         <MapPin className="h-4 w-4 text-slate-400" />
                         <SelectValue placeholder="Province" />
                       </div>
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-white dark:bg-slate-900">
                       <SelectItem value="all">All Provinces</SelectItem>
                       <SelectItem value="ON">🍁 Ontario</SelectItem>
                       <SelectItem value="QC">⚜️ Quebec</SelectItem>
@@ -526,10 +526,10 @@ const VehicleAuctionsPage = () => {
                     Sort By
                   </label>
                   <Select value={filters.sort_by} onValueChange={(v) => handleFilterChange('sort_by', v)}>
-                    <SelectTrigger className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 hover:border-blue-400 rounded-xl" data-testid="sort-select">
+                    <SelectTrigger className="w-full h-12 bg-transparent border-2 border-slate-200 dark:border-slate-700 hover:border-blue-400 rounded-xl" data-testid="sort-select">
                       <SelectValue placeholder="Sort by" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-white dark:bg-slate-900">
                       <SelectItem value="end_time">⏰ Ending Soon</SelectItem>
                       <SelectItem value="created_at">✨ Newest Listed</SelectItem>
                       <SelectItem value="current_bid">💰 Price: Low → High</SelectItem>
@@ -582,7 +582,7 @@ const VehicleAuctionsPage = () => {
                               placeholder="From"
                               value={filters.year_min}
                               onChange={(e) => handleFilterChange('year_min', e.target.value)}
-                              className="h-10 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl"
+                              className="h-10 bg-transparent border-2 border-slate-200 dark:border-slate-700 rounded-xl placeholder:text-slate-400"
                             />
                             <span className="text-slate-400">—</span>
                             <Input
@@ -590,7 +590,7 @@ const VehicleAuctionsPage = () => {
                               placeholder="To"
                               value={filters.year_max}
                               onChange={(e) => handleFilterChange('year_max', e.target.value)}
-                              className="h-10 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl"
+                              className="h-10 bg-transparent border-2 border-slate-200 dark:border-slate-700 rounded-xl placeholder:text-slate-400"
                             />
                           </div>
                         </div>
@@ -608,7 +608,7 @@ const VehicleAuctionsPage = () => {
                                 placeholder="Min"
                                 value={filters.price_min}
                                 onChange={(e) => handleFilterChange('price_min', e.target.value)}
-                                className="h-10 pl-9 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl"
+                                className="h-10 pl-9 bg-transparent border-2 border-slate-200 dark:border-slate-700 rounded-xl placeholder:text-slate-400"
                               />
                             </div>
                             <span className="text-slate-400">—</span>
@@ -619,7 +619,7 @@ const VehicleAuctionsPage = () => {
                                 placeholder="Max"
                                 value={filters.price_max}
                                 onChange={(e) => handleFilterChange('price_max', e.target.value)}
-                                className="h-10 pl-9 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl"
+                                className="h-10 pl-9 bg-transparent border-2 border-slate-200 dark:border-slate-700 rounded-xl placeholder:text-slate-400"
                               />
                             </div>
                           </div>
@@ -631,10 +631,10 @@ const VehicleAuctionsPage = () => {
                             Max Mileage
                           </label>
                           <Select value={filters.max_mileage || 'all'} onValueChange={(v) => handleFilterChange('max_mileage', v)}>
-                            <SelectTrigger className="h-10 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl">
+                            <SelectTrigger className="h-10 bg-transparent border-2 border-slate-200 dark:border-slate-700 rounded-xl">
                               <SelectValue placeholder="Any" />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="bg-white dark:bg-slate-900">
                               <SelectItem value="all">Any Mileage</SelectItem>
                               <SelectItem value="25000">Under 25,000 km</SelectItem>
                               <SelectItem value="50000">Under 50,000 km</SelectItem>
@@ -650,10 +650,10 @@ const VehicleAuctionsPage = () => {
                             Transmission
                           </label>
                           <Select value={filters.transmission || 'all'} onValueChange={(v) => handleFilterChange('transmission', v)}>
-                            <SelectTrigger className="h-10 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl">
+                            <SelectTrigger className="h-10 bg-transparent border-2 border-slate-200 dark:border-slate-700 rounded-xl">
                               <SelectValue placeholder="Any" />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="bg-white dark:bg-slate-900">
                               <SelectItem value="all">Any</SelectItem>
                               <SelectItem value="automatic">Automatic</SelectItem>
                               <SelectItem value="manual">Manual</SelectItem>
