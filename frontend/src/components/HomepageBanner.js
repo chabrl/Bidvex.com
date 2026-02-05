@@ -292,7 +292,7 @@ const HomepageBanner = () => {
                   transition={{ delay: 0.2 }}
                   className="leading-tight"
                   style={{
-                    color: currentBanner.title_color || currentBanner.text_color,
+                    color: currentBanner.title_color,
                     fontFamily: currentBanner.font_family,
                     fontSize: getResponsiveFontSize(currentBanner.title_font_size, true),
                     fontWeight: 'bold',
@@ -300,11 +300,11 @@ const HomepageBanner = () => {
                 >
                   {/* Desktop font size */}
                   <span className="hidden md:inline" style={{ fontSize: currentBanner.title_font_size }}>
-                    {currentBanner.title}
+                    {displayTitle}
                   </span>
                   {/* Mobile font size */}
                   <span className="md:hidden">
-                    {currentBanner.title}
+                    {displayTitle}
                   </span>
                 </motion.h2>
                 
@@ -313,7 +313,7 @@ const HomepageBanner = () => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
                   style={{
-                    color: currentBanner.subtitle_color || currentBanner.text_color,
+                    color: currentBanner.subtitle_color,
                     fontFamily: currentBanner.font_family,
                     fontSize: getResponsiveFontSize(currentBanner.subtitle_font_size, true),
                     opacity: 0.9,
@@ -322,15 +322,15 @@ const HomepageBanner = () => {
                 >
                   {/* Desktop subtitle */}
                   <span className="hidden md:inline" style={{ fontSize: currentBanner.subtitle_font_size }}>
-                    {currentBanner.subtitle}
+                    {displaySubtitle}
                   </span>
                   {/* Mobile subtitle */}
                   <span className="md:hidden">
-                    {currentBanner.subtitle}
+                    {displaySubtitle}
                   </span>
                 </motion.p>
 
-                {currentBanner.cta_text && (
+                {displayCtaText && (
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -340,8 +340,8 @@ const HomepageBanner = () => {
                       onClick={() => handleCtaClick(currentBanner)}
                       className="text-base md:text-lg px-6 md:px-8 py-4 md:py-6 rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
                       style={{
-                        backgroundColor: currentBanner.button_color || '#FFFFFF',
-                        color: currentBanner.button_text_color || '#000000',
+                        backgroundColor: currentBanner.button_color,
+                        color: currentBanner.button_text_color,
                       }}
                     >
                       {currentBanner.cta_text}
