@@ -8815,6 +8815,8 @@ async def create_hero_banner(
         # Styling fields
         "title_color": banner_data.get("title_color", "#FFFFFF"),
         "subtitle_color": banner_data.get("subtitle_color", "#FFFFFF"),
+        "button_color": banner_data.get("button_color", "#FFFFFF"),
+        "button_text_color": banner_data.get("button_text_color", "#000000"),
         "text_color": banner_data.get("text_color", "#FFFFFF"),
         "font_family": banner_data.get("font_family", "Inter"),
         "title_font_size": banner_data.get("title_font_size", "48px"),
