@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Button } from './ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -32,6 +33,8 @@ const DEFAULT_STYLING = {
 
 const HomepageBanner = () => {
   const navigate = useNavigate();
+  const { i18n } = useTranslation();
+  const currentLang = i18n.language?.startsWith('fr') ? 'fr' : 'en';
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const [banners, setBanners] = useState([]);
