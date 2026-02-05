@@ -344,7 +344,7 @@ const HomepageBanner = () => {
                         color: currentBanner.button_text_color,
                       }}
                     >
-                      {currentBanner.cta_text}
+                      {displayCtaText}
                     </Button>
                   </motion.div>
                 )}
