@@ -76,12 +76,22 @@ const SUBTITLE_SIZES = [
 
 // Default banner form values
 const DEFAULT_BANNER = {
+  // Bilingual content
+  title_en: '',
+  title_fr: '',
+  subtitle_en: '',
+  subtitle_fr: '',
+  cta_text_en: 'Learn More',
+  cta_text_fr: 'En savoir plus',
+  // Legacy fields
   title: '',
   subtitle: '',
+  cta_text: 'Learn More',
+  // Images
   image_desktop: '',
   image_mobile: '',
-  cta_text: 'Learn More',
   cta_link: '/marketplace',
+  // Styling - all independent
   title_color: '#FFFFFF',
   subtitle_color: '#FFFFFF',
   button_color: '#FFFFFF',
