@@ -8877,13 +8877,20 @@ async def update_hero_banner(
     if not existing:
         raise HTTPException(status_code=404, detail="Banner not found")
     
-    # Allowed update fields - includes all styling options
+    # Allowed update fields - includes bilingual content and all styling options
     allowed_fields = [
-        "title", "subtitle", "image_desktop", "image_mobile", 
-        "cta_text", "cta_link", 
+        # Bilingual content
+        "title_en", "title_fr", "subtitle_en", "subtitle_fr", 
+        "cta_text_en", "cta_text_fr",
+        # Legacy fields
+        "title", "subtitle", "cta_text",
+        # Images and links
+        "image_desktop", "image_mobile", "cta_link", 
+        # Styling - all independent colors
         "title_color", "subtitle_color", "button_color", "button_text_color", "text_color", 
         "font_family", "title_font_size", "subtitle_font_size",
         "overlay_color", "overlay_opacity",
+        # Status
         "active", "start_date", "end_date", "order"
     ]
     
