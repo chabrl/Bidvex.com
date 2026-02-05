@@ -9083,6 +9083,8 @@ async def get_active_banners():
         # Ensure styling fields have defaults
         banner["title_color"] = banner.get("title_color", "#FFFFFF")
         banner["subtitle_color"] = banner.get("subtitle_color", "#FFFFFF")
+        banner["button_color"] = banner.get("button_color", "#FFFFFF")
+        banner["button_text_color"] = banner.get("button_text_color", "#000000")
         banner["text_color"] = banner.get("text_color", "#FFFFFF")
         banner["font_family"] = banner.get("font_family", "Inter")
         banner["title_font_size"] = banner.get("title_font_size", "48px")
