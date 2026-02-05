@@ -254,7 +254,7 @@ const SellerRegistrationPage = () => {
             Become a Vehicle Seller
           </h1>
           <p className="text-slate-500 max-w-xl mx-auto">
-            Join BidVex's trusted network of vehicle sellers. Choose your seller type to get started.
+            Join BidVex&apos;s trusted network of vehicle sellers. Choose your seller type to get started.
           </p>
         </div>
 
