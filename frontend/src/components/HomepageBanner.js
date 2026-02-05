@@ -223,6 +223,17 @@ const HomepageBanner = () => {
 
   const currentBanner = activeBanners[currentSlide];
   const overlayRgba = hexToRgba(currentBanner.overlay_color, currentBanner.overlay_opacity);
+  
+  // Get bilingual content based on current language
+  const displayTitle = currentLang === 'fr' 
+    ? (currentBanner.title_fr || currentBanner.title_en || currentBanner.title)
+    : (currentBanner.title_en || currentBanner.title);
+  const displaySubtitle = currentLang === 'fr'
+    ? (currentBanner.subtitle_fr || currentBanner.subtitle_en || currentBanner.subtitle)
+    : (currentBanner.subtitle_en || currentBanner.subtitle);
+  const displayCtaText = currentLang === 'fr'
+    ? (currentBanner.cta_text_fr || currentBanner.cta_text_en || currentBanner.cta_text)
+    : (currentBanner.cta_text_en || currentBanner.cta_text);
 
   return (
     <div className="relative w-full h-[400px] md:h-[500px] lg:h-[600px] overflow-hidden">
