@@ -114,6 +114,7 @@ const HeroBannerEditor = () => {
   const [editingBanner, setEditingBanner] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [bannerForm, setBannerForm] = useState(DEFAULT_BANNER);
+  const [previewLang, setPreviewLang] = useState('en'); // For live preview language toggle
 
   // Fetch banners
   const fetchBanners = useCallback(async () => {
