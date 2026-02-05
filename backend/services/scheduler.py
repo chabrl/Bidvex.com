@@ -21,7 +21,7 @@ async def process_ended_auctions_job():
     """Job: Process all ended vehicle auctions"""
     from services.vehicle_auction_handler import process_all_ended_auctions
     
-    if not db_instance:
+    if db_instance is None:
         logger.warning("Database not initialized, skipping auction processing")
         return
     
@@ -46,7 +46,7 @@ async def activate_scheduled_auctions_job():
     """Job: Activate auctions that have reached their start time"""
     from services.vehicle_auction_handler import activate_scheduled_auctions
     
-    if not db_instance:
+    if db_instance is None:
         logger.warning("Database not initialized, skipping auction activation")
         return
     
@@ -70,7 +70,7 @@ async def apply_late_penalties_job():
     """Job: Apply late payment penalties to overdue invoices"""
     from services.vehicle_invoice import check_and_apply_late_penalties
     
-    if not db_instance:
+    if db_instance is None:
         logger.warning("Database not initialized, skipping penalty application")
         return
     
@@ -93,7 +93,7 @@ async def apply_late_penalties_job():
 
 async def cleanup_expired_deposits_job():
     """Job: Clean up expired pending deposits"""
-    if not db_instance:
+    if db_instance is None:
         return
     
     try:
@@ -131,7 +131,7 @@ async def cleanup_expired_deposits_job():
 
 async def cleanup_expired_sessions_job():
     """Job: Clean up expired payment sessions"""
-    if not db_instance:
+    if db_instance is None:
         return
     
     try:
@@ -168,7 +168,7 @@ async def cleanup_expired_sessions_job():
 
 async def daily_summary_job():
     """Job: Generate daily auction summary (for logging/monitoring)"""
-    if not db_instance:
+    if db_instance is None:
         return
     
     try:
@@ -302,7 +302,7 @@ def get_scheduler_status() -> dict:
     """Get current scheduler status and job info"""
     global scheduler
     
-    if not scheduler:
+    if scheduler is None:
         return {"status": "not_initialized"}
     
     jobs = []
@@ -324,7 +324,7 @@ async def run_job_manually(job_id: str) -> dict:
     """Manually trigger a specific job"""
     global scheduler
     
-    if not scheduler:
+    if scheduler is None:
         return {"error": "Scheduler not initialized"}
     
     job = scheduler.get_job(job_id)
