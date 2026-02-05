@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Dict, List, Tuple
 
 # Configuration
-BASE_URL = "https://title-style-debug.preview.emergentagent.com"
+BASE_URL = "https://carauctionpro.preview.emergentagent.com"
 ADMIN_EMAIL = "charbeladmin@bidvex.com"
 ADMIN_PASSWORD = "Admin123!"
 

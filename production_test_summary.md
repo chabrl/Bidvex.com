@@ -1,7 +1,7 @@
 # BidVex Production Launch - Comprehensive Functional Verification Results
 
 **Test Date:** January 2026  
-**Test URL:** https://title-style-debug.preview.emergentagent.com/api  
+**Test URL:** https://carauctionpro.preview.emergentagent.com/api  
 **Tester:** Testing Agent (E2)
 
 ---
@@ -299,7 +299,7 @@
 
 ## TEST ENVIRONMENT
 
-- **Backend URL:** https://title-style-debug.preview.emergentagent.com/api
+- **Backend URL:** https://carauctionpro.preview.emergentagent.com/api
 - **Test Users Created:**
   - Admin: charbeladmin@bidvex.com
   - Buyer: buyer.test@bidvex.com
