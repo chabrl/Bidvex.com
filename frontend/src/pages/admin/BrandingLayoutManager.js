@@ -13,6 +13,7 @@ import {
   ChevronUp, ChevronDown, Eye, EyeOff, Upload, Check, Trash2,
   Plus, Edit2, GripVertical
 } from 'lucide-react';
+import HeroBannerEditor from '../../components/admin/HeroBannerEditor';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
