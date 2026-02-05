@@ -31,11 +31,12 @@ import EmailTemplates from './admin/EmailTemplates';
 import MarketplaceSettings from './admin/MarketplaceSettings';
 import BrandingLayoutManager from './admin/BrandingLayoutManager';
 import SiteContentManager from './admin/SiteContentManager';
+import VehicleAdminManager from './admin/VehicleAdminManager';
 import { 
   Users, Package, Gavel, Shield, TrendingUp, Bell, Settings, FileText, 
   MessageSquare, DollarSign, Search, Image, CreditCard, Megaphone, 
   Activity, AlertTriangle, ChevronRight, Power, Zap, Eye, History,
-  ToggleLeft, ToggleRight, Clock, Mail, Sliders
+  ToggleLeft, ToggleRight, Clock, Mail, Sliders, Car
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
