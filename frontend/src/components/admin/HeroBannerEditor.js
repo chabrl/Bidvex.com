@@ -566,15 +566,6 @@ const HeroBannerEditor = () => {
                     />
                   </div>
                 </div>
-                  <Slider
-                    value={[bannerForm.overlay_opacity * 100]}
-                    onValueChange={(value) => setBannerForm(prev => ({ ...prev, overlay_opacity: value[0] / 100 }))}
-                    min={0}
-                    max={100}
-                    step={5}
-                    className="mt-2"
-                  />
-                </div>
 
                 {/* Typography */}
                 <h4 className="font-semibold flex items-center gap-2 text-sm text-muted-foreground uppercase tracking-wide pt-4">
