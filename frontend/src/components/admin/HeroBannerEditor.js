@@ -272,7 +272,7 @@ const HeroBannerEditor = () => {
           <div className="max-w-2xl space-y-4">
             <h2 
               style={{
-                color: bannerForm.text_color,
+                color: bannerForm.title_color || bannerForm.text_color,
                 fontFamily: bannerForm.font_family,
                 fontSize: bannerForm.title_font_size,
                 fontWeight: 'bold',
@@ -283,7 +283,7 @@ const HeroBannerEditor = () => {
             </h2>
             <p
               style={{
-                color: bannerForm.text_color,
+                color: bannerForm.subtitle_color || bannerForm.text_color,
                 fontFamily: bannerForm.font_family,
                 fontSize: bannerForm.subtitle_font_size,
                 opacity: 0.9,
@@ -294,7 +294,7 @@ const HeroBannerEditor = () => {
             <Button
               className="mt-4"
               style={{
-                backgroundColor: bannerForm.text_color,
+                backgroundColor: bannerForm.title_color || bannerForm.text_color,
                 color: bannerForm.overlay_color,
               }}
             >
