@@ -71,20 +71,29 @@ const HomepageBanner = () => {
         });
         
         if (response.data?.hero_banners && response.data.hero_banners.length > 0) {
-          // Use hero_banners with full styling support
+          // Use hero_banners with full styling and bilingual support
           const transformedBanners = response.data.hero_banners
             .sort((a, b) => (a.order || 0) - (b.order || 0))
             .map(banner => ({
               id: banner.id,
+              // Bilingual content fields
+              title_en: banner.title_en || banner.title || '',
+              title_fr: banner.title_fr || '',
+              subtitle_en: banner.subtitle_en || banner.subtitle || '',
+              subtitle_fr: banner.subtitle_fr || '',
+              cta_text_en: banner.cta_text_en || banner.cta_text || 'Learn More',
+              cta_text_fr: banner.cta_text_fr || 'En savoir plus',
+              // Legacy fields
               title: banner.title || '',
               subtitle: banner.subtitle || '',
+              cta_text: banner.cta_text || 'Learn More',
+              // Images
               image_url: banner.image_desktop || banner.image_url || banner.image_mobile,
               image_mobile: banner.image_mobile,
-              cta_text: banner.cta_text || 'Learn More',
               cta_link: banner.cta_link || '/marketplace',
-              // Styling fields with defaults
-              title_color: banner.title_color || banner.text_color || DEFAULT_STYLING.title_color,
-              subtitle_color: banner.subtitle_color || banner.text_color || DEFAULT_STYLING.subtitle_color,
+              // Styling fields - all independent
+              title_color: banner.title_color || DEFAULT_STYLING.title_color,
+              subtitle_color: banner.subtitle_color || DEFAULT_STYLING.subtitle_color,
               button_color: banner.button_color || DEFAULT_STYLING.button_color,
               button_text_color: banner.button_text_color || DEFAULT_STYLING.button_text_color,
               text_color: banner.text_color || DEFAULT_STYLING.text_color,
