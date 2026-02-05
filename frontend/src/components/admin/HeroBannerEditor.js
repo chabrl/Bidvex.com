@@ -534,6 +534,44 @@ const HeroBannerEditor = () => {
                   </div>
                 </div>
 
+                {/* Button Colors */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Button Background</Label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <input
+                        type="color"
+                        value={bannerForm.button_color || '#FFFFFF'}
+                        onChange={(e) => setBannerForm(prev => ({ ...prev, button_color: e.target.value }))}
+                        className="w-10 h-10 rounded cursor-pointer border"
+                      />
+                      <Input
+                        value={bannerForm.button_color || '#FFFFFF'}
+                        onChange={(e) => setBannerForm(prev => ({ ...prev, button_color: e.target.value }))}
+                        className="flex-1 font-mono text-sm"
+                        maxLength={7}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Button Text Color</Label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <input
+                        type="color"
+                        value={bannerForm.button_text_color || '#000000'}
+                        onChange={(e) => setBannerForm(prev => ({ ...prev, button_text_color: e.target.value }))}
+                        className="w-10 h-10 rounded cursor-pointer border"
+                      />
+                      <Input
+                        value={bannerForm.button_text_color || '#000000'}
+                        onChange={(e) => setBannerForm(prev => ({ ...prev, button_text_color: e.target.value }))}
+                        className="flex-1 font-mono text-sm"
+                        maxLength={7}
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 {/* Overlay Colors */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
