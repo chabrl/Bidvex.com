@@ -286,27 +286,37 @@ const HomepageBanner = () => {
             {/* Content */}
             <div className="relative z-10 h-full flex items-center px-6 md:px-12 lg:px-16 max-w-7xl mx-auto">
               <div className="max-w-2xl space-y-4 md:space-y-6">
-                <motion.h2
+                <motion.h1
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}
                   className="leading-tight"
                   style={{
-                    color: currentBanner.title_color,
                     fontFamily: currentBanner.font_family,
-                    fontSize: getResponsiveFontSize(currentBanner.title_font_size, true),
                     fontWeight: 'bold',
                   }}
                 >
                   {/* Desktop font size */}
-                  <span className="hidden md:inline" style={{ fontSize: currentBanner.title_font_size }}>
+                  <span 
+                    className="hidden md:inline" 
+                    style={{ 
+                      fontSize: currentBanner.title_font_size,
+                      color: currentBanner.title_color,
+                    }}
+                  >
                     {displayTitle}
                   </span>
                   {/* Mobile font size */}
-                  <span className="md:hidden">
+                  <span 
+                    className="md:hidden"
+                    style={{ 
+                      fontSize: getResponsiveFontSize(currentBanner.title_font_size, true),
+                      color: currentBanner.title_color,
+                    }}
+                  >
                     {displayTitle}
                   </span>
-                </motion.h2>
+                </motion.h1>
                 
                 <motion.p
                   initial={{ opacity: 0, y: 20 }}
