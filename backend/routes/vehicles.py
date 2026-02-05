@@ -65,7 +65,8 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     
     try:
         payload = jwt.decode(credentials.credentials, jwt_secret, algorithms=["HS256"])
-        user_id = payload.get("user_id")
+        # JWT uses 'sub' field for user_id
+        user_id = payload.get("sub") or payload.get("user_id")
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token")
         
@@ -74,8 +75,8 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             raise HTTPException(status_code=401, detail="User not found")
         
         return user
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+    except JWTError as e:
+        raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
 
 
 async def get_admin_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
