@@ -435,7 +435,7 @@ const SellerRegistrationPage = () => {
                         <li>Your application will be reviewed by our team</li>
                         <li>We may contact you for additional documentation</li>
                         <li>Approval typically takes 1-2 business days</li>
-                        <li>You'll be notified via email once approved</li>
+                        <li>You&apos;ll be notified via email once approved</li>
                       </ul>
                     </div>
                   </div>
@@ -444,7 +444,7 @@ const SellerRegistrationPage = () => {
                 {/* Agreement */}
                 <div className="bg-slate-50 rounded-lg p-4">
                   <p className="text-sm text-slate-600">
-                    By submitting this application, you agree to BidVex's seller terms and conditions, 
+                    By submitting this application, you agree to BidVex&apos;s seller terms and conditions, 
                     including compliance with all applicable vehicle sales regulations.
                   </p>
                 </div>
