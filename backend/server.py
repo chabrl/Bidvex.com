@@ -8982,6 +8982,21 @@ try:
 except ImportError as e:
     logger.warning(f"⚠️ Could not load modular routers: {e}")
 
+# ========== VEHICLE AUCTION MODULE (STANDALONE) ==========
+# Enterprise-grade vehicle auction system - completely separate from marketplace
+try:
+    from routes.vehicles import vehicle_router, set_vehicle_db
+    
+    # Inject database into vehicle router
+    set_vehicle_db(db)
+    
+    # Include vehicle router (already has /api prefix)
+    app.include_router(vehicle_router)
+    logger.info("✅ Vehicle Auction Module loaded (standalone)")
+    
+except ImportError as e:
+    logger.warning(f"⚠️ Could not load Vehicle Auction Module: {e}")
+
 
 # ========== ADMIN BANNER MANAGEMENT ENDPOINTS ==========
 
