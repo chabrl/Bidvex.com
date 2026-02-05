@@ -1,0 +1,715 @@
+/**
+ * Vehicle Admin Manager
+ * Admin panel for managing vehicle auction sellers and listings
+ */
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
+import axios from 'axios';
+import { toast } from 'sonner';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
+import { Button } from '../../components/ui/button';
+import { Badge } from '../../components/ui/badge';
+import { Input } from '../../components/ui/input';
+import { Textarea } from '../../components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '../../components/ui/dialog';
+import {
+  Car, User, Building2, Gavel, CheckCircle, XCircle, Clock,
+  Eye, FileText, Shield, AlertTriangle, Search, RefreshCw,
+  ChevronDown, ChevronUp, ExternalLink, Calendar, MapPin
+} from 'lucide-react';
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+const formatDate = (date) => {
+  if (!date) return 'N/A';
+  return new Date(date).toLocaleDateString('en-CA', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
+const formatPrice = (price) => {
+  return new Intl.NumberFormat('en-CA', {
+    style: 'currency',
+    currency: 'CAD',
+    minimumFractionDigits: 0,
+  }).format(price);
+};
+
+// Seller Card Component
+const SellerCard = ({ seller, onApprove, onReject, onViewDetails }) => {
+  const [expanded, setExpanded] = useState(false);
+  
+  const getSellerTypeIcon = (type) => {
+    switch (type) {
+      case 'dealer': return <Building2 className="h-5 w-5 text-green-600" />;
+      case 'auctioneer': return <Gavel className="h-5 w-5 text-purple-600" />;
+      default: return <User className="h-5 w-5 text-blue-600" />;
+    }
+  };
+  
+  const getStatusBadge = (status) => {
+    const configs = {
+      pending: { color: 'bg-yellow-500', label: 'Pending' },
+      under_review: { color: 'bg-blue-500', label: 'Under Review' },
+      approved: { color: 'bg-green-500', label: 'Approved' },
+      rejected: { color: 'bg-red-500', label: 'Rejected' },
+      suspended: { color: 'bg-orange-500', label: 'Suspended' },
+    };
+    const config = configs[status] || configs.pending;
+    return <Badge className={config.color}>{config.label}</Badge>;
+  };
+  
+  return (
+    <Card className="mb-4">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center">
+              {getSellerTypeIcon(seller.seller_type)}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-lg">
+                  {seller.business_name || seller.user?.full_name || 'Private Seller'}
+                </h3>
+                {getStatusBadge(seller.verification_status)}
+              </div>
+              <p className="text-sm text-slate-500">
+                {seller.user?.email} • Registered {formatDate(seller.created_at)}
+              </p>
+              <div className="flex items-center gap-4 mt-2">
+                <Badge variant="outline" className="capitalize">
+                  {seller.seller_type}
+                </Badge>
+                <span className="text-sm text-slate-500">
+                  Limit: {seller.monthly_listing_count}/{seller.monthly_listing_limit} this month
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setExpanded(!expanded)}>
+              {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+          </div>
+        </div>
+        
+        {expanded && (
+          <div className="mt-4 pt-4 border-t space-y-4">
+            {/* Business Details */}
+            {seller.seller_type !== 'private' && (
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                {seller.business_address && (
+                  <div>
+                    <p className="text-slate-500">Address</p>
+                    <p className="font-medium">{seller.business_address}</p>
+                  </div>
+                )}
+                {seller.business_phone && (
+                  <div>
+                    <p className="text-slate-500">Phone</p>
+                    <p className="font-medium">{seller.business_phone}</p>
+                  </div>
+                )}
+                {seller.license_number && (
+                  <div>
+                    <p className="text-slate-500">License #</p>
+                    <p className="font-medium">{seller.license_number} ({seller.license_province})</p>
+                  </div>
+                )}
+                {seller.tax_id && (
+                  <div>
+                    <p className="text-slate-500">Tax ID</p>
+                    <p className="font-medium">{seller.tax_id}</p>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Documents */}
+            {seller.documents?.length > 0 && (
+              <div>
+                <p className="text-sm text-slate-500 mb-2">Uploaded Documents</p>
+                <div className="flex flex-wrap gap-2">
+                  {seller.documents.map((doc, idx) => (
+                    <Badge key={idx} variant="outline" className="gap-1">
+                      <FileText className="h-3 w-3" />
+                      {doc.document_type.replace('_', ' ')}
+                      {doc.verified && <CheckCircle className="h-3 w-3 text-green-500" />}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Description */}
+            {seller.description && (
+              <div>
+                <p className="text-sm text-slate-500 mb-1">Description</p>
+                <p className="text-sm">{seller.description}</p>
+              </div>
+            )}
+            
+            {/* Stats */}
+            <div className="grid grid-cols-4 gap-4 text-center bg-slate-50 rounded-lg p-3">
+              <div>
+                <p className="text-xl font-bold">{seller.total_listings}</p>
+                <p className="text-xs text-slate-500">Total Listings</p>
+              </div>
+              <div>
+                <p className="text-xl font-bold">{seller.total_sold}</p>
+                <p className="text-xs text-slate-500">Sold</p>
+              </div>
+              <div>
+                <p className="text-xl font-bold">{formatPrice(seller.total_revenue || 0)}</p>
+                <p className="text-xs text-slate-500">Revenue</p>
+              </div>
+              <div>
+                <p className="text-xl font-bold">{seller.average_rating?.toFixed(1) || 'N/A'}</p>
+                <p className="text-xs text-slate-500">Rating</p>
+              </div>
+            </div>
+            
+            {/* Actions */}
+            {(seller.verification_status === 'pending' || seller.verification_status === 'under_review') && (
+              <div className="flex gap-2 pt-2">
+                <Button 
+                  onClick={() => onApprove(seller)}
+                  className="gap-2 bg-green-600 hover:bg-green-700"
+                >
+                  <CheckCircle className="h-4 w-4" /> Approve Seller
+                </Button>
+                <Button 
+                  variant="destructive"
+                  onClick={() => onReject(seller)}
+                  className="gap-2"
+                >
+                  <XCircle className="h-4 w-4" /> Reject
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+// Vehicle Listing Card Component
+const VehicleListingCard = ({ vehicle, onApprove, onReject, onView }) => {
+  const [expanded, setExpanded] = useState(false);
+  
+  const getStatusBadge = (status) => {
+    const configs = {
+      draft: { color: 'bg-slate-500', label: 'Draft' },
+      pending_approval: { color: 'bg-yellow-500', label: 'Pending Approval' },
+      approved: { color: 'bg-blue-500', label: 'Approved' },
+      active: { color: 'bg-green-500', label: 'Active' },
+      ended: { color: 'bg-slate-500', label: 'Ended' },
+      sold: { color: 'bg-purple-500', label: 'Sold' },
+      rejected: { color: 'bg-red-500', label: 'Rejected' },
+      cancelled: { color: 'bg-red-500', label: 'Cancelled' },
+    };
+    const config = configs[status] || configs.draft;
+    return <Badge className={config.color}>{config.label}</Badge>;
+  };
+  
+  const mainImage = vehicle.media?.find(m => m.category === 'front')?.url || 
+                    vehicle.media?.[0]?.url;
+  
+  return (
+    <Card className="mb-4 overflow-hidden">
+      <div className="flex">
+        {/* Thumbnail */}
+        <div className="w-48 h-32 bg-slate-100 flex-shrink-0">
+          {mainImage ? (
+            <img src={mainImage} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <Car className="h-12 w-12 text-slate-300" />
+            </div>
+          )}
+        </div>
+        
+        {/* Content */}
+        <CardContent className="flex-1 p-4">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold">
+                  {vehicle.year} {vehicle.make} {vehicle.model} {vehicle.trim || ''}
+                </h3>
+                {getStatusBadge(vehicle.status)}
+              </div>
+              <p className="text-sm text-slate-500 mt-1">
+                VIN: {vehicle.vin} • Submitted {formatDate(vehicle.created_at)}
+              </p>
+              <div className="flex items-center gap-4 mt-2 text-sm">
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-4 w-4 text-slate-400" />
+                  {vehicle.location_city}, {vehicle.location_province}
+                </span>
+                <span>Starting: {formatPrice(vehicle.starting_price)}</span>
+                {vehicle.reserve_price && (
+                  <span className="text-slate-500">Reserve: {formatPrice(vehicle.reserve_price)}</span>
+                )}
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={() => onView(vehicle)}>
+                <Eye className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setExpanded(!expanded)}>
+                {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </Button>
+            </div>
+          </div>
+          
+          {expanded && (
+            <div className="mt-4 pt-4 border-t space-y-4">
+              {/* Specs */}
+              <div className="grid grid-cols-4 gap-4 text-sm">
+                <div>
+                  <p className="text-slate-500">Mileage</p>
+                  <p className="font-medium">{vehicle.mileage?.toLocaleString()} km</p>
+                </div>
+                <div>
+                  <p className="text-slate-500">Title Status</p>
+                  <Badge className={vehicle.title_status === 'clean' ? 'bg-green-500' : 'bg-yellow-500'}>
+                    {vehicle.title_status}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-slate-500">Auction Type</p>
+                  <p className="font-medium capitalize">{vehicle.auction_type}</p>
+                </div>
+                <div>
+                  <p className="text-slate-500">Photos</p>
+                  <p className="font-medium">{vehicle.media?.length || 0} uploaded</p>
+                </div>
+              </div>
+              
+              {/* Condition Summary */}
+              <div className="bg-slate-50 rounded-lg p-3">
+                <p className="text-sm text-slate-500 mb-2">Condition Summary</p>
+                <div className="flex flex-wrap gap-2">
+                  {vehicle.condition_report?.is_running ? (
+                    <Badge className="bg-green-100 text-green-700">Running</Badge>
+                  ) : (
+                    <Badge className="bg-red-100 text-red-700">Non-Running</Badge>
+                  )}
+                  {vehicle.condition_report?.has_accident_history && (
+                    <Badge className="bg-yellow-100 text-yellow-700">Accident History</Badge>
+                  )}
+                  {vehicle.condition_report?.has_flood_damage && (
+                    <Badge className="bg-red-100 text-red-700">Flood Damage</Badge>
+                  )}
+                  {vehicle.condition_report?.has_fire_damage && (
+                    <Badge className="bg-red-100 text-red-700">Fire Damage</Badge>
+                  )}
+                </div>
+              </div>
+              
+              {/* Seller Info */}
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-slate-500">Seller:</span>
+                <Badge variant="outline" className="capitalize">
+                  {vehicle.seller?.seller_type || 'Unknown'}
+                </Badge>
+                <span>{vehicle.seller?.business_name || 'Private Seller'}</span>
+              </div>
+              
+              {/* Actions */}
+              {vehicle.status === 'pending_approval' && (
+                <div className="flex gap-2 pt-2">
+                  <Button 
+                    onClick={() => onApprove(vehicle)}
+                    className="gap-2 bg-green-600 hover:bg-green-700"
+                  >
+                    <CheckCircle className="h-4 w-4" /> Approve Listing
+                  </Button>
+                  <Button 
+                    variant="destructive"
+                    onClick={() => onReject(vehicle)}
+                    className="gap-2"
+                  >
+                    <XCircle className="h-4 w-4" /> Reject
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </div>
+    </Card>
+  );
+};
+
+// Main Component
+const VehicleAdminManager = () => {
+  const { token } = useAuth();
+  const [activeTab, setActiveTab] = useState('pending-sellers');
+  const [loading, setLoading] = useState(true);
+  const [pendingSellers, setPendingSellers] = useState([]);
+  const [pendingVehicles, setPendingVehicles] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Dialog states
+  const [rejectDialog, setRejectDialog] = useState({ open: false, item: null, type: null });
+  const [rejectReason, setRejectReason] = useState('');
+  
+  // Stats
+  const [stats, setStats] = useState({
+    pendingSellers: 0,
+    pendingVehicles: 0,
+    activeSellers: 0,
+    activeVehicles: 0,
+  });
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      // Fetch pending sellers
+      const sellersResp = await axios.get(`${API}/vehicle-admin/pending-sellers`, { headers });
+      setPendingSellers(sellersResp.data.sellers || []);
+      
+      // Fetch pending vehicles
+      const vehiclesResp = await axios.get(`${API}/vehicle-admin/pending-vehicles`, { headers });
+      setPendingVehicles(vehiclesResp.data.vehicles || []);
+      
+      // Fetch audit logs
+      const logsResp = await axios.get(`${API}/vehicle-admin/audit-logs?limit=50`, { headers });
+      setAuditLogs(logsResp.data.logs || []);
+      
+      // Update stats
+      setStats({
+        pendingSellers: sellersResp.data.sellers?.length || 0,
+        pendingVehicles: vehiclesResp.data.vehicles?.length || 0,
+      });
+      
+    } catch (error) {
+      console.error('Failed to fetch vehicle admin data:', error);
+      toast.error('Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const handleApproveSeller = async (seller) => {
+    try {
+      await axios.post(`${API}/vehicle-admin/sellers/${seller.id}/approve`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      toast.success(`Seller "${seller.business_name || 'Private Seller'}" approved`);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to approve seller');
+    }
+  };
+
+  const handleRejectSeller = async () => {
+    if (!rejectDialog.item || !rejectReason.trim()) {
+      toast.error('Please provide a rejection reason');
+      return;
+    }
+    
+    try {
+      await axios.post(`${API}/vehicle-admin/sellers/${rejectDialog.item.id}/reject?reason=${encodeURIComponent(rejectReason)}`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      toast.success('Seller rejected');
+      setRejectDialog({ open: false, item: null, type: null });
+      setRejectReason('');
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to reject seller');
+    }
+  };
+
+  const handleApproveVehicle = async (vehicle) => {
+    try {
+      await axios.post(`${API}/vehicle-admin/vehicles/${vehicle.id}/approve`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      toast.success(`Vehicle "${vehicle.year} ${vehicle.make} ${vehicle.model}" approved`);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to approve vehicle');
+    }
+  };
+
+  const handleRejectVehicle = async () => {
+    if (!rejectDialog.item || !rejectReason.trim()) {
+      toast.error('Please provide a rejection reason');
+      return;
+    }
+    
+    try {
+      await axios.post(`${API}/vehicle-admin/vehicles/${rejectDialog.item.id}/reject?reason=${encodeURIComponent(rejectReason)}`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      toast.success('Vehicle listing rejected');
+      setRejectDialog({ open: false, item: null, type: null });
+      setRejectReason('');
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to reject vehicle');
+    }
+  };
+
+  const openRejectDialog = (item, type) => {
+    setRejectDialog({ open: true, item, type });
+    setRejectReason('');
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6" data-testid="vehicle-admin-manager">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            <Car className="h-6 w-6" />
+            Vehicle Auction Administration
+          </h2>
+          <p className="text-slate-500 mt-1">
+            Manage vehicle sellers and listings
+          </p>
+        </div>
+        <Button onClick={fetchData} variant="outline" className="gap-2">
+          <RefreshCw className="h-4 w-4" /> Refresh
+        </Button>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <Clock className="h-5 w-5 text-yellow-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{stats.pendingSellers}</p>
+                <p className="text-sm text-slate-500">Pending Sellers</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Car className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{stats.pendingVehicles}</p>
+                <p className="text-sm text-slate-500">Pending Vehicles</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{pendingSellers.filter(s => s.verification_status === 'approved').length}</p>
+                <p className="text-sm text-slate-500">Approved Sellers</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                <Shield className="h-5 w-5 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{auditLogs.length}</p>
+                <p className="text-sm text-slate-500">Audit Entries</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="pending-sellers" className="gap-2">
+            <User className="h-4 w-4" />
+            Pending Sellers
+            {stats.pendingSellers > 0 && (
+              <Badge className="ml-1 bg-yellow-500">{stats.pendingSellers}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="pending-vehicles" className="gap-2">
+            <Car className="h-4 w-4" />
+            Pending Vehicles
+            {stats.pendingVehicles > 0 && (
+              <Badge className="ml-1 bg-yellow-500">{stats.pendingVehicles}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="audit-logs" className="gap-2">
+            <FileText className="h-4 w-4" />
+            Audit Logs
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Pending Sellers Tab */}
+        <TabsContent value="pending-sellers" className="mt-6">
+          {pendingSellers.length === 0 ? (
+            <Card className="p-12 text-center">
+              <CheckCircle className="h-16 w-16 text-green-300 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold mb-2">All Caught Up!</h3>
+              <p className="text-slate-500">No pending seller applications.</p>
+            </Card>
+          ) : (
+            <div>
+              {pendingSellers.map((seller) => (
+                <SellerCard
+                  key={seller.id}
+                  seller={seller}
+                  onApprove={handleApproveSeller}
+                  onReject={(s) => openRejectDialog(s, 'seller')}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Pending Vehicles Tab */}
+        <TabsContent value="pending-vehicles" className="mt-6">
+          {pendingVehicles.length === 0 ? (
+            <Card className="p-12 text-center">
+              <CheckCircle className="h-16 w-16 text-green-300 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold mb-2">All Caught Up!</h3>
+              <p className="text-slate-500">No pending vehicle listings.</p>
+            </Card>
+          ) : (
+            <div>
+              {pendingVehicles.map((vehicle) => (
+                <VehicleListingCard
+                  key={vehicle.id}
+                  vehicle={vehicle}
+                  onApprove={handleApproveVehicle}
+                  onReject={(v) => openRejectDialog(v, 'vehicle')}
+                  onView={(v) => window.open(`/vehicle-auctions/${v.id}`, '_blank')}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Audit Logs Tab */}
+        <TabsContent value="audit-logs" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Actions</CardTitle>
+              <CardDescription>Audit trail for vehicle module operations</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {auditLogs.length === 0 ? (
+                <p className="text-center text-slate-500 py-8">No audit logs available.</p>
+              ) : (
+                <div className="space-y-2">
+                  {auditLogs.map((log) => (
+                    <div 
+                      key={log.id}
+                      className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Badge variant="outline" className="capitalize">
+                          {log.entity_type}
+                        </Badge>
+                        <span className="font-medium">{log.action}</span>
+                        <span className="text-sm text-slate-500">
+                          by {log.performed_by_role}
+                        </span>
+                      </div>
+                      <span className="text-sm text-slate-400">
+                        {formatDate(log.created_at)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Rejection Dialog */}
+      <Dialog open={rejectDialog.open} onOpenChange={(open) => !open && setRejectDialog({ open: false, item: null, type: null })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              Reject {rejectDialog.type === 'seller' ? 'Seller Application' : 'Vehicle Listing'}
+            </DialogTitle>
+            <DialogDescription>
+              Please provide a reason for rejection. This will be visible to the {rejectDialog.type}.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 my-4">
+            <Textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Enter rejection reason..."
+              rows={4}
+            />
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectDialog({ open: false, item: null, type: null })}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={rejectDialog.type === 'seller' ? handleRejectSeller : handleRejectVehicle}
+              disabled={!rejectReason.trim()}
+            >
+              Reject
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default VehicleAdminManager;
