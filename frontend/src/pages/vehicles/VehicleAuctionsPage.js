@@ -215,6 +215,9 @@ const VehicleAuctionsPage = () => {
     province: searchParams.get('province') || '',
     sort_by: searchParams.get('sort_by') || 'end_time',
     sort_order: searchParams.get('sort_order') || 'asc',
+    auction_status: searchParams.get('auction_status') || '',
+    max_mileage: searchParams.get('max_mileage') || '',
+    transmission: searchParams.get('transmission') || '',
   });
   
   const [searchQuery, setSearchQuery] = useState('');
