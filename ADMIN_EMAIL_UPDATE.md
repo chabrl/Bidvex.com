@@ -35,7 +35,7 @@ Password: Admin123!
 ## Testing
 
 You can now log in to BidVex using the new admin credentials:
-- Live URL: https://auction-hub-65.preview.emergentagent.com
+- Live URL: https://title-style-debug.preview.emergentagent.com
 - Navigate to login page
 - Use the new credentials above
 

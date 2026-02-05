@@ -10,7 +10,7 @@ import json
 from datetime import datetime, timezone, timedelta
 
 # Configuration
-BASE_URL = "https://auction-hub-65.preview.emergentagent.com/api"
+BASE_URL = "https://title-style-debug.preview.emergentagent.com/api"
 ADMIN_EMAIL = "admin@bazario.com"
 ADMIN_PASSWORD = "Admin123!"
 
