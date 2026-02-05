@@ -29,9 +29,10 @@ import {
   DollarSign, ChevronLeft, ChevronRight, Shield, Award,
   AlertTriangle, FileText, Camera, CheckCircle, XCircle,
   User, Building2, Zap, TrendingUp, Eye, History, Gavel,
-  CreditCard, Lock, Info
+  CreditCard, Lock, Info, Calculator
 } from 'lucide-react';
 import useVehicleBidding from '../../hooks/useVehicleBidding';
+import { PricingEstimate } from '../../components/vehicles/PricingBreakdown';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
