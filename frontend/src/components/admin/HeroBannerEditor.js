@@ -296,8 +296,8 @@ const HeroBannerEditor = () => {
             <Button
               className="mt-4"
               style={{
-                backgroundColor: bannerForm.title_color || bannerForm.text_color,
-                color: bannerForm.overlay_color,
+                backgroundColor: bannerForm.button_color || '#FFFFFF',
+                color: bannerForm.button_text_color || '#000000',
               }}
             >
               {bannerForm.cta_text || 'Learn More'}
