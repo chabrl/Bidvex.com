@@ -8872,7 +8872,7 @@ async def update_hero_banner(
     allowed_fields = [
         "title", "subtitle", "image_desktop", "image_mobile", 
         "cta_text", "cta_link", 
-        "title_color", "subtitle_color", "text_color", 
+        "title_color", "subtitle_color", "button_color", "button_text_color", "text_color", 
         "font_family", "title_font_size", "subtitle_font_size",
         "overlay_color", "overlay_opacity",
         "active", "start_date", "end_date", "order"
