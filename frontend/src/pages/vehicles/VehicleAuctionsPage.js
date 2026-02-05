@@ -351,6 +351,36 @@ const VehicleAuctionsPage = () => {
               </SelectContent>
             </Select>
             
+            {/* Vehicle Make Filter */}
+            <Select value={filters.make} onValueChange={(v) => handleFilterChange('make', v)}>
+              <SelectTrigger className="w-36" data-testid="make-filter">
+                <SelectValue placeholder="Make" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Makes</SelectItem>
+                <SelectItem value="Toyota">Toyota</SelectItem>
+                <SelectItem value="Honda">Honda</SelectItem>
+                <SelectItem value="Ford">Ford</SelectItem>
+                <SelectItem value="Chevrolet">Chevrolet</SelectItem>
+                <SelectItem value="BMW">BMW</SelectItem>
+                <SelectItem value="Mercedes-Benz">Mercedes-Benz</SelectItem>
+                <SelectItem value="Audi">Audi</SelectItem>
+                <SelectItem value="Nissan">Nissan</SelectItem>
+                <SelectItem value="Hyundai">Hyundai</SelectItem>
+                <SelectItem value="Kia">Kia</SelectItem>
+                <SelectItem value="Volkswagen">Volkswagen</SelectItem>
+                <SelectItem value="Mazda">Mazda</SelectItem>
+                <SelectItem value="Subaru">Subaru</SelectItem>
+                <SelectItem value="Tesla">Tesla</SelectItem>
+                <SelectItem value="Jeep">Jeep</SelectItem>
+                <SelectItem value="RAM">RAM</SelectItem>
+                <SelectItem value="GMC">GMC</SelectItem>
+                <SelectItem value="Lexus">Lexus</SelectItem>
+                <SelectItem value="Acura">Acura</SelectItem>
+                <SelectItem value="Infiniti">Infiniti</SelectItem>
+              </SelectContent>
+            </Select>
+            
             {/* Body Type */}
             <Select value={filters.body_type} onValueChange={(v) => handleFilterChange('body_type', v)}>
               <SelectTrigger className="w-36">
