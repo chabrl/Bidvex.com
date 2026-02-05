@@ -82,6 +82,8 @@ const DEFAULT_BANNER = {
   image_mobile: '',
   cta_text: 'Learn More',
   cta_link: '/marketplace',
+  title_color: '#FFFFFF',
+  subtitle_color: '#FFFFFF',
   text_color: '#FFFFFF',
   font_family: 'Inter',
   title_font_size: '48px',
