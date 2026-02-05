@@ -261,58 +261,93 @@ const HeroBannerEditor = () => {
   const renderPreview = () => {
     const overlayRgba = hexToRgba(bannerForm.overlay_color, bannerForm.overlay_opacity);
     
+    // Get content based on preview language
+    const previewTitle = previewLang === 'fr' 
+      ? (bannerForm.title_fr || bannerForm.title_en || bannerForm.title || 'Titre de la bannière')
+      : (bannerForm.title_en || bannerForm.title || 'Banner Title');
+    const previewSubtitle = previewLang === 'fr'
+      ? (bannerForm.subtitle_fr || bannerForm.subtitle_en || bannerForm.subtitle || 'Texte de sous-titre ici')
+      : (bannerForm.subtitle_en || bannerForm.subtitle || 'Subtitle text goes here');
+    const previewCta = previewLang === 'fr'
+      ? (bannerForm.cta_text_fr || bannerForm.cta_text_en || bannerForm.cta_text || 'En savoir plus')
+      : (bannerForm.cta_text_en || bannerForm.cta_text || 'Learn More');
+    
     return (
-      <div className="relative w-full h-[300px] rounded-lg overflow-hidden bg-gray-100">
-        {/* Background Image */}
-        {bannerForm.image_desktop ? (
-          <img
-            src={bannerForm.image_desktop}
-            alt="Preview"
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-500" />
-        )}
-        
-        {/* Overlay */}
-        <div 
-          className="absolute inset-0"
-          style={{ backgroundColor: overlayRgba }}
-        />
-        
-        {/* Content */}
-        <div className="relative z-10 h-full flex items-center px-8">
-          <div className="max-w-2xl space-y-4">
-            <h2 
-              style={{
-                color: bannerForm.title_color || bannerForm.text_color,
-                fontFamily: bannerForm.font_family,
-                fontSize: bannerForm.title_font_size,
-                fontWeight: 'bold',
-                lineHeight: 1.2,
-              }}
-            >
-              {bannerForm.title || 'Banner Title'}
-            </h2>
-            <p
-              style={{
-                color: bannerForm.subtitle_color || bannerForm.text_color,
-                fontFamily: bannerForm.font_family,
-                fontSize: bannerForm.subtitle_font_size,
-                opacity: 0.9,
-              }}
-            >
-              {bannerForm.subtitle || 'Subtitle text goes here'}
-            </p>
+      <div className="space-y-3">
+        {/* Language Toggle for Preview */}
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-muted-foreground">Preview Language:</span>
+          <div className="flex gap-2">
             <Button
-              className="mt-4"
-              style={{
-                backgroundColor: bannerForm.button_color || '#FFFFFF',
-                color: bannerForm.button_text_color || '#000000',
-              }}
+              variant={previewLang === 'en' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setPreviewLang('en')}
             >
-              {bannerForm.cta_text || 'Learn More'}
+              🇬🇧 English
             </Button>
+            <Button
+              variant={previewLang === 'fr' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setPreviewLang('fr')}
+            >
+              🇫🇷 Français
+            </Button>
+          </div>
+        </div>
+        
+        {/* Preview Container */}
+        <div className="relative w-full h-[300px] rounded-lg overflow-hidden bg-gray-100">
+          {/* Background Image */}
+          {bannerForm.image_desktop ? (
+            <img
+              src={bannerForm.image_desktop}
+              alt="Preview"
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-500" />
+          )}
+          
+          {/* Overlay */}
+          <div 
+            className="absolute inset-0"
+            style={{ backgroundColor: overlayRgba }}
+          />
+          
+          {/* Content */}
+          <div className="relative z-10 h-full flex items-center px-8">
+            <div className="max-w-2xl space-y-4">
+              <h2 
+                style={{
+                  color: bannerForm.title_color,
+                  fontFamily: bannerForm.font_family,
+                  fontSize: bannerForm.title_font_size,
+                  fontWeight: 'bold',
+                  lineHeight: 1.2,
+                }}
+              >
+                {previewTitle}
+              </h2>
+              <p
+                style={{
+                  color: bannerForm.subtitle_color,
+                  fontFamily: bannerForm.font_family,
+                  fontSize: bannerForm.subtitle_font_size,
+                  opacity: 0.9,
+                }}
+              >
+                {previewSubtitle}
+              </p>
+              <Button
+                className="mt-4"
+                style={{
+                  backgroundColor: bannerForm.button_color,
+                  color: bannerForm.button_text_color,
+                }}
+              >
+                {previewCta}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
