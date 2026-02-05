@@ -356,7 +356,7 @@ const VehicleAuctionsPage = () => {
                 <SelectValue placeholder="Body Type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Types</SelectItem>
+                <SelectItem value="all">All Types</SelectItem>
                 <SelectItem value="sedan">Sedan</SelectItem>
                 <SelectItem value="suv">SUV</SelectItem>
                 <SelectItem value="truck">Truck</SelectItem>
@@ -371,7 +371,7 @@ const VehicleAuctionsPage = () => {
                 <SelectValue placeholder="Province" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Provinces</SelectItem>
+                <SelectItem value="all">All Provinces</SelectItem>
                 <SelectItem value="QC">Quebec</SelectItem>
                 <SelectItem value="ON">Ontario</SelectItem>
                 <SelectItem value="BC">British Columbia</SelectItem>
