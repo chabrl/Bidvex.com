@@ -336,6 +336,15 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
                 </p>
               </div>
               
+              {/* Pricing Breakdown */}
+              {user && bidAmount && parseFloat(bidAmount) > 0 && (
+                <PricingEstimate 
+                  vehicleId={vehicle?.id} 
+                  bidAmount={parseFloat(bidAmount)}
+                  province={vehicle?.location_province}
+                />
+              )}
+              
               {/* Deposit Notice */}
               {vehicle?.requires_deposit && !depositPaid && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
