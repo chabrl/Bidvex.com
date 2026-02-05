@@ -431,58 +431,97 @@ const HeroBannerEditor = () => {
 
             {/* Content Section */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Left Column - Content */}
+              {/* Left Column - Bilingual Content */}
               <div className="space-y-4">
                 <h4 className="font-semibold flex items-center gap-2 text-sm text-muted-foreground uppercase tracking-wide">
                   <Type className="h-4 w-4" />
-                  Content
+                  Content (Bilingual)
                 </h4>
                 
-                <div className="space-y-3">
+                {/* English Content */}
+                <div className="space-y-3 p-4 border rounded-lg bg-blue-50/50 dark:bg-blue-900/10">
+                  <div className="flex items-center gap-2 text-sm font-medium text-blue-700 dark:text-blue-300">
+                    🇬🇧 English
+                  </div>
                   <div>
-                    <Label htmlFor="title">Title *</Label>
+                    <Label htmlFor="title_en">Title (EN) *</Label>
                     <Input
-                      id="title"
-                      value={bannerForm.title}
-                      onChange={(e) => setBannerForm(prev => ({ ...prev, title: e.target.value }))}
+                      id="title_en"
+                      value={bannerForm.title_en}
+                      onChange={(e) => setBannerForm(prev => ({ ...prev, title_en: e.target.value, title: e.target.value }))}
                       placeholder="Discover. Bid. Win."
                       className="mt-1"
                     />
                   </div>
-                  
                   <div>
-                    <Label htmlFor="subtitle">Subtitle</Label>
+                    <Label htmlFor="subtitle_en">Subtitle (EN)</Label>
                     <Input
-                      id="subtitle"
-                      value={bannerForm.subtitle}
-                      onChange={(e) => setBannerForm(prev => ({ ...prev, subtitle: e.target.value }))}
+                      id="subtitle_en"
+                      value={bannerForm.subtitle_en}
+                      onChange={(e) => setBannerForm(prev => ({ ...prev, subtitle_en: e.target.value, subtitle: e.target.value }))}
                       placeholder="Experience the thrill of live auctions"
                       className="mt-1"
                     />
                   </div>
-                  
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label htmlFor="cta_text">Button Text</Label>
-                      <Input
-                        id="cta_text"
-                        value={bannerForm.cta_text}
-                        onChange={(e) => setBannerForm(prev => ({ ...prev, cta_text: e.target.value }))}
-                        placeholder="Learn More"
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="cta_link">Button Link</Label>
-                      <Input
-                        id="cta_link"
-                        value={bannerForm.cta_link}
-                        onChange={(e) => setBannerForm(prev => ({ ...prev, cta_link: e.target.value }))}
-                        placeholder="/marketplace"
-                        className="mt-1"
-                      />
-                    </div>
+                  <div>
+                    <Label htmlFor="cta_text_en">Button Text (EN)</Label>
+                    <Input
+                      id="cta_text_en"
+                      value={bannerForm.cta_text_en}
+                      onChange={(e) => setBannerForm(prev => ({ ...prev, cta_text_en: e.target.value, cta_text: e.target.value }))}
+                      placeholder="Learn More"
+                      className="mt-1"
+                    />
                   </div>
+                </div>
+
+                {/* French Content */}
+                <div className="space-y-3 p-4 border rounded-lg bg-red-50/50 dark:bg-red-900/10">
+                  <div className="flex items-center gap-2 text-sm font-medium text-red-700 dark:text-red-300">
+                    🇫🇷 Français
+                  </div>
+                  <div>
+                    <Label htmlFor="title_fr">Titre (FR) *</Label>
+                    <Input
+                      id="title_fr"
+                      value={bannerForm.title_fr}
+                      onChange={(e) => setBannerForm(prev => ({ ...prev, title_fr: e.target.value }))}
+                      placeholder="Découvrez. Enchérissez. Gagnez."
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="subtitle_fr">Sous-titre (FR)</Label>
+                    <Input
+                      id="subtitle_fr"
+                      value={bannerForm.subtitle_fr}
+                      onChange={(e) => setBannerForm(prev => ({ ...prev, subtitle_fr: e.target.value }))}
+                      placeholder="Vivez le frisson des enchères en direct"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="cta_text_fr">Texte du bouton (FR)</Label>
+                    <Input
+                      id="cta_text_fr"
+                      value={bannerForm.cta_text_fr}
+                      onChange={(e) => setBannerForm(prev => ({ ...prev, cta_text_fr: e.target.value }))}
+                      placeholder="En savoir plus"
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+                
+                {/* Button Link (same for both languages) */}
+                <div>
+                  <Label htmlFor="cta_link">Button Link (both languages)</Label>
+                  <Input
+                    id="cta_link"
+                    value={bannerForm.cta_link}
+                    onChange={(e) => setBannerForm(prev => ({ ...prev, cta_link: e.target.value }))}
+                    placeholder="/marketplace"
+                    className="mt-1"
+                  />
                 </div>
 
                 {/* Images */}
