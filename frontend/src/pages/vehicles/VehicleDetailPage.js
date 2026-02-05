@@ -403,7 +403,7 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <h4 className="font-semibold text-yellow-800 mb-2">As-Is, Where-Is</h4>
               <p className="text-sm text-yellow-700">
-                All vehicles are sold "As-Is, Where-Is" without warranty. 
+                All vehicles are sold &quot;As-Is, Where-Is&quot; without warranty. 
                 BidVex is not the seller and makes no guarantees about vehicle condition.
               </p>
             </div>
