@@ -9040,10 +9040,10 @@ async def delete_admin_banner(banner_id: str, current_user: User = Depends(get_c
 
 @api_router.get("/banners/active")
 async def get_active_banners():
-    """Get active banners for homepage display"""
+    """Get active banners for homepage display (supports both carousel and hero banners)"""
     now = datetime.now(timezone.utc).isoformat()
     
-    # Query for active banners within date range (or no date range)
+    # Query for active banners from banners collection
     query = {
         "is_active": True,
         "$or": [
@@ -9055,7 +9055,38 @@ async def get_active_banners():
     }
     
     banners = await db.banners.find(query, {"_id": 0}).sort("priority", -1).to_list(10)
-    return {"banners": banners}
+    
+    # Also query hero_banners collection for active banners
+    hero_query = {
+        "active": True,
+        "$or": [
+            {"start_date": None, "end_date": None},
+            {"start_date": None, "end_date": {"$gte": now}},
+            {"start_date": {"$lte": now}, "end_date": None},
+            {"start_date": {"$lte": now}, "end_date": {"$gte": now}}
+        ]
+    }
+    
+    hero_banners = await db.hero_banners.find(hero_query, {"_id": 0}).sort("order", 1).to_list(10)
+    
+    # Transform hero_banners to consistent format with styling
+    for banner in hero_banners:
+        # Map fields for consistency
+        banner["is_active"] = banner.get("active", True)
+        banner["image_url"] = banner.get("image_desktop") or banner.get("image_mobile")
+        banner["priority"] = banner.get("order", 0)
+        # Ensure styling fields have defaults
+        banner["text_color"] = banner.get("text_color", "#FFFFFF")
+        banner["font_family"] = banner.get("font_family", "Inter")
+        banner["title_font_size"] = banner.get("title_font_size", "48px")
+        banner["subtitle_font_size"] = banner.get("subtitle_font_size", "18px")
+        banner["overlay_color"] = banner.get("overlay_color", "#000000")
+        banner["overlay_opacity"] = banner.get("overlay_opacity", 0.4)
+    
+    # Combine both sources, prioritizing hero_banners
+    all_banners = hero_banners + banners
+    
+    return {"banners": all_banners, "hero_banners": hero_banners}
 
 
 # ========== PROMOTED LISTINGS ENDPOINTS ==========
