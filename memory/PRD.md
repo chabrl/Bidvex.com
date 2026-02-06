@@ -187,9 +187,10 @@ Implemented complete Enterprise Vehicle Auction Module (Phase 1-7):
 - `vehicle_bids` - Bidding records
 - `vehicle_bid_deposits` - Refundable deposits
 - `vehicle_invoices` - Buyer invoices & seller settlements
-- `seller_documents` - Uploaded verification documents (NEW)
-- `payment_transactions` - Stripe payment tracking (NEW)
-- `scheduler_logs` - Background job execution logs (NEW)
+- `seller_documents` - Uploaded verification documents
+- `payment_transactions` - Stripe payment tracking
+- `scheduler_logs` - Background job execution logs
+- `tax_reports` - CRA tax report storage (NEW)
 - `vehicle_legal_acceptances` - Terms acceptance audit
 - `vehicle_audit_logs` - Full admin audit trail
 - `vehicle_bid_deposits` - Refundable deposits
