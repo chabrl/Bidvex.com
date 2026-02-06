@@ -79,6 +79,29 @@ from services.scheduler import (
     get_scheduler_status,
     run_job_manually
 )
+from services.cra_tax_reporting import (
+    generate_gst_hst_report,
+    generate_qst_report,
+    generate_seller_payments_report,
+    generate_annual_summary,
+    get_tax_reports,
+    get_tax_report_by_id,
+    download_tax_report_xml,
+    TaxReportType
+)
+from services.pdf_invoice import (
+    generate_invoice_pdf,
+    generate_settlement_pdf
+)
+from services.email_notifications import (
+    send_document_approved_email,
+    send_document_rejected_email,
+    send_seller_approved_email,
+    send_invoice_created_email,
+    send_payment_confirmation_email,
+    send_auction_won_email,
+    send_auction_sold_email
+)
 
 logger = logging.getLogger(__name__)
 
