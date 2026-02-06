@@ -283,6 +283,40 @@ async def generate_vehicle_invoice(
     logger.info(f"Generated invoices for vehicle {vehicle_listing['id']}: "
                 f"Buyer={buyer_invoice['invoice_number']}, Seller={seller_invoice['invoice_number']}")
     
+    # Send email notifications
+    try:
+        from services.email_notifications import (
+            send_invoice_created_email,
+            send_auction_won_email,
+            send_auction_sold_email
+        )
+        
+        # Send invoice email to buyer
+        await send_invoice_created_email(buyer_invoice)
+        
+        # Send auction won email to buyer
+        await send_auction_won_email(
+            buyer_email=winner_user.get("email"),
+            buyer_name=winner_user.get("full_name", winner_user.get("email")),
+            vehicle_title=buyer_invoice["vehicle_title"],
+            final_price=float(buyer_pricing.hammer_price),
+            invoice_id=buyer_invoice["id"]
+        )
+        
+        # Send auction sold email to seller
+        await send_auction_sold_email(
+            seller_email=seller_user.get("email"),
+            seller_name=seller_user.get("full_name", seller_user.get("business_name", seller_user.get("email"))),
+            vehicle_title=seller_invoice["vehicle_title"],
+            final_price=float(seller_pricing.hammer_price),
+            commission=float(seller_pricing.seller_commission),
+            net_payout=float(seller_pricing.net_payout)
+        )
+        
+        logger.info(f"Sent invoice and auction notification emails for vehicle {vehicle_listing['id']}")
+    except Exception as e:
+        logger.error(f"Failed to send invoice emails: {e}")
+    
     return {
         "buyer_invoice": buyer_invoice,
         "seller_invoice": seller_invoice
