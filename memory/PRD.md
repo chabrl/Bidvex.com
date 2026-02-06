@@ -159,10 +159,14 @@ Implemented complete Enterprise Vehicle Auction Module (Phase 1-7):
 - `/app/backend/services/vehicle_pricing.py` - Fee & tax calculation engine
 - `/app/backend/services/vehicle_invoice.py` - Invoice generation service
 - `/app/backend/services/vehicle_auction_handler.py` - Auction end handler
-- `/app/backend/services/vehicle_payment.py` - Stripe payment integration (NEW)
-- `/app/backend/services/seller_documents.py` - Document upload service (NEW)
-- `/app/backend/services/scheduler.py` - Background job scheduler (NEW)
-- `/app/backend/routes/vehicles.py` - Full API router (60+ endpoints)
+- `/app/backend/services/vehicle_payment.py` - Stripe payment integration
+- `/app/backend/services/seller_documents.py` - Document upload service
+- `/app/backend/services/scheduler.py` - Background job scheduler
+- `/app/backend/services/cra_tax_reporting.py` - CRA tax XML report generator (NEW)
+- `/app/backend/services/pdf_invoice.py` - PDF invoice generation (NEW)
+- `/app/backend/services/email_notifications.py` - SendGrid email templates (NEW)
+- `/app/backend/routes/vehicles.py` - Full API router (70+ endpoints)
+- `/app/backend/routes/auth.py` - Auth routes (modular) (NEW)
 
 **Frontend Files Created:**
 - `/app/frontend/src/pages/vehicles/VehicleAuctionsPage.js` - Browse page
