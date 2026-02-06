@@ -292,6 +292,20 @@ async def approve_document(
         "created_at": now
     })
     
+    # Send email notification to user
+    try:
+        user = await db.users.find_one({"id": document.get("user_id")})
+        if user and user.get("email"):
+            from services.email_notifications import send_document_approved_email
+            await send_document_approved_email(
+                user_email=user["email"],
+                user_name=user.get("full_name", user.get("email")),
+                document_type=document.get("document_type")
+            )
+            logger.info(f"Sent document approval email to {user['email']}")
+    except Exception as e:
+        logger.error(f"Failed to send document approval email: {e}")
+    
     # Check if all required documents are approved
     await check_seller_verification_status(db, document["seller_id"])
     
