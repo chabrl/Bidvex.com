@@ -2061,3 +2061,279 @@ async def admin_run_scheduler_job(
     )
     
     return result
+
+
+# ============= CRA TAX REPORTING ENDPOINTS =============
+
+@vehicle_router.get("/vehicle-admin/tax-reports")
+async def admin_get_tax_reports(
+    report_type: str = None,
+    year: int = None,
+    limit: int = 20,
+    admin: dict = Depends(get_admin_user)
+):
+    """
+    Admin: Get list of generated tax reports
+    
+    Optional filters:
+    - report_type: gst_hst_summary, provincial_tax, annual_summary, seller_payments
+    - year: Tax year
+    """
+    reports = await get_tax_reports(db, report_type, year, limit)
+    return {
+        "count": len(reports),
+        "reports": reports
+    }
+
+
+@vehicle_router.get("/vehicle-admin/tax-reports/{report_id}")
+async def admin_get_tax_report(
+    report_id: str,
+    admin: dict = Depends(get_admin_user)
+):
+    """Admin: Get specific tax report with full details"""
+    report = await get_tax_report_by_id(db, report_id)
+    if not report:
+        raise HTTPException(status_code=404, detail="Tax report not found")
+    return report
+
+
+@vehicle_router.get("/vehicle-admin/tax-reports/{report_id}/download")
+async def admin_download_tax_report(
+    report_id: str,
+    admin: dict = Depends(get_admin_user)
+):
+    """Admin: Download tax report XML file"""
+    xml_content = await download_tax_report_xml(db, report_id)
+    if not xml_content:
+        raise HTTPException(status_code=404, detail="Tax report not found")
+    
+    from fastapi.responses import Response
+    
+    # Get report to build filename
+    report = await get_tax_report_by_id(db, report_id)
+    report_type = report.get("report_type", "tax")
+    year = report.get("year", datetime.now().year)
+    filename = f"bidvex_{report_type}_{year}_{report_id[:8]}.xml"
+    
+    await log_audit(
+        "tax_report", report_id, "downloaded",
+        admin["id"], "admin"
+    )
+    
+    return Response(
+        content=xml_content,
+        media_type="application/xml",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+@vehicle_router.post("/vehicle-admin/tax-reports/generate/gst-hst")
+async def admin_generate_gst_hst_report(
+    start_date: str,
+    end_date: str,
+    reporting_period: str = "quarterly",
+    admin: dict = Depends(get_admin_user)
+):
+    """
+    Admin: Generate GST/HST Summary Report for CRA filing
+    
+    This generates a GST34-compatible report with:
+    - Total taxable sales by province
+    - GST collected (5% federal)
+    - HST collected (ON 13%, Atlantic 15%)
+    - Provincial breakdown for audit
+    
+    Parameters:
+    - start_date: YYYY-MM-DD format
+    - end_date: YYYY-MM-DD format  
+    - reporting_period: monthly, quarterly, annual
+    """
+    try:
+        start = datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc)
+        end = datetime.fromisoformat(end_date).replace(hour=23, minute=59, second=59, tzinfo=timezone.utc)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+    
+    report = await generate_gst_hst_report(db, start, end, reporting_period)
+    
+    await log_audit(
+        "tax_report", report["report_id"], "generated",
+        admin["id"], "admin",
+        new_value={"type": "gst_hst_summary", "period": f"{start_date} to {end_date}"}
+    )
+    
+    return report
+
+
+@vehicle_router.post("/vehicle-admin/tax-reports/generate/qst")
+async def admin_generate_qst_report(
+    start_date: str,
+    end_date: str,
+    admin: dict = Depends(get_admin_user)
+):
+    """
+    Admin: Generate Quebec QST Report
+    
+    For Revenu Québec filing with:
+    - GST collected on QC transactions
+    - QST collected (9.975%)
+    - Transaction breakdown
+    """
+    try:
+        start = datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc)
+        end = datetime.fromisoformat(end_date).replace(hour=23, minute=59, second=59, tzinfo=timezone.utc)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+    
+    report = await generate_qst_report(db, start, end)
+    
+    await log_audit(
+        "tax_report", report["report_id"], "generated",
+        admin["id"], "admin",
+        new_value={"type": "qst", "period": f"{start_date} to {end_date}"}
+    )
+    
+    return report
+
+
+@vehicle_router.post("/vehicle-admin/tax-reports/generate/seller-payments")
+async def admin_generate_seller_payments_report(
+    year: int,
+    admin: dict = Depends(get_admin_user)
+):
+    """
+    Admin: Generate Annual Seller Payments Report (T5018-style)
+    
+    For CRA reporting of payments to sellers:
+    - Only includes sellers with payments >= $500
+    - Includes gross payments, commissions, net payouts
+    - Used for T5018 filing requirements
+    """
+    if year < 2020 or year > datetime.now().year:
+        raise HTTPException(status_code=400, detail="Invalid year")
+    
+    report = await generate_seller_payments_report(db, year)
+    
+    await log_audit(
+        "tax_report", report["report_id"], "generated",
+        admin["id"], "admin",
+        new_value={"type": "seller_payments", "year": year}
+    )
+    
+    return report
+
+
+@vehicle_router.post("/vehicle-admin/tax-reports/generate/annual-summary")
+async def admin_generate_annual_summary(
+    year: int,
+    admin: dict = Depends(get_admin_user)
+):
+    """
+    Admin: Generate Comprehensive Annual Tax Summary
+    
+    Complete year-end report with:
+    - All tax types (GST, HST, PST, QST)
+    - Monthly breakdown
+    - Total revenue and fees
+    - Platform performance metrics
+    """
+    if year < 2020 or year > datetime.now().year:
+        raise HTTPException(status_code=400, detail="Invalid year")
+    
+    report = await generate_annual_summary(db, year)
+    
+    await log_audit(
+        "tax_report", report["report_id"], "generated",
+        admin["id"], "admin",
+        new_value={"type": "annual_summary", "year": year}
+    )
+    
+    return report
+
+
+# ============= PDF INVOICE DOWNLOAD ENDPOINTS =============
+
+@vehicle_router.get("/vehicle-invoices/{invoice_id}/pdf")
+async def download_invoice_pdf(
+    invoice_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """
+    Download invoice as PDF
+    
+    Generates a professional PDF invoice with:
+    - Full BidVex branding
+    - Business Number (BN) and GST/HST registration numbers
+    - Complete line items with tax breakdown
+    - Payment status and deadline
+    - Subscription savings if applicable
+    """
+    # Verify user has access to this invoice
+    invoice = await get_invoice_by_id(db, invoice_id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    # Check access - buyer, seller, or admin
+    is_buyer = invoice.get("buyer_id") == user["id"]
+    is_seller = invoice.get("seller_id") == user["id"]
+    is_admin = user.get("role") in ["admin", "super_admin"]
+    
+    if not (is_buyer or is_seller or is_admin):
+        raise HTTPException(status_code=403, detail="Access denied to this invoice")
+    
+    # Generate PDF
+    pdf_bytes = await generate_invoice_pdf(db, invoice_id)
+    if not pdf_bytes:
+        raise HTTPException(status_code=500, detail="Failed to generate PDF")
+    
+    from fastapi.responses import Response
+    
+    filename = f"BidVex_Invoice_{invoice.get('invoice_number', invoice_id[:8])}.pdf"
+    
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+@vehicle_router.get("/vehicle-invoices/{invoice_id}/settlement-pdf")
+async def download_settlement_pdf(
+    invoice_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """
+    Download seller settlement statement as PDF
+    
+    For sellers to have a record of their payout breakdown
+    """
+    # Verify this is a seller settlement and user has access
+    invoice = await get_invoice_by_id(db, invoice_id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Settlement not found")
+    
+    if invoice.get("invoice_type") != "seller_settlement":
+        raise HTTPException(status_code=400, detail="This is not a settlement document")
+    
+    # Check access - seller or admin
+    is_seller = invoice.get("seller_id") == user["id"]
+    is_admin = user.get("role") in ["admin", "super_admin"]
+    
+    if not (is_seller or is_admin):
+        raise HTTPException(status_code=403, detail="Access denied to this settlement")
+    
+    # Generate PDF
+    pdf_bytes = await generate_settlement_pdf(db, invoice_id)
+    if not pdf_bytes:
+        raise HTTPException(status_code=500, detail="Failed to generate PDF")
+    
+    from fastapi.responses import Response
+    
+    filename = f"BidVex_Settlement_{invoice.get('invoice_number', invoice_id[:8])}.pdf"
+    
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
