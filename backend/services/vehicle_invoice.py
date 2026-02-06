@@ -426,6 +426,17 @@ async def process_invoice_payment(
         "created_at": now
     })
     
+    # Send payment confirmation email if fully paid
+    if new_status == InvoiceStatus.PAID and invoice["invoice_type"] == "buyer":
+        try:
+            from services.email_notifications import send_payment_confirmation_email
+            # Update invoice with paid_at for the email
+            updated_invoice = await db.vehicle_invoices.find_one({"id": invoice_id}, {"_id": 0})
+            await send_payment_confirmation_email(updated_invoice)
+            logger.info(f"Sent payment confirmation email for invoice {invoice_id}")
+        except Exception as e:
+            logger.error(f"Failed to send payment confirmation email: {e}")
+    
     return {
         "invoice_id": invoice_id,
         "payment_amount": payment_amount,
