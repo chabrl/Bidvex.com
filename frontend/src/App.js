@@ -236,6 +236,7 @@ const App = () => {
           } />
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
           <Route path="/terms-of-service" element={<TermsOfServicePage />} />
+          <Route path="/checkbox-demo" element={<CheckboxDemo />} />
           
           {/* Vehicle Auction Module (Standalone) */}
           <Route path="/vehicle-auctions" element={<VehicleAuctionsPage />} />
