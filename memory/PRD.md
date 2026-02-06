@@ -328,6 +328,23 @@ Implemented complete Enterprise Vehicle Auction Module (Phase 1-7):
 - `POST /api/vehicle-admin/bids/{id}/remove` - Remove bid (with audit)
 - `GET /api/vehicle-admin/audit-logs` - Get audit logs
 
+### CRA Tax Reports (NEW)
+- `GET /api/vehicle-admin/tax-reports` - List generated tax reports
+- `GET /api/vehicle-admin/tax-reports/{id}` - Get specific report details
+- `GET /api/vehicle-admin/tax-reports/{id}/download` - Download XML file
+- `POST /api/vehicle-admin/tax-reports/generate/gst-hst` - Generate GST/HST Summary (GST34)
+- `POST /api/vehicle-admin/tax-reports/generate/qst` - Generate Quebec QST Report
+- `POST /api/vehicle-admin/tax-reports/generate/seller-payments` - Generate T5018-style Report
+- `POST /api/vehicle-admin/tax-reports/generate/annual-summary` - Generate Annual Summary
+
+### PDF Invoice (NEW)
+- `GET /api/vehicle-invoices/{id}/pdf` - Download invoice as PDF
+- `GET /api/vehicle-invoices/{id}/settlement-pdf` - Download seller settlement PDF
+
+### Scheduler (NEW)
+- `GET /api/vehicle-admin/scheduler/status` - Get scheduler status and jobs
+- `POST /api/vehicle-admin/scheduler/run/{job_id}` - Manually trigger a job
+
 ### WebSocket
 - `WS /api/ws/vehicle/{id}` - Live auction updates
 
