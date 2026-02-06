@@ -1869,7 +1869,7 @@ async def stripe_webhook(request: Request):
 # ============= DOCUMENT UPLOAD ENDPOINTS =============
 
 @vehicle_router.post("/vehicle-documents/upload")
-async def upload_seller_document(
+async def upload_verification_document(
     document_type: str = Form(...),
     description: str = Form(None),
     file: UploadFile = File(...),
@@ -1882,7 +1882,7 @@ async def upload_seller_document(
     """
     # Validate document type
     try:
-        doc_type = DocumentType(document_type)
+        DocumentType(document_type)  # Validate the type
     except ValueError:
         raise HTTPException(
             status_code=400, 
