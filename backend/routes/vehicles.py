@@ -1396,7 +1396,7 @@ async def get_vehicle_pricing_estimate(
         try:
             user = await get_current_user(credentials)
             buyer_tier = user.get("subscription_tier", "basic")
-        except:
+        except Exception:
             pass
     
     # Get seller subscription tier
