@@ -1,22 +1,27 @@
 /**
- * Checkbox Demo Page - Shows all checkbox variants
+ * Checkbox Demo Page - Shows unified BidVex checkbox style
+ * 
+ * This demonstrates the single, standardized checkbox design
+ * used across the entire BidVex platform.
  */
 
 import React, { useState } from 'react';
-import { Checkbox, CheckboxCircle, CheckboxSmall } from '../components/ui/checkbox';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Checkbox } from '../components/ui/checkbox';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Label } from '../components/ui/label';
+import { Check, AlertCircle } from 'lucide-react';
 
 const CheckboxDemo = () => {
   const [checks, setChecks] = useState({
-    default1: false,
-    default2: true,
-    circle1: false,
-    circle2: true,
-    small1: false,
-    small2: true,
+    demo1: false,
+    demo2: true,
+    demo3: false,
     native1: false,
     native2: true,
+    terms: false,
+    newsletter: false,
+    dealer: true,
+    notifications: false,
   });
 
   const handleChange = (key) => {
@@ -26,99 +31,53 @@ const CheckboxDemo = () => {
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950 py-12">
       <div className="max-w-4xl mx-auto px-4">
-        <h1 className="text-3xl font-bold text-center mb-8 text-slate-900 dark:text-white">
-          Modern Checkbox Design Demo
-        </h1>
+        {/* Header */}
+        <div className="text-center mb-10">
+          <h1 className="text-3xl font-bold mb-3 text-slate-900 dark:text-white">
+            BidVex Unified Checkbox Design
+          </h1>
+          <p className="text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
+            Clean, modern, native checkbox appearance. One consistent style across the entire platform.
+          </p>
+        </div>
         
         <div className="grid md:grid-cols-2 gap-6">
-          {/* Default Checkbox */}
+          {/* Radix UI Checkbox (Component) */}
           <Card>
             <CardHeader>
-              <CardTitle>Default Rounded Checkbox</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Check className="w-5 h-5 text-blue-600" />
+                Component Checkbox
+              </CardTitle>
+              <CardDescription>
+                Using the Radix UI Checkbox component
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center space-x-3">
                 <Checkbox 
-                  id="default1" 
-                  checked={checks.default1}
-                  onCheckedChange={() => handleChange('default1')}
+                  id="demo1" 
+                  checked={checks.demo1}
+                  onCheckedChange={() => handleChange('demo1')}
                 />
-                <Label htmlFor="default1" className="cursor-pointer">
+                <Label htmlFor="demo1" className="cursor-pointer">
                   Unchecked state (click me!)
                 </Label>
               </div>
               <div className="flex items-center space-x-3">
                 <Checkbox 
-                  id="default2" 
-                  checked={checks.default2}
-                  onCheckedChange={() => handleChange('default2')}
+                  id="demo2" 
+                  checked={checks.demo2}
+                  onCheckedChange={() => handleChange('demo2')}
                 />
-                <Label htmlFor="default2" className="cursor-pointer">
-                  Checked state with gradient
+                <Label htmlFor="demo2" className="cursor-pointer">
+                  Checked state
                 </Label>
               </div>
               <div className="flex items-center space-x-3">
                 <Checkbox id="disabled" disabled />
-                <Label htmlFor="disabled" className="text-slate-400">
+                <Label htmlFor="disabled" className="text-slate-400 cursor-not-allowed">
                   Disabled state
-                </Label>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Circular Checkbox */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Circular Checkbox Variant</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <CheckboxCircle 
-                  id="circle1" 
-                  checked={checks.circle1}
-                  onCheckedChange={() => handleChange('circle1')}
-                />
-                <Label htmlFor="circle1" className="cursor-pointer">
-                  Unchecked circle
-                </Label>
-              </div>
-              <div className="flex items-center space-x-3">
-                <CheckboxCircle 
-                  id="circle2" 
-                  checked={checks.circle2}
-                  onCheckedChange={() => handleChange('circle2')}
-                />
-                <Label htmlFor="circle2" className="cursor-pointer">
-                  Checked with emerald color
-                </Label>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Small Checkbox */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Small Compact Checkbox</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <CheckboxSmall 
-                  id="small1" 
-                  checked={checks.small1}
-                  onCheckedChange={() => handleChange('small1')}
-                />
-                <Label htmlFor="small1" className="cursor-pointer text-sm">
-                  Small unchecked
-                </Label>
-              </div>
-              <div className="flex items-center space-x-3">
-                <CheckboxSmall 
-                  id="small2" 
-                  checked={checks.small2}
-                  onCheckedChange={() => handleChange('small2')}
-                />
-                <Label htmlFor="small2" className="cursor-pointer text-sm">
-                  Small checked
                 </Label>
               </div>
             </CardContent>
@@ -127,7 +86,13 @@ const CheckboxDemo = () => {
           {/* Native HTML Checkbox */}
           <Card>
             <CardHeader>
-              <CardTitle>Native HTML Checkbox (Styled)</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Check className="w-5 h-5 text-blue-600" />
+                Native HTML Checkbox
+              </CardTitle>
+              <CardDescription>
+                Standard HTML input with global CSS styling
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center space-x-3">
@@ -152,53 +117,179 @@ const CheckboxDemo = () => {
                   Native checked
                 </label>
               </div>
+              <div className="flex items-center space-x-3">
+                <input 
+                  type="checkbox" 
+                  id="nativeDisabled"
+                  disabled
+                />
+                <label htmlFor="nativeDisabled" className="text-slate-400 cursor-not-allowed">
+                  Disabled state
+                </label>
+              </div>
             </CardContent>
           </Card>
         </div>
+
+        {/* States Demo */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>All Checkbox States</CardTitle>
+            <CardDescription>
+              Consistent behavior across unchecked, checked, hover, focus, and disabled states
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="text-center">
+                <div className="flex justify-center mb-2">
+                  <Checkbox checked={false} />
+                </div>
+                <span className="text-sm text-slate-600 dark:text-slate-400">Unchecked</span>
+              </div>
+              <div className="text-center">
+                <div className="flex justify-center mb-2">
+                  <Checkbox checked={true} />
+                </div>
+                <span className="text-sm text-slate-600 dark:text-slate-400">Checked</span>
+              </div>
+              <div className="text-center">
+                <div className="flex justify-center mb-2">
+                  <Checkbox disabled />
+                </div>
+                <span className="text-sm text-slate-600 dark:text-slate-400">Disabled</span>
+              </div>
+              <div className="text-center">
+                <div className="flex justify-center mb-2">
+                  <Checkbox checked={true} disabled />
+                </div>
+                <span className="text-sm text-slate-600 dark:text-slate-400">Checked + Disabled</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Form Example */}
         <Card className="mt-6">
           <CardHeader>
             <CardTitle>Real Form Example</CardTitle>
+            <CardDescription>
+              How checkboxes appear in actual BidVex forms
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div className="flex items-start space-x-3">
-                <Checkbox id="terms" className="mt-1" />
+                <Checkbox 
+                  id="terms" 
+                  className="mt-0.5"
+                  checked={checks.terms}
+                  onCheckedChange={() => handleChange('terms')}
+                />
                 <div>
                   <Label htmlFor="terms" className="cursor-pointer font-medium">
                     Accept Terms & Conditions
                   </Label>
-                  <p className="text-sm text-slate-500 mt-1">
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                     By checking this box, you agree to our Terms of Service and Privacy Policy.
                   </p>
                 </div>
               </div>
               
               <div className="flex items-start space-x-3">
-                <Checkbox id="newsletter" className="mt-1" />
+                <Checkbox 
+                  id="newsletter" 
+                  className="mt-0.5"
+                  checked={checks.newsletter}
+                  onCheckedChange={() => handleChange('newsletter')}
+                />
                 <div>
                   <Label htmlFor="newsletter" className="cursor-pointer font-medium">
                     Subscribe to Newsletter
                   </Label>
-                  <p className="text-sm text-slate-500 mt-1">
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                     Receive updates about new features and auction opportunities.
                   </p>
                 </div>
               </div>
 
               <div className="flex items-start space-x-3">
-                <Checkbox id="seller" className="mt-1" defaultChecked />
+                <Checkbox 
+                  id="dealer" 
+                  className="mt-0.5"
+                  checked={checks.dealer}
+                  onCheckedChange={() => handleChange('dealer')}
+                />
                 <div>
-                  <Label htmlFor="seller" className="cursor-pointer font-medium">
+                  <Label htmlFor="dealer" className="cursor-pointer font-medium">
                     I am a licensed dealer
                   </Label>
-                  <p className="text-sm text-slate-500 mt-1">
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                     Check this if you hold a valid dealer license in your province.
                   </p>
                 </div>
               </div>
+
+              <div className="flex items-start space-x-3">
+                <input 
+                  type="checkbox" 
+                  id="notifications"
+                  className="mt-0.5"
+                  checked={checks.notifications}
+                  onChange={() => handleChange('notifications')}
+                />
+                <div>
+                  <label htmlFor="notifications" className="cursor-pointer font-medium block">
+                    Enable push notifications
+                  </label>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                    Get instant alerts for bids and auction updates.
+                  </p>
+                </div>
+              </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Design Specs */}
+        <Card className="mt-6 border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+              <AlertCircle className="w-5 h-5" />
+              Design Specifications
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2 text-sm text-slate-700 dark:text-slate-300">
+              <li className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-green-600" />
+                Square shape with 4px border radius
+              </li>
+              <li className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-green-600" />
+                18x18px size for optimal touch targets
+              </li>
+              <li className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-green-600" />
+                2px border in slate-400 (unchecked)
+              </li>
+              <li className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-green-600" />
+                Blue-600 fill when checked
+              </li>
+              <li className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-green-600" />
+                No gradients, shadows, or custom icons
+              </li>
+              <li className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-green-600" />
+                Transparent background (adapts to theme)
+              </li>
+              <li className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-green-600" />
+                WCAG 2.1 AA compliant contrast
+              </li>
+            </ul>
           </CardContent>
         </Card>
       </div>
