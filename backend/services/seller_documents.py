@@ -410,6 +410,20 @@ async def check_seller_verification_status(db, seller_id: str) -> Dict[str, Any]
         )
         
         logger.info(f"Seller {seller_id} documents fully verified")
+        
+        # Send seller approval email notification
+        try:
+            user = await db.users.find_one({"id": seller.get("user_id")})
+            if user and user.get("email"):
+                from services.email_notifications import send_seller_approved_email
+                await send_seller_approved_email(
+                    user_email=user["email"],
+                    user_name=user.get("full_name", user.get("email")),
+                    seller_type=seller_type
+                )
+                logger.info(f"Sent seller approval email to {user['email']}")
+        except Exception as e:
+            logger.error(f"Failed to send seller approval email: {e}")
     
     return {
         "seller_id": seller_id,
