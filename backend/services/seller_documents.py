@@ -351,6 +351,21 @@ async def reject_document(
         "created_at": now
     })
     
+    # Send email notification to user
+    try:
+        user = await db.users.find_one({"id": document.get("user_id")})
+        if user and user.get("email"):
+            from services.email_notifications import send_document_rejected_email
+            await send_document_rejected_email(
+                user_email=user["email"],
+                user_name=user.get("full_name", user.get("email")),
+                document_type=document.get("document_type"),
+                rejection_reason=reason
+            )
+            logger.info(f"Sent document rejection email to {user['email']}")
+    except Exception as e:
+        logger.error(f"Failed to send document rejection email: {e}")
+    
     return await get_document_by_id(db, document_id)
 
 
