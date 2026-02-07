@@ -379,9 +379,6 @@ async def register_vehicle_seller(
     NOTE: Registration is allowed even when listing is disabled,
     but actual listing will be blocked until permits are obtained.
     """
-    # Check system status - inform user about current state
-    settings = await get_system_settings()
-    
     # Check if already registered
     existing = await db.vehicle_sellers.find_one({"user_id": user["id"]})
     if existing:
