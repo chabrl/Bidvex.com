@@ -472,7 +472,7 @@ const VehicleAuctionsPage = () => {
                         <SelectValue placeholder="Select Make" />
                       </div>
                     </SelectTrigger>
-                    <SelectContent className="max-h-80 bg-white dark:bg-slate-900">
+                    <SelectContent className="max-h-80 bg-slate-900 border-slate-700">
                       <SelectItem value="all">
                         <span className="flex items-center gap-2">
                           <span className="text-lg">🚗</span> All Makes
