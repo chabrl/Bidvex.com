@@ -184,6 +184,168 @@ async def log_audit(entity_type: str, entity_id: str, action: str,
     await db.vehicle_audit_logs.insert_one(audit)
 
 
+# ============= SYSTEM STATUS & ADMIN CONTROLS =============
+
+# Default system settings - Vehicle auctions are DISABLED until permits obtained
+DEFAULT_SYSTEM_SETTINGS = {
+    "vehicle_auctions_enabled": False,  # MUST be False by default - Admin only activation
+    "vehicle_listing_enabled": False,   # Permanently disabled for all users
+    "vehicle_bidding_enabled": False,   # Disabled until auctions enabled
+    "updated_at": None,
+    "updated_by": None
+}
+
+async def get_system_settings():
+    """Get current system settings for vehicle auctions"""
+    settings = await db.vehicle_system_settings.find_one({"_id": "vehicle_settings"})
+    if not settings:
+        # Initialize with defaults (all disabled)
+        await db.vehicle_system_settings.insert_one({
+            "_id": "vehicle_settings",
+            **DEFAULT_SYSTEM_SETTINGS,
+            "created_at": datetime.now(timezone.utc)
+        })
+        return DEFAULT_SYSTEM_SETTINGS
+    
+    # Remove _id from response
+    settings.pop("_id", None)
+    return settings
+
+
+@vehicle_router.get("/vehicles/system/status")
+async def get_vehicle_system_status():
+    """
+    Get current vehicle auction system status
+    
+    Public endpoint - no auth required
+    Returns whether vehicle auctions are enabled
+    """
+    settings = await get_system_settings()
+    return {
+        "vehicle_auctions_enabled": settings.get("vehicle_auctions_enabled", False),
+        "vehicle_listing_enabled": settings.get("vehicle_listing_enabled", False),
+        "vehicle_bidding_enabled": settings.get("vehicle_bidding_enabled", False),
+        "discovery_mode": not settings.get("vehicle_auctions_enabled", False),
+        "message": "Vehicle auctions are currently in discovery mode" if not settings.get("vehicle_auctions_enabled", False) else "Vehicle auctions are active"
+    }
+
+
+@vehicle_router.post("/vehicle-admin/system/toggle-auctions")
+async def admin_toggle_vehicle_auctions(
+    enabled: bool,
+    admin: dict = Depends(get_admin_user)
+):
+    """
+    Admin only: Enable or disable vehicle auctions system-wide
+    
+    When disabled:
+    - No vehicle auctions can go live
+    - No bids can be placed
+    - No vehicle listings can be activated
+    - Discovery/browse mode only
+    
+    IMPORTANT: This is the ONLY way to enable vehicle auctions
+    """
+    now = datetime.now(timezone.utc)
+    
+    # Get current settings for audit log
+    current_settings = await get_system_settings()
+    
+    # Update settings
+    await db.vehicle_system_settings.update_one(
+        {"_id": "vehicle_settings"},
+        {
+            "$set": {
+                "vehicle_auctions_enabled": enabled,
+                "vehicle_bidding_enabled": enabled,  # Bidding follows auction status
+                # Note: vehicle_listing_enabled stays False - separate control
+                "updated_at": now,
+                "updated_by": admin["id"]
+            }
+        },
+        upsert=True
+    )
+    
+    # Log audit
+    await log_audit(
+        "system_settings", "vehicle_settings", 
+        "auctions_enabled" if enabled else "auctions_disabled",
+        admin["id"], "admin",
+        old_value={"vehicle_auctions_enabled": current_settings.get("vehicle_auctions_enabled", False)},
+        new_value={"vehicle_auctions_enabled": enabled}
+    )
+    
+    logger.info(f"Admin {admin['id']} {'enabled' if enabled else 'disabled'} vehicle auctions")
+    
+    return {
+        "success": True,
+        "vehicle_auctions_enabled": enabled,
+        "vehicle_bidding_enabled": enabled,
+        "vehicle_listing_enabled": False,  # Always report this as disabled
+        "message": f"Vehicle auctions have been {'enabled' if enabled else 'disabled'}",
+        "updated_at": now.isoformat()
+    }
+
+
+@vehicle_router.post("/vehicle-admin/system/toggle-listing")
+async def admin_toggle_vehicle_listing(
+    enabled: bool,
+    admin: dict = Depends(get_admin_user)
+):
+    """
+    Admin only: Enable or disable vehicle listing capability
+    
+    When disabled (default):
+    - No users can create vehicle listings
+    - No vehicle auctions can be submitted
+    - This is a separate control from auction viewing
+    
+    IMPORTANT: This should remain OFF until all permits are approved
+    """
+    now = datetime.now(timezone.utc)
+    
+    # Get current settings for audit log
+    current_settings = await get_system_settings()
+    
+    # Update settings
+    await db.vehicle_system_settings.update_one(
+        {"_id": "vehicle_settings"},
+        {
+            "$set": {
+                "vehicle_listing_enabled": enabled,
+                "updated_at": now,
+                "updated_by": admin["id"]
+            }
+        },
+        upsert=True
+    )
+    
+    # Log audit
+    await log_audit(
+        "system_settings", "vehicle_settings", 
+        "listing_enabled" if enabled else "listing_disabled",
+        admin["id"], "admin",
+        old_value={"vehicle_listing_enabled": current_settings.get("vehicle_listing_enabled", False)},
+        new_value={"vehicle_listing_enabled": enabled}
+    )
+    
+    logger.info(f"Admin {admin['id']} {'enabled' if enabled else 'disabled'} vehicle listing")
+    
+    return {
+        "success": True,
+        "vehicle_listing_enabled": enabled,
+        "message": f"Vehicle listing has been {'enabled' if enabled else 'disabled'}",
+        "updated_at": now.isoformat()
+    }
+
+
+@vehicle_router.get("/vehicle-admin/system/settings")
+async def admin_get_system_settings(admin: dict = Depends(get_admin_user)):
+    """Admin only: Get all system settings"""
+    settings = await get_system_settings()
+    return settings
+
+
 # ============= VIN DECODER ENDPOINT =============
 
 @vehicle_router.get("/vehicles/decode-vin/{vin}")
