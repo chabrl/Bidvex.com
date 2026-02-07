@@ -351,40 +351,22 @@ const VehicleAuctionsPage = () => {
             </div>
           </div>
           
-          {/* Seller CTA Buttons */}
-          <div className="flex flex-wrap gap-4 mt-8 pt-6 border-t border-white/20">
-            <Button 
-              size="lg"
-              onClick={() => navigate('/vehicle-auctions/seller/register')}
-              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
-              data-testid="become-seller-btn"
-            >
-              <DollarSign className="h-5 w-5 mr-2" />
-              Sell Your Vehicle
-            </Button>
-            {user && (
-              <>
-                <Button 
-                  size="lg"
-                  onClick={() => navigate('/vehicle-auctions/my-listings')}
-                  className="bg-white/10 border border-white/30 text-white hover:bg-white/20"
-                  data-testid="my-listings-btn"
-                >
-                  <Car className="h-5 w-5 mr-2" />
-                  My Listings
-                </Button>
-                <Button 
-                  size="lg"
-                  onClick={() => navigate('/vehicle-auctions/invoices')}
-                  className="bg-white/10 border border-white/30 text-white hover:bg-white/20"
-                  data-testid="my-invoices-btn"
-                >
-                  <FileText className="h-5 w-5 mr-2" />
-                  My Invoices
-                </Button>
-              </>
-            )}
-          </div>
+          {/* System Status Notice - View Only Mode */}
+          {!vehicleAuctionsEnabled && (
+            <div className="mt-6 p-4 bg-amber-500/20 border border-amber-500/40 rounded-xl">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-amber-500/30 rounded-full flex items-center justify-center">
+                  <Eye className="h-5 w-5 text-amber-300" />
+                </div>
+                <div>
+                  <h4 className="text-amber-200 font-semibold">Discovery Mode</h4>
+                  <p className="text-amber-300/80 text-sm">
+                    Vehicle auctions are currently in preview mode. Browse and discover vehicles while we finalize permits.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
