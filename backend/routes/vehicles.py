@@ -553,7 +553,17 @@ async def create_vehicle_listing(
     """
     Create a new vehicle listing
     Enforces seller limits and requires minimum media
+    
+    BLOCKED when vehicle_listing_enabled is False (default)
     """
+    # CRITICAL: Check if vehicle listing is enabled system-wide
+    settings = await get_system_settings()
+    if not settings.get("vehicle_listing_enabled", False):
+        raise HTTPException(
+            status_code=403,
+            detail="Vehicle listing is currently disabled. Vehicle auctions are pending permit approval. Please check back later."
+        )
+    
     # Check seller limits
     current_month = datetime.now(timezone.utc).strftime("%Y-%m")
     
