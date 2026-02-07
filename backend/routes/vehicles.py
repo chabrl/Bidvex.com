@@ -1281,7 +1281,16 @@ async def approve_vehicle(
     vehicle_id: str,
     admin: dict = Depends(get_admin_user)
 ):
-    """Approve vehicle listing"""
+    """
+    Approve vehicle listing
+    
+    NOTE: Admin can still approve vehicles even when auctions are paused.
+    This allows pre-approval before system goes live.
+    However, the vehicle won't become ACTIVE until auctions are enabled.
+    """
+    # Check if auctions are enabled - warn but don't block admin
+    settings = await get_system_settings()
+    
     listing = await db.vehicle_listings.find_one({"id": vehicle_id})
     if not listing:
         raise HTTPException(status_code=404, detail="Vehicle not found")
@@ -1291,13 +1300,18 @@ async def approve_vehicle(
     
     old_status = listing["status"]
     
-    # Set to active if start time has passed, otherwise approved
+    # Set to active if start time has passed AND auctions are enabled, otherwise approved
     now = datetime.now(timezone.utc)
     start_time = listing["start_time"]
     if isinstance(start_time, str):
         start_time = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
     
-    new_status = VehicleListingStatus.ACTIVE.value if now >= start_time else VehicleListingStatus.APPROVED.value
+    # Only set to ACTIVE if auctions are enabled AND time has passed
+    auctions_enabled = settings.get("vehicle_auctions_enabled", False)
+    if auctions_enabled and now >= start_time:
+        new_status = VehicleListingStatus.ACTIVE.value
+    else:
+        new_status = VehicleListingStatus.APPROVED.value
     
     await db.vehicle_listings.update_one(
         {"id": vehicle_id},
@@ -1318,7 +1332,13 @@ async def approve_vehicle(
         new_value={"status": new_status}
     )
     
-    return {"message": "Vehicle approved", "new_status": new_status}
+    response = {"message": "Vehicle approved", "new_status": new_status}
+    
+    # Add warning if auctions are paused
+    if not auctions_enabled:
+        response["warning"] = "Vehicle auctions are currently paused. Listing will not go live until system is enabled by admin."
+    
+    return response
 
 
 @vehicle_router.post("/vehicle-admin/vehicles/{vehicle_id}/reject")
