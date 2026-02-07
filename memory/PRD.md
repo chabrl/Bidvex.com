@@ -23,7 +23,30 @@ Email: SendGrid
 Background Jobs: APScheduler
 ```
 
-## Current Status: ✅ VEHICLE AUCTION MODULE COMPLETE (ALL PHASES + FINANCIAL ENGINE + AUTOMATION + CRA TAX REPORTING)
+## Current Status: ✅ VEHICLE AUCTION MODULE COMPLETE (ALL PHASES + DISCOVERY MODE)
+
+### Session Summary (Feb 7, 2026)
+Implemented Vehicle Discovery Mode with admin controls:
+
+**Vehicle Discovery Mode: ✅**
+- System flag `vehicle_auctions_enabled` defaults to FALSE
+- All vehicle listing blocked when `vehicle_listing_enabled` is FALSE
+- All vehicle bidding blocked when `vehicle_bidding_enabled` is FALSE
+- Admin-only toggle controls in VehicleAdminManager
+- Discovery Mode banner on Vehicle Auctions page
+- Removed all "Sell Your Vehicle" / listing CTAs
+
+**UI Fixes: ✅**
+- Fixed white background on filter dropdowns (now `bg-slate-900`)
+- All SelectContent components use dark theme styling
+- Filter pills and buttons no longer have white overlays
+
+**Admin Controls Added:**
+- `GET /api/vehicles/system/status` - Public endpoint for system status
+- `POST /api/vehicle-admin/system/toggle-auctions` - Enable/disable auctions
+- `POST /api/vehicle-admin/system/toggle-listing` - Enable/disable listing
+- `GET /api/vehicle-admin/system/settings` - Get all system settings
+- New "System Settings" tab as default in Vehicle Admin panel
 
 ### Session Summary (Feb 6, 2026) - Part 2
 Standardized all checkboxes across the BidVex platform:
