@@ -563,7 +563,7 @@ const VehicleAuctionsPage = () => {
                     <SelectTrigger className="w-full h-12 bg-transparent border-2 border-slate-200 dark:border-slate-700 hover:border-blue-400 rounded-xl" data-testid="sort-select">
                       <SelectValue placeholder="Sort by" />
                     </SelectTrigger>
-                    <SelectContent className="bg-white dark:bg-slate-900">
+                    <SelectContent className="bg-slate-900 border-slate-700">
                       <SelectItem value="end_time">⏰ Ending Soon</SelectItem>
                       <SelectItem value="created_at">✨ Newest Listed</SelectItem>
                       <SelectItem value="current_bid">💰 Price: Low → High</SelectItem>
