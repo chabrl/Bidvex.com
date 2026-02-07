@@ -540,7 +540,7 @@ const VehicleAuctionsPage = () => {
                         <SelectValue placeholder="Province" />
                       </div>
                     </SelectTrigger>
-                    <SelectContent className="bg-white dark:bg-slate-900">
+                    <SelectContent className="bg-slate-900 border-slate-700">
                       <SelectItem value="all">All Provinces</SelectItem>
                       <SelectItem value="ON">🍁 Ontario</SelectItem>
                       <SelectItem value="QC">⚜️ Quebec</SelectItem>
