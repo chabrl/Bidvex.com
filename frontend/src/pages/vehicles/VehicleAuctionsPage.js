@@ -668,7 +668,7 @@ const VehicleAuctionsPage = () => {
                             <SelectTrigger className="h-10 bg-transparent border-2 border-slate-200 dark:border-slate-700 rounded-xl">
                               <SelectValue placeholder="Any" />
                             </SelectTrigger>
-                            <SelectContent className="bg-white dark:bg-slate-900">
+                            <SelectContent className="bg-slate-900 border-slate-700">
                               <SelectItem value="all">Any Mileage</SelectItem>
                               <SelectItem value="25000">Under 25,000 km</SelectItem>
                               <SelectItem value="50000">Under 50,000 km</SelectItem>
