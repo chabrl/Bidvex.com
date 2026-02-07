@@ -514,7 +514,7 @@ const VehicleAuctionsPage = () => {
                     <SelectTrigger className="w-full h-12 bg-transparent border-2 border-slate-200 dark:border-slate-700 hover:border-blue-400 rounded-xl">
                       <SelectValue placeholder="All Types" />
                     </SelectTrigger>
-                    <SelectContent className="bg-white dark:bg-slate-900">
+                    <SelectContent className="bg-slate-900 border-slate-700">
                       <SelectItem value="all">All Types</SelectItem>
                       <SelectItem value="sedan">🚗 Sedan</SelectItem>
                       <SelectItem value="suv">🚙 SUV / Crossover</SelectItem>
