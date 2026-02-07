@@ -61,7 +61,7 @@ class TestAdminToggleEndpoints:
         })
         if response.status_code != 200:
             pytest.skip(f"Admin login failed: {response.status_code}")
-        return response.json().get("token")
+        return response.json().get("access_token")
     
     @pytest.fixture
     def admin_headers(self, admin_token):
@@ -165,7 +165,7 @@ class TestBiddingBlockedWhenDisabled:
         })
         if response.status_code != 200:
             pytest.skip(f"Admin login failed: {response.status_code}")
-        return response.json().get("token")
+        return response.json().get("access_token")
     
     @pytest.fixture
     def admin_headers(self, admin_token):
@@ -218,7 +218,7 @@ class TestListingBlockedWhenDisabled:
         })
         if response.status_code != 200:
             pytest.skip(f"Admin login failed: {response.status_code}")
-        return response.json().get("token")
+        return response.json().get("access_token")
     
     @pytest.fixture
     def admin_headers(self, admin_token):
@@ -303,7 +303,7 @@ class TestDiscoveryModeIntegration:
         })
         if response.status_code != 200:
             pytest.skip(f"Admin login failed: {response.status_code}")
-        return response.json().get("token")
+        return response.json().get("access_token")
     
     @pytest.fixture
     def admin_headers(self, admin_token):
@@ -369,7 +369,7 @@ class TestCleanup:
         })
         if response.status_code != 200:
             pytest.skip(f"Admin login failed: {response.status_code}")
-        return response.json().get("token")
+        return response.json().get("access_token")
     
     @pytest.fixture
     def admin_headers(self, admin_token):
