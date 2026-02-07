@@ -652,6 +652,143 @@ const VehicleAdminManager = () => {
           </TabsTrigger>
         </TabsList>
 
+        {/* System Settings Tab */}
+        <TabsContent value="system-settings" className="mt-6">
+          <div className="grid gap-6">
+            {/* System Status Overview */}
+            <Card className={`border-2 ${systemSettings.vehicle_auctions_enabled ? 'border-green-500 bg-green-50 dark:bg-green-950/20' : 'border-amber-500 bg-amber-50 dark:bg-amber-950/20'}`}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  {systemSettings.vehicle_auctions_enabled ? (
+                    <CheckCircle className="h-6 w-6 text-green-600" />
+                  ) : (
+                    <AlertTriangle className="h-6 w-6 text-amber-600" />
+                  )}
+                  Vehicle Auction System Status
+                </CardTitle>
+                <CardDescription>
+                  {systemSettings.vehicle_auctions_enabled 
+                    ? 'Vehicle auctions are LIVE. Users can browse, bid, and interact with auctions.'
+                    : 'Vehicle auctions are in DISCOVERY MODE. Users can browse but cannot list or bid.'}
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            {/* Auction Controls */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Enable Vehicle Auctions</CardTitle>
+                <CardDescription>
+                  Master switch to enable/disable all vehicle auction functionality.
+                  When OFF, the platform operates in discovery-only mode.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${systemSettings.vehicle_auctions_enabled ? 'bg-green-100' : 'bg-slate-200'}`}>
+                      <Gavel className={`h-6 w-6 ${systemSettings.vehicle_auctions_enabled ? 'text-green-600' : 'text-slate-400'}`} />
+                    </div>
+                    <div>
+                      <p className="font-semibold">Vehicle Auctions</p>
+                      <p className="text-sm text-slate-500">
+                        {systemSettings.vehicle_auctions_enabled ? 'Auctions are LIVE' : 'Auctions are PAUSED'}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => toggleVehicleAuctions(!systemSettings.vehicle_auctions_enabled)}
+                    disabled={settingsLoading}
+                    className={systemSettings.vehicle_auctions_enabled 
+                      ? 'bg-red-600 hover:bg-red-700' 
+                      : 'bg-green-600 hover:bg-green-700'}
+                  >
+                    {settingsLoading ? (
+                      <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                    ) : null}
+                    {systemSettings.vehicle_auctions_enabled ? 'Disable Auctions' : 'Enable Auctions'}
+                  </Button>
+                </div>
+
+                {/* Bidding Status */}
+                <div className="flex items-center justify-between p-4 mt-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${systemSettings.vehicle_bidding_enabled ? 'bg-blue-100' : 'bg-slate-200'}`}>
+                      <Car className={`h-6 w-6 ${systemSettings.vehicle_bidding_enabled ? 'text-blue-600' : 'text-slate-400'}`} />
+                    </div>
+                    <div>
+                      <p className="font-semibold">Vehicle Bidding</p>
+                      <p className="text-sm text-slate-500">
+                        {systemSettings.vehicle_bidding_enabled ? 'Users CAN place bids' : 'Bidding is BLOCKED'}
+                      </p>
+                    </div>
+                  </div>
+                  <Badge className={systemSettings.vehicle_bidding_enabled ? 'bg-green-500' : 'bg-slate-400'}>
+                    {systemSettings.vehicle_bidding_enabled ? 'Enabled' : 'Disabled'}
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Listing Controls */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Enable Vehicle Listing</CardTitle>
+                <CardDescription>
+                  Controls whether users can create new vehicle listings.
+                  This is separate from auction viewing. Keep OFF until permits are approved.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${systemSettings.vehicle_listing_enabled ? 'bg-green-100' : 'bg-red-100'}`}>
+                      <FileText className={`h-6 w-6 ${systemSettings.vehicle_listing_enabled ? 'text-green-600' : 'text-red-600'}`} />
+                    </div>
+                    <div>
+                      <p className="font-semibold">Vehicle Listing Submission</p>
+                      <p className="text-sm text-slate-500">
+                        {systemSettings.vehicle_listing_enabled 
+                          ? 'Users CAN submit vehicle listings' 
+                          : 'All listing submissions BLOCKED'}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => toggleVehicleListing(!systemSettings.vehicle_listing_enabled)}
+                    disabled={settingsLoading}
+                    className={systemSettings.vehicle_listing_enabled 
+                      ? 'bg-red-600 hover:bg-red-700' 
+                      : 'bg-green-600 hover:bg-green-700'}
+                  >
+                    {settingsLoading ? (
+                      <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                    ) : null}
+                    {systemSettings.vehicle_listing_enabled ? 'Disable Listing' : 'Enable Listing'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Warning Notice */}
+            <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/20">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-amber-800 dark:text-amber-200">Important: Permit Requirements</p>
+                    <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                      Vehicle auctions require proper licensing and permits in Canada. 
+                      Do not enable these features until all regulatory requirements are met.
+                      Contact legal@bidvex.com for permit status.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
         {/* Pending Sellers Tab */}
         <TabsContent value="pending-sellers" className="mt-6">
           {pendingSellers.length === 0 ? (
