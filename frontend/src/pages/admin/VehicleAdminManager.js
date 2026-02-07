@@ -363,12 +363,20 @@ const VehicleListingCard = ({ vehicle, onApprove, onReject, onView }) => {
 // Main Component
 const VehicleAdminManager = () => {
   const { token } = useAuth();
-  const [activeTab, setActiveTab] = useState('pending-sellers');
+  const [activeTab, setActiveTab] = useState('system-settings');
   const [loading, setLoading] = useState(true);
   const [pendingSellers, setPendingSellers] = useState([]);
   const [pendingVehicles, setPendingVehicles] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // System settings state
+  const [systemSettings, setSystemSettings] = useState({
+    vehicle_auctions_enabled: false,
+    vehicle_listing_enabled: false,
+    vehicle_bidding_enabled: false,
+  });
+  const [settingsLoading, setSettingsLoading] = useState(false);
   
   // Dialog states
   const [rejectDialog, setRejectDialog] = useState({ open: false, item: null, type: null });
@@ -382,10 +390,24 @@ const VehicleAdminManager = () => {
     activeVehicles: 0,
   });
 
+  // Fetch system settings
+  const fetchSystemSettings = useCallback(async () => {
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const response = await axios.get(`${API}/vehicle-admin/system/settings`, { headers });
+      setSystemSettings(response.data);
+    } catch (error) {
+      console.error('Failed to fetch system settings:', error);
+    }
+  }, [token]);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const headers = { Authorization: `Bearer ${token}` };
+      
+      // Fetch system settings
+      await fetchSystemSettings();
       
       // Fetch pending sellers
       const sellersResp = await axios.get(`${API}/vehicle-admin/pending-sellers`, { headers });
@@ -411,7 +433,44 @@ const VehicleAdminManager = () => {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, fetchSystemSettings]);
+
+  // Toggle vehicle auctions
+  const toggleVehicleAuctions = async (enabled) => {
+    setSettingsLoading(true);
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      await axios.post(`${API}/vehicle-admin/system/toggle-auctions?enabled=${enabled}`, {}, { headers });
+      setSystemSettings(prev => ({
+        ...prev,
+        vehicle_auctions_enabled: enabled,
+        vehicle_bidding_enabled: enabled,
+      }));
+      toast.success(`Vehicle auctions ${enabled ? 'enabled' : 'disabled'}`);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to update settings');
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
+
+  // Toggle vehicle listing
+  const toggleVehicleListing = async (enabled) => {
+    setSettingsLoading(true);
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      await axios.post(`${API}/vehicle-admin/system/toggle-listing?enabled=${enabled}`, {}, { headers });
+      setSystemSettings(prev => ({
+        ...prev,
+        vehicle_listing_enabled: enabled,
+      }));
+      toast.success(`Vehicle listing ${enabled ? 'enabled' : 'disabled'}`);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to update settings');
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchData();
