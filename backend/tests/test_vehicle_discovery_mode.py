@@ -237,7 +237,7 @@ class TestListingBlockedWhenDisabled:
     
     def test_listing_blocked_when_disabled(self, admin_headers, ensure_listing_disabled):
         """Listing creation should return 403 when vehicle_listing_enabled is false"""
-        # Try to create a vehicle listing
+        # Try to create a vehicle listing with correct enum values
         response = requests.post(
             f"{BASE_URL}/api/vehicles",
             headers=admin_headers,
@@ -255,7 +255,7 @@ class TestListingBlockedWhenDisabled:
                 "interior_color": "Black",
                 "ownership_status": "owned",
                 "title_status": "clean",
-                "lien_status": "none",
+                "lien_status": "clear",  # Fixed: was "none", should be "clear"
                 "condition_report": {
                     "overall_rating": 4,
                     "is_running": True,
@@ -286,7 +286,7 @@ class TestListingBlockedWhenDisabled:
         
         data = response.json()
         # Check if it's blocked due to listing disabled OR seller verification
-        detail = data.get("detail", "").lower()
+        detail = data.get("detail", "").lower() if isinstance(data.get("detail"), str) else str(data.get("detail", "")).lower()
         assert "disabled" in detail or "seller" in detail or "pending" in detail
         print(f"Listing correctly blocked: {data['detail']}")
 
