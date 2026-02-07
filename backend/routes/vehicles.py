@@ -930,7 +930,17 @@ async def place_vehicle_bid(
     """
     Place a bid on a vehicle
     Enforces deposit requirement and bid increment rules
+    
+    BLOCKED when vehicle_bidding_enabled is False (default)
     """
+    # CRITICAL: Check if vehicle bidding is enabled system-wide
+    settings = await get_system_settings()
+    if not settings.get("vehicle_bidding_enabled", False):
+        raise HTTPException(
+            status_code=403,
+            detail="Vehicle bidding is currently disabled. Vehicle auctions are pending permit approval."
+        )
+    
     # Get listing
     listing = await db.vehicle_listings.find_one({
         "id": bid_data.vehicle_id,
