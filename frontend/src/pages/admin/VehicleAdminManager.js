@@ -628,6 +628,10 @@ const VehicleAdminManager = () => {
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
+          <TabsTrigger value="system-settings" className="gap-2">
+            <Shield className="h-4 w-4" />
+            System Settings
+          </TabsTrigger>
           <TabsTrigger value="pending-sellers" className="gap-2">
             <User className="h-4 w-4" />
             Pending Sellers
