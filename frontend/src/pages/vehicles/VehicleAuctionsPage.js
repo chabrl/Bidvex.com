@@ -205,6 +205,7 @@ const VehicleAuctionsPage = () => {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [viewMode, setViewMode] = useState('grid');
+  const [vehicleAuctionsEnabled, setVehicleAuctionsEnabled] = useState(false);
   
   // Filters
   const [filters, setFilters] = useState({
@@ -224,6 +225,20 @@ const VehicleAuctionsPage = () => {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+
+  // Check if vehicle auctions are enabled globally
+  useEffect(() => {
+    const checkVehicleAuctionsStatus = async () => {
+      try {
+        const response = await axios.get(`${API}/vehicles/system/status`);
+        setVehicleAuctionsEnabled(response.data.vehicle_auctions_enabled || false);
+      } catch (error) {
+        // Default to disabled if can't reach endpoint
+        setVehicleAuctionsEnabled(false);
+      }
+    };
+    checkVehicleAuctionsStatus();
+  }, []);
 
   const fetchVehicles = useCallback(async () => {
     setLoading(true);
