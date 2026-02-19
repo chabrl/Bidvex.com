@@ -10787,12 +10787,14 @@ async def estimate_full_transaction(
 # ========== EMAIL MARKETING MODULE ==========
 
 class CampaignCreateRequest(BaseModel):
-    """Request model for creating email campaign"""
+    """Request model for creating email campaign with advanced targeting"""
     name: str
     subject: str
     html_content: str
     plain_text_content: str = ""
     audience_filters: Dict[str, Any] = {}
+    manual_emails: Optional[List[str]] = None
+    exclude_emails: Optional[List[str]] = None
     scheduled_at: Optional[str] = None
     from_email: Optional[str] = None
     from_name: Optional[str] = None
@@ -10805,10 +10807,18 @@ class CampaignUpdateRequest(BaseModel):
     html_content: Optional[str] = None
     plain_text_content: Optional[str] = None
     audience_filters: Optional[Dict[str, Any]] = None
+    manual_emails: Optional[List[str]] = None
+    exclude_emails: Optional[List[str]] = None
     scheduled_at: Optional[str] = None
     from_email: Optional[str] = None
     from_name: Optional[str] = None
     reply_to: Optional[str] = None
+
+class AdvancedAudiencePreviewRequest(BaseModel):
+    """Request model for advanced audience preview"""
+    audience_filters: Dict[str, Any] = {}
+    manual_emails: Optional[List[str]] = None
+    exclude_emails: Optional[List[str]] = None
 
 
 @api_router.get("/admin/marketing/segment-filters")
@@ -10828,7 +10838,7 @@ async def preview_audience(
     filters: Dict[str, Any],
     current_user: User = Depends(get_current_user)
 ):
-    """Preview audience matching filters"""
+    """Preview audience matching basic filters"""
     if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
@@ -10839,6 +10849,142 @@ async def preview_audience(
     return {
         "count": count,
         "preview": preview
+    }
+
+
+@api_router.post("/admin/marketing/audience/advanced-preview")
+async def preview_advanced_audience(
+    data: AdvancedAudiencePreviewRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Preview advanced audience with manual emails and exclusions
+    
+    Returns:
+    - Final count after (Segmented + Manual) - Exclusions - Suppressed
+    - Breakdown by source
+    - Preview of recipients
+    - List of excluded/suppressed emails
+    """
+    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    marketing = get_marketing_service(db)
+    
+    result = await marketing.get_advanced_audience_preview(
+        filters=data.audience_filters,
+        manual_emails=data.manual_emails,
+        exclude_emails=data.exclude_emails,
+        limit=20
+    )
+    
+    return result
+
+
+@api_router.post("/admin/marketing/parse-emails")
+async def parse_email_list(
+    data: Dict[str, str],
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Parse and validate a list of emails from text input
+    
+    Request: {"emails": "email1@test.com, email2@test.com\\nemail3@test.com"}
+    Returns: {"valid": [...], "invalid": [...], "count": N}
+    """
+    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    email_text = data.get("emails", "")
+    marketing = get_marketing_service(db)
+    
+    valid_emails = marketing.parse_email_list(email_text)
+    
+    # Find invalid entries
+    import re
+    raw_emails = re.split(r'[,\n;\s]+', email_text)
+    invalid_emails = [e.strip() for e in raw_emails if e.strip() and e.strip().lower() not in [v.lower() for v in valid_emails]]
+    
+    return {
+        "valid": valid_emails,
+        "invalid": invalid_emails,
+        "count": len(valid_emails)
+    }
+
+
+@api_router.post("/admin/marketing/parse-csv")
+async def parse_csv_emails(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Parse and validate emails from a CSV file upload
+    
+    Returns:
+    - valid: List of valid emails
+    - invalid: List of invalid entries
+    - duplicates: List of duplicate emails
+    - total_rows: Number of rows processed
+    """
+    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Validate file type
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(status_code=400, detail="File must be a CSV")
+    
+    # Read file content
+    try:
+        content = await file.read()
+        csv_content = content.decode('utf-8')
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to read file: {str(e)}")
+    
+    marketing = get_marketing_service(db)
+    result = marketing.parse_csv_emails(csv_content)
+    
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    
+    return result
+
+
+@api_router.post("/admin/marketing/check-suppressed")
+async def check_suppressed_emails(
+    data: Dict[str, List[str]],
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Check which emails are suppressed (unsubscribed, bounced, spam reported)
+    
+    Request: {"emails": ["email1@test.com", "email2@test.com"]}
+    Returns: {"suppressed": [...], "valid": [...]}
+    """
+    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    emails = data.get("emails", [])
+    if not emails:
+        return {"suppressed": [], "valid": []}
+    
+    marketing = get_marketing_service(db)
+    suppressed_set = await marketing.get_suppressed_emails()
+    
+    suppressed = []
+    valid = []
+    
+    for email in emails:
+        email_lower = email.strip().lower()
+        if email_lower in suppressed_set:
+            suppressed.append(email_lower)
+        else:
+            valid.append(email_lower)
+    
+    return {
+        "suppressed": suppressed,
+        "valid": valid,
+        "suppressed_count": len(suppressed),
+        "valid_count": len(valid)
     }
 
 
