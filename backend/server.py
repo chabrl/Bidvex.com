@@ -1258,6 +1258,21 @@ async def login(credentials: UserLogin):
     user_doc = await db.users.find_one({"email": credentials.email})
     if not user_doc or not verify_password(credentials.password, user_doc["password"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    # Check if password reset is required (admin-created accounts)
+    if user_doc.get("password_reset_required", False):
+        # Generate a temporary token for password reset only
+        temp_token = create_access_token({"sub": user_doc["id"], "purpose": "password_reset"})
+        raise HTTPException(
+            status_code=403, 
+            detail={
+                "code": "PASSWORD_RESET_REQUIRED",
+                "message": "You must reset your password before accessing your account",
+                "reset_token": temp_token,
+                "user_id": user_doc["id"]
+            }
+        )
+    
     user_doc.pop("password")
     user_doc.pop("_id")
     if isinstance(user_doc.get("created_at"), str):
