@@ -839,18 +839,24 @@ class EmailMarketingService:
     async def _send_campaign_email(
         self,
         campaign: Dict[str, Any],
-        user: Dict[str, Any]
+        recipient: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Send campaign email to a single user"""
+        """Send campaign email to a single recipient (user or external)"""
+        email = recipient["email"]
+        name = recipient.get("name", "")
+        user_id = recipient.get("user_id")
+        source = recipient.get("source", "unknown")
+        
         if not marketing_client:
-            logger.info(f"[CAMPAIGN EMAIL] To: {user['email']}, Campaign: {campaign['id']}")
+            logger.info(f"[CAMPAIGN EMAIL] To: {email}, Campaign: {campaign['id']}, Source: {source}")
             
             # Still record the send
             await self.email_sends.insert_one({
                 "id": str(uuid.uuid4()),
                 "campaign_id": campaign["id"],
-                "user_id": user["id"],
-                "email": user["email"],
+                "user_id": user_id,
+                "email": email,
+                "source": source,
                 "status": "logged",
                 "sent_at": datetime.now(timezone.utc).isoformat(),
                 "message_id": None
@@ -861,18 +867,20 @@ class EmailMarketingService:
         try:
             # Personalize content
             html_content = campaign["html_content"]
-            html_content = html_content.replace("{{name}}", user.get("name", ""))
-            html_content = html_content.replace("{{email}}", user["email"])
+            html_content = html_content.replace("{{name}}", name or "")
+            html_content = html_content.replace("{{email}}", email)
+            # For external recipients without user_id, use email as unsubscribe token
+            unsubscribe_token = user_id or email
             html_content = html_content.replace("{{unsubscribe_url}}", 
-                f"{FRONTEND_URL}/unsubscribe?token={user['id']}")
+                f"{FRONTEND_URL}/unsubscribe?token={unsubscribe_token}")
             
             plain_content = campaign["plain_text_content"]
-            plain_content = plain_content.replace("{{name}}", user.get("name", ""))
-            plain_content = plain_content.replace("{{email}}", user["email"])
+            plain_content = plain_content.replace("{{name}}", name or "")
+            plain_content = plain_content.replace("{{email}}", email)
             
             message = Mail(
                 from_email=Email(campaign["from_email"], campaign["from_name"]),
-                to_emails=To(user["email"]),
+                to_emails=To(email),
                 subject=campaign["subject"],
                 html_content=Content("text/html", html_content),
                 plain_text_content=Content("text/plain", plain_content)
@@ -886,9 +894,11 @@ class EmailMarketingService:
             
             # Add custom args for webhook tracking
             personalization = Personalization()
-            personalization.add_to(To(user["email"]))
+            personalization.add_to(To(email))
             personalization.add_custom_arg(CustomArg("campaign_id", campaign["id"]))
-            personalization.add_custom_arg(CustomArg("user_id", user["id"]))
+            if user_id:
+                personalization.add_custom_arg(CustomArg("user_id", user_id))
+            personalization.add_custom_arg(CustomArg("source", source))
             message.add_personalization(personalization)
             
             response = marketing_client.send(message)
@@ -898,8 +908,9 @@ class EmailMarketingService:
             await self.email_sends.insert_one({
                 "id": str(uuid.uuid4()),
                 "campaign_id": campaign["id"],
-                "user_id": user["id"],
-                "email": user["email"],
+                "user_id": user_id,
+                "email": email,
+                "source": source,
                 "status": "sent",
                 "sent_at": datetime.now(timezone.utc).isoformat(),
                 "message_id": message_id,
@@ -909,13 +920,14 @@ class EmailMarketingService:
             return {"success": True, "message_id": message_id}
             
         except Exception as e:
-            logger.error(f"Send failed for {user['email']}: {e}")
+            logger.error(f"Send failed for {email}: {e}")
             
             await self.email_sends.insert_one({
                 "id": str(uuid.uuid4()),
                 "campaign_id": campaign["id"],
-                "user_id": user["id"],
-                "email": user["email"],
+                "user_id": user_id,
+                "email": email,
+                "source": source,
                 "status": "failed",
                 "sent_at": datetime.now(timezone.utc).isoformat(),
                 "error": str(e)
