@@ -5322,6 +5322,444 @@ async def admin_update_user_status(user_id: str, data: Dict[str, str], current_u
     await db.users.update_one({"id": user_id}, {"$set": {"status": data.get("status")}})
     return {"message": "User status updated"}
 
+
+# ========== SUBSCRIPTION OVERRIDE SYSTEM ==========
+
+class SubscriptionOverrideRequest(BaseModel):
+    """Request model for manual subscription override"""
+    plan: str  # free, premium, vip
+    duration_days: Optional[int] = None  # Number of days from now
+    end_date: Optional[str] = None  # Or specific end date (YYYY-MM-DD)
+    reason: str  # Required audit reason
+
+
+class SubscriptionExtendRequest(BaseModel):
+    """Request model for extending subscription"""
+    additional_days: int
+    reason: str
+
+
+# Subscription plan benefits (for reference and validation)
+SUBSCRIPTION_PLANS = {
+    "free": {
+        "name": "Free",
+        "monthly_listing_limit": 5,
+        "buyer_premium_discount": 0,
+        "seller_commission_discount": 0,
+        "features": ["basic_listings", "standard_support"]
+    },
+    "premium": {
+        "name": "Premium",
+        "monthly_listing_limit": 50,
+        "buyer_premium_discount": 0.10,  # 10% off buyer premium
+        "seller_commission_discount": 0.15,  # 15% off seller commission
+        "features": ["featured_listings", "priority_support", "analytics_basic"]
+    },
+    "vip": {
+        "name": "VIP",
+        "monthly_listing_limit": 500,
+        "buyer_premium_discount": 0.25,  # 25% off buyer premium
+        "seller_commission_discount": 0.30,  # 30% off seller commission
+        "features": ["featured_listings", "priority_support", "analytics_advanced", "dedicated_manager"]
+    }
+}
+
+
+@api_router.get("/admin/users/{user_id}/subscription")
+async def admin_get_user_subscription(
+    user_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Admin: Get detailed subscription information for a user
+    
+    Returns current plan, source, dates, and Stripe status
+    """
+    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Check for active Stripe subscription
+    has_stripe_subscription = False
+    stripe_subscription_status = None
+    if user.get("stripe_subscription_id"):
+        has_stripe_subscription = True
+        stripe_subscription_status = user.get("stripe_subscription_status", "unknown")
+    
+    # Calculate days remaining
+    days_remaining = None
+    end_date = user.get("subscription_end_date")
+    if end_date:
+        if isinstance(end_date, str):
+            end_date = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+        days_remaining = max(0, (end_date - datetime.now(timezone.utc)).days)
+    
+    return {
+        "user_id": user_id,
+        "email": user.get("email"),
+        "name": user.get("name"),
+        "subscription": {
+            "plan": user.get("subscription_tier", "free"),
+            "status": user.get("subscription_status", "active"),
+            "source": user.get("subscription_source", "stripe" if has_stripe_subscription else "manual"),
+            "start_date": user.get("subscription_start_date"),
+            "end_date": user.get("subscription_end_date"),
+            "days_remaining": days_remaining,
+            "currency": user.get("subscription_currency", "CAD"),
+            "region": user.get("subscription_region", "CA"),
+        },
+        "stripe": {
+            "has_subscription": has_stripe_subscription,
+            "subscription_id": user.get("stripe_subscription_id"),
+            "customer_id": user.get("stripe_customer_id"),
+            "status": stripe_subscription_status
+        },
+        "override_info": {
+            "override_by": user.get("subscription_override_by"),
+            "override_at": user.get("subscription_override_at"),
+            "override_reason": user.get("subscription_override_reason")
+        },
+        "plan_benefits": SUBSCRIPTION_PLANS.get(user.get("subscription_tier", "free"), SUBSCRIPTION_PLANS["free"])
+    }
+
+
+@api_router.post("/admin/users/{user_id}/subscription/override")
+async def admin_override_subscription(
+    user_id: str,
+    override_data: SubscriptionOverrideRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Admin: Apply manual subscription override
+    
+    - Validates plan is valid (free/premium/vip)
+    - BLOCKS if user has active Stripe subscription (Option A)
+    - Sets subscription_source = "manual"
+    - Logs all changes to audit table
+    - Does NOT trigger Stripe billing
+    """
+    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Validate plan
+    if override_data.plan not in SUBSCRIPTION_PLANS:
+        raise HTTPException(status_code=400, detail=f"Invalid plan. Must be one of: {list(SUBSCRIPTION_PLANS.keys())}")
+    
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # OPTION A: Block if user has active Stripe subscription
+    if user.get("stripe_subscription_id"):
+        stripe_status = user.get("stripe_subscription_status", "active")
+        if stripe_status in ["active", "trialing"]:
+            raise HTTPException(
+                status_code=409,
+                detail="Cannot apply manual override: User has an active Stripe subscription. "
+                       "The user must cancel their Stripe subscription first, or wait for it to expire."
+            )
+    
+    now = datetime.now(timezone.utc)
+    
+    # Calculate end date
+    if override_data.end_date:
+        try:
+            end_date = datetime.fromisoformat(override_data.end_date).replace(tzinfo=timezone.utc)
+            if end_date <= now:
+                raise HTTPException(status_code=400, detail="End date must be in the future")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+    elif override_data.duration_days:
+        if override_data.duration_days < 1:
+            raise HTTPException(status_code=400, detail="Duration must be at least 1 day")
+        end_date = now + timedelta(days=override_data.duration_days)
+    else:
+        # Default to 30 days if upgrading, no end date if downgrading to free
+        if override_data.plan == "free":
+            end_date = None
+        else:
+            end_date = now + timedelta(days=30)
+    
+    # Get previous values for audit
+    previous_plan = user.get("subscription_tier", "free")
+    previous_source = user.get("subscription_source", "manual")
+    previous_end_date = user.get("subscription_end_date")
+    
+    # Update user subscription
+    update_data = {
+        "subscription_tier": override_data.plan,
+        "subscription_source": "manual",
+        "subscription_status": "active" if override_data.plan != "free" else "active",
+        "subscription_start_date": now.isoformat(),
+        "subscription_end_date": end_date.isoformat() if end_date else None,
+        "subscription_override_by": current_user.id,
+        "subscription_override_at": now.isoformat(),
+        "subscription_override_reason": override_data.reason,
+        "updated_at": now.isoformat()
+    }
+    
+    await db.users.update_one({"id": user_id}, {"$set": update_data})
+    
+    # Log to subscription audit table
+    audit_entry = {
+        "id": str(uuid.uuid4()),
+        "action": "subscription_override",
+        "user_id": user_id,
+        "user_email": user.get("email"),
+        "admin_id": current_user.id,
+        "admin_email": current_user.email,
+        "previous_values": {
+            "plan": previous_plan,
+            "source": previous_source,
+            "end_date": previous_end_date
+        },
+        "new_values": {
+            "plan": override_data.plan,
+            "source": "manual",
+            "end_date": end_date.isoformat() if end_date else None
+        },
+        "reason": override_data.reason,
+        "timestamp": now.isoformat()
+    }
+    await db.subscription_audit_logs.insert_one(audit_entry)
+    
+    logger.info(f"Admin {current_user.email} overrode subscription for {user.get('email')}: {previous_plan} -> {override_data.plan}")
+    
+    return {
+        "success": True,
+        "message": f"Subscription updated to {override_data.plan}",
+        "subscription": {
+            "plan": override_data.plan,
+            "source": "manual",
+            "status": "active",
+            "start_date": now.isoformat(),
+            "end_date": end_date.isoformat() if end_date else None,
+            "days_remaining": (end_date - now).days if end_date else None
+        }
+    }
+
+
+@api_router.post("/admin/users/{user_id}/subscription/extend")
+async def admin_extend_subscription(
+    user_id: str,
+    extend_data: SubscriptionExtendRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Admin: Extend existing manual subscription
+    
+    - Only works for manual subscriptions
+    - Adds days to current end_date (or from now if expired)
+    - Cannot extend Stripe subscriptions (must be done in Stripe)
+    """
+    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    if extend_data.additional_days < 1:
+        raise HTTPException(status_code=400, detail="Must extend by at least 1 day")
+    
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Check subscription source
+    source = user.get("subscription_source", "manual")
+    if source == "stripe" and user.get("stripe_subscription_id"):
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot extend Stripe subscription from admin panel. Use Stripe dashboard instead."
+        )
+    
+    # Check if user has a paid plan
+    current_plan = user.get("subscription_tier", "free")
+    if current_plan == "free":
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot extend Free plan. Use override to assign a paid plan first."
+        )
+    
+    now = datetime.now(timezone.utc)
+    
+    # Calculate new end date
+    current_end = user.get("subscription_end_date")
+    if current_end:
+        if isinstance(current_end, str):
+            current_end = datetime.fromisoformat(current_end.replace('Z', '+00:00'))
+        # If not expired, extend from current end date
+        if current_end > now:
+            new_end_date = current_end + timedelta(days=extend_data.additional_days)
+        else:
+            # If expired, extend from now
+            new_end_date = now + timedelta(days=extend_data.additional_days)
+    else:
+        # No end date set, extend from now
+        new_end_date = now + timedelta(days=extend_data.additional_days)
+    
+    previous_end_date = user.get("subscription_end_date")
+    
+    # Update user subscription
+    await db.users.update_one(
+        {"id": user_id},
+        {
+            "$set": {
+                "subscription_status": "active",
+                "subscription_end_date": new_end_date.isoformat(),
+                "updated_at": now.isoformat()
+            }
+        }
+    )
+    
+    # Log to audit table
+    audit_entry = {
+        "id": str(uuid.uuid4()),
+        "action": "subscription_extended",
+        "user_id": user_id,
+        "user_email": user.get("email"),
+        "admin_id": current_user.id,
+        "admin_email": current_user.email,
+        "previous_values": {
+            "end_date": previous_end_date
+        },
+        "new_values": {
+            "end_date": new_end_date.isoformat(),
+            "days_added": extend_data.additional_days
+        },
+        "reason": extend_data.reason,
+        "timestamp": now.isoformat()
+    }
+    await db.subscription_audit_logs.insert_one(audit_entry)
+    
+    logger.info(f"Admin {current_user.email} extended subscription for {user.get('email')} by {extend_data.additional_days} days")
+    
+    return {
+        "success": True,
+        "message": f"Subscription extended by {extend_data.additional_days} days",
+        "new_end_date": new_end_date.isoformat(),
+        "days_remaining": (new_end_date - now).days
+    }
+
+
+@api_router.post("/admin/users/{user_id}/subscription/revoke")
+async def admin_revoke_subscription(
+    user_id: str,
+    data: Dict[str, str],
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Admin: Immediately revoke/downgrade subscription to Free
+    
+    - Only works for manual subscriptions
+    - Cannot revoke Stripe subscriptions (must be done in Stripe)
+    - Immediate effect
+    """
+    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    reason = data.get("reason", "")
+    if not reason:
+        raise HTTPException(status_code=400, detail="Reason is required for revocation")
+    
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Check subscription source
+    source = user.get("subscription_source", "manual")
+    if source == "stripe" and user.get("stripe_subscription_id"):
+        stripe_status = user.get("stripe_subscription_status", "active")
+        if stripe_status in ["active", "trialing"]:
+            raise HTTPException(
+                status_code=409,
+                detail="Cannot revoke Stripe subscription from admin panel. Cancel it in Stripe dashboard first."
+            )
+    
+    now = datetime.now(timezone.utc)
+    
+    # Get previous values for audit
+    previous_plan = user.get("subscription_tier", "free")
+    previous_end_date = user.get("subscription_end_date")
+    
+    if previous_plan == "free":
+        raise HTTPException(status_code=400, detail="User is already on Free plan")
+    
+    # Update user subscription
+    await db.users.update_one(
+        {"id": user_id},
+        {
+            "$set": {
+                "subscription_tier": "free",
+                "subscription_status": "cancelled",
+                "subscription_end_date": now.isoformat(),
+                "subscription_revoked_at": now.isoformat(),
+                "subscription_revoked_by": current_user.id,
+                "subscription_revoke_reason": reason,
+                "updated_at": now.isoformat()
+            }
+        }
+    )
+    
+    # Log to audit table
+    audit_entry = {
+        "id": str(uuid.uuid4()),
+        "action": "subscription_revoked",
+        "user_id": user_id,
+        "user_email": user.get("email"),
+        "admin_id": current_user.id,
+        "admin_email": current_user.email,
+        "previous_values": {
+            "plan": previous_plan,
+            "end_date": previous_end_date
+        },
+        "new_values": {
+            "plan": "free",
+            "status": "cancelled"
+        },
+        "reason": reason,
+        "timestamp": now.isoformat()
+    }
+    await db.subscription_audit_logs.insert_one(audit_entry)
+    
+    logger.info(f"Admin {current_user.email} revoked subscription for {user.get('email')}: {previous_plan} -> free")
+    
+    return {
+        "success": True,
+        "message": "Subscription revoked. User downgraded to Free plan.",
+        "previous_plan": previous_plan
+    }
+
+
+@api_router.get("/admin/users/{user_id}/subscription/history")
+async def admin_get_subscription_history(
+    user_id: str,
+    limit: int = 50,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Admin: Get subscription change history for a user
+    """
+    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "email": 1, "name": 1})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    history = await db.subscription_audit_logs.find(
+        {"user_id": user_id},
+        {"_id": 0}
+    ).sort("timestamp", -1).limit(limit).to_list(limit)
+    
+    return {
+        "user_id": user_id,
+        "user_email": user.get("email"),
+        "history_count": len(history),
+        "history": history
+    }
+
+
 # ========== MARKETPLACE SETTINGS API ==========
 @api_router.get("/marketplace/feature-flags")
 async def get_public_feature_flags():
