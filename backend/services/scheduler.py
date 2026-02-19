@@ -459,7 +459,16 @@ def init_scheduler(database):
         replace_existing=True
     )
     
-    logger.info("Scheduler initialized with 8 jobs")
+    # Job 9: Process scheduled email campaigns - every 5 minutes
+    scheduler.add_job(
+        process_scheduled_campaigns_job,
+        IntervalTrigger(minutes=5),
+        id="process_scheduled_campaigns",
+        name="Process Scheduled Email Campaigns",
+        replace_existing=True
+    )
+    
+    logger.info("Scheduler initialized with 9 jobs")
     return scheduler
 
 
