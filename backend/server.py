@@ -8848,7 +8848,6 @@ async def sendgrid_webhook(request: Request):
         logger.exception(f"SendGrid webhook error: {str(e)}")
         # Return 200 to prevent SendGrid from retrying
         return {"status": "error", "message": str(e)}
-        return {"status": "error", "message": str(e)}
 
 # NOTE: api_router is included at the end of the file after all routes are defined
 
