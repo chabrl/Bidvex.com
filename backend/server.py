@@ -1531,6 +1531,89 @@ async def verify_reset_token(token: str):
         logger.exception(f"Error verifying reset token: {str(e)}")
         return {"valid": False, "message": "Error verifying token"}
 
+
+class ForceResetPasswordRequest(BaseModel):
+    """Request model for forced password reset (admin-created accounts)"""
+    reset_token: str
+    new_password: str
+
+
+@api_router.post("/auth/force-reset-password")
+async def force_reset_password(request: ForceResetPasswordRequest):
+    """
+    Complete forced password reset for admin-created accounts.
+    
+    This endpoint is used when password_reset_required = true
+    The reset_token is provided during login attempt
+    """
+    try:
+        # Verify the token
+        try:
+            payload = jwt.decode(request.reset_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            user_id = payload.get("sub")
+            purpose = payload.get("purpose")
+            
+            if purpose != "password_reset":
+                raise HTTPException(status_code=400, detail="Invalid token purpose")
+                
+        except JWTError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid or expired token: {str(e)}")
+        
+        # Get user
+        user_doc = await db.users.find_one({"id": user_id})
+        if not user_doc:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Verify this user requires password reset
+        if not user_doc.get("password_reset_required", False):
+            raise HTTPException(status_code=400, detail="Password reset not required for this account")
+        
+        # Validate new password
+        if len(request.new_password) < 8:
+            raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
+        
+        # Hash new password
+        hashed_password = pwd_context.hash(request.new_password)
+        
+        # Update user password and clear the flag
+        await db.users.update_one(
+            {"id": user_id},
+            {
+                "$set": {
+                    "password": hashed_password,
+                    "password_reset_required": False,
+                    "password_changed_at": datetime.now(timezone.utc).isoformat(),
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }
+            }
+        )
+        
+        # Invalidate all existing sessions for security
+        await db.sessions.delete_many({"user_id": user_id})
+        
+        # Audit log
+        await db.admin_audit_logs.insert_one({
+            "id": str(uuid.uuid4()),
+            "action": "force_password_reset_completed",
+            "target_user_id": user_id,
+            "target_email": user_doc.get("email"),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+        
+        logger.info(f"Forced password reset completed for user {user_id}")
+        
+        return {
+            "success": True,
+            "message": "Password reset successful. Please log in with your new password."
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error in force_reset_password: {str(e)}")
+        raise HTTPException(status_code=500, detail="An error occurred while resetting password")
+
+
 @api_router.get("/users/{user_id}", response_model=User)
 async def get_user(user_id: str):
     user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
