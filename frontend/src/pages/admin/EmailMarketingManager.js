@@ -224,6 +224,89 @@ const EmailMarketingManager = () => {
     }
   };
 
+  const parseManualEmails = async (text) => {
+    if (!text.trim()) {
+      setCampaignData(prev => ({ ...prev, manual_emails: [] }));
+      return;
+    }
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const response = await axios.post(`${API}/admin/marketing/parse-emails`, { emails: text }, { headers });
+      setCampaignData(prev => ({ ...prev, manual_emails: response.data.valid }));
+      if (response.data.invalid?.length > 0) {
+        toast.warning(`${response.data.invalid.length} invalid email(s) skipped`);
+      }
+    } catch (error) {
+      console.error('Failed to parse emails:', error);
+    }
+  };
+
+  const parseExcludeEmails = async (text) => {
+    if (!text.trim()) {
+      setCampaignData(prev => ({ ...prev, exclude_emails: [] }));
+      return;
+    }
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const response = await axios.post(`${API}/admin/marketing/parse-emails`, { emails: text }, { headers });
+      setCampaignData(prev => ({ ...prev, exclude_emails: response.data.valid }));
+      if (response.data.invalid?.length > 0) {
+        toast.warning(`${response.data.invalid.length} invalid email(s) skipped`);
+      }
+    } catch (error) {
+      console.error('Failed to parse exclude emails:', error);
+    }
+  };
+
+  const handleCsvUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    if (!file.name.endsWith('.csv')) {
+      toast.error('Please upload a CSV file');
+      return;
+    }
+    
+    setUploadingCsv(true);
+    try {
+      const headers = { 
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data'
+      };
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await axios.post(`${API}/admin/marketing/parse-csv`, formData, { headers });
+      setCsvParseResult(response.data);
+      
+      // Add valid emails to manual emails
+      if (response.data.valid?.length > 0) {
+        setCampaignData(prev => ({
+          ...prev,
+          manual_emails: [...new Set([...prev.manual_emails, ...response.data.valid])]
+        }));
+        setManualEmailsText(prev => {
+          const existingEmails = prev ? prev.split('\n').filter(e => e.trim()) : [];
+          const allEmails = [...new Set([...existingEmails, ...response.data.valid])];
+          return allEmails.join('\n');
+        });
+        toast.success(`Added ${response.data.valid.length} valid emails from CSV`);
+      }
+      
+      if (response.data.invalid?.length > 0 || response.data.duplicates?.length > 0) {
+        toast.warning(`${response.data.invalid?.length || 0} invalid, ${response.data.duplicates?.length || 0} duplicates skipped`);
+      }
+    } catch (error) {
+      console.error('Failed to parse CSV:', error);
+      toast.error('Failed to parse CSV file');
+    } finally {
+      setUploadingCsv(false);
+      if (csvInputRef.current) {
+        csvInputRef.current.value = '';
+      }
+    }
+  };
+
   const openBuilder = (campaign = null) => {
     if (campaign) {
       setEditingCampaign(campaign);
@@ -239,11 +322,19 @@ const EmailMarketingManager = () => {
           activity_status: '',
           exclude_unsubscribed: true
         },
+        manual_emails: campaign.manual_emails || [],
+        exclude_emails: campaign.exclude_emails || [],
         scheduled_at: campaign.scheduled_at || '',
         from_name: campaign.from_name || '',
         reply_to: campaign.reply_to || ''
       });
-      setAudiencePreview({ count: campaign.audience_count || 0, preview: [] });
+      setManualEmailsText((campaign.manual_emails || []).join('\n'));
+      setExcludeEmailsText((campaign.exclude_emails || []).join('\n'));
+      setAudiencePreview({ 
+        count: campaign.audience_count || 0, 
+        preview: [],
+        breakdown: campaign.audience_breakdown || null
+      });
     } else {
       setEditingCampaign(null);
       setCampaignData({
@@ -258,12 +349,17 @@ const EmailMarketingManager = () => {
           activity_status: '',
           exclude_unsubscribed: true
         },
+        manual_emails: [],
+        exclude_emails: [],
         scheduled_at: '',
         from_name: '',
         reply_to: ''
       });
-      setAudiencePreview({ count: 0, preview: [] });
+      setManualEmailsText('');
+      setExcludeEmailsText('');
+      setAudiencePreview({ count: 0, preview: [], breakdown: null });
     }
+    setCsvParseResult(null);
     setBuilderOpen(true);
   };
 
