@@ -11123,36 +11123,6 @@ async def get_marketing_audit_logs(
     return {"logs": logs, "count": len(logs)}
 
 
-# SendGrid Webhook Handler (public endpoint, validated by signature)
-@api_router.post("/webhooks/sendgrid")
-async def sendgrid_webhook(request: Request):
-    """
-    Handle SendGrid webhook events for email tracking
-    
-    Events: delivered, open, click, bounce, dropped, 
-            spam_report, unsubscribe, group_unsubscribe
-    """
-    try:
-        # Get raw body
-        body = await request.body()
-        events = json.loads(body)
-        
-        if not isinstance(events, list):
-            events = [events]
-        
-        marketing = get_marketing_service(db)
-        
-        for event in events:
-            await marketing.process_webhook_event(event)
-        
-        return {"status": "processed", "count": len(events)}
-    
-    except Exception as e:
-        logger.error(f"Webhook processing error: {e}")
-        # Return 200 to prevent SendGrid retries for processing errors
-        return {"status": "error", "message": str(e)}
-
-
 @api_router.get("/admin/marketing/config")
 async def get_marketing_config(current_user: User = Depends(get_current_user)):
     """Get marketing email configuration status"""
