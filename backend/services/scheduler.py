@@ -440,7 +440,25 @@ def init_scheduler(database):
         replace_existing=True
     )
     
-    logger.info("Scheduler initialized with 6 jobs")
+    # Job 7: Check subscription expirations - daily at 00:30 UTC
+    scheduler.add_job(
+        check_subscription_expirations_job,
+        CronTrigger(hour=0, minute=30),
+        id="check_subscription_expirations",
+        name="Check Subscription Expirations",
+        replace_existing=True
+    )
+    
+    # Job 8: Send subscription reminders - daily at 01:00 UTC
+    scheduler.add_job(
+        send_subscription_reminders_job,
+        CronTrigger(hour=1, minute=0),
+        id="send_subscription_reminders",
+        name="Send Subscription Reminders",
+        replace_existing=True
+    )
+    
+    logger.info("Scheduler initialized with 8 jobs")
     return scheduler
 
 
