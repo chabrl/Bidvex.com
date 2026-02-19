@@ -10804,6 +10804,397 @@ async def estimate_full_transaction(
         raise HTTPException(status_code=500, detail="Failed to estimate transaction")
 
 
+# ========== EMAIL MARKETING MODULE ==========
+from services.email_marketing import get_marketing_service, SEGMENT_FILTERS, CAMPAIGN_STATUS
+
+class CampaignCreateRequest(BaseModel):
+    """Request model for creating email campaign"""
+    name: str
+    subject: str
+    html_content: str
+    plain_text_content: str = ""
+    audience_filters: Dict[str, Any] = {}
+    scheduled_at: Optional[str] = None
+    from_email: Optional[str] = None
+    from_name: Optional[str] = None
+    reply_to: Optional[str] = None
+
+class CampaignUpdateRequest(BaseModel):
+    """Request model for updating email campaign"""
+    name: Optional[str] = None
+    subject: Optional[str] = None
+    html_content: Optional[str] = None
+    plain_text_content: Optional[str] = None
+    audience_filters: Optional[Dict[str, Any]] = None
+    scheduled_at: Optional[str] = None
+    from_email: Optional[str] = None
+    from_name: Optional[str] = None
+    reply_to: Optional[str] = None
+
+
+@api_router.get("/admin/marketing/segment-filters")
+async def get_segment_filters(current_user: User = Depends(get_current_user)):
+    """Get available audience segment filter options"""
+    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    return {
+        "filters": SEGMENT_FILTERS,
+        "campaign_statuses": list(CAMPAIGN_STATUS.values())
+    }
+
+
+@api_router.post("/admin/marketing/audience/preview")
+async def preview_audience(
+    filters: Dict[str, Any],
+    current_user: User = Depends(get_current_user)
+):
+    """Preview audience matching filters"""
+    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    marketing = get_marketing_service(db)
+    count = await marketing.get_audience_count(filters)
+    preview = await marketing.get_audience_preview(filters, limit=10)
+    
+    return {
+        "count": count,
+        "preview": preview
+    }
+
+
+@api_router.post("/admin/marketing/campaigns")
+async def create_campaign(
+    data: CampaignCreateRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Create new email campaign"""
+    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    marketing = get_marketing_service(db)
+    
+    try:
+        campaign = await marketing.create_campaign(
+            name=data.name,
+            subject=data.subject,
+            html_content=data.html_content,
+            plain_text_content=data.plain_text_content or "",
+            audience_filters=data.audience_filters,
+            admin_id=current_user.id,
+            admin_email=current_user.email,
+            scheduled_at=data.scheduled_at,
+            from_email=data.from_email,
+            from_name=data.from_name,
+            reply_to=data.reply_to
+        )
+        return campaign
+    except Exception as e:
+        logger.error(f"Failed to create campaign: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/admin/marketing/campaigns")
+async def list_campaigns(
+    status: Optional[str] = None,
+    limit: int = 50,
+    skip: int = 0,
+    current_user: User = Depends(get_current_user)
+):
+    """List email campaigns with optional status filter"""
+    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    marketing = get_marketing_service(db)
+    campaigns = await marketing.list_campaigns(status=status, limit=limit, skip=skip)
+    
+    return {
+        "campaigns": campaigns,
+        "count": len(campaigns)
+    }
+
+
+@api_router.get("/admin/marketing/campaigns/{campaign_id}")
+async def get_campaign(
+    campaign_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Get campaign by ID"""
+    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    marketing = get_marketing_service(db)
+    campaign = await marketing.get_campaign(campaign_id)
+    
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    
+    return campaign
+
+
+@api_router.put("/admin/marketing/campaigns/{campaign_id}")
+async def update_campaign(
+    campaign_id: str,
+    data: CampaignUpdateRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Update draft or scheduled campaign"""
+    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    marketing = get_marketing_service(db)
+    
+    try:
+        # Build update dict from non-None values
+        updates = {k: v for k, v in data.model_dump().items() if v is not None}
+        
+        campaign = await marketing.update_campaign(
+            campaign_id=campaign_id,
+            updates=updates,
+            admin_id=current_user.id,
+            admin_email=current_user.email
+        )
+        return campaign
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to update campaign: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/admin/marketing/campaigns/{campaign_id}/test")
+async def send_test_email(
+    campaign_id: str,
+    data: Dict[str, str],
+    current_user: User = Depends(get_current_user)
+):
+    """Send test email for campaign preview"""
+    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    test_email = data.get("email")
+    if not test_email:
+        raise HTTPException(status_code=400, detail="Test email address required")
+    
+    marketing = get_marketing_service(db)
+    
+    try:
+        result = await marketing.send_test_email(
+            campaign_id=campaign_id,
+            test_email=test_email,
+            admin_id=current_user.id,
+            admin_email=current_user.email
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to send test email: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/admin/marketing/campaigns/{campaign_id}/schedule")
+async def schedule_campaign(
+    campaign_id: str,
+    data: Dict[str, str],
+    current_user: User = Depends(get_current_user)
+):
+    """Schedule campaign for sending"""
+    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    scheduled_at = data.get("scheduled_at")
+    if not scheduled_at:
+        raise HTTPException(status_code=400, detail="Scheduled time required")
+    
+    marketing = get_marketing_service(db)
+    
+    try:
+        campaign = await marketing.schedule_campaign(
+            campaign_id=campaign_id,
+            scheduled_at=scheduled_at,
+            admin_id=current_user.id,
+            admin_email=current_user.email
+        )
+        return campaign
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to schedule campaign: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/admin/marketing/campaigns/{campaign_id}/send")
+async def send_campaign_now(
+    campaign_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Send campaign immediately"""
+    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    marketing = get_marketing_service(db)
+    
+    try:
+        result = await marketing.send_campaign_now(
+            campaign_id=campaign_id,
+            admin_id=current_user.id,
+            admin_email=current_user.email
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to send campaign: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/admin/marketing/campaigns/{campaign_id}/cancel")
+async def cancel_campaign(
+    campaign_id: str,
+    data: Dict[str, str],
+    current_user: User = Depends(get_current_user)
+):
+    """Cancel scheduled campaign"""
+    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    reason = data.get("reason", "")
+    if not reason:
+        raise HTTPException(status_code=400, detail="Cancellation reason required")
+    
+    marketing = get_marketing_service(db)
+    
+    try:
+        campaign = await marketing.cancel_campaign(
+            campaign_id=campaign_id,
+            admin_id=current_user.id,
+            admin_email=current_user.email,
+            reason=reason
+        )
+        return campaign
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to cancel campaign: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/admin/marketing/campaigns/{campaign_id}/stats")
+async def get_campaign_stats(
+    campaign_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Get campaign statistics with open/click rates"""
+    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    marketing = get_marketing_service(db)
+    
+    try:
+        stats = await marketing.get_campaign_stats(campaign_id)
+        return stats
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to get campaign stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/admin/marketing/campaigns/{campaign_id}/events")
+async def get_campaign_events(
+    campaign_id: str,
+    event_type: Optional[str] = None,
+    limit: int = 100,
+    current_user: User = Depends(get_current_user)
+):
+    """Get email events for a campaign"""
+    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    marketing = get_marketing_service(db)
+    events = await marketing.get_email_events(
+        campaign_id=campaign_id,
+        event_type=event_type,
+        limit=limit
+    )
+    
+    return {"events": events, "count": len(events)}
+
+
+@api_router.get("/admin/marketing/audit")
+async def get_marketing_audit_logs(
+    campaign_id: Optional[str] = None,
+    limit: int = 100,
+    current_user: User = Depends(get_current_user)
+):
+    """Get marketing audit logs"""
+    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    query = {}
+    if campaign_id:
+        query["campaign_id"] = campaign_id
+    
+    logs = await db.marketing_audit_logs.find(
+        query, {"_id": 0}
+    ).sort("timestamp", -1).limit(limit).to_list(limit)
+    
+    return {"logs": logs, "count": len(logs)}
+
+
+# SendGrid Webhook Handler (public endpoint, validated by signature)
+@api_router.post("/webhooks/sendgrid")
+async def sendgrid_webhook(request: Request):
+    """
+    Handle SendGrid webhook events for email tracking
+    
+    Events: delivered, open, click, bounce, dropped, 
+            spam_report, unsubscribe, group_unsubscribe
+    """
+    try:
+        # Get raw body
+        body = await request.body()
+        events = json.loads(body)
+        
+        if not isinstance(events, list):
+            events = [events]
+        
+        marketing = get_marketing_service(db)
+        
+        for event in events:
+            await marketing.process_webhook_event(event)
+        
+        return {"status": "processed", "count": len(events)}
+    
+    except Exception as e:
+        logger.error(f"Webhook processing error: {e}")
+        # Return 200 to prevent SendGrid retries for processing errors
+        return {"status": "error", "message": str(e)}
+
+
+@api_router.get("/admin/marketing/config")
+async def get_marketing_config(current_user: User = Depends(get_current_user)):
+    """Get marketing email configuration status"""
+    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    marketing = get_marketing_service(db)
+    
+    marketing_key = os.environ.get("SENDGRID_MARKETING_API_KEY")
+    transactional_key = os.environ.get("SENDGRID_API_KEY")
+    
+    return {
+        "marketing_configured": marketing.is_configured(),
+        "has_marketing_key": bool(marketing_key and marketing_key != "SG.your-actual-sendgrid-key-here"),
+        "has_transactional_key": bool(transactional_key and transactional_key != "SG.your-actual-sendgrid-key-here"),
+        "using_separate_keys": bool(marketing_key and marketing_key != transactional_key),
+        "from_email": os.environ.get("SENDGRID_FROM_EMAIL", "noreply@bidvex.com"),
+        "marketing_from_email": os.environ.get("SENDGRID_MARKETING_FROM_EMAIL") or os.environ.get("SENDGRID_FROM_EMAIL", "noreply@bidvex.com"),
+        "webhook_url": f"{os.environ.get('FRONTEND_URL', '')}/api/webhooks/sendgrid"
+    }
+
+
 # Include all API routes - MUST be after all routes are defined
 app.include_router(api_router)
 
