@@ -10785,7 +10785,6 @@ async def estimate_full_transaction(
 
 
 # ========== EMAIL MARKETING MODULE ==========
-from services.email_marketing import get_marketing_service, SEGMENT_FILTERS, CAMPAIGN_STATUS
 
 class CampaignCreateRequest(BaseModel):
     """Request model for creating email campaign"""
