@@ -217,6 +217,168 @@ async def daily_summary_job():
         return {"error": str(e)}
 
 
+async def check_subscription_expirations_job():
+    """
+    Job: Check for expired manual subscriptions and downgrade to Free
+    
+    Runs daily at 00:30 UTC
+    - Finds all manual subscriptions where end_date < now
+    - Downgrades to Free plan
+    - Sends expiration email
+    - Logs all changes
+    """
+    if db_instance is None:
+        return
+    
+    try:
+        logger.info("Checking for expired subscriptions...")
+        now = datetime.now(timezone.utc)
+        
+        # Find expired manual subscriptions
+        expired_users = await db_instance.users.find({
+            "subscription_source": "manual",
+            "subscription_status": "active",
+            "subscription_tier": {"$ne": "free"},
+            "subscription_end_date": {"$lt": now.isoformat()}
+        }).to_list(None)
+        
+        expired_count = 0
+        for user in expired_users:
+            try:
+                previous_plan = user.get("subscription_tier")
+                
+                # Downgrade to free
+                await db_instance.users.update_one(
+                    {"id": user["id"]},
+                    {
+                        "$set": {
+                            "subscription_tier": "free",
+                            "subscription_status": "expired",
+                            "subscription_expired_at": now.isoformat(),
+                            "updated_at": now.isoformat()
+                        }
+                    }
+                )
+                
+                # Log to audit
+                await db_instance.subscription_audit_logs.insert_one({
+                    "id": str(uuid.uuid4()),
+                    "action": "subscription_auto_expired",
+                    "user_id": user["id"],
+                    "user_email": user.get("email"),
+                    "admin_id": "system",
+                    "admin_email": "system@bidvex.com",
+                    "previous_values": {"plan": previous_plan},
+                    "new_values": {"plan": "free", "status": "expired"},
+                    "reason": "Automatic expiration - subscription end date reached",
+                    "timestamp": now.isoformat()
+                })
+                
+                # Send expiration email
+                try:
+                    from services.email_notifications import send_subscription_expired_email
+                    await send_subscription_expired_email(
+                        user_email=user.get("email"),
+                        user_name=user.get("name", user.get("email")),
+                        previous_plan=previous_plan
+                    )
+                except Exception as email_error:
+                    logger.error(f"Failed to send expiration email to {user.get('email')}: {email_error}")
+                
+                expired_count += 1
+                logger.info(f"Expired subscription for {user.get('email')}: {previous_plan} -> free")
+                
+            except Exception as user_error:
+                logger.error(f"Error expiring subscription for user {user.get('id')}: {user_error}")
+        
+        logger.info(f"Subscription expiration job completed: {expired_count} subscriptions expired")
+        
+        return {
+            "expired_count": expired_count,
+            "timestamp": now.isoformat()
+        }
+    except Exception as e:
+        logger.exception(f"Error in subscription expiration job: {e}")
+        return {"error": str(e)}
+
+
+async def send_subscription_reminders_job():
+    """
+    Job: Send reminder emails for subscriptions expiring in 3 days
+    
+    Runs daily at 01:00 UTC
+    """
+    if db_instance is None:
+        return
+    
+    try:
+        logger.info("Checking for subscription expiration reminders...")
+        now = datetime.now(timezone.utc)
+        
+        from datetime import timedelta
+        
+        # Find subscriptions expiring in exactly 3 days
+        reminder_date_start = now + timedelta(days=2, hours=23)  # ~3 days from now
+        reminder_date_end = now + timedelta(days=3, hours=1)      # Window of 2 hours
+        
+        expiring_users = await db_instance.users.find({
+            "subscription_source": "manual",
+            "subscription_status": "active",
+            "subscription_tier": {"$ne": "free"},
+            "subscription_end_date": {
+                "$gte": reminder_date_start.isoformat(),
+                "$lt": reminder_date_end.isoformat()
+            },
+            # Don't send reminder if already sent
+            "subscription_reminder_sent": {"$ne": True}
+        }).to_list(None)
+        
+        reminder_count = 0
+        for user in expiring_users:
+            try:
+                end_date = user.get("subscription_end_date")
+                if isinstance(end_date, str):
+                    end_date = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                
+                days_left = (end_date - now).days
+                
+                # Send reminder email
+                try:
+                    from services.email_notifications import send_subscription_reminder_email
+                    await send_subscription_reminder_email(
+                        user_email=user.get("email"),
+                        user_name=user.get("name", user.get("email")),
+                        plan=user.get("subscription_tier"),
+                        days_remaining=days_left,
+                        end_date=end_date.strftime("%B %d, %Y")
+                    )
+                    
+                    # Mark reminder as sent
+                    await db_instance.users.update_one(
+                        {"id": user["id"]},
+                        {"$set": {"subscription_reminder_sent": True}}
+                    )
+                    
+                    reminder_count += 1
+                    logger.info(f"Sent subscription reminder to {user.get('email')} - expires in {days_left} days")
+                    
+                except Exception as email_error:
+                    logger.error(f"Failed to send reminder email to {user.get('email')}: {email_error}")
+                
+            except Exception as user_error:
+                logger.error(f"Error sending reminder to user {user.get('id')}: {user_error}")
+        
+        logger.info(f"Subscription reminder job completed: {reminder_count} reminders sent")
+        
+        return {
+            "reminders_sent": reminder_count,
+            "timestamp": now.isoformat()
+        }
+    except Exception as e:
+        logger.exception(f"Error in subscription reminder job: {e}")
+        return {"error": str(e)}
+
+
 def init_scheduler(database):
     """Initialize the background scheduler with all jobs"""
     global scheduler, db_instance
