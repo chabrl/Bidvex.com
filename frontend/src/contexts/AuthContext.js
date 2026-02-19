@@ -42,21 +42,38 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     console.log('Attempting login for:', email);
-    const response = await axios.post(`${API}/auth/login`, { email, password });
-    const { access_token, user: userData } = response.data;
-    console.log('Login successful. User:', userData);
-    console.log('Token received:', access_token ? 'yes' : 'no');
-    setToken(access_token);
-    setUser(userData);
-    localStorage.setItem('token', access_token);
-    axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
-    
-    // Sync language preference with i18next
-    if (userData.preferred_language) {
-      i18n.changeLanguage(userData.preferred_language);
+    try {
+      const response = await axios.post(`${API}/auth/login`, { email, password });
+      const { access_token, user: userData } = response.data;
+      console.log('Login successful. User:', userData);
+      console.log('Token received:', access_token ? 'yes' : 'no');
+      setToken(access_token);
+      setUser(userData);
+      localStorage.setItem('token', access_token);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+      
+      // Sync language preference with i18next
+      if (userData.preferred_language) {
+        i18n.changeLanguage(userData.preferred_language);
+      }
+      
+      return userData;
+    } catch (error) {
+      // Check if this is a password reset required error
+      if (error.response?.status === 403) {
+        const detail = error.response?.data?.detail;
+        if (detail && typeof detail === 'object' && detail.code === 'PASSWORD_RESET_REQUIRED') {
+          // Throw a special error that the UI can handle
+          const resetError = new Error('PASSWORD_RESET_REQUIRED');
+          resetError.resetToken = detail.reset_token;
+          resetError.userId = detail.user_id;
+          resetError.message = detail.message;
+          throw resetError;
+        }
+      }
+      // Re-throw other errors
+      throw error;
     }
-    
-    return userData;
   };
 
   const register = async (userData) => {
