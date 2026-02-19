@@ -1180,15 +1180,161 @@ const EmailMarketingManager = () => {
               </div>
 
               {/* Audience Preview */}
-              {audiencePreview.preview.length > 0 && (
+              {audiencePreview.preview?.length > 0 && (
                 <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
                   <p className="text-sm font-medium mb-2">Sample Recipients ({audiencePreview.count} total)</p>
                   <div className="space-y-1">
                     {audiencePreview.preview.map((user, idx) => (
                       <p key={idx} className="text-xs text-muted-foreground">
                         {user.name || 'No name'} - {user.email}
+                        {user.source && user.source !== 'segmented' && (
+                          <Badge variant="outline" className="ml-2 text-xs py-0">
+                            {user.source === 'manual_external' ? 'external' : user.source}
+                          </Badge>
+                        )}
                       </p>
                     ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Advanced Targeting Section */}
+            <div className="space-y-4 border-t pt-4">
+              <div className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-primary" />
+                <h3 className="font-medium">Advanced Targeting</h3>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Final Audience = (Segmented Users + Manual Emails) − Exclusions − Suppressed
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Manual Emails */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm flex items-center gap-2">
+                      <UserPlus className="h-4 w-4 text-green-600" />
+                      Add Emails Manually
+                    </Label>
+                    <Badge variant="outline" className="text-xs">
+                      {campaignData.manual_emails?.length || 0} added
+                    </Badge>
+                  </div>
+                  <Textarea
+                    value={manualEmailsText}
+                    onChange={(e) => setManualEmailsText(e.target.value)}
+                    onBlur={() => parseManualEmails(manualEmailsText)}
+                    placeholder="Enter emails separated by commas, semicolons, or new lines:&#10;email1@example.com&#10;email2@example.com, email3@example.com"
+                    rows={4}
+                    className="text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="file"
+                      ref={csvInputRef}
+                      accept=".csv"
+                      onChange={handleCsvUpload}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => csvInputRef.current?.click()}
+                      disabled={uploadingCsv}
+                      className="gap-2"
+                    >
+                      {uploadingCsv ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                      Upload CSV
+                    </Button>
+                    {csvParseResult && (
+                      <span className="text-xs text-muted-foreground self-center">
+                        {csvParseResult.valid?.length || 0} valid from CSV
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Exclude Emails */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm flex items-center gap-2">
+                      <UserMinus className="h-4 w-4 text-red-600" />
+                      Exclude Emails
+                    </Label>
+                    <Badge variant="outline" className="text-xs">
+                      {campaignData.exclude_emails?.length || 0} excluded
+                    </Badge>
+                  </div>
+                  <Textarea
+                    value={excludeEmailsText}
+                    onChange={(e) => setExcludeEmailsText(e.target.value)}
+                    onBlur={() => parseExcludeEmails(excludeEmailsText)}
+                    placeholder="Enter emails to exclude:&#10;competitor@example.com&#10;optout@example.com"
+                    rows={4}
+                    className="text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Exclusions override all other targeting rules
+                  </p>
+                </div>
+              </div>
+
+              {/* Final Audience Count */}
+              <div className="flex items-center justify-between p-4 bg-primary/5 rounded-lg border border-primary/20">
+                <div>
+                  <p className="font-medium">Final Recipient Count</p>
+                  <p className="text-xs text-muted-foreground">
+                    Click preview to calculate with all targeting rules
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-primary">{audiencePreview.count || 0}</p>
+                    {audiencePreview.breakdown && (
+                      <p className="text-xs text-muted-foreground">
+                        {audiencePreview.breakdown.segmented_count || 0} segmented + 
+                        {(audiencePreview.breakdown.manual_existing_count || 0) + (audiencePreview.breakdown.manual_external_count || 0)} manual
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="sm"
+                    onClick={fetchAdvancedAudiencePreview}
+                    disabled={loadingAudience}
+                    className="gap-2"
+                  >
+                    {loadingAudience ? <RefreshCw className="h-4 w-4 animate-spin" /> : <ListFilter className="h-4 w-4" />}
+                    Preview
+                  </Button>
+                </div>
+              </div>
+
+              {/* Breakdown Details */}
+              {audiencePreview.breakdown && (
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
+                  <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded">
+                    <p className="text-lg font-bold">{audiencePreview.breakdown.segmented_count || 0}</p>
+                    <p className="text-xs text-muted-foreground">Segmented</p>
+                  </div>
+                  <div className="p-2 bg-green-50 dark:bg-green-950/30 rounded">
+                    <p className="text-lg font-bold text-green-600">{audiencePreview.breakdown.manual_existing_count || 0}</p>
+                    <p className="text-xs text-muted-foreground">Manual (Existing)</p>
+                  </div>
+                  <div className="p-2 bg-blue-50 dark:bg-blue-950/30 rounded">
+                    <p className="text-lg font-bold text-blue-600">{audiencePreview.breakdown.manual_external_count || 0}</p>
+                    <p className="text-xs text-muted-foreground">Manual (External)</p>
+                  </div>
+                  <div className="p-2 bg-red-50 dark:bg-red-950/30 rounded">
+                    <p className="text-lg font-bold text-red-600">{audiencePreview.excluded_count || 0}</p>
+                    <p className="text-xs text-muted-foreground">Excluded</p>
+                  </div>
+                  <div className="p-2 bg-amber-50 dark:bg-amber-950/30 rounded">
+                    <p className="text-lg font-bold text-amber-600">{audiencePreview.suppressed_count || 0}</p>
+                    <p className="text-xs text-muted-foreground">Suppressed</p>
                   </div>
                 </div>
               )}
