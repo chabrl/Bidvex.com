@@ -123,15 +123,16 @@ class TestAdvancedTargetingEndpoints:
         
         csv_content = "email,name\nuser1@csv.com,User One\nuser2@csv.com,User Two\nuser3@csv.com,User Three"
         
-        files = {'file': ('emails.csv', io.BytesIO(csv_content.encode()), 'text/csv')}
+        # Create file-like object
+        csv_file = io.BytesIO(csv_content.encode('utf-8'))
         
-        # Remove JSON content-type for file upload
-        headers = {k: v for k, v in self.session.headers.items() if k != 'Content-Type'}
+        # Use requests.post directly with proper file handling
+        auth_header = self.session.headers.get('Authorization')
         
-        response = self.session.post(
+        response = requests.post(
             f"{BASE_URL}/api/admin/marketing/parse-csv",
-            files=files,
-            headers=headers
+            files={'file': ('emails.csv', csv_file, 'text/csv')},
+            headers={'Authorization': auth_header}
         )
         
         assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
@@ -149,14 +150,14 @@ class TestAdvancedTargetingEndpoints:
         import io
         
         csv_content = "email\nuser@csv.com\nuser@csv.com\nanother@csv.com"
+        csv_file = io.BytesIO(csv_content.encode('utf-8'))
         
-        files = {'file': ('emails.csv', io.BytesIO(csv_content.encode()), 'text/csv')}
-        headers = {k: v for k, v in self.session.headers.items() if k != 'Content-Type'}
+        auth_header = self.session.headers.get('Authorization')
         
-        response = self.session.post(
+        response = requests.post(
             f"{BASE_URL}/api/admin/marketing/parse-csv",
-            files=files,
-            headers=headers
+            files={'file': ('emails.csv', csv_file, 'text/csv')},
+            headers={'Authorization': auth_header}
         )
         
         assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
@@ -173,14 +174,14 @@ class TestAdvancedTargetingEndpoints:
         import io
         
         txt_content = "not,a,csv,file"
+        txt_file = io.BytesIO(txt_content.encode('utf-8'))
         
-        files = {'file': ('emails.txt', io.BytesIO(txt_content.encode()), 'text/plain')}
-        headers = {k: v for k, v in self.session.headers.items() if k != 'Content-Type'}
+        auth_header = self.session.headers.get('Authorization')
         
-        response = self.session.post(
+        response = requests.post(
             f"{BASE_URL}/api/admin/marketing/parse-csv",
-            files=files,
-            headers=headers
+            files={'file': ('emails.txt', txt_file, 'text/plain')},
+            headers={'Authorization': auth_header}
         )
         
         assert response.status_code == 400, f"Expected 400 for non-CSV, got {response.status_code}"
