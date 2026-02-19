@@ -461,6 +461,23 @@ class EmailMarketingService:
         ).limit(limit).to_list(limit)
         return users
     
+    async def calculate_final_audience_count(
+        self,
+        audience_filters: Dict[str, Any],
+        manual_emails: List[str] = None,
+        exclude_emails: List[str] = None
+    ) -> Dict[str, Any]:
+        """Calculate final audience count with advanced targeting"""
+        audience = await self.build_advanced_audience(
+            filters=audience_filters,
+            manual_emails=manual_emails or [],
+            exclude_emails=exclude_emails or []
+        )
+        return {
+            "total": audience["final_count"],
+            "breakdown": audience["breakdown"]
+        }
+    
     async def create_campaign(
         self,
         name: str,
@@ -473,13 +490,23 @@ class EmailMarketingService:
         scheduled_at: Optional[str] = None,
         from_email: Optional[str] = None,
         from_name: Optional[str] = None,
-        reply_to: Optional[str] = None
+        reply_to: Optional[str] = None,
+        manual_emails: Optional[List[str]] = None,
+        exclude_emails: Optional[List[str]] = None
     ) -> Dict[str, Any]:
-        """Create a new email campaign"""
+        """Create a new email campaign with advanced targeting support"""
         now = datetime.now(timezone.utc)
         
-        # Get audience count
-        audience_count = await self.get_audience_count(audience_filters)
+        # Parse and validate manual emails
+        manual_emails = manual_emails or []
+        exclude_emails = exclude_emails or []
+        
+        # Calculate advanced audience
+        audience_result = await self.calculate_final_audience_count(
+            audience_filters=audience_filters,
+            manual_emails=manual_emails,
+            exclude_emails=exclude_emails
+        )
         
         campaign = {
             "id": str(uuid.uuid4()),
@@ -488,7 +515,10 @@ class EmailMarketingService:
             "html_content": html_content,
             "plain_text_content": plain_text_content,
             "audience_filters": audience_filters,
-            "audience_count": audience_count,
+            "manual_emails": manual_emails,
+            "exclude_emails": exclude_emails,
+            "audience_count": audience_result["total"],
+            "audience_breakdown": audience_result["breakdown"],
             "from_email": from_email or MARKETING_FROM_EMAIL,
             "from_name": from_name or MARKETING_FROM_NAME,
             "reply_to": reply_to,
@@ -514,13 +544,23 @@ class EmailMarketingService:
         
         await self.campaigns.insert_one(campaign)
         
-        # Audit log
+        # Audit log with advanced targeting details
+        audit_details = {
+            "name": name, 
+            "audience_count": audience_result["total"],
+            "breakdown": audience_result["breakdown"]
+        }
+        if manual_emails:
+            audit_details["manual_emails_count"] = len(manual_emails)
+        if exclude_emails:
+            audit_details["exclude_emails_count"] = len(exclude_emails)
+        
         await self._log_audit(
             action="campaign_created",
             campaign_id=campaign["id"],
             admin_id=admin_id,
             admin_email=admin_email,
-            details={"name": name, "audience_count": audience_count}
+            details=audit_details
         )
         
         return {k: v for k, v in campaign.items() if k != "_id"}
