@@ -28,6 +28,7 @@ import AdminLogs from './admin/AdminLogs';
 import CurrencyAppealsManager from './admin/CurrencyAppealsManager';
 import SubscriptionManager from './admin/SubscriptionManager';
 import EmailTemplates from './admin/EmailTemplates';
+import EmailMarketingManager from './admin/EmailMarketingManager';
 import MarketplaceSettings from './admin/MarketplaceSettings';
 import BrandingLayoutManager from './admin/BrandingLayoutManager';
 import SiteContentManager from './admin/SiteContentManager';
@@ -36,7 +37,7 @@ import {
   Users, Package, Gavel, Shield, TrendingUp, Bell, Settings, FileText, 
   MessageSquare, DollarSign, Search, Image, CreditCard, Megaphone, 
   Activity, AlertTriangle, ChevronRight, Power, Zap, Eye, History,
-  ToggleLeft, ToggleRight, Clock, Mail, Sliders, Car
+  ToggleLeft, ToggleRight, Clock, Mail, Sliders, Car, Send
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
