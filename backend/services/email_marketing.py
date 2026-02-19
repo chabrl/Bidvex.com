@@ -82,6 +82,256 @@ class EmailMarketingService:
         """Check if marketing email is configured"""
         return marketing_client is not None
     
+    def validate_email(self, email: str) -> bool:
+        """Validate email format"""
+        import re
+        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        return bool(re.match(pattern, email.strip().lower()))
+    
+    def parse_email_list(self, email_text: str) -> List[str]:
+        """
+        Parse a string of emails (comma or newline separated) into a list
+        Returns only valid, unique, lowercase emails
+        """
+        if not email_text or not email_text.strip():
+            return []
+        
+        # Split by comma, newline, semicolon, or space
+        import re
+        raw_emails = re.split(r'[,\n;\s]+', email_text)
+        
+        # Validate and deduplicate
+        valid_emails = set()
+        for email in raw_emails:
+            email = email.strip().lower()
+            if email and self.validate_email(email):
+                valid_emails.add(email)
+        
+        return list(valid_emails)
+    
+    def parse_csv_emails(self, csv_content: str) -> Dict[str, Any]:
+        """
+        Parse CSV content to extract emails
+        Returns: {valid: [...], invalid: [...], duplicates: [...]}
+        """
+        import csv
+        import io
+        
+        result = {
+            "valid": [],
+            "invalid": [],
+            "duplicates": [],
+            "total_rows": 0
+        }
+        
+        try:
+            reader = csv.DictReader(io.StringIO(csv_content))
+            seen_emails = set()
+            
+            # Find email column (case-insensitive)
+            email_column = None
+            if reader.fieldnames:
+                for field in reader.fieldnames:
+                    if field.lower() in ['email', 'e-mail', 'email_address', 'emailaddress', 'mail']:
+                        email_column = field
+                        break
+                # If no email column found, try first column
+                if not email_column and reader.fieldnames:
+                    email_column = reader.fieldnames[0]
+            
+            for row in reader:
+                result["total_rows"] += 1
+                email = row.get(email_column, "").strip().lower() if email_column else ""
+                
+                if not email:
+                    continue
+                
+                if not self.validate_email(email):
+                    result["invalid"].append(email)
+                elif email in seen_emails:
+                    result["duplicates"].append(email)
+                else:
+                    seen_emails.add(email)
+                    result["valid"].append(email)
+                    
+        except Exception as e:
+            logger.error(f"CSV parsing error: {e}")
+            result["error"] = str(e)
+        
+        return result
+    
+    async def get_suppressed_emails(self) -> set:
+        """
+        Get set of emails that should not receive marketing emails:
+        - Unsubscribed users
+        - Bounced emails
+        - Spam reporters
+        """
+        suppressed = set()
+        
+        # Get unsubscribed users
+        unsubscribed = await self.db.users.find(
+            {"marketing_unsubscribed": True},
+            {"_id": 0, "email": 1}
+        ).to_list(None)
+        suppressed.update(u["email"].lower() for u in unsubscribed if u.get("email"))
+        
+        # Get bounced emails from email_events
+        bounced = await self.email_events.distinct(
+            "email",
+            {"event_type": {"$in": ["bounce", "dropped", "spamreport"]}}
+        )
+        suppressed.update(e.lower() for e in bounced if e)
+        
+        return suppressed
+    
+    async def build_advanced_audience(
+        self,
+        filters: Dict[str, Any],
+        manual_emails: List[str] = None,
+        exclude_emails: List[str] = None,
+        include_external: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Build complete audience with advanced targeting:
+        
+        Final Audience = (Segmented Users + Manual Emails) - Exclusions - Suppressed
+        
+        Args:
+            filters: Standard segmentation filters
+            manual_emails: List of manually added email addresses
+            exclude_emails: List of emails to exclude
+            include_external: Whether to include non-registered emails
+            
+        Returns:
+            {
+                "segmented_users": [...],  # Users from DB
+                "manual_external": [...],   # Manual emails not in DB
+                "excluded": [...],          # Emails excluded
+                "suppressed": [...],        # Emails suppressed (unsubscribed/bounced)
+                "final_count": int,
+                "breakdown": {...}
+            }
+        """
+        manual_emails = manual_emails or []
+        exclude_emails = exclude_emails or []
+        
+        # Normalize all emails
+        manual_emails = [e.strip().lower() for e in manual_emails if e and self.validate_email(e)]
+        exclude_emails = [e.strip().lower() for e in exclude_emails if e and self.validate_email(e)]
+        exclude_set = set(exclude_emails)
+        
+        # Get suppressed emails
+        suppressed_set = await self.get_suppressed_emails()
+        
+        # Get segmented users from database
+        query = await self.build_audience_query(filters)
+        segmented_users = await self.db.users.find(
+            query,
+            {"_id": 0, "id": 1, "email": 1, "name": 1}
+        ).to_list(None)
+        
+        # Build final recipient lists
+        final_recipients = []
+        excluded_list = []
+        suppressed_list = []
+        segmented_emails = set()
+        
+        # Process segmented users
+        for user in segmented_users:
+            email = user.get("email", "").lower()
+            if not email:
+                continue
+                
+            segmented_emails.add(email)
+            
+            if email in exclude_set:
+                excluded_list.append({"email": email, "reason": "manually_excluded", "source": "segmented"})
+            elif email in suppressed_set:
+                suppressed_list.append({"email": email, "reason": "suppressed", "source": "segmented"})
+            else:
+                final_recipients.append({
+                    "email": email,
+                    "name": user.get("name"),
+                    "user_id": user.get("id"),
+                    "source": "segmented"
+                })
+        
+        # Process manual emails
+        manual_external = []
+        for email in manual_emails:
+            if email in exclude_set:
+                excluded_list.append({"email": email, "reason": "manually_excluded", "source": "manual"})
+            elif email in suppressed_set:
+                suppressed_list.append({"email": email, "reason": "suppressed", "source": "manual"})
+            elif email in segmented_emails:
+                # Already included from segmentation, skip to avoid duplicates
+                continue
+            else:
+                # Check if user exists in DB
+                existing_user = await self.db.users.find_one(
+                    {"email": {"$regex": f"^{email}$", "$options": "i"}},
+                    {"_id": 0, "id": 1, "name": 1, "email": 1}
+                )
+                
+                if existing_user:
+                    final_recipients.append({
+                        "email": email,
+                        "name": existing_user.get("name"),
+                        "user_id": existing_user.get("id"),
+                        "source": "manual_existing"
+                    })
+                elif include_external:
+                    manual_external.append(email)
+                    final_recipients.append({
+                        "email": email,
+                        "name": None,
+                        "user_id": None,
+                        "source": "manual_external"
+                    })
+        
+        return {
+            "recipients": final_recipients,
+            "excluded": excluded_list,
+            "suppressed": suppressed_list,
+            "manual_external": manual_external,
+            "final_count": len(final_recipients),
+            "breakdown": {
+                "segmented_count": len([r for r in final_recipients if r["source"] == "segmented"]),
+                "manual_existing_count": len([r for r in final_recipients if r["source"] == "manual_existing"]),
+                "manual_external_count": len(manual_external),
+                "excluded_count": len(excluded_list),
+                "suppressed_count": len(suppressed_list)
+            }
+        }
+    
+    async def get_advanced_audience_preview(
+        self,
+        filters: Dict[str, Any],
+        manual_emails: List[str] = None,
+        exclude_emails: List[str] = None,
+        limit: int = 20
+    ) -> Dict[str, Any]:
+        """Get preview of advanced audience with breakdown"""
+        audience = await self.build_advanced_audience(
+            filters=filters,
+            manual_emails=manual_emails,
+            exclude_emails=exclude_emails
+        )
+        
+        # Limit preview
+        preview = audience["recipients"][:limit]
+        
+        return {
+            "count": audience["final_count"],
+            "preview": preview,
+            "breakdown": audience["breakdown"],
+            "excluded_count": len(audience["excluded"]),
+            "suppressed_count": len(audience["suppressed"]),
+            "excluded_preview": audience["excluded"][:5],
+            "suppressed_preview": audience["suppressed"][:5]
+        }
+    
     async def build_audience_query(self, filters: Dict[str, Any]) -> Dict[str, Any]:
         """
         Build MongoDB query from audience filters
