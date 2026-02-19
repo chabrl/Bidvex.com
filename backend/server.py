@@ -10993,7 +10993,7 @@ async def create_campaign(
     data: CampaignCreateRequest,
     current_user: User = Depends(get_current_user)
 ):
-    """Create new email campaign"""
+    """Create new email campaign with advanced targeting support"""
     if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
@@ -11011,7 +11011,9 @@ async def create_campaign(
             scheduled_at=data.scheduled_at,
             from_email=data.from_email,
             from_name=data.from_name,
-            reply_to=data.reply_to
+            reply_to=data.reply_to,
+            manual_emails=data.manual_emails,
+            exclude_emails=data.exclude_emails
         )
         return campaign
     except Exception as e:
