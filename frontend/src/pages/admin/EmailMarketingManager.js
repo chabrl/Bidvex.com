@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
@@ -29,7 +29,8 @@ import {
   Mail, Send, Users, Calendar, BarChart3, Plus, Edit3, 
   Trash2, Eye, Play, Pause, Clock, CheckCircle, XCircle,
   AlertTriangle, RefreshCw, Filter, Search, MousePointer,
-  TrendingUp, ArrowLeft, Copy, FileText, Settings
+  TrendingUp, ArrowLeft, Copy, FileText, Settings, Upload,
+  UserPlus, UserMinus, Download, ListFilter, Target
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
