@@ -1549,7 +1549,7 @@ async def force_reset_password(request: ForceResetPasswordRequest):
     try:
         # Verify the token
         try:
-            payload = jwt.decode(request.reset_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            payload = jwt.decode(request.reset_token, jwt_secret, algorithms=["HS256"])
             user_id = payload.get("sub")
             purpose = payload.get("purpose")
             
