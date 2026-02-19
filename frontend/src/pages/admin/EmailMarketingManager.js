@@ -111,13 +111,28 @@ const EmailMarketingManager = () => {
       activity_status: '',
       exclude_unsubscribed: true
     },
+    manual_emails: [],
+    exclude_emails: [],
     scheduled_at: '',
     from_name: '',
     reply_to: ''
   });
-  const [audiencePreview, setAudiencePreview] = useState({ count: 0, preview: [] });
+  const [audiencePreview, setAudiencePreview] = useState({ 
+    count: 0, 
+    preview: [],
+    breakdown: null,
+    excluded_count: 0,
+    suppressed_count: 0
+  });
   const [loadingAudience, setLoadingAudience] = useState(false);
   const [saving, setSaving] = useState(false);
+  
+  // Advanced targeting state
+  const [manualEmailsText, setManualEmailsText] = useState('');
+  const [excludeEmailsText, setExcludeEmailsText] = useState('');
+  const [csvParseResult, setCsvParseResult] = useState(null);
+  const [uploadingCsv, setUploadingCsv] = useState(false);
+  const csvInputRef = useRef(null);
   
   // Test email state
   const [testEmailDialogOpen, setTestEmailDialogOpen] = useState(false);
@@ -163,6 +178,24 @@ const EmailMarketingManager = () => {
       console.error('Failed to fetch config:', error);
     }
   };
+
+  const fetchAdvancedAudiencePreview = useCallback(async () => {
+    setLoadingAudience(true);
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const response = await axios.post(`${API}/admin/marketing/audience/advanced-preview`, {
+        audience_filters: campaignData.audience_filters,
+        manual_emails: campaignData.manual_emails,
+        exclude_emails: campaignData.exclude_emails
+      }, { headers });
+      setAudiencePreview(response.data);
+    } catch (error) {
+      console.error('Failed to fetch advanced audience:', error);
+      toast.error('Failed to preview audience');
+    } finally {
+      setLoadingAudience(false);
+    }
+  }, [token, campaignData.audience_filters, campaignData.manual_emails, campaignData.exclude_emails]);
 
   const fetchAudiencePreview = useCallback(async (filters) => {
     setLoadingAudience(true);
