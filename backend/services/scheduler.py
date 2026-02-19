@@ -380,6 +380,78 @@ async def send_subscription_reminders_job():
         return {"error": str(e)}
 
 
+async def process_scheduled_campaigns_job():
+    """
+    Job: Process scheduled email campaigns
+    
+    Runs every 5 minutes
+    - Finds scheduled campaigns where scheduled_at <= now
+    - Sends each campaign
+    """
+    if db_instance is None:
+        return
+    
+    try:
+        logger.info("Checking for scheduled email campaigns...")
+        now = datetime.now(timezone.utc)
+        
+        # Find campaigns ready to send
+        ready_campaigns = await db_instance.email_campaigns.find({
+            "status": "scheduled",
+            "scheduled_at": {"$lte": now.isoformat()}
+        }).to_list(None)
+        
+        if not ready_campaigns:
+            return {"processed": 0}
+        
+        from services.email_marketing import get_marketing_service
+        marketing = get_marketing_service(db_instance)
+        
+        processed_count = 0
+        for campaign in ready_campaigns:
+            try:
+                logger.info(f"Processing scheduled campaign: {campaign['id']} - {campaign['name']}")
+                
+                # Update status to sending
+                await db_instance.email_campaigns.update_one(
+                    {"id": campaign["id"]},
+                    {"$set": {
+                        "status": "sending",
+                        "sent_at": now.isoformat(),
+                        "updated_at": now.isoformat()
+                    }}
+                )
+                
+                # Execute send
+                result = await marketing._execute_campaign_send(campaign["id"])
+                processed_count += 1
+                
+                logger.info(f"Campaign {campaign['id']} sent: {result}")
+                
+            except Exception as campaign_error:
+                logger.error(f"Error sending campaign {campaign['id']}: {campaign_error}")
+                
+                # Mark as failed
+                await db_instance.email_campaigns.update_one(
+                    {"id": campaign["id"]},
+                    {"$set": {
+                        "status": "failed",
+                        "error": str(campaign_error),
+                        "updated_at": now.isoformat()
+                    }}
+                )
+        
+        logger.info(f"Processed {processed_count} scheduled campaigns")
+        
+        return {
+            "processed": processed_count,
+            "timestamp": now.isoformat()
+        }
+    except Exception as e:
+        logger.exception(f"Error in scheduled campaigns job: {e}")
+        return {"error": str(e)}
+
+
 def init_scheduler(database):
     """Initialize the background scheduler with all jobs"""
     global scheduler, db_instance
