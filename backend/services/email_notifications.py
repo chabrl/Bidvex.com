@@ -589,3 +589,182 @@ async def send_auction_sold_email(
         subject=f"🎉 Sold! {vehicle_title} - {_format_currency(final_price)}",
         html_content=_base_template(content, "Vehicle Sold")
     )
+
+
+
+# ===== SUBSCRIPTION EMAILS =====
+
+async def send_subscription_reminder_email(
+    user_email: str,
+    user_name: str,
+    plan: str,
+    days_remaining: int,
+    end_date: str
+) -> Dict[str, Any]:
+    """Send reminder email 3 days before subscription expires"""
+    plan_name = plan.title()
+    
+    content = f"""
+    <h2 style="margin: 0 0 20px 0; color: #f59e0b;">⏰ Subscription Expiring Soon</h2>
+    
+    <p style="color: #475569; line-height: 1.6;">
+        Hi {user_name},
+    </p>
+    
+    <p style="color: #475569; line-height: 1.6;">
+        Your <strong>{plan_name}</strong> subscription will expire in <strong>{days_remaining} days</strong>.
+    </p>
+    
+    <div style="background-color: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px; padding: 20px; margin: 20px 0;">
+        <table width="100%" style="font-size: 14px; color: #1e293b;">
+            <tr>
+                <td style="padding: 8px 0;"><strong>Current Plan:</strong></td>
+                <td style="padding: 8px 0; text-align: right;">{plan_name}</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px 0;"><strong>Expires On:</strong></td>
+                <td style="padding: 8px 0; text-align: right;">{end_date}</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px 0;"><strong>Days Remaining:</strong></td>
+                <td style="padding: 8px 0; text-align: right; color: #d97706; font-weight: bold;">{days_remaining}</td>
+            </tr>
+        </table>
+    </div>
+    
+    <p style="color: #475569; line-height: 1.6;">
+        To continue enjoying {plan_name} benefits (reduced fees, priority support, and more), 
+        please contact support to renew your subscription.
+    </p>
+    
+    <div style="text-align: center; margin: 30px 0;">
+        <a href="{FRONTEND_URL}/settings/subscription" 
+           style="display: inline-block; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); 
+                  color: #ffffff; text-decoration: none; padding: 14px 30px; border-radius: 8px; 
+                  font-weight: bold; font-size: 16px;">
+            View Subscription
+        </a>
+    </div>
+    
+    <p style="color: #64748b; font-size: 13px; line-height: 1.6;">
+        If your subscription expires, your account will be downgraded to the Free plan automatically.
+    </p>
+    """
+    
+    return await send_email(
+        to_email=user_email,
+        subject=f"⏰ Your {plan_name} Subscription Expires in {days_remaining} Days",
+        html_content=_base_template(content, "Subscription Reminder")
+    )
+
+
+async def send_subscription_expired_email(
+    user_email: str,
+    user_name: str,
+    previous_plan: str
+) -> Dict[str, Any]:
+    """Send confirmation email when subscription expires"""
+    plan_name = previous_plan.title()
+    
+    content = f"""
+    <h2 style="margin: 0 0 20px 0; color: #64748b;">Subscription Expired</h2>
+    
+    <p style="color: #475569; line-height: 1.6;">
+        Hi {user_name},
+    </p>
+    
+    <p style="color: #475569; line-height: 1.6;">
+        Your <strong>{plan_name}</strong> subscription has expired. Your account has been 
+        downgraded to the <strong>Free</strong> plan.
+    </p>
+    
+    <div style="background-color: #f1f5f9; border-radius: 8px; padding: 20px; margin: 20px 0;">
+        <h4 style="margin: 0 0 15px 0; color: #334155;">What's Changed:</h4>
+        <ul style="margin: 0; padding: 0 0 0 20px; color: #475569; line-height: 1.8;">
+            <li>Monthly listing limit reduced</li>
+            <li>Buyer premium discounts removed</li>
+            <li>Seller commission discounts removed</li>
+            <li>Priority support no longer available</li>
+        </ul>
+    </div>
+    
+    <p style="color: #475569; line-height: 1.6;">
+        Don't worry! Your existing listings will remain active. To regain your {plan_name} benefits, 
+        please contact support to renew your subscription.
+    </p>
+    
+    <div style="text-align: center; margin: 30px 0;">
+        <a href="{FRONTEND_URL}/settings/subscription" 
+           style="display: inline-block; background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%); 
+                  color: #ffffff; text-decoration: none; padding: 14px 30px; border-radius: 8px; 
+                  font-weight: bold; font-size: 16px;">
+            Renew Subscription
+        </a>
+    </div>
+    
+    <p style="color: #64748b; font-size: 13px; line-height: 1.6;">
+        Thank you for being a {plan_name} member. We hope to see you back soon!
+    </p>
+    """
+    
+    return await send_email(
+        to_email=user_email,
+        subject=f"Your {plan_name} Subscription Has Expired",
+        html_content=_base_template(content, "Subscription Expired")
+    )
+
+
+async def send_subscription_upgraded_email(
+    user_email: str,
+    user_name: str,
+    new_plan: str,
+    end_date: str
+) -> Dict[str, Any]:
+    """Send confirmation when subscription is upgraded/changed by admin"""
+    plan_name = new_plan.title()
+    
+    content = f"""
+    <h2 style="margin: 0 0 20px 0; color: #10b981;">🎉 Subscription Updated</h2>
+    
+    <p style="color: #475569; line-height: 1.6;">
+        Hi {user_name},
+    </p>
+    
+    <p style="color: #475569; line-height: 1.6;">
+        Great news! Your subscription has been updated to <strong>{plan_name}</strong>.
+    </p>
+    
+    <div style="background-color: #d1fae5; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
+        <p style="margin: 0; color: #065f46; font-size: 24px; font-weight: bold;">
+            {plan_name}
+        </p>
+        <p style="margin: 10px 0 0 0; color: #10b981; font-size: 14px;">
+            Active until {end_date}
+        </p>
+    </div>
+    
+    <h4 style="margin: 25px 0 15px 0; color: #334155;">Your {plan_name} Benefits:</h4>
+    <ul style="margin: 0; padding: 0 0 0 20px; color: #475569; line-height: 1.8;">
+        {"<li>Reduced buyer premium fees</li>" if new_plan in ['premium', 'vip'] else ""}
+        {"<li>Lower seller commission rates</li>" if new_plan in ['premium', 'vip'] else ""}
+        {"<li>Priority customer support</li>" if new_plan in ['premium', 'vip'] else ""}
+        {"<li>Advanced analytics dashboard</li>" if new_plan == 'vip' else ""}
+        {"<li>Dedicated account manager</li>" if new_plan == 'vip' else ""}
+    </ul>
+    
+    <div style="text-align: center; margin: 30px 0;">
+        <a href="{FRONTEND_URL}/marketplace" 
+           style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
+                  color: #ffffff; text-decoration: none; padding: 14px 30px; border-radius: 8px; 
+                  font-weight: bold; font-size: 16px;">
+            Start Exploring
+        </a>
+    </div>
+    """
+    
+    return await send_email(
+        to_email=user_email,
+        subject=f"🎉 Welcome to {plan_name}!",
+        html_content=_base_template(content, "Subscription Updated")
+    )
+
