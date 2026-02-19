@@ -13,7 +13,389 @@ BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 # Admin credentials from the test request
 ADMIN_EMAIL = "charbeladmin@bidvex.com"
 ADMIN_PASSWORD = "Admin123!"
-TEST_CAMPAIGN_ID = "c501d209-502b-4711-9680-8d798bffb23d"
+TEST_CAMPAIGN_ID = "3a33805a-0816-440e-a5ed-ae525666ca24"  # Updated campaign ID
+
+
+class TestAdvancedTargetingEndpoints:
+    """
+    Advanced Targeting Tests - Phase 4
+    Tests: Parse emails, CSV upload, suppressed check, advanced preview, manual/exclude emails
+    """
+    
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        """Get admin auth token"""
+        self.session = requests.Session()
+        self.session.headers.update({"Content-Type": "application/json"})
+        
+        # Login as admin
+        response = self.session.post(f"{BASE_URL}/api/auth/login", json={
+            "email": ADMIN_EMAIL,
+            "password": ADMIN_PASSWORD
+        })
+        assert response.status_code == 200, f"Admin login failed: {response.text}"
+        
+        token = response.json().get("access_token")
+        assert token, "No access token received"
+        
+        self.session.headers.update({"Authorization": f"Bearer {token}"})
+    
+    # ========== POST /api/admin/marketing/parse-emails ==========
+    def test_parse_emails_comma_separated(self):
+        """Test: Parse comma-separated emails"""
+        response = self.session.post(
+            f"{BASE_URL}/api/admin/marketing/parse-emails",
+            json={"emails": "user1@test.com, user2@test.com, user3@test.com"}
+        )
+        
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+        
+        data = response.json()
+        assert "valid" in data, "Response should have 'valid' list"
+        assert "invalid" in data, "Response should have 'invalid' list"
+        assert "count" in data, "Response should have 'count'"
+        assert len(data["valid"]) == 3, f"Expected 3 valid emails, got {len(data['valid'])}"
+        
+        print(f"✅ Parsed {data['count']} valid emails from comma-separated input")
+    
+    def test_parse_emails_newline_separated(self):
+        """Test: Parse newline-separated emails"""
+        response = self.session.post(
+            f"{BASE_URL}/api/admin/marketing/parse-emails",
+            json={"emails": "user1@test.com\nuser2@test.com\nuser3@test.com"}
+        )
+        
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+        
+        data = response.json()
+        assert len(data["valid"]) == 3, f"Expected 3 valid emails, got {len(data['valid'])}"
+        
+        print(f"✅ Parsed {data['count']} valid emails from newline-separated input")
+    
+    def test_parse_emails_with_invalid(self):
+        """Test: Parse mixed valid and invalid emails"""
+        response = self.session.post(
+            f"{BASE_URL}/api/admin/marketing/parse-emails",
+            json={"emails": "valid@test.com, invalid-email, another@valid.org, @missing.com"}
+        )
+        
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+        
+        data = response.json()
+        assert len(data["valid"]) == 2, f"Expected 2 valid emails, got {len(data['valid'])}"
+        assert len(data["invalid"]) >= 1, f"Expected at least 1 invalid email"
+        
+        print(f"✅ Correctly identified {len(data['valid'])} valid and {len(data['invalid'])} invalid emails")
+    
+    def test_parse_emails_empty_input(self):
+        """Test: Parse empty email input"""
+        response = self.session.post(
+            f"{BASE_URL}/api/admin/marketing/parse-emails",
+            json={"emails": ""}
+        )
+        
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+        
+        data = response.json()
+        assert len(data["valid"]) == 0, "Empty input should return no valid emails"
+        
+        print("✅ Correctly handled empty email input")
+    
+    def test_parse_emails_deduplication(self):
+        """Test: Parse emails removes duplicates"""
+        response = self.session.post(
+            f"{BASE_URL}/api/admin/marketing/parse-emails",
+            json={"emails": "same@test.com, same@test.com, SAME@TEST.COM"}
+        )
+        
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+        
+        data = response.json()
+        # Should have only 1 unique email (case insensitive)
+        assert len(data["valid"]) == 1, f"Expected 1 unique email, got {len(data['valid'])}"
+        
+        print(f"✅ Correctly deduplicated emails, count: {data['count']}")
+    
+    # ========== POST /api/admin/marketing/parse-csv ==========
+    def test_parse_csv_success(self):
+        """Test: Parse CSV file with email column"""
+        import io
+        
+        csv_content = "email,name\nuser1@csv.com,User One\nuser2@csv.com,User Two\nuser3@csv.com,User Three"
+        
+        files = {'file': ('emails.csv', io.BytesIO(csv_content.encode()), 'text/csv')}
+        
+        # Remove JSON content-type for file upload
+        headers = {k: v for k, v in self.session.headers.items() if k != 'Content-Type'}
+        
+        response = self.session.post(
+            f"{BASE_URL}/api/admin/marketing/parse-csv",
+            files=files,
+            headers=headers
+        )
+        
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+        
+        data = response.json()
+        assert "valid" in data, "Response should have 'valid' list"
+        assert "total_rows" in data, "Response should have 'total_rows'"
+        assert len(data["valid"]) == 3, f"Expected 3 valid emails, got {len(data['valid'])}"
+        
+        print(f"✅ Parsed {len(data['valid'])} valid emails from CSV")
+        print(f"✅ Total rows: {data['total_rows']}")
+    
+    def test_parse_csv_with_duplicates(self):
+        """Test: Parse CSV file with duplicate emails"""
+        import io
+        
+        csv_content = "email\nuser@csv.com\nuser@csv.com\nanother@csv.com"
+        
+        files = {'file': ('emails.csv', io.BytesIO(csv_content.encode()), 'text/csv')}
+        headers = {k: v for k, v in self.session.headers.items() if k != 'Content-Type'}
+        
+        response = self.session.post(
+            f"{BASE_URL}/api/admin/marketing/parse-csv",
+            files=files,
+            headers=headers
+        )
+        
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+        
+        data = response.json()
+        assert "duplicates" in data, "Response should have 'duplicates' list"
+        assert len(data["valid"]) == 2, f"Expected 2 unique emails, got {len(data['valid'])}"
+        assert len(data["duplicates"]) == 1, f"Expected 1 duplicate, got {len(data['duplicates'])}"
+        
+        print(f"✅ Found {len(data['valid'])} unique and {len(data['duplicates'])} duplicate emails")
+    
+    def test_parse_csv_invalid_file_type(self):
+        """Test: Reject non-CSV files"""
+        import io
+        
+        txt_content = "not,a,csv,file"
+        
+        files = {'file': ('emails.txt', io.BytesIO(txt_content.encode()), 'text/plain')}
+        headers = {k: v for k, v in self.session.headers.items() if k != 'Content-Type'}
+        
+        response = self.session.post(
+            f"{BASE_URL}/api/admin/marketing/parse-csv",
+            files=files,
+            headers=headers
+        )
+        
+        assert response.status_code == 400, f"Expected 400 for non-CSV, got {response.status_code}"
+        
+        print("✅ Correctly rejected non-CSV file")
+    
+    # ========== POST /api/admin/marketing/check-suppressed ==========
+    def test_check_suppressed_emails(self):
+        """Test: Check which emails are suppressed"""
+        response = self.session.post(
+            f"{BASE_URL}/api/admin/marketing/check-suppressed",
+            json={"emails": ["test1@example.com", "test2@example.com", "bounced@test.com"]}
+        )
+        
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+        
+        data = response.json()
+        assert "suppressed" in data, "Response should have 'suppressed' list"
+        assert "valid" in data, "Response should have 'valid' list"
+        assert "suppressed_count" in data, "Response should have 'suppressed_count'"
+        assert "valid_count" in data, "Response should have 'valid_count'"
+        
+        print(f"✅ Check suppressed: {data['suppressed_count']} suppressed, {data['valid_count']} valid")
+    
+    def test_check_suppressed_empty_list(self):
+        """Test: Check suppressed with empty list"""
+        response = self.session.post(
+            f"{BASE_URL}/api/admin/marketing/check-suppressed",
+            json={"emails": []}
+        )
+        
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+        
+        data = response.json()
+        assert len(data["suppressed"]) == 0, "Empty input should return empty suppressed list"
+        assert len(data["valid"]) == 0, "Empty input should return empty valid list"
+        
+        print("✅ Correctly handled empty email list for suppressed check")
+    
+    # ========== POST /api/admin/marketing/audience/advanced-preview ==========
+    def test_advanced_audience_preview_with_manual_emails(self):
+        """Test: Advanced preview with manual emails added"""
+        response = self.session.post(
+            f"{BASE_URL}/api/admin/marketing/audience/advanced-preview",
+            json={
+                "audience_filters": {"exclude_unsubscribed": True},
+                "manual_emails": ["external1@test.com", "external2@test.com"],
+                "exclude_emails": []
+            }
+        )
+        
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+        
+        data = response.json()
+        assert "count" in data, "Response should have 'count'"
+        assert "breakdown" in data, "Response should have 'breakdown'"
+        assert "preview" in data, "Response should have 'preview'"
+        
+        breakdown = data["breakdown"]
+        assert "segmented_count" in breakdown, "Breakdown should have segmented_count"
+        assert "manual_existing_count" in breakdown, "Breakdown should have manual_existing_count"
+        assert "manual_external_count" in breakdown, "Breakdown should have manual_external_count"
+        
+        print(f"✅ Advanced preview count: {data['count']}")
+        print(f"✅ Breakdown: segmented={breakdown.get('segmented_count', 0)}, manual_existing={breakdown.get('manual_existing_count', 0)}, manual_external={breakdown.get('manual_external_count', 0)}")
+    
+    def test_advanced_audience_preview_with_exclusions(self):
+        """Test: Advanced preview with email exclusions"""
+        response = self.session.post(
+            f"{BASE_URL}/api/admin/marketing/audience/advanced-preview",
+            json={
+                "audience_filters": {"exclude_unsubscribed": True},
+                "manual_emails": ["user1@test.com", "user2@test.com"],
+                "exclude_emails": ["user1@test.com"]  # Exclude one of the manual emails
+            }
+        )
+        
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+        
+        data = response.json()
+        assert "excluded_count" in data, "Response should have 'excluded_count'"
+        
+        breakdown = data["breakdown"]
+        assert "excluded_count" in breakdown, "Breakdown should have excluded_count"
+        
+        print(f"✅ Advanced preview with exclusions: count={data['count']}, excluded={data.get('excluded_count', 0)}")
+    
+    def test_advanced_audience_preview_full_breakdown(self):
+        """Test: Advanced preview returns all breakdown fields"""
+        response = self.session.post(
+            f"{BASE_URL}/api/admin/marketing/audience/advanced-preview",
+            json={
+                "audience_filters": {
+                    "subscription_tiers": ["free"],
+                    "exclude_unsubscribed": True
+                },
+                "manual_emails": ["newuser@external.com", ADMIN_EMAIL],  # One external, one existing
+                "exclude_emails": ["excludeme@test.com"]
+            }
+        )
+        
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+        
+        data = response.json()
+        
+        # Verify all breakdown fields
+        breakdown = data["breakdown"]
+        required_fields = ["segmented_count", "manual_existing_count", "manual_external_count", "excluded_count", "suppressed_count"]
+        for field in required_fields:
+            assert field in breakdown, f"Breakdown missing '{field}'"
+        
+        print(f"✅ Full breakdown: {breakdown}")
+    
+    # ========== Campaign with manual_emails and exclude_emails ==========
+    def test_create_campaign_with_advanced_targeting(self):
+        """Test: Create campaign with manual and exclude emails"""
+        campaign_data = {
+            "name": f"TEST_AdvancedTarget_{uuid.uuid4().hex[:8]}",
+            "subject": "Advanced Targeting Test",
+            "html_content": "<html><body><h1>Hello {{name}}</h1></body></html>",
+            "plain_text_content": "Hello {{name}}",
+            "audience_filters": {
+                "subscription_tiers": ["free", "premium"],
+                "exclude_unsubscribed": True
+            },
+            "manual_emails": ["manual1@test.com", "manual2@test.com"],
+            "exclude_emails": ["exclude1@test.com"]
+        }
+        
+        response = self.session.post(f"{BASE_URL}/api/admin/marketing/campaigns", json=campaign_data)
+        
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+        
+        data = response.json()
+        
+        assert "manual_emails" in data, "Campaign should have manual_emails"
+        assert "exclude_emails" in data, "Campaign should have exclude_emails"
+        assert "audience_breakdown" in data, "Campaign should have audience_breakdown"
+        
+        assert len(data["manual_emails"]) == 2, "Should have 2 manual emails"
+        assert len(data["exclude_emails"]) == 1, "Should have 1 exclude email"
+        
+        print(f"✅ Created campaign with advanced targeting: {data['id']}")
+        print(f"✅ Manual emails: {data['manual_emails']}")
+        print(f"✅ Exclude emails: {data['exclude_emails']}")
+        print(f"✅ Audience breakdown: {data.get('audience_breakdown', {})}")
+    
+    def test_update_campaign_preserves_targeting(self):
+        """Test: Update campaign preserves manual and exclude emails"""
+        # First create a campaign
+        create_data = {
+            "name": f"TEST_UpdateTarget_{uuid.uuid4().hex[:8]}",
+            "subject": "Original Subject",
+            "html_content": "<html><body>Original</body></html>",
+            "audience_filters": {"exclude_unsubscribed": True},
+            "manual_emails": ["preserve1@test.com", "preserve2@test.com"],
+            "exclude_emails": ["excludepreserve@test.com"]
+        }
+        
+        create_response = self.session.post(f"{BASE_URL}/api/admin/marketing/campaigns", json=create_data)
+        assert create_response.status_code == 200, f"Create failed: {create_response.text}"
+        
+        campaign_id = create_response.json()["id"]
+        
+        # Update only the subject
+        update_response = self.session.put(
+            f"{BASE_URL}/api/admin/marketing/campaigns/{campaign_id}",
+            json={"subject": "Updated Subject - Targeting Preserved"}
+        )
+        
+        assert update_response.status_code == 200, f"Update failed: {update_response.text}"
+        
+        data = update_response.json()
+        
+        # Verify targeting data preserved
+        assert data["subject"] == "Updated Subject - Targeting Preserved"
+        assert len(data.get("manual_emails", [])) == 2, "Manual emails should be preserved"
+        assert len(data.get("exclude_emails", [])) == 1, "Exclude emails should be preserved"
+        
+        print(f"✅ Campaign updated, manual_emails preserved: {data.get('manual_emails', [])}")
+    
+    def test_update_campaign_modifies_targeting(self):
+        """Test: Update campaign can modify manual and exclude emails"""
+        # First create a campaign
+        create_data = {
+            "name": f"TEST_ModifyTarget_{uuid.uuid4().hex[:8]}",
+            "subject": "Modify Targeting Test",
+            "html_content": "<html><body>Test</body></html>",
+            "audience_filters": {},
+            "manual_emails": ["old1@test.com"],
+            "exclude_emails": []
+        }
+        
+        create_response = self.session.post(f"{BASE_URL}/api/admin/marketing/campaigns", json=create_data)
+        assert create_response.status_code == 200
+        
+        campaign_id = create_response.json()["id"]
+        
+        # Update targeting
+        update_response = self.session.put(
+            f"{BASE_URL}/api/admin/marketing/campaigns/{campaign_id}",
+            json={
+                "manual_emails": ["new1@test.com", "new2@test.com", "new3@test.com"],
+                "exclude_emails": ["newexclude@test.com"]
+            }
+        )
+        
+        assert update_response.status_code == 200, f"Update failed: {update_response.text}"
+        
+        data = update_response.json()
+        
+        assert len(data.get("manual_emails", [])) == 3, "Should have 3 new manual emails"
+        assert len(data.get("exclude_emails", [])) == 1, "Should have 1 new exclude email"
+        
+        print(f"✅ Targeting updated: manual={len(data.get('manual_emails', []))}, exclude={len(data.get('exclude_emails', []))}")
 
 
 class TestEmailMarketingEndpoints:
