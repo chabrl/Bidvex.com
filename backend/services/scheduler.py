@@ -5,6 +5,7 @@ Handles automated auction processing, penalty application, and cleanup
 
 import asyncio
 import logging
+import uuid
 from datetime import datetime, timezone
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
