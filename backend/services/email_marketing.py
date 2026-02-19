@@ -765,33 +765,47 @@ class EmailMarketingService:
         return result
     
     async def _execute_campaign_send(self, campaign_id: str) -> Dict[str, Any]:
-        """Execute the actual campaign send"""
+        """Execute the actual campaign send with advanced targeting"""
         campaign = await self.get_campaign(campaign_id)
         if not campaign:
             return {"status": "error", "message": "Campaign not found"}
         
-        # Get audience
-        query = await self.build_audience_query(campaign["audience_filters"])
-        users = await self.db.users.find(
-            query,
-            {"_id": 0, "id": 1, "email": 1, "name": 1}
-        ).to_list(None)
+        # Use advanced audience builder to get final recipients
+        audience = await self.build_advanced_audience(
+            filters=campaign.get("audience_filters", {}),
+            manual_emails=campaign.get("manual_emails", []),
+            exclude_emails=campaign.get("exclude_emails", [])
+        )
         
-        total = len(users)
+        recipients = audience["recipients"]
+        total = len(recipients)
         sent = 0
         failed = 0
         
         logger.info(f"Starting campaign {campaign_id} send to {total} recipients")
+        logger.info(f"Audience breakdown: {audience['breakdown']}")
         
-        for user in users:
+        # Track sent emails to prevent duplicates
+        sent_emails = set()
+        
+        for recipient in recipients:
+            email = recipient["email"].lower()
+            
+            # Skip if already sent (shouldn't happen but safety check)
+            if email in sent_emails:
+                logger.warning(f"Skipping duplicate email: {email}")
+                continue
+            
+            sent_emails.add(email)
+            
             try:
-                result = await self._send_campaign_email(campaign, user)
+                result = await self._send_campaign_email(campaign, recipient)
                 if result["success"]:
                     sent += 1
                 else:
                     failed += 1
             except Exception as e:
-                logger.error(f"Failed to send to {user['email']}: {e}")
+                logger.error(f"Failed to send to {email}: {e}")
                 failed += 1
         
         # Update campaign stats
@@ -803,7 +817,12 @@ class EmailMarketingService:
                 "completed_at": now.isoformat(),
                 "updated_at": now.isoformat(),
                 "stats.total_recipients": total,
-                "stats.sent": sent
+                "stats.sent": sent,
+                "stats.segmented_count": audience["breakdown"]["segmented_count"],
+                "stats.manual_existing_count": audience["breakdown"]["manual_existing_count"],
+                "stats.manual_external_count": audience["breakdown"]["manual_external_count"],
+                "stats.excluded_count": audience["breakdown"]["excluded_count"],
+                "stats.suppressed_count": audience["breakdown"]["suppressed_count"]
             }}
         )
         
@@ -813,7 +832,8 @@ class EmailMarketingService:
             "status": "completed",
             "total": total,
             "sent": sent,
-            "failed": failed
+            "failed": failed,
+            "breakdown": audience["breakdown"]
         }
     
     async def _send_campaign_email(
