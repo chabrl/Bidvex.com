@@ -8,7 +8,10 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Lock, Eye, EyeOff, AlertTriangle, CheckCircle } from 'lucide-react';
+import axios from 'axios';
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const AuthPage = () => {
   const { t } = useTranslation();
@@ -28,6 +31,14 @@ const AuthPage = () => {
     tax_number: '',
   });
 
+  // Forced Password Reset State
+  const [showForceReset, setShowForceReset] = useState(false);
+  const [resetToken, setResetToken] = useState(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [resetting, setResetting] = useState(false);
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -40,18 +51,62 @@ const AuthPage = () => {
       if (isLogin) {
         await login(formData.email, formData.password);
         toast.success(t('auth.welcomeMessage'));
+        const from = location.state?.from?.pathname || '/marketplace';
+        navigate(from, { replace: true });
       } else {
         await register(formData);
         toast.success(t('auth.accountCreatedMessage'));
+        const from = location.state?.from?.pathname || '/marketplace';
+        navigate(from, { replace: true });
       }
-      
-      const from = location.state?.from?.pathname || '/marketplace';
-      navigate(from, { replace: true });
     } catch (error) {
-      const errorMessage = extractErrorMessage(error);
-      toast.error(errorMessage || t('auth.authFailedMessage'));
+      // Check for forced password reset
+      if (error.message === 'PASSWORD_RESET_REQUIRED') {
+        setResetToken(error.resetToken);
+        setShowForceReset(true);
+        toast.info('Please set a new password to continue');
+      } else {
+        const errorMessage = extractErrorMessage(error);
+        toast.error(errorMessage || t('auth.authFailedMessage'));
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForceReset = async (e) => {
+    e.preventDefault();
+    
+    // Validation
+    if (newPassword.length < 8) {
+      toast.error('Password must be at least 8 characters');
+      return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    setResetting(true);
+    try {
+      await axios.post(`${API}/auth/force-reset-password`, {
+        reset_token: resetToken,
+        new_password: newPassword
+      });
+      
+      toast.success('Password updated! Please log in with your new password.');
+      setShowForceReset(false);
+      setResetToken(null);
+      setNewPassword('');
+      setConfirmPassword('');
+      // Keep email filled for convenience
+      setFormData(prev => ({ ...prev, password: '' }));
+    } catch (error) {
+      const errorMessage = error.response?.data?.detail || 'Failed to reset password';
+      toast.error(errorMessage);
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -60,6 +115,114 @@ const AuthPage = () => {
     window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
   };
 
+  // Forced Password Reset Form
+  if (showForceReset) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4 py-12" data-testid="force-reset-page">
+        <Card className="w-full max-w-md glassmorphism">
+          <CardHeader className="space-y-4">
+            <div className="flex justify-center">
+              <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900 rounded-full flex items-center justify-center">
+                <Lock className="h-8 w-8 text-amber-600" />
+              </div>
+            </div>
+            <CardTitle className="text-2xl font-bold text-center">
+              Password Reset Required
+            </CardTitle>
+            <CardDescription className="text-center">
+              Your account requires a password reset. Please choose a new secure password.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Warning Notice */}
+            <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg text-sm">
+              <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5" />
+              <div className="text-amber-700 dark:text-amber-300">
+                <p className="font-medium">First-time login</p>
+                <p>An administrator created your account. You must set a new password before accessing your dashboard.</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleForceReset} className="space-y-4">
+              {/* New Password */}
+              <div className="space-y-2">
+                <Label htmlFor="newPassword">New Password</Label>
+                <div className="relative">
+                  <Input
+                    id="newPassword"
+                    type={showNewPassword ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    minLength={8}
+                    placeholder="Enter new password (min 8 characters)"
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                  >
+                    {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Confirm Password */}
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  placeholder="Confirm new password"
+                />
+                {confirmPassword && newPassword !== confirmPassword && (
+                  <p className="text-sm text-red-500">Passwords do not match</p>
+                )}
+                {confirmPassword && newPassword === confirmPassword && newPassword.length >= 8 && (
+                  <p className="text-sm text-green-600 flex items-center gap-1">
+                    <CheckCircle className="h-3 w-3" /> Passwords match
+                  </p>
+                )}
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full gradient-button text-white border-0"
+                disabled={resetting || newPassword.length < 8 || newPassword !== confirmPassword}
+              >
+                {resetting ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Updating Password...</>
+                ) : (
+                  <>Set New Password</>
+                )}
+              </Button>
+            </form>
+
+            <div className="text-center text-sm">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowForceReset(false);
+                  setResetToken(null);
+                }}
+                className="text-muted-foreground hover:underline"
+              >
+                Cancel and return to login
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Regular Login/Register Form
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-12" data-testid="auth-page">
       <Card className="w-full max-w-md glassmorphism">
