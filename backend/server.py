@@ -16,6 +16,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.triggers.cron import CronTrigger
 from services.email_service import get_email_service
 from services.sms_notification_service import get_sms_notification_service
+from services.email_marketing import get_marketing_service, SEGMENT_FILTERS, CAMPAIGN_STATUS
 import os
 import logging
 import uuid
