@@ -286,6 +286,7 @@ const AdminDashboard = () => {
           case 'branding-layout': return <BrandingLayoutManager />;
           case 'marketplace-settings': return <MarketplaceSettings />;
           case 'subscriptions': return <SubscriptionManager />;
+          case 'email-marketing': return <EmailMarketingManager />;
           case 'trust-safety': return <TrustSafetyDashboard />;
           case 'email-templates': return <EmailTemplates />;
           default: return <SiteContentManager />;
