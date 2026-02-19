@@ -572,7 +572,7 @@ class EmailMarketingService:
         admin_id: str,
         admin_email: str
     ) -> Dict[str, Any]:
-        """Update a draft campaign"""
+        """Update a draft campaign with advanced targeting support"""
         campaign = await self.campaigns.find_one({"id": campaign_id})
         if not campaign:
             raise ValueError("Campaign not found")
@@ -580,9 +580,21 @@ class EmailMarketingService:
         if campaign["status"] not in [CAMPAIGN_STATUS["DRAFT"], CAMPAIGN_STATUS["SCHEDULED"]]:
             raise ValueError("Can only edit draft or scheduled campaigns")
         
-        # Recalculate audience if filters changed
-        if "audience_filters" in updates:
-            updates["audience_count"] = await self.get_audience_count(updates["audience_filters"])
+        # Recalculate audience if filters, manual_emails, or exclude_emails changed
+        recalculate = any(key in updates for key in ["audience_filters", "manual_emails", "exclude_emails"])
+        
+        if recalculate:
+            audience_filters = updates.get("audience_filters", campaign.get("audience_filters", {}))
+            manual_emails = updates.get("manual_emails", campaign.get("manual_emails", []))
+            exclude_emails = updates.get("exclude_emails", campaign.get("exclude_emails", []))
+            
+            audience_result = await self.calculate_final_audience_count(
+                audience_filters=audience_filters,
+                manual_emails=manual_emails,
+                exclude_emails=exclude_emails
+            )
+            updates["audience_count"] = audience_result["total"]
+            updates["audience_breakdown"] = audience_result["breakdown"]
         
         updates["updated_at"] = datetime.now(timezone.utc).isoformat()
         
