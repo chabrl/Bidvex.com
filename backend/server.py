@@ -4989,6 +4989,234 @@ async def admin_get_users(current_user: User = Depends(get_current_user), limit:
     users = await db.users.find({}, {"_id": 0, "password": 0}).skip(skip).limit(limit).to_list(limit)
     return users
 
+
+# ========== ADMIN USER CREATION ==========
+class AdminCreateUserRequest(BaseModel):
+    """Request model for admin-created user accounts"""
+    email: EmailStr
+    name: str
+    phone: str = ""
+    account_type: str = "personal"  # personal or business
+    company_name: Optional[str] = None
+    admin_verified: bool = False
+
+
+def generate_secure_password(length: int = 12) -> str:
+    """Generate a secure temporary password"""
+    import secrets
+    import string
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    # Ensure at least one of each type
+    password = [
+        secrets.choice(string.ascii_lowercase),
+        secrets.choice(string.ascii_uppercase),
+        secrets.choice(string.digits),
+        secrets.choice("!@#$%^&*")
+    ]
+    # Fill the rest
+    password.extend(secrets.choice(alphabet) for _ in range(length - 4))
+    # Shuffle
+    secrets.SystemRandom().shuffle(password)
+    return ''.join(password)
+
+
+@api_router.post("/admin/users/create")
+async def admin_create_user(
+    user_data: AdminCreateUserRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Admin: Create a new user account manually
+    
+    - Generates secure temporary password
+    - Sets password_reset_required = true
+    - Sends welcome email with credentials
+    - Logs action in audit table
+    
+    Returns the temporary password ONCE (not stored in plain text)
+    """
+    # Admin check
+    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Check if email already exists
+    existing = await db.users.find_one({"email": user_data.email})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Generate secure temporary password
+    temp_password = generate_secure_password(12)
+    hashed_pwd = hash_password(temp_password)
+    
+    # Generate user ID
+    user_id = str(uuid.uuid4())
+    
+    # Generate affiliate code
+    prefix = user_id[:8].upper()
+    suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+    affiliate_code = f"BVX{prefix}{suffix}"
+    
+    now = datetime.now(timezone.utc)
+    
+    # Create user document with new fields
+    user_doc = {
+        "id": user_id,
+        "email": user_data.email,
+        "password": hashed_pwd,
+        "name": user_data.name,
+        "account_type": user_data.account_type,
+        "phone": user_data.phone,
+        "phone_verified": False,
+        "email_verified": False,
+        "admin_verified": user_data.admin_verified,  # New field: admin-verified status
+        "role": "user",
+        "preferred_language": "en",
+        "preferred_currency": "CAD",
+        "affiliate_code": affiliate_code,
+        "subscription_tier": "free",
+        "subscription_status": "active",
+        "created_at": now.isoformat(),
+        "updated_at": None,
+        # Admin creation specific fields
+        "password_reset_required": True,  # Force password reset on first login
+        "created_by_admin": current_user.id,
+        "created_by_admin_at": now.isoformat(),
+    }
+    
+    # Add business-specific fields if business account
+    if user_data.account_type == "business":
+        user_doc["company_name"] = user_data.company_name or ""
+        user_doc["seller_type"] = "business"
+    
+    # Insert user
+    await db.users.insert_one(user_doc)
+    
+    # Get client IP for audit
+    forwarded = request.headers.get("x-forwarded-for")
+    client_ip = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown")
+    
+    # Log to audit table
+    audit_entry = {
+        "id": str(uuid.uuid4()),
+        "action": "admin_create_user",
+        "admin_id": current_user.id,
+        "admin_email": current_user.email,
+        "target_user_id": user_id,
+        "target_email": user_data.email,
+        "account_type": user_data.account_type,
+        "admin_verified": user_data.admin_verified,
+        "ip_address": client_ip,
+        "timestamp": now.isoformat(),
+        "details": {
+            "name": user_data.name,
+            "company_name": user_data.company_name if user_data.account_type == "business" else None
+        }
+    }
+    await db.admin_audit_logs.insert_one(audit_entry)
+    
+    # Send welcome email with credentials via SendGrid
+    email_sent = False
+    try:
+        from services.email_service import get_email_service
+        email_service = get_email_service()
+        
+        if email_service.is_configured():
+            # Build email content
+            result = await email_service.send_email(
+                to=user_data.email,
+                template_id=None,  # Use dynamic content instead
+                subject="Welcome to BidVex - Your Account Has Been Created",
+                html_content=f"""
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h1 style="color: #1e3a5f;">Welcome to BidVex!</h1>
+                    <p>Hello {user_data.name},</p>
+                    <p>An account has been created for you on BidVex, Canada's premier auction marketplace.</p>
+                    
+                    <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                        <h3 style="margin-top: 0;">Your Login Credentials</h3>
+                        <p><strong>Email:</strong> {user_data.email}</p>
+                        <p><strong>Temporary Password:</strong> {temp_password}</p>
+                    </div>
+                    
+                    <p style="color: #d9534f;"><strong>Important:</strong> You will be required to change your password on first login.</p>
+                    
+                    <p>
+                        <a href="https://www.bidvex.com/login" 
+                           style="display: inline-block; background: #1e3a5f; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
+                            Login to BidVex
+                        </a>
+                    </p>
+                    
+                    <p style="color: #666; font-size: 12px; margin-top: 30px;">
+                        If you did not expect this email, please contact support@bidvex.com
+                    </p>
+                </div>
+                """,
+                language="en"
+            )
+            email_sent = result.get("success", False)
+            logger.info(f"Welcome email sent to {user_data.email}: {email_sent}")
+    except Exception as e:
+        logger.error(f"Failed to send welcome email: {e}")
+    
+    logger.info(f"Admin {current_user.email} created user {user_data.email}")
+    
+    # Return response with temporary password (shown ONCE)
+    return {
+        "success": True,
+        "message": "User account created successfully",
+        "user_id": user_id,
+        "email": user_data.email,
+        "name": user_data.name,
+        "account_type": user_data.account_type,
+        "admin_verified": user_data.admin_verified,
+        "temporary_password": temp_password,  # Shown ONCE to admin
+        "email_sent": email_sent,
+        "password_reset_required": True
+    }
+
+
+@api_router.put("/admin/users/{user_id}/admin-verify")
+async def admin_toggle_user_verification(
+    user_id: str,
+    data: Dict[str, bool],
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Admin: Toggle admin_verified status for a user
+    
+    This is separate from email_verified (system-based)
+    admin_verified is a manual badge that can be shown on user profiles
+    """
+    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    new_status = data.get("admin_verified", False)
+    
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"admin_verified": new_status, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    # Audit log
+    await db.admin_audit_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "action": "admin_verify_user" if new_status else "admin_unverify_user",
+        "admin_id": current_user.id,
+        "admin_email": current_user.email,
+        "target_user_id": user_id,
+        "target_email": user.get("email"),
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {"success": True, "admin_verified": new_status}
+
+
 @api_router.put("/admin/users/{user_id}/status")
 async def admin_update_user_status(user_id: str, data: Dict[str, str], current_user: User = Depends(get_current_user)):
     if not current_user.email.endswith("@bidvex.com") and current_user.role != "admin":
