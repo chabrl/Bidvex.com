@@ -546,11 +546,17 @@ const ClientEmailMarketing = () => {
             <Mail className="h-6 w-6 text-primary" />
             Client Email Marketing
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground flex items-center gap-2">
             {access?.can_send 
               ? 'Send auction campaigns to your client list'
               : 'Build your contact list and upgrade to send campaigns'
             }
+            <a 
+              href="/email-marketing-pricing" 
+              className="text-primary hover:underline text-sm font-medium"
+            >
+              How it works
+            </a>
           </p>
         </div>
         
