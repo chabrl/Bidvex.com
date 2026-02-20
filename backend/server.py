@@ -11323,15 +11323,18 @@ async def check_marketing_access(current_user: User = Depends(get_current_user))
     user_marketing = get_user_marketing_service(db)
     tier = current_user.subscription_tier or "free"
     
-    can_access = user_marketing.can_access_feature(tier)
+    can_send = user_marketing.can_access_feature(tier)
     quota = await user_marketing.get_remaining_quota(current_user.id, tier)
+    contact_limit = await user_marketing.check_contact_limit(current_user.id, tier)
     
     return {
-        "can_access": can_access,
+        "can_access": True,  # All users can access the feature to manage contacts
+        "can_send": can_send,  # Only Premium/VIP can send
         "subscription_tier": tier,
-        "limits": SUBSCRIPTION_LIMITS,
+        "limits": user_marketing.get_subscription_limits(tier),
         "quota": quota,
-        "upgrade_message": "Upgrade to Premium or VIP to send auctions to your client list." if not can_access else None
+        "contact_limit": contact_limit,
+        "upgrade_message": "Upgrade to Premium or VIP to send auctions to your client list." if not can_send else None
     }
 
 
@@ -11343,15 +11346,8 @@ async def get_user_contacts(
     skip: int = 0,
     current_user: User = Depends(get_current_user)
 ):
-    """Get user's contacts"""
+    """Get user's contacts - all tiers can view their contacts"""
     user_marketing = get_user_marketing_service(db)
-    tier = current_user.subscription_tier or "free"
-    
-    if not user_marketing.can_access_feature(tier):
-        raise HTTPException(
-            status_code=403,
-            detail="Upgrade to Premium or VIP to access client email marketing"
-        )
     
     result = await user_marketing.get_contacts(
         user_id=current_user.id,
@@ -11365,18 +11361,17 @@ async def get_user_contacts(
 
 @api_router.get("/user/marketing/contacts/stats")
 async def get_user_contact_stats(current_user: User = Depends(get_current_user)):
-    """Get contact statistics"""
+    """Get contact statistics - all tiers can view stats"""
     user_marketing = get_user_marketing_service(db)
     tier = current_user.subscription_tier or "free"
     
-    if not user_marketing.can_access_feature(tier):
-        raise HTTPException(
-            status_code=403,
-            detail="Upgrade to Premium or VIP to access client email marketing"
-        )
-    
     stats = await user_marketing.get_contact_stats(current_user.id)
-    return stats
+    contact_limit = await user_marketing.check_contact_limit(current_user.id, tier)
+    
+    return {
+        **stats,
+        "contact_limit": contact_limit
+    }
 
 
 @api_router.post("/user/marketing/contacts")
