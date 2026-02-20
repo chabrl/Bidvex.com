@@ -480,7 +480,7 @@ const ClientEmailMarketing = () => {
 
   // Locked state for free users
   const LockedState = () => (
-    <div className="flex flex-col items-center justify-center py-16 px-4">
+    <div className="flex flex-col items-center justify-center py-16 px-4" data-testid="locked-state">
       <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6">
         <Lock className="h-10 w-10 text-slate-400" />
       </div>
@@ -492,7 +492,8 @@ const ClientEmailMarketing = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl w-full mb-8">
         <Card 
           className="border-2 border-blue-500/20 cursor-pointer hover:border-blue-500/50 hover:shadow-lg transition-all"
-          onClick={() => navigate('/pricing')}
+          onClick={() => navigate('/seller/dashboard?tab=subscription')}
+          data-testid="premium-card"
         >
           <CardHeader className="text-center pb-2">
             <Badge className="w-fit mx-auto bg-blue-500">Premium</Badge>
@@ -506,7 +507,8 @@ const ClientEmailMarketing = () => {
             </ul>
             <Button 
               className="w-full mt-4 bg-blue-600 hover:bg-blue-700"
-              onClick={(e) => { e.stopPropagation(); navigate('/pricing'); }}
+              onClick={(e) => { e.stopPropagation(); navigate('/seller/dashboard?tab=subscription'); }}
+              data-testid="upgrade-premium-btn"
             >
               Upgrade to Premium
             </Button>
@@ -515,7 +517,8 @@ const ClientEmailMarketing = () => {
         
         <Card 
           className="border-2 border-purple-500/20 cursor-pointer hover:border-purple-500/50 hover:shadow-lg transition-all"
-          onClick={() => navigate('/pricing')}
+          onClick={() => navigate('/seller/dashboard?tab=subscription')}
+          data-testid="vip-card"
         >
           <CardHeader className="text-center pb-2">
             <Badge className="w-fit mx-auto bg-purple-500">VIP</Badge>
@@ -529,7 +532,8 @@ const ClientEmailMarketing = () => {
             </ul>
             <Button 
               className="w-full mt-4 bg-purple-600 hover:bg-purple-700"
-              onClick={(e) => { e.stopPropagation(); navigate('/pricing'); }}
+              onClick={(e) => { e.stopPropagation(); navigate('/seller/dashboard?tab=subscription'); }}
+              data-testid="upgrade-vip-btn"
             >
               Upgrade to VIP
             </Button>
@@ -541,7 +545,8 @@ const ClientEmailMarketing = () => {
         <Button 
           size="lg" 
           className="gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-          onClick={() => navigate('/pricing')}
+          onClick={() => navigate('/seller/dashboard?tab=subscription')}
+          data-testid="view-subscription-plans-btn"
         >
           <Crown className="h-5 w-5" />
           View Subscription Plans
@@ -551,6 +556,7 @@ const ClientEmailMarketing = () => {
           variant="outline"
           className="gap-2"
           onClick={() => navigate('/email-marketing-pricing')}
+          data-testid="see-pricing-btn"
         >
           <DollarSign className="h-5 w-5" />
           See Pay-As-You-Go Pricing
@@ -595,8 +601,9 @@ const ClientEmailMarketing = () => {
               className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white gap-2"
               onClick={() => {
                 setActiveTab('campaigns');
-                setCampaignBuilderOpen(true);
+                openCampaignBuilder();
               }}
+              data-testid="send-campaign-btn"
             >
               <Send className="h-4 w-4" />
               Send Campaign
@@ -604,7 +611,8 @@ const ClientEmailMarketing = () => {
           ) : (
             <Button 
               className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white gap-2"
-              onClick={() => navigate('/pricing')}
+              onClick={() => navigate('/seller/dashboard?tab=subscription')}
+              data-testid="upgrade-to-send-btn"
             >
               <Crown className="h-4 w-4" />
               Upgrade to Send
@@ -613,7 +621,8 @@ const ClientEmailMarketing = () => {
           <Badge 
             variant={access?.subscription_tier === 'vip' ? 'default' : access?.subscription_tier === 'premium' ? 'default' : 'secondary'} 
             className="uppercase cursor-pointer hover:opacity-80"
-            onClick={() => navigate('/pricing')}
+            onClick={() => navigate('/seller/dashboard?tab=subscription')}
+            data-testid="subscription-badge"
           >
             {access?.subscription_tier || 'free'}
           </Badge>
@@ -622,7 +631,7 @@ const ClientEmailMarketing = () => {
 
       {/* Upgrade banner for free users */}
       {!access?.can_send && (
-        <div className="flex items-start gap-3 p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+        <div className="flex items-start gap-3 p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 rounded-lg border border-blue-200 dark:border-blue-800" data-testid="upgrade-banner">
           <Lock className="h-5 w-5 text-blue-600 mt-0.5" />
           <div className="flex-1">
             <p className="font-medium text-blue-700 dark:text-blue-300">
@@ -634,6 +643,7 @@ const ClientEmailMarketing = () => {
               <button 
                 onClick={() => navigate('/email-marketing-pricing')} 
                 className="underline font-medium hover:text-blue-800 cursor-pointer"
+                data-testid="see-pricing-link"
               >
                 See pricing & how it works
               </button>
@@ -642,7 +652,8 @@ const ClientEmailMarketing = () => {
           <Button 
             size="sm" 
             className="gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white" 
-            onClick={() => navigate('/pricing')}
+            onClick={() => navigate('/seller/dashboard?tab=subscription')}
+            data-testid="upgrade-banner-btn"
           >
             <Crown className="h-4 w-4" />
             Upgrade
@@ -666,25 +677,32 @@ const ClientEmailMarketing = () => {
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-4 max-w-lg">
-          <TabsTrigger value="contacts" className="gap-2">
+          <TabsTrigger value="contacts" className="gap-2" data-testid="tab-contacts">
             <Users className="h-4 w-4" />
             <span className="hidden sm:inline">Contacts</span>
           </TabsTrigger>
-          <TabsTrigger value="campaigns" className="gap-2" disabled={!access?.can_send}>
+          <TabsTrigger value="campaigns" className="gap-2" disabled={!access?.can_send} data-testid="tab-campaigns">
             <Send className="h-4 w-4" />
             <span className="hidden sm:inline">Campaigns</span>
             {!access?.can_send && <Lock className="h-3 w-3 ml-1" />}
           </TabsTrigger>
-          <TabsTrigger value="analytics" className="gap-2" disabled={!access?.can_send}>
+          <TabsTrigger value="analytics" className="gap-2" disabled={!access?.can_send} data-testid="tab-analytics">
             <BarChart3 className="h-4 w-4" />
             <span className="hidden sm:inline">Analytics</span>
             {!access?.can_send && <Lock className="h-3 w-3 ml-1" />}
           </TabsTrigger>
-          <TabsTrigger value="pricing" className="gap-2" onClick={() => navigate('/email-marketing-pricing')}>
+          <TabsTrigger 
+            value="pricing" 
+            className="gap-2" 
+            onClick={(e) => {
+              e.preventDefault();
+              navigate('/email-marketing-pricing');
+            }}
+            data-testid="tab-pricing"
+          >
             <DollarSign className="h-4 w-4" />
             <span className="hidden sm:inline">Pricing</span>
           </TabsTrigger>
-        </TabsList>
         </TabsList>
 
         {/* Contacts Tab */}
