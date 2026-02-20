@@ -553,34 +553,34 @@ const ClientEmailMarketing = () => {
               ? 'Send auction campaigns to your client list'
               : 'Build your contact list and upgrade to send campaigns'
             }
-            <a 
-              href="/email-marketing-pricing" 
-              className="text-primary hover:underline text-sm font-medium"
-            >
-              How it works
-            </a>
           </p>
         </div>
         
         <div className="flex items-center gap-3">
           {access?.can_send ? (
-            <div className="text-right">
-              <p className="text-sm text-muted-foreground">Monthly Quota</p>
-              <p className="font-bold">
-                {access.quota?.monthly_used?.toLocaleString() || 0} / {access.quota?.monthly_limit?.toLocaleString() || 0}
-              </p>
-            </div>
+            <Button 
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white gap-2"
+              onClick={() => {
+                setActiveTab('campaigns');
+                setCampaignBuilderOpen(true);
+              }}
+            >
+              <Send className="h-4 w-4" />
+              Send Campaign
+            </Button>
           ) : (
-            <div className="text-right">
-              <p className="text-sm text-muted-foreground">Contacts</p>
-              <p className="font-bold">
-                {access?.contact_limit?.current || 0} / {access?.contact_limit?.limit || 50}
-              </p>
-            </div>
+            <Button 
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white gap-2"
+              onClick={() => navigate('/pricing')}
+            >
+              <Crown className="h-4 w-4" />
+              Upgrade to Send
+            </Button>
           )}
           <Badge 
             variant={access?.subscription_tier === 'vip' ? 'default' : access?.subscription_tier === 'premium' ? 'default' : 'secondary'} 
-            className="uppercase"
+            className="uppercase cursor-pointer hover:opacity-80"
+            onClick={() => navigate('/pricing')}
           >
             {access?.subscription_tier || 'free'}
           </Badge>
@@ -598,12 +598,19 @@ const ClientEmailMarketing = () => {
             <p className="text-sm text-blue-600 dark:text-blue-400">
               Upgrade to Premium to send auction announcements to your contacts. 
               Free plan lets you build a list of up to 50 contacts.{' '}
-              <a href="/email-marketing-pricing" className="underline font-medium hover:text-blue-800">
+              <button 
+                onClick={() => navigate('/email-marketing-pricing')} 
+                className="underline font-medium hover:text-blue-800 cursor-pointer"
+              >
                 See pricing & how it works
-              </a>
+              </button>
             </p>
           </div>
-          <Button size="sm" className="gap-2" onClick={() => window.location.href = '/pricing'}>
+          <Button 
+            size="sm" 
+            className="gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white" 
+            onClick={() => navigate('/pricing')}
+          >
             <Crown className="h-4 w-4" />
             Upgrade
           </Button>
@@ -625,21 +632,26 @@ const ClientEmailMarketing = () => {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3 max-w-md">
+        <TabsList className="grid w-full grid-cols-4 max-w-lg">
           <TabsTrigger value="contacts" className="gap-2">
             <Users className="h-4 w-4" />
-            Contacts
+            <span className="hidden sm:inline">Contacts</span>
           </TabsTrigger>
           <TabsTrigger value="campaigns" className="gap-2" disabled={!access?.can_send}>
             <Send className="h-4 w-4" />
-            Campaigns
+            <span className="hidden sm:inline">Campaigns</span>
             {!access?.can_send && <Lock className="h-3 w-3 ml-1" />}
           </TabsTrigger>
           <TabsTrigger value="analytics" className="gap-2" disabled={!access?.can_send}>
             <BarChart3 className="h-4 w-4" />
-            Analytics
+            <span className="hidden sm:inline">Analytics</span>
             {!access?.can_send && <Lock className="h-3 w-3 ml-1" />}
           </TabsTrigger>
+          <TabsTrigger value="pricing" className="gap-2" onClick={() => navigate('/email-marketing-pricing')}>
+            <DollarSign className="h-4 w-4" />
+            <span className="hidden sm:inline">Pricing</span>
+          </TabsTrigger>
+        </TabsList>
         </TabsList>
 
         {/* Contacts Tab */}
