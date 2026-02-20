@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -28,12 +29,13 @@ import { toast } from 'sonner';
 import { 
   Mail, Users, Send, Plus, Trash2, Upload, Search, RefreshCw,
   Lock, Crown, AlertTriangle, CheckCircle, Eye, BarChart3,
-  UserPlus, FileText, ArrowRight, Zap, XCircle, Edit3
+  UserPlus, FileText, ArrowRight, Zap, XCircle, Edit3, DollarSign
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const ClientEmailMarketing = () => {
+  const navigate = useNavigate();
   const { token, user } = useAuth();
   const [activeTab, setActiveTab] = useState('contacts');
   const [loading, setLoading] = useState(true);
