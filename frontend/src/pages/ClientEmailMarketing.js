@@ -905,8 +905,6 @@ const ClientEmailMarketing = () => {
               </Card>
             </TabsContent>
           </Tabs>
-        </>
-      )}
 
       {/* Add Single Contact Dialog */}
       <Dialog open={addContactDialogOpen} onOpenChange={setAddContactDialogOpen}>
