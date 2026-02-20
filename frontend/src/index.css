@@ -2088,31 +2088,42 @@ select:focus {
 /* Cache buster: 20250104154500 */
 
 /* ============================================
-   CLEAN FLAT TABS - v2.5
+   CLEAN FLAT TABS - v2.5 (FIXED)
+   Removes white rectangular backgrounds completely
    ============================================ */
 
-/* Remove ALL shadows and 3D effects from tabs */
+/* Remove ALL shadows, backgrounds, and 3D effects from tabs */
 [role="tablist"],
+[role="tablist"] *,
 [role="tab"] {
   background: transparent !important;
+  background-color: transparent !important;
   box-shadow: none !important;
   border-radius: 0 !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+  --tw-gradient-stops: transparent !important;
+  --tw-bg-opacity: 0 !important;
 }
 
-/* Tab List - Simple bottom border */
+/* Tab List - Simple bottom border only */
 [role="tablist"] {
   border-bottom: 2px solid #e2e8f0 !important;
   padding: 0 !important;
   gap: 0 !important;
+  display: inline-flex !important;
 }
 
 .dark [role="tablist"] {
   border-bottom-color: #334155 !important;
 }
 
-/* Individual Tab - Flat Design */
+/* Individual Tab - Completely Flat Design */
 [role="tab"] {
   background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
   box-shadow: none !important;
   border: none !important;
   border-bottom: 2px solid transparent !important;
@@ -2121,48 +2132,102 @@ select:focus {
   color: #64748b !important;
   font-weight: 500 !important;
   font-size: 14px !important;
-  transition: color 0.2s, border-color 0.2s !important;
+  transition: color 0.2s ease, border-color 0.2s ease !important;
+  position: relative !important;
 }
 
-/* Tab Hover */
+/* Tab Hover - No background change */
 [role="tab"]:hover {
   color: #1e293b !important;
   background: transparent !important;
+  background-color: transparent !important;
+}
+
+.dark [role="tab"] {
+  color: #94a3b8 !important;
 }
 
 .dark [role="tab"]:hover {
   color: #e2e8f0 !important;
+  background: transparent !important;
 }
 
-/* Active Tab - Blue underline only */
+/* Active Tab - Blue underline only, NO background */
 [role="tab"][data-state="active"] {
   color: #2563eb !important;
   font-weight: 600 !important;
   border-bottom-color: #2563eb !important;
   background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
   box-shadow: none !important;
 }
 
 .dark [role="tab"][data-state="active"] {
   color: #60a5fa !important;
   border-bottom-color: #60a5fa !important;
+  background: transparent !important;
 }
 
-/* Remove any ::after pseudo elements */
+/* Remove any ::after and ::before pseudo elements that might add backgrounds */
 [role="tab"]::after,
 [role="tab"]::before {
   display: none !important;
+  content: none !important;
 }
 
-/* Tab Icons */
+/* Tab Icons - Consistent sizing */
 [role="tab"] svg {
   width: 18px !important;
   height: 18px !important;
   opacity: 0.8 !important;
+  flex-shrink: 0 !important;
 }
 
 [role="tab"][data-state="active"] svg {
   opacity: 1 !important;
 }
 
-/* Cache buster: 20250104155500 */
+/* Disabled tabs */
+[role="tab"]:disabled,
+[role="tab"][disabled],
+[role="tab"][data-disabled] {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+}
+
+/* Mobile Tab Scrolling */
+@media (max-width: 640px) {
+  [role="tablist"] {
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+  }
+  
+  [role="tablist"]::-webkit-scrollbar {
+    display: none !important;
+  }
+  
+  [role="tab"] {
+    padding: 10px 16px !important;
+    font-size: 13px !important;
+  }
+}
+
+/* Grid-based tab lists - prevent grid from adding backgrounds */
+[role="tablist"].grid,
+.grid [role="tablist"],
+[role="tablist"][class*="grid"] {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+[role="tablist"].grid > *,
+.grid [role="tablist"] > *,
+[role="tablist"][class*="grid"] > * {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Cache buster: 20260220170000 */
