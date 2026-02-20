@@ -11384,15 +11384,9 @@ async def add_user_contact(
     data: UserContactCreateRequest,
     current_user: User = Depends(get_current_user)
 ):
-    """Add a single contact"""
+    """Add a single contact - all tiers can add contacts up to their limit"""
     user_marketing = get_user_marketing_service(db)
     tier = current_user.subscription_tier or "free"
-    
-    if not user_marketing.can_access_feature(tier):
-        raise HTTPException(
-            status_code=403,
-            detail="Upgrade to Premium or VIP to access client email marketing"
-        )
     
     try:
         contact = await user_marketing.add_contact(
@@ -11400,7 +11394,8 @@ async def add_user_contact(
             email=data.email,
             name=data.name,
             tags=data.tags,
-            consent_confirmed=data.consent_confirmed
+            consent_confirmed=data.consent_confirmed,
+            user_tier=tier
         )
         return contact
     except ValueError as e:
@@ -11412,20 +11407,15 @@ async def add_user_contacts_bulk(
     data: UserContactBulkRequest,
     current_user: User = Depends(get_current_user)
 ):
-    """Add multiple contacts at once"""
+    """Add multiple contacts at once - all tiers can add up to their limit"""
     user_marketing = get_user_marketing_service(db)
     tier = current_user.subscription_tier or "free"
-    
-    if not user_marketing.can_access_feature(tier):
-        raise HTTPException(
-            status_code=403,
-            detail="Upgrade to Premium or VIP to access client email marketing"
-        )
     
     result = await user_marketing.add_contacts_bulk(
         user_id=current_user.id,
         emails=data.emails,
-        consent_confirmed=data.consent_confirmed
+        consent_confirmed=data.consent_confirmed,
+        user_tier=tier
     )
     return result
 
