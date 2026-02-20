@@ -581,63 +581,100 @@ const ClientEmailMarketing = () => {
 
       {/* Upgrade banner for free users */}
       {!access?.can_send && (
-        </Card>
-      ) : (
-        <>
-          {/* Quota Warning */}
-          {access.quota?.remaining < 100 && access.quota?.remaining > 0 && (
-            <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
-              <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
-              <div>
-                <p className="font-medium text-amber-700 dark:text-amber-300">Low Quota</p>
-                <p className="text-sm text-amber-600 dark:text-amber-400">
-                  You have {access.quota.remaining} emails remaining this month.
-                </p>
-              </div>
-            </div>
+        <div className="flex items-start gap-3 p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+          <Lock className="h-5 w-5 text-blue-600 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-medium text-blue-700 dark:text-blue-300">
+              Turn your buyer list into revenue
+            </p>
+            <p className="text-sm text-blue-600 dark:text-blue-400">
+              Upgrade to Premium to send auction announcements to your contacts. 
+              Free plan lets you build a list of up to 50 contacts.
+            </p>
+          </div>
+          <Button size="sm" className="gap-2">
+            <Crown className="h-4 w-4" />
+            Upgrade
+          </Button>
+        </div>
+      )}
+
+      {/* Quota Warning for paid users */}
+      {access?.can_send && access?.quota?.monthly_remaining < 100 && access?.quota?.monthly_remaining > 0 && (
+        <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+          <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
+          <div>
+            <p className="font-medium text-amber-700 dark:text-amber-300">Low Quota</p>
+            <p className="text-sm text-amber-600 dark:text-amber-400">
+              You have {access.quota.monthly_remaining} emails remaining this month.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-3 max-w-md">
+          <TabsTrigger value="contacts" className="gap-2">
+            <Users className="h-4 w-4" />
+            Contacts
+          </TabsTrigger>
+          <TabsTrigger value="campaigns" className="gap-2" disabled={!access?.can_send}>
+            <Send className="h-4 w-4" />
+            Campaigns
+            {!access?.can_send && <Lock className="h-3 w-3 ml-1" />}
+          </TabsTrigger>
+          <TabsTrigger value="analytics" className="gap-2" disabled={!access?.can_send}>
+            <BarChart3 className="h-4 w-4" />
+            Analytics
+            {!access?.can_send && <Lock className="h-3 w-3 ml-1" />}
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Contacts Tab */}
+        <TabsContent value="contacts" className="space-y-4">
+          {/* Contact Limit for free users */}
+          {!access?.can_send && contactStats && (
+            <Card className="border-blue-200 dark:border-blue-800">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Contact Storage</p>
+                  <p className="text-sm text-muted-foreground">
+                    {contactStats.total} / {access?.contact_limit?.limit || 50} contacts used
+                  </p>
+                </div>
+                <div className="w-32 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-blue-500" 
+                    style={{ width: `${Math.min(100, (contactStats.total / (access?.contact_limit?.limit || 50)) * 100)}%` }}
+                  />
+                </div>
+              </CardContent>
+            </Card>
           )}
 
-          {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-3 max-w-md">
-              <TabsTrigger value="contacts" className="gap-2">
-                <Users className="h-4 w-4" />
-                Contacts
-              </TabsTrigger>
-              <TabsTrigger value="campaigns" className="gap-2">
-                <Send className="h-4 w-4" />
-                Campaigns
-              </TabsTrigger>
-              <TabsTrigger value="analytics" className="gap-2">
-                <BarChart3 className="h-4 w-4" />
-                Analytics
-              </TabsTrigger>
-            </TabsList>
-
-            {/* Contacts Tab */}
-            <TabsContent value="contacts" className="space-y-4">
-              {/* Stats */}
-              {contactStats && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <Card>
-                    <CardContent className="p-4 text-center">
-                      <p className="text-3xl font-bold">{contactStats.total}</p>
-                      <p className="text-sm text-muted-foreground">Total</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4 text-center">
-                      <p className="text-3xl font-bold text-green-600">{contactStats.active}</p>
-                      <p className="text-sm text-muted-foreground">Active</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4 text-center">
-                      <p className="text-3xl font-bold text-amber-600">{contactStats.unsubscribed}</p>
-                      <p className="text-sm text-muted-foreground">Unsubscribed</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
+          {/* Stats */}
+          {contactStats && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="p-4 text-center">
+                  <p className="text-3xl font-bold">{contactStats.total}</p>
+                  <p className="text-sm text-muted-foreground">Total</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4 text-center">
+                  <p className="text-3xl font-bold text-green-600">{contactStats.active}</p>
+                  <p className="text-sm text-muted-foreground">Active</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4 text-center">
+                  <p className="text-3xl font-bold text-amber-600">{contactStats.unsubscribed}</p>
+                  <p className="text-sm text-muted-foreground">Unsubscribed</p>
+                </CardContent>
+              </Card>
+              <Card>
                     <CardContent className="p-4 text-center">
                       <p className="text-3xl font-bold text-red-600">{contactStats.bounced}</p>
                       <p className="text-sm text-muted-foreground">Bounced</p>
