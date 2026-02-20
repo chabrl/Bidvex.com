@@ -4,7 +4,7 @@ import { cva } from "class-variance-authority";
 import { cn } from "@/lib/utils"
 
 const badgeVariants = cva(
-  "inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 [&>span]:bg-transparent [&>*]:bg-transparent",
+  "inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 [&>span]:bg-transparent",
   {
     variants: {
       variant: {
@@ -31,7 +31,6 @@ function Badge({
   return (
     <div 
       className={cn(badgeVariants({ variant }), className)} 
-      style={{ '--tw-gradient-stops': 'transparent' }}
       {...props} 
     />
   );
