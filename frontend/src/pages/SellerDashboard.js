@@ -129,6 +129,14 @@ const SellerDashboard = () => {
                 {t('dashboard.seller.createLot', 'Create Lot')}
               </Button>
             )}
+            <Button
+              variant="outline"
+              onClick={() => navigate('/client-marketing')}
+              data-testid="client-marketing-btn"
+            >
+              <Mail className="mr-2 h-4 w-4" />
+              {t('dashboard.seller.clientMarketing', 'Marketing')}
+            </Button>
           </div>
         </div>
 
