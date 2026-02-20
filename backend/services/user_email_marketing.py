@@ -302,10 +302,15 @@ class UserEmailMarketingService:
         self,
         user_id: str,
         emails: List[str],
-        consent_confirmed: bool = False
+        consent_confirmed: bool = False,
+        user_tier: str = "free"
     ) -> Dict[str, Any]:
         """Add multiple contacts at once"""
         now = datetime.now(timezone.utc)
+        
+        # Check contact limit
+        contact_check = await self.check_contact_limit(user_id, user_tier)
+        slots_available = contact_check["remaining"]
         
         # Get existing emails for this user
         existing = await self.contacts.distinct("email", {"user_id": user_id})
@@ -314,6 +319,7 @@ class UserEmailMarketingService:
         added = []
         duplicates = []
         invalid = []
+        limit_exceeded = []
         
         contacts_to_insert = []
         
@@ -329,6 +335,11 @@ class UserEmailMarketingService:
             
             if email in existing_set:
                 duplicates.append(email)
+                continue
+            
+            # Check if we've hit the limit
+            if len(contacts_to_insert) >= slots_available:
+                limit_exceeded.append(email)
                 continue
             
             existing_set.add(email)
@@ -355,7 +366,11 @@ class UserEmailMarketingService:
             "duplicates": duplicates,
             "duplicates_count": len(duplicates),
             "invalid": invalid,
-            "invalid_count": len(invalid)
+            "invalid_count": len(invalid),
+            "limit_exceeded": limit_exceeded,
+            "limit_exceeded_count": len(limit_exceeded),
+            "contact_limit": contact_check["limit"],
+            "contacts_remaining": max(0, slots_available - len(contacts_to_insert))
         }
     
     async def get_contacts(
