@@ -32,11 +32,41 @@ marketing_client = None
 if MARKETING_API_KEY and MARKETING_API_KEY != "SG.your-actual-sendgrid-key-here":
     marketing_client = SendGridAPIClient(MARKETING_API_KEY)
 
-# Subscription limits (emails per month)
+# Subscription limits
+# Daily limit prevents spam blasts, monthly limit protects cost structure
 SUBSCRIPTION_LIMITS = {
-    "free": 0,
-    "premium": 5000,
-    "vip": 50000
+    "free": {"daily": 0, "monthly": 0, "contacts": 50},
+    "premium": {"daily": 500, "monthly": 5000, "contacts": 5000},
+    "vip": {"daily": 2000, "monthly": 50000, "contacts": 25000}
+}
+
+# Pre-built auction email templates
+EMAIL_TEMPLATES = {
+    "new_auction": {
+        "name": "New Auction Announcement",
+        "subject": "New Auction: {{auction_title}}",
+        "description": "Announce a new auction to your client list"
+    },
+    "ending_soon": {
+        "name": "Ending Soon Reminder",
+        "subject": "Ending Soon: {{auction_title}} - Don't Miss Out!",
+        "description": "Remind clients about auctions ending within 24 hours"
+    },
+    "new_inventory": {
+        "name": "New Inventory Alert",
+        "subject": "Fresh Inventory Just Listed!",
+        "description": "Notify clients about new items in your listings"
+    },
+    "vip_preview": {
+        "name": "Exclusive VIP Preview",
+        "subject": "VIP Preview: Early Access to Upcoming Auction",
+        "description": "Give VIP clients early preview access"
+    },
+    "price_drop": {
+        "name": "Price Drop Alert",
+        "subject": "Price Drop Alert: {{auction_title}}",
+        "description": "Notify clients about reduced starting prices"
+    }
 }
 
 # Contact status constants
