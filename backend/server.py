@@ -9703,28 +9703,67 @@ try:
     from routes.analytics import analytics_router, set_db as set_analytics_db
     from routes.auctions import auctions_router, set_db as set_auctions_db, set_notification_manager
     from routes.sms_verification import sms_router, set_db as set_sms_db
+    from routes.users import users_router, set_users_db, set_users_auth
+    from routes.marketing import marketing_router, set_marketing_db, set_marketing_auth, set_marketing_services
+    from routes.admin import admin_router, set_admin_db, set_admin_auth, set_admin_email_service
+    from routes.webhooks import webhooks_router, set_webhooks_db, set_webhooks_marketing_service
+    from routes.payments import payments_router, set_payments_db, set_payments_auth
+    from services.user_email_marketing import get_user_marketing_service, SUBSCRIPTION_LIMITS as USER_SUBSCRIPTION_LIMITS
     
-    # Inject database and managers into routers
+    # Inject database and services into routers
     set_analytics_db(db)
     set_auctions_db(db)
     set_sms_db(db)
+    set_users_db(db)
+    set_marketing_db(db)
+    set_admin_db(db)
+    set_webhooks_db(db)
+    set_payments_db(db)
+    
+    # Set auth functions
+    set_users_auth(get_current_user)
+    set_marketing_auth(get_current_user)
+    set_admin_auth(get_current_user)
+    set_payments_auth(get_current_user)
+    
+    # Set marketing services
+    set_marketing_services(
+        get_marketing_service,
+        get_user_marketing_service,
+        SEGMENT_FILTERS,
+        CAMPAIGN_STATUS,
+        USER_SUBSCRIPTION_LIMITS
+    )
+    set_webhooks_marketing_service(get_marketing_service)
+    
+    # Set email service for admin notifications
+    email_svc = get_email_service()
+    set_admin_email_service(email_svc)
+    
     # Use message_manager for notifications (or None if not available)
     set_notification_manager(message_manager if 'message_manager' in dir() else None)
     
-    # Include analytics router under /api prefix
+    # Include routers under /api prefix
     api_router.include_router(analytics_router)
     logger.info("✅ Analytics router loaded")
     
-    # Include auctions router under /api prefix
     api_router.include_router(auctions_router)
     logger.info("✅ Auctions router loaded")
     
-    # Include SMS verification router under /api prefix
     api_router.include_router(sms_router)
     logger.info("✅ SMS Verification router loaded")
     
+    # Note: users, marketing, admin, webhooks, payments routers contain endpoints
+    # that are still duplicated in server.py. They will be fully activated after
+    # removing duplicates from server.py in a future refactoring pass.
+    # For now, they serve as the modular foundation.
+    
+    logger.info("✅ Modular router framework initialized")
+    
 except ImportError as e:
     logger.warning(f"⚠️ Could not load modular routers: {e}")
+    import traceback
+    traceback.print_exc()
 
 # ========== VEHICLE AUCTION MODULE (STANDALONE) ==========
 # Enterprise-grade vehicle auction system - completely separate from marketplace
