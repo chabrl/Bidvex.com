@@ -490,39 +490,72 @@ const ClientEmailMarketing = () => {
       </p>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl w-full mb-8">
-        <Card className="border-2 border-blue-500/20">
+        <Card 
+          className="border-2 border-blue-500/20 cursor-pointer hover:border-blue-500/50 hover:shadow-lg transition-all"
+          onClick={() => navigate('/pricing')}
+        >
           <CardHeader className="text-center pb-2">
             <Badge className="w-fit mx-auto bg-blue-500">Premium</Badge>
-            <CardTitle className="text-lg mt-2">5,000 emails/month</CardTitle>
+            <CardTitle className="text-lg mt-2">1 free campaign/month</CardTitle>
           </CardHeader>
           <CardContent className="text-center text-sm text-muted-foreground">
             <ul className="space-y-1">
-              <li>Upload unlimited contacts</li>
-              <li>Send auction campaigns</li>
-              <li>View open/click stats</li>
+              <li>10% discount on all emails</li>
+              <li>All premium templates</li>
+              <li>Open & click analytics</li>
             </ul>
+            <Button 
+              className="w-full mt-4 bg-blue-600 hover:bg-blue-700"
+              onClick={(e) => { e.stopPropagation(); navigate('/pricing'); }}
+            >
+              Upgrade to Premium
+            </Button>
           </CardContent>
         </Card>
         
-        <Card className="border-2 border-purple-500/20">
+        <Card 
+          className="border-2 border-purple-500/20 cursor-pointer hover:border-purple-500/50 hover:shadow-lg transition-all"
+          onClick={() => navigate('/pricing')}
+        >
           <CardHeader className="text-center pb-2">
             <Badge className="w-fit mx-auto bg-purple-500">VIP</Badge>
-            <CardTitle className="text-lg mt-2">50,000 emails/month</CardTitle>
+            <CardTitle className="text-lg mt-2">2 free campaigns/month</CardTitle>
           </CardHeader>
           <CardContent className="text-center text-sm text-muted-foreground">
             <ul className="space-y-1">
-              <li>Everything in Premium</li>
-              <li>10x higher limits</li>
-              <li>Priority sending</li>
+              <li>20% discount on all emails</li>
+              <li>Priority delivery queue</li>
+              <li>Advanced analytics</li>
             </ul>
+            <Button 
+              className="w-full mt-4 bg-purple-600 hover:bg-purple-700"
+              onClick={(e) => { e.stopPropagation(); navigate('/pricing'); }}
+            >
+              Upgrade to VIP
+            </Button>
           </CardContent>
         </Card>
       </div>
       
-      <Button size="lg" className="gap-2">
-        <Crown className="h-5 w-5" />
-        Upgrade Now
-      </Button>
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Button 
+          size="lg" 
+          className="gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+          onClick={() => navigate('/pricing')}
+        >
+          <Crown className="h-5 w-5" />
+          View Subscription Plans
+        </Button>
+        <Button 
+          size="lg" 
+          variant="outline"
+          className="gap-2"
+          onClick={() => navigate('/email-marketing-pricing')}
+        >
+          <DollarSign className="h-5 w-5" />
+          See Pay-As-You-Go Pricing
+        </Button>
+      </div>
       
       <p className="text-sm text-muted-foreground mt-4">
         Free plan: Build your list with up to 50 contacts. Upgrade to start sending.
