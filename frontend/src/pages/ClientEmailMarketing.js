@@ -492,7 +492,7 @@ const ClientEmailMarketing = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl w-full mb-8">
         <Card 
           className="border-2 border-blue-500/20 cursor-pointer hover:border-blue-500/50 hover:shadow-lg transition-all"
-          onClick={() => navigate('/seller/dashboard?tab=subscription')}
+          onClick={() => navigate('/settings?tab=subscription')}
           data-testid="premium-card"
         >
           <CardHeader className="text-center pb-2">
@@ -507,7 +507,7 @@ const ClientEmailMarketing = () => {
             </ul>
             <Button 
               className="w-full mt-4 bg-blue-600 hover:bg-blue-700"
-              onClick={(e) => { e.stopPropagation(); navigate('/seller/dashboard?tab=subscription'); }}
+              onClick={(e) => { e.stopPropagation(); navigate('/settings?tab=subscription'); }}
               data-testid="upgrade-premium-btn"
             >
               Upgrade to Premium
@@ -517,7 +517,7 @@ const ClientEmailMarketing = () => {
         
         <Card 
           className="border-2 border-purple-500/20 cursor-pointer hover:border-purple-500/50 hover:shadow-lg transition-all"
-          onClick={() => navigate('/seller/dashboard?tab=subscription')}
+          onClick={() => navigate('/settings?tab=subscription')}
           data-testid="vip-card"
         >
           <CardHeader className="text-center pb-2">
@@ -532,7 +532,7 @@ const ClientEmailMarketing = () => {
             </ul>
             <Button 
               className="w-full mt-4 bg-purple-600 hover:bg-purple-700"
-              onClick={(e) => { e.stopPropagation(); navigate('/seller/dashboard?tab=subscription'); }}
+              onClick={(e) => { e.stopPropagation(); navigate('/settings?tab=subscription'); }}
               data-testid="upgrade-vip-btn"
             >
               Upgrade to VIP
@@ -545,7 +545,7 @@ const ClientEmailMarketing = () => {
         <Button 
           size="lg" 
           className="gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-          onClick={() => navigate('/seller/dashboard?tab=subscription')}
+          onClick={() => navigate('/settings?tab=subscription')}
           data-testid="view-subscription-plans-btn"
         >
           <Crown className="h-5 w-5" />
@@ -611,7 +611,7 @@ const ClientEmailMarketing = () => {
           ) : (
             <Button 
               className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white gap-2"
-              onClick={() => navigate('/seller/dashboard?tab=subscription')}
+              onClick={() => navigate('/settings?tab=subscription')}
               data-testid="upgrade-to-send-btn"
             >
               <Crown className="h-4 w-4" />
@@ -621,7 +621,7 @@ const ClientEmailMarketing = () => {
           <Badge 
             variant={access?.subscription_tier === 'vip' ? 'default' : access?.subscription_tier === 'premium' ? 'default' : 'secondary'} 
             className="uppercase cursor-pointer hover:opacity-80"
-            onClick={() => navigate('/seller/dashboard?tab=subscription')}
+            onClick={() => navigate('/settings?tab=subscription')}
             data-testid="subscription-badge"
           >
             {access?.subscription_tier || 'free'}
@@ -652,7 +652,7 @@ const ClientEmailMarketing = () => {
           <Button 
             size="sm" 
             className="gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white" 
-            onClick={() => navigate('/seller/dashboard?tab=subscription')}
+            onClick={() => navigate('/settings?tab=subscription')}
             data-testid="upgrade-banner-btn"
           >
             <Crown className="h-4 w-4" />
