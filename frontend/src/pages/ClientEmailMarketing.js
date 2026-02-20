@@ -589,10 +589,13 @@ const ClientEmailMarketing = () => {
             </p>
             <p className="text-sm text-blue-600 dark:text-blue-400">
               Upgrade to Premium to send auction announcements to your contacts. 
-              Free plan lets you build a list of up to 50 contacts.
+              Free plan lets you build a list of up to 50 contacts.{' '}
+              <a href="/email-marketing-pricing" className="underline font-medium hover:text-blue-800">
+                See pricing & how it works
+              </a>
             </p>
           </div>
-          <Button size="sm" className="gap-2">
+          <Button size="sm" className="gap-2" onClick={() => window.location.href = '/pricing'}>
             <Crown className="h-4 w-4" />
             Upgrade
           </Button>
