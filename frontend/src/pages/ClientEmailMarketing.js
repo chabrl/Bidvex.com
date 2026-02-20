@@ -521,6 +521,10 @@ const ClientEmailMarketing = () => {
         <Crown className="h-5 w-5" />
         Upgrade Now
       </Button>
+      
+      <p className="text-sm text-muted-foreground mt-4">
+        Free plan: Build your list with up to 50 contacts. Upgrade to start sending.
+      </p>
     </div>
   );
 
@@ -543,31 +547,40 @@ const ClientEmailMarketing = () => {
             Client Email Marketing
           </h1>
           <p className="text-muted-foreground">
-            Send auction campaigns to your client list
+            {access?.can_send 
+              ? 'Send auction campaigns to your client list'
+              : 'Build your contact list and upgrade to send campaigns'
+            }
           </p>
         </div>
         
-        {access?.can_access && (
-          <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3">
+          {access?.can_send ? (
             <div className="text-right">
               <p className="text-sm text-muted-foreground">Monthly Quota</p>
               <p className="font-bold">
-                {access.quota?.used?.toLocaleString() || 0} / {access.quota?.limit?.toLocaleString() || 0}
+                {access.quota?.monthly_used?.toLocaleString() || 0} / {access.quota?.monthly_limit?.toLocaleString() || 0}
               </p>
             </div>
-            <Badge variant={access.subscription_tier === 'vip' ? 'default' : 'secondary'} className="uppercase">
-              {access.subscription_tier}
-            </Badge>
-          </div>
-        )}
+          ) : (
+            <div className="text-right">
+              <p className="text-sm text-muted-foreground">Contacts</p>
+              <p className="font-bold">
+                {access?.contact_limit?.current || 0} / {access?.contact_limit?.limit || 50}
+              </p>
+            </div>
+          )}
+          <Badge 
+            variant={access?.subscription_tier === 'vip' ? 'default' : access?.subscription_tier === 'premium' ? 'default' : 'secondary'} 
+            className="uppercase"
+          >
+            {access?.subscription_tier || 'free'}
+          </Badge>
+        </div>
       </div>
 
-      {/* Show locked state for free users */}
-      {!access?.can_access ? (
-        <Card>
-          <CardContent className="p-0">
-            <LockedState />
-          </CardContent>
+      {/* Upgrade banner for free users */}
+      {!access?.can_send && (
         </Card>
       ) : (
         <>
