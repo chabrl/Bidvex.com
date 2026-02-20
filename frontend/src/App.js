@@ -41,6 +41,7 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import PhoneVerificationPage from './pages/PhoneVerificationPage';
 import CheckboxDemo from './pages/CheckboxDemo';
+import ClientEmailMarketing from './pages/ClientEmailMarketing';
 
 // Vehicle Auction Module (Standalone)
 import VehicleAuctionsPage from './pages/vehicles/VehicleAuctionsPage';
