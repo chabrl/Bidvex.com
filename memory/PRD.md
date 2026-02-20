@@ -49,48 +49,38 @@ Background Jobs: APScheduler
 └── models/
 ```
 
-## Current Status: ✅ FULL PLATFORM UI AUDIT COMPLETE (v3.0)
+## Current Status: ✅ SURGICAL WHITE BACKGROUND FIX COMPLETE (v4.0)
 
 ### Session Summary (Feb 20, 2026 - Latest)
-Performed comprehensive platform-wide fix for white rectangular backgrounds on ALL UI elements.
+Fixed the "Nuclear Fix" that was too broad and broke layout backgrounds.
 
-**NUCLEAR WHITE BACKGROUND FIX v3.0: ✅**
+**SURGICAL WHITE BACKGROUND FIX v4.0: ✅**
 
-**Root Cause Identified:**
-- Tailwind CSS `--tw-gradient-stops` inheritance causing white backgrounds
-- Browser-specific rendering of button/tab elements with default backgrounds
-- Radix UI primitives inheriting unwanted background styles
+**Issue Fixed:**
+The previous "Nuclear Fix" used a universal `*` selector to reset `--tw-gradient-stops` which stripped gradient backgrounds from ALL elements, breaking hero sections, cards, and containers.
 
-**Solution Applied (Multi-Layer Approach):**
+**Solution Applied (Targeted Approach):**
+Replaced universal reset with targeted selectors that ONLY affect text-level elements:
 
-1. **Global CSS Override** (`/app/frontend/src/index.css` lines 2232-2545):
-   - Universal gradient stops reset: `*::before, *::after { --tw-gradient-stops: transparent !important }`
-   - Tab-specific rules: `[role="tab"], [role="tablist"]` with forced transparency
-   - Select/dropdown rules: `[data-radix-select-value], [role="combobox"]` transparency
-   - Navigation rules: `nav a, nav button, nav span` transparency
-   - Button text rules: `button span, [class*="Badge"] span` transparency
+**CSS Selectors Used (index.css lines 2233-2375):**
+- `[role="tab"]` - Tab buttons
+- `[role="tab"] span` - Spans inside tabs
+- `[data-radix-select-value]` - Select dropdown values
+- `nav a > span, nav button > span` - Navigation link text
+- `button > span, a > span` - Button/link child spans
+- `[data-radix-collection-item]` - Radix collection items
 
-2. **Component-Level Fixes:**
-   - `tabs.jsx` - TabsList and TabsTrigger with `bg-transparent` + inline styles
-   - `select.jsx` - SelectValue wrapped with forwardRef + transparent styling
-   - `badge.jsx` - Added `[&>span]:bg-transparent` + `--tw-gradient-stops` inline style
-   - `button.jsx` - Added `[&_span]:bg-transparent` to all variants
-   - `dropdown-menu.jsx` - DropdownMenuItem with `style={{ background: 'transparent' }}`
-   - `navigation-menu.jsx` - navigationMenuTriggerStyle with `bg-transparent [&>span]:bg-transparent`
+**Results:**
+- ✅ Homepage hero gradient (blue/cyan) - RESTORED
+- ✅ Vehicle Auctions hero gradient - RESTORED
+- ✅ Lots Auction header - RESTORED
+- ✅ Email Marketing Pricing cards - RESTORED
+- ✅ "Why Choose BidVex" and "How It Works" sections - RESTORED
+- ✅ Tabs still have NO white rectangular backgrounds
+- ✅ Navigation links still have NO white backgrounds
+- ✅ Both Light and Dark modes work correctly
 
-**Elements Fixed:**
-- ✅ Navigation bar (Home, Marketplace, Lots Auction, Vehicles, Sell)
-- ✅ Client Marketing tabs (Contacts, Campaigns, Analytics, Pricing)
-- ✅ Vehicle Auctions filter buttons (All Auctions, Ending Soon, Live Now, No Reserve, Buy Now)
-- ✅ Vehicle Auctions select dropdowns (Vehicle Make, Body Type, Location, Sort By)
-- ✅ Settings page tabs (Profile, Payment, Subscription, Notifications)
-- ✅ All badges and filter chips
-- ✅ Dropdown menus
-
-**Testing:** 100% pass rate (7/7 features verified via frontend testing agent)
-- Verified in both Light Mode and Dark Mode
-- All elements have `rgba(0, 0, 0, 0)` transparent backgrounds
-- Active states maintain proper styling without white boxes
+**Testing:** 100% pass rate (8/8 features verified via frontend testing agent)
 
 ---
 
