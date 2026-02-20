@@ -11292,6 +11292,481 @@ async def get_marketing_config(current_user: User = Depends(get_current_user)):
     }
 
 
+# ========== USER EMAIL MARKETING MODULE ==========
+from services.user_email_marketing import get_user_marketing_service, SUBSCRIPTION_LIMITS
+
+class UserContactCreateRequest(BaseModel):
+    """Request for creating a contact"""
+    email: str
+    name: Optional[str] = None
+    tags: Optional[List[str]] = None
+    consent_confirmed: bool = False
+
+class UserContactBulkRequest(BaseModel):
+    """Request for bulk adding contacts"""
+    emails: List[str]
+    consent_confirmed: bool = False
+
+class UserCampaignCreateRequest(BaseModel):
+    """Request for creating a user campaign"""
+    name: str
+    subject: str
+    html_content: str
+    plain_text_content: str = ""
+    contact_ids: Optional[List[str]] = None
+    auction_id: Optional[str] = None
+
+
+@api_router.get("/user/marketing/access")
+async def check_marketing_access(current_user: User = Depends(get_current_user)):
+    """Check user's access to email marketing feature"""
+    user_marketing = get_user_marketing_service(db)
+    tier = current_user.subscription_tier or "free"
+    
+    can_access = user_marketing.can_access_feature(tier)
+    quota = await user_marketing.get_remaining_quota(current_user.id, tier)
+    
+    return {
+        "can_access": can_access,
+        "subscription_tier": tier,
+        "limits": SUBSCRIPTION_LIMITS,
+        "quota": quota,
+        "upgrade_message": "Upgrade to Premium or VIP to send auctions to your client list." if not can_access else None
+    }
+
+
+@api_router.get("/user/marketing/contacts")
+async def get_user_contacts(
+    status: Optional[str] = None,
+    search: Optional[str] = None,
+    limit: int = 100,
+    skip: int = 0,
+    current_user: User = Depends(get_current_user)
+):
+    """Get user's contacts"""
+    user_marketing = get_user_marketing_service(db)
+    tier = current_user.subscription_tier or "free"
+    
+    if not user_marketing.can_access_feature(tier):
+        raise HTTPException(
+            status_code=403,
+            detail="Upgrade to Premium or VIP to access client email marketing"
+        )
+    
+    result = await user_marketing.get_contacts(
+        user_id=current_user.id,
+        status=status,
+        search=search,
+        limit=limit,
+        skip=skip
+    )
+    return result
+
+
+@api_router.get("/user/marketing/contacts/stats")
+async def get_user_contact_stats(current_user: User = Depends(get_current_user)):
+    """Get contact statistics"""
+    user_marketing = get_user_marketing_service(db)
+    tier = current_user.subscription_tier or "free"
+    
+    if not user_marketing.can_access_feature(tier):
+        raise HTTPException(
+            status_code=403,
+            detail="Upgrade to Premium or VIP to access client email marketing"
+        )
+    
+    stats = await user_marketing.get_contact_stats(current_user.id)
+    return stats
+
+
+@api_router.post("/user/marketing/contacts")
+async def add_user_contact(
+    data: UserContactCreateRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Add a single contact"""
+    user_marketing = get_user_marketing_service(db)
+    tier = current_user.subscription_tier or "free"
+    
+    if not user_marketing.can_access_feature(tier):
+        raise HTTPException(
+            status_code=403,
+            detail="Upgrade to Premium or VIP to access client email marketing"
+        )
+    
+    try:
+        contact = await user_marketing.add_contact(
+            user_id=current_user.id,
+            email=data.email,
+            name=data.name,
+            tags=data.tags,
+            consent_confirmed=data.consent_confirmed
+        )
+        return contact
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@api_router.post("/user/marketing/contacts/bulk")
+async def add_user_contacts_bulk(
+    data: UserContactBulkRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Add multiple contacts at once"""
+    user_marketing = get_user_marketing_service(db)
+    tier = current_user.subscription_tier or "free"
+    
+    if not user_marketing.can_access_feature(tier):
+        raise HTTPException(
+            status_code=403,
+            detail="Upgrade to Premium or VIP to access client email marketing"
+        )
+    
+    result = await user_marketing.add_contacts_bulk(
+        user_id=current_user.id,
+        emails=data.emails,
+        consent_confirmed=data.consent_confirmed
+    )
+    return result
+
+
+@api_router.post("/user/marketing/contacts/parse")
+async def parse_user_emails(
+    data: Dict[str, str],
+    current_user: User = Depends(get_current_user)
+):
+    """Parse and validate email list"""
+    user_marketing = get_user_marketing_service(db)
+    tier = current_user.subscription_tier or "free"
+    
+    if not user_marketing.can_access_feature(tier):
+        raise HTTPException(
+            status_code=403,
+            detail="Upgrade to Premium or VIP to access client email marketing"
+        )
+    
+    result = user_marketing.parse_email_list(data.get("emails", ""))
+    return result
+
+
+@api_router.post("/user/marketing/contacts/csv")
+async def upload_user_contacts_csv(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    """Upload CSV file with contacts"""
+    user_marketing = get_user_marketing_service(db)
+    tier = current_user.subscription_tier or "free"
+    
+    if not user_marketing.can_access_feature(tier):
+        raise HTTPException(
+            status_code=403,
+            detail="Upgrade to Premium or VIP to access client email marketing"
+        )
+    
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(status_code=400, detail="File must be a CSV")
+    
+    try:
+        content = await file.read()
+        csv_content = content.decode('utf-8')
+        result = user_marketing.parse_csv_emails(csv_content)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@api_router.get("/user/marketing/contacts/{contact_id}")
+async def get_user_contact(
+    contact_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Get single contact"""
+    user_marketing = get_user_marketing_service(db)
+    contact = await user_marketing.get_contact(current_user.id, contact_id)
+    
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact not found")
+    
+    return contact
+
+
+@api_router.put("/user/marketing/contacts/{contact_id}")
+async def update_user_contact(
+    contact_id: str,
+    data: Dict[str, Any],
+    current_user: User = Depends(get_current_user)
+):
+    """Update a contact"""
+    user_marketing = get_user_marketing_service(db)
+    tier = current_user.subscription_tier or "free"
+    
+    if not user_marketing.can_access_feature(tier):
+        raise HTTPException(
+            status_code=403,
+            detail="Upgrade to Premium or VIP to access client email marketing"
+        )
+    
+    try:
+        contact = await user_marketing.update_contact(
+            user_id=current_user.id,
+            contact_id=contact_id,
+            updates=data
+        )
+        return contact
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@api_router.delete("/user/marketing/contacts/{contact_id}")
+async def delete_user_contact(
+    contact_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Delete a contact"""
+    user_marketing = get_user_marketing_service(db)
+    tier = current_user.subscription_tier or "free"
+    
+    if not user_marketing.can_access_feature(tier):
+        raise HTTPException(
+            status_code=403,
+            detail="Upgrade to Premium or VIP to access client email marketing"
+        )
+    
+    deleted = await user_marketing.delete_contact(current_user.id, contact_id)
+    
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Contact not found")
+    
+    return {"status": "deleted"}
+
+
+@api_router.post("/user/marketing/contacts/delete-bulk")
+async def delete_user_contacts_bulk(
+    data: Dict[str, List[str]],
+    current_user: User = Depends(get_current_user)
+):
+    """Delete multiple contacts"""
+    user_marketing = get_user_marketing_service(db)
+    tier = current_user.subscription_tier or "free"
+    
+    if not user_marketing.can_access_feature(tier):
+        raise HTTPException(
+            status_code=403,
+            detail="Upgrade to Premium or VIP to access client email marketing"
+        )
+    
+    contact_ids = data.get("contact_ids", [])
+    deleted_count = await user_marketing.delete_contacts_bulk(current_user.id, contact_ids)
+    
+    return {"deleted_count": deleted_count}
+
+
+# User Campaigns
+@api_router.get("/user/marketing/campaigns")
+async def get_user_campaigns(
+    status: Optional[str] = None,
+    limit: int = 50,
+    skip: int = 0,
+    current_user: User = Depends(get_current_user)
+):
+    """Get user's campaigns"""
+    user_marketing = get_user_marketing_service(db)
+    tier = current_user.subscription_tier or "free"
+    
+    if not user_marketing.can_access_feature(tier):
+        raise HTTPException(
+            status_code=403,
+            detail="Upgrade to Premium or VIP to access client email marketing"
+        )
+    
+    result = await user_marketing.get_campaigns(
+        user_id=current_user.id,
+        status=status,
+        limit=limit,
+        skip=skip
+    )
+    return result
+
+
+@api_router.post("/user/marketing/campaigns")
+async def create_user_campaign(
+    data: UserCampaignCreateRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Create a new campaign"""
+    user_marketing = get_user_marketing_service(db)
+    tier = current_user.subscription_tier or "free"
+    
+    if not user_marketing.can_access_feature(tier):
+        raise HTTPException(
+            status_code=403,
+            detail="Upgrade to Premium or VIP to access client email marketing"
+        )
+    
+    campaign = await user_marketing.create_campaign(
+        user_id=current_user.id,
+        user_email=current_user.email,
+        name=data.name,
+        subject=data.subject,
+        html_content=data.html_content,
+        plain_text_content=data.plain_text_content,
+        contact_ids=data.contact_ids,
+        auction_id=data.auction_id
+    )
+    return campaign
+
+
+@api_router.get("/user/marketing/campaigns/{campaign_id}")
+async def get_user_campaign(
+    campaign_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Get single campaign"""
+    user_marketing = get_user_marketing_service(db)
+    campaign = await user_marketing.get_campaign(current_user.id, campaign_id)
+    
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    
+    return campaign
+
+
+@api_router.put("/user/marketing/campaigns/{campaign_id}")
+async def update_user_campaign(
+    campaign_id: str,
+    data: Dict[str, Any],
+    current_user: User = Depends(get_current_user)
+):
+    """Update a draft campaign"""
+    user_marketing = get_user_marketing_service(db)
+    tier = current_user.subscription_tier or "free"
+    
+    if not user_marketing.can_access_feature(tier):
+        raise HTTPException(
+            status_code=403,
+            detail="Upgrade to Premium or VIP to access client email marketing"
+        )
+    
+    try:
+        campaign = await user_marketing.update_campaign(
+            user_id=current_user.id,
+            campaign_id=campaign_id,
+            updates=data
+        )
+        return campaign
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@api_router.post("/user/marketing/campaigns/{campaign_id}/confirm-consent")
+async def confirm_user_campaign_consent(
+    campaign_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Confirm consent before sending"""
+    user_marketing = get_user_marketing_service(db)
+    
+    campaign = await user_marketing.confirm_consent(current_user.id, campaign_id)
+    return campaign
+
+
+@api_router.post("/user/marketing/campaigns/{campaign_id}/send")
+async def send_user_campaign(
+    campaign_id: str,
+    request: Request,
+    current_user: User = Depends(get_current_user)
+):
+    """Send a campaign"""
+    user_marketing = get_user_marketing_service(db)
+    tier = current_user.subscription_tier or "free"
+    
+    if not user_marketing.can_access_feature(tier):
+        raise HTTPException(
+            status_code=403,
+            detail="Upgrade to Premium or VIP to access client email marketing"
+        )
+    
+    user_ip = request.client.host if request.client else None
+    
+    try:
+        result = await user_marketing.send_campaign(
+            user_id=current_user.id,
+            user_email=current_user.email,
+            campaign_id=campaign_id,
+            user_tier=tier,
+            user_ip=user_ip
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@api_router.get("/user/marketing/campaigns/{campaign_id}/stats")
+async def get_user_campaign_stats(
+    campaign_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Get campaign stats"""
+    user_marketing = get_user_marketing_service(db)
+    
+    try:
+        stats = await user_marketing.get_campaign_stats(current_user.id, campaign_id)
+        return stats
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@api_router.get("/user/marketing/auction-template/{auction_id}")
+async def get_auction_email_template(
+    auction_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Get email template for an auction"""
+    user_marketing = get_user_marketing_service(db)
+    tier = current_user.subscription_tier or "free"
+    
+    if not user_marketing.can_access_feature(tier):
+        raise HTTPException(
+            status_code=403,
+            detail="Upgrade to Premium or VIP to access client email marketing"
+        )
+    
+    # Get auction details
+    auction = await db.listings.find_one({"id": auction_id}, {"_id": 0})
+    if not auction:
+        # Try vehicles
+        auction = await db.vehicle_auctions.find_one({"id": auction_id}, {"_id": 0})
+    
+    if not auction:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    
+    template = user_marketing.get_auction_email_template(auction)
+    
+    return {
+        "auction_id": auction_id,
+        "auction_title": auction.get("title"),
+        "html_template": template
+    }
+
+
+# Public unsubscribe endpoint
+@api_router.get("/unsubscribe/user")
+async def unsubscribe_user_contact(
+    user: str,
+    contact: str
+):
+    """Handle unsubscribe from user marketing email"""
+    user_marketing = get_user_marketing_service(db)
+    
+    success = await user_marketing.handle_unsubscribe(user, contact)
+    
+    if success:
+        return {"status": "unsubscribed", "message": "You have been unsubscribed from this sender's list."}
+    else:
+        return {"status": "not_found", "message": "Contact not found or already unsubscribed."}
+
+
 # Include all API routes - MUST be after all routes are defined
 app.include_router(api_router)
 
