@@ -628,10 +628,16 @@ class UserEmailMarketingService:
         if not campaign.get("consent_confirmed"):
             raise ValueError("You must confirm consent before sending")
         
-        # Check quota
+        # Check quota - both daily and monthly limits
         quota = await self.get_remaining_quota(user_id, user_tier)
+        
         if not quota["can_send"]:
-            raise ValueError(f"Monthly email limit reached ({quota['limit']} emails)")
+            if quota["daily_remaining"] <= 0:
+                raise ValueError(f"Daily sending limit reached ({quota['daily_limit']} emails/day). Try again tomorrow.")
+            elif quota["monthly_remaining"] <= 0:
+                raise ValueError(f"Monthly sending limit reached ({quota['monthly_limit']} emails/month). Upgrade to VIP to increase capacity.")
+            else:
+                raise ValueError("Sending limit reached. Upgrade to Premium or VIP to send emails.")
         
         # Get recipients
         suppressed = await self.get_suppressed_contacts(user_id)
@@ -651,10 +657,13 @@ class UserEmailMarketingService:
         # Filter out suppressed
         recipients = [c for c in contacts if c["email"].lower() not in suppressed]
         
-        # Check if within quota
-        remaining = quota["remaining"]
-        if len(recipients) > remaining:
-            raise ValueError(f"Campaign has {len(recipients)} recipients but you only have {remaining} emails remaining this month")
+        # Check if within quota - use the minimum of daily and monthly remaining
+        effective_remaining = min(quota["daily_remaining"], quota["monthly_remaining"])
+        if len(recipients) > effective_remaining:
+            if quota["daily_remaining"] < len(recipients):
+                raise ValueError(f"Campaign has {len(recipients)} recipients but you only have {quota['daily_remaining']} emails remaining today. Reduce recipients or try tomorrow.")
+            else:
+                raise ValueError(f"Campaign has {len(recipients)} recipients but you only have {quota['monthly_remaining']} emails remaining this month. Upgrade to VIP to increase capacity.")
         
         # Update campaign status
         now = datetime.now(timezone.utc)
