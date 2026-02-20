@@ -164,7 +164,7 @@ class TestClientEmailMarketing:
         
         # Verify contact structure
         assert "id" in data
-        assert data["email"] == test_email
+        assert data["email"] == test_email.lower()  # Backend normalizes to lowercase
         assert data["name"] == "Test Contact"
         assert data["consent_confirmed"] == True
         assert data["status"] == "active"
@@ -201,9 +201,9 @@ class TestClientEmailMarketing:
         assert isinstance(data["contacts"], list)
         assert data["total"] >= 1
         
-        # Verify the contact we added is in the list
+        # Verify the contact we added is in the list (lowercase normalized)
         contact_emails = [c["email"] for c in data["contacts"]]
-        assert test_email in contact_emails, f"Added contact not found in list"
+        assert test_email.lower() in contact_emails, f"Added contact not found in list"
         
         print(f"✅ List contacts passed - total: {data['total']}")
     
