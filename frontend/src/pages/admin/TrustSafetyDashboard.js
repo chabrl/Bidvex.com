@@ -134,11 +134,11 @@ const TrustSafetyDashboard = () => {
 
       {/* Tabs */}
       <Tabs defaultValue="scores" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="scores">Trust Scores</TabsTrigger>
-          <TabsTrigger value="flags">Fraud Flags</TabsTrigger>
-          <TabsTrigger value="collusion">Collusion</TabsTrigger>
-          <TabsTrigger value="ai">AI Scanner</TabsTrigger>
+        <TabsList className="flex w-full bg-transparent">
+          <TabsTrigger value="scores" className="flex-1 bg-transparent">Trust Scores</TabsTrigger>
+          <TabsTrigger value="flags" className="flex-1 bg-transparent">Fraud Flags</TabsTrigger>
+          <TabsTrigger value="collusion" className="flex-1 bg-transparent">Collusion</TabsTrigger>
+          <TabsTrigger value="ai" className="flex-1 bg-transparent">AI Scanner</TabsTrigger>
         </TabsList>
 
         {/* Trust Scores Tab */}

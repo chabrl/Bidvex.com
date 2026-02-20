@@ -220,11 +220,11 @@ const WatchlistPage = () => {
         </div>
         {hasItems ? (
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-4 mb-6">
-              <TabsTrigger value="all">All ({totalItems})</TabsTrigger>
-              <TabsTrigger value="auctions">Auctions ({watchlistData.auctions?.length || 0})</TabsTrigger>
-              <TabsTrigger value="lots">Lots ({watchlistData.lots?.length || 0})</TabsTrigger>
-              <TabsTrigger value="marketplace">Marketplace ({watchlistData.listings?.length || 0})</TabsTrigger>
+            <TabsList className="flex w-full mb-6 bg-transparent">
+              <TabsTrigger value="all" className="flex-1 bg-transparent">All ({totalItems})</TabsTrigger>
+              <TabsTrigger value="auctions" className="flex-1 bg-transparent">Auctions ({watchlistData.auctions?.length || 0})</TabsTrigger>
+              <TabsTrigger value="lots" className="flex-1 bg-transparent">Lots ({watchlistData.lots?.length || 0})</TabsTrigger>
+              <TabsTrigger value="marketplace" className="flex-1 bg-transparent">Marketplace ({watchlistData.listings?.length || 0})</TabsTrigger>
             </TabsList>
             <TabsContent value="all" className="space-y-8">
               {watchlistData.auctions && watchlistData.auctions.length > 0 && (

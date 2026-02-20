@@ -201,16 +201,16 @@ const BrandingLayoutManager = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="branding" className="flex items-center gap-2">
+        <TabsList className="flex w-full bg-transparent">
+          <TabsTrigger value="branding" className="flex-1 flex items-center justify-center gap-2 bg-transparent">
             <Palette className="h-4 w-4" />
             Branding
           </TabsTrigger>
-          <TabsTrigger value="layout" className="flex items-center gap-2">
+          <TabsTrigger value="layout" className="flex-1 flex items-center justify-center gap-2 bg-transparent">
             <Layout className="h-4 w-4" />
             Homepage Layout
           </TabsTrigger>
-          <TabsTrigger value="banners" className="flex items-center gap-2">
+          <TabsTrigger value="banners" className="flex-1 flex items-center justify-center gap-2 bg-transparent">
             <Image className="h-4 w-4" />
             Hero Banners
           </TabsTrigger>

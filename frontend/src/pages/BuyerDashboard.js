@@ -77,11 +77,11 @@ const BuyerDashboard = () => {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="all" className="space-y-4">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="all">{t('dashboard.buyer.allBids')}</TabsTrigger>
-                <TabsTrigger value="winning" className="text-green-600">{t('dashboard.buyer.winning')}</TabsTrigger>
-                <TabsTrigger value="losing" className="text-red-600">{t('dashboard.buyer.outbid')}</TabsTrigger>
-                <TabsTrigger value="watching">{t('watchlist.title', 'Watching')}</TabsTrigger>
+              <TabsList className="flex w-full bg-transparent">
+                <TabsTrigger value="all" className="flex-1 bg-transparent">{t('dashboard.buyer.allBids')}</TabsTrigger>
+                <TabsTrigger value="winning" className="flex-1 bg-transparent text-green-600">{t('dashboard.buyer.winning')}</TabsTrigger>
+                <TabsTrigger value="losing" className="flex-1 bg-transparent text-red-600">{t('dashboard.buyer.outbid')}</TabsTrigger>
+                <TabsTrigger value="watching" className="flex-1 bg-transparent">{t('watchlist.title', 'Watching')}</TabsTrigger>
               </TabsList>
 
               <TabsContent value="all">
