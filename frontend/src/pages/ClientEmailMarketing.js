@@ -103,6 +103,16 @@ const ClientEmailMarketing = () => {
     }
   };
 
+  const fetchTemplates = async () => {
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const response = await axios.get(`${API}/user/marketing/templates`, { headers });
+      setTemplates(response.data.templates || {});
+    } catch (error) {
+      console.error('Failed to fetch templates:', error);
+    }
+  };
+
   const fetchContacts = async () => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
@@ -147,6 +157,20 @@ const ClientEmailMarketing = () => {
       setCampaignStats(response.data);
     } catch (error) {
       console.error('Failed to fetch campaign stats:', error);
+    }
+  };
+
+  const selectTemplate = (templateKey) => {
+    const template = templates[templateKey];
+    if (template) {
+      setCampaignData(prev => ({
+        ...prev,
+        name: prev.name || template.name,
+        subject: template.subject,
+        html_content: template.html_content
+      }));
+      setTemplateSelectorOpen(false);
+      toast.success(`Loaded "${template.name}" template`);
     }
   };
 
