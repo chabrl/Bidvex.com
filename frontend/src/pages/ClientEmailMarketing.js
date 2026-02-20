@@ -70,21 +70,25 @@ const ClientEmailMarketing = () => {
   // Selected campaign for viewing
   const [selectedCampaign, setSelectedCampaign] = useState(null);
   const [campaignStats, setCampaignStats] = useState(null);
+  
+  // Templates state
+  const [templates, setTemplates] = useState({});
+  const [templateSelectorOpen, setTemplateSelectorOpen] = useState(false);
 
   useEffect(() => {
     checkAccess();
+    fetchTemplates();
   }, []);
 
   useEffect(() => {
-    if (access?.can_access) {
-      if (activeTab === 'contacts') {
-        fetchContacts();
-        fetchContactStats();
-      } else if (activeTab === 'campaigns') {
-        fetchCampaigns();
-      }
+    // All users can view contacts - removed can_access check
+    if (activeTab === 'contacts') {
+      fetchContacts();
+      fetchContactStats();
+    } else if (activeTab === 'campaigns') {
+      fetchCampaigns();
     }
-  }, [activeTab, access?.can_access]);
+  }, [activeTab]);
 
   const checkAccess = async () => {
     try {
