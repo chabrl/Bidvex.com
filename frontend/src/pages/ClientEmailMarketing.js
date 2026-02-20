@@ -676,24 +676,24 @@ const ClientEmailMarketing = () => {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4 max-w-lg">
-          <TabsTrigger value="contacts" className="gap-2" data-testid="tab-contacts">
+        <TabsList className="flex w-full max-w-lg bg-transparent">
+          <TabsTrigger value="contacts" className="flex-1 gap-2 bg-transparent" data-testid="tab-contacts">
             <Users className="h-4 w-4" />
             <span className="hidden sm:inline">Contacts</span>
           </TabsTrigger>
-          <TabsTrigger value="campaigns" className="gap-2" disabled={!access?.can_send} data-testid="tab-campaigns">
+          <TabsTrigger value="campaigns" className="flex-1 gap-2 bg-transparent" disabled={!access?.can_send} data-testid="tab-campaigns">
             <Send className="h-4 w-4" />
             <span className="hidden sm:inline">Campaigns</span>
             {!access?.can_send && <Lock className="h-3 w-3 ml-1" />}
           </TabsTrigger>
-          <TabsTrigger value="analytics" className="gap-2" disabled={!access?.can_send} data-testid="tab-analytics">
+          <TabsTrigger value="analytics" className="flex-1 gap-2 bg-transparent" disabled={!access?.can_send} data-testid="tab-analytics">
             <BarChart3 className="h-4 w-4" />
             <span className="hidden sm:inline">Analytics</span>
             {!access?.can_send && <Lock className="h-3 w-3 ml-1" />}
           </TabsTrigger>
           <TabsTrigger 
             value="pricing" 
-            className="gap-2" 
+            className="flex-1 gap-2 bg-transparent" 
             onClick={(e) => {
               e.preventDefault();
               navigate('/email-marketing-pricing');
