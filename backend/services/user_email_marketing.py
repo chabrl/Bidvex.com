@@ -258,13 +258,20 @@ class UserEmailMarketingService:
         email: str,
         name: Optional[str] = None,
         tags: Optional[List[str]] = None,
-        consent_confirmed: bool = False
+        consent_confirmed: bool = False,
+        user_tier: str = "free"
     ) -> Dict[str, Any]:
         """Add a single contact"""
         email = email.strip().lower()
         
         if not self.validate_email(email):
             raise ValueError(f"Invalid email format: {email}")
+        
+        # Check contact limit
+        contact_check = await self.check_contact_limit(user_id, user_tier)
+        if not contact_check["can_add"]:
+            tier_name = user_tier.capitalize()
+            raise ValueError(f"Contact limit reached ({contact_check['limit']} contacts for {tier_name}). Upgrade to add more contacts.")
         
         # Check for duplicate
         existing = await self.contacts.find_one({
