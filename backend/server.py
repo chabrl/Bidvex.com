@@ -11752,6 +11752,14 @@ async def unsubscribe_user_contact(
         return {"status": "not_found", "message": "Contact not found or already unsubscribed."}
 
 
+@api_router.get("/user/marketing/templates")
+async def get_email_templates(current_user: User = Depends(get_current_user)):
+    """Get pre-built email templates"""
+    user_marketing = get_user_marketing_service(db)
+    templates = user_marketing.get_email_templates()
+    return {"templates": templates}
+
+
 # Include all API routes - MUST be after all routes are defined
 app.include_router(api_router)
 
