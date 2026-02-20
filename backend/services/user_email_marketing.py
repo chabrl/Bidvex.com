@@ -93,13 +93,33 @@ class UserEmailMarketingService:
         
     # ==================== SUBSCRIPTION CHECKS ====================
     
-    def get_subscription_limit(self, tier: str) -> int:
-        """Get monthly email limit for subscription tier"""
-        return SUBSCRIPTION_LIMITS.get(tier.lower(), 0)
+    def get_subscription_limits(self, tier: str) -> Dict[str, int]:
+        """Get all limits for subscription tier"""
+        return SUBSCRIPTION_LIMITS.get(tier.lower(), SUBSCRIPTION_LIMITS["free"])
+    
+    def get_contact_limit(self, tier: str) -> int:
+        """Get contact storage limit for subscription tier"""
+        return self.get_subscription_limits(tier).get("contacts", 50)
     
     def can_access_feature(self, tier: str) -> bool:
-        """Check if user's subscription tier can access the feature"""
+        """Check if user's subscription tier can access send feature (Premium/VIP only)"""
         return tier.lower() in ["premium", "vip"]
+    
+    def can_manage_contacts(self, tier: str) -> bool:
+        """Free users can manage up to 50 contacts but cannot send"""
+        return True  # All tiers can manage contacts
+    
+    async def get_daily_usage(self, user_id: str) -> int:
+        """Get user's email sends for today"""
+        now = datetime.now(timezone.utc)
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        count = await self.campaign_sends.count_documents({
+            "user_id": user_id,
+            "sent_at": {"$gte": today_start.isoformat()},
+            "status": {"$in": ["sent", "logged"]}
+        })
+        return count
     
     async def get_monthly_usage(self, user_id: str) -> int:
         """Get user's email sends for the current month"""
@@ -114,16 +134,47 @@ class UserEmailMarketingService:
         return count
     
     async def get_remaining_quota(self, user_id: str, tier: str) -> Dict[str, Any]:
-        """Get remaining email quota for the month"""
-        limit = self.get_subscription_limit(tier)
-        used = await self.get_monthly_usage(user_id)
+        """Get remaining email quota for daily and monthly limits"""
+        limits = self.get_subscription_limits(tier)
+        daily_used = await self.get_daily_usage(user_id)
+        monthly_used = await self.get_monthly_usage(user_id)
+        
+        daily_limit = limits.get("daily", 0)
+        monthly_limit = limits.get("monthly", 0)
+        contact_limit = limits.get("contacts", 50)
+        
+        daily_remaining = max(0, daily_limit - daily_used)
+        monthly_remaining = max(0, monthly_limit - monthly_used)
+        
+        # Can only send if both daily and monthly limits allow
+        can_send = daily_remaining > 0 and monthly_remaining > 0 if (daily_limit > 0 and monthly_limit > 0) else False
+        
+        return {
+            "daily_limit": daily_limit,
+            "daily_used": daily_used,
+            "daily_remaining": daily_remaining,
+            "monthly_limit": monthly_limit,
+            "monthly_used": monthly_used,
+            "monthly_remaining": monthly_remaining,
+            "contact_limit": contact_limit,
+            "can_send": can_send,
+            "tier": tier,
+            # Legacy fields for backwards compatibility
+            "limit": monthly_limit,
+            "used": monthly_used,
+            "remaining": monthly_remaining
+        }
+    
+    async def check_contact_limit(self, user_id: str, tier: str) -> Dict[str, Any]:
+        """Check if user can add more contacts"""
+        limit = self.get_contact_limit(tier)
+        current_count = await self.contacts.count_documents({"user_id": user_id})
         
         return {
             "limit": limit,
-            "used": used,
-            "remaining": max(0, limit - used),
-            "can_send": used < limit if limit > 0 else False,
-            "tier": tier
+            "current": current_count,
+            "remaining": max(0, limit - current_count),
+            "can_add": current_count < limit
         }
     
     # ==================== CONTACT MANAGEMENT ====================
