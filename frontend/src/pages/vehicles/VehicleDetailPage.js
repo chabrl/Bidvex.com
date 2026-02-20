@@ -557,11 +557,11 @@ const VehicleDetailPage = () => {
             
             {/* Tabs */}
             <Tabs defaultValue="details">
-              <TabsList className="w-full justify-start">
-                <TabsTrigger value="details">Details</TabsTrigger>
-                <TabsTrigger value="condition">Condition</TabsTrigger>
-                <TabsTrigger value="history">Bid History</TabsTrigger>
-                <TabsTrigger value="seller">Seller</TabsTrigger>
+              <TabsList className="w-full justify-start bg-transparent">
+                <TabsTrigger value="details" className="bg-transparent">Details</TabsTrigger>
+                <TabsTrigger value="condition" className="bg-transparent">Condition</TabsTrigger>
+                <TabsTrigger value="history" className="bg-transparent">Bid History</TabsTrigger>
+                <TabsTrigger value="seller" className="bg-transparent">Seller</TabsTrigger>
               </TabsList>
               
               {/* Details Tab */}

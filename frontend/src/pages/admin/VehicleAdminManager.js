@@ -627,26 +627,26 @@ const VehicleAdminManager = () => {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="system-settings" className="gap-2">
+        <TabsList className="flex bg-transparent">
+          <TabsTrigger value="system-settings" className="gap-2 bg-transparent">
             <Shield className="h-4 w-4" />
             System Settings
           </TabsTrigger>
-          <TabsTrigger value="pending-sellers" className="gap-2">
+          <TabsTrigger value="pending-sellers" className="gap-2 bg-transparent">
             <User className="h-4 w-4" />
             Pending Sellers
             {stats.pendingSellers > 0 && (
               <Badge className="ml-1 bg-yellow-500">{stats.pendingSellers}</Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="pending-vehicles" className="gap-2">
+          <TabsTrigger value="pending-vehicles" className="gap-2 bg-transparent">
             <Car className="h-4 w-4" />
             Pending Vehicles
             {stats.pendingVehicles > 0 && (
               <Badge className="ml-1 bg-yellow-500">{stats.pendingVehicles}</Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="audit-logs" className="gap-2">
+          <TabsTrigger value="audit-logs" className="gap-2 bg-transparent">
             <FileText className="h-4 w-4" />
             Audit Logs
           </TabsTrigger>
