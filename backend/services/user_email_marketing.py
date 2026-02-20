@@ -975,6 +975,179 @@ class UserEmailMarketingService:
   </div>
 </body>
 </html>'''
+    
+    def get_email_templates(self) -> Dict[str, Dict[str, Any]]:
+        """Get available pre-built email templates"""
+        templates = {}
+        
+        for key, meta in EMAIL_TEMPLATES.items():
+            templates[key] = {
+                **meta,
+                "html_content": self._get_template_html(key)
+            }
+        
+        return templates
+    
+    def _get_template_html(self, template_key: str) -> str:
+        """Get HTML content for a specific template"""
+        base_style = """
+            font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5;
+        """
+        container_style = """
+            max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; 
+            overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        """
+        
+        templates = {
+            "new_auction": f'''<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="{base_style}">
+  <div style="{container_style}">
+    <div style="background: linear-gradient(135deg, #3B82F6, #8B5CF6); padding: 30px; text-align: center;">
+      <h1 style="color: white; margin: 0; font-size: 24px;">🔔 New Auction Announcement</h1>
+    </div>
+    <div style="padding: 30px;">
+      <p style="color: #333; font-size: 16px;">Hello {{{{name}}}},</p>
+      <p style="color: #333; font-size: 16px;">I'm excited to announce a new auction that you won't want to miss!</p>
+      <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0;">
+        <h2 style="margin: 0 0 10px; color: #333;">{{{{auction_title}}}}</h2>
+        <p style="color: #666; font-size: 14px; margin: 0 0 15px;">{{{{auction_description}}}}</p>
+        <p style="font-size: 18px; color: #3B82F6; font-weight: bold; margin: 0;">Starting Bid: ${{{{starting_price}}}}</p>
+      </div>
+      <div style="text-align: center; margin-top: 30px;">
+        <a href="{{{{auction_link}}}}" style="display: inline-block; background: #3B82F6; color: white; padding: 14px 40px; text-decoration: none; border-radius: 6px; font-weight: bold;">View Auction</a>
+      </div>
+    </div>
+    <div style="background: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #eee;">
+      <p style="color: #666; font-size: 12px; margin: 0;">You received this email from a BidVex seller.</p>
+      <p style="margin: 10px 0 0; font-size: 12px;"><a href="{{{{unsubscribe_url}}}}" style="color: #999;">Unsubscribe</a></p>
+    </div>
+  </div>
+</body>
+</html>''',
+
+            "ending_soon": f'''<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="{base_style}">
+  <div style="{container_style}">
+    <div style="background: linear-gradient(135deg, #EF4444, #F97316); padding: 30px; text-align: center;">
+      <h1 style="color: white; margin: 0; font-size: 24px;">⏰ Ending Soon!</h1>
+    </div>
+    <div style="padding: 30px;">
+      <p style="color: #333; font-size: 16px;">Hello {{{{name}}}},</p>
+      <p style="color: #333; font-size: 16px;"><strong>Don't miss out!</strong> This auction is ending soon:</p>
+      <div style="background: #FEF2F2; border: 2px solid #FECACA; border-radius: 8px; padding: 20px; margin: 20px 0;">
+        <h2 style="margin: 0 0 10px; color: #991B1B;">{{{{auction_title}}}}</h2>
+        <p style="color: #B91C1C; font-size: 16px; font-weight: bold; margin: 0;">⏰ Ends in {{{{time_remaining}}}}</p>
+        <p style="font-size: 18px; color: #333; margin-top: 15px;">Current Bid: ${{{{current_price}}}}</p>
+      </div>
+      <div style="text-align: center; margin-top: 30px;">
+        <a href="{{{{auction_link}}}}" style="display: inline-block; background: #EF4444; color: white; padding: 14px 40px; text-decoration: none; border-radius: 6px; font-weight: bold;">Bid Now</a>
+      </div>
+    </div>
+    <div style="background: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #eee;">
+      <p style="color: #666; font-size: 12px; margin: 0;">You received this email from a BidVex seller.</p>
+      <p style="margin: 10px 0 0; font-size: 12px;"><a href="{{{{unsubscribe_url}}}}" style="color: #999;">Unsubscribe</a></p>
+    </div>
+  </div>
+</body>
+</html>''',
+
+            "new_inventory": f'''<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="{base_style}">
+  <div style="{container_style}">
+    <div style="background: linear-gradient(135deg, #10B981, #059669); padding: 30px; text-align: center;">
+      <h1 style="color: white; margin: 0; font-size: 24px;">📦 Fresh Inventory Alert</h1>
+    </div>
+    <div style="padding: 30px;">
+      <p style="color: #333; font-size: 16px;">Hello {{{{name}}}},</p>
+      <p style="color: #333; font-size: 16px;">New items have just been added to our inventory!</p>
+      <div style="background: #ECFDF5; border-radius: 8px; padding: 20px; margin: 20px 0;">
+        <h3 style="margin: 0 0 15px; color: #065F46;">What's New:</h3>
+        <p style="color: #333; font-size: 14px; margin: 0;">{{{{inventory_description}}}}</p>
+      </div>
+      <p style="color: #333; font-size: 16px;">Be the first to browse and bid on these exciting new items!</p>
+      <div style="text-align: center; margin-top: 30px;">
+        <a href="{{{{browse_link}}}}" style="display: inline-block; background: #10B981; color: white; padding: 14px 40px; text-decoration: none; border-radius: 6px; font-weight: bold;">Browse New Items</a>
+      </div>
+    </div>
+    <div style="background: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #eee;">
+      <p style="color: #666; font-size: 12px; margin: 0;">You received this email from a BidVex seller.</p>
+      <p style="margin: 10px 0 0; font-size: 12px;"><a href="{{{{unsubscribe_url}}}}" style="color: #999;">Unsubscribe</a></p>
+    </div>
+  </div>
+</body>
+</html>''',
+
+            "vip_preview": f'''<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="{base_style}">
+  <div style="{container_style}">
+    <div style="background: linear-gradient(135deg, #8B5CF6, #7C3AED); padding: 30px; text-align: center;">
+      <h1 style="color: white; margin: 0; font-size: 24px;">👑 Exclusive VIP Preview</h1>
+    </div>
+    <div style="padding: 30px;">
+      <p style="color: #333; font-size: 16px;">Hello {{{{name}}}},</p>
+      <p style="color: #333; font-size: 16px;">As one of our valued clients, you're getting <strong>exclusive early access</strong> to an upcoming auction!</p>
+      <div style="background: linear-gradient(135deg, #F5F3FF, #EDE9FE); border: 2px solid #C4B5FD; border-radius: 8px; padding: 20px; margin: 20px 0;">
+        <div style="text-align: center; margin-bottom: 15px;">
+          <span style="background: #8B5CF6; color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold;">VIP EARLY ACCESS</span>
+        </div>
+        <h2 style="margin: 0 0 10px; color: #5B21B6; text-align: center;">{{{{auction_title}}}}</h2>
+        <p style="color: #6B7280; font-size: 14px; margin: 0; text-align: center;">{{{{preview_details}}}}</p>
+      </div>
+      <p style="color: #333; font-size: 14px; text-align: center;"><em>This preview is available exclusively to you before the general public.</em></p>
+      <div style="text-align: center; margin-top: 30px;">
+        <a href="{{{{preview_link}}}}" style="display: inline-block; background: #8B5CF6; color: white; padding: 14px 40px; text-decoration: none; border-radius: 6px; font-weight: bold;">Get VIP Access</a>
+      </div>
+    </div>
+    <div style="background: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #eee;">
+      <p style="color: #666; font-size: 12px; margin: 0;">You received this exclusive preview from a BidVex seller.</p>
+      <p style="margin: 10px 0 0; font-size: 12px;"><a href="{{{{unsubscribe_url}}}}" style="color: #999;">Unsubscribe</a></p>
+    </div>
+  </div>
+</body>
+</html>''',
+
+            "price_drop": f'''<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="{base_style}">
+  <div style="{container_style}">
+    <div style="background: linear-gradient(135deg, #F59E0B, #D97706); padding: 30px; text-align: center;">
+      <h1 style="color: white; margin: 0; font-size: 24px;">💰 Price Drop Alert!</h1>
+    </div>
+    <div style="padding: 30px;">
+      <p style="color: #333; font-size: 16px;">Hello {{{{name}}}},</p>
+      <p style="color: #333; font-size: 16px;">Great news! The starting price has been reduced on this auction:</p>
+      <div style="background: #FFFBEB; border: 2px solid #FDE68A; border-radius: 8px; padding: 20px; margin: 20px 0;">
+        <h2 style="margin: 0 0 10px; color: #92400E;">{{{{auction_title}}}}</h2>
+        <div style="display: flex; align-items: center; justify-content: center; gap: 20px; margin: 15px 0;">
+          <span style="color: #9CA3AF; text-decoration: line-through; font-size: 18px;">${{{{old_price}}}}</span>
+          <span style="color: #B45309; font-size: 24px; font-weight: bold;">→</span>
+          <span style="color: #059669; font-size: 24px; font-weight: bold;">${{{{new_price}}}}</span>
+        </div>
+        <p style="text-align: center; color: #059669; font-weight: bold; margin: 0;">Save ${{{{savings}}}}!</p>
+      </div>
+      <div style="text-align: center; margin-top: 30px;">
+        <a href="{{{{auction_link}}}}" style="display: inline-block; background: #F59E0B; color: white; padding: 14px 40px; text-decoration: none; border-radius: 6px; font-weight: bold;">View Reduced Price</a>
+      </div>
+    </div>
+    <div style="background: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #eee;">
+      <p style="color: #666; font-size: 12px; margin: 0;">You received this email from a BidVex seller.</p>
+      <p style="margin: 10px 0 0; font-size: 12px;"><a href="{{{{unsubscribe_url}}}}" style="color: #999;">Unsubscribe</a></p>
+    </div>
+  </div>
+</body>
+</html>'''
+        }
+        
+        return templates.get(template_key, templates["new_auction"])
 
 
 # Singleton instance
