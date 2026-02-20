@@ -242,6 +242,7 @@ const App = () => {
           <Route path="/client-marketing" element={
             <ProtectedRoute><ClientEmailMarketing /></ProtectedRoute>
           } />
+          <Route path="/email-marketing-pricing" element={<EmailMarketingPricing />} />
           
           {/* Vehicle Auction Module (Standalone) */}
           <Route path="/vehicle-auctions" element={<VehicleAuctionsPage />} />
