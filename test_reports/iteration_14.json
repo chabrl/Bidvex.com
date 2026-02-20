@@ -49,14 +49,14 @@
     "webhooks_sendgrid": "POST /api/webhooks/sendgrid - endpoint exists"
   },
   "router_loading_status": {
-    "analytics_router": "✅ Loaded and included",
-    "auctions_router": "✅ Loaded and included",
-    "sms_router": "✅ Loaded and included",
-    "users_router": "✅ Created (not yet included)",
-    "marketing_router": "✅ Created (not yet included)",
-    "admin_router": "✅ Created (not yet included)",
-    "webhooks_router": "✅ Created (not yet included)",
-    "payments_router": "✅ Created (not yet included)"
+    "analytics_router": "Loaded and included",
+    "auctions_router": "Loaded and included",
+    "sms_router": "Loaded and included",
+    "users_router": "Created (not yet included)",
+    "marketing_router": "Created (not yet included)",
+    "admin_router": "Created (not yet included)",
+    "webhooks_router": "Created (not yet included)",
+    "payments_router": "Created (not yet included)"
   },
   "mocked_integrations": {
     "sendgrid": "MOCKED - SendGrid email sending uses placeholder API keys"
