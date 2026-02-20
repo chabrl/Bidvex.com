@@ -2231,3 +2231,314 @@ select:focus {
 }
 
 /* Cache buster: 20260220170000 */
+
+/* ============================================
+   NUCLEAR WHITE BACKGROUND FIX - v3.0
+   Removes white rectangular backgrounds from ALL UI elements
+   Affects: Tabs, Selects, Badges, Chips, Nav labels, Dropdowns
+   ============================================ */
+
+/* === UNIVERSAL BACKGROUND RESET === */
+/* Reset all potential gradient stops that could cause white backgrounds */
+*,
+*::before,
+*::after {
+  --tw-gradient-from: transparent !important;
+  --tw-gradient-to: transparent !important;
+  --tw-gradient-stops: transparent !important;
+}
+
+/* === TAB FIXES === */
+[role="tablist"],
+[role="tablist"] *,
+[role="tab"],
+[role="tab"] *,
+[role="tab"] span,
+[data-radix-collection-item] {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+}
+
+/* Tab List Container */
+[role="tablist"] {
+  border-bottom: 2px solid #e2e8f0 !important;
+  padding: 0 !important;
+  gap: 0 !important;
+  display: inline-flex !important;
+}
+
+.dark [role="tablist"] {
+  border-bottom-color: #334155 !important;
+}
+
+/* Individual Tab Triggers */
+[role="tab"] {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+  margin-bottom: -2px !important;
+  padding: 12px 20px !important;
+  color: #64748b !important;
+  font-weight: 500 !important;
+  font-size: 14px !important;
+  transition: color 0.2s ease, border-color 0.2s ease !important;
+  position: relative !important;
+}
+
+[role="tab"]:hover {
+  color: #1e293b !important;
+  background: transparent !important;
+}
+
+.dark [role="tab"] {
+  color: #94a3b8 !important;
+}
+
+.dark [role="tab"]:hover {
+  color: #e2e8f0 !important;
+}
+
+[role="tab"][data-state="active"] {
+  color: #2563eb !important;
+  font-weight: 600 !important;
+  border-bottom-color: #2563eb !important;
+  background: transparent !important;
+}
+
+.dark [role="tab"][data-state="active"] {
+  color: #60a5fa !important;
+  border-bottom-color: #60a5fa !important;
+}
+
+[role="tab"]::after,
+[role="tab"]::before {
+  display: none !important;
+  content: none !important;
+}
+
+/* === SELECT/DROPDOWN FIXES === */
+/* Select Trigger - the button that opens the dropdown */
+[data-radix-select-trigger],
+[role="combobox"],
+button[aria-haspopup="listbox"],
+.select-trigger,
+[class*="SelectTrigger"] {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+/* Select Value - the text inside the select */
+[data-radix-select-value],
+[data-placeholder],
+.select-value,
+[class*="SelectValue"],
+[role="combobox"] span,
+button[aria-haspopup="listbox"] span {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+/* Select Content/Dropdown */
+[data-radix-select-content],
+[data-radix-select-viewport],
+[role="listbox"] {
+  background-color: hsl(var(--popover)) !important;
+}
+
+/* Select Items */
+[data-radix-select-item],
+[role="option"] {
+  background: transparent !important;
+}
+
+[data-radix-select-item]:hover,
+[data-radix-select-item][data-highlighted],
+[role="option"]:hover,
+[role="option"][data-highlighted] {
+  background-color: hsl(var(--accent)) !important;
+}
+
+/* === BADGE/CHIP FIXES === */
+/* Filter chips, tags, badges with text */
+[class*="Badge"],
+[class*="badge"],
+[class*="Chip"],
+[class*="chip"],
+[class*="Tag"],
+[class*="tag"],
+.filter-chip,
+.active-filter {
+  /* Keep intentional badge backgrounds, but remove text-level white boxes */
+}
+
+/* Text inside badges/chips should not have backgrounds */
+[class*="Badge"] span,
+[class*="badge"] span,
+[class*="Chip"] span,
+[class*="chip"] span,
+.filter-chip span,
+.active-filter span {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* === NAVIGATION FIXES === */
+nav a,
+nav button,
+nav span,
+.nav-link,
+.nav-item,
+[data-testid="main-navbar"] a,
+[data-testid="main-navbar"] button,
+[data-testid="main-navbar"] span {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Nav buttons with intentional backgrounds */
+nav a:hover,
+nav button:hover {
+  background-color: hsl(var(--accent)) !important;
+}
+
+/* === DROPDOWN MENU FIXES === */
+[role="menu"],
+[role="menuitem"],
+[data-radix-dropdown-menu-content],
+[data-radix-menu-content] {
+  /* Keep dropdown backgrounds */
+}
+
+[role="menuitem"] span,
+[data-radix-dropdown-menu-item] span {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* === BUTTON TEXT FIXES === */
+button span,
+button > span,
+a span,
+a > span {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* === LABEL FIXES === */
+label,
+label span,
+.label,
+.label span {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* === INPUT/FORM ELEMENT TEXT FIXES === */
+input,
+select,
+textarea {
+  background-color: hsl(var(--background)) !important;
+}
+
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: hsl(222, 47%, 12%) !important;
+}
+
+/* === VEHICLE SEARCH BAR SPECIFIC FIXES === */
+/* Filter buttons in vehicle search */
+.filter-btn,
+[data-filter-btn],
+button[class*="filter"] {
+  background: transparent !important;
+}
+
+.filter-btn span,
+[data-filter-btn] span,
+button[class*="filter"] span {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Active filter with background - keep the container bg, remove text bg */
+.filter-btn.active,
+[data-filter-btn][data-state="active"],
+button[class*="filter"].active {
+  background-color: #2563eb !important;
+}
+
+.filter-btn.active span,
+[data-filter-btn][data-state="active"] span,
+button[class*="filter"].active span {
+  background: transparent !important;
+  color: white !important;
+}
+
+/* Vehicle filter chips */
+.vehicle-filter-chip,
+[data-vehicle-filter] {
+  background-color: #f1f5f9 !important;
+}
+
+.dark .vehicle-filter-chip,
+.dark [data-vehicle-filter] {
+  background-color: #334155 !important;
+}
+
+.vehicle-filter-chip span,
+[data-vehicle-filter] span {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* === RADIX UI COMPONENT OVERRIDES === */
+/* These target Radix primitives that might inherit unwanted styles */
+[data-radix-collection-item] {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+[data-radix-collection-item] > span,
+[data-radix-collection-item] span {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* === DARK MODE SPECIFIC === */
+.dark [role="tablist"],
+.dark [role="tab"],
+.dark [data-radix-select-trigger],
+.dark [role="combobox"],
+.dark nav a,
+.dark nav button,
+.dark nav span {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Ensure text is visible in dark mode */
+.dark [role="tab"],
+.dark [data-radix-select-value],
+.dark nav span,
+.dark button span,
+.dark a span {
+  color: inherit !important;
+}
+
+/* Cache buster: 20260220180000 */
