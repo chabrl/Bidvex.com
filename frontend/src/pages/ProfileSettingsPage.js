@@ -113,6 +113,7 @@ const ProfileSettingsPage = () => {
             <TabsTrigger 
               value="profile" 
               data-testid="profile-tab"
+              className="bg-transparent"
             >
               <User className="h-[18px] w-[18px]" />
               {t('profile.profileTab')}
@@ -120,6 +121,7 @@ const ProfileSettingsPage = () => {
             <TabsTrigger 
               value="payment" 
               data-testid="payment-tab"
+              className="bg-transparent"
             >
               <CreditCard className="h-[18px] w-[18px]" />
               {t('profile.paymentTab')}
@@ -130,6 +132,7 @@ const ProfileSettingsPage = () => {
             <TabsTrigger 
               value="subscription" 
               data-testid="subscription-tab"
+              className="bg-transparent"
             >
               <Crown className="h-[18px] w-[18px]" />
               Subscription
@@ -137,6 +140,7 @@ const ProfileSettingsPage = () => {
             <TabsTrigger 
               value="notifications" 
               data-testid="notifications-tab"
+              className="bg-transparent"
             >
               <Bell className="h-[18px] w-[18px]" />
               {t('profile.notificationsTab')}
