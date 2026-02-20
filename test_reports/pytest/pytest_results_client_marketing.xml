@@ -1,11 +1,293 @@
-<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="16" time="71.161" timestamp="2026-02-20T03:23:24.694558+00:00" hostname="agent-env-5c5a73f1-bcba-40aa-8b07-e4dee46cdef6"><testcase classname="backend.tests.test_client_email_marketing.TestClientEmailMarketing" name="test_marketing_access_vip_user" time="8.495" /><testcase classname="backend.tests.test_client_email_marketing.TestClientEmailMarketing" name="test_subscription_limits_structure" time="21.725" /><testcase classname="backend.tests.test_client_email_marketing.TestClientEmailMarketing" name="test_get_templates_returns_5_templates" time="0.944" /><testcase classname="backend.tests.test_client_email_marketing.TestClientEmailMarketing" name="test_add_contact_with_consent" time="0.541"><failure message="AssertionError: assert 'test_contact...6@example.com' == 'TEST_contact...6@example.com'&#10;  &#10;  - TEST_contact_1771557836@example.com&#10;  ? ^^^^&#10;  + test_contact_1771557836@example.com&#10;  ? ^^^^">backend/tests/test_client_email_marketing.py:167: in test_add_contact_with_consent
-    assert data["email"] == test_email
-E   AssertionError: assert 'test_contact...6@example.com' == 'TEST_contact...6@example.com'
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="3" failures="1" skipped="0" tests="16" time="103.637" timestamp="2026-02-20T03:24:48.289572+00:00" hostname="agent-env-5c5a73f1-bcba-40aa-8b07-e4dee46cdef6"><testcase classname="backend.tests.test_client_email_marketing.TestClientEmailMarketing" name="test_marketing_access_vip_user" time="0.597" /><testcase classname="backend.tests.test_client_email_marketing.TestClientEmailMarketing" name="test_subscription_limits_structure" time="29.730"><error message="failed on setup with &quot;AssertionError: Login failed: &lt;!DOCTYPE html&gt;&#10;  &lt;!--[if lt IE 7]&gt; &lt;html class=&quot;no-js ie6 oldie&quot; lang=&quot;en-US&quot;&gt; &lt;![endif]--&gt;&#10;  &lt;!--[if IE 7]&gt;    &lt;html class=&quot;no-js ie7 oldie&quot; lang=&quot;en-US&quot;&gt; &lt;![endif]--&gt;&#10;  &lt;!--[if IE 8]&gt;    &lt;html class=&quot;no-js ie8 oldie&quot; lang=&quot;en-US&quot;&gt; &lt;![endif]--&gt;&#10;  &lt;!--[if gt IE 8]&gt;&lt;!--&gt; &lt;html class=&quot;no-js&quot; lang=&quot;en-US&quot;&gt; &lt;!--&lt;![endif]--&gt;&#10;  &lt;head&gt;&#10;  &lt;title&gt;Origin DNS error | bidvex-mailer.cluster-0.preview.emergentcf.cloud | Cloudflare&lt;/title&gt;&#10;  &lt;meta charset=&quot;UTF-8&quot; /&gt;&#10;  &lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot; /&gt;&#10;  &lt;meta http-equiv=&quot;X-UA-Compatible&quot; content=&quot;IE=Edge&quot; /&gt;&#10;  &lt;meta name=&quot;robots&quot; content=&quot;noindex, nofollow&quot; /&gt;&#10;  &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width,initial-scale=1&quot; /&gt;&#10;  &lt;link rel=&quot;stylesheet&quot; id=&quot;cf_styles-css&quot; href=&quot;/cdn-cgi/styles/main.css&quot; /&gt;&#10;  &#10;  &#10;  &lt;script&gt;&#10;  (function(){if(document.addEventListener&amp;&amp;window.XMLHttpRequest&amp;&amp;JSON&amp;&amp;JSON.stringify){var e=function(a){var c=document.getElementById(&quot;error-feedback-survey&quot;),d=document.getElementById(&quot;error-feedback-success&quot;),b=new XMLHttpRequest;a={event:&quot;feedback clicked&quot;,properties:{errorCode:1016,helpful:a,version:1}};b.open(&quot;POST&quot;,&quot;https://sparrow.cloudflare.com/api/v1/event&quot;);b.setRequestHeader(&quot;Content-Type&quot;,&quot;application/json&quot;);b.setRequestHeader(&quot;Sparrow-Source-Key&quot;,&quot;c771f0e4b54944bebf4261d44bd79a1e&quot;);&#10;  b.send(JSON.stringify(a));c.classList.add(&quot;feedback-hidden&quot;);d.classList.remove(&quot;feedback-hidden&quot;)};document.addEventListener(&quot;DOMContentLoaded&quot;,function(){var a=document.getElementById(&quot;error-feedback&quot;),c=document.getElementById(&quot;feedback-button-yes&quot;),d=document.getElementById(&quot;feedback-button-no&quot;);&quot;classList&quot;in a&amp;&amp;(a.classList.remove(&quot;feedback-hidden&quot;),c.addEventListener(&quot;click&quot;,function(){e(!0)}),d.addEventListener(&quot;click&quot;,function(){e(!1)}))})}})();&#10;  &lt;/script&gt;&#10;  &#10;  &lt;script defer src=&quot;https://performance.radar.cloudflare.com/beacon.js&quot;&gt;&lt;/script&gt;&#10;  &lt;/head&gt;&#10;  &lt;body&gt;&#10;    &lt;div id=&quot;cf-wrapper&quot;&gt;&#10;      &lt;div class=&quot;cf-alert cf-alert-error cf-cookie-error hidden&quot; id=&quot;cookie-alert&quot; data-translate=&quot;enable_cookies&quot;&gt;Please enable cookies.&lt;/div&gt;&#10;      &lt;div id=&quot;cf-error-details&quot; class=&quot;p-0&quot;&gt;&#10;        &lt;header class=&quot;mx-auto pt-10 lg:pt-6 lg:px-8 w-240 lg:w-full mb-15 antialiased&quot;&gt;&#10;           &lt;h1 class=&quot;inline-block md:block mr-2 md:mb-2 font-light text-60 md:text-3xl text-black-dark leading-tight&quot;&gt;&#10;             &lt;span data-translate=&quot;error&quot;&gt;Error&lt;/span&gt;&#10;             &lt;span&gt;1016&lt;/span&gt;&#10;           &lt;/h1&gt;&#10;           &lt;span class=&quot;inline-block md:block heading-ray-id font-mono text-15 lg:text-sm lg:leading-relaxed&quot;&gt;Ray ID: 9d0ae4fd36dbb859 &amp;bull;&lt;/span&gt;&#10;           &lt;span class=&quot;inline-block md:block heading-ray-id font-mono text-15 lg:text-sm lg:leading-relaxed&quot;&gt;2026-02-20 03:25:15 UTC&lt;/span&gt;&#10;          &lt;h2 class=&quot;text-gray-600 leading-1.3 text-3xl lg:text-2xl font-light&quot;&gt;Origin DNS error&lt;/h2&gt;&#10;        &lt;/header&gt;&#10;  &#10;        &lt;section class=&quot;w-240 lg:w-full mx-auto mb-8 lg:px-8&quot;&gt;&#10;            &lt;div id=&quot;what-happened-section&quot; class=&quot;w-1/2 md:w-full&quot;&gt;&#10;              &lt;h2 class=&quot;text-3xl leading-tight font-normal mb-4 text-black-dark antialiased&quot; data-translate=&quot;what_happened&quot;&gt;What happened?&lt;/h2&gt;&#10;              &lt;p&gt;You've requested a page on a website (bidvex-mailer.cluster-0.preview.emergentcf.cloud) that is on the &lt;a href=&quot;https://www.cloudflare.com/5xx-error-landing/&quot; target=&quot;_blank&quot;&gt;Cloudflare&lt;/a&gt; network. Cloudflare is currently unable to resolve your requested domain (bidvex-mailer.cluster-0.preview.emergentcf.cloud).&#10;              &#10;                &lt;p&gt;Please see &lt;a rel=&quot;noopener noreferrer&quot; href=&quot;https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1016/&quot; target=&quot;_blank&quot;&gt;https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1016/&lt;/a&gt; for more details.&lt;/p&gt;&#10;              &#10;            &lt;/div&gt;&#10;  &#10;            &#10;            &lt;div id=&quot;resolution-copy-section&quot; class=&quot;w-1/2 mt-6 text-15 leading-normal&quot;&gt;&#10;              &lt;h2 class=&quot;text-3xl leading-tight font-normal mb-4 text-black-dark antialiased&quot; data-translate=&quot;what_can_i_do&quot;&gt;What can I do?&lt;/h2&gt;&#10;              &lt;p&gt;&lt;strong&gt;If you are a visitor of this website:&lt;/strong&gt;&lt;br /&gt;Please try again in a few minutes.&lt;/p&gt;&lt;p&gt;&lt;strong&gt;If you are the owner of this website:&lt;/strong&gt;&lt;br /&gt;Check your DNS settings. If you are using a CNAME origin record, make sure it is valid and resolvable. &lt;a rel=&quot;noopener noreferrer&quot; href=&quot;https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/#error-1016-origin-dns-error&quot;&gt;Additional troubleshooting information here.&lt;/a&gt;&lt;/p&gt;&#10;            &lt;/div&gt;&#10;            &#10;        &lt;/section&gt;&#10;  &#10;        &lt;div class=&quot;feedback-hidden py-8 text-center&quot; id=&quot;error-feedback&quot;&gt;&#10;      &lt;div id=&quot;error-feedback-survey&quot; class=&quot;footer-line-wrapper&quot;&gt;&#10;          Was this page helpful?&#10;          &lt;button class=&quot;border border-solid bg-white cf-button cursor-pointer ml-4 px-4 py-2 rounded&quot; id=&quot;feedback-button-yes&quot; type=&quot;button&quot;&gt;Yes&lt;/button&gt;&#10;          &lt;button class=&quot;border border-solid bg-white cf-button cursor-pointer ml-4 px-4 py-2 rounded&quot; id=&quot;feedback-button-no&quot; type=&quot;button&quot;&gt;No&lt;/button&gt;&#10;      &lt;/div&gt;&#10;      &lt;div class=&quot;feedback-success feedback-hidden&quot; id=&quot;error-feedback-success&quot;&gt;&#10;          Thank you for your feedback!&#10;      &lt;/div&gt;&#10;  &lt;/div&gt;&#10;  &#10;  &#10;        &lt;div class=&quot;cf-error-footer cf-wrapper w-240 lg:w-full py-10 sm:py-4 sm:px-8 mx-auto text-center sm:text-left border-solid border-0 border-t border-gray-300&quot;&gt;&#10;    &lt;p class=&quot;text-13&quot;&gt;&#10;      &lt;span class=&quot;cf-footer-item sm:block sm:mb-1&quot;&gt;Cloudflare Ray ID: &lt;strong class=&quot;font-semibold&quot;&gt;9d0ae4fd36dbb859&lt;/strong&gt;&lt;/span&gt;&#10;      &lt;span class=&quot;cf-footer-separator sm:hidden&quot;&gt;&amp;bull;&lt;/span&gt;&#10;      &lt;span id=&quot;cf-footer-item-ip&quot; class=&quot;cf-footer-item hidden sm:block sm:mb-1&quot;&gt;&#10;        Your IP:&#10;        &lt;button type=&quot;button&quot; id=&quot;cf-footer-ip-reveal&quot; class=&quot;cf-footer-ip-reveal-btn&quot;&gt;Click to reveal&lt;/button&gt;&#10;        &lt;span class=&quot;hidden&quot; id=&quot;cf-footer-ip&quot;&gt;104.198.214.223&lt;/span&gt;&#10;        &lt;span class=&quot;cf-footer-separator sm:hidden&quot;&gt;&amp;bull;&lt;/span&gt;&#10;      &lt;/span&gt;&#10;      &lt;span class=&quot;cf-footer-item sm:block sm:mb-1&quot;&gt;&lt;span&gt;Performance &amp;amp; security by&lt;/span&gt; &lt;a rel=&quot;noopener noreferrer&quot; href=&quot;https://www.cloudflare.com/5xx-error-landing&quot; id=&quot;brand_link&quot; target=&quot;_blank&quot;&gt;Cloudflare&lt;/a&gt;&lt;/span&gt;&#10;      &#10;    &lt;/p&gt;&#10;    &lt;script&gt;(function(){function d(){var b=a.getElementById(&quot;cf-footer-item-ip&quot;),c=a.getElementById(&quot;cf-footer-ip-reveal&quot;);b&amp;&amp;&quot;classList&quot;in b&amp;&amp;(b.classList.remove(&quot;hidden&quot;),c.addEventListener(&quot;click&quot;,function(){c.classList.add(&quot;hidden&quot;);a.getElementById(&quot;cf-footer-ip&quot;).classList.remove(&quot;hidden&quot;)}))}var a=document;document.addEventListener&amp;&amp;a.addEventListener(&quot;DOMContentLoaded&quot;,d)})();&lt;/script&gt;&#10;  &lt;/div&gt;&lt;!-- /.error-footer --&gt;&#10;  &#10;  &#10;      &lt;/div&gt;&lt;!-- /#cf-error-details --&gt;&#10;    &lt;/div&gt;&lt;!-- /#cf-wrapper --&gt;&#10;  &#10;    &lt;script&gt;&#10;    window._cf_translation = {};&#10;    &#10;    &#10;  &lt;/script&gt;&#10;  &#10;  &lt;/body&gt;&#10;  &lt;/html&gt;&#10;  &#10;assert 530 == 200&#10; +  where 530 = &lt;Response [530]&gt;.status_code&quot;">backend/tests/test_client_email_marketing.py:35: in setup
+    assert login_response.status_code == 200, f"Login failed: {login_response.text}"
+E   AssertionError: Login failed: &lt;!DOCTYPE html&gt;
+E     &lt;!--[if lt IE 7]&gt; &lt;html class="no-js ie6 oldie" lang="en-US"&gt; &lt;![endif]--&gt;
+E     &lt;!--[if IE 7]&gt;    &lt;html class="no-js ie7 oldie" lang="en-US"&gt; &lt;![endif]--&gt;
+E     &lt;!--[if IE 8]&gt;    &lt;html class="no-js ie8 oldie" lang="en-US"&gt; &lt;![endif]--&gt;
+E     &lt;!--[if gt IE 8]&gt;&lt;!--&gt; &lt;html class="no-js" lang="en-US"&gt; &lt;!--&lt;![endif]--&gt;
+E     &lt;head&gt;
+E     &lt;title&gt;Origin DNS error | bidvex-mailer.cluster-0.preview.emergentcf.cloud | Cloudflare&lt;/title&gt;
+E     &lt;meta charset="UTF-8" /&gt;
+E     &lt;meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /&gt;
+E     &lt;meta http-equiv="X-UA-Compatible" content="IE=Edge" /&gt;
+E     &lt;meta name="robots" content="noindex, nofollow" /&gt;
+E     &lt;meta name="viewport" content="width=device-width,initial-scale=1" /&gt;
+E     &lt;link rel="stylesheet" id="cf_styles-css" href="/cdn-cgi/styles/main.css" /&gt;
 E     
-E     - TEST_contact_1771557836@example.com
-E     ? ^^^^
-E     + test_contact_1771557836@example.com
-E     ? ^^^^</failure></testcase><testcase classname="backend.tests.test_client_email_marketing.TestClientEmailMarketing" name="test_list_contacts" time="0.807"><failure message="AssertionError: Added contact not found in list&#10;assert 'TEST_list_1771557836@example.com' in ['test_list_1771557836@example.com', 'test_contact_1771557836@example.com']">backend/tests/test_client_email_marketing.py:206: in test_list_contacts
-    assert test_email in contact_emails, f"Added contact not found in list"
-E   AssertionError: Added contact not found in list
-E   assert 'TEST_list_1771557836@example.com' in ['test_list_1771557836@example.com', 'test_contact_1771557836@example.com']</failure></testcase><testcase classname="backend.tests.test_client_email_marketing.TestClientEmailMarketing" name="test_get_contact_stats" time="0.495" /><testcase classname="backend.tests.test_client_email_marketing.TestClientEmailMarketing" name="test_delete_contact" time="0.772" /><testcase classname="backend.tests.test_client_email_marketing.TestClientEmailMarketing" name="test_bulk_add_contacts" time="0.646" /><testcase classname="backend.tests.test_client_email_marketing.TestClientEmailMarketing" name="test_create_campaign" time="0.527" /><testcase classname="backend.tests.test_client_email_marketing.TestClientEmailMarketing" name="test_list_campaigns" time="0.541" /><testcase classname="backend.tests.test_client_email_marketing.TestClientEmailMarketing" name="test_get_single_campaign" time="0.646" /><testcase classname="backend.tests.test_client_email_marketing.TestClientEmailMarketing" name="test_update_campaign" time="32.829" /><testcase classname="backend.tests.test_client_email_marketing.TestClientMarketingQuotas" name="test_quota_structure" time="0.560" /><testcase classname="backend.tests.test_client_email_marketing.TestClientMarketingQuotas" name="test_contact_limit_check" time="0.528" /><testcase classname="backend.tests.test_client_email_marketing.TestTemplateDetails" name="test_template_subjects" time="0.519" /><testcase classname="backend.tests.test_client_email_marketing.TestTemplateDetails" name="test_templates_have_unsubscribe_link" time="0.490" /></testsuite></testsuites>
+E     
+E     &lt;script&gt;
+E     (function(){if(document.addEventListener&amp;&amp;window.XMLHttpRequest&amp;&amp;JSON&amp;&amp;JSON.stringify){var e=function(a){var c=document.getElementById("error-feedback-survey"),d=document.getElementById("error-feedback-success"),b=new XMLHttpRequest;a={event:"feedback clicked",properties:{errorCode:1016,helpful:a,version:1}};b.open("POST","https://sparrow.cloudflare.com/api/v1/event");b.setRequestHeader("Content-Type","application/json");b.setRequestHeader("Sparrow-Source-Key","c771f0e4b54944bebf4261d44bd79a1e");
+E     b.send(JSON.stringify(a));c.classList.add("feedback-hidden");d.classList.remove("feedback-hidden")};document.addEventListener("DOMContentLoaded",function(){var a=document.getElementById("error-feedback"),c=document.getElementById("feedback-button-yes"),d=document.getElementById("feedback-button-no");"classList"in a&amp;&amp;(a.classList.remove("feedback-hidden"),c.addEventListener("click",function(){e(!0)}),d.addEventListener("click",function(){e(!1)}))})}})();
+E     &lt;/script&gt;
+E     
+E     &lt;script defer src="https://performance.radar.cloudflare.com/beacon.js"&gt;&lt;/script&gt;
+E     &lt;/head&gt;
+E     &lt;body&gt;
+E       &lt;div id="cf-wrapper"&gt;
+E         &lt;div class="cf-alert cf-alert-error cf-cookie-error hidden" id="cookie-alert" data-translate="enable_cookies"&gt;Please enable cookies.&lt;/div&gt;
+E         &lt;div id="cf-error-details" class="p-0"&gt;
+E           &lt;header class="mx-auto pt-10 lg:pt-6 lg:px-8 w-240 lg:w-full mb-15 antialiased"&gt;
+E              &lt;h1 class="inline-block md:block mr-2 md:mb-2 font-light text-60 md:text-3xl text-black-dark leading-tight"&gt;
+E                &lt;span data-translate="error"&gt;Error&lt;/span&gt;
+E                &lt;span&gt;1016&lt;/span&gt;
+E              &lt;/h1&gt;
+E              &lt;span class="inline-block md:block heading-ray-id font-mono text-15 lg:text-sm lg:leading-relaxed"&gt;Ray ID: 9d0ae4fd36dbb859 &amp;bull;&lt;/span&gt;
+E              &lt;span class="inline-block md:block heading-ray-id font-mono text-15 lg:text-sm lg:leading-relaxed"&gt;2026-02-20 03:25:15 UTC&lt;/span&gt;
+E             &lt;h2 class="text-gray-600 leading-1.3 text-3xl lg:text-2xl font-light"&gt;Origin DNS error&lt;/h2&gt;
+E           &lt;/header&gt;
+E     
+E           &lt;section class="w-240 lg:w-full mx-auto mb-8 lg:px-8"&gt;
+E               &lt;div id="what-happened-section" class="w-1/2 md:w-full"&gt;
+E                 &lt;h2 class="text-3xl leading-tight font-normal mb-4 text-black-dark antialiased" data-translate="what_happened"&gt;What happened?&lt;/h2&gt;
+E                 &lt;p&gt;You've requested a page on a website (bidvex-mailer.cluster-0.preview.emergentcf.cloud) that is on the &lt;a href="https://www.cloudflare.com/5xx-error-landing/" target="_blank"&gt;Cloudflare&lt;/a&gt; network. Cloudflare is currently unable to resolve your requested domain (bidvex-mailer.cluster-0.preview.emergentcf.cloud).
+E                 
+E                   &lt;p&gt;Please see &lt;a rel="noopener noreferrer" href="https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1016/" target="_blank"&gt;https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1016/&lt;/a&gt; for more details.&lt;/p&gt;
+E                 
+E               &lt;/div&gt;
+E     
+E               
+E               &lt;div id="resolution-copy-section" class="w-1/2 mt-6 text-15 leading-normal"&gt;
+E                 &lt;h2 class="text-3xl leading-tight font-normal mb-4 text-black-dark antialiased" data-translate="what_can_i_do"&gt;What can I do?&lt;/h2&gt;
+E                 &lt;p&gt;&lt;strong&gt;If you are a visitor of this website:&lt;/strong&gt;&lt;br /&gt;Please try again in a few minutes.&lt;/p&gt;&lt;p&gt;&lt;strong&gt;If you are the owner of this website:&lt;/strong&gt;&lt;br /&gt;Check your DNS settings. If you are using a CNAME origin record, make sure it is valid and resolvable. &lt;a rel="noopener noreferrer" href="https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/#error-1016-origin-dns-error"&gt;Additional troubleshooting information here.&lt;/a&gt;&lt;/p&gt;
+E               &lt;/div&gt;
+E               
+E           &lt;/section&gt;
+E     
+E           &lt;div class="feedback-hidden py-8 text-center" id="error-feedback"&gt;
+E         &lt;div id="error-feedback-survey" class="footer-line-wrapper"&gt;
+E             Was this page helpful?
+E             &lt;button class="border border-solid bg-white cf-button cursor-pointer ml-4 px-4 py-2 rounded" id="feedback-button-yes" type="button"&gt;Yes&lt;/button&gt;
+E             &lt;button class="border border-solid bg-white cf-button cursor-pointer ml-4 px-4 py-2 rounded" id="feedback-button-no" type="button"&gt;No&lt;/button&gt;
+E         &lt;/div&gt;
+E         &lt;div class="feedback-success feedback-hidden" id="error-feedback-success"&gt;
+E             Thank you for your feedback!
+E         &lt;/div&gt;
+E     &lt;/div&gt;
+E     
+E     
+E           &lt;div class="cf-error-footer cf-wrapper w-240 lg:w-full py-10 sm:py-4 sm:px-8 mx-auto text-center sm:text-left border-solid border-0 border-t border-gray-300"&gt;
+E       &lt;p class="text-13"&gt;
+E         &lt;span class="cf-footer-item sm:block sm:mb-1"&gt;Cloudflare Ray ID: &lt;strong class="font-semibold"&gt;9d0ae4fd36dbb859&lt;/strong&gt;&lt;/span&gt;
+E         &lt;span class="cf-footer-separator sm:hidden"&gt;&amp;bull;&lt;/span&gt;
+E         &lt;span id="cf-footer-item-ip" class="cf-footer-item hidden sm:block sm:mb-1"&gt;
+E           Your IP:
+E           &lt;button type="button" id="cf-footer-ip-reveal" class="cf-footer-ip-reveal-btn"&gt;Click to reveal&lt;/button&gt;
+E           &lt;span class="hidden" id="cf-footer-ip"&gt;104.198.214.223&lt;/span&gt;
+E           &lt;span class="cf-footer-separator sm:hidden"&gt;&amp;bull;&lt;/span&gt;
+E         &lt;/span&gt;
+E         &lt;span class="cf-footer-item sm:block sm:mb-1"&gt;&lt;span&gt;Performance &amp;amp; security by&lt;/span&gt; &lt;a rel="noopener noreferrer" href="https://www.cloudflare.com/5xx-error-landing" id="brand_link" target="_blank"&gt;Cloudflare&lt;/a&gt;&lt;/span&gt;
+E         
+E       &lt;/p&gt;
+E       &lt;script&gt;(function(){function d(){var b=a.getElementById("cf-footer-item-ip"),c=a.getElementById("cf-footer-ip-reveal");b&amp;&amp;"classList"in b&amp;&amp;(b.classList.remove("hidden"),c.addEventListener("click",function(){c.classList.add("hidden");a.getElementById("cf-footer-ip").classList.remove("hidden")}))}var a=document;document.addEventListener&amp;&amp;a.addEventListener("DOMContentLoaded",d)})();&lt;/script&gt;
+E     &lt;/div&gt;&lt;!-- /.error-footer --&gt;
+E     
+E     
+E         &lt;/div&gt;&lt;!-- /#cf-error-details --&gt;
+E       &lt;/div&gt;&lt;!-- /#cf-wrapper --&gt;
+E     
+E       &lt;script&gt;
+E       window._cf_translation = {};
+E       
+E       
+E     &lt;/script&gt;
+E     
+E     &lt;/body&gt;
+E     &lt;/html&gt;
+E     
+E   assert 530 == 200
+E    +  where 530 = &lt;Response [530]&gt;.status_code</error></testcase><testcase classname="backend.tests.test_client_email_marketing.TestClientEmailMarketing" name="test_get_templates_returns_5_templates" time="16.390"><error message="failed on setup with &quot;AssertionError: Login failed: &lt;!DOCTYPE html&gt;&#10;  &lt;!--[if lt IE 7]&gt; &lt;html class=&quot;no-js ie6 oldie&quot; lang=&quot;en-US&quot;&gt; &lt;![endif]--&gt;&#10;  &lt;!--[if IE 7]&gt;    &lt;html class=&quot;no-js ie7 oldie&quot; lang=&quot;en-US&quot;&gt; &lt;![endif]--&gt;&#10;  &lt;!--[if IE 8]&gt;    &lt;html class=&quot;no-js ie8 oldie&quot; lang=&quot;en-US&quot;&gt; &lt;![endif]--&gt;&#10;  &lt;!--[if gt IE 8]&gt;&lt;!--&gt; &lt;html class=&quot;no-js&quot; lang=&quot;en-US&quot;&gt; &lt;!--&lt;![endif]--&gt;&#10;  &lt;head&gt;&#10;  &lt;title&gt;Could not find host | bidvex-mailer.preview.emergentagent.com | Cloudflare&lt;/title&gt;&#10;  &lt;meta charset=&quot;UTF-8&quot; /&gt;&#10;  &lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot; /&gt;&#10;  &lt;meta http-equiv=&quot;X-UA-Compatible&quot; content=&quot;IE=Edge&quot; /&gt;&#10;  &lt;meta name=&quot;robots&quot; content=&quot;noindex, nofollow&quot; /&gt;&#10;  &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width,initial-scale=1&quot; /&gt;&#10;  &lt;link rel=&quot;stylesheet&quot; id=&quot;cf_styles-css&quot; href=&quot;/cdn-cgi/styles/main.css&quot; /&gt;&#10;  &#10;  &#10;  &lt;script&gt;&#10;  (function(){if(document.addEventListener&amp;&amp;window.XMLHttpRequest&amp;&amp;JSON&amp;&amp;JSON.stringify){var e=function(a){var c=document.getElementById(&quot;error-feedback-survey&quot;),d=document.getElementById(&quot;error-feedback-success&quot;),b=new XMLHttpRequest;a={event:&quot;feedback clicked&quot;,properties:{errorCode:1023,helpful:a,version:1}};b.open(&quot;POST&quot;,&quot;https://sparrow.cloudflare.com/api/v1/event&quot;);b.setRequestHeader(&quot;Content-Type&quot;,&quot;application/json&quot;);b.setRequestHeader(&quot;Sparrow-Source-Key&quot;,&quot;c771f0e4b54944bebf4261d44bd79a1e&quot;);&#10;  b.send(JSON.stringify(a));c.classList.add(&quot;feedback-hidden&quot;);d.classList.remove(&quot;feedback-hidden&quot;)};document.addEventListener(&quot;DOMContentLoaded&quot;,function(){var a=document.getElementById(&quot;error-feedback&quot;),c=document.getElementById(&quot;feedback-button-yes&quot;),d=document.getElementById(&quot;feedback-button-no&quot;);&quot;classList&quot;in a&amp;&amp;(a.classList.remove(&quot;feedback-hidden&quot;),c.addEventListener(&quot;click&quot;,function(){e(!0)}),d.addEventListener(&quot;click&quot;,function(){e(!1)}))})}})();&#10;  &lt;/script&gt;&#10;  &#10;  &lt;script defer src=&quot;https://performance.radar.cloudflare.com/beacon.js&quot;&gt;&lt;/script&gt;&#10;  &lt;/head&gt;&#10;  &lt;body&gt;&#10;    &lt;div id=&quot;cf-wrapper&quot;&gt;&#10;      &lt;div class=&quot;cf-alert cf-alert-error cf-cookie-error hidden&quot; id=&quot;cookie-alert&quot; data-translate=&quot;enable_cookies&quot;&gt;Please enable cookies.&lt;/div&gt;&#10;      &lt;div id=&quot;cf-error-details&quot; class=&quot;p-0&quot;&gt;&#10;        &lt;header class=&quot;mx-auto pt-10 lg:pt-6 lg:px-8 w-240 lg:w-full mb-15 antialiased&quot;&gt;&#10;           &lt;h1 class=&quot;inline-block md:block mr-2 md:mb-2 font-light text-60 md:text-3xl text-black-dark leading-tight&quot;&gt;&#10;             &lt;span data-translate=&quot;error&quot;&gt;Error&lt;/span&gt;&#10;             &lt;span&gt;1023&lt;/span&gt;&#10;           &lt;/h1&gt;&#10;           &lt;span class=&quot;inline-block md:block heading-ray-id font-mono text-15 lg:text-sm lg:leading-relaxed&quot;&gt;Ray ID: 9d0ae56438aab859 &amp;bull;&lt;/span&gt;&#10;           &lt;span class=&quot;inline-block md:block heading-ray-id font-mono text-15 lg:text-sm lg:leading-relaxed&quot;&gt;2026-02-20 03:25:35 UTC&lt;/span&gt;&#10;          &lt;h2 class=&quot;text-gray-600 leading-1.3 text-3xl lg:text-2xl font-light&quot;&gt;Could not find host&lt;/h2&gt;&#10;        &lt;/header&gt;&#10;  &#10;        &lt;section class=&quot;w-240 lg:w-full mx-auto mb-8 lg:px-8&quot;&gt;&#10;            &lt;div id=&quot;what-happened-section&quot; class=&quot;w-1/2 md:w-full&quot;&gt;&#10;              &lt;h2 class=&quot;text-3xl leading-tight font-normal mb-4 text-black-dark antialiased&quot; data-translate=&quot;what_happened&quot;&gt;What happened?&lt;/h2&gt;&#10;              &lt;p&gt;You've requested a page on a website (bidvex-mailer.preview.emergentagent.com) that is on the &lt;a href=&quot;https://www.cloudflare.com/5xx-error-landing/&quot; target=&quot;_blank&quot;&gt;Cloudflare&lt;/a&gt; network. Cloudflare is currently unable to resolve your requested domain (bidvex-mailer.preview.emergentagent.com). There are two potential causes of this:&lt;/p&gt;&#10;              &lt;ul class=&quot;ml-10 mt-6 text-15 text-black-dark antialiased leading-normal&quot;&gt;&#10;                 &lt;li class=&quot;mb-4&quot;&gt;&lt;strong class=&quot;font-semibold&quot;&gt;Most likely:&lt;/strong&gt; if the owner just signed up for Cloudflare it can take a few minutes for the website's information to be distributed to our global network.&lt;/li&gt;&#10;                 &lt;li&gt;&lt;strong&gt;Less likely:&lt;/strong&gt; something is wrong with this site's configuration. Usually this happens when accounts have been signed up with a partner organization (e.g., a hosting provider) and the provider's DNS fails.&lt;/li&gt;&#10;              &lt;/ul&gt;&#10;              &#10;                &lt;p&gt;Please see &lt;a rel=&quot;noopener noreferrer&quot; href=&quot;https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1023/&quot; target=&quot;_blank&quot;&gt;https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1023/&lt;/a&gt; for more details.&lt;/p&gt;&#10;              &#10;            &lt;/div&gt;&#10;  &#10;            &#10;        &lt;/section&gt;&#10;  &#10;        &lt;div class=&quot;feedback-hidden py-8 text-center&quot; id=&quot;error-feedback&quot;&gt;&#10;      &lt;div id=&quot;error-feedback-survey&quot; class=&quot;footer-line-wrapper&quot;&gt;&#10;          Was this page helpful?&#10;          &lt;button class=&quot;border border-solid bg-white cf-button cursor-pointer ml-4 px-4 py-2 rounded&quot; id=&quot;feedback-button-yes&quot; type=&quot;button&quot;&gt;Yes&lt;/button&gt;&#10;          &lt;button class=&quot;border border-solid bg-white cf-button cursor-pointer ml-4 px-4 py-2 rounded&quot; id=&quot;feedback-button-no&quot; type=&quot;button&quot;&gt;No&lt;/button&gt;&#10;      &lt;/div&gt;&#10;      &lt;div class=&quot;feedback-success feedback-hidden&quot; id=&quot;error-feedback-success&quot;&gt;&#10;          Thank you for your feedback!&#10;      &lt;/div&gt;&#10;  &lt;/div&gt;&#10;  &#10;  &#10;        &lt;div class=&quot;cf-error-footer cf-wrapper w-240 lg:w-full py-10 sm:py-4 sm:px-8 mx-auto text-center sm:text-left border-solid border-0 border-t border-gray-300&quot;&gt;&#10;    &lt;p class=&quot;text-13&quot;&gt;&#10;      &lt;span class=&quot;cf-footer-item sm:block sm:mb-1&quot;&gt;Cloudflare Ray ID: &lt;strong class=&quot;font-semibold&quot;&gt;9d0ae56438aab859&lt;/strong&gt;&lt;/span&gt;&#10;      &lt;span class=&quot;cf-footer-separator sm:hidden&quot;&gt;&amp;bull;&lt;/span&gt;&#10;      &lt;span id=&quot;cf-footer-item-ip&quot; class=&quot;cf-footer-item hidden sm:block sm:mb-1&quot;&gt;&#10;        Your IP:&#10;        &lt;button type=&quot;button&quot; id=&quot;cf-footer-ip-reveal&quot; class=&quot;cf-footer-ip-reveal-btn&quot;&gt;Click to reveal&lt;/button&gt;&#10;        &lt;span class=&quot;hidden&quot; id=&quot;cf-footer-ip&quot;&gt;104.198.214.223&lt;/span&gt;&#10;        &lt;span class=&quot;cf-footer-separator sm:hidden&quot;&gt;&amp;bull;&lt;/span&gt;&#10;      &lt;/span&gt;&#10;      &lt;span class=&quot;cf-footer-item sm:block sm:mb-1&quot;&gt;&lt;span&gt;Performance &amp;amp; security by&lt;/span&gt; &lt;a rel=&quot;noopener noreferrer&quot; href=&quot;https://www.cloudflare.com/5xx-error-landing&quot; id=&quot;brand_link&quot; target=&quot;_blank&quot;&gt;Cloudflare&lt;/a&gt;&lt;/span&gt;&#10;      &#10;    &lt;/p&gt;&#10;    &lt;script&gt;(function(){function d(){var b=a.getElementById(&quot;cf-footer-item-ip&quot;),c=a.getElementById(&quot;cf-footer-ip-reveal&quot;);b&amp;&amp;&quot;classList&quot;in b&amp;&amp;(b.classList.remove(&quot;hidden&quot;),c.addEventListener(&quot;click&quot;,function(){c.classList.add(&quot;hidden&quot;);a.getElementById(&quot;cf-footer-ip&quot;).classList.remove(&quot;hidden&quot;)}))}var a=document;document.addEventListener&amp;&amp;a.addEventListener(&quot;DOMContentLoaded&quot;,d)})();&lt;/script&gt;&#10;  &lt;/div&gt;&lt;!-- /.error-footer --&gt;&#10;  &#10;  &#10;      &lt;/div&gt;&lt;!-- /#cf-error-details --&gt;&#10;    &lt;/div&gt;&lt;!-- /#cf-wrapper --&gt;&#10;  &#10;    &lt;script&gt;&#10;    window._cf_translation = {};&#10;    &#10;    &#10;  &lt;/script&gt;&#10;  &#10;  &lt;/body&gt;&#10;  &lt;/html&gt;&#10;  &#10;assert 503 == 200&#10; +  where 503 = &lt;Response [503]&gt;.status_code&quot;">backend/tests/test_client_email_marketing.py:35: in setup
+    assert login_response.status_code == 200, f"Login failed: {login_response.text}"
+E   AssertionError: Login failed: &lt;!DOCTYPE html&gt;
+E     &lt;!--[if lt IE 7]&gt; &lt;html class="no-js ie6 oldie" lang="en-US"&gt; &lt;![endif]--&gt;
+E     &lt;!--[if IE 7]&gt;    &lt;html class="no-js ie7 oldie" lang="en-US"&gt; &lt;![endif]--&gt;
+E     &lt;!--[if IE 8]&gt;    &lt;html class="no-js ie8 oldie" lang="en-US"&gt; &lt;![endif]--&gt;
+E     &lt;!--[if gt IE 8]&gt;&lt;!--&gt; &lt;html class="no-js" lang="en-US"&gt; &lt;!--&lt;![endif]--&gt;
+E     &lt;head&gt;
+E     &lt;title&gt;Could not find host | bidvex-mailer.preview.emergentagent.com | Cloudflare&lt;/title&gt;
+E     &lt;meta charset="UTF-8" /&gt;
+E     &lt;meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /&gt;
+E     &lt;meta http-equiv="X-UA-Compatible" content="IE=Edge" /&gt;
+E     &lt;meta name="robots" content="noindex, nofollow" /&gt;
+E     &lt;meta name="viewport" content="width=device-width,initial-scale=1" /&gt;
+E     &lt;link rel="stylesheet" id="cf_styles-css" href="/cdn-cgi/styles/main.css" /&gt;
+E     
+E     
+E     &lt;script&gt;
+E     (function(){if(document.addEventListener&amp;&amp;window.XMLHttpRequest&amp;&amp;JSON&amp;&amp;JSON.stringify){var e=function(a){var c=document.getElementById("error-feedback-survey"),d=document.getElementById("error-feedback-success"),b=new XMLHttpRequest;a={event:"feedback clicked",properties:{errorCode:1023,helpful:a,version:1}};b.open("POST","https://sparrow.cloudflare.com/api/v1/event");b.setRequestHeader("Content-Type","application/json");b.setRequestHeader("Sparrow-Source-Key","c771f0e4b54944bebf4261d44bd79a1e");
+E     b.send(JSON.stringify(a));c.classList.add("feedback-hidden");d.classList.remove("feedback-hidden")};document.addEventListener("DOMContentLoaded",function(){var a=document.getElementById("error-feedback"),c=document.getElementById("feedback-button-yes"),d=document.getElementById("feedback-button-no");"classList"in a&amp;&amp;(a.classList.remove("feedback-hidden"),c.addEventListener("click",function(){e(!0)}),d.addEventListener("click",function(){e(!1)}))})}})();
+E     &lt;/script&gt;
+E     
+E     &lt;script defer src="https://performance.radar.cloudflare.com/beacon.js"&gt;&lt;/script&gt;
+E     &lt;/head&gt;
+E     &lt;body&gt;
+E       &lt;div id="cf-wrapper"&gt;
+E         &lt;div class="cf-alert cf-alert-error cf-cookie-error hidden" id="cookie-alert" data-translate="enable_cookies"&gt;Please enable cookies.&lt;/div&gt;
+E         &lt;div id="cf-error-details" class="p-0"&gt;
+E           &lt;header class="mx-auto pt-10 lg:pt-6 lg:px-8 w-240 lg:w-full mb-15 antialiased"&gt;
+E              &lt;h1 class="inline-block md:block mr-2 md:mb-2 font-light text-60 md:text-3xl text-black-dark leading-tight"&gt;
+E                &lt;span data-translate="error"&gt;Error&lt;/span&gt;
+E                &lt;span&gt;1023&lt;/span&gt;
+E              &lt;/h1&gt;
+E              &lt;span class="inline-block md:block heading-ray-id font-mono text-15 lg:text-sm lg:leading-relaxed"&gt;Ray ID: 9d0ae56438aab859 &amp;bull;&lt;/span&gt;
+E              &lt;span class="inline-block md:block heading-ray-id font-mono text-15 lg:text-sm lg:leading-relaxed"&gt;2026-02-20 03:25:35 UTC&lt;/span&gt;
+E             &lt;h2 class="text-gray-600 leading-1.3 text-3xl lg:text-2xl font-light"&gt;Could not find host&lt;/h2&gt;
+E           &lt;/header&gt;
+E     
+E           &lt;section class="w-240 lg:w-full mx-auto mb-8 lg:px-8"&gt;
+E               &lt;div id="what-happened-section" class="w-1/2 md:w-full"&gt;
+E                 &lt;h2 class="text-3xl leading-tight font-normal mb-4 text-black-dark antialiased" data-translate="what_happened"&gt;What happened?&lt;/h2&gt;
+E                 &lt;p&gt;You've requested a page on a website (bidvex-mailer.preview.emergentagent.com) that is on the &lt;a href="https://www.cloudflare.com/5xx-error-landing/" target="_blank"&gt;Cloudflare&lt;/a&gt; network. Cloudflare is currently unable to resolve your requested domain (bidvex-mailer.preview.emergentagent.com). There are two potential causes of this:&lt;/p&gt;
+E                 &lt;ul class="ml-10 mt-6 text-15 text-black-dark antialiased leading-normal"&gt;
+E                    &lt;li class="mb-4"&gt;&lt;strong class="font-semibold"&gt;Most likely:&lt;/strong&gt; if the owner just signed up for Cloudflare it can take a few minutes for the website's information to be distributed to our global network.&lt;/li&gt;
+E                    &lt;li&gt;&lt;strong&gt;Less likely:&lt;/strong&gt; something is wrong with this site's configuration. Usually this happens when accounts have been signed up with a partner organization (e.g., a hosting provider) and the provider's DNS fails.&lt;/li&gt;
+E                 &lt;/ul&gt;
+E                 
+E                   &lt;p&gt;Please see &lt;a rel="noopener noreferrer" href="https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1023/" target="_blank"&gt;https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1023/&lt;/a&gt; for more details.&lt;/p&gt;
+E                 
+E               &lt;/div&gt;
+E     
+E               
+E           &lt;/section&gt;
+E     
+E           &lt;div class="feedback-hidden py-8 text-center" id="error-feedback"&gt;
+E         &lt;div id="error-feedback-survey" class="footer-line-wrapper"&gt;
+E             Was this page helpful?
+E             &lt;button class="border border-solid bg-white cf-button cursor-pointer ml-4 px-4 py-2 rounded" id="feedback-button-yes" type="button"&gt;Yes&lt;/button&gt;
+E             &lt;button class="border border-solid bg-white cf-button cursor-pointer ml-4 px-4 py-2 rounded" id="feedback-button-no" type="button"&gt;No&lt;/button&gt;
+E         &lt;/div&gt;
+E         &lt;div class="feedback-success feedback-hidden" id="error-feedback-success"&gt;
+E             Thank you for your feedback!
+E         &lt;/div&gt;
+E     &lt;/div&gt;
+E     
+E     
+E           &lt;div class="cf-error-footer cf-wrapper w-240 lg:w-full py-10 sm:py-4 sm:px-8 mx-auto text-center sm:text-left border-solid border-0 border-t border-gray-300"&gt;
+E       &lt;p class="text-13"&gt;
+E         &lt;span class="cf-footer-item sm:block sm:mb-1"&gt;Cloudflare Ray ID: &lt;strong class="font-semibold"&gt;9d0ae56438aab859&lt;/strong&gt;&lt;/span&gt;
+E         &lt;span class="cf-footer-separator sm:hidden"&gt;&amp;bull;&lt;/span&gt;
+E         &lt;span id="cf-footer-item-ip" class="cf-footer-item hidden sm:block sm:mb-1"&gt;
+E           Your IP:
+E           &lt;button type="button" id="cf-footer-ip-reveal" class="cf-footer-ip-reveal-btn"&gt;Click to reveal&lt;/button&gt;
+E           &lt;span class="hidden" id="cf-footer-ip"&gt;104.198.214.223&lt;/span&gt;
+E           &lt;span class="cf-footer-separator sm:hidden"&gt;&amp;bull;&lt;/span&gt;
+E         &lt;/span&gt;
+E         &lt;span class="cf-footer-item sm:block sm:mb-1"&gt;&lt;span&gt;Performance &amp;amp; security by&lt;/span&gt; &lt;a rel="noopener noreferrer" href="https://www.cloudflare.com/5xx-error-landing" id="brand_link" target="_blank"&gt;Cloudflare&lt;/a&gt;&lt;/span&gt;
+E         
+E       &lt;/p&gt;
+E       &lt;script&gt;(function(){function d(){var b=a.getElementById("cf-footer-item-ip"),c=a.getElementById("cf-footer-ip-reveal");b&amp;&amp;"classList"in b&amp;&amp;(b.classList.remove("hidden"),c.addEventListener("click",function(){c.classList.add("hidden");a.getElementById("cf-footer-ip").classList.remove("hidden")}))}var a=document;document.addEventListener&amp;&amp;a.addEventListener("DOMContentLoaded",d)})();&lt;/script&gt;
+E     &lt;/div&gt;&lt;!-- /.error-footer --&gt;
+E     
+E     
+E         &lt;/div&gt;&lt;!-- /#cf-error-details --&gt;
+E       &lt;/div&gt;&lt;!-- /#cf-wrapper --&gt;
+E     
+E       &lt;script&gt;
+E       window._cf_translation = {};
+E       
+E       
+E     &lt;/script&gt;
+E     
+E     &lt;/body&gt;
+E     &lt;/html&gt;
+E     
+E   assert 503 == 200
+E    +  where 503 = &lt;Response [503]&gt;.status_code</error></testcase><testcase classname="backend.tests.test_client_email_marketing.TestClientEmailMarketing" name="test_add_contact_with_consent" time="0.794" /><testcase classname="backend.tests.test_client_email_marketing.TestClientEmailMarketing" name="test_list_contacts" time="16.856"><error message="failed on setup with &quot;AssertionError: Login failed: &lt;!DOCTYPE html&gt;&#10;  &lt;!--[if lt IE 7]&gt; &lt;html class=&quot;no-js ie6 oldie&quot; lang=&quot;en-US&quot;&gt; &lt;![endif]--&gt;&#10;  &lt;!--[if IE 7]&gt;    &lt;html class=&quot;no-js ie7 oldie&quot; lang=&quot;en-US&quot;&gt; &lt;![endif]--&gt;&#10;  &lt;!--[if IE 8]&gt;    &lt;html class=&quot;no-js ie8 oldie&quot; lang=&quot;en-US&quot;&gt; &lt;![endif]--&gt;&#10;  &lt;!--[if gt IE 8]&gt;&lt;!--&gt; &lt;html class=&quot;no-js&quot; lang=&quot;en-US&quot;&gt; &lt;!--&lt;![endif]--&gt;&#10;  &lt;head&gt;&#10;  &lt;title&gt;Could not find host | bidvex-mailer.preview.emergentagent.com | Cloudflare&lt;/title&gt;&#10;  &lt;meta charset=&quot;UTF-8&quot; /&gt;&#10;  &lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot; /&gt;&#10;  &lt;meta http-equiv=&quot;X-UA-Compatible&quot; content=&quot;IE=Edge&quot; /&gt;&#10;  &lt;meta name=&quot;robots&quot; content=&quot;noindex, nofollow&quot; /&gt;&#10;  &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width,initial-scale=1&quot; /&gt;&#10;  &lt;link rel=&quot;stylesheet&quot; id=&quot;cf_styles-css&quot; href=&quot;/cdn-cgi/styles/main.css&quot; /&gt;&#10;  &#10;  &#10;  &lt;script&gt;&#10;  (function(){if(document.addEventListener&amp;&amp;window.XMLHttpRequest&amp;&amp;JSON&amp;&amp;JSON.stringify){var e=function(a){var c=document.getElementById(&quot;error-feedback-survey&quot;),d=document.getElementById(&quot;error-feedback-success&quot;),b=new XMLHttpRequest;a={event:&quot;feedback clicked&quot;,properties:{errorCode:1018,helpful:a,version:1}};b.open(&quot;POST&quot;,&quot;https://sparrow.cloudflare.com/api/v1/event&quot;);b.setRequestHeader(&quot;Content-Type&quot;,&quot;application/json&quot;);b.setRequestHeader(&quot;Sparrow-Source-Key&quot;,&quot;c771f0e4b54944bebf4261d44bd79a1e&quot;);&#10;  b.send(JSON.stringify(a));c.classList.add(&quot;feedback-hidden&quot;);d.classList.remove(&quot;feedback-hidden&quot;)};document.addEventListener(&quot;DOMContentLoaded&quot;,function(){var a=document.getElementById(&quot;error-feedback&quot;),c=document.getElementById(&quot;feedback-button-yes&quot;),d=document.getElementById(&quot;feedback-button-no&quot;);&quot;classList&quot;in a&amp;&amp;(a.classList.remove(&quot;feedback-hidden&quot;),c.addEventListener(&quot;click&quot;,function(){e(!0)}),d.addEventListener(&quot;click&quot;,function(){e(!1)}))})}})();&#10;  &lt;/script&gt;&#10;  &#10;  &lt;script defer src=&quot;https://performance.radar.cloudflare.com/beacon.js&quot;&gt;&lt;/script&gt;&#10;  &lt;/head&gt;&#10;  &lt;body&gt;&#10;    &lt;div id=&quot;cf-wrapper&quot;&gt;&#10;      &lt;div class=&quot;cf-alert cf-alert-error cf-cookie-error hidden&quot; id=&quot;cookie-alert&quot; data-translate=&quot;enable_cookies&quot;&gt;Please enable cookies.&lt;/div&gt;&#10;      &lt;div id=&quot;cf-error-details&quot; class=&quot;p-0&quot;&gt;&#10;        &lt;header class=&quot;mx-auto pt-10 lg:pt-6 lg:px-8 w-240 lg:w-full mb-15 antialiased&quot;&gt;&#10;           &lt;h1 class=&quot;inline-block md:block mr-2 md:mb-2 font-light text-60 md:text-3xl text-black-dark leading-tight&quot;&gt;&#10;             &lt;span data-translate=&quot;error&quot;&gt;Error&lt;/span&gt;&#10;             &lt;span&gt;1018&lt;/span&gt;&#10;           &lt;/h1&gt;&#10;           &lt;span class=&quot;inline-block md:block heading-ray-id font-mono text-15 lg:text-sm lg:leading-relaxed&quot;&gt;Ray ID: 9d0ae5ccfcaf7b25 &amp;bull;&lt;/span&gt;&#10;           &lt;span class=&quot;inline-block md:block heading-ray-id font-mono text-15 lg:text-sm lg:leading-relaxed&quot;&gt;2026-02-20 03:25:52 UTC&lt;/span&gt;&#10;          &lt;h2 class=&quot;text-gray-600 leading-1.3 text-3xl lg:text-2xl font-light&quot;&gt;Could not find host&lt;/h2&gt;&#10;        &lt;/header&gt;&#10;  &#10;        &lt;section class=&quot;w-240 lg:w-full mx-auto mb-8 lg:px-8&quot;&gt;&#10;            &lt;div id=&quot;what-happened-section&quot; class=&quot;w-1/2 md:w-full&quot;&gt;&#10;              &lt;h2 class=&quot;text-3xl leading-tight font-normal mb-4 text-black-dark antialiased&quot; data-translate=&quot;what_happened&quot;&gt;What happened?&lt;/h2&gt;&#10;              &lt;p&gt;You've requested a page on a website (bidvex-mailer.preview.emergentagent.com) that is on the &lt;a href=&quot;https://www.cloudflare.com/5xx-error-landing/&quot; target=&quot;_blank&quot;&gt;Cloudflare&lt;/a&gt; network. Cloudflare is currently unable to resolve your requested domain (bidvex-mailer.preview.emergentagent.com). There are two potential causes of this:&lt;/p&gt;&#10;              &lt;ul class=&quot;ml-10 mt-6 text-15 text-black-dark antialiased leading-normal&quot;&gt;&#10;                 &lt;li class=&quot;mb-4&quot;&gt;&lt;strong class=&quot;font-semibold&quot;&gt;Most likely:&lt;/strong&gt; if the owner just signed up for Cloudflare it can take a few minutes for the website's information to be distributed to our global network.&lt;/li&gt;&#10;                 &lt;li&gt;&lt;strong&gt;Less likely:&lt;/strong&gt; something is wrong with this site's configuration. Usually this happens when accounts have been signed up with a partner organization (e.g., a hosting provider) and the provider's DNS fails.&lt;/li&gt;&#10;              &lt;/ul&gt;&#10;              &#10;                &lt;p&gt;Please see &lt;a rel=&quot;noopener noreferrer&quot; href=&quot;https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1018/&quot; target=&quot;_blank&quot;&gt;https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1018/&lt;/a&gt; for more details.&lt;/p&gt;&#10;              &#10;            &lt;/div&gt;&#10;  &#10;            &#10;        &lt;/section&gt;&#10;  &#10;        &lt;div class=&quot;feedback-hidden py-8 text-center&quot; id=&quot;error-feedback&quot;&gt;&#10;      &lt;div id=&quot;error-feedback-survey&quot; class=&quot;footer-line-wrapper&quot;&gt;&#10;          Was this page helpful?&#10;          &lt;button class=&quot;border border-solid bg-white cf-button cursor-pointer ml-4 px-4 py-2 rounded&quot; id=&quot;feedback-button-yes&quot; type=&quot;button&quot;&gt;Yes&lt;/button&gt;&#10;          &lt;button class=&quot;border border-solid bg-white cf-button cursor-pointer ml-4 px-4 py-2 rounded&quot; id=&quot;feedback-button-no&quot; type=&quot;button&quot;&gt;No&lt;/button&gt;&#10;      &lt;/div&gt;&#10;      &lt;div class=&quot;feedback-success feedback-hidden&quot; id=&quot;error-feedback-success&quot;&gt;&#10;          Thank you for your feedback!&#10;      &lt;/div&gt;&#10;  &lt;/div&gt;&#10;  &#10;  &#10;        &lt;div class=&quot;cf-error-footer cf-wrapper w-240 lg:w-full py-10 sm:py-4 sm:px-8 mx-auto text-center sm:text-left border-solid border-0 border-t border-gray-300&quot;&gt;&#10;    &lt;p class=&quot;text-13&quot;&gt;&#10;      &lt;span class=&quot;cf-footer-item sm:block sm:mb-1&quot;&gt;Cloudflare Ray ID: &lt;strong class=&quot;font-semibold&quot;&gt;9d0ae5ccfcaf7b25&lt;/strong&gt;&lt;/span&gt;&#10;      &lt;span class=&quot;cf-footer-separator sm:hidden&quot;&gt;&amp;bull;&lt;/span&gt;&#10;      &lt;span id=&quot;cf-footer-item-ip&quot; class=&quot;cf-footer-item hidden sm:block sm:mb-1&quot;&gt;&#10;        Your IP:&#10;        &lt;button type=&quot;button&quot; id=&quot;cf-footer-ip-reveal&quot; class=&quot;cf-footer-ip-reveal-btn&quot;&gt;Click to reveal&lt;/button&gt;&#10;        &lt;span class=&quot;hidden&quot; id=&quot;cf-footer-ip&quot;&gt;104.198.214.223&lt;/span&gt;&#10;        &lt;span class=&quot;cf-footer-separator sm:hidden&quot;&gt;&amp;bull;&lt;/span&gt;&#10;      &lt;/span&gt;&#10;      &lt;span class=&quot;cf-footer-item sm:block sm:mb-1&quot;&gt;&lt;span&gt;Performance &amp;amp; security by&lt;/span&gt; &lt;a rel=&quot;noopener noreferrer&quot; href=&quot;https://www.cloudflare.com/5xx-error-landing&quot; id=&quot;brand_link&quot; target=&quot;_blank&quot;&gt;Cloudflare&lt;/a&gt;&lt;/span&gt;&#10;      &#10;    &lt;/p&gt;&#10;    &lt;script&gt;(function(){function d(){var b=a.getElementById(&quot;cf-footer-item-ip&quot;),c=a.getElementById(&quot;cf-footer-ip-reveal&quot;);b&amp;&amp;&quot;classList&quot;in b&amp;&amp;(b.classList.remove(&quot;hidden&quot;),c.addEventListener(&quot;click&quot;,function(){c.classList.add(&quot;hidden&quot;);a.getElementById(&quot;cf-footer-ip&quot;).classList.remove(&quot;hidden&quot;)}))}var a=document;document.addEventListener&amp;&amp;a.addEventListener(&quot;DOMContentLoaded&quot;,d)})();&lt;/script&gt;&#10;  &lt;/div&gt;&lt;!-- /.error-footer --&gt;&#10;  &#10;  &#10;      &lt;/div&gt;&lt;!-- /#cf-error-details --&gt;&#10;    &lt;/div&gt;&lt;!-- /#cf-wrapper --&gt;&#10;  &#10;    &lt;script&gt;&#10;    window._cf_translation = {};&#10;    &#10;    &#10;  &lt;/script&gt;&#10;  &#10;  &lt;/body&gt;&#10;  &lt;/html&gt;&#10;  &#10;assert 409 == 200&#10; +  where 409 = &lt;Response [409]&gt;.status_code&quot;">backend/tests/test_client_email_marketing.py:35: in setup
+    assert login_response.status_code == 200, f"Login failed: {login_response.text}"
+E   AssertionError: Login failed: &lt;!DOCTYPE html&gt;
+E     &lt;!--[if lt IE 7]&gt; &lt;html class="no-js ie6 oldie" lang="en-US"&gt; &lt;![endif]--&gt;
+E     &lt;!--[if IE 7]&gt;    &lt;html class="no-js ie7 oldie" lang="en-US"&gt; &lt;![endif]--&gt;
+E     &lt;!--[if IE 8]&gt;    &lt;html class="no-js ie8 oldie" lang="en-US"&gt; &lt;![endif]--&gt;
+E     &lt;!--[if gt IE 8]&gt;&lt;!--&gt; &lt;html class="no-js" lang="en-US"&gt; &lt;!--&lt;![endif]--&gt;
+E     &lt;head&gt;
+E     &lt;title&gt;Could not find host | bidvex-mailer.preview.emergentagent.com | Cloudflare&lt;/title&gt;
+E     &lt;meta charset="UTF-8" /&gt;
+E     &lt;meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /&gt;
+E     &lt;meta http-equiv="X-UA-Compatible" content="IE=Edge" /&gt;
+E     &lt;meta name="robots" content="noindex, nofollow" /&gt;
+E     &lt;meta name="viewport" content="width=device-width,initial-scale=1" /&gt;
+E     &lt;link rel="stylesheet" id="cf_styles-css" href="/cdn-cgi/styles/main.css" /&gt;
+E     
+E     
+E     &lt;script&gt;
+E     (function(){if(document.addEventListener&amp;&amp;window.XMLHttpRequest&amp;&amp;JSON&amp;&amp;JSON.stringify){var e=function(a){var c=document.getElementById("error-feedback-survey"),d=document.getElementById("error-feedback-success"),b=new XMLHttpRequest;a={event:"feedback clicked",properties:{errorCode:1018,helpful:a,version:1}};b.open("POST","https://sparrow.cloudflare.com/api/v1/event");b.setRequestHeader("Content-Type","application/json");b.setRequestHeader("Sparrow-Source-Key","c771f0e4b54944bebf4261d44bd79a1e");
+E     b.send(JSON.stringify(a));c.classList.add("feedback-hidden");d.classList.remove("feedback-hidden")};document.addEventListener("DOMContentLoaded",function(){var a=document.getElementById("error-feedback"),c=document.getElementById("feedback-button-yes"),d=document.getElementById("feedback-button-no");"classList"in a&amp;&amp;(a.classList.remove("feedback-hidden"),c.addEventListener("click",function(){e(!0)}),d.addEventListener("click",function(){e(!1)}))})}})();
+E     &lt;/script&gt;
+E     
+E     &lt;script defer src="https://performance.radar.cloudflare.com/beacon.js"&gt;&lt;/script&gt;
+E     &lt;/head&gt;
+E     &lt;body&gt;
+E       &lt;div id="cf-wrapper"&gt;
+E         &lt;div class="cf-alert cf-alert-error cf-cookie-error hidden" id="cookie-alert" data-translate="enable_cookies"&gt;Please enable cookies.&lt;/div&gt;
+E         &lt;div id="cf-error-details" class="p-0"&gt;
+E           &lt;header class="mx-auto pt-10 lg:pt-6 lg:px-8 w-240 lg:w-full mb-15 antialiased"&gt;
+E              &lt;h1 class="inline-block md:block mr-2 md:mb-2 font-light text-60 md:text-3xl text-black-dark leading-tight"&gt;
+E                &lt;span data-translate="error"&gt;Error&lt;/span&gt;
+E                &lt;span&gt;1018&lt;/span&gt;
+E              &lt;/h1&gt;
+E              &lt;span class="inline-block md:block heading-ray-id font-mono text-15 lg:text-sm lg:leading-relaxed"&gt;Ray ID: 9d0ae5ccfcaf7b25 &amp;bull;&lt;/span&gt;
+E              &lt;span class="inline-block md:block heading-ray-id font-mono text-15 lg:text-sm lg:leading-relaxed"&gt;2026-02-20 03:25:52 UTC&lt;/span&gt;
+E             &lt;h2 class="text-gray-600 leading-1.3 text-3xl lg:text-2xl font-light"&gt;Could not find host&lt;/h2&gt;
+E           &lt;/header&gt;
+E     
+E           &lt;section class="w-240 lg:w-full mx-auto mb-8 lg:px-8"&gt;
+E               &lt;div id="what-happened-section" class="w-1/2 md:w-full"&gt;
+E                 &lt;h2 class="text-3xl leading-tight font-normal mb-4 text-black-dark antialiased" data-translate="what_happened"&gt;What happened?&lt;/h2&gt;
+E                 &lt;p&gt;You've requested a page on a website (bidvex-mailer.preview.emergentagent.com) that is on the &lt;a href="https://www.cloudflare.com/5xx-error-landing/" target="_blank"&gt;Cloudflare&lt;/a&gt; network. Cloudflare is currently unable to resolve your requested domain (bidvex-mailer.preview.emergentagent.com). There are two potential causes of this:&lt;/p&gt;
+E                 &lt;ul class="ml-10 mt-6 text-15 text-black-dark antialiased leading-normal"&gt;
+E                    &lt;li class="mb-4"&gt;&lt;strong class="font-semibold"&gt;Most likely:&lt;/strong&gt; if the owner just signed up for Cloudflare it can take a few minutes for the website's information to be distributed to our global network.&lt;/li&gt;
+E                    &lt;li&gt;&lt;strong&gt;Less likely:&lt;/strong&gt; something is wrong with this site's configuration. Usually this happens when accounts have been signed up with a partner organization (e.g., a hosting provider) and the provider's DNS fails.&lt;/li&gt;
+E                 &lt;/ul&gt;
+E                 
+E                   &lt;p&gt;Please see &lt;a rel="noopener noreferrer" href="https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1018/" target="_blank"&gt;https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1018/&lt;/a&gt; for more details.&lt;/p&gt;
+E                 
+E               &lt;/div&gt;
+E     
+E               
+E           &lt;/section&gt;
+E     
+E           &lt;div class="feedback-hidden py-8 text-center" id="error-feedback"&gt;
+E         &lt;div id="error-feedback-survey" class="footer-line-wrapper"&gt;
+E             Was this page helpful?
+E             &lt;button class="border border-solid bg-white cf-button cursor-pointer ml-4 px-4 py-2 rounded" id="feedback-button-yes" type="button"&gt;Yes&lt;/button&gt;
+E             &lt;button class="border border-solid bg-white cf-button cursor-pointer ml-4 px-4 py-2 rounded" id="feedback-button-no" type="button"&gt;No&lt;/button&gt;
+E         &lt;/div&gt;
+E         &lt;div class="feedback-success feedback-hidden" id="error-feedback-success"&gt;
+E             Thank you for your feedback!
+E         &lt;/div&gt;
+E     &lt;/div&gt;
+E     
+E     
+E           &lt;div class="cf-error-footer cf-wrapper w-240 lg:w-full py-10 sm:py-4 sm:px-8 mx-auto text-center sm:text-left border-solid border-0 border-t border-gray-300"&gt;
+E       &lt;p class="text-13"&gt;
+E         &lt;span class="cf-footer-item sm:block sm:mb-1"&gt;Cloudflare Ray ID: &lt;strong class="font-semibold"&gt;9d0ae5ccfcaf7b25&lt;/strong&gt;&lt;/span&gt;
+E         &lt;span class="cf-footer-separator sm:hidden"&gt;&amp;bull;&lt;/span&gt;
+E         &lt;span id="cf-footer-item-ip" class="cf-footer-item hidden sm:block sm:mb-1"&gt;
+E           Your IP:
+E           &lt;button type="button" id="cf-footer-ip-reveal" class="cf-footer-ip-reveal-btn"&gt;Click to reveal&lt;/button&gt;
+E           &lt;span class="hidden" id="cf-footer-ip"&gt;104.198.214.223&lt;/span&gt;
+E           &lt;span class="cf-footer-separator sm:hidden"&gt;&amp;bull;&lt;/span&gt;
+E         &lt;/span&gt;
+E         &lt;span class="cf-footer-item sm:block sm:mb-1"&gt;&lt;span&gt;Performance &amp;amp; security by&lt;/span&gt; &lt;a rel="noopener noreferrer" href="https://www.cloudflare.com/5xx-error-landing" id="brand_link" target="_blank"&gt;Cloudflare&lt;/a&gt;&lt;/span&gt;
+E         
+E       &lt;/p&gt;
+E       &lt;script&gt;(function(){function d(){var b=a.getElementById("cf-footer-item-ip"),c=a.getElementById("cf-footer-ip-reveal");b&amp;&amp;"classList"in b&amp;&amp;(b.classList.remove("hidden"),c.addEventListener("click",function(){c.classList.add("hidden");a.getElementById("cf-footer-ip").classList.remove("hidden")}))}var a=document;document.addEventListener&amp;&amp;a.addEventListener("DOMContentLoaded",d)})();&lt;/script&gt;
+E     &lt;/div&gt;&lt;!-- /.error-footer --&gt;
+E     
+E     
+E         &lt;/div&gt;&lt;!-- /#cf-error-details --&gt;
+E       &lt;/div&gt;&lt;!-- /#cf-wrapper --&gt;
+E     
+E       &lt;script&gt;
+E       window._cf_translation = {};
+E       
+E       
+E     &lt;/script&gt;
+E     
+E     &lt;/body&gt;
+E     &lt;/html&gt;
+E     
+E   assert 409 == 200
+E    +  where 409 = &lt;Response [409]&gt;.status_code</error></testcase><testcase classname="backend.tests.test_client_email_marketing.TestClientEmailMarketing" name="test_get_contact_stats" time="0.568" /><testcase classname="backend.tests.test_client_email_marketing.TestClientEmailMarketing" name="test_delete_contact" time="33.595"><failure message="assert 503 == 200&#10; +  where 503 = &lt;Response [503]&gt;.status_code">backend/tests/test_client_email_marketing.py:244: in test_delete_contact
+    assert add_response.status_code == 200
+E   assert 503 == 200
+E    +  where 503 = &lt;Response [503]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_client_email_marketing.TestClientEmailMarketing" name="test_bulk_add_contacts" time="0.701" /><testcase classname="backend.tests.test_client_email_marketing.TestClientEmailMarketing" name="test_create_campaign" time="0.506" /><testcase classname="backend.tests.test_client_email_marketing.TestClientEmailMarketing" name="test_list_campaigns" time="0.488" /><testcase classname="backend.tests.test_client_email_marketing.TestClientEmailMarketing" name="test_get_single_campaign" time="0.653" /><testcase classname="backend.tests.test_client_email_marketing.TestClientEmailMarketing" name="test_update_campaign" time="0.635" /><testcase classname="backend.tests.test_client_email_marketing.TestClientMarketingQuotas" name="test_quota_structure" time="0.522" /><testcase classname="backend.tests.test_client_email_marketing.TestClientMarketingQuotas" name="test_contact_limit_check" time="0.502" /><testcase classname="backend.tests.test_client_email_marketing.TestTemplateDetails" name="test_template_subjects" time="0.507" /><testcase classname="backend.tests.test_client_email_marketing.TestTemplateDetails" name="test_templates_have_unsubscribe_link" time="0.495" /></testsuite></testsuites>
