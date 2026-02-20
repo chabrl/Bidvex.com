@@ -998,6 +998,23 @@ const ClientEmailMarketing = () => {
           </DialogHeader>
           
           <div className="p-4 sm:p-6 space-y-4">
+            {/* Template Selector */}
+            <div className="space-y-2">
+              <Label>Start with a Template</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {Object.entries(templates).map(([key, template]) => (
+                  <button
+                    key={key}
+                    onClick={() => selectTemplate(key)}
+                    className="p-3 text-left border rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
+                  >
+                    <p className="font-medium text-sm">{template.name}</p>
+                    <p className="text-xs text-muted-foreground line-clamp-2">{template.description}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Campaign Name *</Label>
@@ -1018,10 +1035,32 @@ const ClientEmailMarketing = () => {
             </div>
 
             <div className="space-y-2">
-              <Label>Email Content (HTML)</Label>
+              <div className="flex items-center justify-between">
+                <Label>Email Content (HTML)</Label>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setTemplateSelectorOpen(!templateSelectorOpen)}
+                >
+                  Preview
+                </Button>
+              </div>
               <p className="text-xs text-muted-foreground">
                 Use {'{{name}}'}, {'{{email}}'}, {'{{unsubscribe_url}}'} for personalization
               </p>
+              {templateSelectorOpen && campaignData.html_content && (
+                <Card className="p-4 mb-2">
+                  <div 
+                    className="prose dark:prose-invert max-w-none text-sm"
+                    dangerouslySetInnerHTML={{ 
+                      __html: campaignData.html_content
+                        .replace(/\{\{name\}\}/g, 'John')
+                        .replace(/\{\{email\}\}/g, 'john@example.com')
+                        .replace(/\{\{unsubscribe_url\}\}/g, '#') 
+                    }} 
+                  />
+                </Card>
+              )}
               <Textarea
                 value={campaignData.html_content}
                 onChange={(e) => setCampaignData(prev => ({ ...prev, html_content: e.target.value }))}
