@@ -2733,12 +2733,12 @@ async def place_bid(bid_data: BidCreate, current_user: User = Depends(get_curren
         # ========== OUTBID EMAIL NOTIFICATION ==========
         try:
             # Get outbid user's details for email
-            outbid_user = await db.users.find_one({"id": previous_highest_bidder}, {"_id": 0, "email": 1, "first_name": 1, "last_name": 1})
+            outbid_user = await db.users.find_one({"id": previous_highest_bidder}, {"_id": 0, "email": 1, "name": 1})
             if outbid_user and outbid_user.get("email"):
                 from services.email_notifications import send_outbid_email
                 await send_outbid_email(
                     user_email=outbid_user["email"],
-                    user_name=outbid_user.get("first_name", "Bidder"),
+                    user_name=outbid_user.get("name", "Bidder"),
                     listing_title=listing.get("title", "Item"),
                     their_bid=previous_highest_bid,
                     new_high_bid=bid_data.amount,
@@ -2754,7 +2754,7 @@ async def place_bid(bid_data: BidCreate, current_user: User = Depends(get_curren
         from services.email_notifications import send_bid_placed_email
         await send_bid_placed_email(
             bidder_email=current_user.email,
-            bidder_name=current_user.first_name or "Bidder",
+            bidder_name=current_user.name or "Bidder",
             listing_title=listing.get("title", "Item"),
             bid_amount=bid_data.amount,
             listing_id=bid_data.listing_id,
