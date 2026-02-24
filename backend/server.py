@@ -2729,6 +2729,41 @@ async def place_bid(bid_data: BidCreate, current_user: User = Depends(get_curren
             )
         except Exception as sms_error:
             logger.warning(f"📵 SMS outbid notification failed: {sms_error}")
+        
+        # ========== OUTBID EMAIL NOTIFICATION ==========
+        try:
+            # Get outbid user's details for email
+            outbid_user = await db.users.find_one({"id": previous_highest_bidder}, {"_id": 0, "email": 1, "first_name": 1, "last_name": 1})
+            if outbid_user and outbid_user.get("email"):
+                from services.email_notifications import send_outbid_email
+                await send_outbid_email(
+                    user_email=outbid_user["email"],
+                    user_name=outbid_user.get("first_name", "Bidder"),
+                    listing_title=listing.get("title", "Item"),
+                    their_bid=previous_highest_bid,
+                    new_high_bid=bid_data.amount,
+                    listing_id=bid_data.listing_id,
+                    auction_end_date=listing.get("auction_end_date", "")
+                )
+                logger.info(f"📧 Outbid email sent to {outbid_user['email']}")
+        except Exception as email_error:
+            logger.warning(f"📧 Outbid email notification failed: {email_error}")
+    
+    # ========== BID PLACED EMAIL CONFIRMATION ==========
+    try:
+        from services.email_notifications import send_bid_placed_email
+        await send_bid_placed_email(
+            bidder_email=current_user.email,
+            bidder_name=current_user.first_name or "Bidder",
+            listing_title=listing.get("title", "Item"),
+            bid_amount=bid_data.amount,
+            listing_id=bid_data.listing_id,
+            auction_end_date=new_auction_end.isoformat() if extension_applied else listing.get("auction_end_date", ""),
+            is_leading=True  # This bid is now the highest
+        )
+        logger.info(f"📧 Bid confirmation email sent to {current_user.email}")
+    except Exception as email_error:
+        logger.warning(f"📧 Bid confirmation email failed: {email_error}")
     
     logger.info(f"Bid placed: listing={bid_data.listing_id}, bidder={current_user.id}, amount={bid_data.amount}, extension={extension_applied}")
     
