@@ -591,6 +591,184 @@ async def send_auction_sold_email(
     )
 
 
+# ===== BID NOTIFICATION EMAILS =====
+
+async def send_bid_placed_email(
+    bidder_email: str,
+    bidder_name: str,
+    listing_title: str,
+    bid_amount: float,
+    listing_id: str,
+    auction_end_date: str,
+    is_leading: bool = True
+) -> Dict[str, Any]:
+    """
+    Send confirmation email when user places a bid
+    
+    Args:
+        bidder_email: Email of the bidder
+        bidder_name: Name of the bidder
+        listing_title: Title of the item
+        bid_amount: Amount of the bid placed
+        listing_id: ID of the listing for link
+        auction_end_date: When the auction ends
+        is_leading: Whether this bid is currently leading
+    """
+    status_color = "#10b981" if is_leading else "#f59e0b"
+    status_text = "You're in the lead!" if is_leading else "Your bid was placed"
+    status_message = (
+        "You are currently the highest bidder. We'll notify you if someone outbids you."
+        if is_leading else 
+        "Your bid has been recorded, but you're not currently in the lead."
+    )
+    
+    content = f"""
+    <h2 style="margin: 0 0 20px 0; color: {status_color};">✓ Bid Confirmed</h2>
+    
+    <p style="color: #475569; line-height: 1.6;">
+        Hi {bidder_name},
+    </p>
+    
+    <p style="color: #475569; line-height: 1.6;">
+        Your bid has been successfully placed on:
+    </p>
+    
+    <div style="background-color: #eff6ff; border: 2px solid #2563eb; border-radius: 8px; padding: 25px; margin: 20px 0;">
+        <p style="margin: 0 0 15px 0; color: #1e40af; font-size: 18px; font-weight: bold;">
+            {listing_title}
+        </p>
+        <table width="100%" style="font-size: 14px; color: #1e293b;">
+            <tr>
+                <td style="padding: 6px 0;"><strong>Your Bid:</strong></td>
+                <td style="padding: 6px 0; text-align: right; font-size: 20px; color: #2563eb; font-weight: bold;">
+                    {_format_currency(bid_amount)}
+                </td>
+            </tr>
+            <tr>
+                <td style="padding: 6px 0;"><strong>Auction Ends:</strong></td>
+                <td style="padding: 6px 0; text-align: right; color: #dc2626;">
+                    {_format_date(auction_end_date)}
+                </td>
+            </tr>
+        </table>
+    </div>
+    
+    <div style="background-color: {'#d1fae5' if is_leading else '#fef3c7'}; border-radius: 8px; padding: 15px; margin: 20px 0; text-align: center;">
+        <p style="margin: 0; color: {'#065f46' if is_leading else '#92400e'}; font-size: 16px; font-weight: bold;">
+            {status_text}
+        </p>
+        <p style="margin: 8px 0 0 0; color: {'#065f46' if is_leading else '#92400e'}; font-size: 13px;">
+            {status_message}
+        </p>
+    </div>
+    
+    <div style="text-align: center; margin: 30px 0;">
+        <a href="{FRONTEND_URL}/listing/{listing_id}" 
+           style="display: inline-block; background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); 
+                  color: #ffffff; text-decoration: none; padding: 14px 30px; border-radius: 8px; 
+                  font-weight: bold; font-size: 16px;">
+            View Auction
+        </a>
+    </div>
+    
+    <p style="color: #64748b; font-size: 13px; line-height: 1.6;">
+        <strong>Tip:</strong> Add this item to your watchlist to get notifications when the auction is about to end.
+    </p>
+    """
+    
+    return await send_email(
+        to_email=bidder_email,
+        subject=f"✓ Bid Confirmed: {_format_currency(bid_amount)} on {listing_title}",
+        html_content=_base_template(content, "Bid Confirmed")
+    )
+
+
+async def send_outbid_email(
+    user_email: str,
+    user_name: str,
+    listing_title: str,
+    their_bid: float,
+    new_high_bid: float,
+    listing_id: str,
+    auction_end_date: str
+) -> Dict[str, Any]:
+    """
+    Send notification email when user is outbid
+    
+    Args:
+        user_email: Email of the outbid user
+        user_name: Name of the outbid user
+        listing_title: Title of the item
+        their_bid: The user's previous bid amount
+        new_high_bid: The new highest bid
+        listing_id: ID of the listing for link
+        auction_end_date: When the auction ends
+    """
+    suggested_bid = new_high_bid + 1  # Minimum increment
+    
+    content = f"""
+    <h2 style="margin: 0 0 20px 0; color: #dc2626;">🔔 You've Been Outbid!</h2>
+    
+    <p style="color: #475569; line-height: 1.6;">
+        Hi {user_name},
+    </p>
+    
+    <p style="color: #475569; line-height: 1.6;">
+        Someone has placed a higher bid on an item you're watching:
+    </p>
+    
+    <div style="background-color: #fef2f2; border: 2px solid #dc2626; border-radius: 8px; padding: 25px; margin: 20px 0;">
+        <p style="margin: 0 0 15px 0; color: #991b1b; font-size: 18px; font-weight: bold;">
+            {listing_title}
+        </p>
+        <table width="100%" style="font-size: 14px; color: #1e293b;">
+            <tr>
+                <td style="padding: 6px 0;"><strong>Your Bid:</strong></td>
+                <td style="padding: 6px 0; text-align: right; text-decoration: line-through; color: #94a3b8;">
+                    {_format_currency(their_bid)}
+                </td>
+            </tr>
+            <tr>
+                <td style="padding: 6px 0;"><strong>New High Bid:</strong></td>
+                <td style="padding: 6px 0; text-align: right; font-size: 20px; color: #dc2626; font-weight: bold;">
+                    {_format_currency(new_high_bid)}
+                </td>
+            </tr>
+            <tr>
+                <td style="padding: 6px 0;"><strong>Auction Ends:</strong></td>
+                <td style="padding: 6px 0; text-align: right; color: #f59e0b;">
+                    {_format_date(auction_end_date)}
+                </td>
+            </tr>
+        </table>
+    </div>
+    
+    <div style="background-color: #eff6ff; border-radius: 8px; padding: 15px; margin: 20px 0; text-align: center;">
+        <p style="margin: 0; color: #1e40af; font-size: 14px;">
+            <strong>Suggested next bid:</strong> {_format_currency(suggested_bid)} or higher
+        </p>
+    </div>
+    
+    <div style="text-align: center; margin: 30px 0;">
+        <a href="{FRONTEND_URL}/listing/{listing_id}" 
+           style="display: inline-block; background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); 
+                  color: #ffffff; text-decoration: none; padding: 14px 30px; border-radius: 8px; 
+                  font-weight: bold; font-size: 16px;">
+            Bid Again Now
+        </a>
+    </div>
+    
+    <p style="color: #64748b; font-size: 13px; line-height: 1.6;">
+        Don't miss out! Place a higher bid to get back in the lead.
+    </p>
+    """
+    
+    return await send_email(
+        to_email=user_email,
+        subject=f"🔔 Outbid Alert: {listing_title} - Bid Now!",
+        html_content=_base_template(content, "You've Been Outbid")
+    )
+
 
 # ===== SUBSCRIPTION EMAILS =====
 
