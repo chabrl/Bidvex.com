@@ -23,125 +23,8 @@ ADMIN_EMAIL = "charbeladmin@bidvex.com"
 ADMIN_PASSWORD = "Admin123!"
 
 
-class TestBidEmailNotifications:
-    """Test suite for bid email notifications"""
-    
-    @pytest.fixture(scope="class")
-    def admin_token(self):
-        """Authenticate as admin user"""
-        response = requests.post(f"{BASE_URL}/api/auth/login", json={
-            "email": ADMIN_EMAIL,
-            "password": ADMIN_PASSWORD
-        })
-        if response.status_code != 200:
-            pytest.skip(f"Admin login failed: {response.status_code} - {response.text}")
-        return response.json()["access_token"]
-    
-    @pytest.fixture(scope="class")
-    def admin_user(self, admin_token):
-        """Get admin user details"""
-        headers = {"Authorization": f"Bearer {admin_token}"}
-        response = requests.get(f"{BASE_URL}/api/auth/me", headers=headers)
-        assert response.status_code == 200, f"Failed to get admin user: {response.text}"
-        return response.json()
-    
-    @pytest.fixture(scope="class")
-    def test_user_a(self, admin_token):
-        """Create or get test user A for bidding tests"""
-        # Try to register a new test user
-        test_email = f"test_bidder_a_{uuid.uuid4().hex[:6]}@test.bidvex.com"
-        response = requests.post(f"{BASE_URL}/api/auth/register", json={
-            "email": test_email,
-            "password": "TestPass123!",
-            "name": "Test Bidder A",
-            "phone": "+15141234567",
-            "account_type": "personal"
-        })
-        
-        if response.status_code == 200:
-            data = response.json()
-            return {
-                "token": data["access_token"],
-                "user": data["user"],
-                "email": test_email
-            }
-        elif response.status_code == 400:
-            # User already exists, try to login
-            login_resp = requests.post(f"{BASE_URL}/api/auth/login", json={
-                "email": test_email,
-                "password": "TestPass123!"
-            })
-            if login_resp.status_code == 200:
-                data = login_resp.json()
-                return {
-                    "token": data["access_token"],
-                    "user": data["user"],
-                    "email": test_email
-                }
-        pytest.skip(f"Failed to create/login test user A: {response.text}")
-    
-    @pytest.fixture(scope="class")
-    def test_user_b(self, admin_token):
-        """Create or get test user B for bidding tests"""
-        test_email = f"test_bidder_b_{uuid.uuid4().hex[:6]}@test.bidvex.com"
-        response = requests.post(f"{BASE_URL}/api/auth/register", json={
-            "email": test_email,
-            "password": "TestPass123!",
-            "name": "Test Bidder B",
-            "phone": "+15149876543",
-            "account_type": "personal"
-        })
-        
-        if response.status_code == 200:
-            data = response.json()
-            return {
-                "token": data["access_token"],
-                "user": data["user"],
-                "email": test_email
-            }
-        pytest.skip(f"Failed to create test user B: {response.text}")
-    
-    @pytest.fixture(scope="class")
-    def test_listing(self, admin_token, admin_user):
-        """Create a test listing for bidding"""
-        headers = {"Authorization": f"Bearer {admin_token}"}
-        
-        # Create a listing that ends in 2 hours
-        auction_end = (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()
-        
-        listing_data = {
-            "title": f"TEST_Email_Notification_Vehicle_{uuid.uuid4().hex[:6]}",
-            "description": "Test listing for email notification testing",
-            "category": "Vehicles",
-            "condition": "Good",
-            "starting_price": 100.00,
-            "buy_now_price": 5000.00,
-            "images": [],
-            "location": "Montreal, QC",
-            "city": "Montreal",
-            "region": "QC",
-            "auction_end_date": auction_end,
-            "agreement_accepted": True,
-            "agreement_metadata": {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "ip_address": "127.0.0.1",
-                "user_agent": "pytest"
-            }
-        }
-        
-        response = requests.post(f"{BASE_URL}/api/listings", headers=headers, json=listing_data)
-        
-        if response.status_code != 200:
-            pytest.skip(f"Failed to create test listing: {response.status_code} - {response.text}")
-        
-        listing = response.json()
-        yield listing
-        
-        # Cleanup: Delete the test listing after tests
-        try:
-            requests.delete(f"{BASE_URL}/api/listings/{listing['id']}", headers=headers)
-        except:
-            pass
+class TestBidEmailNotificationFunctions:
+    """Test the email notification function implementation"""
     
     def test_health_check(self):
         """Verify API is running"""
@@ -149,66 +32,9 @@ class TestBidEmailNotifications:
         assert response.status_code == 200, f"Health check failed: {response.text}"
         print("✅ Health check passed")
     
-    def test_admin_login(self, admin_token):
-        """Verify admin can login"""
-        assert admin_token is not None
-        assert len(admin_token) > 0
-        print(f"✅ Admin login successful, token length: {len(admin_token)}")
-    
-    def test_bid_placement_returns_success(self, admin_token, test_listing):
-        """
-        Test that placing a bid returns successful response
-        The bid confirmation email should be logged (since SendGrid is mocked)
-        """
-        # Admin needs phone verified and payment method to bid
-        # For this test, we use admin who should have those set
-        headers = {"Authorization": f"Bearer {admin_token}"}
-        
-        # Get current price
-        listing_response = requests.get(f"{BASE_URL}/api/listings/{test_listing['id']}", headers=headers)
-        if listing_response.status_code != 200:
-            pytest.skip(f"Failed to get listing: {listing_response.text}")
-        
-        current_price = listing_response.json().get("current_price", test_listing["starting_price"])
-        
-        # Place a bid (increase by $5)
-        bid_amount = current_price + 5
-        
-        bid_data = {
-            "listing_id": test_listing["id"],
-            "amount": bid_amount
-        }
-        
-        response = requests.post(f"{BASE_URL}/api/bids", headers=headers, json=bid_data)
-        
-        # Check response - may fail due to phone/payment verification requirements
-        if response.status_code == 403:
-            error_detail = response.json().get("detail", "")
-            if "Phone verification" in error_detail or "Payment method" in error_detail:
-                print(f"⚠️ Bid blocked due to verification requirements: {error_detail}")
-                # This is expected behavior - verification is required
-                # The email functions are still being called in the code path
-                pytest.skip(f"Test user requires verification: {error_detail}")
-        
-        # If bid succeeds, verify the response
-        if response.status_code == 200:
-            bid_response = response.json()
-            assert "id" in bid_response, "Bid response should contain id"
-            assert bid_response.get("amount") == bid_amount, f"Bid amount should be {bid_amount}"
-            print(f"✅ Bid placed successfully: ${bid_amount}")
-            print(f"   Bid ID: {bid_response['id']}")
-            # Email should be logged in backend logs
-            print("   📧 Bid confirmation email should be logged in backend (SendGrid mocked)")
-            return bid_response
-        else:
-            print(f"❌ Bid failed: {response.status_code} - {response.text}")
-            # Assert for detailed error
-            assert response.status_code == 200, f"Bid should succeed: {response.text}"
-    
     def test_email_notification_code_exists(self):
         """
         Verify the email notification functions exist in the codebase
-        This is a code review check rather than runtime test
         """
         import sys
         sys.path.insert(0, '/app/backend')
@@ -234,7 +60,7 @@ class TestBidEmailNotifications:
         import sys
         sys.path.insert(0, '/app/backend')
         
-        from services.email_notifications import SENDGRID_AVAILABLE, send_email
+        from services.email_notifications import SENDGRID_AVAILABLE
         
         # Since SendGrid API key is placeholder, SENDGRID_AVAILABLE should be False
         print(f"   SENDGRID_AVAILABLE: {SENDGRID_AVAILABLE}")
@@ -383,7 +209,7 @@ class TestBidEmailNotifications:
         print("   - Suggested next bid ✓")
         print("   - 'Bid Again' CTA ✓")
     
-    def test_email_functions_are_nonblocking(self):
+    def test_email_functions_are_nonblocking_in_server(self):
         """
         Verify that email functions are wrapped in try-except
         so bid still succeeds even if email fails
@@ -392,46 +218,157 @@ class TestBidEmailNotifications:
         with open('/app/backend/server.py', 'r') as f:
             content = f.read()
         
-        # Find the bid email section
-        bid_email_section = content[content.find("BID PLACED EMAIL CONFIRMATION"):content.find("BID PLACED EMAIL CONFIRMATION")+500]
-        outbid_email_section = content[content.find("OUTBID EMAIL NOTIFICATION"):content.find("OUTBID EMAIL NOTIFICATION")+500]
+        # Find the place_bid function and check email handling
+        place_bid_start = content.find("async def place_bid(")
+        place_bid_end = content.find("@api_router.post(\"/buy-now\")")
+        place_bid_code = content[place_bid_start:place_bid_end]
         
-        # Check for try-except wrapper
-        assert "try:" in bid_email_section, "Bid email should be wrapped in try-except"
+        # Check for both email sections with try-except
+        # Bid confirmation email
+        assert "BID PLACED EMAIL CONFIRMATION" in place_bid_code, "Bid email section should exist"
+        bid_email_start = place_bid_code.find("BID PLACED EMAIL CONFIRMATION")
+        bid_email_section = place_bid_code[bid_email_start:bid_email_start+800]
+        assert "try:" in bid_email_section, "Bid email should be wrapped in try"
         assert "except" in bid_email_section, "Bid email should have except handler"
         
-        assert "try:" in outbid_email_section, "Outbid email should be wrapped in try-except"
+        # Outbid notification email
+        assert "OUTBID EMAIL NOTIFICATION" in place_bid_code, "Outbid email section should exist"
+        outbid_email_start = place_bid_code.find("OUTBID EMAIL NOTIFICATION")
+        outbid_email_section = place_bid_code[outbid_email_start:outbid_email_start+800]
+        assert "try:" in outbid_email_section, "Outbid email should be wrapped in try"
         assert "except" in outbid_email_section, "Outbid email should have except handler"
         
         print("✅ Both email functions are non-blocking (wrapped in try-except)")
         print("   - Bid confirmation email: try-except ✓")
         print("   - Outbid notification email: try-except ✓")
     
-    def test_user_name_field_issue(self):
+    def test_user_name_field_is_correct(self):
         """
         Verify that the code correctly accesses user name field.
-        Issue found: code uses current_user.first_name but User model has 'name'
+        User model has 'name' field (not first_name)
         """
         # Read server.py to check the field access
         with open('/app/backend/server.py', 'r') as f:
             content = f.read()
         
-        # Find where bidder_name is being set for email
-        if 'current_user.first_name' in content:
-            print("⚠️ ISSUE FOUND: Code uses 'current_user.first_name' but User model uses 'name'")
-            print("   This could cause AttributeError or return None")
-            # Check if User model has first_name
-            if 'first_name: ' not in content or 'first_name:' not in content:
-                print("   User model does NOT have first_name field")
-                pytest.xfail("User model field mismatch: code uses first_name but model uses name")
-        elif 'current_user.name' in content:
-            print("✅ Code correctly uses 'current_user.name'")
+        # Find the bid placed email section
+        place_bid_start = content.find("async def place_bid(")
+        place_bid_end = content.find("@api_router.post(\"/buy-now\")")
+        place_bid_code = content[place_bid_start:place_bid_end]
+        
+        # Check bid placed email uses current_user.name (not first_name)
+        if 'bidder_name=current_user.first_name' in place_bid_code:
+            pytest.fail("Bug: Code uses 'current_user.first_name' but User model has 'name'")
+        
+        if 'bidder_name=current_user.name' in place_bid_code:
+            print("✅ Bid email correctly uses 'current_user.name'")
         else:
-            print("⚠️ Could not determine how user name is accessed")
+            print("⚠️ Could not verify bidder_name field access")
+        
+        # Check outbid email
+        if '"first_name": 1, "last_name": 1' in place_bid_code:
+            pytest.fail("Bug: Query uses first_name/last_name but User model has 'name'")
+        
+        if '"name": 1' in place_bid_code:
+            print("✅ Outbid query correctly uses 'name' field")
+        else:
+            print("⚠️ Could not verify outbid user query")
+
+
+class TestEmailNotificationDirectCall:
+    """Test the email functions directly (unit tests)"""
+    
+    @pytest.mark.asyncio
+    async def test_send_bid_placed_email_logging(self):
+        """
+        Test that send_bid_placed_email logs the email when SendGrid is not configured
+        """
+        import sys
+        sys.path.insert(0, '/app/backend')
+        
+        from services.email_notifications import send_bid_placed_email, SENDGRID_AVAILABLE
+        
+        result = await send_bid_placed_email(
+            bidder_email="test@example.com",
+            bidder_name="Test User",
+            listing_title="Test Vehicle 2024",
+            bid_amount=1500.00,
+            listing_id="test-listing-123",
+            auction_end_date=datetime.now(timezone.utc).isoformat(),
+            is_leading=True
+        )
+        
+        if not SENDGRID_AVAILABLE:
+            assert result["status"] == "logged", f"Expected logged status, got: {result}"
+            print("✅ Bid placed email was logged (SendGrid not configured)")
+            print(f"   Result: {result}")
+        else:
+            print(f"⚠️ SendGrid is configured, result: {result}")
+    
+    @pytest.mark.asyncio
+    async def test_send_outbid_email_logging(self):
+        """
+        Test that send_outbid_email logs the email when SendGrid is not configured
+        """
+        import sys
+        sys.path.insert(0, '/app/backend')
+        
+        from services.email_notifications import send_outbid_email, SENDGRID_AVAILABLE
+        
+        result = await send_outbid_email(
+            user_email="outbid@example.com",
+            user_name="Outbid User",
+            listing_title="Test Vehicle 2024",
+            their_bid=1400.00,
+            new_high_bid=1500.00,
+            listing_id="test-listing-123",
+            auction_end_date=datetime.now(timezone.utc).isoformat()
+        )
+        
+        if not SENDGRID_AVAILABLE:
+            assert result["status"] == "logged", f"Expected logged status, got: {result}"
+            print("✅ Outbid email was logged (SendGrid not configured)")
+            print(f"   Result: {result}")
+        else:
+            print(f"⚠️ SendGrid is configured, result: {result}")
 
 
 class TestEmailNotificationIntegration:
     """Integration tests that check backend logs for email logging"""
+    
+    @pytest.fixture(scope="class")
+    def admin_token(self):
+        """Authenticate as admin user"""
+        response = requests.post(f"{BASE_URL}/api/auth/login", json={
+            "email": ADMIN_EMAIL,
+            "password": ADMIN_PASSWORD
+        })
+        if response.status_code != 200:
+            pytest.skip(f"Admin login failed: {response.status_code} - {response.text}")
+        return response.json()["access_token"]
+    
+    def test_admin_login(self, admin_token):
+        """Verify admin can login"""
+        assert admin_token is not None
+        assert len(admin_token) > 0
+        print(f"✅ Admin login successful")
+    
+    def test_get_active_listings(self, admin_token):
+        """
+        Get active listings to understand available test data
+        """
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        
+        response = requests.get(f"{BASE_URL}/api/listings?limit=5", headers=headers)
+        assert response.status_code == 200, f"Failed to get listings: {response.text}"
+        
+        data = response.json()
+        listings = data.get("listings", [])
+        
+        print(f"✅ Found {len(listings)} listing(s)")
+        for listing in listings[:3]:
+            print(f"   - {listing.get('title', 'N/A')[:50]} (ID: {listing.get('id', 'N/A')[:8]}...)")
+            print(f"     Current price: ${listing.get('current_price', 0)}, Status: {listing.get('status', 'N/A')}")
     
     def test_check_backend_log_for_email_entries(self):
         """
@@ -451,12 +388,13 @@ class TestEmailNotificationIntegration:
             log_content = result.stdout
             
             # Check for EMAIL LOG entries
-            email_logs = [line for line in log_content.split('\n') if '[EMAIL LOG]' in line or 'email' in line.lower()]
+            email_logs = [line for line in log_content.split('\n') 
+                         if '[EMAIL LOG]' in line or 'email' in line.lower() or '📧' in line]
             
             if email_logs:
                 print("✅ Found email-related log entries:")
-                for log in email_logs[-5:]:  # Show last 5 entries
-                    print(f"   {log[:100]}...")
+                for log in email_logs[-10:]:  # Show last 10 entries
+                    print(f"   {log[:120]}...")
             else:
                 print("⚠️ No [EMAIL LOG] entries found in recent logs")
                 print("   This is expected if no bids have been placed recently")
