@@ -2372,4 +2372,21 @@ a > span {
   color: inherit !important;
 }
 
-/* Cache buster: 20260220190000 */
+/* === MOBILE UTILITY CLASSES === */
+/* Hide scrollbar but allow scrolling */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari, Opera */
+}
+
+/* Minimum tap target size for mobile (44px) */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Cache buster: 20260220200000 */
