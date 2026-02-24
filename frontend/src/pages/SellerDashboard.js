@@ -110,7 +110,7 @@ const SellerDashboard = () => {
               {t('dashboard.seller.commissionRate')}: {user.subscription_tier === 'vip' ? '2%' : user.subscription_tier === 'premium' ? '2.5%' : '4%'}
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               className="gradient-button text-white border-0"
               onClick={() => navigate('/create-listing')}
