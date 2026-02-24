@@ -276,7 +276,7 @@ const Navbar = () => {
                 </DropdownMenu>
               ) : (
                 <Link to="/auth" data-testid="login-link">
-                  <Button className="gradient-button text-white border-0" size="sm">
+                  <Button className="gradient-button text-white border-0 h-10 min-h-[44px] px-4">
                     {t('nav.login')}
                   </Button>
                 </Link>
