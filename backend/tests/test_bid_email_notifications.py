@@ -12,6 +12,7 @@ import pytest
 import requests
 import os
 import uuid
+import asyncio
 from datetime import datetime, timedelta, timezone
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
@@ -227,14 +228,15 @@ class TestBidEmailNotificationFunctions:
         # Bid confirmation email
         assert "BID PLACED EMAIL CONFIRMATION" in place_bid_code, "Bid email section should exist"
         bid_email_start = place_bid_code.find("BID PLACED EMAIL CONFIRMATION")
-        bid_email_section = place_bid_code[bid_email_start:bid_email_start+800]
+        bid_email_section = place_bid_code[bid_email_start:bid_email_start+1000]
         assert "try:" in bid_email_section, "Bid email should be wrapped in try"
         assert "except" in bid_email_section, "Bid email should have except handler"
         
         # Outbid notification email
         assert "OUTBID EMAIL NOTIFICATION" in place_bid_code, "Outbid email section should exist"
         outbid_email_start = place_bid_code.find("OUTBID EMAIL NOTIFICATION")
-        outbid_email_section = place_bid_code[outbid_email_start:outbid_email_start+800]
+        # Get a larger section to include the except handler
+        outbid_email_section = place_bid_code[outbid_email_start:outbid_email_start+1200]
         assert "try:" in outbid_email_section, "Outbid email should be wrapped in try"
         assert "except" in outbid_email_section, "Outbid email should have except handler"
         
@@ -278,8 +280,7 @@ class TestBidEmailNotificationFunctions:
 class TestEmailNotificationDirectCall:
     """Test the email functions directly (unit tests)"""
     
-    @pytest.mark.asyncio
-    async def test_send_bid_placed_email_logging(self):
+    def test_send_bid_placed_email_logging(self):
         """
         Test that send_bid_placed_email logs the email when SendGrid is not configured
         """
@@ -288,14 +289,17 @@ class TestEmailNotificationDirectCall:
         
         from services.email_notifications import send_bid_placed_email, SENDGRID_AVAILABLE
         
-        result = await send_bid_placed_email(
-            bidder_email="test@example.com",
-            bidder_name="Test User",
-            listing_title="Test Vehicle 2024",
-            bid_amount=1500.00,
-            listing_id="test-listing-123",
-            auction_end_date=datetime.now(timezone.utc).isoformat(),
-            is_leading=True
+        # Run async function using asyncio
+        result = asyncio.get_event_loop().run_until_complete(
+            send_bid_placed_email(
+                bidder_email="test@example.com",
+                bidder_name="Test User",
+                listing_title="Test Vehicle 2024",
+                bid_amount=1500.00,
+                listing_id="test-listing-123",
+                auction_end_date=datetime.now(timezone.utc).isoformat(),
+                is_leading=True
+            )
         )
         
         if not SENDGRID_AVAILABLE:
@@ -305,8 +309,7 @@ class TestEmailNotificationDirectCall:
         else:
             print(f"⚠️ SendGrid is configured, result: {result}")
     
-    @pytest.mark.asyncio
-    async def test_send_outbid_email_logging(self):
+    def test_send_outbid_email_logging(self):
         """
         Test that send_outbid_email logs the email when SendGrid is not configured
         """
@@ -315,14 +318,17 @@ class TestEmailNotificationDirectCall:
         
         from services.email_notifications import send_outbid_email, SENDGRID_AVAILABLE
         
-        result = await send_outbid_email(
-            user_email="outbid@example.com",
-            user_name="Outbid User",
-            listing_title="Test Vehicle 2024",
-            their_bid=1400.00,
-            new_high_bid=1500.00,
-            listing_id="test-listing-123",
-            auction_end_date=datetime.now(timezone.utc).isoformat()
+        # Run async function using asyncio
+        result = asyncio.get_event_loop().run_until_complete(
+            send_outbid_email(
+                user_email="outbid@example.com",
+                user_name="Outbid User",
+                listing_title="Test Vehicle 2024",
+                their_bid=1400.00,
+                new_high_bid=1500.00,
+                listing_id="test-listing-123",
+                auction_end_date=datetime.now(timezone.utc).isoformat()
+            )
         )
         
         if not SENDGRID_AVAILABLE:
@@ -363,7 +369,13 @@ class TestEmailNotificationIntegration:
         assert response.status_code == 200, f"Failed to get listings: {response.text}"
         
         data = response.json()
-        listings = data.get("listings", [])
+        # Handle both list and dict response formats
+        if isinstance(data, list):
+            listings = data
+        elif isinstance(data, dict):
+            listings = data.get("listings", [])
+        else:
+            listings = []
         
         print(f"✅ Found {len(listings)} listing(s)")
         for listing in listings[:3]:
