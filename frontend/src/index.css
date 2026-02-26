@@ -2390,3 +2390,116 @@ a > span {
 }
 
 /* Cache buster: 20260220200000 */
+
+/* ============================================
+   MODERN VEHICLE FILTER STYLES
+   Glassmorphism, Dark Mode Compliant
+   ============================================ */
+
+/* Dark Mode Base - Deep Charcoal (not pure black) */
+.dark {
+  --bg-filter: #121212;
+  --bg-filter-elevated: #1a1a1a;
+  --text-primary: #E0E0E0;
+  --text-secondary: rgba(224, 224, 224, 0.6);
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --accent: #007AFF;
+}
+
+/* Glassmorphism Card */
+[data-testid="vehicle-filter-modern"] > div {
+  background: rgba(255, 255, 255, 0.8) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+}
+
+.dark [data-testid="vehicle-filter-modern"] > div {
+  background: rgba(18, 18, 18, 0.8) !important;
+}
+
+/* Select Dropdowns with Glassmorphism */
+[data-radix-select-content] {
+  background: rgba(26, 26, 26, 0.95) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 12px !important;
+}
+
+/* Select Items - 48px Touch Targets */
+[data-radix-select-item] {
+  min-height: 48px !important;
+  padding: 12px 16px !important;
+  border-radius: 8px !important;
+  margin: 2px 4px !important;
+}
+
+[data-radix-select-item]:hover,
+[data-radix-select-item][data-highlighted] {
+  background: rgba(0, 122, 255, 0.15) !important;
+}
+
+[data-radix-select-item][data-state="checked"] {
+  background: rgba(0, 122, 255, 0.2) !important;
+  color: #007AFF !important;
+}
+
+/* Range Sliders */
+[data-testid="vehicle-filter-modern"] [role="slider"] {
+  background: #007AFF !important;
+  border: none !important;
+  width: 20px !important;
+  height: 20px !important;
+  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.4) !important;
+}
+
+[data-testid="vehicle-filter-modern"] [data-orientation="horizontal"] {
+  background: rgba(255, 255, 255, 0.1) !important;
+  height: 4px !important;
+  border-radius: 2px !important;
+}
+
+[data-testid="vehicle-filter-modern"] [data-orientation="horizontal"] > span:first-child {
+  background: linear-gradient(90deg, #007AFF, #5856D6) !important;
+}
+
+/* Status Pills - Touch Targets */
+[data-testid="vehicle-filter-modern"] button[class*="rounded-full"] {
+  min-height: 44px !important;
+  touch-action: manipulation !important;
+}
+
+/* Subtle Separators */
+[data-testid="vehicle-filter-modern"] .h-px {
+  opacity: 0.05 !important;
+}
+
+/* WCAG AA Compliant Text */
+.dark [data-testid="vehicle-filter-modern"] {
+  color: #E0E0E0 !important;
+}
+
+.dark [data-testid="vehicle-filter-modern"] label {
+  color: rgba(224, 224, 224, 0.6) !important;
+}
+
+.dark [data-testid="vehicle-filter-modern"] p {
+  color: rgba(224, 224, 224, 0.6) !important;
+}
+
+/* Filter Badge - Accent Color */
+[data-testid="vehicle-filter-modern"] [class*="Badge"] {
+  border: none !important;
+}
+
+/* Mobile Scroll Indicators */
+@media (max-width: 640px) {
+  [data-testid="vehicle-filter-modern"] [class*="overflow-x-auto"] {
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+  }
+  
+  [data-testid="vehicle-filter-modern"] [class*="overflow-x-auto"] > button {
+    scroll-snap-align: start;
+  }
+}
