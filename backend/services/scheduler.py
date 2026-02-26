@@ -184,17 +184,17 @@ async def cleanup_expired_deposits_job():
             "expired_deposits": result.modified_count,
             "timestamp": now.isoformat()
         }
-    except Exception as e:
-        logger.exception(f"Error in deposit cleanup job: {e}")
-        return {"error": str(e)}
+    
+    return await safe_db_operation("cleanup_expired_deposits", _run)
 
 
 async def cleanup_expired_sessions_job():
     """Job: Clean up expired payment sessions"""
     if db_instance is None:
-        return
+        logger.warning("Database not initialized, skipping session cleanup")
+        return {"error": "db_not_initialized"}
     
-    try:
+    async def _run():
         logger.info("Running payment session cleanup job...")
         now = datetime.now(timezone.utc)
         
@@ -221,17 +221,17 @@ async def cleanup_expired_sessions_job():
             "expired_sessions": result.modified_count,
             "timestamp": now.isoformat()
         }
-    except Exception as e:
-        logger.exception(f"Error in session cleanup job: {e}")
-        return {"error": str(e)}
+    
+    return await safe_db_operation("cleanup_expired_sessions", _run)
 
 
 async def daily_summary_job():
     """Job: Generate daily auction summary (for logging/monitoring)"""
     if db_instance is None:
-        return
+        logger.warning("Database not initialized, skipping daily summary")
+        return {"error": "db_not_initialized"}
     
-    try:
+    async def _run():
         logger.info("Generating daily summary...")
         now = datetime.now(timezone.utc)
         start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
