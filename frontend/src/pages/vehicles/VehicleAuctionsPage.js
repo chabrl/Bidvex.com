@@ -399,55 +399,17 @@ const VehicleAuctionsPage = () => {
             ))}
           </div>
         ) : vehicles.length === 0 ? (
-                          group flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium
-                          transition-all duration-200 ease-out
-                          ${isActive 
-                            ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25 scale-105' 
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 hover:scale-102'
-                          }
-                        `}
-                      >
-                        <Icon className={`h-4 w-4 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'}`} />
-                        {status.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              
-              {/* Main Filters Row */}
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                {/* Vehicle Make - Prominent Searchable */}
-                <div className="md:col-span-4">
-                  <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 block">
-                    Vehicle Make
-                  </label>
-                  <Select value={filters.make || 'all'} onValueChange={(v) => handleFilterChange('make', v)}>
-                    <SelectTrigger 
-                      className="w-full h-12 bg-transparent border-2 border-slate-200 dark:border-slate-700 hover:border-blue-400 focus:border-blue-500 transition-colors rounded-xl"
-                      data-testid="make-filter"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Car className="h-5 w-5 text-blue-500" />
-                        <SelectValue placeholder="Select Make" />
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent className="max-h-80 bg-slate-900 border-slate-700">
-                      <SelectItem value="all">
-                        <span className="flex items-center gap-2">
-                          <span className="text-lg">🚗</span> All Makes
-                        </span>
-                      </SelectItem>
-                      <div className="px-2 py-1.5 text-xs font-semibold text-slate-400 uppercase">Popular</div>
-                      <SelectItem value="Toyota"><span className="flex items-center gap-2">🇯🇵 Toyota</span></SelectItem>
-                      <SelectItem value="Honda"><span className="flex items-center gap-2">🇯🇵 Honda</span></SelectItem>
-                      <SelectItem value="Ford"><span className="flex items-center gap-2">🇺🇸 Ford</span></SelectItem>
-                      <SelectItem value="Chevrolet"><span className="flex items-center gap-2">🇺🇸 Chevrolet</span></SelectItem>
-                      <SelectItem value="Tesla"><span className="flex items-center gap-2">⚡ Tesla</span></SelectItem>
-                      <div className="px-2 py-1.5 text-xs font-semibold text-slate-400 uppercase">Luxury</div>
-                      <SelectItem value="BMW"><span className="flex items-center gap-2">🇩🇪 BMW</span></SelectItem>
-                      <SelectItem value="Mercedes-Benz"><span className="flex items-center gap-2">🇩🇪 Mercedes-Benz</span></SelectItem>
-                      <SelectItem value="Audi"><span className="flex items-center gap-2">🇩🇪 Audi</span></SelectItem>
+          <div className="text-center py-16">
+            <Car className="h-16 w-16 text-slate-300 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">
+              No Vehicles Found
+            </h3>
+            <p className="text-slate-500 mb-6">
+              Try adjusting your filters or check back later for new listings.
+            </p>
+            <Button onClick={clearFilters}>Clear Filters</Button>
+          </div>
+        ) : (
                       <SelectItem value="Lexus"><span className="flex items-center gap-2">🇯🇵 Lexus</span></SelectItem>
                       <SelectItem value="Acura"><span className="flex items-center gap-2">🇯🇵 Acura</span></SelectItem>
                       <SelectItem value="Infiniti"><span className="flex items-center gap-2">🇯🇵 Infiniti</span></SelectItem>
