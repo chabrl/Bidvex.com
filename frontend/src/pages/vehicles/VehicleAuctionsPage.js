@@ -373,31 +373,19 @@ const VehicleAuctionsPage = () => {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Premium Filter Card */}
-        <div className="relative mb-8">
-          {/* Decorative gradient border */}
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 rounded-2xl opacity-20 blur-sm" />
-          
-          <Card className="relative bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-0 shadow-2xl rounded-2xl overflow-hidden">
-            {/* Header with gradient accent */}
-            <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-6 py-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
-                    <SlidersHorizontal className="h-5 w-5 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-white font-semibold">Find Your Vehicle</h3>
-                    <p className="text-slate-400 text-sm">Search across {total} active auctions</p>
-                  </div>
-                </div>
-                
-                {/* View Toggle - Premium Style */}
-                <div className="flex items-center gap-2">
-                  <span className="text-slate-400 text-sm mr-2">View:</span>
-                  <div className="flex items-center bg-slate-800 rounded-lg p-1">
-                    <button
-                      onClick={() => setViewMode('grid')}
+        {/* Modern Filter Component */}
+        <VehicleFilterModern
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          total={total}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+        />
+
+        {/* Results */}
+        {loading ? (
                       className={`p-2 rounded-md transition-all ${
                         viewMode === 'grid' 
                           ? 'bg-blue-500 text-white shadow-lg' 
