@@ -25,7 +25,7 @@ from typing import Dict, Any, Optional
 from pathlib import Path
 
 # Configuration
-BASE_URL = "https://bidvex-campaigns.preview.emergentagent.com/api"
+BASE_URL = "https://vehicle-filter-ui.preview.emergentagent.com/api"
 
 class BilingualInvoiceTester:
     def __init__(self):
