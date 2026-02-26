@@ -386,48 +386,19 @@ const VehicleAuctionsPage = () => {
 
         {/* Results */}
         {loading ? (
-                      className={`p-2 rounded-md transition-all ${
-                        viewMode === 'grid' 
-                          ? 'bg-blue-500 text-white shadow-lg' 
-                          : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      <Grid className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => setViewMode('list')}
-                      className={`p-2 rounded-md transition-all ${
-                        viewMode === 'list' 
-                          ? 'bg-blue-500 text-white shadow-lg' 
-                          : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      <List className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <CardContent className="p-6 space-y-6">
-              {/* Auction Status Pills */}
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="text-sm font-medium text-slate-500 dark:text-slate-400">Status:</span>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { id: 'all', label: 'All Auctions', icon: Sparkles },
-                    { id: 'ending_soon', label: 'Ending Soon', icon: Clock },
-                    { id: 'live', label: 'Live Now', icon: Zap },
-                    { id: 'no_reserve', label: 'No Reserve', icon: Award },
-                    { id: 'buy_now', label: 'Buy Now', icon: DollarSign },
-                  ].map((status) => {
-                    const Icon = status.icon;
-                    const isActive = filters.auction_status === status.id || (status.id === 'all' && !filters.auction_status);
-                    return (
-                      <button
-                        key={status.id}
-                        onClick={() => handleFilterChange('auction_status', status.id === 'all' ? '' : status.id)}
-                        className={`
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(6)].map((_, i) => (
+              <Card key={i} className="overflow-hidden animate-pulse">
+                <div className="aspect-[16/10] bg-slate-200 dark:bg-slate-800" />
+                <CardContent className="p-4 space-y-3">
+                  <div className="h-6 bg-slate-200 dark:bg-slate-800 rounded" />
+                  <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-2/3" />
+                  <div className="h-8 bg-slate-200 dark:bg-slate-800 rounded w-1/2" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : vehicles.length === 0 ? (
                           group flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium
                           transition-all duration-200 ease-out
                           ${isActive 
