@@ -66,6 +66,7 @@ const SECONDARY_TABS = {
   ],
   vehicles: [
     { id: 'vehicle-admin', label: 'Vehicle Administration', icon: '🚗', lucideIcon: Car },
+    { id: 'ai-guard', label: 'AI Guard', icon: '🤖', lucideIcon: Bot },
   ],
   settings: [
     { id: 'site-content', label: 'Site Content & Pages', icon: '📄', lucideIcon: FileText },
