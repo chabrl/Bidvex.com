@@ -113,22 +113,19 @@ async def activate_scheduled_auctions_job():
     
     if db_instance is None:
         logger.warning("Database not initialized, skipping auction activation")
-        return
+        return {"error": "db_not_initialized"}
     
-    try:
+    async def _run():
         logger.info("Running auction activation job...")
         count = await activate_scheduled_auctions(db_instance)
-        
         if count > 0:
             logger.info(f"Activated {count} scheduled auctions")
-        
         return {
             "activated": count,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
-    except Exception as e:
-        logger.exception(f"Error in auction activation job: {e}")
-        return {"error": str(e)}
+    
+    return await safe_db_operation("activate_scheduled_auctions", _run)
 
 
 async def apply_late_penalties_job():
@@ -137,9 +134,9 @@ async def apply_late_penalties_job():
     
     if db_instance is None:
         logger.warning("Database not initialized, skipping penalty application")
-        return
+        return {"error": "db_not_initialized"}
     
-    try:
+    async def _run():
         logger.info("Running late penalties job...")
         penalties = await check_and_apply_late_penalties(db_instance)
         
