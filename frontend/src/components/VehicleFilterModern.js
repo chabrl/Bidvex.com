@@ -27,11 +27,157 @@ import {
 // Accent color for selections
 const ACCENT_COLOR = '#007AFF';
 
+// Monochrome SVG logos for vehicle makes (currentColor for light/dark mode)
+const VEHICLE_LOGOS = {
+  Toyota: (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3.14.69 4.22 1.78C13.14 7.86 10.58 9 8 9c-.35 0-.69-.02-1.03-.06A6.95 6.95 0 0112 5zm0 14c-3.87 0-7-3.13-7-7 0-1.5.47-2.89 1.27-4.03.75.62 1.64 1.1 2.62 1.37.19.05.38.1.58.13C5.83 10.09 5.5 11.01 5.5 12c0 3.59 2.91 6.5 6.5 6.5s6.5-2.91 6.5-6.5c0-.99-.22-1.93-.62-2.77a7.34 7.34 0 002.73-1.27A6.95 6.95 0 0119 12c0 3.87-3.13 7-7 7z"/>
+    </svg>
+  ),
+  Honda: (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+      <path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/>
+    </svg>
+  ),
+  Ford: (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+      <ellipse cx="12" cy="12" rx="10" ry="6" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+      <text x="12" y="14" textAnchor="middle" fontSize="6" fill="currentColor" fontFamily="serif" fontStyle="italic">Ford</text>
+    </svg>
+  ),
+  Chevrolet: (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+      <path d="M2 10h8v4H2v-4zm12 0h8v4h-8v-4zM10 8h4v8h-4V8z"/>
+    </svg>
+  ),
+  Tesla: (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+      <path d="M12 2L8 6h3v14h2V6h3L12 2z"/>
+    </svg>
+  ),
+  Nissan: (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+      <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+      <rect x="4" y="10" width="16" height="4" fill="currentColor"/>
+    </svg>
+  ),
+  Hyundai: (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+      <ellipse cx="12" cy="12" rx="10" ry="6" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M8 12c0-2.21 1.79-4 4-4s4 1.79 4 4" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+    </svg>
+  ),
+  BMW: (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+      <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M12 2v10h10M12 12H2v10" fill="none" stroke="currentColor" strokeWidth="1"/>
+    </svg>
+  ),
+  'Mercedes-Benz': (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+      <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M12 2v10l8.66 5M12 12L3.34 17M12 12l8.66 5" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+    </svg>
+  ),
+  Audi: (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+      <circle cx="5" cy="12" r="3.5" fill="none" stroke="currentColor" strokeWidth="1.2"/>
+      <circle cx="9.5" cy="12" r="3.5" fill="none" stroke="currentColor" strokeWidth="1.2"/>
+      <circle cx="14.5" cy="12" r="3.5" fill="none" stroke="currentColor" strokeWidth="1.2"/>
+      <circle cx="19" cy="12" r="3.5" fill="none" stroke="currentColor" strokeWidth="1.2"/>
+    </svg>
+  ),
+  Lexus: (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+      <ellipse cx="12" cy="12" rx="10" ry="6" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M12 6l-3 12h6l-3-12z" fill="currentColor"/>
+    </svg>
+  ),
+  Acura: (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+      <path d="M12 4L4 18h16L12 4zm0 4l5 10H7l5-10z"/>
+    </svg>
+  ),
+  Infiniti: (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+      <path d="M12 4l8 16H4L12 4zm0 3l-5 10h10L12 7z" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+    </svg>
+  ),
+  Porsche: (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+      <rect x="3" y="6" width="18" height="12" rx="2" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M7 10h10v4H7v-4z" fill="currentColor"/>
+    </svg>
+  ),
+  Volkswagen: (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+      <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M8 8l4 8 4-8M6 14l6-4 6 4" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+    </svg>
+  ),
+  Mazda: (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+      <ellipse cx="12" cy="12" rx="10" ry="5" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M12 7c-3 0-5 2.5-5 5s2 5 5 5 5-2.5 5-5-2-5-5-5z" fill="none" stroke="currentColor" strokeWidth="1"/>
+    </svg>
+  ),
+  Subaru: (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+      <ellipse cx="12" cy="12" rx="10" ry="6" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+      <circle cx="8" cy="10" r="1.5" fill="currentColor"/>
+      <circle cx="12" cy="10" r="1.5" fill="currentColor"/>
+      <circle cx="16" cy="10" r="1.5" fill="currentColor"/>
+      <circle cx="10" cy="14" r="1.5" fill="currentColor"/>
+      <circle cx="14" cy="14" r="1.5" fill="currentColor"/>
+    </svg>
+  ),
+  Jeep: (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+      <rect x="3" y="8" width="18" height="8" rx="1" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+      <circle cx="7" cy="12" r="2" fill="currentColor"/>
+      <circle cx="12" cy="12" r="2" fill="currentColor"/>
+      <circle cx="17" cy="12" r="2" fill="currentColor"/>
+    </svg>
+  ),
+  RAM: (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+      <path d="M4 8h16v8H4V8zm2 2v4h12v-4H6z"/>
+    </svg>
+  ),
+  GMC: (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+      <rect x="2" y="8" width="20" height="8" rx="1" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+      <text x="12" y="14" textAnchor="middle" fontSize="6" fill="currentColor" fontWeight="bold">GMC</text>
+    </svg>
+  ),
+  Kia: (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+      <ellipse cx="12" cy="12" rx="10" ry="5" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+      <text x="12" y="14" textAnchor="middle" fontSize="6" fill="currentColor" fontWeight="bold">KIA</text>
+    </svg>
+  ),
+  Volvo: (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+      <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M6 12h12M12 6l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+    </svg>
+  ),
+};
+
 // Vehicle makes with clean typography (no emojis)
 const VEHICLE_MAKES = {
   popular: ['Toyota', 'Honda', 'Ford', 'Chevrolet', 'Tesla', 'Nissan', 'Hyundai'],
   luxury: ['BMW', 'Mercedes-Benz', 'Audi', 'Lexus', 'Acura', 'Infiniti', 'Porsche'],
   other: ['Volkswagen', 'Mazda', 'Subaru', 'Jeep', 'RAM', 'GMC', 'Kia', 'Volvo']
+};
+
+// Logo component with fallback
+const MakeLogo = ({ make }) => {
+  const logo = VEHICLE_LOGOS[make];
+  if (logo) {
+    return <span className="text-slate-500 dark:text-slate-400 flex-shrink-0">{logo}</span>;
+  }
+  return <Car className="w-4 h-4 text-slate-400 flex-shrink-0" />;
 };
 
 // Body types without emojis
