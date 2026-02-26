@@ -243,6 +243,9 @@ const GlassSelectContent = ({ children, ...props }) => (
       rounded-xl
       shadow-2xl
       max-h-[320px]
+      text-white
+      [&_[role=option]]:text-white
+      [&_[role=option]:focus]:bg-white/10
     "
     {...props}
   >
