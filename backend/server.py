@@ -6970,6 +6970,205 @@ async def enforce_verification_requirement(data: Dict[str, Any], current_user: U
     
     return {"message": f"{requirement_type.capitalize()} verification requirement {'enabled' if enabled else 'disabled'}"}
 
+# ========== AI GUARD - FRAUD DETECTION API ==========
+from services.fraud_detection import get_fraud_detection_service, FLAG_TYPES, FLAG_STATUSES
+
+@api_router.get("/admin/ai-guard/flags")
+async def get_fraud_flags(
+    status: Optional[str] = None,
+    flag_type: Optional[str] = None,
+    limit: int = 50,
+    current_user: User = Depends(get_current_user)
+):
+    """Get all fraud flags with optional filters."""
+    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    fraud_service = get_fraud_detection_service(db)
+    flags = await fraud_service.get_flagged_auctions(status=status, flag_type=flag_type, limit=limit)
+    
+    return {
+        "success": True,
+        "flags": flags,
+        "total": len(flags),
+        "filters": {"status": status, "flag_type": flag_type}
+    }
+
+@api_router.post("/admin/ai-guard/scan")
+async def scan_for_fraud(
+    hours_back: int = 24,
+    current_user: User = Depends(get_current_user)
+):
+    """Run fraud detection scan on all recent auctions."""
+    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    fraud_service = get_fraud_detection_service(db)
+    
+    try:
+        # Run the scan
+        flags = await fraud_service.scan_all_auctions(hours_back=hours_back)
+        
+        # Save all detected flags
+        saved_count = 0
+        for flag in flags:
+            if await fraud_service.save_flag(flag):
+                saved_count += 1
+        
+        return {
+            "success": True,
+            "flags_detected": len(flags),
+            "flags_saved": saved_count,
+            "scan_range_hours": hours_back
+        }
+    except Exception as e:
+        logger.error(f"Fraud scan error: {e}")
+        raise HTTPException(status_code=500, detail=f"Scan failed: {str(e)}")
+
+@api_router.post("/admin/ai-guard/analyze/{auction_id}")
+async def analyze_single_auction(
+    auction_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Analyze a specific auction for fraud."""
+    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    fraud_service = get_fraud_detection_service(db)
+    flags = await fraud_service.analyze_auction(auction_id)
+    
+    # Save any detected flags
+    for flag in flags:
+        await fraud_service.save_flag(flag)
+    
+    return {
+        "success": True,
+        "auction_id": auction_id,
+        "flags_detected": len(flags),
+        "flags": flags
+    }
+
+@api_router.put("/admin/ai-guard/flags/{flag_id}/status")
+async def update_flag_status(
+    flag_id: str,
+    data: Dict[str, Any],
+    current_user: User = Depends(get_current_user)
+):
+    """Update the status of a fraud flag."""
+    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    new_status = data.get("status")
+    notes = data.get("notes")
+    
+    if new_status not in FLAG_STATUSES:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {FLAG_STATUSES}")
+    
+    fraud_service = get_fraud_detection_service(db)
+    success = await fraud_service.update_flag_status(
+        flag_id=flag_id,
+        new_status=new_status,
+        admin_id=current_user.id,
+        notes=notes
+    )
+    
+    if not success:
+        raise HTTPException(status_code=404, detail="Flag not found or update failed")
+    
+    return {
+        "success": True,
+        "flag_id": flag_id,
+        "new_status": new_status
+    }
+
+@api_router.post("/admin/ai-guard/suspend/{auction_id}")
+async def suspend_auction(
+    auction_id: str,
+    data: Dict[str, Any],
+    current_user: User = Depends(get_current_user)
+):
+    """Suspend an auction due to fraud concerns."""
+    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    reason = data.get("reason", "Suspended for fraud investigation")
+    
+    fraud_service = get_fraud_detection_service(db)
+    success = await fraud_service.suspend_auction(
+        auction_id=auction_id,
+        admin_id=current_user.id,
+        reason=reason
+    )
+    
+    if not success:
+        raise HTTPException(status_code=404, detail="Auction not found or suspension failed")
+    
+    return {
+        "success": True,
+        "auction_id": auction_id,
+        "status": "suspended",
+        "reason": reason
+    }
+
+@api_router.post("/admin/ai-guard/summary/{flag_id}")
+async def generate_flag_summary(
+    flag_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Generate AI-powered fraud summary for a flag."""
+    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Get the flag from database
+    flag = await db.fraud_flags.find_one({"id": flag_id}, {"_id": 0})
+    if not flag:
+        raise HTTPException(status_code=404, detail="Flag not found")
+    
+    fraud_service = get_fraud_detection_service(db)
+    summary = await fraud_service.generate_fraud_summary(flag)
+    
+    # Save summary to flag
+    await db.fraud_flags.update_one(
+        {"id": flag_id},
+        {"$set": {"ai_summary": summary, "summary_generated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    return {
+        "success": True,
+        "flag_id": flag_id,
+        "summary": summary
+    }
+
+@api_router.get("/admin/ai-guard/stats")
+async def get_fraud_stats(current_user: User = Depends(get_current_user)):
+    """Get fraud detection statistics."""
+    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Get counts by status
+    total = await db.fraud_flags.count_documents({})
+    pending = await db.fraud_flags.count_documents({"status": "pending_review"})
+    investigating = await db.fraud_flags.count_documents({"status": "under_investigation"})
+    cleared = await db.fraud_flags.count_documents({"status": "cleared"})
+    confirmed = await db.fraud_flags.count_documents({"status": "confirmed_fraud"})
+    
+    # Get counts by flag type
+    type_counts = {}
+    for flag_type in FLAG_TYPES.keys():
+        type_counts[flag_type] = await db.fraud_flags.count_documents({"flag_type": flag_type})
+    
+    return {
+        "success": True,
+        "stats": {
+            "total": total,
+            "pending_review": pending,
+            "under_investigation": investigating,
+            "cleared": cleared,
+            "confirmed_fraud": confirmed,
+            "by_type": type_counts
+        }
+    }
+
 # PHASE 2: AI INTEGRATION
 
 # Use environment variable for API key (already defined at line 9308)
