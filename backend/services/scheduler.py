@@ -139,26 +139,24 @@ async def apply_late_penalties_job():
     async def _run():
         logger.info("Running late penalties job...")
         penalties = await check_and_apply_late_penalties(db_instance)
-        
         if penalties:
             logger.warning(f"Applied penalties to {len(penalties)} overdue invoices")
-        
         return {
             "penalties_applied": len(penalties),
             "invoices": [p["invoice_number"] for p in penalties],
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
-    except Exception as e:
-        logger.exception(f"Error in late penalties job: {e}")
-        return {"error": str(e)}
+    
+    return await safe_db_operation("apply_late_penalties", _run)
 
 
 async def cleanup_expired_deposits_job():
     """Job: Clean up expired pending deposits"""
     if db_instance is None:
-        return
+        logger.warning("Database not initialized, skipping deposit cleanup")
+        return {"error": "db_not_initialized"}
     
-    try:
+    async def _run():
         logger.info("Running deposit cleanup job...")
         now = datetime.now(timezone.utc)
         
