@@ -410,44 +410,7 @@ const VehicleAuctionsPage = () => {
             <Button onClick={clearFilters}>Clear Filters</Button>
           </div>
         ) : (
-                      <SelectItem value="Lexus"><span className="flex items-center gap-2">🇯🇵 Lexus</span></SelectItem>
-                      <SelectItem value="Acura"><span className="flex items-center gap-2">🇯🇵 Acura</span></SelectItem>
-                      <SelectItem value="Infiniti"><span className="flex items-center gap-2">🇯🇵 Infiniti</span></SelectItem>
-                      <div className="px-2 py-1.5 text-xs font-semibold text-slate-400 uppercase">Other</div>
-                      <SelectItem value="Nissan">Nissan</SelectItem>
-                      <SelectItem value="Hyundai">Hyundai</SelectItem>
-                      <SelectItem value="Kia">Kia</SelectItem>
-                      <SelectItem value="Volkswagen">Volkswagen</SelectItem>
-                      <SelectItem value="Mazda">Mazda</SelectItem>
-                      <SelectItem value="Subaru">Subaru</SelectItem>
-                      <SelectItem value="Jeep">Jeep</SelectItem>
-                      <SelectItem value="RAM">RAM</SelectItem>
-                      <SelectItem value="GMC">GMC</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {/* Body Type */}
-                <div className="md:col-span-2">
-                  <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 block">
-                    Body Type
-                  </label>
-                  <Select value={filters.body_type || 'all'} onValueChange={(v) => handleFilterChange('body_type', v)}>
-                    <SelectTrigger className="w-full h-12 bg-transparent border-2 border-slate-200 dark:border-slate-700 hover:border-blue-400 rounded-xl">
-                      <SelectValue placeholder="All Types" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-slate-900 border-slate-700">
-                      <SelectItem value="all">All Types</SelectItem>
-                      <SelectItem value="sedan">🚗 Sedan</SelectItem>
-                      <SelectItem value="suv">🚙 SUV / Crossover</SelectItem>
-                      <SelectItem value="truck">🛻 Truck / Pickup</SelectItem>
-                      <SelectItem value="coupe">🏎️ Coupe</SelectItem>
-                      <SelectItem value="hatchback">🚘 Hatchback</SelectItem>
-                      <SelectItem value="van">🚐 Van / Minivan</SelectItem>
-                      <SelectItem value="convertible">🏎️ Convertible</SelectItem>
-                      <SelectItem value="wagon">🚗 Wagon</SelectItem>
-                    </SelectContent>
-                  </Select>
+          <>
                 </div>
                 
                 {/* Province */}
