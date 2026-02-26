@@ -272,9 +272,8 @@ async def daily_summary_job():
         })
         
         return summary
-    except Exception as e:
-        logger.exception(f"Error in daily summary job: {e}")
-        return {"error": str(e)}
+    
+    return await safe_db_operation("daily_summary", _run)
 
 
 async def check_subscription_expirations_job():
@@ -288,9 +287,10 @@ async def check_subscription_expirations_job():
     - Logs all changes
     """
     if db_instance is None:
-        return
+        logger.warning("Database not initialized, skipping subscription check")
+        return {"error": "db_not_initialized"}
     
-    try:
+    async def _run():
         logger.info("Checking for expired subscriptions...")
         now = datetime.now(timezone.utc)
         
