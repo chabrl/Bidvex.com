@@ -26,6 +26,7 @@ import {
   Award, Shield, Zap, TrendingUp, Eye, Heart, RefreshCw,
   ChevronDown, X, SlidersHorizontal, Sparkles, FileText
 } from 'lucide-react';
+import VehicleFilterModern from '../../components/VehicleFilterModern';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
