@@ -508,7 +508,6 @@ async def process_scheduled_campaigns_job():
         }
     
     return await safe_db_operation("process_scheduled_campaigns", _run)
-        return {"error": str(e)}
 
 
 def init_scheduler(database):
