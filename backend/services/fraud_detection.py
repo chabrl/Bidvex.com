@@ -179,12 +179,16 @@ class FraudDetectionService:
                 if avg_increment > 0 and avg_increment < 50 and max(increments) - min(increments) < 10:
                     confidence = min(0.9, 0.5 + (count * 0.1))
                     
+                    # Get seller name safely
+                    seller_doc = await self.db.users.find_one({"id": seller_id}) if seller_id else None
+                    seller_name = seller_doc.get("name", "Unknown") if seller_doc else "Unknown"
+                    
                     flags.append({
                         "id": f"flag-{auction.get('id')}-shill-{bidder_id[:8]}",
                         "auction_id": auction.get("id"),
                         "auction_title": auction.get("title", auction.get("year", "") + " " + auction.get("make", "") + " " + auction.get("model", "")),
                         "seller_id": seller_id,
-                        "seller_name": (await self.db.users.find_one({"id": seller_id}))?.get("name", "Unknown") if seller_id else "Unknown",
+                        "seller_name": seller_name,
                         "flag_type": "bid_shilling",
                         "confidence": confidence,
                         "reason": f"Bidder placed {count} bids with suspiciously uniform increments (avg ${avg_increment:.2f}). Pattern suggests automated price manipulation.",
