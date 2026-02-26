@@ -357,9 +357,8 @@ async def check_subscription_expirations_job():
             "expired_count": expired_count,
             "timestamp": now.isoformat()
         }
-    except Exception as e:
-        logger.exception(f"Error in subscription expiration job: {e}")
-        return {"error": str(e)}
+    
+    return await safe_db_operation("check_subscription_expirations", _run)
 
 
 async def send_subscription_reminders_job():
@@ -369,9 +368,10 @@ async def send_subscription_reminders_job():
     Runs daily at 01:00 UTC
     """
     if db_instance is None:
-        return
+        logger.warning("Database not initialized, skipping subscription reminders")
+        return {"error": "db_not_initialized"}
     
-    try:
+    async def _run():
         logger.info("Checking for subscription expiration reminders...")
         now = datetime.now(timezone.utc)
         
