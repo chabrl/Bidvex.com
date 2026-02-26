@@ -482,7 +482,10 @@ const VehicleFilterModern = ({
                   </div>
                   {VEHICLE_MAKES.popular.map(make => (
                     <SelectItem key={make} value={make} className="min-h-[44px]">
-                      {make}
+                      <span className="flex items-center gap-2.5">
+                        <MakeLogo make={make} />
+                        {make}
+                      </span>
                     </SelectItem>
                   ))}
                   
@@ -492,7 +495,10 @@ const VehicleFilterModern = ({
                   </div>
                   {VEHICLE_MAKES.luxury.map(make => (
                     <SelectItem key={make} value={make} className="min-h-[44px]">
-                      {make}
+                      <span className="flex items-center gap-2.5">
+                        <MakeLogo make={make} />
+                        {make}
+                      </span>
                     </SelectItem>
                   ))}
                   
@@ -502,7 +508,10 @@ const VehicleFilterModern = ({
                   </div>
                   {VEHICLE_MAKES.other.map(make => (
                     <SelectItem key={make} value={make} className="min-h-[44px]">
-                      {make}
+                      <span className="flex items-center gap-2.5">
+                        <MakeLogo make={make} />
+                        {make}
+                      </span>
                     </SelectItem>
                   ))}
                 </GlassSelectContent>
