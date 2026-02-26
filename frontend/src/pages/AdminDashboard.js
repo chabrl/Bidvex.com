@@ -281,7 +281,11 @@ const AdminDashboard = () => {
           default: return <EnhancedUserManager />;
         }
       case 'vehicles':
-        return <VehicleAdminManager />;
+        switch (secondaryTab) {
+          case 'vehicle-admin': return <VehicleAdminManager />;
+          case 'ai-guard': return <AIGuardDashboard />;
+          default: return <VehicleAdminManager />;
+        }
       case 'settings':
         switch (secondaryTab) {
           case 'site-content': return <SiteContentManager />;
