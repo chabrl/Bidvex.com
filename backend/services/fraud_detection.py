@@ -102,7 +102,7 @@ class FraudDetectionService:
         Returns list of all detected flags.
         """
         all_flags = []
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours_back)
+        # Note: hours_back parameter reserved for future filtering by created_at
         
         # Scan vehicle auctions
         vehicles = await self.db.vehicles.find(
@@ -368,7 +368,7 @@ class FraudDetectionService:
                 else:
                     created_dt = created_at
                 account_age_days = (datetime.now(timezone.utc) - created_dt).days
-            except:
+            except Exception:
                 account_age_days = 365  # Default to old account if can't parse
             
             bid_amount = bid.get("amount", 0)
