@@ -10,12 +10,79 @@ from datetime import datetime, timezone
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
+from pymongo.errors import OperationFailure, ServerSelectionTimeoutError, ConfigurationError
 
 logger = logging.getLogger(__name__)
 
 # Global scheduler instance
 scheduler = None
 db_instance = None
+
+# Custom exception for database authentication errors
+class DatabaseAuthenticationError(Exception):
+    """Raised when database authentication fails"""
+    pass
+
+
+async def check_db_connection():
+    """Verify database connection and permissions before running jobs"""
+    global db_instance
+    
+    if db_instance is None:
+        raise DatabaseAuthenticationError("Database not initialized")
+    
+    try:
+        # Test basic read permission by running a simple command
+        await db_instance.command('ping')
+        return True
+    except OperationFailure as e:
+        error_code = e.details.get('code', 0)
+        if error_code == 13:  # Unauthorized
+            raise DatabaseAuthenticationError(
+                f"Database authentication failed (Error 13): {e}. "
+                "Please verify: 1) MONGO_URL has correct credentials, "
+                "2) User has readWrite permission on the database, "
+                "3) authSource is set correctly (e.g., ?authSource=admin)"
+            )
+        raise
+    except ServerSelectionTimeoutError as e:
+        raise DatabaseAuthenticationError(
+            f"Could not connect to MongoDB server: {e}. "
+            "Please verify: 1) MongoDB server is running, "
+            "2) Network access is configured (IP whitelist for Atlas)"
+        )
+    except ConfigurationError as e:
+        raise DatabaseAuthenticationError(
+            f"MongoDB configuration error: {e}. "
+            "Please verify MONGO_URL format is correct."
+        )
+
+
+async def safe_db_operation(operation_name: str, operation_func):
+    """Wrapper to handle database operations with proper error handling"""
+    try:
+        return await operation_func()
+    except OperationFailure as e:
+        error_code = e.details.get('code', 0)
+        if error_code == 13:  # Unauthorized
+            logger.error(
+                f"🔐 DATABASE AUTH FAILURE in {operation_name}: "
+                f"Not authorized to execute command. Error: {e}"
+            )
+            logger.error(
+                "🔧 FIX: Grant readWrite permissions to your MongoDB user. "
+                "Run in MongoDB shell:\n"
+                "  use admin\n"
+                "  db.grantRolesToUser('your_username', [{role: 'readWrite', db: 'bazario_db'}])"
+            )
+            return {"error": "database_auth_failure", "details": str(e)}
+        raise
+    except ServerSelectionTimeoutError as e:
+        logger.error(f"🔌 DATABASE CONNECTION TIMEOUT in {operation_name}: {e}")
+        return {"error": "connection_timeout", "details": str(e)}
+    except Exception as e:
+        logger.exception(f"❌ UNEXPECTED ERROR in {operation_name}: {e}")
+        return {"error": "unexpected_error", "details": str(e)}
 
 
 async def process_ended_auctions_job():
@@ -24,23 +91,20 @@ async def process_ended_auctions_job():
     
     if db_instance is None:
         logger.warning("Database not initialized, skipping auction processing")
-        return
+        return {"error": "db_not_initialized"}
     
-    try:
+    async def _run():
         logger.info("Running ended auctions job...")
         results = await process_all_ended_auctions(db_instance)
-        
         sold_count = sum(1 for r in results if r.status == "sold")
         logger.info(f"Processed {len(results)} auctions: {sold_count} sold")
-        
         return {
             "processed": len(results),
             "sold": sold_count,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
-    except Exception as e:
-        logger.exception(f"Error in ended auctions job: {e}")
-        return {"error": str(e)}
+    
+    return await safe_db_operation("process_ended_auctions", _run)
 
 
 async def activate_scheduled_auctions_job():
