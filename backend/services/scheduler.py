@@ -434,9 +434,8 @@ async def send_subscription_reminders_job():
             "reminders_sent": reminder_count,
             "timestamp": now.isoformat()
         }
-    except Exception as e:
-        logger.exception(f"Error in subscription reminder job: {e}")
-        return {"error": str(e)}
+    
+    return await safe_db_operation("send_subscription_reminders", _run)
 
 
 async def process_scheduled_campaigns_job():
@@ -448,9 +447,10 @@ async def process_scheduled_campaigns_job():
     - Sends each campaign
     """
     if db_instance is None:
-        return
+        logger.warning("Database not initialized, skipping scheduled campaigns")
+        return {"error": "db_not_initialized"}
     
-    try:
+    async def _run():
         logger.info("Checking for scheduled email campaigns...")
         now = datetime.now(timezone.utc)
         
@@ -506,8 +506,8 @@ async def process_scheduled_campaigns_job():
             "processed": processed_count,
             "timestamp": now.isoformat()
         }
-    except Exception as e:
-        logger.exception(f"Error in scheduled campaigns job: {e}")
+    
+    return await safe_db_operation("process_scheduled_campaigns", _run)
         return {"error": str(e)}
 
 
