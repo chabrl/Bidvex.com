@@ -1,6 +1,6 @@
 # BidVex Auction Platform - Product Requirements Document
 
-## Last Updated: February 26, 2026
+## Last Updated: February 27, 2026
 
 ## Original Problem Statement
 Build and maintain a sophisticated full-stack auction platform (BidVex) with:
@@ -23,31 +23,67 @@ Email: SendGrid
 Background Jobs: APScheduler
 ```
 
-## Current Status: ✅ LEGAL PAGES UI REFACTOR COMPLETE
+## Current Status: ✅ SUBSCRIPTION MANAGEMENT & COUPON SYSTEM COMPLETE
 
-### Session Summary (Feb 26, 2026 - Latest)
-Completed comprehensive Legal Pages UI refactor with light/dark mode support - 100% pass rate (12/12 frontend features verified).
+### Session Summary (Feb 27, 2026 - Latest)
+Completed comprehensive Subscription Management, Pricing Engine, and Coupon Code System - 100% backend pass rate (18/18 tests), 95% frontend success.
 
 **Tasks Completed:**
 
-1. ✅ **Legal Pages System-Wide Refactor (DynamicLegalPage.js)**
-   - Complete redesign with light/dark mode adaptability
-   - **Typography & Readability:**
-     - Base 16px font size, 1.6 line-height
-     - Max content width 800px for optimal readability
-     - Space Grotesk font for headings
-   - **Modern Glassmorphism Surfaces:**
-     - Light: `bg-white/70 backdrop-blur-xl border-slate-200/50`
-     - Dark: `bg-slate-800/70 backdrop-blur-xl border-slate-700/50`
-   - **WCAG AA Contrast Compliance:**
-     - Light mode: slate-600 text on white (4.5:1+)
-     - Dark mode: slate-300 text on dark bg (4.5:1+)
+1. ✅ **Admin Pricing Engine**
+   - Created `/app/backend/services/subscription_pricing.py`
+   - **3 Default Plans:** Free ($0), Premium ($29.99/mo, $299.99/yr), VIP ($99.99/mo, $999.99/yr)
+   - **Editable Fields:** Monthly/yearly prices, buyer/seller fee discounts, listing limits
+   - **Change Log:** All pricing changes tracked with admin attribution and reason
+   - **Stripe Sync:** Automatic product/price creation when API key configured
 
-2. ✅ **Responsive Navigation**
-   - **Desktop (>1024px):** Sticky sidebar with scroll spy
-     - Highlights active section as user scrolls
-     - Custom checkmark icons for each section type
-   - **Mobile (<1024px):** Collapsible accordion
+2. ✅ **Coupon Code System (CRUD)**
+   - **Create:** Code, discount_type (percentage/fixed), value, expiry, usage_limit
+   - **Validation:** Checks active status, expiry date, usage count, applicable plans, min purchase
+   - **API Endpoint:** `POST /api/validate-coupon` - public validation with discount calculation
+   - **Usage Tracking:** Auto-increments usage count on successful checkout
+
+3. ✅ **Public Subscription Pricing Page (/pricing)**
+   - Hero section with billing toggle (Monthly/Yearly)
+   - 3 plan cards with feature comparison, fee discounts
+   - Checkout section with coupon code input
+   - Real-time discount calculation and price breakdown
+   - Trust badges: "Secure Payment • Cancel Anytime • Instant Access"
+
+4. ✅ **Admin Panel Integration**
+   - **Pricing Engine Tab:** Edit all plan prices, view changelog
+   - **Coupon Codes Tab:** Full CRUD with stats cards (Active, Total Uses, With Expiry)
+
+5. ✅ **Checkout API**
+   - `POST /api/subscription/checkout` - Creates Stripe checkout session
+   - Applies coupon discounts, stores transaction record
+
+**New API Endpoints:**
+- `GET /api/subscription-plans` - Public plans list
+- `GET /api/admin/subscription-plans` - Admin plans with full details
+- `PUT /api/admin/subscription-plans/{plan_id}` - Update pricing
+- `GET /api/admin/subscription-plans/changelog` - Change history
+- `POST /api/admin/coupons` - Create coupon
+- `GET /api/admin/coupons` - List all coupons
+- `PUT /api/admin/coupons/{id}` - Update coupon
+- `DELETE /api/admin/coupons/{id}` - Deactivate coupon
+- `POST /api/validate-coupon` - Public coupon validation
+- `POST /api/subscription/checkout` - Create checkout session
+
+**Files Created:**
+- `/app/backend/services/subscription_pricing.py` - Pricing & coupon service
+- `/app/frontend/src/pages/SubscriptionPricingPage.js` - Public pricing page
+- `/app/frontend/src/pages/admin/PricingManager.js` - Admin pricing editor
+- `/app/frontend/src/pages/admin/CouponManager.js` - Admin coupon CRUD
+
+**Test Report:** `/app/test_reports/iteration_26.json`
+
+**NOTE:** Stripe sync requires valid `STRIPE_API_KEY` in .env - without it, products/prices are stored locally but not synced to Stripe.
+
+---
+
+### Previous Session (Feb 26, 2026)
+Legal Pages UI Refactor with light/dark mode support.
      - Touch-friendly 44px+ tap targets
      - Sticky header with hamburger toggle
      - Max 50vh scrollable dropdown
