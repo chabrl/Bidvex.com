@@ -36,11 +36,12 @@ import VehicleAdminManager from './admin/VehicleAdminManager';
 import AIGuardDashboard from './admin/AIGuardDashboard';
 import PricingManager from './admin/PricingManager';
 import CouponManager from './admin/CouponManager';
+import SubscriptionAnalytics from './admin/SubscriptionAnalytics';
 import { 
   Users, Package, Gavel, Shield, TrendingUp, Bell, Settings, FileText, 
   MessageSquare, DollarSign, Search, Image, CreditCard, Megaphone, 
   Activity, AlertTriangle, ChevronRight, Power, Zap, Eye, History,
-  ToggleLeft, ToggleRight, Clock, Mail, Sliders, Car, Send, Bot, Ticket
+  ToggleLeft, ToggleRight, Clock, Mail, Sliders, Car, Send, Bot, Ticket, BarChart3
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
