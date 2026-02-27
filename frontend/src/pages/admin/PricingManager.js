@@ -231,11 +231,25 @@ const PricingManager = () => {
                     <div className="space-y-2">
                       <div className="flex justify-between items-baseline">
                         <span className="text-sm text-muted-foreground">Monthly</span>
-                        <span className="text-xl font-bold">{formatCurrency(plan.price_monthly)}</span>
+                        <div className="text-right">
+                          {plan.original_price_monthly > plan.price_monthly && (
+                            <span className="text-xs text-slate-400 line-through mr-2">
+                              {formatCurrency(plan.original_price_monthly)}
+                            </span>
+                          )}
+                          <span className="text-xl font-bold">{formatCurrency(plan.price_monthly)}</span>
+                        </div>
                       </div>
                       <div className="flex justify-between items-baseline">
                         <span className="text-sm text-muted-foreground">Yearly</span>
-                        <span className="text-xl font-bold">{formatCurrency(plan.price_yearly)}</span>
+                        <div className="text-right">
+                          {plan.original_price_yearly > plan.price_yearly && (
+                            <span className="text-xs text-slate-400 line-through mr-2">
+                              {formatCurrency(plan.original_price_yearly)}
+                            </span>
+                          )}
+                          <span className="text-xl font-bold">{formatCurrency(plan.price_yearly)}</span>
+                        </div>
                       </div>
                     </div>
 
