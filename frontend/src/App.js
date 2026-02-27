@@ -42,6 +42,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import PhoneVerificationPage from './pages/PhoneVerificationPage';
 import ClientEmailMarketing from './pages/ClientEmailMarketing';
 import EmailMarketingPricing from './pages/EmailMarketingPricing';
+import SubscriptionPricingPage from './pages/SubscriptionPricingPage';
 
 // Vehicle Auction Module (Standalone)
 import VehicleAuctionsPage from './pages/vehicles/VehicleAuctionsPage';
