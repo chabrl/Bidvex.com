@@ -1,12 +1,13 @@
 /**
  * SubscriptionPricingPage - Public pricing page with checkout
  * Features: Plan comparison, coupon code input, Stripe checkout
+ * Enhanced: Price anchoring, Launch Special badges, savings calculator
  */
 
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
@@ -15,10 +16,17 @@ import { Switch } from '../components/ui/switch';
 import { toast } from 'sonner';
 import { 
   Crown, Star, User as UserIcon, Check, X, Zap, ArrowRight,
-  Ticket, RefreshCw, Percent, DollarSign, Sparkles, Shield
+  Ticket, RefreshCw, Percent, DollarSign, Sparkles, Shield,
+  Gift, TrendingDown, PartyPopper
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+// Full prices (before launch discount) for price anchoring
+const FULL_PRICES = {
+  premium: { monthly: 59.99, yearly: 599.99 },
+  vip: { monthly: 199.99, yearly: 1999.99 }
+};
 
 // Plan icons and styling
 const PLAN_STYLES = {
@@ -26,19 +34,24 @@ const PLAN_STYLES = {
     icon: UserIcon, 
     gradient: 'from-slate-500 to-slate-600',
     border: 'border-slate-200 dark:border-slate-700',
-    badge: null
+    badge: null,
+    launchBadge: false
   },
   premium: { 
     icon: Star, 
     gradient: 'from-purple-500 to-indigo-600',
     border: 'border-purple-300 dark:border-purple-700',
-    badge: 'Popular'
+    badge: null,
+    launchBadge: true,
+    launchBadgeColor: 'from-blue-500 to-cyan-500'
   },
   vip: { 
     icon: Crown, 
     gradient: 'from-amber-500 to-orange-600',
     border: 'border-amber-300 dark:border-amber-700',
-    badge: 'Best Value'
+    badge: null,
+    launchBadge: true,
+    launchBadgeColor: 'from-amber-400 to-yellow-500'
   }
 };
 
@@ -166,6 +179,20 @@ const SubscriptionPricingPage = () => {
     return isYearly ? plan.price_yearly : plan.price_monthly;
   };
 
+  const getFullPrice = (planId) => {
+    const full = FULL_PRICES[planId];
+    if (!full) return null;
+    return isYearly ? full.yearly : full.monthly;
+  };
+
+  const getDiscountPercent = (planId) => {
+    const fullPrice = getFullPrice(planId);
+    const plan = plans.find(p => p.plan_id === planId);
+    if (!fullPrice || !plan) return 0;
+    const currentPrice = getPrice(plan);
+    return Math.round((1 - currentPrice / fullPrice) * 100);
+  };
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-CA', {
       style: 'currency',
@@ -192,6 +219,15 @@ const SubscriptionPricingPage = () => {
         <div className="absolute top-20 right-1/4 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl" />
         
         <div className="relative container mx-auto px-4 py-16 text-center">
+          {/* Launch Offer Banner */}
+          <div className="inline-flex items-center gap-2 mb-6 px-4 py-2 bg-gradient-to-r from-amber-500/10 to-orange-500/10 dark:from-amber-500/20 dark:to-orange-500/20 border border-amber-500/30 rounded-full">
+            <Gift className="h-4 w-4 text-amber-500" />
+            <span className="text-sm font-medium text-amber-700 dark:text-amber-400">
+              Launch Special: Use code <strong className="text-amber-600 dark:text-amber-300">LAUNCH50</strong> for 50% OFF!
+            </span>
+            <PartyPopper className="h-4 w-4 text-amber-500" />
+          </div>
+
           <Badge className="mb-4 bg-primary/10 text-primary border-primary/20">
             <Sparkles className="h-3 w-3 mr-1" />
             Membership Plans
@@ -232,6 +268,8 @@ const SubscriptionPricingPage = () => {
             const style = PLAN_STYLES[plan.plan_id] || PLAN_STYLES.free;
             const PlanIcon = style.icon;
             const price = getPrice(plan);
+            const fullPrice = getFullPrice(plan.plan_id);
+            const discountPercent = getDiscountPercent(plan.plan_id);
             const isSelected = selectedPlan?.plan_id === plan.plan_id;
             const monthlyEquivalent = isYearly && plan.price_yearly > 0 
               ? plan.price_yearly / 12 
@@ -247,31 +285,56 @@ const SubscriptionPricingPage = () => {
                 } ${style.border}`}
                 onClick={() => plan.plan_id !== 'free' && setSelectedPlan(plan)}
               >
-                {/* Badge */}
-                {style.badge && (
-                  <div className="absolute top-0 right-0">
-                    <Badge className={`rounded-none rounded-bl-lg bg-gradient-to-r ${style.gradient} text-white border-0`}>
-                      {style.badge}
-                    </Badge>
+                {/* Launch Special Badge */}
+                {style.launchBadge && (
+                  <div className="absolute top-0 left-0 right-0">
+                    <div className={`bg-gradient-to-r ${style.launchBadgeColor} text-white text-xs font-bold py-1.5 px-3 text-center`}>
+                      <Zap className="h-3 w-3 inline mr-1" />
+                      LAUNCH SPECIAL - {discountPercent}% OFF
+                    </div>
                   </div>
                 )}
 
-                <CardHeader className="text-center pb-4">
+                <CardHeader className={`text-center pb-4 ${style.launchBadge ? 'pt-10' : ''}`}>
                   <div className={`w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br ${style.gradient} flex items-center justify-center shadow-lg mb-4`}>
                     <PlanIcon className="h-8 w-8 text-white" />
                   </div>
                   <CardTitle className="text-2xl">{plan.name}</CardTitle>
+                  
+                  {/* Price with Strikethrough Anchoring */}
                   <div className="mt-4">
-                    <span className="text-4xl font-bold text-slate-900 dark:text-white">
-                      {formatCurrency(price)}
-                    </span>
-                    <span className="text-slate-500">
-                      /{isYearly ? 'year' : 'month'}
-                    </span>
+                    {/* Full Price Strikethrough */}
+                    {fullPrice && fullPrice > price && (
+                      <div className="mb-1">
+                        <span className="text-lg text-slate-400 line-through decoration-red-500/50 decoration-2">
+                          {formatCurrency(fullPrice)}
+                        </span>
+                      </div>
+                    )}
+                    
+                    {/* Current Price */}
+                    <div className="flex items-baseline justify-center gap-2">
+                      <span className="text-4xl font-bold text-slate-900 dark:text-white">
+                        {formatCurrency(price)}
+                      </span>
+                      <span className="text-slate-500">
+                        /{isYearly ? 'year' : 'month'}
+                      </span>
+                    </div>
+                    
+                    {/* Monthly Equivalent */}
                     {monthlyEquivalent && (
                       <p className="text-sm text-slate-400 mt-1">
                         {formatCurrency(monthlyEquivalent)}/mo equivalent
                       </p>
+                    )}
+                    
+                    {/* Savings Badge */}
+                    {fullPrice && fullPrice > price && (
+                      <Badge className="mt-2 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 gap-1">
+                        <TrendingDown className="h-3 w-3" />
+                        Save {formatCurrency(fullPrice - price)}
+                      </Badge>
                     )}
                   </div>
                 </CardHeader>
@@ -341,9 +404,9 @@ const SubscriptionPricingPage = () => {
                 <Zap className="h-5 w-5 text-primary" />
                 Complete Your Subscription
               </CardTitle>
-              <CardDescription>
+              <p className="text-sm text-muted-foreground">
                 {selectedPlan.name} Plan - {isYearly ? 'Yearly' : 'Monthly'} Billing
-              </CardDescription>
+              </p>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Coupon Code Input */}
@@ -356,9 +419,10 @@ const SubscriptionPricingPage = () => {
                   <Input
                     value={couponCode}
                     onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                    placeholder="Enter code (e.g., SAVE20)"
+                    placeholder="Enter code (e.g., LAUNCH50)"
                     disabled={!!couponValidation}
                     className="flex-1 uppercase"
+                    data-testid="coupon-input"
                   />
                   {couponValidation ? (
                     <Button variant="outline" onClick={removeCoupon} className="gap-2">
@@ -371,6 +435,7 @@ const SubscriptionPricingPage = () => {
                       onClick={validateCoupon}
                       disabled={validatingCoupon || !couponCode}
                       className="gap-2"
+                      data-testid="apply-coupon-btn"
                     >
                       {validatingCoupon ? (
                         <RefreshCw className="h-4 w-4 animate-spin" />
@@ -382,18 +447,29 @@ const SubscriptionPricingPage = () => {
                   )}
                 </div>
                 
-                {/* Coupon Applied Success */}
+                {/* Coupon Applied Success - Enhanced with Savings */}
                 {couponValidation && (
-                  <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                  <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800 rounded-xl">
                     <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
                       <Check className="h-5 w-5" />
-                      <span className="font-medium">{couponValidation.code} applied!</span>
+                      <span className="font-bold text-lg">{couponValidation.code} applied!</span>
                     </div>
                     <p className="text-sm text-green-600 dark:text-green-500 mt-1">
                       {couponValidation.discount_type === 'percentage' 
-                        ? `${couponValidation.discount_value}% off` 
-                        : `$${couponValidation.discount_value} off`}
+                        ? `${couponValidation.discount_value}% off your subscription` 
+                        : `$${couponValidation.discount_value} off your subscription`}
                     </p>
+                    
+                    {/* Big Savings Highlight */}
+                    <div className="mt-3 p-3 bg-white/60 dark:bg-slate-800/60 rounded-lg border border-green-300 dark:border-green-700">
+                      <div className="flex items-center justify-center gap-2">
+                        <PartyPopper className="h-5 w-5 text-amber-500" />
+                        <span className="text-xl font-bold text-green-700 dark:text-green-300">
+                          You are saving {formatCurrency(couponValidation.discount_amount)} today!
+                        </span>
+                        <PartyPopper className="h-5 w-5 text-amber-500" />
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -406,7 +482,7 @@ const SubscriptionPricingPage = () => {
                 </div>
                 
                 {couponValidation && (
-                  <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
+                  <div className="flex justify-between text-sm text-green-600 dark:text-green-400 font-medium">
                     <span className="flex items-center gap-1">
                       <Percent className="h-3 w-3" />
                       Discount ({couponValidation.code})
@@ -417,11 +493,18 @@ const SubscriptionPricingPage = () => {
                 
                 <div className="flex justify-between text-lg font-bold pt-3 border-t">
                   <span>Total</span>
-                  <span className="text-primary">
-                    {couponValidation 
-                      ? formatCurrency(couponValidation.new_total)
-                      : formatCurrency(getPrice(selectedPlan))}
-                  </span>
+                  <div className="text-right">
+                    {couponValidation && (
+                      <span className="text-sm text-slate-400 line-through mr-2">
+                        {formatCurrency(getPrice(selectedPlan))}
+                      </span>
+                    )}
+                    <span className="text-primary text-2xl">
+                      {couponValidation 
+                        ? formatCurrency(couponValidation.new_total)
+                        : formatCurrency(getPrice(selectedPlan))}
+                    </span>
+                  </div>
                 </div>
               </div>
 
