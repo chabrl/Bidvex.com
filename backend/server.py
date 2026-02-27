@@ -7487,6 +7487,175 @@ async def create_subscription_checkout(
         logger.error(f"Stripe checkout error: {e}")
         raise HTTPException(status_code=500, detail=f"Payment processing error: {str(e)}")
 
+# ========== SUBSCRIPTION ANALYTICS ==========
+
+@api_router.get("/admin/subscription-analytics")
+async def get_subscription_analytics(current_user: User = Depends(get_current_user)):
+    """
+    Get comprehensive subscription analytics for admin dashboard.
+    Includes revenue metrics, subscriber counts, plan distribution, coupon usage.
+    """
+    if not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    try:
+        now = datetime.now(timezone.utc)
+        start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        start_of_last_month = (start_of_month - timedelta(days=1)).replace(day=1)
+        
+        # Get all users with subscriptions
+        users = await db.users.find({}, {"_id": 0, "subscription_tier": 1, "subscription_start_date": 1, "subscription_end_date": 1, "subscription_source": 1}).to_list(10000)
+        
+        # Calculate subscriber counts by plan
+        plan_counts = {"free": 0, "premium": 0, "vip": 0}
+        active_subscribers = 0
+        manual_count = 0
+        stripe_count = 0
+        
+        for user in users:
+            tier = user.get("subscription_tier", "free").lower()
+            if tier in plan_counts:
+                plan_counts[tier] += 1
+            else:
+                plan_counts["free"] += 1
+            
+            if tier != "free":
+                active_subscribers += 1
+                source = user.get("subscription_source", "").lower()
+                if source == "manual":
+                    manual_count += 1
+                else:
+                    stripe_count += 1
+        
+        # Get payment transactions for revenue
+        transactions = await db.payment_transactions.find({
+            "status": "completed",
+            "type": {"$in": ["subscription_checkout", "subscription"]}
+        }, {"_id": 0}).to_list(1000)
+        
+        total_revenue = 0
+        monthly_revenue = 0
+        yearly_revenue = 0
+        this_month_revenue = 0
+        last_month_revenue = 0
+        
+        monthly_data = {}  # For chart data
+        
+        for txn in transactions:
+            amount = float(txn.get("final_price", txn.get("amount", 0)))
+            total_revenue += amount
+            
+            billing = txn.get("billing_period", "yearly")
+            if billing == "monthly":
+                monthly_revenue += amount
+            else:
+                yearly_revenue += amount
+            
+            created_at = txn.get("created_at")
+            if created_at:
+                try:
+                    if isinstance(created_at, str):
+                        txn_date = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+                    else:
+                        txn_date = created_at
+                    
+                    # Monthly breakdown for chart
+                    month_key = txn_date.strftime("%Y-%m")
+                    if month_key not in monthly_data:
+                        monthly_data[month_key] = {"revenue": 0, "count": 0}
+                    monthly_data[month_key]["revenue"] += amount
+                    monthly_data[month_key]["count"] += 1
+                    
+                    # This month vs last month
+                    if txn_date >= start_of_month:
+                        this_month_revenue += amount
+                    elif txn_date >= start_of_last_month and txn_date < start_of_month:
+                        last_month_revenue += amount
+                except Exception:
+                    pass
+        
+        # Get coupon statistics
+        coupons = await db.coupon_codes.find({}, {"_id": 0}).to_list(100)
+        total_coupons = len(coupons)
+        active_coupons = sum(1 for c in coupons if c.get("is_active", True))
+        total_coupon_uses = sum(c.get("usage_count", 0) for c in coupons)
+        
+        # Top coupons by usage
+        top_coupons = sorted(coupons, key=lambda x: x.get("usage_count", 0), reverse=True)[:5]
+        top_coupons_data = [
+            {
+                "code": c.get("code"),
+                "uses": c.get("usage_count", 0),
+                "discount_type": c.get("discount_type"),
+                "value": c.get("value")
+            }
+            for c in top_coupons
+        ]
+        
+        # Calculate discount savings from coupons
+        total_discount_given = 0
+        for txn in transactions:
+            discount = float(txn.get("discount_amount", 0))
+            total_discount_given += discount
+        
+        # Get pricing changelog for recent changes
+        recent_changes = await db.pricing_changelog.find({}, {"_id": 0}).sort("changed_at", -1).limit(10).to_list(10)
+        
+        # Calculate MRR (Monthly Recurring Revenue) estimate
+        mrr_estimate = (plan_counts.get("premium", 0) * 30 + plan_counts.get("vip", 0) * 60)  # Using current prices
+        
+        # Growth calculation
+        growth_percentage = 0
+        if last_month_revenue > 0:
+            growth_percentage = round(((this_month_revenue - last_month_revenue) / last_month_revenue) * 100, 1)
+        
+        # Prepare monthly chart data (last 6 months)
+        chart_data = []
+        for i in range(5, -1, -1):
+            month_date = now - timedelta(days=30 * i)
+            month_key = month_date.strftime("%Y-%m")
+            month_label = month_date.strftime("%b %Y")
+            data = monthly_data.get(month_key, {"revenue": 0, "count": 0})
+            chart_data.append({
+                "month": month_label,
+                "revenue": round(data["revenue"], 2),
+                "subscriptions": data["count"]
+            })
+        
+        return {
+            "success": True,
+            "overview": {
+                "total_revenue": round(total_revenue, 2),
+                "this_month_revenue": round(this_month_revenue, 2),
+                "last_month_revenue": round(last_month_revenue, 2),
+                "growth_percentage": growth_percentage,
+                "mrr_estimate": round(mrr_estimate, 2),
+                "monthly_revenue_split": round(monthly_revenue, 2),
+                "yearly_revenue_split": round(yearly_revenue, 2)
+            },
+            "subscribers": {
+                "total_users": len(users),
+                "active_subscribers": active_subscribers,
+                "free_users": plan_counts.get("free", 0),
+                "premium_users": plan_counts.get("premium", 0),
+                "vip_users": plan_counts.get("vip", 0),
+                "manual_subscriptions": manual_count,
+                "stripe_subscriptions": stripe_count
+            },
+            "coupons": {
+                "total_coupons": total_coupons,
+                "active_coupons": active_coupons,
+                "total_uses": total_coupon_uses,
+                "total_discount_given": round(total_discount_given, 2),
+                "top_coupons": top_coupons_data
+            },
+            "chart_data": chart_data,
+            "recent_changes": recent_changes
+        }
+    except Exception as e:
+        logger.error(f"Error fetching subscription analytics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Use environment variable for API key (already defined at line 9308)
 
 @api_router.post("/admin/trust-safety/analyze-content")
