@@ -7171,6 +7171,322 @@ async def get_fraud_stats(current_user: User = Depends(get_current_user)):
 
 # PHASE 2: AI INTEGRATION
 
+# ========== SUBSCRIPTION PRICING & COUPON API ==========
+from services.subscription_pricing import get_pricing_service, CouponCode, CouponValidationResult
+
+@api_router.get("/admin/subscription-plans")
+async def get_subscription_plans(current_user: User = Depends(get_current_user)):
+    """Get all subscription plans with pricing"""
+    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    pricing_service = get_pricing_service(db)
+    plans = await pricing_service.get_all_plans()
+    return {"success": True, "plans": plans}
+
+@api_router.get("/subscription-plans")
+async def get_public_subscription_plans():
+    """Get public subscription plans (no auth required)"""
+    pricing_service = get_pricing_service(db)
+    plans = await pricing_service.get_all_plans()
+    # Remove sensitive fields for public view
+    public_plans = []
+    for plan in plans:
+        public_plan = {
+            "plan_id": plan.get("plan_id"),
+            "name": plan.get("name"),
+            "price_monthly": plan.get("price_monthly", 0),
+            "price_yearly": plan.get("price_yearly", 0),
+            "features": plan.get("features", []),
+            "buyer_premium_discount": plan.get("buyer_premium_discount", 0),
+            "seller_commission_discount": plan.get("seller_commission_discount", 0),
+            "monthly_listing_limit": plan.get("monthly_listing_limit", 0),
+            "is_active": plan.get("is_active", True)
+        }
+        public_plans.append(public_plan)
+    return {"success": True, "plans": public_plans}
+
+@api_router.put("/admin/subscription-plans/{plan_id}")
+async def update_subscription_plan(
+    plan_id: str,
+    data: Dict[str, Any],
+    current_user: User = Depends(get_current_user)
+):
+    """Update subscription plan pricing and settings"""
+    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    pricing_service = get_pricing_service(db)
+    reason = data.pop("reason", None)
+    
+    try:
+        updated_plan = await pricing_service.update_plan_pricing(
+            plan_id=plan_id,
+            updates=data,
+            admin_id=current_user.id,
+            reason=reason
+        )
+        return {"success": True, "plan": updated_plan}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/admin/subscription-plans/changelog")
+async def get_pricing_changelog(
+    plan_id: Optional[str] = None,
+    limit: int = 50,
+    current_user: User = Depends(get_current_user)
+):
+    """Get pricing change history"""
+    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    pricing_service = get_pricing_service(db)
+    logs = await pricing_service.get_pricing_changelog(plan_id=plan_id, limit=limit)
+    return {"success": True, "changelog": logs}
+
+# ========== COUPON CODE API ==========
+
+@api_router.post("/admin/coupons")
+async def create_coupon(
+    data: Dict[str, Any],
+    current_user: User = Depends(get_current_user)
+):
+    """Create a new coupon code"""
+    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    pricing_service = get_pricing_service(db)
+    
+    try:
+        coupon_data = CouponCode(**data)
+        coupon = await pricing_service.create_coupon(coupon_data, admin_id=current_user.id)
+        return {"success": True, "coupon": coupon}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/admin/coupons")
+async def get_coupons(
+    include_inactive: bool = False,
+    current_user: User = Depends(get_current_user)
+):
+    """Get all coupon codes"""
+    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    pricing_service = get_pricing_service(db)
+    coupons = await pricing_service.get_all_coupons(include_inactive=include_inactive)
+    return {"success": True, "coupons": coupons}
+
+@api_router.get("/admin/coupons/{coupon_id}")
+async def get_coupon(
+    coupon_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Get a specific coupon by ID"""
+    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    pricing_service = get_pricing_service(db)
+    coupon = await pricing_service.get_coupon(coupon_id)
+    if not coupon:
+        raise HTTPException(status_code=404, detail="Coupon not found")
+    return {"success": True, "coupon": coupon}
+
+@api_router.put("/admin/coupons/{coupon_id}")
+async def update_coupon(
+    coupon_id: str,
+    data: Dict[str, Any],
+    current_user: User = Depends(get_current_user)
+):
+    """Update a coupon code"""
+    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    pricing_service = get_pricing_service(db)
+    
+    try:
+        updated_coupon = await pricing_service.update_coupon(
+            coupon_id=coupon_id,
+            updates=data,
+            admin_id=current_user.id
+        )
+        return {"success": True, "coupon": updated_coupon}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.delete("/admin/coupons/{coupon_id}")
+async def delete_coupon(
+    coupon_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Delete (deactivate) a coupon code"""
+    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    pricing_service = get_pricing_service(db)
+    success = await pricing_service.delete_coupon(coupon_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Coupon not found")
+    return {"success": True, "message": "Coupon deactivated"}
+
+@api_router.post("/validate-coupon")
+async def validate_coupon_code(data: Dict[str, Any]):
+    """
+    Validate a coupon code and calculate discount.
+    Public endpoint - no auth required.
+    """
+    code = data.get("code", "").strip()
+    plan_id = data.get("plan_id", "premium")
+    billing_period = data.get("billing_period", "yearly")
+    
+    if not code:
+        raise HTTPException(status_code=400, detail="Coupon code is required")
+    
+    pricing_service = get_pricing_service(db)
+    result = await pricing_service.validate_coupon(
+        code=code,
+        plan_id=plan_id,
+        billing_period=billing_period
+    )
+    
+    return result.dict()
+
+# ========== SUBSCRIPTION CHECKOUT WITH COUPON ==========
+
+@api_router.post("/subscription/checkout")
+async def create_subscription_checkout(
+    data: Dict[str, Any],
+    request: Request,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Create a Stripe checkout session for subscription with optional coupon.
+    """
+    plan_id = data.get("plan_id", "premium")
+    billing_period = data.get("billing_period", "yearly")  # monthly or yearly
+    coupon_code = data.get("coupon_code")
+    origin_url = data.get("origin_url", str(request.base_url).rstrip("/"))
+    
+    pricing_service = get_pricing_service(db)
+    
+    # Get plan details
+    plan = await pricing_service.get_plan(plan_id)
+    if not plan or plan_id == "free":
+        raise HTTPException(status_code=400, detail="Invalid plan selected")
+    
+    # Get price
+    if billing_period == "monthly":
+        price = plan.get("price_monthly", 0)
+        stripe_price_id = plan.get("stripe_price_id_monthly")
+    else:
+        price = plan.get("price_yearly", 0)
+        stripe_price_id = plan.get("stripe_price_id_yearly")
+    
+    if price <= 0:
+        raise HTTPException(status_code=400, detail="Plan pricing not configured")
+    
+    # Validate coupon if provided
+    stripe_coupon_id = None
+    discount_amount = 0
+    final_price = price
+    
+    if coupon_code:
+        validation = await pricing_service.validate_coupon(
+            code=coupon_code,
+            plan_id=plan_id,
+            billing_period=billing_period
+        )
+        
+        if not validation.valid:
+            raise HTTPException(status_code=400, detail=validation.message)
+        
+        stripe_coupon_id = validation.stripe_coupon_id
+        discount_amount = validation.discount_amount or 0
+        final_price = validation.new_total or price
+    
+    # Build checkout session URLs
+    success_url = f"{origin_url}/subscription/success?session_id={{CHECKOUT_SESSION_ID}}"
+    cancel_url = f"{origin_url}/pricing"
+    
+    try:
+        # Create Stripe checkout session
+        checkout_params = {
+            "mode": "subscription" if stripe_price_id else "payment",
+            "success_url": success_url,
+            "cancel_url": cancel_url,
+            "customer_email": current_user.email,
+            "metadata": {
+                "user_id": current_user.id,
+                "plan_id": plan_id,
+                "billing_period": billing_period,
+                "coupon_code": coupon_code or "",
+                "original_price": str(price),
+                "discount_amount": str(discount_amount),
+                "final_price": str(final_price)
+            }
+        }
+        
+        if stripe_price_id:
+            checkout_params["line_items"] = [{
+                "price": stripe_price_id,
+                "quantity": 1
+            }]
+        else:
+            # Create one-time payment if no recurring price
+            checkout_params["line_items"] = [{
+                "price_data": {
+                    "currency": "cad",
+                    "product_data": {
+                        "name": f"BidVex {plan.get('name')} - {billing_period.capitalize()}",
+                        "description": f"BidVex {plan.get('name')} subscription"
+                    },
+                    "unit_amount": int(final_price * 100),
+                },
+                "quantity": 1
+            }]
+            checkout_params["mode"] = "payment"
+        
+        # Apply coupon if we have a Stripe coupon ID
+        if stripe_coupon_id:
+            checkout_params["discounts"] = [{"coupon": stripe_coupon_id}]
+        
+        session = stripe.checkout.Session.create(**checkout_params)
+        
+        # Create payment transaction record
+        transaction = {
+            "id": f"txn-{datetime.now().timestamp()}",
+            "session_id": session.id,
+            "user_id": current_user.id,
+            "user_email": current_user.email,
+            "plan_id": plan_id,
+            "billing_period": billing_period,
+            "original_amount": price,
+            "discount_amount": discount_amount,
+            "final_amount": final_price,
+            "coupon_code": coupon_code,
+            "currency": "cad",
+            "payment_status": "initiated",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.payment_transactions.insert_one(transaction)
+        
+        # Increment coupon usage if applied
+        if coupon_code:
+            await pricing_service.increment_coupon_usage(coupon_code)
+        
+        return {
+            "success": True,
+            "checkout_url": session.url,
+            "session_id": session.id,
+            "original_price": price,
+            "discount_amount": discount_amount,
+            "final_price": final_price
+        }
+        
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe checkout error: {e}")
+        raise HTTPException(status_code=500, detail=f"Payment processing error: {str(e)}")
+
 # Use environment variable for API key (already defined at line 9308)
 
 @api_router.post("/admin/trust-safety/analyze-content")
