@@ -188,7 +188,7 @@ class SubscriptionPricingService:
     # ========== PRICING MANAGEMENT ==========
     
     async def initialize_plans(self):
-        """Initialize default plans if not present in database"""
+        """Initialize default plans if not present in database, migrate existing plans with new fields"""
         for plan_id, plan_data in DEFAULT_PLANS.items():
             existing = await self.plans_collection.find_one({"plan_id": plan_id})
             if not existing:
@@ -196,11 +196,30 @@ class SubscriptionPricingService:
                 plan_data["updated_at"] = datetime.now(timezone.utc).isoformat()
                 await self.plans_collection.insert_one(plan_data)
                 logger.info(f"Initialized plan: {plan_id}")
+            else:
+                # Migration: Add original_price fields if missing
+                updates = {}
+                if "original_price_monthly" not in existing:
+                    updates["original_price_monthly"] = plan_data.get("original_price_monthly", 0.0)
+                if "original_price_yearly" not in existing:
+                    updates["original_price_yearly"] = plan_data.get("original_price_yearly", 0.0)
+                if updates:
+                    await self.plans_collection.update_one(
+                        {"plan_id": plan_id},
+                        {"$set": updates}
+                    )
+                    logger.info(f"Migrated plan {plan_id} with original price fields")
     
     async def get_all_plans(self) -> List[Dict[str, Any]]:
         """Get all subscription plans"""
         await self.initialize_plans()
         plans = await self.plans_collection.find({}, {"_id": 0}).to_list(10)
+        # Ensure all plans have original price fields
+        for plan in plans:
+            if "original_price_monthly" not in plan:
+                plan["original_price_monthly"] = 0.0
+            if "original_price_yearly" not in plan:
+                plan["original_price_yearly"] = 0.0
         return plans
     
     async def get_plan(self, plan_id: str) -> Optional[Dict[str, Any]]:
