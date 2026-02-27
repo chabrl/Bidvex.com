@@ -287,12 +287,14 @@ const SubscriptionPricingPage = () => {
             const style = PLAN_STYLES[plan.plan_id] || PLAN_STYLES.free;
             const PlanIcon = style.icon;
             const price = getPrice(plan);
-            const fullPrice = getFullPrice(plan.plan_id);
-            const discountPercent = getDiscountPercent(plan.plan_id);
+            const fullPrice = getFullPrice(plan);  // Now uses plan object, not planId
+            const discountPercent = getDiscountPercent(plan);  // Now uses plan object
             const isSelected = selectedPlan?.plan_id === plan.plan_id;
             const monthlyEquivalent = isYearly && plan.price_yearly > 0 
               ? plan.price_yearly / 12 
               : null;
+            const hasPromoDiscount = fullPrice && fullPrice > price;
+            const stripeReady = isStripeConfigured(plan);
 
             return (
               <Card 
@@ -303,9 +305,10 @@ const SubscriptionPricingPage = () => {
                     : 'hover:shadow-lg'
                 } ${style.border}`}
                 onClick={() => plan.plan_id !== 'free' && setSelectedPlan(plan)}
+                data-testid={`plan-card-${plan.plan_id}`}
               >
-                {/* Launch Special Badge */}
-                {style.launchBadge && (
+                {/* Launch Special Badge - Only show if there's a promotional discount */}
+                {style.launchBadge && hasPromoDiscount && discountPercent > 0 && (
                   <div className="absolute top-0 left-0 right-0">
                     <div className={`bg-gradient-to-r ${style.launchBadgeColor} text-white text-xs font-bold py-1.5 px-3 text-center`}>
                       <Zap className="h-3 w-3 inline mr-1" />
