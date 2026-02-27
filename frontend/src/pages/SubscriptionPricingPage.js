@@ -317,16 +317,16 @@ const SubscriptionPricingPage = () => {
                   </div>
                 )}
 
-                <CardHeader className={`text-center pb-4 ${style.launchBadge ? 'pt-10' : ''}`}>
+                <CardHeader className={`text-center pb-4 ${style.launchBadge && hasPromoDiscount ? 'pt-10' : ''}`}>
                   <div className={`w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br ${style.gradient} flex items-center justify-center shadow-lg mb-4`}>
                     <PlanIcon className="h-8 w-8 text-white" />
                   </div>
                   <CardTitle className="text-2xl">{plan.name}</CardTitle>
                   
-                  {/* Price with Strikethrough Anchoring */}
+                  {/* Price with Strikethrough Anchoring - Only when promotional discount exists */}
                   <div className="mt-4">
                     {/* Full Price Strikethrough */}
-                    {fullPrice && fullPrice > price && (
+                    {hasPromoDiscount && (
                       <div className="mb-1">
                         <span className="text-lg text-slate-400 line-through decoration-red-500/50 decoration-2">
                           {formatCurrency(fullPrice)}
@@ -336,7 +336,7 @@ const SubscriptionPricingPage = () => {
                     
                     {/* Current Price */}
                     <div className="flex items-baseline justify-center gap-2">
-                      <span className="text-4xl font-bold text-slate-900 dark:text-white">
+                      <span className="text-4xl font-bold text-slate-900 dark:text-white" data-testid={`price-${plan.plan_id}`}>
                         {formatCurrency(price)}
                       </span>
                       <span className="text-slate-500">
@@ -351,8 +351,8 @@ const SubscriptionPricingPage = () => {
                       </p>
                     )}
                     
-                    {/* Savings Badge */}
-                    {fullPrice && fullPrice > price && (
+                    {/* Savings Badge - Only when promotional discount exists */}
+                    {hasPromoDiscount && (
                       <Badge className="mt-2 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 gap-1">
                         <TrendingDown className="h-3 w-3" />
                         Save {formatCurrency(fullPrice - price)}
