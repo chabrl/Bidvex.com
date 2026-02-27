@@ -34,11 +34,13 @@ import BrandingLayoutManager from './admin/BrandingLayoutManager';
 import SiteContentManager from './admin/SiteContentManager';
 import VehicleAdminManager from './admin/VehicleAdminManager';
 import AIGuardDashboard from './admin/AIGuardDashboard';
+import PricingManager from './admin/PricingManager';
+import CouponManager from './admin/CouponManager';
 import { 
   Users, Package, Gavel, Shield, TrendingUp, Bell, Settings, FileText, 
   MessageSquare, DollarSign, Search, Image, CreditCard, Megaphone, 
   Activity, AlertTriangle, ChevronRight, Power, Zap, Eye, History,
-  ToggleLeft, ToggleRight, Clock, Mail, Sliders, Car, Send, Bot
+  ToggleLeft, ToggleRight, Clock, Mail, Sliders, Car, Send, Bot, Ticket
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
