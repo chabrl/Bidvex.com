@@ -267,13 +267,14 @@ const SubscriptionPricingPage = () => {
               checked={isYearly}
               onCheckedChange={setIsYearly}
               className="data-[state=checked]:bg-primary"
+              data-testid="billing-toggle"
             />
             <span className={`text-sm font-medium ${isYearly ? 'text-primary' : 'text-slate-500'}`}>
               Yearly
             </span>
-            {isYearly && (
+            {isYearly && plans.length > 0 && (
               <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                Save up to 20%
+                Save up to {Math.max(...plans.filter(p => p.price_monthly > 0).map(p => getYearlySavingsPercent(p)), 0)}%
               </Badge>
             )}
           </div>
