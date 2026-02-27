@@ -382,7 +382,7 @@ const PricingManager = () => {
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            {/* Pricing */}
+            {/* Current Pricing */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Monthly Price (CAD)</Label>
@@ -403,6 +403,37 @@ const PricingManager = () => {
                   value={editData.price_yearly}
                   onChange={(e) => setEditData(d => ({ ...d, price_yearly: parseFloat(e.target.value) || 0 }))}
                 />
+              </div>
+            </div>
+
+            {/* Original Prices (for promotional strikethrough display) */}
+            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+              <p className="text-xs text-amber-700 dark:text-amber-400 font-medium mb-2">
+                Original Prices (displayed as strikethrough on pricing page)
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs">Original Monthly</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={editData.original_price_monthly}
+                    onChange={(e) => setEditData(d => ({ ...d, original_price_monthly: parseFloat(e.target.value) || 0 }))}
+                    placeholder="Leave 0 to hide"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Original Yearly</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={editData.original_price_yearly}
+                    onChange={(e) => setEditData(d => ({ ...d, original_price_yearly: parseFloat(e.target.value) || 0 }))}
+                    placeholder="Leave 0 to hide"
+                  />
+                </div>
               </div>
             </div>
 
