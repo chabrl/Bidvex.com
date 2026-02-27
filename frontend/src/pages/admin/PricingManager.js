@@ -93,6 +93,8 @@ const PricingManager = () => {
     setEditData({
       price_monthly: plan.price_monthly || 0,
       price_yearly: plan.price_yearly || 0,
+      original_price_monthly: plan.original_price_monthly || 0,
+      original_price_yearly: plan.original_price_yearly || 0,
       buyer_premium_discount: plan.buyer_premium_discount || 0,
       seller_commission_discount: plan.seller_commission_discount || 0,
       monthly_listing_limit: plan.monthly_listing_limit || 0,
