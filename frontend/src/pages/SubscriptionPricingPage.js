@@ -391,7 +391,7 @@ const SubscriptionPricingPage = () => {
                   )}
                 </CardContent>
 
-                <CardFooter>
+                <CardFooter className="flex flex-col gap-2">
                   <Button
                     className={`w-full gap-2 ${
                       plan.plan_id !== 'free' 
@@ -408,10 +408,18 @@ const SubscriptionPricingPage = () => {
                         setSelectedPlan(plan);
                       }
                     }}
+                    data-testid={`select-plan-${plan.plan_id}`}
                   >
                     {plan.plan_id === 'free' ? 'Current Plan' : 'Select Plan'}
                     {plan.plan_id !== 'free' && <ArrowRight className="h-4 w-4" />}
                   </Button>
+                  {/* Stripe Configuration Status */}
+                  {plan.plan_id !== 'free' && !stripeReady && (
+                    <div className="flex items-center justify-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+                      <AlertCircle className="h-3 w-3" />
+                      <span>Payment setup pending</span>
+                    </div>
+                  )}
                 </CardFooter>
               </Card>
             );
