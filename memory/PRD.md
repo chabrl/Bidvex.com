@@ -23,53 +23,54 @@ Email: SendGrid
 Background Jobs: APScheduler
 ```
 
-## Current Status: ✅ SUBSCRIPTION ANALYTICS & LAUNCH OFFER UI COMPLETE
+## Current Status: ✅ DYNAMIC PRICING ENGINE CONNECTED TO FRONTEND
 
 ### Session Summary (Feb 27, 2026 - Latest Update)
-Completed Launch Offer UI enhancements and Subscription Analytics Dashboard - 100% pass rate on both backend and frontend.
+Fixed the Pricing Engine to Frontend connection - admin price changes now reflect immediately on public /pricing page. 100% pass rate (16/16 tests).
 
-**Tasks Completed:**
+**Issue Fixed:**
+- Changes in Admin Pricing Engine (e.g., Premium $30/mo) were not reflecting on public /pricing page
+- Frontend was using hardcoded `FULL_PRICES` constant instead of API data
 
-1. ✅ **Launch Offer UI Enhancements (Already Implemented)**
-   - "Launch Special: Use code LAUNCH50 for 50% OFF!" banner at top of pricing page
-   - "LAUNCH SPECIAL" badges on Premium (50% OFF) and VIP (70% OFF) cards
-   - Strikethrough original prices ($599.99 → $299.99 Premium, $1,999.99 → $599 VIP)
-   - Savings badges showing exact discount amounts (Save $300, Save $1,400.99)
-   - Checkout flow shows "You are saving $XXX.XX today!" message when coupon applied
-   - Full light/dark mode compatibility
+**Solution Implemented:**
 
-2. ✅ **Subscription Analytics Dashboard (NEW)**
-   - Created `/app/frontend/src/pages/admin/SubscriptionAnalytics.js`
-   - Added new tab in Admin Panel → Settings → Subscription Analytics
-   - **Revenue Overview Cards:**
-     - Total Revenue
-     - This Month Revenue with growth percentage
-     - Estimated MRR (Monthly Recurring Revenue)
-     - Active Subscribers count
-   - **Plan Distribution:**
-     - Visual progress bars for Free/Premium/VIP user counts
-     - Subscription source breakdown (Stripe vs Manual)
-   - **Revenue Trend Chart:**
-     - 6-month historical revenue data
-     - Monthly/Yearly billing period split
-   - **Coupon Performance:**
-     - Total coupons, active count, total uses
-     - Total discounts given
-     - Top 5 performing coupons list
-   - **Recent Pricing Changes:**
-     - Audit log of pricing modifications
+1. ✅ **Backend Schema Updates**
+   - Added `original_price_monthly` and `original_price_yearly` fields to subscription plans
+   - These fields are used for promotional strikethrough pricing display
+   - Migration auto-adds these fields to existing plans
+   - Default values: Premium original=$59.99/mo, $599.99/yr; VIP original=$199.99/mo, $1999.99/yr
 
-**New API Endpoints:**
-- `GET /api/admin/subscription-analytics` - Comprehensive analytics data
+2. ✅ **Public API Updated**
+   - `GET /api/subscription-plans` now returns:
+     - `price_monthly`, `price_yearly` (current prices)
+     - `original_price_monthly`, `original_price_yearly` (for strikethrough)
+     - `stripe_price_id_monthly`, `stripe_price_id_yearly` (for payment status check)
 
-**Files Created:**
-- `/app/frontend/src/pages/admin/SubscriptionAnalytics.js` - Analytics dashboard component
+3. ✅ **Frontend Dynamic Pricing**
+   - Removed hardcoded `FULL_PRICES` constant
+   - `getPrice(plan)` - returns current price from API
+   - `getFullPrice(plan)` - returns original price from API (for strikethrough)
+   - `getDiscountPercent(plan)` - calculates % off dynamically
+   - `getYearlySavingsPercent(plan)` - calculates yearly vs monthly savings
+   - `isStripeConfigured(plan)` - checks if Stripe is ready for checkout
+
+4. ✅ **Admin Pricing Manager Enhanced**
+   - Added "Original Prices" section in edit dialog
+   - Fields for `original_price_monthly` and `original_price_yearly`
+   - Explanation text: "displayed as strikethrough on pricing page"
+   - Plan cards show current and original prices
+
+5. ✅ **Stripe Configuration Status**
+   - Shows "Payment setup pending" when `stripe_price_id` is null
+   - Graceful handling - prices display correctly even without Stripe
 
 **Files Modified:**
-- `/app/frontend/src/pages/AdminDashboard.js` - Added Subscription Analytics tab
-- `/app/backend/server.py` - Added analytics endpoint
+- `/app/backend/services/subscription_pricing.py` - Added original_price fields
+- `/app/backend/server.py` - Updated public API response
+- `/app/frontend/src/pages/SubscriptionPricingPage.js` - Dynamic pricing logic
+- `/app/frontend/src/pages/admin/PricingManager.js` - Original price editing
 
-**Test Report:** `/app/test_reports/iteration_27.json` - 100% pass rate
+**Test Report:** `/app/test_reports/iteration_28.json` - 100% pass rate (16/16 tests)
 
 ---
 
