@@ -173,18 +173,43 @@ const SubscriptionPricingPage = () => {
     return isYearly ? plan.price_yearly : plan.price_monthly;
   };
 
-  const getFullPrice = (planId) => {
-    const full = FULL_PRICES[planId];
-    if (!full) return null;
-    return isYearly ? full.yearly : full.monthly;
+  // Get original/full price from dynamic API data (not hardcoded)
+  const getFullPrice = (plan) => {
+    if (!plan) return null;
+    const originalPrice = isYearly 
+      ? plan.original_price_yearly 
+      : plan.original_price_monthly;
+    // Only return if original price is set and greater than current price
+    const currentPrice = getPrice(plan);
+    if (originalPrice && originalPrice > currentPrice) {
+      return originalPrice;
+    }
+    return null;
   };
 
-  const getDiscountPercent = (planId) => {
-    const fullPrice = getFullPrice(planId);
-    const plan = plans.find(p => p.plan_id === planId);
-    if (!fullPrice || !plan) return 0;
+  // Calculate discount percentage dynamically from API data
+  const getDiscountPercent = (plan) => {
+    if (!plan) return 0;
+    const fullPrice = getFullPrice(plan);
     const currentPrice = getPrice(plan);
+    if (!fullPrice || fullPrice <= currentPrice) return 0;
     return Math.round((1 - currentPrice / fullPrice) * 100);
+  };
+
+  // Calculate yearly savings vs monthly (for the billing toggle badge)
+  const getYearlySavingsPercent = (plan) => {
+    if (!plan || plan.price_monthly <= 0) return 0;
+    const yearlyEquivalent = plan.price_monthly * 12;
+    if (yearlyEquivalent <= plan.price_yearly) return 0;
+    return Math.round((1 - plan.price_yearly / yearlyEquivalent) * 100);
+  };
+
+  // Check if Stripe is configured for checkout
+  const isStripeConfigured = (plan) => {
+    if (isYearly) {
+      return !!plan.stripe_price_id_yearly;
+    }
+    return !!plan.stripe_price_id_monthly;
   };
 
   const formatCurrency = (amount) => {
