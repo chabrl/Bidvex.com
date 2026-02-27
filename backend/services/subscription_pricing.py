@@ -113,6 +113,8 @@ DEFAULT_PLANS = {
         "name": "Free",
         "price_monthly": 0.0,
         "price_yearly": 0.0,
+        "original_price_monthly": 0.0,  # For promotional display
+        "original_price_yearly": 0.0,
         "features": [
             "Basic marketplace access",
             "Up to 5 listings per month",
@@ -129,6 +131,8 @@ DEFAULT_PLANS = {
         "name": "Premium",
         "price_monthly": 29.99,
         "price_yearly": 299.99,
+        "original_price_monthly": 59.99,  # For promotional display (shows as "was $59.99")
+        "original_price_yearly": 599.99,
         "features": [
             "Unlimited listings",
             "Reduced buyer premium (3.5%)",
@@ -147,6 +151,8 @@ DEFAULT_PLANS = {
         "name": "VIP",
         "price_monthly": 99.99,
         "price_yearly": 999.99,
+        "original_price_monthly": 199.99,  # For promotional display
+        "original_price_yearly": 1999.99,
         "features": [
             "All Premium benefits",
             "Lowest buyer premium (3%)",
