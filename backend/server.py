@@ -7189,7 +7189,7 @@ async def get_public_subscription_plans():
     """Get public subscription plans (no auth required)"""
     pricing_service = get_pricing_service(db)
     plans = await pricing_service.get_all_plans()
-    # Remove sensitive fields for public view
+    # Remove sensitive fields for public view (keep original_price for promotional display)
     public_plans = []
     for plan in plans:
         public_plan = {
@@ -7197,11 +7197,15 @@ async def get_public_subscription_plans():
             "name": plan.get("name"),
             "price_monthly": plan.get("price_monthly", 0),
             "price_yearly": plan.get("price_yearly", 0),
+            "original_price_monthly": plan.get("original_price_monthly", 0),
+            "original_price_yearly": plan.get("original_price_yearly", 0),
             "features": plan.get("features", []),
             "buyer_premium_discount": plan.get("buyer_premium_discount", 0),
             "seller_commission_discount": plan.get("seller_commission_discount", 0),
             "monthly_listing_limit": plan.get("monthly_listing_limit", 0),
-            "is_active": plan.get("is_active", True)
+            "is_active": plan.get("is_active", True),
+            "stripe_price_id_monthly": plan.get("stripe_price_id_monthly"),
+            "stripe_price_id_yearly": plan.get("stripe_price_id_yearly")
         }
         public_plans.append(public_plan)
     return {"success": True, "plans": public_plans}
