@@ -1,7 +1,7 @@
 /**
  * SubscriptionPricingPage - Public pricing page with checkout
  * Features: Plan comparison, coupon code input, Stripe checkout
- * Enhanced: Price anchoring, Launch Special badges, savings calculator
+ * Enhanced: Dynamic pricing from Admin Pricing Engine, Launch Special badges, savings calculator
  */
 
 import React, { useState, useEffect } from 'react';
@@ -17,16 +17,10 @@ import { toast } from 'sonner';
 import { 
   Crown, Star, User as UserIcon, Check, X, Zap, ArrowRight,
   Ticket, RefreshCw, Percent, DollarSign, Sparkles, Shield,
-  Gift, TrendingDown, PartyPopper
+  Gift, TrendingDown, PartyPopper, AlertCircle
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
-
-// Full prices (before launch discount) for price anchoring
-const FULL_PRICES = {
-  premium: { monthly: 59.99, yearly: 599.99 },
-  vip: { monthly: 199.99, yearly: 1999.99 }
-};
 
 // Plan icons and styling
 const PLAN_STYLES = {
