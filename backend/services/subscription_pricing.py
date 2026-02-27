@@ -27,6 +27,8 @@ class PlanPricing(BaseModel):
     name: str = Field(..., description="Display name")
     price_monthly: float = Field(0.0, ge=0, description="Monthly price in CAD")
     price_yearly: float = Field(0.0, ge=0, description="Yearly price in CAD")
+    original_price_monthly: float = Field(0.0, ge=0, description="Original monthly price for promotional display")
+    original_price_yearly: float = Field(0.0, ge=0, description="Original yearly price for promotional display")
     stripe_price_id_monthly: Optional[str] = None
     stripe_price_id_yearly: Optional[str] = None
     stripe_product_id: Optional[str] = None
@@ -36,7 +38,7 @@ class PlanPricing(BaseModel):
     monthly_listing_limit: int = Field(10, ge=0)
     is_active: bool = True
     
-    @validator('price_monthly', 'price_yearly', pre=True)
+    @validator('price_monthly', 'price_yearly', 'original_price_monthly', 'original_price_yearly', pre=True)
     def validate_price(cls, v):
         if v is None:
             return 0.0
