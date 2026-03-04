@@ -11,7 +11,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
  * PersonalizedSavingsCalculator - Shows ROI based on user's actual transaction history
  * Features:
  * - Fetches user's 12-month transaction volume
- * - Calculates personalized savings for Premium/VIP
+ * - Calculates personalized savings for Premium/VIP (dynamic pricing from API)
  * - Fallback to manual slider for non-logged users
  * - "What If" toggle to project future savings with hypothetical volume
  */
@@ -23,6 +23,28 @@ const PersonalizedSavingsCalculator = ({ currentTier = 'free' }) => {
   const [loading, setLoading] = useState(true);
   const [usePersonalized, setUsePersonalized] = useState(false);
   const [whatIfMode, setWhatIfMode] = useState(false); // Toggle between real stats and "What If"
+  const [planPrices, setPlanPrices] = useState({ premium: 99.99, vip: 299.99 }); // Dynamic from API
+
+  // Fetch plan prices from API
+  useEffect(() => {
+    const fetchPrices = async () => {
+      try {
+        const response = await axios.get(`${API}/subscription-plans`);
+        if (response.data.success) {
+          const plans = response.data.plans || [];
+          const premium = plans.find(p => p.plan_id === 'premium');
+          const vip = plans.find(p => p.plan_id === 'vip');
+          setPlanPrices({
+            premium: premium?.price_yearly || 99.99,
+            vip: vip?.price_yearly || 299.99
+          });
+        }
+      } catch (error) {
+        console.log('Using default prices');
+      }
+    };
+    fetchPrices();
+  }, []);
 
   // Fetch user's transaction history
   useEffect(() => {
@@ -71,9 +93,9 @@ const PersonalizedSavingsCalculator = ({ currentTier = 'free' }) => {
   const premiumSavings = freeFees - premiumFees;
   const vipSavings = freeFees - vipFees;
 
-  // ROI calculation
-  const premiumROI = (premiumSavings / 99.99).toFixed(1);
-  const vipROI = (vipSavings / 299.99).toFixed(1);
+  // ROI calculation using dynamic prices
+  const premiumROI = (premiumSavings / planPrices.premium).toFixed(1);
+  const vipROI = (vipSavings / planPrices.vip).toFixed(1);
 
   // Format currency
   const formatCurrency = (amount) => {
@@ -218,7 +240,7 @@ const PersonalizedSavingsCalculator = ({ currentTier = 'free' }) => {
                   With Premium
                 </span>
                 <span className="text-xs bg-purple-100 dark:bg-purple-800 text-purple-700 dark:text-purple-200 px-2 py-1 rounded-full">
-                  $99.99/yr
+                  ${planPrices.premium}/yr
                 </span>
               </div>
               <p className="text-3xl font-bold text-purple-700 dark:text-purple-300 mb-1">
@@ -249,7 +271,7 @@ const PersonalizedSavingsCalculator = ({ currentTier = 'free' }) => {
                   With VIP Elite
                 </span>
                 <span className="text-xs bg-amber-100 dark:bg-amber-800 text-amber-700 dark:text-amber-200 px-2 py-1 rounded-full">
-                  $299.99/yr
+                  ${planPrices.vip}/yr
                 </span>
               </div>
               <p className="text-3xl font-bold text-amber-700 dark:text-amber-300 mb-1">

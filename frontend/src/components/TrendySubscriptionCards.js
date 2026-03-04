@@ -1,25 +1,75 @@
 import React, { useState, useEffect } from 'react';
-import { Crown, Star, Zap, Shield, TrendingUp, Percent, Megaphone, Headphones, Check, Sparkles } from 'lucide-react';
+import axios from 'axios';
+import { Crown, Star, Zap, Shield, TrendingUp, Percent, Megaphone, Headphones, Check, Sparkles, RefreshCw } from 'lucide-react';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 /**
  * TrendySubscriptionCards - Premium glassmorphism subscription UI
  * Features:
+ * - Dynamic pricing from Admin Pricing Engine API
  * - Three distinct cards with glassmorphism effect
  * - Premium card slightly larger with glowing "Best Value" badge
  * - VIP card with dark/gold luxury theme
  * - Interactive hover effects with elevation
- * - Professional SVG icons for features
  */
 const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
   const [hoveredCard, setHoveredCard] = useState(null);
+  const [plans, setPlans] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchPlans();
+  }, []);
+
+  const fetchPlans = async () => {
+    try {
+      const response = await axios.get(`${API}/subscription-plans`);
+      if (response.data.success) {
+        setPlans(response.data.plans || []);
+      }
+    } catch (error) {
+      console.error('Error fetching plans:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Get plan price from API data
+  const getPlanPrice = (planId) => {
+    const plan = plans.find(p => p.plan_id === planId);
+    return plan?.price_yearly || 0;
+  };
+
+  // Get original price for strikethrough display
+  const getOriginalPrice = (planId) => {
+    const plan = plans.find(p => p.plan_id === planId);
+    const original = plan?.original_price_yearly || 0;
+    const current = plan?.price_yearly || 0;
+    return original > current ? original : null;
+  };
+
+  // Calculate savings percentage
+  const getSavingsPercent = (planId) => {
+    const original = getOriginalPrice(planId);
+    const current = getPlanPrice(planId);
+    if (!original || original <= current) return null;
+    return Math.round((1 - current / original) * 100);
+  };
+
+  const formatPrice = (amount) => {
+    return new Intl.NumberFormat('en-CA', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    }).format(amount || 0);
+  };
 
   const tiers = [
     {
       id: 'free',
       name: 'Starter',
-      price: 0,
       period: 'Forever Free',
       description: 'Perfect for occasional bidders',
       icon: Zap,
@@ -39,9 +89,7 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
     {
       id: 'premium',
       name: 'Premium',
-      price: 99.99,
       period: '/year',
-      promo: '2 Months Free!',
       description: 'For serious buyers & sellers',
       icon: Star,
       iconBg: 'bg-purple-100 dark:bg-purple-900/50',
@@ -64,9 +112,7 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
     {
       id: 'vip',
       name: 'VIP Elite',
-      price: 299.99,
       period: '/year',
-      promo: '2 Months Free!',
       description: 'Ultimate auction experience',
       icon: Crown,
       iconBg: 'bg-gradient-to-br from-amber-200 to-yellow-300 dark:from-amber-700 dark:to-yellow-600',
@@ -95,12 +141,23 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="w-full py-8 flex items-center justify-center">
+        <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="w-full py-8" data-testid="trendy-subscription-cards">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
         {tiers.map((tier) => {
           const isCurrentTier = currentTier === tier.id;
           const Icon = tier.icon;
+          const price = getPlanPrice(tier.id);
+          const originalPrice = getOriginalPrice(tier.id);
+          const savingsPercent = getSavingsPercent(tier.id);
           
           return (
             <div
@@ -137,19 +194,37 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
                 </p>
               </div>
 
-              {/* Pricing */}
+              {/* Pricing - Dynamic from API */}
               <div className="text-center mb-6">
+                {/* Original Price Strikethrough */}
+                {originalPrice && (
+                  <div className="mb-1">
+                    <span className={`text-lg line-through decoration-red-500/60 decoration-2 ${tier.darkTheme ? 'text-slate-500' : 'text-slate-400'}`}>
+                      ${formatPrice(originalPrice)}
+                    </span>
+                    {savingsPercent && (
+                      <span className="ml-2 text-xs px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full font-semibold">
+                        {savingsPercent}% OFF
+                      </span>
+                    )}
+                  </div>
+                )}
                 <div className="flex items-end justify-center gap-1">
-                  <span className={`text-4xl lg:text-5xl font-bold ${tier.darkTheme ? 'text-white' : 'text-slate-900 dark:text-white'}`}>
-                    ${tier.price}
+                  <span className={`text-4xl lg:text-5xl font-bold ${tier.darkTheme ? 'text-white' : 'text-slate-900 dark:text-white'}`} data-testid={`price-${tier.id}`}>
+                    ${formatPrice(price)}
                   </span>
                   <span className={`text-sm mb-2 ${tier.darkTheme ? 'text-slate-400' : 'text-slate-500 dark:text-slate-400'}`}>
                     {tier.period}
                   </span>
                 </div>
-                {tier.promo && (
+                {/* Promo badge - show savings amount if original exists */}
+                {originalPrice ? (
                   <span className="inline-block mt-2 px-3 py-1 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400 text-xs font-semibold rounded-full">
-                    {tier.promo}
+                    Save ${formatPrice(originalPrice - price)}!
+                  </span>
+                ) : tier.id !== 'free' && (
+                  <span className="inline-block mt-2 px-3 py-1 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400 text-xs font-semibold rounded-full">
+                    2 Months Free!
                   </span>
                 )}
               </div>

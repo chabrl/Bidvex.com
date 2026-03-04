@@ -32,11 +32,11 @@ import {
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-// Plan configurations
+// Plan configurations (prices will be fetched from API)
 const PLANS = {
   free: { name: 'Free', color: 'gray', icon: UserIcon, price: 0 },
-  premium: { name: 'Premium', color: 'purple', icon: Star, price: 99.99 },
-  vip: { name: 'VIP', color: 'amber', icon: Crown, price: 299.99 }
+  premium: { name: 'Premium', color: 'purple', icon: Star, price: 0 },
+  vip: { name: 'VIP', color: 'amber', icon: Crown, price: 0 }
 };
 
 const SubscriptionManager = () => {
@@ -50,6 +50,7 @@ const SubscriptionManager = () => {
     total: 0, free: 0, premium: 0, vip: 0, 
     manual: 0, stripe: 0, revenue: 0
   });
+  const [planPrices, setPlanPrices] = useState({ free: 0, premium: 99.99, vip: 299.99 }); // Dynamic from API
 
   // Selected user state
   const [selectedUser, setSelectedUser] = useState(null);
@@ -83,7 +84,26 @@ const SubscriptionManager = () => {
 
   useEffect(() => {
     fetchUsers();
+    fetchPlanPrices();
   }, []);
+
+  const fetchPlanPrices = async () => {
+    try {
+      const response = await axios.get(`${API}/subscription-plans`);
+      if (response.data.success) {
+        const plans = response.data.plans || [];
+        const prices = { free: 0, premium: 99.99, vip: 299.99 };
+        plans.forEach(p => {
+          if (prices.hasOwnProperty(p.plan_id)) {
+            prices[p.plan_id] = p.price_yearly || 0;
+          }
+        });
+        setPlanPrices(prices);
+      }
+    } catch (error) {
+      console.log('Using default prices');
+    }
+  };
 
   const fetchUsers = async () => {
     try {
@@ -106,7 +126,8 @@ const SubscriptionManager = () => {
     const vip = userList.filter(u => u.subscription_tier === 'vip').length;
     const manual = userList.filter(u => u.subscription_source === 'manual').length;
     const stripe = userList.filter(u => u.subscription_source === 'stripe' || u.stripe_subscription_id).length;
-    const revenue = (premium * 99.99) + (vip * 299.99);
+    // Use dynamic prices
+    const revenue = (premium * planPrices.premium) + (vip * planPrices.vip);
 
     setStats({ total: userList.length, free, premium, vip, manual, stripe, revenue });
   };
