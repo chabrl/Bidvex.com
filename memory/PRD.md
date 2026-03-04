@@ -23,54 +23,41 @@ Email: SendGrid
 Background Jobs: APScheduler
 ```
 
-## Current Status: ✅ DYNAMIC PRICING ENGINE CONNECTED TO FRONTEND
+## Current Status: ✅ ALL SUBSCRIPTION PAGES USING DYNAMIC PRICING
 
 ### Session Summary (Feb 27, 2026 - Latest Update)
-Fixed the Pricing Engine to Frontend connection - admin price changes now reflect immediately on public /pricing page. 100% pass rate (16/16 tests).
+Fixed ALL subscription-related components to use dynamic pricing from Admin Pricing Engine. 100% pass rate.
 
 **Issue Fixed:**
-- Changes in Admin Pricing Engine (e.g., Premium $30/mo) were not reflecting on public /pricing page
-- Frontend was using hardcoded `FULL_PRICES` constant instead of API data
+- User reported `/settings?tab=subscription` page (TrendySubscriptionCards) still showing old hardcoded prices ($99.99 Premium, $299.99 VIP)
+- Additional hardcoded prices found in PersonalizedSavingsCalculator and SubscriptionManager
 
 **Solution Implemented:**
 
-1. ✅ **Backend Schema Updates**
-   - Added `original_price_monthly` and `original_price_yearly` fields to subscription plans
-   - These fields are used for promotional strikethrough pricing display
-   - Migration auto-adds these fields to existing plans
-   - Default values: Premium original=$59.99/mo, $599.99/yr; VIP original=$199.99/mo, $1999.99/yr
+1. ✅ **TrendySubscriptionCards.js** (User Settings Page)
+   - Added API fetch on component mount: `GET /api/subscription-plans`
+   - `getPlanPrice(planId)` - returns dynamic price_yearly from API
+   - `getOriginalPrice(planId)` - returns original_price_yearly for strikethrough
+   - `getSavingsPercent(planId)` - calculates discount percentage dynamically
+   - Shows strikethrough original prices and "X% OFF" badges when promotional pricing active
 
-2. ✅ **Public API Updated**
-   - `GET /api/subscription-plans` now returns:
-     - `price_monthly`, `price_yearly` (current prices)
-     - `original_price_monthly`, `original_price_yearly` (for strikethrough)
-     - `stripe_price_id_monthly`, `stripe_price_id_yearly` (for payment status check)
+2. ✅ **PersonalizedSavingsCalculator.js** (ROI Calculator)
+   - Added `planPrices` state fetched from API
+   - ROI calculations now use dynamic prices: `premiumROI = savings / planPrices.premium`
+   - Price badges in comparison cards show dynamic values
 
-3. ✅ **Frontend Dynamic Pricing**
-   - Removed hardcoded `FULL_PRICES` constant
-   - `getPrice(plan)` - returns current price from API
-   - `getFullPrice(plan)` - returns original price from API (for strikethrough)
-   - `getDiscountPercent(plan)` - calculates % off dynamically
-   - `getYearlySavingsPercent(plan)` - calculates yearly vs monthly savings
-   - `isStripeConfigured(plan)` - checks if Stripe is ready for checkout
+3. ✅ **SubscriptionManager.js** (Admin Panel)
+   - Added `fetchPlanPrices()` function to get dynamic prices
+   - Revenue calculation uses dynamic prices: `revenue = (premium * planPrices.premium) + (vip * planPrices.vip)`
 
-4. ✅ **Admin Pricing Manager Enhanced**
-   - Added "Original Prices" section in edit dialog
-   - Fields for `original_price_monthly` and `original_price_yearly`
-   - Explanation text: "displayed as strikethrough on pricing page"
-   - Plan cards show current and original prices
-
-5. ✅ **Stripe Configuration Status**
-   - Shows "Payment setup pending" when `stripe_price_id` is null
-   - Graceful handling - prices display correctly even without Stripe
+**Test Report:** `/app/test_reports/iteration_29.json` - 100% pass rate
+- Premium: $180/year (original $360, 50% OFF) - dynamically loaded
+- VIP: $300/year (original $600, 50% OFF) - dynamically loaded
 
 **Files Modified:**
-- `/app/backend/services/subscription_pricing.py` - Added original_price fields
-- `/app/backend/server.py` - Updated public API response
-- `/app/frontend/src/pages/SubscriptionPricingPage.js` - Dynamic pricing logic
-- `/app/frontend/src/pages/admin/PricingManager.js` - Original price editing
-
-**Test Report:** `/app/test_reports/iteration_28.json` - 100% pass rate (16/16 tests)
+- `/app/frontend/src/components/TrendySubscriptionCards.js`
+- `/app/frontend/src/components/PersonalizedSavingsCalculator.js`
+- `/app/frontend/src/pages/admin/SubscriptionManager.js`
 
 ---
 
