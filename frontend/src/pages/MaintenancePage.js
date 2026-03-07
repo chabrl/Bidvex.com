@@ -1,15 +1,17 @@
 /**
  * MaintenancePage - Coming Soon / Maintenance Mode Landing Page
  * Modern startup-style design for BidVex auction platform
- * Features: Email subscription, responsive design, animated elements
+ * Features: Email subscription, responsive design, animated elements, bilingual (EN/FR)
  */
 
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { 
   Mail, Bell, ArrowRight, Gavel, TrendingUp, Shield, Users,
-  Clock, CheckCircle, Sparkles, Twitter, Facebook, Instagram, Linkedin
+  Clock, CheckCircle, Sparkles, Twitter, Facebook, Instagram, Linkedin,
+  Globe
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -17,10 +19,21 @@ import { Input } from '../components/ui/input';
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const MaintenancePage = ({ mode = 'coming_soon', message, expectedBack }) => {
+  const { t, i18n } = useTranslation();
   const [email, setEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
   const [countdown, setCountdown] = useState(null);
+
+  const currentLang = i18n.language?.startsWith('fr') ? 'fr' : 'en';
+
+  const toggleLanguage = () => {
+    const newLang = currentLang === 'en' ? 'fr' : 'en';
+    i18n.changeLanguage(newLang);
+    try {
+      localStorage.setItem('bidvex_language', newLang);
+    } catch (e) {}
+  };
 
   // Calculate countdown if expectedBack is provided
   useEffect(() => {
@@ -52,7 +65,7 @@ const MaintenancePage = ({ mode = 'coming_soon', message, expectedBack }) => {
   const handleSubscribe = async (e) => {
     e.preventDefault();
     if (!email || !email.includes('@')) {
-      toast.error('Please enter a valid email address');
+      toast.error(t('maintenance.invalidEmail'));
       return;
     }
 
@@ -64,7 +77,7 @@ const MaintenancePage = ({ mode = 'coming_soon', message, expectedBack }) => {
         toast.success(response.data.message);
       }
     } catch (error) {
-      const errorMsg = error.response?.data?.detail || 'Failed to subscribe. Please try again.';
+      const errorMsg = error.response?.data?.detail || t('maintenance.subscriptionFailed');
       toast.error(errorMsg);
     } finally {
       setSubmitting(false);
@@ -114,14 +127,26 @@ const MaintenancePage = ({ mode = 'coming_soon', message, expectedBack }) => {
               </span>
             </div>
             
-            {/* Status Badge */}
-            <div className={`px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 ${
-              isMaintenanceMode 
-                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-            }`}>
-              <div className={`w-2 h-2 rounded-full animate-pulse ${isMaintenanceMode ? 'bg-amber-400' : 'bg-blue-400'}`} />
-              {isMaintenanceMode ? 'Under Maintenance' : 'Coming Soon'}
+            <div className="flex items-center gap-3">
+              {/* Language Toggle */}
+              <button
+                onClick={toggleLanguage}
+                className="flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded-full hover:bg-white/10 transition-colors"
+                aria-label="Toggle language"
+              >
+                <Globe className="h-4 w-4" />
+                <span className="text-sm font-medium">{currentLang.toUpperCase()}</span>
+              </button>
+              
+              {/* Status Badge */}
+              <div className={`px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 ${
+                isMaintenanceMode 
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+              }`}>
+                <div className={`w-2 h-2 rounded-full animate-pulse ${isMaintenanceMode ? 'bg-amber-400' : 'bg-blue-400'}`} />
+                {isMaintenanceMode ? t('maintenance.statusBadgeMaintenance') : t('maintenance.statusBadgeComingSoon')}
+              </div>
             </div>
           </div>
         </header>
@@ -134,23 +159,23 @@ const MaintenancePage = ({ mode = 'coming_soon', message, expectedBack }) => {
               <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full border border-white/10 mb-6">
                 <Sparkles className="h-4 w-4 text-yellow-400" />
                 <span className="text-sm text-blue-200">
-                  {isMaintenanceMode ? 'We\'ll be back shortly' : 'Something amazing is coming'}
+                  {isMaintenanceMode ? t('maintenance.maintenanceTagline') : t('maintenance.tagline')}
                 </span>
               </div>
               
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
                 {isMaintenanceMode ? (
                   <>
-                    We're Improving
+                    {t('maintenance.headlineMaintenance')}
                     <span className="block bg-gradient-to-r from-blue-400 via-teal-400 to-blue-400 bg-clip-text text-transparent">
-                      BidVex
+                      {t('maintenance.maintenanceHighlight')}
                     </span>
                   </>
                 ) : (
                   <>
-                    BidVex is
+                    {t('maintenance.headlineComingSoon')}
                     <span className="block bg-gradient-to-r from-blue-400 via-teal-400 to-blue-400 bg-clip-text text-transparent">
-                      Coming Soon
+                      {t('maintenance.headlineHighlight')}
                     </span>
                   </>
                 )}
@@ -158,8 +183,8 @@ const MaintenancePage = ({ mode = 'coming_soon', message, expectedBack }) => {
               
               <p className="text-lg sm:text-xl text-slate-300 max-w-2xl mx-auto leading-relaxed">
                 {message || (isMaintenanceMode 
-                  ? 'We\'re making some improvements to bring you an even better auction experience. Please check back soon!'
-                  : 'BidVex is a modern online auction platform where buyers and sellers connect to discover great deals on vehicles, collectibles, and more.'
+                  ? t('maintenance.defaultDescriptionMaintenance')
+                  : t('maintenance.defaultDescriptionComingSoon')
                 )}
               </p>
             </div>
@@ -168,14 +193,14 @@ const MaintenancePage = ({ mode = 'coming_soon', message, expectedBack }) => {
             {countdown && (
               <div className="mb-10">
                 <p className="text-sm text-slate-400 mb-4">
-                  {isMaintenanceMode ? 'Expected back in:' : 'Launching in:'}
+                  {isMaintenanceMode ? t('maintenance.expectedBackIn') : t('maintenance.launchingIn')}
                 </p>
                 <div className="flex justify-center gap-4">
                   {[
-                    { value: countdown.days, label: 'Days' },
-                    { value: countdown.hours, label: 'Hours' },
-                    { value: countdown.minutes, label: 'Minutes' },
-                    { value: countdown.seconds, label: 'Seconds' }
+                    { value: countdown.days, label: t('maintenance.days') },
+                    { value: countdown.hours, label: t('maintenance.hours') },
+                    { value: countdown.minutes, label: t('maintenance.minutes') },
+                    { value: countdown.seconds, label: t('maintenance.seconds') }
                   ].map((item) => (
                     <div key={item.label} className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl px-4 sm:px-6 py-4">
                       <div className="text-3xl sm:text-4xl font-bold text-white">{String(item.value).padStart(2, '0')}</div>
@@ -192,14 +217,14 @@ const MaintenancePage = ({ mode = 'coming_soon', message, expectedBack }) => {
                 <form onSubmit={handleSubscribe} className="space-y-4">
                   <p className="text-slate-300 mb-4">
                     <Bell className="h-4 w-4 inline mr-2" />
-                    Get notified when we launch
+                    {t('maintenance.getNotified')}
                   </p>
                   <div className="flex flex-col sm:flex-row gap-3">
                     <div className="relative flex-1">
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
                       <Input
                         type="email"
-                        placeholder="Enter your email"
+                        placeholder={t('maintenance.emailPlaceholder')}
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         className="pl-12 h-14 bg-white/5 border-white/10 text-white placeholder:text-slate-400 focus:border-blue-400 focus:ring-blue-400/20 rounded-xl"
@@ -217,7 +242,7 @@ const MaintenancePage = ({ mode = 'coming_soon', message, expectedBack }) => {
                         <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
                       ) : (
                         <>
-                          Notify Me
+                          {t('maintenance.notifyMe')}
                           <ArrowRight className="ml-2 h-5 w-5" />
                         </>
                       )}
@@ -227,9 +252,9 @@ const MaintenancePage = ({ mode = 'coming_soon', message, expectedBack }) => {
               ) : (
                 <div className="p-6 bg-green-500/10 border border-green-500/30 rounded-2xl" data-testid="subscription-success">
                   <CheckCircle className="h-12 w-12 text-green-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-green-300 mb-2">You're on the list!</h3>
+                  <h3 className="text-xl font-semibold text-green-300 mb-2">{t('maintenance.successTitle')}</h3>
                   <p className="text-slate-300">
-                    Thank you! We will notify you when BidVex is live.
+                    {t('maintenance.successMessage')}
                   </p>
                 </div>
               )}
@@ -239,9 +264,9 @@ const MaintenancePage = ({ mode = 'coming_soon', message, expectedBack }) => {
             {!isMaintenanceMode && (
               <div className="grid sm:grid-cols-3 gap-6 max-w-3xl mx-auto mb-12">
                 {[
-                  { icon: Gavel, title: 'Live Auctions', desc: 'Real-time bidding on vehicles & collectibles' },
-                  { icon: Shield, title: 'Secure Platform', desc: 'Protected transactions & verified sellers' },
-                  { icon: TrendingUp, title: 'Great Deals', desc: 'Save up to 50% on market value' }
+                  { icon: Gavel, title: t('maintenance.featureLiveAuctions'), desc: t('maintenance.featureLiveAuctionsDesc') },
+                  { icon: Shield, title: t('maintenance.featureSecurePlatform'), desc: t('maintenance.featureSecurePlatformDesc') },
+                  { icon: TrendingUp, title: t('maintenance.featureGreatDeals'), desc: t('maintenance.featureGreatDealsDesc') }
                 ].map((feature) => (
                   <div key={feature.title} className="p-6 bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl hover:bg-white/10 transition-colors">
                     <feature.icon className="h-8 w-8 text-blue-400 mx-auto mb-4" />
@@ -258,7 +283,7 @@ const MaintenancePage = ({ mode = 'coming_soon', message, expectedBack }) => {
         <footer className="py-8 px-6 border-t border-white/10">
           <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
             <p className="text-sm text-slate-400">
-              © {new Date().getFullYear()} BidVex. All rights reserved.
+              © {new Date().getFullYear()} BidVex. {currentLang === 'fr' ? 'Tous droits réservés.' : 'All rights reserved.'}
             </p>
             
             {/* Social Links */}

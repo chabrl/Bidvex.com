@@ -23,77 +23,42 @@ Email: SendGrid
 Background Jobs: APScheduler
 ```
 
-## Current Status: ✅ WEBSITE MAINTENANCE / COMING SOON MODE COMPLETE
+## Current Status: ✅ BILINGUAL MAINTENANCE PAGE COMPLETE (EN/FR)
 
 ### Session Summary (Mar 7, 2026 - Latest Update)
-Implemented comprehensive Website Maintenance / Coming Soon Mode feature. 100% pass rate (18/18 tests).
+Added bilingual support (English/French) to the Coming Soon / Maintenance landing page.
 
-**Features Implemented:**
+**Features Added:**
 
-1. ✅ **Admin Site Mode Control**
-   - New "Site Mode" section in Admin Panel → Settings (first item)
-   - Toggle between: Live Mode, Maintenance Mode, Coming Soon Mode
-   - Custom message and expected back online time (with countdown)
-   - Real-time status badge showing current mode
-   - All changes logged to admin_logs collection
+1. ✅ **Language Toggle Button**
+   - Globe icon with "EN" / "FR" indicator in header
+   - Persists selection in localStorage
+   - Instant language switch without page reload
 
-2. ✅ **Coming Soon / Maintenance Landing Page**
-   - Modern startup-style dark gradient design
-   - BidVex branding with logo
-   - "Something amazing is coming" tagline with animated elements
-   - Email subscription form with validation
-   - Feature highlights (Live Auctions, Secure Platform, Great Deals)
-   - Social media icons in footer
-   - Countdown timer when expected_back is set
-   - Mobile responsive design
+2. ✅ **Full French Translations**
+   - Status badge: "Bientôt Disponible" / "En Maintenance"
+   - Tagline: "Quelque chose d'incroyable arrive"
+   - Headline: "BidVex arrive Bientôt"
+   - Description: Full French translation
+   - Form labels: "Soyez notifié lors du lancement", "Entrez votre courriel", "M'avertir"
+   - Features: "Enchères en Direct", "Plateforme Sécurisée", "Bonnes Affaires"
+   - Footer: "Tous droits réservés"
+   - Countdown: "Jours", "Heures", "Minutes", "Secondes"
+   - Success messages translated
 
-3. ✅ **Subscriber Management System**
-   - Database collection: `launch_subscribers`
-   - Fields: email, subscribed_at, ip_address, source, notified
-   - Duplicate email handling (graceful message)
-   - Admin panel shows:
-     - Total subscribers count
-     - Today's signups
-     - 7-day trend chart
-   - CSV export with all subscriber data
-   - Delete individual subscribers
-   - Search/filter functionality
-
-4. ✅ **Route Guard System**
-   - `SiteModeContext` provides global state
-   - `MaintenanceGuard` wrapper blocks public routes
-   - Always allows `/auth` route (for admin login)
-   - Always allows `/admin` routes
-   - Admins (@bidvex.com) can access full site
-   - Preview mode via `?preview_mode=true` URL param
-
-**New API Endpoints:**
-- `GET /api/site-mode` - Public endpoint for current mode
-- `PUT /api/admin/site-mode` - Update mode (admin only)
-- `POST /api/subscribe` - Email subscription (public)
-- `GET /api/admin/subscribers` - List subscribers (paginated)
-- `GET /api/admin/subscribers/export` - CSV export
-- `DELETE /api/admin/subscribers/{id}` - Delete subscriber
-- `GET /api/admin/subscribers/stats` - Subscriber statistics
-
-**Files Created:**
-- `/app/frontend/src/pages/MaintenancePage.js`
-- `/app/frontend/src/pages/admin/SiteModeManager.js`
-- `/app/frontend/src/contexts/SiteModeContext.js`
-- `/app/backend/tests/test_site_mode.py`
+3. ✅ **Translation Files Updated**
+   - Added `maintenance` section to both EN and FR in `/app/frontend/src/i18n.js`
+   - 25+ translation keys for complete coverage
 
 **Files Modified:**
-- `/app/backend/server.py` - Added 7 new endpoints
-- `/app/frontend/src/App.js` - Added SiteModeProvider and MaintenanceGuard
-- `/app/frontend/src/pages/AdminDashboard.js` - Added Site Mode tab
-
-**Test Report:** `/app/test_reports/iteration_30.json` - 100% pass rate
+- `/app/frontend/src/pages/MaintenancePage.js` - Added useTranslation hook, language toggle
+- `/app/frontend/src/i18n.js` - Added maintenance translations for EN and FR
 
 **Current State:** Site is in `live` mode (normal operation)
 
 ---
 
-### Previous Session (Feb 27, 2026)
+### Previous Session (Mar 7, 2026)
 Completed comprehensive Subscription Management, Pricing Engine, and Coupon Code System - 100% backend pass rate (18/18 tests), 95% frontend success.
 
 **Tasks Completed:**
