@@ -23,41 +23,73 @@ Email: SendGrid
 Background Jobs: APScheduler
 ```
 
-## Current Status: ✅ ALL SUBSCRIPTION PAGES USING DYNAMIC PRICING
+## Current Status: ✅ WEBSITE MAINTENANCE / COMING SOON MODE COMPLETE
 
-### Session Summary (Feb 27, 2026 - Latest Update)
-Fixed ALL subscription-related components to use dynamic pricing from Admin Pricing Engine. 100% pass rate.
+### Session Summary (Mar 7, 2026 - Latest Update)
+Implemented comprehensive Website Maintenance / Coming Soon Mode feature. 100% pass rate (18/18 tests).
 
-**Issue Fixed:**
-- User reported `/settings?tab=subscription` page (TrendySubscriptionCards) still showing old hardcoded prices ($99.99 Premium, $299.99 VIP)
-- Additional hardcoded prices found in PersonalizedSavingsCalculator and SubscriptionManager
+**Features Implemented:**
 
-**Solution Implemented:**
+1. ✅ **Admin Site Mode Control**
+   - New "Site Mode" section in Admin Panel → Settings (first item)
+   - Toggle between: Live Mode, Maintenance Mode, Coming Soon Mode
+   - Custom message and expected back online time (with countdown)
+   - Real-time status badge showing current mode
+   - All changes logged to admin_logs collection
 
-1. ✅ **TrendySubscriptionCards.js** (User Settings Page)
-   - Added API fetch on component mount: `GET /api/subscription-plans`
-   - `getPlanPrice(planId)` - returns dynamic price_yearly from API
-   - `getOriginalPrice(planId)` - returns original_price_yearly for strikethrough
-   - `getSavingsPercent(planId)` - calculates discount percentage dynamically
-   - Shows strikethrough original prices and "X% OFF" badges when promotional pricing active
+2. ✅ **Coming Soon / Maintenance Landing Page**
+   - Modern startup-style dark gradient design
+   - BidVex branding with logo
+   - "Something amazing is coming" tagline with animated elements
+   - Email subscription form with validation
+   - Feature highlights (Live Auctions, Secure Platform, Great Deals)
+   - Social media icons in footer
+   - Countdown timer when expected_back is set
+   - Mobile responsive design
 
-2. ✅ **PersonalizedSavingsCalculator.js** (ROI Calculator)
-   - Added `planPrices` state fetched from API
-   - ROI calculations now use dynamic prices: `premiumROI = savings / planPrices.premium`
-   - Price badges in comparison cards show dynamic values
+3. ✅ **Subscriber Management System**
+   - Database collection: `launch_subscribers`
+   - Fields: email, subscribed_at, ip_address, source, notified
+   - Duplicate email handling (graceful message)
+   - Admin panel shows:
+     - Total subscribers count
+     - Today's signups
+     - 7-day trend chart
+   - CSV export with all subscriber data
+   - Delete individual subscribers
+   - Search/filter functionality
 
-3. ✅ **SubscriptionManager.js** (Admin Panel)
-   - Added `fetchPlanPrices()` function to get dynamic prices
-   - Revenue calculation uses dynamic prices: `revenue = (premium * planPrices.premium) + (vip * planPrices.vip)`
+4. ✅ **Route Guard System**
+   - `SiteModeContext` provides global state
+   - `MaintenanceGuard` wrapper blocks public routes
+   - Always allows `/auth` route (for admin login)
+   - Always allows `/admin` routes
+   - Admins (@bidvex.com) can access full site
+   - Preview mode via `?preview_mode=true` URL param
 
-**Test Report:** `/app/test_reports/iteration_29.json` - 100% pass rate
-- Premium: $180/year (original $360, 50% OFF) - dynamically loaded
-- VIP: $300/year (original $600, 50% OFF) - dynamically loaded
+**New API Endpoints:**
+- `GET /api/site-mode` - Public endpoint for current mode
+- `PUT /api/admin/site-mode` - Update mode (admin only)
+- `POST /api/subscribe` - Email subscription (public)
+- `GET /api/admin/subscribers` - List subscribers (paginated)
+- `GET /api/admin/subscribers/export` - CSV export
+- `DELETE /api/admin/subscribers/{id}` - Delete subscriber
+- `GET /api/admin/subscribers/stats` - Subscriber statistics
+
+**Files Created:**
+- `/app/frontend/src/pages/MaintenancePage.js`
+- `/app/frontend/src/pages/admin/SiteModeManager.js`
+- `/app/frontend/src/contexts/SiteModeContext.js`
+- `/app/backend/tests/test_site_mode.py`
 
 **Files Modified:**
-- `/app/frontend/src/components/TrendySubscriptionCards.js`
-- `/app/frontend/src/components/PersonalizedSavingsCalculator.js`
-- `/app/frontend/src/pages/admin/SubscriptionManager.js`
+- `/app/backend/server.py` - Added 7 new endpoints
+- `/app/frontend/src/App.js` - Added SiteModeProvider and MaintenanceGuard
+- `/app/frontend/src/pages/AdminDashboard.js` - Added Site Mode tab
+
+**Test Report:** `/app/test_reports/iteration_30.json` - 100% pass rate
+
+**Current State:** Site is in `live` mode (normal operation)
 
 ---
 
