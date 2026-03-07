@@ -7667,6 +7667,7 @@ class SiteModeUpdate(BaseModel):
     mode: str = Field(..., description="Site mode: live, maintenance, coming_soon")
     message: Optional[str] = Field(None, description="Custom message to display")
     expected_back: Optional[str] = Field(None, description="Expected back online time")
+    social_links: Optional[dict] = Field(None, description="Social media links: twitter, facebook, instagram, linkedin")
 
 class EmailSubscription(BaseModel):
     """Model for email subscription"""
@@ -7686,17 +7687,19 @@ async def get_site_mode():
                 "mode": "live",
                 "message": None,
                 "expected_back": None,
+                "social_links": None,
                 "updated_at": None
             }
         return {
             "mode": settings.get("mode", "live"),
             "message": settings.get("message"),
             "expected_back": settings.get("expected_back"),
+            "social_links": settings.get("social_links"),
             "updated_at": settings.get("updated_at")
         }
     except Exception as e:
         logger.error(f"Error fetching site mode: {e}")
-        return {"mode": "live", "message": None, "expected_back": None}
+        return {"mode": "live", "message": None, "expected_back": None, "social_links": None}
 
 @api_router.put("/admin/site-mode")
 async def update_site_mode(data: SiteModeUpdate, current_user: User = Depends(get_current_user)):
@@ -7716,6 +7719,7 @@ async def update_site_mode(data: SiteModeUpdate, current_user: User = Depends(ge
             "mode": data.mode,
             "message": data.message,
             "expected_back": data.expected_back,
+            "social_links": data.social_links,
             "updated_at": datetime.now(timezone.utc).isoformat(),
             "updated_by": current_user.email
         }

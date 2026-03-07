@@ -11,14 +11,17 @@ import { toast } from 'sonner';
 import { 
   Mail, Bell, ArrowRight, Gavel, TrendingUp, Shield, Users,
   Clock, CheckCircle, Sparkles, Twitter, Facebook, Instagram, Linkedin,
-  Globe
+  Globe, Lock
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-const MaintenancePage = ({ mode = 'coming_soon', message, expectedBack }) => {
+// BidVex Logo URL
+const BIDVEX_LOGO = 'https://customer-assets.emergentagent.com/job_aa51ced5-053b-417a-a5ea-c63c2febfff9/artifacts/xkt9mtpw_logo%20app.png';
+
+const MaintenancePage = ({ mode = 'coming_soon', message, expectedBack, socialLinks }) => {
   const { t, i18n } = useTranslation();
   const [email, setEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -34,6 +37,14 @@ const MaintenancePage = ({ mode = 'coming_soon', message, expectedBack }) => {
       localStorage.setItem('bidvex_language', newLang);
     } catch (e) {}
   };
+
+  // Social media icons with dynamic links
+  const socialMediaIcons = [
+    { icon: Twitter, href: socialLinks?.twitter || '#', label: 'Twitter' },
+    { icon: Facebook, href: socialLinks?.facebook || '#', label: 'Facebook' },
+    { icon: Instagram, href: socialLinks?.instagram || '#', label: 'Instagram' },
+    { icon: Linkedin, href: socialLinks?.linkedin || '#', label: 'LinkedIn' }
+  ];
 
   // Calculate countdown if expectedBack is provided
   useEffect(() => {
@@ -119,15 +130,27 @@ const MaintenancePage = ({ mode = 'coming_soon', message, expectedBack }) => {
         <header className="py-8 px-6">
           <div className="max-w-6xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-teal-400 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
-                <Gavel className="h-6 w-6 text-white" />
-              </div>
+              {/* BidVex Logo */}
+              <img 
+                src={BIDVEX_LOGO} 
+                alt="BidVex" 
+                className="h-12 w-12 object-contain rounded-xl"
+              />
               <span className="text-2xl font-bold bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
                 BidVex
               </span>
             </div>
             
             <div className="flex items-center gap-3">
+              {/* Admin Access Link - Hidden but accessible */}
+              <a
+                href="/admin"
+                className="flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded-full hover:bg-white/10 transition-colors opacity-50 hover:opacity-100"
+                title="Admin Access"
+              >
+                <Lock className="h-4 w-4" />
+              </a>
+              
               {/* Language Toggle */}
               <button
                 onClick={toggleLanguage}
@@ -286,23 +309,34 @@ const MaintenancePage = ({ mode = 'coming_soon', message, expectedBack }) => {
               © {new Date().getFullYear()} BidVex. {currentLang === 'fr' ? 'Tous droits réservés.' : 'All rights reserved.'}
             </p>
             
-            {/* Social Links */}
+            {/* Social Links - Dynamic from admin settings */}
             <div className="flex items-center gap-4">
-              {[
-                { icon: Twitter, href: '#', label: 'Twitter' },
-                { icon: Facebook, href: '#', label: 'Facebook' },
-                { icon: Instagram, href: '#', label: 'Instagram' },
-                { icon: Linkedin, href: '#', label: 'LinkedIn' }
-              ].map((social) => (
-                <a
-                  key={social.label}
-                  href={social.href}
-                  aria-label={social.label}
-                  className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-                >
-                  <social.icon className="h-5 w-5" />
-                </a>
-              ))}
+              {socialMediaIcons.filter(s => s.href && s.href !== '#').length > 0 ? (
+                // Show only configured social links
+                socialMediaIcons.filter(s => s.href && s.href !== '#').map((social) => (
+                  <a
+                    key={social.label}
+                    href={social.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={social.label}
+                    className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                  >
+                    <social.icon className="h-5 w-5" />
+                  </a>
+                ))
+              ) : (
+                // Show all as placeholders if none configured
+                socialMediaIcons.map((social) => (
+                  <div
+                    key={social.label}
+                    aria-label={social.label}
+                    className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 border border-white/10 text-slate-400 opacity-50"
+                  >
+                    <social.icon className="h-5 w-5" />
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </footer>

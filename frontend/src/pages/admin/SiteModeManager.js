@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import {
   Globe, Wrench, Rocket, RefreshCw, Save, Eye, Users, Mail,
   Download, Trash2, Search, Calendar, TrendingUp, AlertTriangle,
-  CheckCircle, Clock, ExternalLink, Copy
+  CheckCircle, Clock, ExternalLink, Copy, Twitter, Facebook, Instagram, Linkedin, Lock, Info
 } from 'lucide-react';
 import {
   Dialog,
@@ -77,6 +77,14 @@ const SiteModeManager = () => {
   const [saving, setSaving] = useState(false);
   const [updatedAt, setUpdatedAt] = useState(null);
   
+  // Social links state
+  const [socialLinks, setSocialLinks] = useState({
+    twitter: '',
+    facebook: '',
+    instagram: '',
+    linkedin: ''
+  });
+  
   // Subscribers state
   const [subscribers, setSubscribers] = useState([]);
   const [subscriberStats, setSubscriberStats] = useState(null);
@@ -101,6 +109,7 @@ const SiteModeManager = () => {
       setCurrentMode(response.data.mode || 'live');
       setMessage(response.data.message || '');
       setExpectedBack(response.data.expected_back || '');
+      setSocialLinks(response.data.social_links || { twitter: '', facebook: '', instagram: '', linkedin: '' });
       setUpdatedAt(response.data.updated_at);
     } catch (error) {
       console.error('Error fetching site mode:', error);
@@ -151,7 +160,8 @@ const SiteModeManager = () => {
       await axios.put(`${API}/admin/site-mode`, {
         mode: currentMode,
         message: message || null,
-        expected_back: expectedBack || null
+        expected_back: expectedBack || null,
+        social_links: socialLinks
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -282,6 +292,28 @@ const SiteModeManager = () => {
         </Card>
       )}
 
+      {/* Admin Access Info - Show when not in live mode */}
+      {currentMode !== 'live' && (
+        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-blue-100 dark:bg-blue-800 rounded-lg">
+              <Lock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-blue-900 dark:text-blue-200">Admin Access</h4>
+              <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                While the site is in {currentMode === 'maintenance' ? 'Maintenance' : 'Coming Soon'} mode:
+              </p>
+              <ul className="text-sm text-blue-600 dark:text-blue-400 mt-2 space-y-1 list-disc list-inside">
+                <li>Go to <code className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-800 rounded text-xs">/admin</code> to access the admin panel</li>
+                <li>Login with your <code className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-800 rounded text-xs">@bidvex.com</code> admin email</li>
+                <li>A lock icon <Lock className="h-3 w-3 inline" /> on the maintenance page links to admin</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Mode Selection */}
       <Card>
         <CardHeader>
@@ -356,6 +388,70 @@ const SiteModeManager = () => {
                 If set, a countdown timer will be displayed
               </p>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Social Media Links */}
+      {currentMode !== 'live' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ExternalLink className="h-5 w-5" />
+              Social Media Links
+            </CardTitle>
+            <CardDescription>Configure social media links shown on the coming soon / maintenance page</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Twitter className="h-4 w-4 text-blue-400" />
+                  Twitter / X
+                </Label>
+                <Input
+                  placeholder="https://twitter.com/bidvex"
+                  value={socialLinks.twitter || ''}
+                  onChange={(e) => setSocialLinks(prev => ({ ...prev, twitter: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Facebook className="h-4 w-4 text-blue-600" />
+                  Facebook
+                </Label>
+                <Input
+                  placeholder="https://facebook.com/bidvex"
+                  value={socialLinks.facebook || ''}
+                  onChange={(e) => setSocialLinks(prev => ({ ...prev, facebook: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Instagram className="h-4 w-4 text-pink-500" />
+                  Instagram
+                </Label>
+                <Input
+                  placeholder="https://instagram.com/bidvex"
+                  value={socialLinks.instagram || ''}
+                  onChange={(e) => setSocialLinks(prev => ({ ...prev, instagram: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Linkedin className="h-4 w-4 text-blue-700" />
+                  LinkedIn
+                </Label>
+                <Input
+                  placeholder="https://linkedin.com/company/bidvex"
+                  value={socialLinks.linkedin || ''}
+                  onChange={(e) => setSocialLinks(prev => ({ ...prev, linkedin: e.target.value }))}
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-4">
+              Leave empty to hide the icon. Social icons appear in the footer of the maintenance/coming soon page.
+            </p>
           </CardContent>
         </Card>
       )}

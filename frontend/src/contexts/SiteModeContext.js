@@ -12,6 +12,7 @@ const SiteModeContext = createContext({
   mode: 'live',
   message: null,
   expectedBack: null,
+  socialLinks: null,
   loading: true,
   isMaintenanceOrComingSoon: false,
   refresh: () => {}
@@ -21,6 +22,7 @@ export const SiteModeProvider = ({ children }) => {
   const [mode, setMode] = useState('live');
   const [message, setMessage] = useState(null);
   const [expectedBack, setExpectedBack] = useState(null);
+  const [socialLinks, setSocialLinks] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const fetchSiteMode = async () => {
@@ -29,6 +31,7 @@ export const SiteModeProvider = ({ children }) => {
       setMode(response.data.mode || 'live');
       setMessage(response.data.message);
       setExpectedBack(response.data.expected_back);
+      setSocialLinks(response.data.social_links);
     } catch (error) {
       console.error('Error fetching site mode:', error);
       // Default to live mode on error
@@ -53,6 +56,7 @@ export const SiteModeProvider = ({ children }) => {
       mode,
       message,
       expectedBack,
+      socialLinks,
       loading,
       isMaintenanceOrComingSoon,
       refresh: fetchSiteMode

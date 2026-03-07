@@ -136,7 +136,7 @@ const PhoneVerificationRoute = ({ children }) => {
 
 // Route guard for maintenance/coming soon mode
 const MaintenanceGuard = ({ children }) => {
-  const { mode, message, expectedBack, loading, isMaintenanceOrComingSoon } = useSiteMode();
+  const { mode, message, expectedBack, socialLinks, loading, isMaintenanceOrComingSoon } = useSiteMode();
   const { user, loading: authLoading } = useAuth();
   const location = useLocation();
   
@@ -170,7 +170,7 @@ const MaintenanceGuard = ({ children }) => {
   
   // If in maintenance/coming soon mode and not admin, show maintenance page
   if (isMaintenanceOrComingSoon && !isAdmin && !isPreview) {
-    return <MaintenancePage mode={mode} message={message} expectedBack={expectedBack} />;
+    return <MaintenancePage mode={mode} message={message} expectedBack={expectedBack} socialLinks={socialLinks} />;
   }
   
   return children;
