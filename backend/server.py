@@ -7660,6 +7660,256 @@ async def get_subscription_analytics(current_user: User = Depends(get_current_us
         logger.error(f"Error fetching subscription analytics: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# ========== SITE MODE & MAINTENANCE SYSTEM ==========
+
+class SiteModeUpdate(BaseModel):
+    """Model for site mode update"""
+    mode: str = Field(..., description="Site mode: live, maintenance, coming_soon")
+    message: Optional[str] = Field(None, description="Custom message to display")
+    expected_back: Optional[str] = Field(None, description="Expected back online time")
+
+class EmailSubscription(BaseModel):
+    """Model for email subscription"""
+    email: EmailStr
+
+@api_router.get("/site-mode")
+async def get_site_mode():
+    """
+    Get current site mode (public endpoint).
+    Returns: live, maintenance, or coming_soon
+    """
+    try:
+        settings = await db.site_settings.find_one({"setting_id": "site_mode"})
+        if not settings:
+            # Default to live mode
+            return {
+                "mode": "live",
+                "message": None,
+                "expected_back": None,
+                "updated_at": None
+            }
+        return {
+            "mode": settings.get("mode", "live"),
+            "message": settings.get("message"),
+            "expected_back": settings.get("expected_back"),
+            "updated_at": settings.get("updated_at")
+        }
+    except Exception as e:
+        logger.error(f"Error fetching site mode: {e}")
+        return {"mode": "live", "message": None, "expected_back": None}
+
+@api_router.put("/admin/site-mode")
+async def update_site_mode(data: SiteModeUpdate, current_user: User = Depends(get_current_user)):
+    """
+    Update site mode (admin only).
+    Valid modes: live, maintenance, coming_soon
+    """
+    if not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    if data.mode not in ["live", "maintenance", "coming_soon"]:
+        raise HTTPException(status_code=400, detail="Invalid mode. Use: live, maintenance, coming_soon")
+    
+    try:
+        update_data = {
+            "setting_id": "site_mode",
+            "mode": data.mode,
+            "message": data.message,
+            "expected_back": data.expected_back,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_by": current_user.email
+        }
+        
+        await db.site_settings.update_one(
+            {"setting_id": "site_mode"},
+            {"$set": update_data},
+            upsert=True
+        )
+        
+        # Log the action
+        await db.admin_logs.insert_one({
+            "log_id": f"log-{uuid.uuid4()}",
+            "action": "site_mode_changed",
+            "admin_email": current_user.email,
+            "details": f"Changed site mode to: {data.mode}",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+        
+        return {"success": True, "mode": data.mode, "message": "Site mode updated successfully"}
+    except Exception as e:
+        logger.error(f"Error updating site mode: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/subscribe")
+async def subscribe_email(data: EmailSubscription, request: Request):
+    """
+    Subscribe an email to launch notifications (public endpoint).
+    Used on maintenance/coming soon page.
+    """
+    try:
+        # Check if already subscribed
+        existing = await db.launch_subscribers.find_one({"email": data.email.lower()})
+        if existing:
+            return {"success": True, "message": "You're already subscribed! We'll notify you when we launch."}
+        
+        # Get client IP
+        client_ip = request.client.host if request.client else None
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            client_ip = forwarded.split(",")[0].strip()
+        
+        # Save subscriber
+        subscriber = {
+            "subscriber_id": f"sub-{uuid.uuid4()}",
+            "email": data.email.lower(),
+            "subscribed_at": datetime.now(timezone.utc).isoformat(),
+            "ip_address": client_ip,
+            "source": "coming_soon_page",
+            "notified": False
+        }
+        
+        await db.launch_subscribers.insert_one(subscriber)
+        
+        return {
+            "success": True,
+            "message": "Thank you! We will notify you when BidVex is live."
+        }
+    except Exception as e:
+        logger.error(f"Error subscribing email: {e}")
+        raise HTTPException(status_code=500, detail="Failed to subscribe. Please try again.")
+
+@api_router.get("/admin/subscribers")
+async def get_subscribers(
+    current_user: User = Depends(get_current_user),
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=100),
+    search: str = Query(None)
+):
+    """
+    Get all launch subscribers (admin only).
+    """
+    if not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    try:
+        query = {}
+        if search:
+            query["email"] = {"$regex": search, "$options": "i"}
+        
+        total = await db.launch_subscribers.count_documents(query)
+        skip = (page - 1) * limit
+        
+        subscribers = await db.launch_subscribers.find(
+            query,
+            {"_id": 0}
+        ).sort("subscribed_at", -1).skip(skip).limit(limit).to_list(limit)
+        
+        return {
+            "success": True,
+            "subscribers": subscribers,
+            "total": total,
+            "page": page,
+            "pages": (total + limit - 1) // limit
+        }
+    except Exception as e:
+        logger.error(f"Error fetching subscribers: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/admin/subscribers/export")
+async def export_subscribers(current_user: User = Depends(get_current_user)):
+    """
+    Export all subscribers as CSV (admin only).
+    """
+    if not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    try:
+        subscribers = await db.launch_subscribers.find({}, {"_id": 0}).to_list(10000)
+        
+        # Build CSV content
+        csv_lines = ["email,subscribed_at,ip_address,source,notified"]
+        for sub in subscribers:
+            csv_lines.append(
+                f"{sub.get('email', '')},{sub.get('subscribed_at', '')},{sub.get('ip_address', '')},{sub.get('source', '')},{sub.get('notified', False)}"
+            )
+        
+        return {
+            "success": True,
+            "csv": "\n".join(csv_lines),
+            "total": len(subscribers),
+            "filename": f"bidvex_subscribers_{datetime.now().strftime('%Y%m%d')}.csv"
+        }
+    except Exception as e:
+        logger.error(f"Error exporting subscribers: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.delete("/admin/subscribers/{subscriber_id}")
+async def delete_subscriber(subscriber_id: str, current_user: User = Depends(get_current_user)):
+    """
+    Delete a subscriber (admin only).
+    """
+    if not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    try:
+        result = await db.launch_subscribers.delete_one({"subscriber_id": subscriber_id})
+        
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Subscriber not found")
+        
+        return {"success": True, "message": "Subscriber deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting subscriber: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/admin/subscribers/stats")
+async def get_subscriber_stats(current_user: User = Depends(get_current_user)):
+    """
+    Get subscriber statistics (admin only).
+    """
+    if not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    try:
+        total = await db.launch_subscribers.count_documents({})
+        
+        # Get subscribers by day (last 7 days)
+        now = datetime.now(timezone.utc)
+        daily_counts = []
+        for i in range(6, -1, -1):
+            day = now - timedelta(days=i)
+            day_start = day.replace(hour=0, minute=0, second=0, microsecond=0)
+            day_end = day_start + timedelta(days=1)
+            
+            count = await db.launch_subscribers.count_documents({
+                "subscribed_at": {
+                    "$gte": day_start.isoformat(),
+                    "$lt": day_end.isoformat()
+                }
+            })
+            daily_counts.append({
+                "date": day_start.strftime("%b %d"),
+                "count": count
+            })
+        
+        # Today's count
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        today_count = await db.launch_subscribers.count_documents({
+            "subscribed_at": {"$gte": today_start.isoformat()}
+        })
+        
+        return {
+            "success": True,
+            "total": total,
+            "today": today_count,
+            "daily_trend": daily_counts
+        }
+    except Exception as e:
+        logger.error(f"Error fetching subscriber stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Use environment variable for API key (already defined at line 9308)
 
 @api_router.post("/admin/trust-safety/analyze-content")

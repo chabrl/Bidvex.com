@@ -6,6 +6,7 @@ import { useAuth } from './contexts/AuthContext';
 import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
 import { SiteConfigProvider } from './contexts/SiteConfigContext';
 import { CurrencyProvider } from './contexts/CurrencyContext';
+import { SiteModeProvider, useSiteMode } from './contexts/SiteModeContext';
 import { Toaster } from './components/ui/sonner';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -43,6 +44,7 @@ import PhoneVerificationPage from './pages/PhoneVerificationPage';
 import ClientEmailMarketing from './pages/ClientEmailMarketing';
 import EmailMarketingPricing from './pages/EmailMarketingPricing';
 import SubscriptionPricingPage from './pages/SubscriptionPricingPage';
+import MaintenancePage from './pages/MaintenancePage';
 
 // Vehicle Auction Module (Standalone)
 import VehicleAuctionsPage from './pages/vehicles/VehicleAuctionsPage';
@@ -132,6 +134,48 @@ const PhoneVerificationRoute = ({ children }) => {
   return children;
 };
 
+// Route guard for maintenance/coming soon mode
+const MaintenanceGuard = ({ children }) => {
+  const { mode, message, expectedBack, loading, isMaintenanceOrComingSoon } = useSiteMode();
+  const { user, loading: authLoading } = useAuth();
+  const location = useLocation();
+  
+  // Allow preview mode via URL param
+  const searchParams = new URLSearchParams(location.search);
+  const isPreview = searchParams.get('preview_mode') === 'true';
+  
+  // Always allow access to admin route (authentication handled separately by ProtectedRoute)
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  if (isAdminRoute) {
+    return children;
+  }
+  
+  // Always allow access to auth page for admin login
+  const isAuthRoute = location.pathname === '/auth';
+  if (isAuthRoute) {
+    return children;
+  }
+  
+  // Wait for both site mode and auth to load
+  if (loading || authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
+      </div>
+    );
+  }
+  
+  // Allow admins to access the site normally
+  const isAdmin = user?.email?.endsWith('@bidvex.com');
+  
+  // If in maintenance/coming soon mode and not admin, show maintenance page
+  if (isMaintenanceOrComingSoon && !isAdmin && !isPreview) {
+    return <MaintenancePage mode={mode} message={message} expectedBack={expectedBack} />;
+  }
+  
+  return children;
+};
+
 const App = () => {
   const { i18n } = useTranslation();
   const { user, processGoogleSession } = useAuth();
@@ -187,7 +231,9 @@ const App = () => {
         <SiteConfigProvider>
           <CurrencyProvider>
           <FeatureFlagsProvider>
+          <SiteModeProvider>
             <ScrollToTop />
+            <MaintenanceGuard>
         <div className="App min-h-screen bg-gradient-to-br from-blue-50 via-white to-teal-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
           <TrendyAnnouncementBar />
           <Navbar />
@@ -276,6 +322,8 @@ const App = () => {
           <CookieConsentBanner />
             <MobileBottomNav />
           </div>
+          </MaintenanceGuard>
+          </SiteModeProvider>
         </FeatureFlagsProvider>
         </CurrencyProvider>
       </SiteConfigProvider>

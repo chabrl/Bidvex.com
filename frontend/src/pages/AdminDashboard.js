@@ -37,11 +37,12 @@ import AIGuardDashboard from './admin/AIGuardDashboard';
 import PricingManager from './admin/PricingManager';
 import CouponManager from './admin/CouponManager';
 import SubscriptionAnalytics from './admin/SubscriptionAnalytics';
+import SiteModeManager from './admin/SiteModeManager';
 import { 
   Users, Package, Gavel, Shield, TrendingUp, Bell, Settings, FileText, 
   MessageSquare, DollarSign, Search, Image, CreditCard, Megaphone, 
   Activity, AlertTriangle, ChevronRight, Power, Zap, Eye, History,
-  ToggleLeft, ToggleRight, Clock, Mail, Sliders, Car, Send, Bot, Ticket, BarChart3
+  ToggleLeft, ToggleRight, Clock, Mail, Sliders, Car, Send, Bot, Ticket, BarChart3, Globe
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -72,6 +73,7 @@ const SECONDARY_TABS = {
     { id: 'ai-guard', label: 'AI Guard', icon: '🤖', lucideIcon: Bot },
   ],
   settings: [
+    { id: 'site-mode', label: 'Site Mode', icon: '🌐', lucideIcon: Globe },
     { id: 'site-content', label: 'Site Content & Pages', icon: '📄', lucideIcon: FileText },
     { id: 'branding-layout', label: 'Branding & Layout', icon: '🎨', lucideIcon: Settings },
     { id: 'marketplace-settings', label: 'Marketplace Settings', icon: '⚙️', lucideIcon: Sliders },
@@ -294,6 +296,7 @@ const AdminDashboard = () => {
         }
       case 'settings':
         switch (secondaryTab) {
+          case 'site-mode': return <SiteModeManager />;
           case 'site-content': return <SiteContentManager />;
           case 'branding-layout': return <BrandingLayoutManager />;
           case 'marketplace-settings': return <MarketplaceSettings />;
@@ -304,7 +307,7 @@ const AdminDashboard = () => {
           case 'email-marketing': return <EmailMarketingManager />;
           case 'trust-safety': return <TrustSafetyDashboard />;
           case 'email-templates': return <EmailTemplates />;
-          default: return <SiteContentManager />;
+          default: return <SiteModeManager />;
         }
       case 'banners':
         switch (secondaryTab) {

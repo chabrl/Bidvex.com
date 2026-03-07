@@ -1,0 +1,124 @@
+{
+  "summary": "Full E2E testing of Website Maintenance / Coming Soon Mode feature. All 18 backend API tests passed. Frontend testing verified Coming Soon page display, email subscription, admin auth access, mode switching, and subscriber management.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_site_mode.py",
+    "/app/test_reports/pytest/pytest_results_site_mode.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "MaintenanceGuard in App.js correctly allows /auth and /admin routes through always",
+    "SiteModeContext provides global state via useSiteMode() hook",
+    "Admin email check uses @bidvex.com domain (current admin is charbeladmin@bidvex.com)",
+    "Site mode persists in MongoDB site_settings collection",
+    "Subscribers stored in launch_subscribers collection with proper deduplication"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_site_mode.py"
+  ],
+  "success_rate": {
+    "backend": "100% (18/18 tests passed)",
+    "frontend": "100% (all flows verified)"
+  },
+  "test_credentials": {
+    "admin_email": "charbeladmin@bidvex.com",
+    "admin_password": "Admin123!"
+  },
+  "seed_data_creation": "Created test email subscribers during testing - prefixed with TEST_ or playwright_test_",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Site mode feature fully functional. Current state: coming_soon mode. Admin can toggle between live/maintenance/coming_soon. Subscriber management (list, export CSV, delete) all working.",
+  "features_tested": {
+    "1_get_site_mode_api": {
+      "status": "PASSED",
+      "endpoint": "GET /api/site-mode",
+      "details": "Returns current mode (coming_soon/maintenance/live) with optional message and expected_back"
+    },
+    "2_update_site_mode_api": {
+      "status": "PASSED",
+      "endpoint": "PUT /api/admin/site-mode",
+      "details": "Admin can update mode. Requires @bidvex.com email. Validates mode values."
+    },
+    "3_subscribe_email_api": {
+      "status": "PASSED",
+      "endpoint": "POST /api/subscribe",
+      "details": "Saves email to launch_subscribers. Handles duplicates gracefully. Validates email format."
+    },
+    "4_get_subscribers_api": {
+      "status": "PASSED",
+      "endpoint": "GET /api/admin/subscribers",
+      "details": "Returns paginated list with search. Admin only."
+    },
+    "5_export_subscribers_csv": {
+      "status": "PASSED",
+      "endpoint": "GET /api/admin/subscribers/export",
+      "details": "Returns CSV format with headers: email,subscribed_at,ip_address,source,notified"
+    },
+    "6_delete_subscriber_api": {
+      "status": "PASSED",
+      "endpoint": "DELETE /api/admin/subscribers/{id}",
+      "details": "Deletes by subscriber_id. Returns 404 for non-existent."
+    },
+    "7_subscriber_stats_api": {
+      "status": "PASSED",
+      "endpoint": "GET /api/admin/subscribers/stats",
+      "details": "Returns total, today count, and 7-day trend"
+    },
+    "8_coming_soon_page_display": {
+      "status": "PASSED",
+      "details": "Displays when mode=coming_soon with BidVex branding, email form, feature highlights"
+    },
+    "9_email_subscription_ui": {
+      "status": "PASSED",
+      "details": "Form submits via POST /api/subscribe. Shows 'You're on the list!' success state."
+    },
+    "10_admin_auth_access": {
+      "status": "PASSED",
+      "details": "/auth route accessible in maintenance/coming_soon mode (MaintenanceGuard allows it)"
+    },
+    "11_admin_panel_access": {
+      "status": "PASSED",
+      "details": "/admin route accessible after login. Shows Site Mode in Settings tab."
+    },
+    "12_site_mode_manager_ui": {
+      "status": "PASSED",
+      "details": "Settings > Site Mode shows toggle, current mode badge, subscriber stats, CSV export"
+    },
+    "13_mode_switching_live": {
+      "status": "PASSED",
+      "details": "Switching to Live mode removes Coming Soon page and shows normal homepage"
+    },
+    "14_mode_persistence": {
+      "status": "PASSED",
+      "details": "Mode changes persist after save. Verified via API call after update."
+    }
+  },
+  "api_verification": {
+    "GET /api/site-mode": "PASSED - Returns mode, message, expected_back, updated_at",
+    "PUT /api/admin/site-mode": "PASSED - Requires auth, validates mode enum",
+    "POST /api/subscribe": "PASSED - Creates subscriber, handles duplicates",
+    "GET /api/admin/subscribers": "PASSED - Paginated list with search",
+    "GET /api/admin/subscribers/export": "PASSED - CSV format export",
+    "DELETE /api/admin/subscribers/{id}": "PASSED - Deletes by subscriber_id",
+    "GET /api/admin/subscribers/stats": "PASSED - Total, today, daily_trend"
+  },
+  "playwright_tests": {
+    "coming_soon_page_loads": "PASSED",
+    "email_subscription_form_works": "PASSED",
+    "subscription_success_message": "PASSED",
+    "auth_page_accessible": "PASSED",
+    "admin_login_works": "PASSED",
+    "admin_panel_accessible": "PASSED",
+    "site_mode_manager_visible": "PASSED",
+    "mode_switch_to_live": "PASSED",
+    "mode_restored_to_coming_soon": "PASSED"
+  }
+}
