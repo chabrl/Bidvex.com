@@ -450,7 +450,7 @@ const VehicleAuctionsPage = () => {
             <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
               <Button
                 onClick={() => navigate('/vehicle-auctions/seller/register')}
-                className="bg-white text-emerald-700 hover:bg-emerald-50 dark:bg-white dark:text-emerald-700 dark:hover:bg-emerald-50 font-semibold px-6 h-11 rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center"
+                className="bg-white text-emerald-700 hover:bg-emerald-50 dark:bg-white dark:text-emerald-700 dark:hover:bg-emerald-50 font-semibold px-5 h-10 rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center"
                 data-testid="btn-seller-register"
               >
                 <User className="h-4 w-4 mr-2" />
@@ -458,11 +458,19 @@ const VehicleAuctionsPage = () => {
               </Button>
               <Button
                 onClick={() => navigate('/vehicle-auctions/create')}
-                className="bg-transparent border-2 border-white text-white hover:bg-white/20 dark:border-white dark:text-white dark:hover:bg-white/20 font-semibold px-6 h-11 rounded-lg transition-all flex items-center justify-center"
+                className="bg-transparent border-2 border-white text-white hover:bg-white/20 dark:border-white dark:text-white dark:hover:bg-white/20 font-semibold px-5 h-10 rounded-lg transition-all flex items-center justify-center"
                 data-testid="btn-create-listing"
               >
                 <PlusCircle className="h-4 w-4 mr-2" />
                 List a Vehicle
+              </Button>
+              <Button
+                onClick={() => navigate('/vehicle-auctions/my-listings')}
+                className="bg-transparent border-2 border-white text-white hover:bg-white/20 dark:border-white dark:text-white dark:hover:bg-white/20 font-semibold px-5 h-10 rounded-lg transition-all flex items-center justify-center"
+                data-testid="btn-my-listings"
+              >
+                <Car className="h-4 w-4 mr-2" />
+                My Listings
               </Button>
             </div>
           </div>
