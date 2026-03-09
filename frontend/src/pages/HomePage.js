@@ -70,8 +70,12 @@ const HomePage = () => {
   const [featured, setFeatured] = useState([]);
   const [newListings, setNewListings] = useState([]);
   const [recentlySold, setRecentlySold] = useState([]);
+  const [heroLoaded, setHeroLoaded] = useState(false);
 
   useEffect(() => {
+    // Trigger hero animation after mount
+    setTimeout(() => setHeroLoaded(true), 100);
+    
     fetchTopSellers();
     fetchHotItems();
     fetchEndingSoon();
@@ -136,6 +140,133 @@ const HomePage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900" data-testid="home-page">
+      {/* ========== EXTRAORDINARY HERO SECTION ========== */}
+      <section className="relative min-h-[90vh] flex items-center overflow-hidden">
+        {/* Animated Gradient Background */}
+        <div className="absolute inset-0 animated-gradient" />
+        
+        {/* Animated Pattern Overlay */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute inset-0" style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+          }} />
+        </div>
+        
+        {/* Floating Orbs */}
+        <div className="absolute top-20 left-10 w-64 h-64 bg-cyan-400/20 rounded-full blur-[80px] float-animation" />
+        <div className="absolute bottom-20 right-10 w-96 h-96 bg-blue-600/20 rounded-full blur-[100px] float-animation" style={{ animationDelay: '-2s' }} />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-cyan-500/10 rounded-full blur-[120px]" />
+        
+        {/* Particle Effects */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {[...Array(20)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute w-1 h-1 bg-cyan-400 rounded-full opacity-60"
+              style={{
+                top: `${Math.random() * 100}%`,
+                left: `${Math.random() * 100}%`,
+                animation: `sparkle ${2 + Math.random() * 3}s ease-in-out infinite`,
+                animationDelay: `${Math.random() * 2}s`
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Hero Content */}
+        <div className="relative max-w-7xl mx-auto px-4 py-20 md:py-32 w-full">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            {/* Left Content */}
+            <div className="text-white space-y-8">
+              {/* Animated Badge */}
+              <div className={`transition-all duration-1000 ${heroLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+                <Badge className="bg-white/10 backdrop-blur-md text-white border border-cyan-400/30 text-sm px-5 py-2.5 shadow-lg shadow-cyan-500/20">
+                  <Sparkles className="h-4 w-4 mr-2 inline text-cyan-400" />
+                  {t('homepage.liveAuctionsNow')}
+                </Badge>
+              </div>
+              
+              {/* Animated Headline */}
+              <div className="space-y-4">
+                <h1 className={`text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.1] transition-all duration-1000 delay-200 ${heroLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+                  <span className="block text-white">{t('homepage.discover')}</span>
+                  <span className="block bg-gradient-to-r from-cyan-400 via-cyan-300 to-blue-400 bg-clip-text text-transparent">
+                    {t('homepage.bid')}
+                  </span>
+                  <span className="block text-white">{t('homepage.win')}</span>
+                </h1>
+              </div>
+              
+              {/* Animated Description */}
+              <p className={`text-lg md:text-xl text-blue-100/90 max-w-lg leading-relaxed transition-all duration-1000 delay-400 ${heroLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+                {t('homepage.heroDescription')}
+              </p>
+              
+              {/* Animated CTA Buttons */}
+              <div className={`flex flex-col sm:flex-row gap-4 transition-all duration-1000 delay-500 ${heroLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+                <Button 
+                  onClick={() => navigate('/marketplace')}
+                  className="btn-shine bg-gradient-to-r from-cyan-500 to-cyan-400 hover:from-cyan-400 hover:to-cyan-300 text-slate-900 font-bold px-8 py-6 text-lg shadow-xl shadow-cyan-500/30 hover:shadow-2xl hover:shadow-cyan-400/40 transition-all hover:-translate-y-1 whitespace-nowrap"
+                >
+                  <Zap className="mr-2 h-5 w-5 flex-shrink-0" />
+                  {t('hero.browseAuctions')}
+                  <ArrowRight className="ml-2 h-5 w-5 flex-shrink-0" />
+                </Button>
+                <Button 
+                  onClick={() => navigate('/how-it-works')}
+                  variant="outline"
+                  className="border-2 border-white/30 bg-white/5 backdrop-blur-sm text-white hover:bg-white/15 hover:border-cyan-400/50 px-8 py-6 text-lg transition-all whitespace-nowrap"
+                >
+                  <Play className="mr-2 h-5 w-5 flex-shrink-0" />
+                  {t('homepage.howItWorks')}
+                </Button>
+              </div>
+
+              {/* Trust Indicators */}
+              <div className={`flex flex-wrap items-center gap-6 pt-4 transition-all duration-1000 delay-700 ${heroLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+                {[
+                  { icon: <Shield className="h-5 w-5" />, text: t('homepage.securePayments'), color: 'text-green-400' },
+                  { icon: <CheckCircle2 className="h-5 w-5" />, text: t('homepage.verifiedSellers'), color: 'text-cyan-400' },
+                  { icon: <Trophy className="h-5 w-5" />, text: t('homepage.buyerProtection'), color: 'text-yellow-400' }
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center gap-2 text-sm text-blue-100/80">
+                    <span className={item.color}>{item.icon}</span>
+                    <span>{item.text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Right Side - Live Stats Cards */}
+            <div className={`hidden lg:grid grid-cols-2 gap-5 transition-all duration-1000 delay-300 ${heroLoaded ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-20'}`}>
+              {[
+                { value: '50K+', label: t('homepage.activeBidders'), icon: <Users className="h-6 w-6" />, delay: 0 },
+                { value: '10K+', label: t('homepage.liveAuctions'), icon: <Gavel className="h-6 w-6" />, delay: 100 },
+                { value: '$2M+', label: t('homepage.itemsWon'), icon: <TrendingUp className="h-6 w-6" />, delay: 200 },
+                { value: '99.9%', label: t('homepage.satisfaction'), icon: <Award className="h-6 w-6" />, delay: 300 }
+              ].map((stat, i) => (
+                <div 
+                  key={i} 
+                  className="group bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 hover:bg-white/20 hover:border-cyan-400/40 transition-all duration-300 hover:-translate-y-2 hover:shadow-xl hover:shadow-cyan-500/20"
+                  style={{ animationDelay: `${stat.delay}ms` }}
+                >
+                  <div className="text-cyan-400 mb-3 group-hover:scale-110 transition-transform">{stat.icon}</div>
+                  <div className="text-4xl font-bold text-white mb-1">{stat.value}</div>
+                  <div className="text-blue-200/70 text-sm">{stat.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        
+        {/* Wave Divider */}
+        <div className="absolute bottom-0 left-0 right-0">
+          <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full">
+            <path d="M0 120L48 108C96 96 192 72 288 60C384 48 480 48 576 54C672 60 768 72 864 78C960 84 1056 84 1152 78C1248 72 1344 60 1392 54L1440 48V120H1392C1344 120 1248 120 1152 120C1056 120 960 120 864 120C768 120 672 120 576 120C480 120 384 120 288 120C192 120 96 120 48 120H0Z" fill="#F8FAFC" className="dark:fill-slate-900"/>
+          </svg>
+        </div>
+      </section>
+
       {/* ========== LIVE AUCTIONS SECTION ========== */}
       {isSectionVisible('ending_soon') && (
         <LiveAuctionsSection items={endingSoon} navigate={navigate} />
