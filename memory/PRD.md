@@ -27,7 +27,10 @@ i18n: react-i18next (EN/FR bilingual support)
 ## Current Status: ✅ i18n BILINGUAL SUPPORT COMPLETE
 
 ### Session Summary (Mar 9, 2026 - Latest Update)
-Completed internationalization (i18n) implementation for full bilingual support (English/French - Quebec specific).
+Completed full internationalization (i18n) implementation including:
+- Legal Pages Migration (separate EN/FR components)
+- Marketplace & Settings dictionary updates
+- UI Component Audit
 
 **i18n Features Implemented:**
 
@@ -45,16 +48,37 @@ Completed internationalization (i18n) implementation for full bilingual support 
    - How It Works: Browse/Parcourir, Bid/Miser, Win/Gagner
    - Login Page: Welcome Back/Bon retour, Email/Courriel, Password/Mot de passe
    - Footer: Privacy Policy/Politique de Confidentialité, Terms/Conditions d'Utilisation
+   - Marketplace: place_bid, current_bid, buy_now, ends_in, reserve_met, lot_details
+   - Settings: account_info, payout_settings, notification_prefs, verify_identity, security_settings
 
-3. ✅ **Language Persistence**
+3. ✅ **Legal Pages Migration**
+   - Separate component files: TermsEN.jsx, TermsFR.jsx, PrivacyEN.jsx, PrivacyFR.jsx
+   - Dynamic rendering based on i18n.language in TermsOfServicePage.js and PrivacyPolicyPage.js
+   - Full French translations (Quebec-specific OQLF compliant)
+
+4. ✅ **Language Persistence**
    - Language preference saved to localStorage under 'bidvex_language' key
-   - Persists on page refresh
+   - Persists on page refresh and across navigation
    - Browser language detection as fallback
 
-4. ✅ **Translation Files**
-   - `/app/frontend/src/locales/en.json` - English translations
+5. ✅ **Translation Files**
+   - `/app/frontend/src/locales/en.json` - English translations (with marketplace & settings keys)
    - `/app/frontend/src/locales/fr.json` - French translations (Quebec-specific OQLF compliant)
    - `/app/frontend/src/i18n.js` - i18next configuration with merged translations
+   - `/app/frontend/src/components/legal/` - EN/FR component directory
+
+### Testing Results (iteration_33.json)
+- ✅ Terms of Service - English: Shows 'BidVex Terms & Conditions'
+- ✅ Terms of Service - French: Shows 'Conditions générales d'utilisation de BidVex'
+- ✅ Privacy Policy - English: Shows 'BidVex Privacy Policy'
+- ✅ Privacy Policy - French: Shows 'Politique de confidentialité de BidVex'
+- ✅ Marketplace translations: French shows 'Enchères Actives', English shows 'Active Auctions'
+- ✅ Language persistence across navigation
+- ✅ Language persistence on page refresh
+- **Success Rate: 100%**
+
+### Minor Issue (P3)
+- Cookie consent modal doesn't translate (shows English regardless of language)
 
 ### Previous Session Summary (Vehicle Auction System)
 Implemented comprehensive Vehicle Auction Operational Logic including Trust & Verification System, Fee Transparency, Auction Rules, Legal Compliance UI, and Admin Dashboard enhancements.
