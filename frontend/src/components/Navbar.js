@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { 
-  Moon, Sun, Globe, User, LogOut, LayoutDashboard, 
+  Moon, Sun, User, LogOut, LayoutDashboard, 
   MessageCircle, DollarSign, Shield, Menu, X,
   Home, ShoppingBag, Gavel, ChevronDown, Car
 } from 'lucide-react';
@@ -63,7 +63,7 @@ const Navbar = () => {
     { path: '/', label: t('nav.home'), icon: Home },
     { path: '/marketplace', label: t('nav.marketplace'), icon: ShoppingBag },
     { path: '/lots', label: t('nav.lotsAuction'), icon: Gavel },
-    { path: '/vehicle-auctions', label: 'Vehicles', icon: Car },
+    { path: '/vehicle-auctions', label: t('vehicles.vehicleAuctions'), icon: Car },
   ];
 
   return (
@@ -151,33 +151,35 @@ const Navbar = () => {
                 )}
               </Button>
 
-              {/* Language Selector */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    data-testid="language-toggle-btn" 
-                    className="hover:bg-slate-100 dark:hover:bg-slate-800 navbar-icon-btn"
-                  >
-                    <Globe className="h-5 w-5 navbar-icon text-slate-900 dark:text-slate-100" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-40">
-                  <DropdownMenuItem 
-                    onClick={() => changeLanguage('en')}
-                    className={i18n.language === 'en' ? 'bg-accent' : ''}
-                  >
-                    🇬🇧 English
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => changeLanguage('fr')}
-                    className={i18n.language === 'fr' ? 'bg-accent' : ''}
-                  >
-                    🇫🇷 Français
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {/* Language Toggle - EN | FR */}
+              <div 
+                className="flex items-center border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden"
+                data-testid="language-toggle"
+              >
+                <button
+                  onClick={() => changeLanguage('en')}
+                  data-testid="language-en-btn"
+                  className={`px-2.5 py-1.5 text-xs font-semibold transition-all duration-200 ${
+                    i18n.language === 'en' || i18n.language?.startsWith('en')
+                      ? 'bg-primary text-white'
+                      : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  EN
+                </button>
+                <div className="w-px h-5 bg-slate-200 dark:bg-slate-700" />
+                <button
+                  onClick={() => changeLanguage('fr')}
+                  data-testid="language-fr-btn"
+                  className={`px-2.5 py-1.5 text-xs font-semibold transition-all duration-200 ${
+                    i18n.language === 'fr' || i18n.language?.startsWith('fr')
+                      ? 'bg-primary text-white'
+                      : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  FR
+                </button>
+              </div>
 
               {/* Notification Center (Bell Icon) */}
               {user && <NotificationCenter />}

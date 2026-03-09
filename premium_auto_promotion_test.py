@@ -12,7 +12,7 @@ from typing import Dict, Any, Optional
 import uuid
 
 # Configuration
-BASE_URL = "https://seller-verify-7.preview.emergentagent.com/api"
+BASE_URL = "https://auction-bilingual.preview.emergentagent.com/api"
 
 class PremiumAutoPromotionTester:
     def __init__(self):

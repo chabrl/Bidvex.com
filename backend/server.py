@@ -3309,7 +3309,7 @@ async def add_payment_method(data: PaymentMethodCreate, current_user: User = Dep
             payment_method=data.payment_method_id,
             customer=current_user.id,
             confirm=True,
-            return_url='https://seller-verify-7.preview.emergentagent.com'
+            return_url='https://auction-bilingual.preview.emergentagent.com'
         )
         
         is_verified = intent.status == 'succeeded' or intent.status == 'requires_capture'
