@@ -8,7 +8,7 @@ Build and maintain a sophisticated full-stack auction platform (BidVex) with:
 - Multi-item and single-item auction listings
 - Comprehensive admin panel
 - Canadian tax compliance system
-- Full bilingual support (EN/FR)
+- Full bilingual support (EN/FR) ✅ **COMPLETED**
 - **Enterprise Vehicle Auction Module** (standalone, Copart/IAA quality)
 
 ## Architecture
@@ -21,11 +21,42 @@ AI: OpenAI GPT-4 via emergentintegrations
 Payments: Stripe (via emergentintegrations)
 Email: SendGrid
 Background Jobs: APScheduler
+i18n: react-i18next (EN/FR bilingual support)
 ```
 
-## Current Status: ✅ VEHICLE AUCTION OPERATIONAL LOGIC COMPLETE (Phase 1-5)
+## Current Status: ✅ i18n BILINGUAL SUPPORT COMPLETE
 
 ### Session Summary (Mar 9, 2026 - Latest Update)
+Completed internationalization (i18n) implementation for full bilingual support (English/French - Quebec specific).
+
+**i18n Features Implemented:**
+
+1. ✅ **Language Switcher (EN | FR)**
+   - Clean toggle button in main navigation/header
+   - Located near login/profile area (industry standard)
+   - EN button highlighted when English active
+   - FR button highlighted when French active
+   - Uses data-testid for testing: language-toggle, language-en-btn, language-fr-btn
+
+2. ✅ **Translation Coverage**
+   - Navigation: Home/Accueil, Marketplace/Marché, Lots Auction/Enchères par lots, Vehicles/Enchères de véhicules
+   - Hero Section: Discover/Découvrez, Bid/Misez, Win/Gagnez
+   - Trust Badges: Secure Payments/Paiements sécurisés, Verified Sellers/Vendeurs vérifiés
+   - How It Works: Browse/Parcourir, Bid/Miser, Win/Gagner
+   - Login Page: Welcome Back/Bon retour, Email/Courriel, Password/Mot de passe
+   - Footer: Privacy Policy/Politique de Confidentialité, Terms/Conditions d'Utilisation
+
+3. ✅ **Language Persistence**
+   - Language preference saved to localStorage under 'bidvex_language' key
+   - Persists on page refresh
+   - Browser language detection as fallback
+
+4. ✅ **Translation Files**
+   - `/app/frontend/src/locales/en.json` - English translations
+   - `/app/frontend/src/locales/fr.json` - French translations (Quebec-specific OQLF compliant)
+   - `/app/frontend/src/i18n.js` - i18next configuration with merged translations
+
+### Previous Session Summary (Vehicle Auction System)
 Implemented comprehensive Vehicle Auction Operational Logic including Trust & Verification System, Fee Transparency, Auction Rules, Legal Compliance UI, and Admin Dashboard enhancements.
 
 **Features Implemented:**

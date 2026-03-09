@@ -612,6 +612,17 @@ const buildEnglishResources = () => ({
     securePaymentsDesc: 'Bank-level encryption via Stripe',
     buyerProtectionDesc: 'Full refund guarantee on disputes',
     globalCommunityDesc: 'Verified buyers and sellers worldwide',
+    // How It Works section
+    howItWorksTitle: 'How It Works',
+    startWinning: 'Start winning amazing deals in three simple steps',
+    browse: 'Browse',
+    browseDesc: 'Find unique items from trusted sellers',
+    bidStep: 'Bid',
+    bidStepDesc: 'Place competitive bids in real-time',
+    winStep: 'Win',
+    winStepDesc: 'Secure your items with safe payment',
+    learnMore: 'Learn More',
+    gettingStarted: 'Getting Started',
   },
 
   // Bid Error Guide
@@ -1197,6 +1208,17 @@ const buildFrenchResources = () => ({
     securePaymentsDesc: 'Chiffrement bancaire via Stripe',
     buyerProtectionDesc: 'Garantie de remboursement complet en cas de litige',
     globalCommunityDesc: 'Acheteurs et vendeurs vérifiés dans le monde entier',
+    // How It Works section
+    howItWorksTitle: 'Comment ça fonctionne',
+    startWinning: 'Commencez à gagner des offres incroyables en trois étapes simples',
+    browse: 'Parcourir',
+    browseDesc: 'Trouvez des articles uniques de vendeurs de confiance',
+    bidStep: 'Miser',
+    bidStepDesc: 'Placez des enchères compétitives en temps réel',
+    winStep: 'Gagner',
+    winStepDesc: 'Sécurisez vos articles avec un paiement sûr',
+    learnMore: 'En Savoir Plus',
+    gettingStarted: 'Pour Commencer',
   },
 
   bidErrorGuide: {
