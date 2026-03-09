@@ -1,42 +1,33 @@
-<analysis>**original_problem_statement**: The user's initial request was to fix a broken vehicle filter UI. This evolved into a series of major feature implementations, including:
-1.  **Modern Vehicle Filter**: A complete overhaul of the vehicle filtering system, which was successfully integrated and tested.
-2.  **AI Fraud Detection**: A new AI Guard feature with a backend service (using GPT-4 for analysis) and an admin dashboard to monitor suspicious auction activity.
-3.  **Legal Pages Redesign**: A full UI/UX refactor of the legal pages (Terms, Privacy) to incorporate modern glassmorphism styling, a sticky sidebar, and full light/dark mode compatibility.
-4.  **Subscription & Coupon System**: A comprehensive system allowing admins to dynamically manage subscription plan pricing and create/manage coupon codes. This included a new pricing page, checkout flow, and backend integration with Stripe.
-5.  **Launch Offer UI**: The current request is to visually enhance the new pricing page to promote a LAUNCH50 50% discount offer, and to build a subscription analytics dashboard.
+<analysis>**original_problem_statement**: The initial request was to fix a broken vehicle filter UI, which evolved into implementing an AI fraud detection system, redesigning legal pages, and building a full subscription/coupon system.
 
-**User's preferred language**: English
+The work in this session focused on:
+1.  **Subscription Analytics Dashboard**: Building a new dashboard for admins.
+2.  **Dynamic Pricing Bug Fix**: A user-reported bug where admin-set prices were not reflecting on user-facing pages. This required a significant refactor to remove hardcoded prices across multiple components.
+3.  **Maintenance/Coming Soon Mode**: A new feature allowing admins to put the site into a maintenance or coming soon state, complete with a bilingual (EN/FR) landing page and email capture. This included follow-up requests to fix the logo, add configurable social media links, and clarify admin access.
+4.  **Vehicle Auction Logic (Current Request)**: The latest user request is a large, detailed new feature to implement the entire operational, legal, and trust-building framework for the vehicle auction section of the platform.
+
+**User's preferred language**: English, with a requirement for French translations on user-facing features where requested.
 
 **what currently exists?**
-The BidVex application is a full-stack vehicle auction platform with a React frontend, a FastAPI backend, and a MongoDB Atlas database. It is feature-rich, including a modern vehicle filter, an AI-powered fraud detection system, redesigned legal pages, and a newly implemented, admin-controlled subscription and coupon management system. The platform is stable and most features have been tested.
+The BidVex application is a feature-rich, full-stack vehicle auction platform using React, FastAPI, and MongoDB. It includes a modern vehicle filter, an AI-powered fraud detection system, a dynamic subscription and coupon engine, a subscription analytics dashboard, and a fully functional, bilingual maintenance/coming-soon mode. The pricing system is now fully dynamic, pulling values from the database in real-time. The codebase is stable, and recently completed features have been tested.
 
 **Last working item**:
-    - Last item agent was working: The agent was implementing the user's request for Launch Offer visual enhancements on the . This involves adding strikethrough pricing to show a discount, adding a Launch Special badge to pricing cards, and enhancing the checkout UI to display the exact savings amount when a coupon is applied. The agent successfully created the  coupon and was about to modify the frontend component.
-    - Status: IN PROGRESS
+    - Last item agent was working: The agent received a very large and detailed set of requirements for building out the core operational logic of the vehicle auction system. This includes the platform's legal positioning, buyer/seller fee structures, a comprehensive user trust system (verified sellers, VIN checks, etc.), auction transparency rules, and anti-manipulation protections. The agent had just begun the initial exploration phase by viewing existing vehicle-related files (, ) to understand the current state before planning the implementation.
+    - Status: NOT STARTED
     - Agent Testing Done: N
-    - Which testing method agent to use? frontend testing agent. The agent should test the following:
-        1. Verify the strikethrough price and Launch Special badge appear correctly on the Premium and VIP plans.
-        2. Test the checkout flow by applying the  coupon and confirming the You are saving .XX today! message appears with the correct calculated value.
-        3. Ensure these changes are responsive and work in both light and dark modes.
+    - Which testing method agent to use? both. This is a massive feature with significant backend logic and frontend UI changes. The testing agent should be used incrementally after implementing major sub-modules (e.g., after building the buyer premium logic, after building the seller verification UI, etc.).
     - User Testing Done: N
 
 **All Pending/In progress Issue list**:
-There are no known bugs. The pending work is the completion of in-progress features.
+There are no known bugs or pending issues. All work is focused on the new feature request.
 
 **In progress Task List**:
-  - Task 1: Complete Launch Offer UI Enhancements (P0)
-  - Task 2: Build Subscription Analytics Dashboard (P1)
+  - Task 1: Implement Vehicle Auction Operational Logic (P0)
 
  Task Detail:
   - Task 1: 
-     - Where to resume: Modify . The  coupon has already been created on the backend.
-     - What will be achieved with this? The pricing page will be visually updated to clearly communicate the 50% launch discount, encouraging user conversion.
-     - Status: IN PROGRESS
-     - Should Test frontend/backend/both after fix? Frontend
-     - Blocked on something: None.
-  - Task 2: 
-     - Where to resume: This task is next in line. It involves creating a new component for the analytics dashboard and adding it to the admin panel. The backend already has endpoints that can be leveraged or extended to provide the necessary data (revenue, subscriber counts, coupon usage).
-     - What will be achieved with this? Admins will gain critical insights into revenue streams, plan popularity, and promotion effectiveness.
+     - Where to resume: The agent has only performed initial file exploration. The immediate next step is to create a detailed, step-by-step implementation plan based on the user's comprehensive requirements. This plan should be presented to the user for approval via  before any code is written. The plan should break the epic into smaller, manageable chunks (e.g., Backend Models, Buyer Premium Logic, Trust System UI, etc.).
+     - What will be achieved with this? This will transform the vehicle auction section from a visual placeholder into a fully operational, legally-defined, and trustworthy marketplace, which is the core of the business model.
      - Status: NOT STARTED
      - Should Test frontend/backend/both after fix? Both
      - Blocked on something: None.
@@ -44,27 +35,24 @@ There are no known bugs. The pending work is the completion of in-progress featu
 **Upcoming and Future Tasks**
 *   **Future Tasks:**
     *   **P3: Email to Friend Feature:** Implement a single-click email sharing option for vehicle listings.
-    *   **P3: Production Environment Setup:** The user needs to be reminded to configure production environment variables (e.g., live Stripe/SendGrid keys) and whitelist their production server's IP in MongoDB Atlas for deployment.
-    *   **P3: Database Indexing:** A performance recommendation to add an index to  in the  collection remains outstanding.
-    *   **Mobile App Strategy**: The user expressed interest in turning the platform into a mobile app. This could be proposed as a future project (e.g., using Capacitor).
+    *   **P3: Production Environment Setup:** Remind the user to configure production environment variables (e.g., live Stripe/SendGrid keys) and whitelist their production server's IP in MongoDB Atlas for deployment.
+    *   **P3: Database Indexing:** Add a database index to the  field in the  collection to improve performance.
+    *   **Mobile App Strategy**: The user has expressed interest in a mobile app; this can be proposed as a future project (e.g., using Capacitor).
 
 **Completed work in this session**
-- **Vehicle Filter Modernization**: Successfully integrated the new  component, fixing the previously broken vehicle auctions page.
-- **Visual Polish (Filters)**: Implemented monochrome SVG logos for vehicle makes in the filter dropdown.
-- **AI Guard System (Full Stack)**:
-    - Created a backend service () using GPT-4 to analyze and flag suspicious auctions.
-    - Built a corresponding AI Guard dashboard in the admin panel to view and manage these flags.
-- **Legal Pages Refactor**: Completely redesigned the  component with glassmorphism, a sticky sidebar, and full light/dark mode support, making it responsive across devices.
-- **Subscription & Coupon System (Full Stack)**:
-    - Built backend services () for a dynamic pricing engine and a full CRUD coupon system.
-    - Created admin panel UIs (, ) for managing prices and coupons.
-    - Developed a new  with a checkout flow that integrates the coupon system.
-- **Code Hygiene**: Deleted the temporary  file and removed its references.
-- **Extensive Testing**: Used the testing agent to verify all major features, achieving high pass rates.
+- **Subscription Analytics Dashboard**: Successfully built and integrated a new dashboard in the admin panel for tracking revenue, subscribers, and plan distribution. Tested with the testing agent.
+- **Dynamic Pricing System (Bug Fix & Refactor)**:
+  - Refactored the backend  model and the frontend (, , ) to remove all hardcoded prices and fetch them dynamically from the database.
+  - Added support for original prices to display strikethrough promotional pricing.
+- **Maintenance/Coming Soon Mode (Feature)**:
+  - Implemented a Site Mode toggle in the admin panel.
+  - Created a modern, responsive, and bilingual (EN/FR) landing page for non-live modes.
+  - Added an admin-configurable logo and social media links.
+  - Implemented a route guard to protect public pages while allowing admin access.
 
 **Earlier issues found/mentioned but not fixed**
-   - **Production Environment Configuration:** User still needs to configure production environment variables and whitelist their production server's IP in MongoDB Atlas for a live deployment.
-   - **Database Indexing:** A performance recommendation to add an index to  in the  collection remains outstanding.
+   - **Production Environment Configuration:** The user still needs to configure production environment variables (Stripe, SendGrid) and whitelist their server IP in MongoDB Atlas for live deployment.
+   - **Database Indexing:** The recommendation to add an index to the  collection on  has not been implemented.
 
 **Known issue recurrence from previous fork**
   - None.
@@ -73,65 +61,49 @@ There are no known bugs. The pending work is the completion of in-progress featu
 
 
 **Key Technical Concepts**
-- **Dynamic Pricing Engine**: Backend logic to store and manage subscription prices in the database, allowing for real-time updates without deployments.
-- **Coupon & Discount System**: Full CRUD system for creating and validating promotional codes with various constraints (expiry, usage limits).
-- **AI-driven Analysis**: Using a large language model (GPT-4) via an API to generate human-readable summaries for automated fraud detection.
-- **Stateful UI Components**: Building complex UI dashboards (AI Guard, Admin Managers) that fetch, display, and manipulate backend data.
-- **CSS Variables for Theming**: Extensive use of CSS variables for robust and maintainable light/dark mode support.
-- **Stripe API Integration**: Setting up backend logic to interact with Stripe for processing payments and applying discounts.
+- **Route Guarding:** Using a wrapper component in React Router () to control access to routes based on global application state.
+- **Global State with Context API:** Employing  to provide application-wide access to the site's operational mode and configuration.
+- **Internationalization (i18n):** Using  and  to add bilingual (EN/FR) support to components.
+- **Automated Data Migration:** Backend logic that checks for and applies schema changes to the database on application startup, ensuring smooth updates.
+- **Dynamic Promotional Pricing:** Storing both a  and an  in the database to allow for flexible, admin-controlled sales and discounts.
 
 **key DB schema**
-  - **plans**: 
-  - **coupons**: 
-  - **flags**: 
-
-**changes in tech stack**
-  - None.
+  - **plans**: (Updated) 
+  - **site_config**: (New)  (Used for storing  and ).
+  - **subscribers**: (New) 
 
 **All files of reference**
-*   **/app/frontend/src/pages/SubscriptionPricingPage.js**: The primary file to be modified for the current task.
-*   **/app/frontend/src/pages/admin/AdminDashboardPage.js**: Will need modification to add the new Subscription Analytics tab.
-*   **/app/backend/services/subscription_manager.py**: Contains the backend logic for plans and coupons; may need to be extended for analytics.
-*   **/app/backend/services/fraud_detection.py**: The new AI Guard service.
-*   **/app/frontend/src/pages/legal/DynamicLegalPage.js**: The recently refactored legal page component.
-
-**Areas that need refactoring**:
-*   None at present. The codebase is in a relatively clean state.
-
-**key api endpoints**
-*   : Fetches all subscription plans and their current prices.
-*   : Validates a coupon code and returns discount info.
-*   , : Admin endpoints for coupon management.
-*   : Admin endpoint to update plan pricing.
-*   , , : AI Guard endpoints.
+*   **/app/frontend/src/pages/VehicleAuctionsPage.js**: The main page for the new feature.
+*   **/app/backend/server.py**: Will need significant additions for new endpoints related to vehicle auctions, bidding, and trust verification.
+*   **/app/frontend/src/App.js**: May need route updates.
+*   **/app/frontend/src/pages/admin/AdminDashboardPage.js**: Will need new sections for managing vehicle auction settings.
 
 **Critical Info for New Agent**
-*   **Your immediate priority is to implement the Launch Offer UI changes on the **. This is a visual task to support a marketing campaign.
-*   The second priority is to **build the Subscription Analytics dashboard**. This will involve creating a new frontend component and potentially extending the backend to aggregate analytics data.
-*   The entire subscription and coupon system is new but has been tested. You are building on a solid foundation.
-*   The  coupon (50% off) has already been created in the database. You can use it for testing the UI.
+*   **Your top priority is the new Vehicle Auction System.** This is a massive feature request. Do not start coding immediately. First, create a detailed, phased implementation plan based on the user's requirements. Propose this plan to the user for approval.
+*   Break the feature down into smaller, testable parts: 1) Backend models and fee logic, 2) Seller verification and trust system, 3) Frontend UI indicators on listings, 4) Admin panel controls.
+*   All previously completed work in this session (dynamic pricing, maintenance mode) is fully tested and finished. You are starting fresh on this new epic.
 
 **documents and test reports created in this job**
-*   /app/memory/PRD.md (Continuously updated)
-*   Multiple test reports in  confirming the functionality of the vehicle filter, AI Guard, legal pages, and subscription system.
+*    (Continuously updated)
+*   Multiple test reports in , including successful reports for the Subscription Analytics Dashboard, Dynamic Pricing Refactor, and Maintenance Mode feature.
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User (latest):** **(PENDING/ACTIVE)** Requested visual updates to the  page for a 50% launch offer and a new subscription analytics dashboard.
-2.  **User:** Asked to implement a full admin subscription management and coupon code system. (COMPLETED)
-3.  **User:** Asked for the . (COMPLETED)
-4.  **User:** Asked how to turn the platform into a mobile application. (ANSWERED)
-5.  **User:** Provided a detailed prompt to refactor the legal pages for modern UI and light/dark modes. (COMPLETED)
-6.  **User:** Requested the implementation of the AI Guard backend intelligence and a legal pages UI refresh. (COMPLETED)
-7.  **User:** Requested visual polish (SVG logos) for the vehicle filter, cleanup of a demo file, and SendGrid configuration. (COMPLETED)
-8.  **User:** Confirmed approval of the plan to integrate the modern vehicle filter. (COMPLETED)
-9.  **Agent:** Proposed a plan to fix the broken filter integration and tackle upcoming tasks. (COMPLETED)
-10. **Agent:** Started work on the filter integration. (COMPLETED)
+1.  **User (latest):** **(PENDING/ACTIVE)** Provided a comprehensive list of requirements for building the full operational logic for the Vehicle Auction section.
+2.  **User:** Requested three follow-up changes to the Maintenance Mode: fix the logo, allow admin to edit social media links, and explain how to access the admin panel when the site is down. (COMPLETED)
+3.  **User:** Asked for the Maintenance/Coming Soon page to be bilingual (French and English). (COMPLETED)
+4.  **User:** Requested a Maintenance/Coming Soon Mode feature for the website. (COMPLETED)
+5.  **User:** Pointed out that prices on a different subscription page were still hardcoded and not updating. (COMPLETED)
+6.  **Agent:** Finished implementing the dynamic pricing fix. (COMPLETED)
+7.  **Agent:** Started work to fix the hardcoded prices on user-facing subscription pages. (COMPLETED)
+8.  **User:** Reported a bug that admin-set prices were not appearing on the public pricing page. (COMPLETED)
+9.  **Agent:** Finished implementing the Subscription Analytics Dashboard. (COMPLETED)
+10. **Agent:** Started work on the Subscription Analytics Dashboard. (COMPLETED)
 
 **Project Health Check:**
 *   **Broken:** None.
 *   **Mocked:**
-    *   **SendGrid:** The email service is configured to use the  environment variable but it likely holds a placeholder. The user needs to provide a real key for transactional emails to work in production.
-    *   **Stripe:** The integration is configured, but will require live keys for production use.
+    *   **SendGrid:** Awaits a production API key from the user.
+    *   **Stripe:** Awaits production API keys from the user.
 
 **3rd Party Integrations**
 *   **MongoDB Atlas:** Primary cloud database.
@@ -143,14 +115,14 @@ There are no known bugs. The pending work is the completion of in-progress featu
 *   **APScheduler:** Background jobs.
 
 **Testing status**
-  - Testing agent used after significant changes: YES. The agent has consistently used the testing agent after each major feature completion (filter, AI guard, legal pages, subscriptions) with high success rates.
+  - Testing agent used after significant changes: YES. The testing agent was used successfully to validate the Subscription Analytics dashboard, the dynamic pricing refactor, and the complete Maintenance Mode feature set.
   - Troubleshoot agent used after agent stuck in loop: NO
   - Test files created: None.
-  - Known regressions: None from this session.
+  - Known regressions: None.
 
 **Credentials to test flow:**
 *   **Admin:**  / 
 *   **MongoDB Atlas:** Credentials are in .
 
 **What agent forgot to execute**
-The agent was in the middle of executing the user's latest request when the session ended. The immediate next step is to continue that work. No tasks were forgotten.</analysis>
+The agent has not forgotten any tasks. It was correctly beginning the exploration phase for the user's latest and largest feature request right as the session concluded.</analysis>
