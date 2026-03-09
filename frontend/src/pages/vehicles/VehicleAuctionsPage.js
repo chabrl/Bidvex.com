@@ -25,7 +25,8 @@ import {
   Fuel, Settings2, Calendar, DollarSign, ChevronRight,
   Award, Shield, Zap, TrendingUp, Eye, Heart, RefreshCw,
   ChevronDown, X, SlidersHorizontal, Sparkles, FileText,
-  CheckCircle, BadgeCheck, Building2, User, AlertTriangle
+  CheckCircle, BadgeCheck, Building2, User, AlertTriangle,
+  PlusCircle, Gavel, ArrowRight, Star
 } from 'lucide-react';
 import VehicleFilterModern from '../../components/VehicleFilterModern';
 import { TrustIndicators } from '../../components/vehicles/TrustBadges';
@@ -428,6 +429,56 @@ const VehicleAuctionsPage = () => {
         </div>
       </div>
 
+      {/* Seller CTA Section */}
+      <div className="bg-gradient-to-r from-emerald-600 to-teal-600 py-6" data-testid="seller-cta-section">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            {/* Left Side - Message */}
+            <div className="flex items-center gap-4 text-white">
+              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                <DollarSign className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold">Want to Sell Your Vehicle?</h3>
+                <p className="text-emerald-100 text-sm">
+                  Join our verified sellers network. Private, Dealer, or Auctioneer - we've got you covered.
+                </p>
+              </div>
+            </div>
+            
+            {/* Right Side - Buttons */}
+            <div className="flex flex-wrap gap-3">
+              <Button
+                onClick={() => navigate('/vehicle-auctions/seller/register')}
+                className="bg-white text-emerald-700 hover:bg-emerald-50 gap-2"
+                data-testid="btn-seller-register"
+              >
+                <User className="h-4 w-4" />
+                Become a Seller
+              </Button>
+              <Button
+                onClick={() => navigate('/vehicle-auctions/create')}
+                variant="outline"
+                className="border-white text-white hover:bg-white/10 gap-2"
+                data-testid="btn-create-listing"
+              >
+                <PlusCircle className="h-4 w-4" />
+                List a Vehicle
+              </Button>
+              <Button
+                onClick={() => navigate('/vehicle-auctions/my-listings')}
+                variant="outline"
+                className="border-white text-white hover:bg-white/10 gap-2"
+                data-testid="btn-my-listings"
+              >
+                <Car className="h-4 w-4" />
+                My Listings
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Modern Filter Component */}
@@ -465,6 +516,63 @@ const VehicleAuctionsPage = () => {
               Try adjusting your filters or check back later for new listings.
             </p>
             <Button onClick={clearFilters}>Clear Filters</Button>
+            
+            {/* Seller CTA Card */}
+            <div className="mt-12 max-w-2xl mx-auto">
+              <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-200 dark:border-emerald-800">
+                <CardContent className="p-8">
+                  <div className="flex items-center justify-center gap-2 mb-4">
+                    <Gavel className="h-8 w-8 text-emerald-600" />
+                    <h3 className="text-2xl font-bold text-emerald-800 dark:text-emerald-200">
+                      Be the First to List!
+                    </h3>
+                  </div>
+                  <p className="text-emerald-700 dark:text-emerald-300 mb-6">
+                    Join our verified seller network and reach thousands of qualified buyers.
+                    Low commission rates for dealers and auctioneers.
+                  </p>
+                  
+                  {/* Seller Type Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div className="bg-white dark:bg-slate-800 rounded-lg p-4 text-center">
+                      <User className="h-8 w-8 text-blue-500 mx-auto mb-2" />
+                      <h4 className="font-semibold text-slate-900 dark:text-white">Private Seller</h4>
+                      <p className="text-xs text-slate-500">Sell your personal vehicle</p>
+                    </div>
+                    <div className="bg-white dark:bg-slate-800 rounded-lg p-4 text-center">
+                      <Building2 className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                      <h4 className="font-semibold text-slate-900 dark:text-white">Licensed Dealer</h4>
+                      <p className="text-xs text-slate-500">Up to 500 vehicles/month</p>
+                    </div>
+                    <div className="bg-white dark:bg-slate-800 rounded-lg p-4 text-center">
+                      <Gavel className="h-8 w-8 text-purple-500 mx-auto mb-2" />
+                      <h4 className="font-semibold text-slate-900 dark:text-white">Auctioneer</h4>
+                      <p className="text-xs text-slate-500">Professional auction house</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-col sm:flex-row justify-center gap-3">
+                    <Button
+                      onClick={() => navigate('/vehicle-auctions/seller/register')}
+                      className="bg-emerald-600 hover:bg-emerald-700 gap-2"
+                      size="lg"
+                    >
+                      <Star className="h-5 w-5" />
+                      Register as Seller
+                    </Button>
+                    <Button
+                      onClick={() => navigate('/vehicle-auctions/create')}
+                      variant="outline"
+                      className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 gap-2"
+                      size="lg"
+                    >
+                      <PlusCircle className="h-5 w-5" />
+                      List a Vehicle Now
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         ) : (
           <>
