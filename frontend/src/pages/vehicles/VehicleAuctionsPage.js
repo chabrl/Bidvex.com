@@ -24,9 +24,11 @@ import {
   Car, Search, Filter, Grid, List, Clock, MapPin, Gauge,
   Fuel, Settings2, Calendar, DollarSign, ChevronRight,
   Award, Shield, Zap, TrendingUp, Eye, Heart, RefreshCw,
-  ChevronDown, X, SlidersHorizontal, Sparkles, FileText
+  ChevronDown, X, SlidersHorizontal, Sparkles, FileText,
+  CheckCircle, BadgeCheck, Building2, User, AlertTriangle
 } from 'lucide-react';
 import VehicleFilterModern from '../../components/VehicleFilterModern';
+import { TrustIndicators } from '../../components/vehicles/TrustBadges';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -81,6 +83,14 @@ const VehicleCard = ({ vehicle, onClick }) => {
   const mainImage = vehicle.media?.find(m => m.category === 'front')?.url || 
                     vehicle.media?.[0]?.url;
   
+  // Check for ending soon (within 1 hour)
+  const isEndingSoon = vehicle.end_time && (() => {
+    const end = new Date(vehicle.end_time);
+    const now = new Date();
+    const hoursLeft = (end - now) / (1000 * 60 * 60);
+    return hoursLeft > 0 && hoursLeft < 1;
+  })();
+  
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -108,21 +118,45 @@ const VehicleCard = ({ vehicle, onClick }) => {
             </div>
           )}
           
-          {/* Overlay Badges */}
-          <div className="absolute top-3 left-3 flex flex-col gap-2">
+          {/* Overlay Badges - Top Left */}
+          <div className="absolute top-3 left-3 flex flex-col gap-1.5">
             {vehicle.auction_type === 'live' && (
-              <Badge className="bg-red-500 text-white animate-pulse">
+              <Badge className="bg-red-500 text-white animate-pulse text-xs">
                 <Zap className="h-3 w-3 mr-1" /> LIVE
               </Badge>
             )}
-            {vehicle.reserve_met && (
-              <Badge className="bg-green-500 text-white">
-                <Award className="h-3 w-3 mr-1" /> Reserve Met
+            {isEndingSoon && (
+              <Badge className="bg-orange-500 text-white animate-pulse text-xs">
+                <Clock className="h-3 w-3 mr-1" /> Ending Soon
               </Badge>
             )}
+            {!vehicle.reserve_price && (
+              <Badge className="bg-purple-500 text-white text-xs">
+                <Award className="h-3 w-3 mr-1" /> No Reserve
+              </Badge>
+            )}
+            {vehicle.reserve_met && (
+              <Badge className="bg-green-500 text-white text-xs">
+                <CheckCircle className="h-3 w-3 mr-1" /> Reserve Met
+              </Badge>
+            )}
+          </div>
+          
+          {/* Trust Badges - Top Right */}
+          <div className="absolute top-3 right-3 flex flex-col gap-1.5">
             {vehicle.title_status === 'clean' && (
-              <Badge className="bg-emerald-500 text-white">
+              <Badge className="bg-emerald-500 text-white text-xs">
                 <Shield className="h-3 w-3 mr-1" /> Clean Title
+              </Badge>
+            )}
+            {vehicle.title_status === 'salvage' && (
+              <Badge className="bg-red-500 text-white text-xs">
+                <AlertTriangle className="h-3 w-3 mr-1" /> Salvage
+              </Badge>
+            )}
+            {vehicle.seller?.verification_status === 'approved' && (
+              <Badge className="bg-blue-500 text-white text-xs">
+                <BadgeCheck className="h-3 w-3 mr-1" /> Verified
               </Badge>
             )}
           </div>
@@ -153,6 +187,29 @@ const VehicleCard = ({ vehicle, onClick }) => {
             </h3>
             {vehicle.trim && (
               <p className="text-sm text-slate-500">{vehicle.trim}</p>
+            )}
+          </div>
+          
+          {/* Running Status & Seller Type Badges */}
+          <div className="flex flex-wrap gap-1.5">
+            {vehicle.condition_report?.is_running ? (
+              <Badge className="bg-green-100 text-green-700 text-xs gap-1">
+                <CheckCircle className="h-3 w-3" /> Running
+              </Badge>
+            ) : (
+              <Badge className="bg-red-100 text-red-700 text-xs gap-1">
+                <AlertTriangle className="h-3 w-3" /> Non-Running
+              </Badge>
+            )}
+            {vehicle.seller?.seller_type === 'dealer' && (
+              <Badge className="bg-slate-100 text-slate-600 text-xs gap-1">
+                <Building2 className="h-3 w-3" /> Dealer
+              </Badge>
+            )}
+            {vehicle.seller?.seller_type === 'private' && (
+              <Badge className="bg-slate-100 text-slate-600 text-xs gap-1">
+                <User className="h-3 w-3" /> Private
+              </Badge>
             )}
           </div>
           

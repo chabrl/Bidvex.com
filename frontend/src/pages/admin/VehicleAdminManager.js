@@ -24,7 +24,8 @@ import {
 import {
   Car, User, Building2, Gavel, CheckCircle, XCircle, Clock,
   Eye, FileText, Shield, AlertTriangle, Search, RefreshCw,
-  ChevronDown, ChevronUp, ExternalLink, Calendar, MapPin
+  ChevronDown, ChevronUp, ExternalLink, Calendar, MapPin,
+  DollarSign, Settings2, Percent, Timer, Scale, Award
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -627,10 +628,14 @@ const VehicleAdminManager = () => {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="flex bg-transparent">
+        <TabsList className="flex flex-wrap bg-transparent">
           <TabsTrigger value="system-settings" className="gap-2 bg-transparent">
             <Shield className="h-4 w-4" />
             System Settings
+          </TabsTrigger>
+          <TabsTrigger value="fee-config" className="gap-2 bg-transparent">
+            <DollarSign className="h-4 w-4" />
+            Fee Config
           </TabsTrigger>
           <TabsTrigger value="pending-sellers" className="gap-2 bg-transparent">
             <User className="h-4 w-4" />
@@ -645,6 +650,10 @@ const VehicleAdminManager = () => {
             {stats.pendingVehicles > 0 && (
               <Badge className="ml-1 bg-yellow-500">{stats.pendingVehicles}</Badge>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="auction-rules" className="gap-2 bg-transparent">
+            <Settings2 className="h-4 w-4" />
+            Auction Rules
           </TabsTrigger>
           <TabsTrigger value="audit-logs" className="gap-2 bg-transparent">
             <FileText className="h-4 w-4" />
@@ -869,6 +878,348 @@ const VehicleAdminManager = () => {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+        
+        {/* Fee Configuration Tab */}
+        <TabsContent value="fee-config" className="mt-6">
+          <div className="grid gap-6">
+            {/* Buyer Premium Configuration */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-blue-600" />
+                  Buyer Premium Rates
+                </CardTitle>
+                <CardDescription>
+                  Configure buyer premium percentages by subscription tier
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-slate-600">Standard</span>
+                      <Badge variant="outline">Free Tier</Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        defaultValue="5"
+                        className="w-24 text-center font-bold"
+                        step="0.5"
+                        min="0"
+                        max="20"
+                      />
+                      <Percent className="h-4 w-4 text-slate-400" />
+                    </div>
+                  </div>
+                  <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-blue-700">Premium</span>
+                      <Badge className="bg-blue-100 text-blue-700">Premium Tier</Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        defaultValue="3.5"
+                        className="w-24 text-center font-bold"
+                        step="0.5"
+                        min="0"
+                        max="20"
+                      />
+                      <Percent className="h-4 w-4 text-blue-400" />
+                    </div>
+                  </div>
+                  <div className="p-4 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-amber-700">VIP Elite</span>
+                      <Badge className="bg-amber-100 text-amber-700">VIP Tier</Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        defaultValue="3"
+                        className="w-24 text-center font-bold"
+                        step="0.5"
+                        min="0"
+                        max="20"
+                      />
+                      <Percent className="h-4 w-4 text-amber-400" />
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Seller Commission Configuration */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5 text-green-600" />
+                  Seller Commission Rates
+                </CardTitle>
+                <CardDescription>
+                  Configure seller commission percentages by subscription tier
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-slate-600">Standard</span>
+                      <Badge variant="outline">Free Tier</Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        defaultValue="4"
+                        className="w-24 text-center font-bold"
+                        step="0.5"
+                        min="0"
+                        max="20"
+                      />
+                      <Percent className="h-4 w-4 text-slate-400" />
+                    </div>
+                  </div>
+                  <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-blue-700">Premium</span>
+                      <Badge className="bg-blue-100 text-blue-700">Premium Tier</Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        defaultValue="2.5"
+                        className="w-24 text-center font-bold"
+                        step="0.5"
+                        min="0"
+                        max="20"
+                      />
+                      <Percent className="h-4 w-4 text-blue-400" />
+                    </div>
+                  </div>
+                  <div className="p-4 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-amber-700">VIP Elite</span>
+                      <Badge className="bg-amber-100 text-amber-700">VIP Tier</Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        defaultValue="2"
+                        className="w-24 text-center font-bold"
+                        step="0.5"
+                        min="0"
+                        max="20"
+                      />
+                      <Percent className="h-4 w-4 text-amber-400" />
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Platform Fee */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Scale className="h-5 w-5 text-purple-600" />
+                  Platform Fee
+                </CardTitle>
+                <CardDescription>
+                  Base platform fee applied to all transactions
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-4 p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg">
+                  <div>
+                    <p className="text-sm text-slate-500 mb-1">Platform Fee</p>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        defaultValue="2.5"
+                        className="w-24 text-center font-bold"
+                        step="0.5"
+                        min="0"
+                        max="10"
+                      />
+                      <Percent className="h-4 w-4 text-purple-400" />
+                    </div>
+                  </div>
+                  <p className="text-sm text-slate-500 flex-1">
+                    Applied to all transactions regardless of subscription tier
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="flex justify-end">
+              <Button className="bg-blue-600 hover:bg-blue-700">
+                Save Fee Configuration
+              </Button>
+            </div>
+          </div>
+        </TabsContent>
+        
+        {/* Auction Rules Tab */}
+        <TabsContent value="auction-rules" className="mt-6">
+          <div className="grid gap-6">
+            {/* Anti-Sniping Configuration */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Timer className="h-5 w-5 text-blue-600" />
+                  Anti-Sniping Rules
+                </CardTitle>
+                <CardDescription>
+                  Configure automatic auction extension for last-minute bids
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                    <label className="text-sm font-medium text-slate-600 block mb-2">
+                      Trigger Window (minutes before end)
+                    </label>
+                    <Input
+                      type="number"
+                      defaultValue="2"
+                      className="w-32"
+                      min="1"
+                      max="10"
+                    />
+                    <p className="text-xs text-slate-500 mt-1">
+                      Bids within this window trigger an extension
+                    </p>
+                  </div>
+                  <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                    <label className="text-sm font-medium text-slate-600 block mb-2">
+                      Extension Duration (minutes)
+                    </label>
+                    <Input
+                      type="number"
+                      defaultValue="2"
+                      className="w-32"
+                      min="1"
+                      max="10"
+                    />
+                    <p className="text-xs text-slate-500 mt-1">
+                      How long to extend the auction
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Bid Increment Rules */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings2 className="h-5 w-5 text-green-600" />
+                  Bid Increment Schedule
+                </CardTitle>
+                <CardDescription>
+                  Define minimum bid increments based on current price
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2 font-medium">Price Range</th>
+                        <th className="text-left py-2 font-medium">Minimum Increment</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      <tr>
+                        <td className="py-2">$0 - $99</td>
+                        <td className="py-2"><Input type="number" defaultValue="5" className="w-24" /></td>
+                      </tr>
+                      <tr>
+                        <td className="py-2">$100 - $499</td>
+                        <td className="py-2"><Input type="number" defaultValue="10" className="w-24" /></td>
+                      </tr>
+                      <tr>
+                        <td className="py-2">$500 - $999</td>
+                        <td className="py-2"><Input type="number" defaultValue="25" className="w-24" /></td>
+                      </tr>
+                      <tr>
+                        <td className="py-2">$1,000 - $4,999</td>
+                        <td className="py-2"><Input type="number" defaultValue="50" className="w-24" /></td>
+                      </tr>
+                      <tr>
+                        <td className="py-2">$5,000 - $9,999</td>
+                        <td className="py-2"><Input type="number" defaultValue="100" className="w-24" /></td>
+                      </tr>
+                      <tr>
+                        <td className="py-2">$10,000 - $49,999</td>
+                        <td className="py-2"><Input type="number" defaultValue="250" className="w-24" /></td>
+                      </tr>
+                      <tr>
+                        <td className="py-2">$50,000 - $99,999</td>
+                        <td className="py-2"><Input type="number" defaultValue="500" className="w-24" /></td>
+                      </tr>
+                      <tr>
+                        <td className="py-2">$100,000+</td>
+                        <td className="py-2"><Input type="number" defaultValue="1000" className="w-24" /></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Reserve Price Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Award className="h-5 w-5 text-amber-600" />
+                  Reserve Price Settings
+                </CardTitle>
+                <CardDescription>
+                  Configure reserve price options for sellers
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                    <div>
+                      <p className="font-medium">Allow Reserve Prices</p>
+                      <p className="text-sm text-slate-500">Sellers can set a minimum price</p>
+                    </div>
+                    <Button variant="outline" className="bg-green-100 text-green-700 border-green-300">
+                      Enabled
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                    <div>
+                      <p className="font-medium">Show Reserve Met/Not Met</p>
+                      <p className="text-sm text-slate-500">Display reserve status to bidders</p>
+                    </div>
+                    <Button variant="outline" className="bg-green-100 text-green-700 border-green-300">
+                      Enabled
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                    <div>
+                      <p className="font-medium">Allow No-Reserve Auctions</p>
+                      <p className="text-sm text-slate-500">Sellers can list without a minimum</p>
+                    </div>
+                    <Button variant="outline" className="bg-green-100 text-green-700 border-green-300">
+                      Enabled
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="flex justify-end">
+              <Button className="bg-blue-600 hover:bg-blue-700">
+                Save Auction Rules
+              </Button>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
 

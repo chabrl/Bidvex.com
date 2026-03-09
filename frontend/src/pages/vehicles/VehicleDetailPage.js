@@ -1,6 +1,7 @@
 /**
  * Vehicle Detail Page
  * Shows full vehicle details with live bidding panel
+ * Includes trust indicators, legal disclaimers, and transparent auction rules
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -15,6 +16,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Badge } from '../../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import { Separator } from '../../components/ui/separator';
 import {
   Dialog,
   DialogContent,
@@ -29,10 +31,46 @@ import {
   DollarSign, ChevronLeft, ChevronRight, Shield, Award,
   AlertTriangle, FileText, Camera, CheckCircle, XCircle,
   User, Building2, Zap, TrendingUp, Eye, History, Gavel,
-  CreditCard, Lock, Info, Calculator
+  CreditCard, Lock, Info, Calculator, Star, Scale
 } from 'lucide-react';
 import useVehicleBidding from '../../hooks/useVehicleBidding';
 import { PricingEstimate } from '../../components/vehicles/PricingBreakdown';
+
+// Trust & Legal Components
+import {
+  TrustIndicators,
+  SellerTypeBadge,
+  VerifiedSellerBadge,
+  TitleStatusBadge,
+  VINVerifiedBadge,
+  SellerRatingBadge,
+  ReserveStatusBadge,
+  RunningStatusBadge,
+  NoReserveBadge,
+  LiveAuctionBadge,
+  EndingSoonBadge
+} from '../../components/vehicles/TrustBadges';
+import { PricingCalculator, PricingEstimateInline } from '../../components/vehicles/PricingCalculator';
+import {
+  AsIsWhereIsDisclaimer,
+  PlatformRoleDisclaimer,
+  InspectionReminder,
+  PaymentTermsDisplay,
+  BindingBidNotice,
+  TermsAcceptanceDialog,
+  DepositNotice,
+  LegalFooter
+} from '../../components/vehicles/LegalDisclaimers';
+import {
+  AntiSnipingNotice,
+  AntiSnipingRulesCard,
+  MinimumBidDisplay,
+  BidHistory,
+  ReserveStatusDisplay,
+  ActiveBiddersCount,
+  AuctionRulesSummary,
+  LiveStatusIndicator
+} from '../../components/vehicles/AuctionRulesDisplay';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -520,28 +558,37 @@ const VehicleDetailPage = () => {
           
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">
-                {vehicle.year} {vehicle.make} {vehicle.model}
-              </h1>
+              <div className="flex items-center gap-3 mb-1">
+                <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">
+                  {vehicle.year} {vehicle.make} {vehicle.model}
+                </h1>
+                {vehicle.auction_type === 'live' && <LiveAuctionBadge />}
+              </div>
               {vehicle.trim && (
                 <p className="text-lg text-slate-500">{vehicle.trim}</p>
               )}
             </div>
             
+            {/* Trust Badges Header Row */}
             <div className="flex flex-wrap gap-2">
-              {vehicle.title_status === 'clean' && (
-                <Badge className="bg-green-100 text-green-800">
-                  <Shield className="h-3 w-3 mr-1" /> Clean Title
-                </Badge>
-              )}
-              {vehicle.condition_report?.is_running && (
-                <Badge className="bg-blue-100 text-blue-800">
-                  <CheckCircle className="h-3 w-3 mr-1" /> Running
-                </Badge>
-              )}
-              <Badge variant="outline">
-                VIN: {vehicle.vin}
-              </Badge>
+              <TitleStatusBadge status={vehicle.title_status} />
+              <RunningStatusBadge isRunning={vehicle.condition_report?.is_running} />
+              <VINVerifiedBadge vin={vehicle.vin} vinData={vehicle.vin_data} />
+              {!vehicle.reserve_price && <NoReserveBadge />}
+            </div>
+          </div>
+          
+          {/* Seller Trust Indicators */}
+          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-sm text-slate-500">Seller:</span>
+              <SellerTypeBadge sellerType={seller?.seller_type} size="sm" />
+              <VerifiedSellerBadge isVerified={seller?.verification_status === 'approved'} />
+              <SellerRatingBadge 
+                rating={seller?.average_rating} 
+                reviewCount={seller?.review_count}
+                totalSold={seller?.total_sold}
+              />
             </div>
           </div>
         </div>
@@ -557,11 +604,13 @@ const VehicleDetailPage = () => {
             
             {/* Tabs */}
             <Tabs defaultValue="details">
-              <TabsList className="w-full justify-start bg-transparent">
+              <TabsList className="w-full justify-start bg-transparent flex-wrap">
                 <TabsTrigger value="details" className="bg-transparent">Details</TabsTrigger>
                 <TabsTrigger value="condition" className="bg-transparent">Condition</TabsTrigger>
                 <TabsTrigger value="history" className="bg-transparent">Bid History</TabsTrigger>
                 <TabsTrigger value="seller" className="bg-transparent">Seller</TabsTrigger>
+                <TabsTrigger value="rules" className="bg-transparent">Auction Rules</TabsTrigger>
+                <TabsTrigger value="pricing" className="bg-transparent">Pricing</TabsTrigger>
               </TabsList>
               
               {/* Details Tab */}
@@ -840,15 +889,23 @@ const VehicleDetailPage = () => {
                             )}
                           </div>
                           <div>
-                            <h3 className="font-semibold text-lg">
-                              {seller.business_name || 'Private Seller'}
-                            </h3>
-                            <Badge className="capitalize">
-                              {seller.seller_type === 'dealer' ? '🏪 Licensed Dealer' : 
-                               seller.seller_type === 'auctioneer' ? '🔨 Verified Auctioneer' : 
-                               '👤 Private Seller'}
-                            </Badge>
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-semibold text-lg">
+                                {seller.business_name || 'Private Seller'}
+                              </h3>
+                              <VerifiedSellerBadge isVerified={seller.verification_status === 'approved'} />
+                            </div>
+                            <SellerTypeBadge sellerType={seller.seller_type} />
                           </div>
+                        </div>
+                        
+                        {/* Seller Rating Display */}
+                        <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
+                          <SellerRatingBadge 
+                            rating={seller.average_rating} 
+                            reviewCount={seller.review_count}
+                            totalSold={seller.total_sold}
+                          />
                         </div>
                         
                         <div className="grid grid-cols-3 gap-4 text-center py-4 border-y">
@@ -857,7 +914,14 @@ const VehicleDetailPage = () => {
                             <p className="text-sm text-slate-500">Vehicles Sold</p>
                           </div>
                           <div>
-                            <p className="text-2xl font-bold">{seller.average_rating?.toFixed(1) || 'N/A'}</p>
+                            <p className="text-2xl font-bold">
+                              {seller.average_rating ? (
+                                <span className="flex items-center justify-center gap-1">
+                                  {seller.average_rating.toFixed(1)}
+                                  <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
+                                </span>
+                              ) : 'N/A'}
+                            </p>
                             <p className="text-sm text-slate-500">Rating</p>
                           </div>
                           <div>
@@ -867,6 +931,28 @@ const VehicleDetailPage = () => {
                             <p className="text-sm text-slate-500">Member Since</p>
                           </div>
                         </div>
+                        
+                        {/* Verification Status */}
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div className="flex items-center gap-2 text-green-600">
+                            <CheckCircle className="h-4 w-4" />
+                            <span>ID Verified</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-green-600">
+                            <CheckCircle className="h-4 w-4" />
+                            <span>Email Confirmed</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-green-600">
+                            <CheckCircle className="h-4 w-4" />
+                            <span>Phone Verified</span>
+                          </div>
+                          {seller.seller_type === 'dealer' && (
+                            <div className="flex items-center gap-2 text-green-600">
+                              <CheckCircle className="h-4 w-4" />
+                              <span>License Verified</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ) : (
                       <p className="text-slate-500">Seller information not available</p>
@@ -874,18 +960,73 @@ const VehicleDetailPage = () => {
                   </CardContent>
                 </Card>
               </TabsContent>
+              
+              {/* Auction Rules Tab */}
+              <TabsContent value="rules" className="space-y-6">
+                <AntiSnipingRulesCard />
+                <AuctionRulesSummary vehicle={vehicle} />
+                <AsIsWhereIsDisclaimer vehicle={vehicle} prominent />
+                <InspectionReminder />
+                <PaymentTermsDisplay />
+                <BindingBidNotice />
+                <PlatformRoleDisclaimer />
+              </TabsContent>
+              
+              {/* Pricing Tab */}
+              <TabsContent value="pricing" className="space-y-6">
+                <PricingCalculator 
+                  vehicleId={vehicle.id}
+                  bidAmount={vehicle.current_bid || vehicle.starting_price}
+                  province={vehicle.location_province}
+                  showInput={true}
+                  expanded={true}
+                />
+                
+                {/* Fee Transparency */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Info className="h-5 w-5 text-slate-600" />
+                      Fee Transparency
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-4">
+                        <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-2">Buyer Premium</h4>
+                        <ul className="space-y-1 text-sm text-blue-700 dark:text-blue-300">
+                          <li>Standard: 5%</li>
+                          <li>Premium: 3.5%</li>
+                          <li>VIP Elite: 3%</li>
+                        </ul>
+                      </div>
+                      <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-4">
+                        <h4 className="font-semibold text-green-800 dark:text-green-200 mb-2">Seller Commission</h4>
+                        <ul className="space-y-1 text-sm text-green-700 dark:text-green-300">
+                          <li>Standard: 4%</li>
+                          <li>Premium: 2.5%</li>
+                          <li>VIP Elite: 2%</li>
+                        </ul>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-500 text-center">
+                      Platform fee of 2.5% applies to all transactions. Taxes calculated based on buyer's province.
+                    </p>
+                  </CardContent>
+                </Card>
+              </TabsContent>
             </Tabs>
           </div>
 
           {/* Right Column - Bidding Panel */}
-          <div>
+          <div className="space-y-4">
             <BiddingPanel 
               vehicle={vehicle} 
               onBidPlaced={fetchVehicle}
             />
             
             {/* Location Card */}
-            <Card className="mt-4">
+            <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <MapPin className="h-5 w-5 text-slate-400" />
@@ -896,6 +1037,19 @@ const VehicleDetailPage = () => {
                 </div>
               </CardContent>
             </Card>
+            
+            {/* Reserve Status */}
+            <ReserveStatusDisplay 
+              hasReserve={!!vehicle.reserve_price} 
+              reserveMet={vehicle.reserve_met}
+              prominent
+            />
+            
+            {/* Anti-Sniping Badge */}
+            <AntiSnipingRulesCard compact />
+            
+            {/* Legal Footer */}
+            <LegalFooter />
           </div>
         </div>
       </div>
