@@ -360,7 +360,7 @@ const VehicleAuctionsPage = () => {
           <div className="flex items-center gap-3 mb-4">
             <Car className="h-10 w-10 text-blue-400" />
             <Badge className="bg-blue-500/20 text-blue-300 border-blue-400/30">
-              Enterprise Vehicle Auctions
+              Vehicle Auctions
             </Badge>
           </div>
           
@@ -430,49 +430,39 @@ const VehicleAuctionsPage = () => {
       </div>
 
       {/* Seller CTA Section */}
-      <div className="bg-gradient-to-r from-emerald-600 to-teal-600 py-6" data-testid="seller-cta-section">
+      <div className="bg-gradient-to-r from-emerald-600 to-teal-600 dark:from-emerald-700 dark:to-teal-700 py-5" data-testid="seller-cta-section">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
             {/* Left Side - Message */}
-            <div className="flex items-center gap-4 text-white">
-              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+            <div className="flex items-center gap-4 text-white text-center lg:text-left">
+              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
                 <DollarSign className="h-6 w-6" />
               </div>
               <div>
                 <h3 className="text-lg font-bold">Want to Sell Your Vehicle?</h3>
                 <p className="text-emerald-100 text-sm">
-                  Join our verified sellers network. Private, Dealer, or Auctioneer - we've got you covered.
+                  Join our verified sellers network. Private, Dealer, or Auctioneer.
                 </p>
               </div>
             </div>
             
             {/* Right Side - Buttons */}
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
               <Button
                 onClick={() => navigate('/vehicle-auctions/seller/register')}
-                className="bg-white text-emerald-700 hover:bg-emerald-50 gap-2"
+                className="bg-white text-emerald-700 hover:bg-emerald-50 dark:bg-white dark:text-emerald-700 dark:hover:bg-emerald-50 font-semibold px-6 h-11 rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center"
                 data-testid="btn-seller-register"
               >
-                <User className="h-4 w-4" />
+                <User className="h-4 w-4 mr-2" />
                 Become a Seller
               </Button>
               <Button
                 onClick={() => navigate('/vehicle-auctions/create')}
-                variant="outline"
-                className="border-white text-white hover:bg-white/10 gap-2"
+                className="bg-transparent border-2 border-white text-white hover:bg-white/20 dark:border-white dark:text-white dark:hover:bg-white/20 font-semibold px-6 h-11 rounded-lg transition-all flex items-center justify-center"
                 data-testid="btn-create-listing"
               >
-                <PlusCircle className="h-4 w-4" />
+                <PlusCircle className="h-4 w-4 mr-2" />
                 List a Vehicle
-              </Button>
-              <Button
-                onClick={() => navigate('/vehicle-auctions/my-listings')}
-                variant="outline"
-                className="border-white text-white hover:bg-white/10 gap-2"
-                data-testid="btn-my-listings"
-              >
-                <Car className="h-4 w-4" />
-                My Listings
               </Button>
             </div>
           </div>
