@@ -3125,28 +3125,124 @@ async def get_payment_status(session_id: str, current_user: User = Depends(get_c
 
 @api_router.post("/webhook/stripe")
 async def stripe_webhook(request: Request):
+    """
+    Handle Stripe webhook events
+    
+    Processes:
+    - checkout.session.completed (payments)
+    - customer.subscription.* (subscription lifecycle)
+    - invoice.paid (subscription payments)
+    """
     body = await request.body()
     signature = request.headers.get("Stripe-Signature")
     webhook_url = "http://localhost:8001/api/webhook/stripe"
     stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
+    
     try:
         webhook_response = await stripe_checkout.handle_webhook(body, signature)
+        
+        # Handle payment completion
         if webhook_response.payment_status == "paid":
-            await db.payment_transactions.update_one({"session_id": webhook_response.session_id}, {"$set": {"payment_status": "paid"}})
+            await db.payment_transactions.update_one(
+                {"session_id": webhook_response.session_id}, 
+                {"$set": {"payment_status": "paid"}}
+            )
             transaction = await db.payment_transactions.find_one({"session_id": webhook_response.session_id})
             if transaction and transaction.get("listing_id"):
-                await db.listings.update_one({"id": transaction["listing_id"]}, {"$set": {"status": "sold"}})
+                await db.listings.update_one(
+                    {"id": transaction["listing_id"]}, 
+                    {"$set": {"status": "sold"}}
+                )
             # Handle promotion payment
             if transaction and transaction.get("metadata") and transaction["metadata"].get("promotion_id"):
                 promotion_id = transaction["metadata"]["promotion_id"]
-                await db.promotions.update_one({"id": promotion_id}, {"$set": {"status": "active", "payment_status": "paid"}})
+                await db.promotions.update_one(
+                    {"id": promotion_id}, 
+                    {"$set": {"status": "active", "payment_status": "paid"}}
+                )
                 promotion = await db.promotions.find_one({"id": promotion_id})
                 if promotion and promotion.get("listing_id"):
-                    await db.listings.update_one({"id": promotion["listing_id"]}, {"$set": {"is_promoted": True}})
+                    await db.listings.update_one(
+                        {"id": promotion["listing_id"]}, 
+                        {"$set": {"is_promoted": True}}
+                    )
+        
         return {"status": "success"}
     except Exception as e:
         logger.error(f"Webhook error: {str(e)}")
         raise HTTPException(status_code=400, detail="Webhook error")
+
+
+@api_router.post("/webhook/stripe/connect")
+async def stripe_connect_webhook(request: Request):
+    """
+    Handle Stripe Connect and subscription webhook events
+    
+    Processes subscription lifecycle events:
+    - customer.subscription.created
+    - customer.subscription.updated  
+    - customer.subscription.deleted
+    - invoice.paid
+    - checkout.session.completed (for auction purchases)
+    """
+    from services.subscription_service import handle_subscription_event, get_tier_from_price_id
+    
+    body = await request.body()
+    signature = request.headers.get("Stripe-Signature")
+    
+    webhook_secret = os.environ.get("STRIPE_CONNECT_WEBHOOK_SECRET", os.environ.get("STRIPE_WEBHOOK_SECRET", ""))
+    
+    try:
+        event = stripe.Webhook.construct_event(body, signature, webhook_secret)
+    except stripe.error.SignatureVerificationError:
+        logger.error("Invalid webhook signature")
+        raise HTTPException(status_code=400, detail="Invalid signature")
+    except Exception as e:
+        logger.error(f"Webhook parsing error: {e}")
+        raise HTTPException(status_code=400, detail="Invalid payload")
+    
+    event_type = event.get("type", "")
+    data = event.get("data", {}).get("object", {})
+    
+    logger.info(f"Processing Stripe Connect webhook: {event_type}")
+    
+    try:
+        # Handle subscription events
+        if event_type in ["customer.subscription.created", "customer.subscription.updated", 
+                          "customer.subscription.deleted", "invoice.paid"]:
+            
+            if event_type == "invoice.paid" and not data.get("subscription"):
+                # One-time payment, not subscription
+                pass
+            else:
+                subscription_data = data if "subscription" not in event_type else data
+                if event_type == "invoice.paid":
+                    # For invoice events, get subscription ID
+                    subscription_id = data.get("subscription")
+                    if subscription_id:
+                        subscription_data = stripe.Subscription.retrieve(subscription_id)
+                
+                await handle_subscription_event(db, event_type, subscription_data)
+        
+        # Handle checkout session completed
+        elif event_type == "checkout.session.completed":
+            session = data
+            session_type = session.get("metadata", {}).get("type", "")
+            
+            if session_type == "subscription_upgrade":
+                # Subscription payment handled by subscription event
+                pass
+            elif session_type in ["auction_purchase", "vehicle_fees"]:
+                # Handle auction payment
+                # Import from webhooks module
+                from routes.webhooks import _handle_checkout_completed
+                await _handle_checkout_completed(db, session)
+        
+        return {"status": "ok", "event_type": event_type}
+        
+    except Exception as e:
+        logger.error(f"Webhook processing error: {e}")
+        return {"status": "error", "message": str(e)}
 
 @api_router.post("/payments/promote")
 async def create_promotion_checkout(request: Request, data: Dict[str, Any], current_user: User = Depends(get_current_user)):
@@ -10745,6 +10841,181 @@ except ImportError as e:
     logger.warning(f"⚠️ Could not load modular routers: {e}")
     import traceback
     traceback.print_exc()
+
+
+# ========== STRIPE CONNECT USER ENDPOINTS ==========
+# These endpoints handle seller onboarding and earnings
+
+@api_router.get("/users/me/tax-info")
+async def get_my_tax_info(current_user: User = Depends(get_current_user)):
+    """Get current user's tax and business registration info"""
+    user = await db.users.find_one({"id": current_user.id}, {"_id": 0})
+    
+    return {
+        "is_business": user.get("is_business", False),
+        "is_tax_registered": user.get("is_tax_registered", False),
+        "tax_id": user.get("tax_id"),
+        "business_name": user.get("business_name"),
+        "business_address": user.get("business_address"),
+        "account_type": user.get("account_type", "personal"),
+        "stripe_connect_account_id": user.get("stripe_connect_account_id"),
+        "stripe_connect_onboarding_complete": user.get("stripe_connect_onboarding_complete", False)
+    }
+
+
+@api_router.put("/users/me/tax-info")
+async def update_my_tax_info(
+    data: Dict[str, Any],
+    current_user: User = Depends(get_current_user)
+):
+    """Update current user's tax and business registration info"""
+    update_data = {}
+    
+    if "is_business" in data:
+        update_data["is_business"] = data["is_business"]
+        update_data["account_type"] = "business" if data["is_business"] else "personal"
+    
+    if "is_tax_registered" in data:
+        update_data["is_tax_registered"] = data["is_tax_registered"]
+    
+    if "tax_id" in data:
+        update_data["tax_id"] = data["tax_id"]
+    
+    if "business_name" in data:
+        update_data["business_name"] = data["business_name"]
+    
+    if "business_address" in data:
+        update_data["business_address"] = data["business_address"]
+    
+    if update_data:
+        update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        await db.users.update_one({"id": current_user.id}, {"$set": update_data})
+    
+    return await get_my_tax_info(current_user)
+
+
+@api_router.post("/users/me/stripe-connect/onboard")
+async def create_stripe_connect_account(
+    request: Request,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Create or retrieve Stripe Connect account and generate onboarding link
+    """
+    user = await db.users.find_one({"id": current_user.id})
+    connect_account_id = user.get("stripe_connect_account_id")
+    
+    if not connect_account_id:
+        # Create new Connect account
+        account = stripe.Account.create(
+            type="express",
+            country="CA",
+            email=current_user.email,
+            capabilities={
+                "card_payments": {"requested": True},
+                "transfers": {"requested": True}
+            },
+            business_type="individual",
+            metadata={
+                "user_id": current_user.id,
+                "platform": "bidvex"
+            }
+        )
+        connect_account_id = account.id
+        
+        await db.users.update_one(
+            {"id": current_user.id},
+            {"$set": {
+                "stripe_connect_account_id": connect_account_id,
+                "stripe_connect_onboarding_complete": False,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+    
+    # Generate onboarding link
+    base_url = os.environ.get("REACT_APP_BACKEND_URL", str(request.base_url).rstrip('/'))
+    
+    account_link = stripe.AccountLink.create(
+        account=connect_account_id,
+        refresh_url=f"{base_url}/seller/settings?stripe_refresh=true",
+        return_url=f"{base_url}/seller/settings?stripe_onboard=success",
+        type="account_onboarding"
+    )
+    
+    return {
+        "connect_account_id": connect_account_id,
+        "onboarding_url": account_link.url,
+        "expires_at": datetime.fromtimestamp(account_link.expires_at, tz=timezone.utc).isoformat()
+    }
+
+
+@api_router.get("/users/me/stripe-connect/status")
+async def get_stripe_connect_status(current_user: User = Depends(get_current_user)):
+    """
+    Get Stripe Connect account status and capabilities
+    """
+    user = await db.users.find_one({"id": current_user.id})
+    connect_account_id = user.get("stripe_connect_account_id")
+    
+    if not connect_account_id:
+        return {
+            "has_account": False,
+            "onboarding_complete": False,
+            "payouts_enabled": False,
+            "charges_enabled": False
+        }
+    
+    try:
+        account = stripe.Account.retrieve(connect_account_id)
+        
+        # Update onboarding status in database if changed
+        if account.details_submitted and not user.get("stripe_connect_onboarding_complete"):
+            await db.users.update_one(
+                {"id": current_user.id},
+                {"$set": {
+                    "stripe_connect_onboarding_complete": True,
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+        
+        return {
+            "has_account": True,
+            "account_id": connect_account_id,
+            "onboarding_complete": account.details_submitted,
+            "payouts_enabled": account.payouts_enabled,
+            "charges_enabled": account.charges_enabled,
+            "capabilities": {
+                "card_payments": account.capabilities.get("card_payments", "inactive") if account.capabilities else "inactive",
+                "transfers": account.capabilities.get("transfers", "inactive") if account.capabilities else "inactive"
+            },
+            "requirements": {
+                "currently_due": list(account.requirements.currently_due) if account.requirements else [],
+                "eventually_due": list(account.requirements.eventually_due) if account.requirements else []
+            }
+        }
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe Connect status error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@api_router.post("/users/me/stripe-connect/dashboard-link")
+async def get_stripe_connect_dashboard_link(current_user: User = Depends(get_current_user)):
+    """
+    Generate a login link to the Stripe Express Dashboard
+    """
+    user = await db.users.find_one({"id": current_user.id})
+    connect_account_id = user.get("stripe_connect_account_id")
+    
+    if not connect_account_id:
+        raise HTTPException(status_code=400, detail="No Stripe Connect account found. Please complete onboarding first.")
+    
+    try:
+        login_link = stripe.Account.create_login_link(connect_account_id)
+        return {"dashboard_url": login_link.url}
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe dashboard link error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 # ========== VEHICLE AUCTION MODULE (STANDALONE) ==========
 # Enterprise-grade vehicle auction system - completely separate from marketplace

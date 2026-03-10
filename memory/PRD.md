@@ -13,6 +13,8 @@ Build and maintain a sophisticated full-stack auction platform (BidVex) with:
 - Quebec Tax & Invoicing Engine ✅ **COMPLETED**
 - Total Cost Calculator Frontend ✅ **COMPLETED**
 - Marketplace Engine with Stripe Connect ✅ **COMPLETED**
+- Subscription Tier System ✅ **COMPLETED**
+- Seller Earnings Dashboard ✅ **COMPLETED**
 - **Enterprise Vehicle Auction Module** (standalone, Copart/IAA quality)
 
 ## Architecture
@@ -22,77 +24,64 @@ Backend: FastAPI (Python)
 Database: MongoDB Atlas (Cloud)
 Authentication: JWT + Emergent Google Auth
 AI: OpenAI GPT-4 via emergentintegrations
-Payments: Stripe Connect (Destination Charges) + Hybrid Fee Engine + Tax Engine
+Payments: Stripe Connect (Destination Charges) + Subscriptions + Tax Engine
 Email: SendGrid
 Background Jobs: APScheduler
 i18n: react-i18next (EN/FR bilingual support)
 PDF Generation: ReportLab (bilingual invoices)
 ```
 
-## Current Status: ✅ MARKETPLACE ENGINE COMPLETE
+## Current Status: ✅ SUBSCRIPTION & SELLER DASHBOARD COMPLETE
 
 ### Session Summary (Mar 10, 2026 - Latest Update)
 
-**Phase 1: Database & Schema Updates ✅**
-- Added to User model: `is_business`, `is_tax_registered`, `tax_id`, `stripe_connect_account_id`
-- New Pydantic models in `/app/backend/models/user_models.py`
-- New endpoints: `/api/users/me/tax-info`, `/api/users/me/stripe-connect/*`
+**Subscription Tier System ✅**
+- Stripe Price ID Mappings:
+  - Free: price_1T5V79Bd6Wtvh7hsnp69zu1F
+  - Premium ($180): price_1T5V5xBd6Wtvh7hscWcNnk34
+  - VIP ($300): price_1T5V2bBd6Wtvh7hsqLLmAZSH
 
-**Phase 2: Stripe Connect Financial Logic ✅**
-- Created `/app/backend/services/stripe_connect_service.py`
-- Implemented destination charges with gross-up formula
-- Processing fee (2.9% + $0.30) passed to buyer
-- Application fee = BidVex fees (Premium + Commission) + Tax on fees
-- Transfer to seller = Hammer - Commission (+hammer tax if business)
+- Fee Rates by Tier:
+  | Tier | Buyer Premium | Seller Commission | Savings/$1000 |
+  |------|---------------|-------------------|---------------|
+  | Free/Basic | 5.0% | 4.0% | - |
+  | Premium | 3.5% | 2.5% | $30 |
+  | VIP Elite | 3.0% | 2.0% | $40 |
 
-**Phase 3: Checkout Endpoints ✅**
-- `POST /api/payments/checkout/auction` - Creates Stripe Checkout Session
-- `GET /api/payments/checkout/preview/{listing_id}` - Cost breakdown preview
-- `GET /api/payments/fees/processing` - Processing fee info
-- `GET /api/payments/invoices/download/{invoice_id}` - PDF download
+**New API Endpoints:**
+- `GET /api/payments/subscriptions/tiers` - All tiers with Stripe IDs
+- `GET /api/payments/subscriptions/my-status` - Current user's tier
+- `POST /api/payments/subscriptions/upgrade` - Upgrade checkout
+- `GET /api/payments/subscriptions/fee-rates` - User's current rates
+- `GET /api/payments/seller/earnings` - Financial metrics
+- `GET /api/payments/seller/transactions` - Transaction history
+- `GET /api/users/me/tax-info` - Tax registration info
+- `PUT /api/users/me/tax-info` - Update tax info
+- `POST /api/users/me/stripe-connect/onboard` - Seller onboarding
+- `GET /api/users/me/stripe-connect/status` - Connect status
+- `POST /api/users/me/stripe-connect/dashboard-link` - Stripe dashboard
 
-**Phase 4: Webhook Handler ✅**
-- `checkout.session.completed` webhook handling
-- Updates listing/auction status to "Paid"
-- Triggers confirmation emails (buyer + seller)
-- Auto-generates PDF invoice
+**Webhook Integration:**
+- `POST /api/webhook/stripe/connect` - Handles subscription lifecycle:
+  - customer.subscription.created
+  - customer.subscription.updated
+  - customer.subscription.deleted
+  - invoice.paid
+  - checkout.session.completed
 
-**Phase 5: Bilingual PDF Invoice Engine ✅**
-- Updated `/app/backend/services/invoice_generator.py`
-- Full French/English support based on user `preferred_language`
-- Separate sections: BidVex Service Fees vs Item Sale
-- BidVex GST/QST numbers in footer
-- Cloud storage integration (URL returned)
+**New Frontend Components:**
+- `/app/frontend/src/pages/CheckoutPage.js` - Full checkout with cost breakdown
+- `/app/frontend/src/components/SellerEarningsDashboard.js` - Earnings view
+- `/app/frontend/src/components/SubscriptionPlans.js` - Tier selection UI
 
-**Testing Results:**
-- **103 Backend Tests Passing**
-  - 36 tax engine tests
-  - 28 API endpoint tests
-  - 20 fee calculation tests
-  - 19 Stripe Connect tests
+**New Backend Services:**
+- `/app/backend/services/subscription_service.py` - Centralized tier logic
+- Updated `/app/backend/server.py` - Stripe Connect user endpoints
 
-**New Files Created:**
-- `/app/backend/models/user_models.py` - User tax/business models
-- `/app/backend/services/stripe_connect_service.py` - Checkout calculations
-- `/app/backend/tests/test_stripe_connect.py` - 19 tests
-
-**Gross-Up Formula:**
-```python
-gross_amount = (net_amount + 0.30) / (1 - 0.029)
-# Example: To receive $100 net → charge $103.30
-```
-
-**Split Example ($1,000 Hammer, Basic Tier, Private Seller):**
-| Item | Amount |
-|------|--------|
-| Hammer Price | $1,000.00 |
-| Buyer Premium (5%) | $50.00 |
-| Seller Commission (4%) | $40.00 |
-| Tax on Fees (14.975%) | $13.48 |
-| Processing Fee | $32.07 |
-| **Buyer Total** | **$1,095.55** |
-| Application Fee (BidVex) | $103.48 |
-| Seller Payout | $960.00 |
+**Testing: 75 Backend Tests Passing**
+- 36 tax engine tests
+- 20 fee calculation tests  
+- 19 Stripe Connect tests
    - Marketplace: place_bid, current_bid, buy_now, ends_in, reserve_met, lot_details
    - Settings: account_info, payout_settings, notification_prefs, verify_identity, security_settings
 

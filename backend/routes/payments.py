@@ -33,9 +33,23 @@ def set_payments_db(db_instance):
 
 
 def set_payments_auth(get_current_user_func):
-    """Set authentication function"""
+    """
+    Set authentication function
+    
+    Note: The passed function expects (Request, credentials) but most routes
+    only have access to credentials. We create a wrapper that works with credentials only.
+    """
     global _get_current_user
-    _get_current_user = get_current_user_func
+    
+    async def wrapper(credentials):
+        """Wrapper that creates a mock request for cookie-less auth"""
+        # Create a minimal mock request since we're using Bearer token auth
+        # The real function checks cookies first, then credentials
+        class MockRequest:
+            cookies = {}
+        return await get_current_user_func(MockRequest(), credentials)
+    
+    _get_current_user = wrapper
 
 
 def get_db():
