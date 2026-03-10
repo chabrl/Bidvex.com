@@ -10730,7 +10730,11 @@ try:
     api_router.include_router(sms_router)
     logger.info("✅ SMS Verification router loaded")
     
-    # Note: users, marketing, admin, webhooks, payments routers contain endpoints
+    # Include payments router for fee calculations
+    api_router.include_router(payments_router)
+    logger.info("✅ Payments & Fee Calculation router loaded")
+    
+    # Note: users, marketing, admin, webhooks routers contain endpoints
     # that are still duplicated in server.py. They will be fully activated after
     # removing duplicates from server.py in a future refactoring pass.
     # For now, they serve as the modular foundation.

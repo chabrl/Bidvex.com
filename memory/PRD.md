@@ -9,6 +9,7 @@ Build and maintain a sophisticated full-stack auction platform (BidVex) with:
 - Comprehensive admin panel
 - Canadian tax compliance system
 - Full bilingual support (EN/FR) ✅ **COMPLETED**
+- Hybrid Fee Calculation Engine ✅ **COMPLETED**
 - **Enterprise Vehicle Auction Module** (standalone, Copart/IAA quality)
 
 ## Architecture
@@ -18,45 +19,46 @@ Backend: FastAPI (Python)
 Database: MongoDB Atlas (Cloud)
 Authentication: JWT + Emergent Google Auth
 AI: OpenAI GPT-4 via emergentintegrations
-Payments: Stripe (via emergentintegrations)
+Payments: Stripe (via emergentintegrations) + Hybrid Fee Engine
 Email: SendGrid
 Background Jobs: APScheduler
 i18n: react-i18next (EN/FR bilingual support)
 ```
 
-## Current Status: ✅ i18n P0 LOCALIZATION FIXES COMPLETE
+## Current Status: ✅ HYBRID FEE CALCULATION ENGINE COMPLETE
 
 ### Session Summary (Mar 10, 2026 - Latest Update)
-Fixed critical localization key mismatches and missing content:
-- Fixed profile page key leaks (profile.profileTab → "Profil")
-- Fixed seller action buttons (green bar) translation
-- Fixed footer links translation
-- Added maintenance translations
+Implemented Hybrid Fee Calculation Engine for Stripe with differentiated fee structures:
 
-**Fixes Applied:**
+**VEHICLE Auctions:**
+- Buyer pays: Bid + (Bid × Tier Buyer Premium) + (Bid × 2.5% Platform Fee)
+- Seller receives: 100% of Final Bid
+- BidVex keeps: Buyer Premium + Platform Fee
 
-1. ✅ **Profile Page Keys Synced**
-   - Added `profile` section to both JSON files
-   - Keys: profileTab, paymentTab, subscription, notificationsTab, trustStatus, completeVerification, personalInformation, updateDetails, companyName, taxNumber
+**GENERAL Auctions:**
+- Buyer pays: Bid + (Bid × Tier Buyer Premium)
+- Seller receives: Bid - (Bid × Tier Seller Commission)
+- BidVex keeps: Buyer Premium + Seller Commission
 
-2. ✅ **Seller Actions Translated (Green Bar)**
-   - "Become a Seller" → "Devenir vendeur"
-   - "List a Vehicle" → "Inscrire un véhicule"
-   - "My Listings" → "Mes annonces"
-   - "List a Vehicle Now" → "Inscrire un véhicule maintenant"
-   - "Be the First to List!" → "Soyez le premier à inscrire!"
+**Fee Rates by Tier:**
+| Tier | Buyer Premium | Seller Commission |
+|------|---------------|-------------------|
+| Basic/Standard | 5.0% | 4.0% |
+| Premium | 3.5% | 2.5% |
+| VIP Elite | 3.0% | 2.0% |
 
-3. ✅ **Footer Links Fixed**
-   - "How It Works" → "Comment ça fonctionne"
-   - "Privacy Policy" → "Politique de confidentialité"
-   - "Terms of Service" → "Conditions d'utilisation"
-   - "Support" → "Soutien"
-   - "All rights reserved" → "Tous droits réservés"
+**API Endpoints Created:**
+- `POST /api/payments/fees/calculate` - Full fee calculation with JSON body
+- `GET /api/payments/fees/calculate-hybrid` - Fee calculation via query params
+- `GET /api/payments/fees/vehicle` - Vehicle-specific fees
+- `GET /api/payments/fees/general` - General auction fees
+- `GET /api/payments/fees/structure` - Fee structure documentation
 
-4. ✅ **Maintenance Translations Added**
-   - Full maintenance/coming soon page translations for both EN/FR
+**Files Created:**
+- `/app/backend/services/fee_calculation_engine.py` - Core fee calculation logic
+- `/app/backend/tests/test_fee_calculation.py` - 20 comprehensive tests (all passing)
 
-**i18n Complete Coverage:**
+**Testing:** All 20 pytest tests passing, API endpoints verified via curl
    - Marketplace: place_bid, current_bid, buy_now, ends_in, reserve_met, lot_details
    - Settings: account_info, payout_settings, notification_prefs, verify_identity, security_settings
 

@@ -336,12 +336,182 @@ async def get_my_promotions(
 
 # ========== FEE CALCULATIONS ==========
 
+# Import the hybrid fee calculation engine
+from services.fee_calculation_engine import (
+    calculate_fees,
+    calculate_vehicle_fees,
+    calculate_general_fees,
+    get_fee_structure_summary,
+    FeeCalculationResult
+)
+
+
+class FeeCalculationRequest(BaseModel):
+    """Request model for fee calculation"""
+    hammer_price: float = Field(..., gt=0, description="Winning bid amount in dollars")
+    category: str = Field(default="general", description="Auction category: 'vehicle' or 'general'")
+    buyer_tier: str = Field(default="basic", description="Buyer subscription tier")
+    seller_tier: str = Field(default="basic", description="Seller subscription tier")
+
+
+@payments_router.post("/fees/calculate")
+async def calculate_auction_fees(request: FeeCalculationRequest):
+    """
+    Calculate complete fee breakdown for an auction transaction
+    
+    Supports two fee structures:
+    - VEHICLE: Buyer pays premium + 2.5% platform fee, Seller gets 100%
+    - GENERAL: Buyer pays premium, Seller pays commission
+    
+    All amounts returned in both dollars and cents (for Stripe)
+    """
+    result = calculate_fees(
+        hammer_price=request.hammer_price,
+        category=request.category,
+        buyer_tier=request.buyer_tier,
+        seller_tier=request.seller_tier
+    )
+    
+    return result.to_dict()
+
+
+@payments_router.get("/fees/calculate-hybrid")
+async def calculate_hybrid_fees(
+    price: float,
+    category: str = "general",
+    buyer_tier: str = "basic",
+    seller_tier: str = "basic"
+):
+    """
+    GET endpoint for fee calculation (alternative to POST)
+    
+    Args:
+        price: Hammer price (winning bid) in dollars
+        category: 'vehicle' or 'general'
+        buyer_tier: Buyer's subscription tier
+        seller_tier: Seller's subscription tier
+    """
+    result = calculate_fees(
+        hammer_price=price,
+        category=category,
+        buyer_tier=buyer_tier,
+        seller_tier=seller_tier
+    )
+    
+    return result.to_dict()
+
+
+@payments_router.get("/fees/vehicle")
+async def calculate_vehicle_auction_fees(
+    price: float,
+    buyer_tier: str = "basic"
+):
+    """
+    Calculate fees specifically for vehicle auctions
+    
+    Vehicle Fee Structure:
+    - Buyer pays: Price + Buyer Premium + 2.5% Platform Fee
+    - Seller receives: 100% of hammer price
+    - BidVex keeps: Buyer Premium + Platform Fee
+    """
+    result = calculate_vehicle_fees(
+        hammer_price=price,
+        buyer_tier=buyer_tier
+    )
+    
+    return {
+        "auction_type": "vehicle",
+        "hammer_price": result.hammer_price,
+        "buyer": {
+            "premium_rate": f"{result.buyer_premium_rate * 100:.1f}%",
+            "premium_amount": result.buyer_premium,
+            "platform_fee_rate": f"{result.platform_fee_rate * 100:.1f}%",
+            "platform_fee_amount": result.platform_fee,
+            "total_cost": result.buyer_total,
+            "total_cost_cents": result.buyer_total_cents
+        },
+        "seller": {
+            "commission_rate": "0%",
+            "commission_amount": 0.0,
+            "net_payout": result.seller_net_payout,
+            "net_payout_cents": result.seller_net_payout_cents
+        },
+        "bidvex": {
+            "revenue": result.bidvex_revenue,
+            "revenue_cents": result.bidvex_revenue_cents
+        },
+        "stripe": {
+            "amount_cents": result.stripe_amount_cents,
+            "application_fee_cents": result.stripe_application_fee_cents,
+            "transfer_amount_cents": result.stripe_transfer_amount_cents
+        }
+    }
+
+
+@payments_router.get("/fees/general")
+async def calculate_general_auction_fees(
+    price: float,
+    buyer_tier: str = "basic",
+    seller_tier: str = "basic"
+):
+    """
+    Calculate fees specifically for general auctions
+    
+    General Fee Structure:
+    - Buyer pays: Price + Buyer Premium
+    - Seller receives: Price - Commission
+    - BidVex keeps: Buyer Premium + Seller Commission
+    """
+    result = calculate_general_fees(
+        hammer_price=price,
+        buyer_tier=buyer_tier,
+        seller_tier=seller_tier
+    )
+    
+    return {
+        "auction_type": "general",
+        "hammer_price": result.hammer_price,
+        "buyer": {
+            "premium_rate": f"{result.buyer_premium_rate * 100:.1f}%",
+            "premium_amount": result.buyer_premium,
+            "platform_fee_rate": "0%",
+            "platform_fee_amount": 0.0,
+            "total_cost": result.buyer_total,
+            "total_cost_cents": result.buyer_total_cents
+        },
+        "seller": {
+            "commission_rate": f"{result.seller_commission_rate * 100:.1f}%",
+            "commission_amount": result.seller_commission,
+            "net_payout": result.seller_net_payout,
+            "net_payout_cents": result.seller_net_payout_cents
+        },
+        "bidvex": {
+            "revenue": result.bidvex_revenue,
+            "revenue_cents": result.bidvex_revenue_cents
+        },
+        "stripe": {
+            "amount_cents": result.stripe_amount_cents,
+            "application_fee_cents": result.stripe_application_fee_cents,
+            "transfer_amount_cents": result.stripe_transfer_amount_cents
+        }
+    }
+
+
+@payments_router.get("/fees/structure")
+async def get_fee_structures():
+    """
+    Get complete fee structure documentation for both auction types
+    """
+    return get_fee_structure_summary()
+
+
+# Legacy endpoints (kept for backward compatibility)
 @payments_router.get("/fees/calculate-buyer-cost")
 async def calculate_buyer_cost(
     price: float,
     tier: str = "free"
 ):
-    """Calculate total buyer cost including fees"""
+    """Calculate total buyer cost including fees (legacy endpoint)"""
     # Buyer premium rates
     rates = {
         "free": 0.10,      # 10%
@@ -366,7 +536,7 @@ async def calculate_seller_net(
     price: float,
     tier: str = "free"
 ):
-    """Calculate seller net after commission"""
+    """Calculate seller net after commission (legacy endpoint)"""
     # Commission rates
     rates = {
         "free": 0.04,      # 4%
