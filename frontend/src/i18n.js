@@ -161,11 +161,15 @@ const buildEnglishResources = () => ({
     termsOfService: enTranslations.legal?.termsOfService || 'Terms of Service',
     privacyPolicy: enTranslations.legal?.privacyPolicy || 'Privacy Policy',
     faq: enTranslations.footer?.faq || 'FAQ',
-    support: 'Support',
+    support: enTranslations.footer?.support || 'Contact Support',
     followUs: enTranslations.footer?.followUs || 'Follow Us',
     allRightsReserved: enTranslations.legal?.allRightsReserved || 'All rights reserved',
     howItWorks: enTranslations.homepage?.howItWorks || 'How It Works',
     cookiePreferences: enTranslations.legal?.cookieSettings || 'Cookie Preferences',
+    // Snake_case keys used by Footer component
+    how_it_works: enTranslations.footer?.how_it_works || 'How It Works',
+    privacy_policy: enTranslations.footer?.privacy_policy || 'Privacy Policy',
+    terms_of_service: enTranslations.footer?.terms_of_service || 'Terms of Service',
   },
 
   // Errors
@@ -654,6 +658,47 @@ const buildEnglishResources = () => ({
       },
     },
   },
+
+  // Profile settings
+  profile: {
+    ...enTranslations.profile,
+    accountSettings: enTranslations.profile?.accountSettings || 'Account Settings',
+    profileTab: enTranslations.profile?.profileTab || 'Profile',
+    paymentTab: enTranslations.profile?.paymentTab || 'Payment',
+    subscription: enTranslations.profile?.subscription || 'Subscription',
+    notificationsTab: enTranslations.profile?.notificationsTab || 'Notifications',
+    trustStatus: enTranslations.profile?.trustStatus || 'Trust Status',
+    completeVerification: enTranslations.profile?.completeVerification || 'Complete verification to bid and sell',
+    verifyPhone: enTranslations.profile?.verifyPhone || 'Verify Phone',
+    addPayment: enTranslations.profile?.addPayment || 'Add Payment',
+    personalInformation: enTranslations.profile?.personalInformation || 'Personal Information',
+    updateDetails: enTranslations.profile?.updateDetails || 'Update your contact details',
+    fullName: enTranslations.profile?.fullName || 'Full Name',
+    phoneNumber: enTranslations.profile?.phoneNumber || 'Phone Number',
+    address: enTranslations.profile?.address || 'Address',
+    companyName: enTranslations.profile?.companyName || 'Company Name',
+    taxNumber: enTranslations.profile?.taxNumber || 'Tax Number',
+    language: enTranslations.profile?.language || 'Language',
+    english: enTranslations.profile?.english || 'English',
+    french: enTranslations.profile?.french || 'Français',
+    currency: enTranslations.profile?.currency || 'Currency',
+    saveChanges: enTranslations.profile?.saveChanges || 'Save Changes',
+    changesSaved: enTranslations.profile?.changesSaved || 'Changes saved successfully',
+  },
+
+  // Seller Actions (green bar)
+  sellerActions: {
+    ...enTranslations.sellerActions,
+    becomeSeller: enTranslations.sellerActions?.becomeSeller || 'Become a Seller',
+    listVehicle: enTranslations.sellerActions?.listVehicle || 'List a Vehicle',
+    myListings: enTranslations.sellerActions?.myListings || 'My Listings',
+    listVehicleNow: enTranslations.sellerActions?.listVehicleNow || 'List a Vehicle Now',
+    beTheFirst: enTranslations.sellerActions?.beTheFirst || 'Be the First to List!',
+    beTheFirstDesc: enTranslations.sellerActions?.beTheFirstDesc || 'Start selling your vehicles on BidVex today',
+    startSelling: enTranslations.sellerActions?.startSelling || 'Start Selling',
+    sellerBenefits: enTranslations.sellerActions?.sellerBenefits || 'Join thousands of sellers',
+    earnMore: enTranslations.sellerActions?.earnMore || 'Earn more with competitive fees',
+  },
 });
 
 // Build French resources from JSON + legacy keys for backward compatibility
@@ -787,11 +832,15 @@ const buildFrenchResources = () => ({
     termsOfService: frTranslations.legal?.termsOfService || "Conditions d'utilisation",
     privacyPolicy: frTranslations.legal?.privacyPolicy || 'Politique de confidentialité',
     faq: frTranslations.footer?.faq || 'FAQ',
-    support: 'Soutien',
+    support: frTranslations.footer?.support || 'Soutien',
     followUs: frTranslations.footer?.followUs || 'Suivez-nous',
     allRightsReserved: frTranslations.legal?.allRightsReserved || 'Tous droits réservés',
     howItWorks: frTranslations.homepage?.howItWorks || 'Comment ça fonctionne',
     cookiePreferences: frTranslations.legal?.cookieSettings || 'Paramètres des témoins',
+    // Snake_case keys used by Footer component
+    how_it_works: frTranslations.footer?.how_it_works || 'Comment ça fonctionne',
+    privacy_policy: frTranslations.footer?.privacy_policy || 'Politique de confidentialité',
+    terms_of_service: frTranslations.footer?.terms_of_service || "Conditions d'utilisation",
   },
 
   errors: {
@@ -1248,6 +1297,47 @@ const buildFrenchResources = () => ({
         solution: 'Connectez-vous à votre compte ou créez un nouveau compte pour commencer à enchérir.',
       },
     },
+  },
+
+  // Profile settings
+  profile: {
+    ...frTranslations.profile,
+    accountSettings: frTranslations.profile?.accountSettings || 'Paramètres du compte',
+    profileTab: frTranslations.profile?.profileTab || 'Profil',
+    paymentTab: frTranslations.profile?.paymentTab || 'Paiement',
+    subscription: frTranslations.profile?.subscription || 'Abonnement',
+    notificationsTab: frTranslations.profile?.notificationsTab || 'Notifications',
+    trustStatus: frTranslations.profile?.trustStatus || 'Statut de confiance',
+    completeVerification: frTranslations.profile?.completeVerification || 'Veuillez compléter la vérification pour enchérir et vendre',
+    verifyPhone: frTranslations.profile?.verifyPhone || 'Vérifier le téléphone',
+    addPayment: frTranslations.profile?.addPayment || 'Ajouter un mode de paiement',
+    personalInformation: frTranslations.profile?.personalInformation || 'Informations personnelles',
+    updateDetails: frTranslations.profile?.updateDetails || 'Mettre à jour vos coordonnées',
+    fullName: frTranslations.profile?.fullName || 'Nom complet',
+    phoneNumber: frTranslations.profile?.phoneNumber || 'Numéro de téléphone',
+    address: frTranslations.profile?.address || 'Adresse',
+    companyName: frTranslations.profile?.companyName || "Nom de l'entreprise",
+    taxNumber: frTranslations.profile?.taxNumber || 'Numéro de taxe',
+    language: frTranslations.profile?.language || 'Langue',
+    english: frTranslations.profile?.english || 'English',
+    french: frTranslations.profile?.french || 'Français',
+    currency: frTranslations.profile?.currency || 'Devise',
+    saveChanges: frTranslations.profile?.saveChanges || 'Enregistrer les modifications',
+    changesSaved: frTranslations.profile?.changesSaved || 'Modifications enregistrées avec succès',
+  },
+
+  // Seller Actions (green bar)
+  sellerActions: {
+    ...frTranslations.sellerActions,
+    becomeSeller: frTranslations.sellerActions?.becomeSeller || 'Devenir vendeur',
+    listVehicle: frTranslations.sellerActions?.listVehicle || 'Inscrire un véhicule',
+    myListings: frTranslations.sellerActions?.myListings || 'Mes annonces',
+    listVehicleNow: frTranslations.sellerActions?.listVehicleNow || 'Inscrire un véhicule maintenant',
+    beTheFirst: frTranslations.sellerActions?.beTheFirst || 'Soyez le premier à inscrire!',
+    beTheFirstDesc: frTranslations.sellerActions?.beTheFirstDesc || 'Commencez à vendre vos véhicules sur BidVex dès aujourd\'hui',
+    startSelling: frTranslations.sellerActions?.startSelling || 'Commencer à vendre',
+    sellerBenefits: frTranslations.sellerActions?.sellerBenefits || 'Rejoignez des milliers de vendeurs',
+    earnMore: frTranslations.sellerActions?.earnMore || 'Gagnez plus avec des frais compétitifs',
   },
 });
 

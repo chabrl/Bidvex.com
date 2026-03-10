@@ -135,7 +135,7 @@ const ProfileSettingsPage = () => {
               className="bg-transparent"
             >
               <Crown className="h-[18px] w-[18px]" />
-              Subscription
+              {t('profile.subscription')}
             </TabsTrigger>
             <TabsTrigger 
               value="notifications" 

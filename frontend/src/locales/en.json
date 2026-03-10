@@ -26,7 +26,8 @@
     "currency": "CAD",
     "currencySymbol": "$",
     "required": "Required",
-    "optional": "Optional"
+    "optional": "Optional",
+    "tryAdjustingFilters": "Try adjusting your filters or check back later for new listings."
   },
   "navigation": {
     "home": "Home",
@@ -220,7 +221,10 @@
     "privateSeller": "Private Seller",
     "licensedDealer": "Licensed Dealer",
     "verifiedAuctioneer": "Verified Auctioneer",
-    "verifiedSeller": "Verified Seller"
+    "verifiedSeller": "Verified Seller",
+    "sellPersonalVehicle": "Sell your personal vehicle",
+    "upTo500Vehicles": "Up to 500 vehicles/month",
+    "professionalAuctionHouse": "Professional auction house"
   },
   "bidding": {
     "bindingBid": "All bids are legally binding",
@@ -430,6 +434,46 @@
     "newsletter": "Newsletter",
     "subscribeNewsletter": "Subscribe to our newsletter",
     "enterEmail": "Enter your email",
-    "subscribe": "Subscribe"
+    "subscribe": "Subscribe",
+    "how_it_works": "How It Works",
+    "privacy_policy": "Privacy Policy",
+    "terms_of_service": "Terms of Service",
+    "support": "Contact Support",
+    "allRightsReserved": "All rights reserved"
+  },
+  "profile": {
+    "accountSettings": "Account Settings",
+    "profileTab": "Profile",
+    "paymentTab": "Payment",
+    "subscription": "Subscription",
+    "notificationsTab": "Notifications",
+    "trustStatus": "Trust Status",
+    "completeVerification": "Complete verification to bid and sell",
+    "verifyPhone": "Verify Phone",
+    "addPayment": "Add Payment",
+    "personalInformation": "Personal Information",
+    "updateDetails": "Update your contact details",
+    "fullName": "Full Name",
+    "phoneNumber": "Phone Number",
+    "address": "Address",
+    "companyName": "Company Name",
+    "taxNumber": "Tax Number",
+    "language": "Language",
+    "english": "English",
+    "french": "Français",
+    "currency": "Currency",
+    "saveChanges": "Save Changes",
+    "changesSaved": "Changes saved successfully"
+  },
+  "sellerActions": {
+    "becomeSeller": "Become a Seller",
+    "listVehicle": "List a Vehicle",
+    "myListings": "My Listings",
+    "listVehicleNow": "List a Vehicle Now",
+    "beTheFirst": "Be the First to List!",
+    "beTheFirstDesc": "Start selling your vehicles on BidVex today",
+    "startSelling": "Start Selling",
+    "sellerBenefits": "Join thousands of sellers",
+    "earnMore": "Earn more with competitive fees"
   }
 }

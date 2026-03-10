@@ -49,7 +49,9 @@ const Footer = () => {
 
   const renderLink = (pageKey, defaultTitle, defaultPath) => {
     const linkData = footerLinks?.[pageKey];
-    const title = linkData?.title || t(`footer.${pageKey}`, defaultTitle);
+    // Prioritize i18n translations for proper accents, fall back to API title if translation key matches default
+    const i18nTitle = t(`footer.${pageKey}`, { defaultValue: '' });
+    const title = i18nTitle || linkData?.title || defaultTitle;
     const linkType = linkData?.link_type || 'page';
     const linkValue = linkData?.link_value || defaultPath;
 

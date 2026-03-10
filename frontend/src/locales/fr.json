@@ -26,7 +26,8 @@
     "currency": "CAD",
     "currencySymbol": "$",
     "required": "Obligatoire",
-    "optional": "Facultatif"
+    "optional": "Facultatif",
+    "tryAdjustingFilters": "Essayez d'ajuster vos filtres ou revenez plus tard pour de nouvelles annonces."
   },
   "navigation": {
     "home": "Accueil",
@@ -220,7 +221,10 @@
     "privateSeller": "Vendeur particulier",
     "licensedDealer": "Concessionnaire agréé",
     "verifiedAuctioneer": "Encanteur vérifié",
-    "verifiedSeller": "Vendeur vérifié"
+    "verifiedSeller": "Vendeur vérifié",
+    "sellPersonalVehicle": "Vendre votre véhicule personnel",
+    "upTo500Vehicles": "Jusqu'à 500 véhicules/mois",
+    "professionalAuctionHouse": "Maison d'enchères professionnelle"
   },
   "bidding": {
     "bindingBid": "Toutes les enchères sont juridiquement contraignantes",
@@ -430,6 +434,46 @@
     "newsletter": "Infolettre",
     "subscribeNewsletter": "Abonnez-vous à notre infolettre",
     "enterEmail": "Entrez votre courriel",
-    "subscribe": "S'abonner"
+    "subscribe": "S'abonner",
+    "how_it_works": "Comment ça fonctionne",
+    "privacy_policy": "Politique de confidentialité",
+    "terms_of_service": "Conditions d'utilisation",
+    "support": "Soutien",
+    "allRightsReserved": "Tous droits réservés"
+  },
+  "profile": {
+    "accountSettings": "Paramètres du compte",
+    "profileTab": "Profil",
+    "paymentTab": "Paiement",
+    "subscription": "Abonnement",
+    "notificationsTab": "Notifications",
+    "trustStatus": "Statut de confiance",
+    "completeVerification": "Veuillez compléter la vérification pour enchérir et vendre",
+    "verifyPhone": "Vérifier le téléphone",
+    "addPayment": "Ajouter un mode de paiement",
+    "personalInformation": "Informations personnelles",
+    "updateDetails": "Mettre à jour vos coordonnées",
+    "fullName": "Nom complet",
+    "phoneNumber": "Numéro de téléphone",
+    "address": "Adresse",
+    "companyName": "Nom de l'entreprise",
+    "taxNumber": "Numéro de taxe",
+    "language": "Langue",
+    "english": "English",
+    "french": "Français",
+    "currency": "Devise",
+    "saveChanges": "Enregistrer les modifications",
+    "changesSaved": "Modifications enregistrées avec succès"
+  },
+  "sellerActions": {
+    "becomeSeller": "Devenir vendeur",
+    "listVehicle": "Inscrire un véhicule",
+    "myListings": "Mes annonces",
+    "listVehicleNow": "Inscrire un véhicule maintenant",
+    "beTheFirst": "Soyez le premier à inscrire!",
+    "beTheFirstDesc": "Commencez à vendre vos véhicules sur BidVex dès aujourd'hui",
+    "startSelling": "Commencer à vendre",
+    "sellerBenefits": "Rejoignez des milliers de vendeurs",
+    "earnMore": "Gagnez plus avec des frais compétitifs"
   }
 }

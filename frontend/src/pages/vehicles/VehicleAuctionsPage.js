@@ -454,7 +454,7 @@ const VehicleAuctionsPage = () => {
                 data-testid="btn-seller-register"
               >
                 <User className="h-4 w-4 mr-2" />
-                Become a Seller
+                {t('sellerActions.becomeSeller')}
               </Button>
               <Button
                 onClick={() => navigate('/vehicle-auctions/create')}
@@ -462,7 +462,7 @@ const VehicleAuctionsPage = () => {
                 data-testid="btn-create-listing"
               >
                 <PlusCircle className="h-4 w-4 mr-2" />
-                List a Vehicle
+                {t('sellerActions.listVehicle')}
               </Button>
               <Button
                 onClick={() => navigate('/vehicle-auctions/my-listings')}
@@ -470,7 +470,7 @@ const VehicleAuctionsPage = () => {
                 data-testid="btn-my-listings"
               >
                 <Car className="h-4 w-4 mr-2" />
-                My Listings
+                {t('sellerActions.myListings')}
               </Button>
             </div>
           </div>
@@ -508,12 +508,12 @@ const VehicleAuctionsPage = () => {
           <div className="text-center py-16">
             <Car className="h-16 w-16 text-slate-300 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">
-              No Vehicles Found
+              {t('marketplace.noResults')}
             </h3>
             <p className="text-slate-500 mb-6">
-              Try adjusting your filters or check back later for new listings.
+              {t('common.tryAdjustingFilters') || 'Try adjusting your filters or check back later for new listings.'}
             </p>
-            <Button onClick={clearFilters}>Clear Filters</Button>
+            <Button onClick={clearFilters}>{t('marketplace.clearFilters')}</Button>
             
             {/* Seller CTA Card */}
             <div className="mt-12 max-w-2xl mx-auto">
@@ -522,30 +522,29 @@ const VehicleAuctionsPage = () => {
                   <div className="flex items-center justify-center gap-2 mb-4">
                     <Gavel className="h-8 w-8 text-emerald-600" />
                     <h3 className="text-2xl font-bold text-emerald-800 dark:text-emerald-200">
-                      Be the First to List!
+                      {t('sellerActions.beTheFirst')}
                     </h3>
                   </div>
                   <p className="text-emerald-700 dark:text-emerald-300 mb-6">
-                    Join our verified seller network and reach thousands of qualified buyers.
-                    Low commission rates for dealers and auctioneers.
+                    {t('sellerActions.beTheFirstDesc')}
                   </p>
                   
                   {/* Seller Type Cards */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <div className="bg-white dark:bg-slate-800 rounded-lg p-4 text-center">
                       <User className="h-8 w-8 text-blue-500 mx-auto mb-2" />
-                      <h4 className="font-semibold text-slate-900 dark:text-white">Private Seller</h4>
-                      <p className="text-xs text-slate-500">Sell your personal vehicle</p>
+                      <h4 className="font-semibold text-slate-900 dark:text-white">{t('vehicles.privateSeller')}</h4>
+                      <p className="text-xs text-slate-500">{t('vehicles.sellPersonalVehicle') || 'Sell your personal vehicle'}</p>
                     </div>
                     <div className="bg-white dark:bg-slate-800 rounded-lg p-4 text-center">
                       <Building2 className="h-8 w-8 text-green-500 mx-auto mb-2" />
-                      <h4 className="font-semibold text-slate-900 dark:text-white">Licensed Dealer</h4>
-                      <p className="text-xs text-slate-500">Up to 500 vehicles/month</p>
+                      <h4 className="font-semibold text-slate-900 dark:text-white">{t('vehicles.licensedDealer')}</h4>
+                      <p className="text-xs text-slate-500">{t('vehicles.upTo500Vehicles') || 'Up to 500 vehicles/month'}</p>
                     </div>
                     <div className="bg-white dark:bg-slate-800 rounded-lg p-4 text-center">
                       <Gavel className="h-8 w-8 text-purple-500 mx-auto mb-2" />
-                      <h4 className="font-semibold text-slate-900 dark:text-white">Auctioneer</h4>
-                      <p className="text-xs text-slate-500">Professional auction house</p>
+                      <h4 className="font-semibold text-slate-900 dark:text-white">{t('vehicles.verifiedAuctioneer')}</h4>
+                      <p className="text-xs text-slate-500">{t('vehicles.professionalAuctionHouse') || 'Professional auction house'}</p>
                     </div>
                   </div>
                   
@@ -556,7 +555,7 @@ const VehicleAuctionsPage = () => {
                       size="lg"
                     >
                       <Star className="h-5 w-5" />
-                      Register as Seller
+                      {t('sellerActions.becomeSeller')}
                     </Button>
                     <Button
                       onClick={() => navigate('/vehicle-auctions/create')}
@@ -565,7 +564,7 @@ const VehicleAuctionsPage = () => {
                       size="lg"
                     >
                       <PlusCircle className="h-5 w-5" />
-                      List a Vehicle Now
+                      {t('sellerActions.listVehicleNow')}
                     </Button>
                   </div>
                 </CardContent>
