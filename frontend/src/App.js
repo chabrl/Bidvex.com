@@ -45,6 +45,7 @@ import ClientEmailMarketing from './pages/ClientEmailMarketing';
 import EmailMarketingPricing from './pages/EmailMarketingPricing';
 import SubscriptionPricingPage from './pages/SubscriptionPricingPage';
 import MaintenancePage from './pages/MaintenancePage';
+import CheckoutPage from './pages/CheckoutPage';
 
 // Vehicle Auction Module (Standalone)
 import VehicleAuctionsPage from './pages/vehicles/VehicleAuctionsPage';
@@ -290,6 +291,9 @@ const App = () => {
           <Route path="/email-marketing-pricing" element={<EmailMarketingPricing />} />
           <Route path="/pricing" element={<SubscriptionPricingPage />} />
           <Route path="/subscription/success" element={<PaymentSuccessPage />} />
+          <Route path="/checkout/:listingId" element={
+            <ProtectedRoute><CheckoutPage /></ProtectedRoute>
+          } />
           
           {/* Vehicle Auction Module (Standalone) */}
           <Route path="/vehicle-auctions" element={<VehicleAuctionsPage />} />

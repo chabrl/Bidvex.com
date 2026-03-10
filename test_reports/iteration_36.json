@@ -1,0 +1,111 @@
+{
+  "summary": "Phase 2 Backend Testing: Subscription & Seller Features. Found 2 CRITICAL bugs preventing authenticated endpoints from working: (1) _get_current_user function mismatch, (2) users_router and webhooks_router not included in API. 15 tests passed, 10 skipped due to known bugs.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "All authenticated endpoints in payments.py",
+        "issue": "_get_current_user(credentials) called but function expects (Request, credentials). Causes AttributeError: 'HTTPAuthorizationCredentials' object has no attribute 'cookies'",
+        "priority": "CRITICAL",
+        "fix": "Add Request parameter to route signatures: async def endpoint(request: Request, credentials: ...) and call _get_current_user(request, credentials)",
+        "affected_endpoints": [
+          "/api/payments/subscriptions/fee-rates",
+          "/api/payments/subscriptions/my-status",
+          "/api/payments/seller/earnings",
+          "/api/payments/seller/transactions",
+          "/api/payments/checkout/preview/{listing_id}",
+          "/api/payments/checkout/auction"
+        ]
+      },
+      {
+        "endpoint": "Stripe Connect endpoints (/api/users/me/stripe-connect/*)",
+        "issue": "users_router NOT included in api_router (see server.py line 10737-10740). All endpoints in routes/users.py return 404.",
+        "priority": "CRITICAL",
+        "fix": "Add api_router.include_router(users_router) to server.py after resolving duplicate endpoint conflicts"
+      },
+      {
+        "endpoint": "Webhook endpoint (/api/webhooks/stripe)",
+        "issue": "webhooks_router NOT included in api_router. Webhook cannot receive Stripe subscription events.",
+        "priority": "CRITICAL",
+        "fix": "Add api_router.include_router(webhooks_router) to server.py"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase2_subscription_seller.py",
+    "/app/test_reports/pytest/pytest_results_phase2_subscription.xml"
+  ],
+  "action_items": [
+    "FIX CRITICAL: Update payments.py routes to pass Request object to _get_current_user. Change from _get_current_user(credentials) to _get_current_user(request, credentials) and add Request parameter to route signatures",
+    "FIX CRITICAL: Include users_router in api_router to expose Stripe Connect onboarding endpoints",
+    "FIX CRITICAL: Include webhooks_router in api_router to receive Stripe subscription webhook events",
+    "After fixes, retest all 10 skipped tests"
+  ],
+  "critical_code_review_comments": [
+    "Subscription tier mappings correctly defined in subscription_service.py with correct Stripe Price IDs",
+    "Fee rates by tier are correctly configured (Free: 5%/4%, Premium: 3.5%/2.5%, VIP: 3%/2%)",
+    "Processing fee info endpoint works correctly (2.9% + $0.30)",
+    "Subscription upgrade endpoint structure is correct, creates Stripe checkout session"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase2_subscription_seller.py - Created comprehensive test suite (25 tests)"
+  ],
+  "success_rate": {
+    "backend": "60% (15/25 passed, 10 skipped due to bugs)"
+  },
+  "test_credentials": "charbeladmin@bidvex.com / Admin123!",
+  "seed_data_creation": "",
+  "retest_needed": true,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "Phase 2 subscription and seller endpoints have critical bugs. All authenticated endpoints in payments.py fail due to incorrect _get_current_user call. Stripe Connect and Webhook routes are not registered (404). After main agent fixes these 3 issues, rerun test_phase2_subscription_seller.py to validate all 25 tests.",
+  "bugs_identified": {
+    "bug_1": {
+      "title": "_get_current_user function parameter mismatch",
+      "severity": "CRITICAL",
+      "file": "/app/backend/routes/payments.py",
+      "root_cause": "Routes call _get_current_user(credentials) but the function in server.py expects (request: Request, credentials). The function tries to access request.cookies which fails on HTTPAuthorizationCredentials object.",
+      "error_message": "AttributeError: 'HTTPAuthorizationCredentials' object has no attribute 'cookies'",
+      "fix_steps": [
+        "1. Add 'from fastapi import Request' if not already imported",
+        "2. Update each route signature to include Request: async def endpoint(request: Request, ...)",
+        "3. Update function calls: await _get_current_user(request, credentials)"
+      ]
+    },
+    "bug_2": {
+      "title": "users_router not included in api_router",
+      "severity": "CRITICAL",
+      "file": "/app/backend/server.py",
+      "line": "10737-10740",
+      "root_cause": "Comment indicates users_router not included due to duplicate endpoints. New Stripe Connect endpoints added to routes/users.py are therefore inaccessible.",
+      "fix_steps": [
+        "1. Add: api_router.include_router(users_router)",
+        "2. Alternatively, move Stripe Connect endpoints to server.py or payments_router"
+      ]
+    },
+    "bug_3": {
+      "title": "webhooks_router not included in api_router",
+      "severity": "CRITICAL",
+      "file": "/app/backend/server.py",
+      "line": "10737-10740",
+      "root_cause": "webhooks_router imported but not included. Stripe webhook events cannot be received.",
+      "fix_steps": [
+        "1. Add: api_router.include_router(webhooks_router)"
+      ]
+    }
+  },
+  "working_endpoints": [
+    "GET /api/payments/subscriptions/tiers - Returns all tiers with correct Stripe Price IDs",
+    "POST /api/payments/subscriptions/upgrade - Creates Stripe checkout (requires valid tier)",
+    "GET /api/payments/fees/processing - Returns processing fee info (2.9% + $0.30)"
+  ],
+  "stripe_price_ids_verified": {
+    "free": "price_1T5V79Bd6Wtvh7hsnp69zu1F",
+    "premium": "price_1T5V5xBd6Wtvh7hscWcNnk34",
+    "vip": "price_1T5V2bBd6Wtvh7hsqLLmAZSH"
+  }
+}

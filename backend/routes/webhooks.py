@@ -2,7 +2,7 @@
 BidVex Webhooks Router
 Handles external webhooks from third-party services:
 - SendGrid (email events)
-- Stripe (payment events)
+- Stripe (payment events, subscription events)
 """
 
 from fastapi import APIRouter, HTTPException, Request
@@ -10,6 +10,8 @@ from typing import Dict, Any, List
 from datetime import datetime, timezone
 import logging
 import json
+
+from services.subscription_service import handle_subscription_event, get_tier_from_price_id
 
 logger = logging.getLogger(__name__)
 
@@ -346,18 +348,8 @@ async def _handle_payment_failed(db, invoice):
 
 
 def _map_price_to_tier(price_id: str) -> str:
-    """Map Stripe price ID to subscription tier"""
-    import os
-    
-    premium_price = os.environ.get("STRIPE_PREMIUM_PRICE_ID", "")
-    vip_price = os.environ.get("STRIPE_VIP_PRICE_ID", "")
-    
-    if price_id == vip_price:
-        return "vip"
-    elif price_id == premium_price:
-        return "premium"
-    else:
-        return "free"
+    """Map Stripe price ID to subscription tier using centralized mapping"""
+    return get_tier_from_price_id(price_id)
 
 
 async def _handle_checkout_completed(db, session):

@@ -1038,3 +1038,274 @@ async def get_processing_fee_info():
             "stripe_fee": 3.30
         }
     }
+
+
+
+# ========== SUBSCRIPTION ENDPOINTS ==========
+
+from services.subscription_service import (
+    get_all_tiers,
+    get_tier_benefits,
+    create_subscription_checkout,
+    get_user_subscription_status,
+    STRIPE_PRICE_IDS,
+    BUYER_PREMIUM_RATES,
+    SELLER_COMMISSION_RATES,
+)
+
+
+@payments_router.get("/subscriptions/tiers")
+async def get_subscription_tiers():
+    """
+    Get all available subscription tiers with pricing and benefits
+    
+    Returns:
+        List of tiers: Free, Premium ($180/mo), VIP ($300/mo)
+        Fee comparison table
+    """
+    return get_all_tiers()
+
+
+@payments_router.get("/subscriptions/my-status")
+async def get_my_subscription_status(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Get current user's subscription status and benefits
+    """
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    db = get_db()
+    current_user = await _get_current_user(credentials)
+    
+    return await get_user_subscription_status(db, current_user.id)
+
+
+class SubscriptionUpgradeRequest(BaseModel):
+    tier: str = Field(..., description="Target tier: 'premium' or 'vip'")
+    return_url: str = Field(..., description="URL to redirect after checkout")
+
+
+@payments_router.post("/subscriptions/upgrade")
+async def upgrade_subscription(
+    request: SubscriptionUpgradeRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Create checkout session for subscription upgrade
+    
+    Args:
+        tier: Target subscription tier ('premium' or 'vip')
+        return_url: URL to redirect after checkout
+    
+    Returns:
+        Stripe Checkout URL for subscription payment
+    """
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    if request.tier.lower() not in ["premium", "vip"]:
+        raise HTTPException(status_code=400, detail="Invalid tier. Must be 'premium' or 'vip'")
+    
+    db = get_db()
+    current_user = await _get_current_user(credentials)
+    
+    result = await create_subscription_checkout(
+        db=db,
+        user_id=current_user.id,
+        tier=request.tier.lower(),
+        return_url=request.return_url
+    )
+    
+    return result
+
+
+@payments_router.get("/subscriptions/fee-rates")
+async def get_fee_rates(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Get fee rates for current user's subscription tier
+    
+    Used by tax calculation endpoints to apply correct rates.
+    """
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    db = get_db()
+    current_user = await _get_current_user(credentials)
+    
+    user = await db.users.find_one({"id": current_user.id})
+    tier = user.get("subscription_tier", "free") if user else "free"
+    
+    return {
+        "tier": tier,
+        "buyer_premium_rate": BUYER_PREMIUM_RATES.get(tier, 0.05),
+        "buyer_premium_display": f"{BUYER_PREMIUM_RATES.get(tier, 0.05) * 100:.1f}%",
+        "seller_commission_rate": SELLER_COMMISSION_RATES.get(tier, 0.04),
+        "seller_commission_display": f"{SELLER_COMMISSION_RATES.get(tier, 0.04) * 100:.1f}%",
+        "all_rates": {
+            "free": {"buyer": "5.0%", "seller": "4.0%"},
+            "premium": {"buyer": "3.5%", "seller": "2.5%"},
+            "vip": {"buyer": "3.0%", "seller": "2.0%"}
+        }
+    }
+
+
+# ========== SELLER EARNINGS DASHBOARD ==========
+
+@payments_router.get("/seller/earnings")
+async def get_seller_earnings(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Get seller earnings dashboard data
+    
+    Returns:
+        - Total earned
+        - Pending payouts
+        - Available balance
+        - Recent transactions
+    """
+    import stripe
+    
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    db = get_db()
+    current_user = await _get_current_user(credentials)
+    
+    user = await db.users.find_one({"id": current_user.id})
+    connect_account_id = user.get("stripe_connect_account_id") if user else None
+    
+    if not connect_account_id:
+        return {
+            "has_connect_account": False,
+            "message": "Please complete seller onboarding to view earnings",
+            "onboarding_required": True
+        }
+    
+    try:
+        # Get Stripe Connect account balance
+        balance = stripe.Balance.retrieve(stripe_account=connect_account_id)
+        
+        # Get available balance
+        available = sum(
+            b.get("amount", 0) 
+            for b in balance.get("available", []) 
+            if b.get("currency") == "cad"
+        )
+        
+        # Get pending balance
+        pending = sum(
+            b.get("amount", 0) 
+            for b in balance.get("pending", []) 
+            if b.get("currency") == "cad"
+        )
+        
+        # Get recent payouts
+        payouts = stripe.Payout.list(
+            limit=10,
+            stripe_account=connect_account_id
+        )
+        
+        recent_payouts = [
+            {
+                "id": p.id,
+                "amount": p.amount / 100,
+                "currency": p.currency.upper(),
+                "status": p.status,
+                "arrival_date": datetime.fromtimestamp(p.arrival_date, tz=timezone.utc).isoformat() if p.arrival_date else None,
+                "created": datetime.fromtimestamp(p.created, tz=timezone.utc).isoformat()
+            }
+            for p in payouts.data
+        ]
+        
+        # Get total earned from database
+        total_earned_cursor = db.invoices.aggregate([
+            {"$match": {"seller_id": current_user.id, "type": "marketplace_purchase"}},
+            {"$group": {"_id": None, "total": {"$sum": "$breakdown.seller_payout"}}}
+        ])
+        total_earned_result = await total_earned_cursor.to_list(length=1)
+        total_earned = total_earned_result[0]["total"] if total_earned_result else 0
+        
+        # Get account status
+        account = stripe.Account.retrieve(connect_account_id)
+        
+        return {
+            "has_connect_account": True,
+            "account_id": connect_account_id,
+            "payouts_enabled": account.payouts_enabled,
+            "charges_enabled": account.charges_enabled,
+            "financial_metrics": {
+                "total_earned": total_earned,
+                "total_earned_display": f"${total_earned:,.2f}",
+                "pending_payouts": pending / 100,
+                "pending_payouts_display": f"${pending / 100:,.2f}",
+                "available_balance": available / 100,
+                "available_balance_display": f"${available / 100:,.2f}",
+                "currency": "CAD"
+            },
+            "recent_payouts": recent_payouts,
+            "requirements": {
+                "currently_due": list(account.requirements.currently_due) if account.requirements else [],
+                "past_due": list(account.requirements.past_due) if account.requirements else []
+            }
+        }
+        
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe error getting seller earnings: {e}")
+        return {
+            "has_connect_account": True,
+            "error": "Unable to retrieve earnings data",
+            "message": str(e)
+        }
+
+
+@payments_router.get("/seller/transactions")
+async def get_seller_transactions(
+    limit: int = 20,
+    offset: int = 0,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Get seller's transaction history
+    """
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    db = get_db()
+    current_user = await _get_current_user(credentials)
+    
+    # Get invoices where user is seller
+    invoices_cursor = db.invoices.find(
+        {"seller_id": current_user.id}
+    ).sort("created_at", -1).skip(offset).limit(limit)
+    
+    invoices = await invoices_cursor.to_list(length=limit)
+    
+    transactions = []
+    for inv in invoices:
+        breakdown = inv.get("breakdown", {})
+        transactions.append({
+            "id": inv.get("id"),
+            "type": inv.get("type", "sale"),
+            "listing_id": inv.get("listing_id"),
+            "auction_id": inv.get("auction_id"),
+            "hammer_price": breakdown.get("hammer_price", 0),
+            "seller_commission": breakdown.get("seller_commission", 0),
+            "seller_payout": breakdown.get("seller_payout", 0),
+            "created_at": inv.get("created_at"),
+            "pdf_url": inv.get("pdf_url")
+        })
+    
+    # Get total count
+    total_count = await db.invoices.count_documents({"seller_id": current_user.id})
+    
+    return {
+        "transactions": transactions,
+        "total_count": total_count,
+        "limit": limit,
+        "offset": offset
+    }
