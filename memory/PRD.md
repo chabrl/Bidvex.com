@@ -12,6 +12,7 @@ Build and maintain a sophisticated full-stack auction platform (BidVex) with:
 - Hybrid Fee Calculation Engine ✅ **COMPLETED**
 - Quebec Tax & Invoicing Engine ✅ **COMPLETED**
 - Total Cost Calculator Frontend ✅ **COMPLETED**
+- Marketplace Engine with Stripe Connect ✅ **COMPLETED**
 - **Enterprise Vehicle Auction Module** (standalone, Copart/IAA quality)
 
 ## Architecture
@@ -21,53 +22,77 @@ Backend: FastAPI (Python)
 Database: MongoDB Atlas (Cloud)
 Authentication: JWT + Emergent Google Auth
 AI: OpenAI GPT-4 via emergentintegrations
-Payments: Stripe (via emergentintegrations) + Hybrid Fee Engine + Tax Engine
+Payments: Stripe Connect (Destination Charges) + Hybrid Fee Engine + Tax Engine
 Email: SendGrid
 Background Jobs: APScheduler
 i18n: react-i18next (EN/FR bilingual support)
+PDF Generation: ReportLab (bilingual invoices)
 ```
 
-## Current Status: ✅ TOTAL COST CALCULATOR COMPLETE
+## Current Status: ✅ MARKETPLACE ENGINE COMPLETE
 
 ### Session Summary (Mar 10, 2026 - Latest Update)
 
-**Frontend Total Cost Calculator Implementation:**
-- Created `PriceBreakdown.js` component with real-time tax calculations
-- Updated `BidConfirmationDialog.js` to use new tax API
-- Integrated into `ListingDetailPage.js` bid form
-- Debounced API calls (300ms) to avoid excessive requests while typing
+**Phase 1: Database & Schema Updates ✅**
+- Added to User model: `is_business`, `is_tax_registered`, `tax_id`, `stripe_connect_account_id`
+- New Pydantic models in `/app/backend/models/user_models.py`
+- New endpoints: `/api/users/me/tax-info`, `/api/users/me/stripe-connect/*`
 
-**Features Implemented:**
-- Real-time cost breakdown when user types bid amount
-- Shows: Your Bid, Buyer's Premium, Platform Fee (vehicles), Taxes (GST/QST), Estimated Total
-- Vehicle Exception Note: "Only BidVex fees and taxes are paid online. Hammer price paid directly to seller"
-- Business seller taxation indicator
-- Private seller tax savings display
-- Premium member discount hint
-- Bilingual support (EN/FR)
+**Phase 2: Stripe Connect Financial Logic ✅**
+- Created `/app/backend/services/stripe_connect_service.py`
+- Implemented destination charges with gross-up formula
+- Processing fee (2.9% + $0.30) passed to buyer
+- Application fee = BidVex fees (Premium + Commission) + Tax on fees
+- Transfer to seller = Hammer - Commission (+hammer tax if business)
 
-**New Frontend Files:**
-- `/app/frontend/src/components/PriceBreakdown.js` - Total Cost Calculator component
+**Phase 3: Checkout Endpoints ✅**
+- `POST /api/payments/checkout/auction` - Creates Stripe Checkout Session
+- `GET /api/payments/checkout/preview/{listing_id}` - Cost breakdown preview
+- `GET /api/payments/fees/processing` - Processing fee info
+- `GET /api/payments/invoices/download/{invoice_id}` - PDF download
 
-**Testing Results (iteration_35.json):**
-- **84 Backend Tests Passing** (36 tax engine + 28 API endpoint + 20 fee calculation)
-- All API endpoints verified:
-  - POST /api/payments/tax/calculate ✅
-  - GET /api/payments/tax/vehicle ✅
-  - GET /api/payments/tax/general ✅
-  - GET /api/payments/tax/rates ✅
+**Phase 4: Webhook Handler ✅**
+- `checkout.session.completed` webhook handling
+- Updates listing/auction status to "Paid"
+- Triggers confirmation emails (buyer + seller)
+- Auto-generates PDF invoice
 
-**Quebec Tax Rates:**
-| Tax | Rate | Registration |
-|-----|------|--------------|
-| GST (Federal) | 5% | 123456789RT0001 |
-| QST (Provincial) | 9.975% | 1234567890TQ0001 |
-| Combined | 14.975% | - |
+**Phase 5: Bilingual PDF Invoice Engine ✅**
+- Updated `/app/backend/services/invoice_generator.py`
+- Full French/English support based on user `preferred_language`
+- Separate sections: BidVex Service Fees vs Item Sale
+- BidVex GST/QST numbers in footer
+- Cloud storage integration (URL returned)
 
-**Example Calculations Verified:**
-- Vehicle $10,000 (Basic): Stripe charge $862.31, Seller balance $10,000
-- General $1,000 (Business Seller): Buyer total $1,207.24
-- General $1,000 (Private Seller): Buyer total $1,057.49 (saves $149.75)
+**Testing Results:**
+- **103 Backend Tests Passing**
+  - 36 tax engine tests
+  - 28 API endpoint tests
+  - 20 fee calculation tests
+  - 19 Stripe Connect tests
+
+**New Files Created:**
+- `/app/backend/models/user_models.py` - User tax/business models
+- `/app/backend/services/stripe_connect_service.py` - Checkout calculations
+- `/app/backend/tests/test_stripe_connect.py` - 19 tests
+
+**Gross-Up Formula:**
+```python
+gross_amount = (net_amount + 0.30) / (1 - 0.029)
+# Example: To receive $100 net → charge $103.30
+```
+
+**Split Example ($1,000 Hammer, Basic Tier, Private Seller):**
+| Item | Amount |
+|------|--------|
+| Hammer Price | $1,000.00 |
+| Buyer Premium (5%) | $50.00 |
+| Seller Commission (4%) | $40.00 |
+| Tax on Fees (14.975%) | $13.48 |
+| Processing Fee | $32.07 |
+| **Buyer Total** | **$1,095.55** |
+| Application Fee (BidVex) | $103.48 |
+| Seller Payout | $960.00 |
    - Marketplace: place_bid, current_bid, buy_now, ends_in, reserve_met, lot_details
    - Settings: account_info, payout_settings, notification_prefs, verify_identity, security_settings
 

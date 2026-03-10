@@ -7,9 +7,12 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, EmailStr
 from typing import Optional, Dict, Any, List
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import logging
 import uuid
+import os
+
+from models.user_models import UpdateUserTaxInfo, DEFAULT_USER_TAX_FIELDS
 
 logger = logging.getLogger(__name__)
 
@@ -476,3 +479,231 @@ async def export_user_data(
         "ratings_given": ratings_given,
         "ratings_received": ratings_received
     }
+
+
+# ========== SELLER TAX & BUSINESS INFO ENDPOINTS ==========
+
+@users_router.get("/me/tax-info")
+async def get_my_tax_info(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Get current user's tax and business registration info"""
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    db = get_db()
+    current_user = await _get_current_user(credentials)
+    
+    user = await db.users.find_one({"id": current_user.id}, {"_id": 0})
+    
+    return {
+        "is_business": user.get("is_business", False),
+        "is_tax_registered": user.get("is_tax_registered", False),
+        "tax_id": user.get("tax_id"),
+        "business_name": user.get("business_name"),
+        "business_address": user.get("business_address"),
+        "account_type": user.get("account_type", "personal"),
+        "stripe_connect_account_id": user.get("stripe_connect_account_id"),
+        "stripe_connect_onboarding_complete": user.get("stripe_connect_onboarding_complete", False)
+    }
+
+
+@users_router.put("/me/tax-info")
+async def update_my_tax_info(
+    tax_info: UpdateUserTaxInfo,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Update current user's tax and business registration info"""
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    db = get_db()
+    current_user = await _get_current_user(credentials)
+    
+    # Build update dict with only provided fields
+    update_data = {}
+    
+    if tax_info.is_business is not None:
+        update_data["is_business"] = tax_info.is_business
+        update_data["account_type"] = "business" if tax_info.is_business else "personal"
+    
+    if tax_info.is_tax_registered is not None:
+        update_data["is_tax_registered"] = tax_info.is_tax_registered
+    
+    if tax_info.tax_id is not None:
+        update_data["tax_id"] = tax_info.tax_id
+    
+    if tax_info.business_name is not None:
+        update_data["business_name"] = tax_info.business_name
+    
+    if tax_info.business_address is not None:
+        update_data["business_address"] = tax_info.business_address
+    
+    if update_data:
+        update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        
+        await db.users.update_one(
+            {"id": current_user.id},
+            {"$set": update_data}
+        )
+    
+    # Return updated info
+    return await get_my_tax_info(credentials)
+
+
+# ========== STRIPE CONNECT ENDPOINTS ==========
+
+@users_router.post("/me/stripe-connect/onboard")
+async def create_stripe_connect_account(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Create or retrieve Stripe Connect account and generate onboarding link
+    
+    This enables sellers to receive payouts via Stripe Connect destination charges.
+    """
+    import stripe
+    
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    db = get_db()
+    current_user = await _get_current_user(credentials)
+    
+    user = await db.users.find_one({"id": current_user.id})
+    
+    # Check if user already has a Connect account
+    connect_account_id = user.get("stripe_connect_account_id")
+    
+    if not connect_account_id:
+        # Create new Connect account
+        account = stripe.Account.create(
+            type="express",
+            country="CA",
+            email=current_user.email,
+            capabilities={
+                "card_payments": {"requested": True},
+                "transfers": {"requested": True}
+            },
+            business_type="individual",
+            metadata={
+                "user_id": current_user.id,
+                "platform": "bidvex"
+            }
+        )
+        connect_account_id = account.id
+        
+        # Save to database
+        await db.users.update_one(
+            {"id": current_user.id},
+            {"$set": {
+                "stripe_connect_account_id": connect_account_id,
+                "stripe_connect_onboarding_complete": False,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+    
+    # Generate onboarding link
+    base_url = os.environ.get("REACT_APP_BACKEND_URL", "https://bidvex.com")
+    
+    account_link = stripe.AccountLink.create(
+        account=connect_account_id,
+        refresh_url=f"{base_url}/seller/settings?stripe_refresh=true",
+        return_url=f"{base_url}/seller/settings?stripe_onboard=success",
+        type="account_onboarding"
+    )
+    
+    return {
+        "connect_account_id": connect_account_id,
+        "onboarding_url": account_link.url,
+        "expires_at": datetime.fromtimestamp(account_link.expires_at, tz=timezone.utc).isoformat()
+    }
+
+
+@users_router.get("/me/stripe-connect/status")
+async def get_stripe_connect_status(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Get Stripe Connect account status and capabilities
+    """
+    import stripe
+    
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    db = get_db()
+    current_user = await _get_current_user(credentials)
+    
+    user = await db.users.find_one({"id": current_user.id})
+    connect_account_id = user.get("stripe_connect_account_id")
+    
+    if not connect_account_id:
+        return {
+            "has_account": False,
+            "onboarding_complete": False,
+            "payouts_enabled": False,
+            "charges_enabled": False
+        }
+    
+    try:
+        account = stripe.Account.retrieve(connect_account_id)
+        
+        # Update onboarding status in database if changed
+        if account.details_submitted and not user.get("stripe_connect_onboarding_complete"):
+            await db.users.update_one(
+                {"id": current_user.id},
+                {"$set": {
+                    "stripe_connect_onboarding_complete": True,
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+        
+        return {
+            "has_account": True,
+            "account_id": connect_account_id,
+            "onboarding_complete": account.details_submitted,
+            "payouts_enabled": account.payouts_enabled,
+            "charges_enabled": account.charges_enabled,
+            "capabilities": {
+                "card_payments": account.capabilities.get("card_payments", "inactive"),
+                "transfers": account.capabilities.get("transfers", "inactive")
+            },
+            "requirements": {
+                "currently_due": list(account.requirements.currently_due) if account.requirements else [],
+                "eventually_due": list(account.requirements.eventually_due) if account.requirements else []
+            }
+        }
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe Connect status error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@users_router.post("/me/stripe-connect/dashboard-link")
+async def get_stripe_connect_dashboard_link(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Generate a login link to the Stripe Express Dashboard
+    """
+    import stripe
+    
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    db = get_db()
+    current_user = await _get_current_user(credentials)
+    
+    user = await db.users.find_one({"id": current_user.id})
+    connect_account_id = user.get("stripe_connect_account_id")
+    
+    if not connect_account_id:
+        raise HTTPException(status_code=400, detail="No Stripe Connect account found. Please complete onboarding first.")
+    
+    try:
+        login_link = stripe.Account.create_login_link(connect_account_id)
+        return {"dashboard_url": login_link.url}
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe dashboard link error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+

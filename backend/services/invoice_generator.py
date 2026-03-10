@@ -562,6 +562,220 @@ GRAND TOTAL: {format_currency(payment_result.buyer_total)}
     return text.encode('utf-8')
 
 
+# ============= BILINGUAL TRANSLATIONS =============
+
+TRANSLATIONS = {
+    "en": {
+        "invoice": "INVOICE",
+        "invoice_number": "Invoice Number",
+        "invoice_date": "Invoice Date",
+        "status": "Status",
+        "paid": "PAID",
+        "bill_to": "BILL TO",
+        "item_details": "ITEM DETAILS",
+        "bidvex_service_fees": "BIDVEX SERVICE FEES",
+        "item_sale": "ITEM SALE",
+        "description": "Description",
+        "rate": "Rate",
+        "amount": "Amount",
+        "hammer_price": "Hammer Price",
+        "buyer_premium": "Buyer's Premium",
+        "platform_fee": "Platform Fee",
+        "gst_on_fees": "GST on BidVex Fees",
+        "qst_on_fees": "QST on BidVex Fees",
+        "processing_fee": "Processing Fee",
+        "total_paid": "TOTAL PAID",
+        "tax_registration": "Tax Registration Numbers",
+        "gst_hst": "GST/HST",
+        "qst": "QST",
+        "thank_you": "Thank you for your business!",
+        "vehicle": "Vehicle",
+        "vin": "VIN",
+        "auction_id": "Auction ID",
+        "bidvex_fees_only": "BidVex Fees Invoice",
+        "hammer_due_seller": "Balance Due to Seller (Bank Draft)",
+        "bank_draft_note": "The hammer price must be paid directly to the seller via Bank Draft within 14 days.",
+    },
+    "fr": {
+        "invoice": "FACTURE",
+        "invoice_number": "Numéro de facture",
+        "invoice_date": "Date de facture",
+        "status": "Statut",
+        "paid": "PAYÉ",
+        "bill_to": "FACTURER À",
+        "item_details": "DÉTAILS DE L'ARTICLE",
+        "bidvex_service_fees": "FRAIS DE SERVICE BIDVEX",
+        "item_sale": "VENTE D'ARTICLE",
+        "description": "Description",
+        "rate": "Taux",
+        "amount": "Montant",
+        "hammer_price": "Prix au marteau",
+        "buyer_premium": "Prime acheteur",
+        "platform_fee": "Frais de plateforme",
+        "gst_on_fees": "TPS sur les frais BidVex",
+        "qst_on_fees": "TVQ sur les frais BidVex",
+        "processing_fee": "Frais de traitement",
+        "total_paid": "TOTAL PAYÉ",
+        "tax_registration": "Numéros d'inscription aux taxes",
+        "gst_hst": "TPS/TVH",
+        "qst": "TVQ",
+        "thank_you": "Merci de votre confiance!",
+        "vehicle": "Véhicule",
+        "vin": "NIV",
+        "auction_id": "ID d'enchère",
+        "bidvex_fees_only": "Facture des frais BidVex",
+        "hammer_due_seller": "Solde dû au vendeur (traite bancaire)",
+        "bank_draft_note": "Le prix au marteau doit être payé directement au vendeur par traite bancaire dans les 14 jours.",
+    }
+}
+
+
+def t(key: str, lang: str = "en") -> str:
+    """Get translated string"""
+    translations = TRANSLATIONS.get(lang, TRANSLATIONS["en"])
+    return translations.get(key, TRANSLATIONS["en"].get(key, key))
+
+
+# ============= WEBHOOK-COMPATIBLE INVOICE FUNCTIONS =============
+
+async def generate_marketplace_invoice(
+    db,
+    invoice_id: str,
+    listing: Dict[str, Any],
+    buyer: Dict[str, Any],
+    seller: Dict[str, Any],
+    breakdown: Dict[str, Any],
+    language: str = "en"
+) -> Optional[str]:
+    """
+    Generate PDF invoice for marketplace purchase (webhook handler compatible)
+    Returns URL to stored PDF
+    """
+    import os
+    
+    try:
+        # Build buyer/seller/auction info dicts for existing generator
+        buyer_info = {
+            "name": buyer.get("name", "Buyer"),
+            "email": buyer.get("email", ""),
+            "address": buyer.get("address", ""),
+            "province": "QC"
+        }
+        
+        seller_info = {
+            "name": seller.get("name", "Seller"),
+            "is_business": seller.get("is_tax_registered", False),
+            "business_name": seller.get("business_name"),
+            "gst_number": seller.get("tax_id") if seller.get("is_tax_registered") else None,
+            "qst_number": None
+        }
+        
+        auction_info = {
+            "auction_id": listing.get("id", invoice_id),
+            "item_title": listing.get("title", "Auction Item"),
+            "hammer_price": breakdown.get("hammer_price", 0),
+            "auction_date": datetime.now(timezone.utc).isoformat()
+        }
+        
+        # Create a GeneralPaymentResult-like dict
+        payment_result = type('obj', (object,), breakdown)()
+        
+        # Generate PDF bytes using existing function
+        pdf_bytes = generate_general_invoice_pdf(
+            payment_result=payment_result,
+            buyer_info=buyer_info,
+            seller_info=seller_info,
+            auction_info=auction_info,
+            language=language
+        )
+        
+        if not pdf_bytes:
+            return None
+        
+        # Store PDF
+        storage_dir = "/tmp/invoices"
+        os.makedirs(storage_dir, exist_ok=True)
+        
+        filepath = os.path.join(storage_dir, f"marketplace_{invoice_id}.pdf")
+        with open(filepath, 'wb') as f:
+            f.write(pdf_bytes)
+        
+        # Return download URL
+        base_url = os.environ.get("REACT_APP_BACKEND_URL", "https://bidvex.com")
+        return f"{base_url}/api/invoices/download/{invoice_id}"
+        
+    except Exception as e:
+        logger.error(f"Failed to generate marketplace invoice: {e}")
+        return None
+
+
+async def generate_vehicle_fees_invoice(
+    db,
+    invoice_id: str,
+    auction: Dict[str, Any],
+    buyer: Dict[str, Any],
+    seller: Dict[str, Any],
+    breakdown: Dict[str, Any],
+    language: str = "en"
+) -> Optional[str]:
+    """
+    Generate PDF invoice for vehicle BidVex fees (webhook handler compatible)
+    Returns URL to stored PDF
+    """
+    import os
+    
+    try:
+        buyer_info = {
+            "name": buyer.get("name", "Buyer"),
+            "email": buyer.get("email", ""),
+            "address": buyer.get("address", ""),
+            "province": "QC"
+        }
+        
+        seller_info = {
+            "name": seller.get("name", "Seller"),
+            "is_business": False,  # Not relevant for vehicle fees
+            "address": seller.get("address", "")
+        }
+        
+        auction_info = {
+            "auction_id": auction.get("id", invoice_id),
+            "vehicle_title": auction.get("title", "Vehicle"),
+            "vin": auction.get("vin", "N/A"),
+            "hammer_price": breakdown.get("hammer_price", 0),
+            "auction_date": datetime.now(timezone.utc).isoformat()
+        }
+        
+        # Create VehiclePaymentResult-like object
+        payment_result = type('obj', (object,), breakdown)()
+        
+        pdf_bytes = generate_vehicle_invoice_pdf(
+            payment_result=payment_result,
+            buyer_info=buyer_info,
+            seller_info=seller_info,
+            auction_info=auction_info,
+            language=language
+        )
+        
+        if not pdf_bytes:
+            return None
+        
+        # Store PDF
+        storage_dir = "/tmp/invoices"
+        os.makedirs(storage_dir, exist_ok=True)
+        
+        filepath = os.path.join(storage_dir, f"vehicle_{invoice_id}.pdf")
+        with open(filepath, 'wb') as f:
+            f.write(pdf_bytes)
+        
+        base_url = os.environ.get("REACT_APP_BACKEND_URL", "https://bidvex.com")
+        return f"{base_url}/api/invoices/download/{invoice_id}"
+        
+    except Exception as e:
+        logger.error(f"Failed to generate vehicle fees invoice: {e}")
+        return None
+
+
 # ============= EXPORTS =============
 
 __all__ = [
@@ -569,5 +783,9 @@ __all__ = [
     "format_currency",
     "generate_vehicle_invoice_pdf",
     "generate_general_invoice_pdf",
+    "generate_marketplace_invoice",
+    "generate_vehicle_fees_invoice",
     "REPORTLAB_AVAILABLE",
+    "TRANSLATIONS",
+    "t",
 ]

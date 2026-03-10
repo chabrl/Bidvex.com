@@ -800,3 +800,241 @@ async def get_tax_rates():
             "rate_display": "14.975%"
         }
     }
+
+
+
+# ========== CHECKOUT ENDPOINTS WITH FULL BREAKDOWN ==========
+
+from services.stripe_connect_service import (
+    calculate_general_checkout,
+    calculate_vehicle_checkout,
+    create_destination_charge,
+    create_vehicle_payment_session,
+    STRIPE_PERCENTAGE_FEE,
+    STRIPE_FIXED_FEE
+)
+
+
+class AuctionCheckoutRequest(BaseModel):
+    """Request model for auction checkout"""
+    listing_id: str = Field(..., description="Listing/auction ID")
+    return_url: str = Field(..., description="URL to redirect after checkout")
+
+
+@payments_router.post("/checkout/auction")
+async def create_auction_checkout(
+    request: AuctionCheckoutRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Create checkout session for auction purchase
+    
+    This handles both GENERAL and VEHICLE auctions:
+    - GENERAL: Destination charge to seller's Stripe Connect account
+    - VEHICLE: Direct charge for BidVex fees only (hammer paid offline)
+    
+    Returns checkout URL and complete breakdown for display.
+    """
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    db = get_db()
+    current_user = await _get_current_user(credentials)
+    
+    # Get listing
+    listing = await db.listings.find_one({"id": request.listing_id})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    
+    # Verify buyer is the winner
+    if listing.get("winning_bidder_id") != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the winning bidder can checkout")
+    
+    # Check if already paid
+    if listing.get("payment_status") == "paid":
+        raise HTTPException(status_code=400, detail="This auction has already been paid")
+    
+    # Get seller info
+    seller = await db.users.find_one({"id": listing["seller_id"]})
+    if not seller:
+        raise HTTPException(status_code=404, detail="Seller not found")
+    
+    # Determine if this is a vehicle auction
+    category = listing.get("category", "").lower()
+    is_vehicle = any(keyword in category for keyword in ["vehicle", "car", "auto", "truck", "motorcycle"])
+    
+    hammer_price = listing.get("current_price", listing.get("starting_price", 0))
+    
+    if is_vehicle:
+        # Vehicle auction - only BidVex fees via Stripe
+        breakdown = calculate_vehicle_checkout(
+            hammer_price=hammer_price,
+            buyer_tier=current_user.subscription_tier if hasattr(current_user, 'subscription_tier') else "basic"
+        )
+        
+        result = await create_vehicle_payment_session(
+            db=db,
+            auction_id=request.listing_id,
+            buyer_id=current_user.id,
+            breakdown=breakdown,
+            return_url=request.return_url
+        )
+        
+        return {
+            "checkout_type": "vehicle",
+            **result
+        }
+    else:
+        # General auction - destination charge to seller
+        seller_connect_id = seller.get("stripe_connect_account_id")
+        
+        if not seller_connect_id:
+            raise HTTPException(
+                status_code=400, 
+                detail="Seller has not completed Stripe Connect onboarding. Please contact seller."
+            )
+        
+        breakdown = calculate_general_checkout(
+            hammer_price=hammer_price,
+            buyer_tier=current_user.subscription_tier if hasattr(current_user, 'subscription_tier') else "basic",
+            seller_tier=seller.get("subscription_tier", "basic"),
+            seller_is_tax_registered=seller.get("is_tax_registered", False),
+            include_processing_fee=True
+        )
+        
+        result = await create_destination_charge(
+            db=db,
+            listing_id=request.listing_id,
+            buyer_id=current_user.id,
+            breakdown=breakdown,
+            return_url=request.return_url,
+            seller_connect_account_id=seller_connect_id
+        )
+        
+        return {
+            "checkout_type": "general",
+            **result
+        }
+
+
+@payments_router.get("/checkout/preview/{listing_id}")
+async def preview_checkout_breakdown(
+    listing_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Get checkout breakdown preview without creating a session
+    
+    Use this to display the cost breakdown in the UI before checkout.
+    """
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    db = get_db()
+    current_user = await _get_current_user(credentials)
+    
+    # Get listing
+    listing = await db.listings.find_one({"id": listing_id})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    
+    # Get seller info
+    seller = await db.users.find_one({"id": listing["seller_id"]})
+    
+    category = listing.get("category", "").lower()
+    is_vehicle = any(keyword in category for keyword in ["vehicle", "car", "auto", "truck", "motorcycle"])
+    
+    hammer_price = listing.get("current_price", listing.get("starting_price", 0))
+    
+    buyer_tier = "basic"
+    if hasattr(current_user, 'subscription_tier'):
+        buyer_tier = current_user.subscription_tier
+    
+    if is_vehicle:
+        breakdown = calculate_vehicle_checkout(
+            hammer_price=hammer_price,
+            buyer_tier=buyer_tier
+        )
+        
+        return {
+            "checkout_type": "vehicle",
+            "breakdown": breakdown.to_dict(),
+            "stripe_charge_description": "BidVex Fees Only",
+            "hammer_price_note": "Hammer price ($" + f"{float(breakdown.hammer_price):,.2f}" + ") paid directly to seller via Bank Draft",
+            "seller_is_tax_registered": False
+        }
+    else:
+        seller_tier = seller.get("subscription_tier", "basic") if seller else "basic"
+        seller_is_tax_registered = seller.get("is_tax_registered", False) if seller else False
+        
+        breakdown = calculate_general_checkout(
+            hammer_price=hammer_price,
+            buyer_tier=buyer_tier,
+            seller_tier=seller_tier,
+            seller_is_tax_registered=seller_is_tax_registered,
+            include_processing_fee=True
+        )
+        
+        return {
+            "checkout_type": "general",
+            "breakdown": breakdown.to_dict(),
+            "stripe_charge_description": "Full Payment via Stripe",
+            "seller_is_tax_registered": seller_is_tax_registered,
+            "tax_on_item_note": "Tax on item (14.975%)" if seller_is_tax_registered else "No tax on item (private seller)"
+        }
+
+
+# ========== INVOICE DOWNLOAD ENDPOINT ==========
+
+from fastapi.responses import FileResponse
+
+@payments_router.get("/invoices/download/{invoice_id}")
+async def download_invoice(invoice_id: str):
+    """
+    Download PDF invoice by ID
+    
+    Checks for invoice in /tmp/invoices directory
+    """
+    storage_dir = "/tmp/invoices"
+    
+    # Try marketplace invoice first
+    filepath = os.path.join(storage_dir, f"marketplace_{invoice_id}.pdf")
+    if os.path.exists(filepath):
+        return FileResponse(
+            filepath,
+            media_type="application/pdf",
+            filename=f"invoice_{invoice_id[:8]}.pdf"
+        )
+    
+    # Try vehicle invoice
+    filepath = os.path.join(storage_dir, f"vehicle_{invoice_id}.pdf")
+    if os.path.exists(filepath):
+        return FileResponse(
+            filepath,
+            media_type="application/pdf",
+            filename=f"invoice_vehicle_{invoice_id[:8]}.pdf"
+        )
+    
+    raise HTTPException(status_code=404, detail="Invoice not found")
+
+
+@payments_router.get("/fees/processing")
+async def get_processing_fee_info():
+    """
+    Get Stripe processing fee information
+    
+    Processing fee (2.9% + $0.30) is passed to buyer using gross-up formula.
+    """
+    return {
+        "percentage_rate": float(STRIPE_PERCENTAGE_FEE),
+        "percentage_display": "2.9%",
+        "fixed_fee": float(STRIPE_FIXED_FEE),
+        "fixed_fee_display": "$0.30",
+        "description": "Card processing fee (2.9% + $0.30)",
+        "gross_up_formula": "gross_amount = (net_amount + 0.30) / (1 - 0.029)",
+        "example": {
+            "net_to_receive": 100.00,
+            "gross_charge": 103.30,
+            "stripe_fee": 3.30
+        }
+    }

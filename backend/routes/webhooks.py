@@ -211,6 +211,10 @@ async def handle_stripe_webhook(request: Request):
         elif event_type == "invoice.payment_failed":
             await _handle_payment_failed(db, data)
         
+        # Process checkout session completed (auction purchases)
+        elif event_type == "checkout.session.completed":
+            await _handle_checkout_completed(db, data)
+        
         return {"status": "ok", "event_type": event_type}
         
     except json.JSONDecodeError:
@@ -354,3 +358,260 @@ def _map_price_to_tier(price_id: str) -> str:
         return "premium"
     else:
         return "free"
+
+
+async def _handle_checkout_completed(db, session):
+    """
+    Handle checkout.session.completed webhook for auction purchases
+    
+    This triggers when buyer completes payment via Stripe Checkout.
+    Actions:
+    1. Update listing/auction status to "Paid"
+    2. Send confirmation emails to buyer and seller
+    3. Generate and store PDF invoice
+    """
+    session_id = session.get("id")
+    metadata = session.get("metadata", {})
+    
+    payment_type = metadata.get("type")
+    invoice_id = metadata.get("invoice_id")
+    
+    logger.info(f"Processing checkout completed: {session_id}, type: {payment_type}")
+    
+    # Get pending payment record
+    pending = await db.pending_payments.find_one({"session_id": session_id})
+    
+    if not pending:
+        logger.warning(f"No pending payment found for session {session_id}")
+        return
+    
+    breakdown = pending.get("breakdown", {})
+    
+    # Update pending payment status
+    await db.pending_payments.update_one(
+        {"session_id": session_id},
+        {"$set": {
+            "status": "completed",
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "stripe_payment_intent": session.get("payment_intent")
+        }}
+    )
+    
+    if payment_type == "auction_purchase":
+        # General auction - update listing
+        listing_id = metadata.get("listing_id")
+        buyer_id = metadata.get("buyer_id")
+        
+        # Get listing and update status
+        listing = await db.listings.find_one({"id": listing_id})
+        if listing:
+            await db.listings.update_one(
+                {"id": listing_id},
+                {"$set": {
+                    "status": "sold",
+                    "payment_status": "paid",
+                    "paid_at": datetime.now(timezone.utc).isoformat(),
+                    "stripe_session_id": session_id,
+                    "invoice_id": invoice_id
+                }}
+            )
+            
+            # Send confirmation emails
+            await _send_purchase_confirmation_emails(db, listing, buyer_id, breakdown, invoice_id)
+            
+            # Generate and store PDF invoice
+            await _generate_and_store_invoice(db, listing, buyer_id, breakdown, invoice_id)
+            
+    elif payment_type == "vehicle_fees":
+        # Vehicle auction - BidVex fees paid, hammer still due
+        auction_id = metadata.get("auction_id")
+        buyer_id = metadata.get("buyer_id")
+        
+        # Update vehicle auction status
+        auction = await db.vehicle_auctions.find_one({"id": auction_id})
+        if auction:
+            await db.vehicle_auctions.update_one(
+                {"id": auction_id},
+                {"$set": {
+                    "bidvex_fees_paid": True,
+                    "bidvex_fees_paid_at": datetime.now(timezone.utc).isoformat(),
+                    "stripe_session_id": session_id,
+                    "invoice_id": invoice_id,
+                    "hammer_price_status": "pending_bank_draft"
+                }}
+            )
+            
+            # Send vehicle-specific confirmation with Bank Draft instructions
+            await _send_vehicle_fees_confirmation(db, auction, buyer_id, breakdown, invoice_id)
+            
+            # Generate invoice for fees
+            await _generate_vehicle_fees_invoice(db, auction, buyer_id, breakdown, invoice_id)
+    
+    logger.info(f"Checkout completed processing finished: {session_id}")
+
+
+async def _send_purchase_confirmation_emails(db, listing, buyer_id, breakdown, invoice_id):
+    """Send confirmation emails to buyer and seller after successful purchase"""
+    try:
+        # Get buyer and seller info
+        buyer = await db.users.find_one({"id": buyer_id})
+        seller = await db.users.find_one({"id": listing["seller_id"]})
+        
+        if not buyer or not seller:
+            logger.warning("Could not find buyer or seller for email notification")
+            return
+        
+        # Import email service (SendGrid)
+        from services.email_service import send_email
+        
+        # Send buyer confirmation
+        await send_email(
+            to_email=buyer.get("email"),
+            subject=f"Payment Confirmed - {listing.get('title', 'Auction Item')}",
+            template="purchase_confirmation",
+            data={
+                "buyer_name": buyer.get("name", "Buyer"),
+                "item_title": listing.get("title"),
+                "hammer_price": breakdown.get("hammer_price"),
+                "buyer_total": breakdown.get("buyer_total"),
+                "invoice_id": invoice_id,
+                "seller_name": seller.get("name")
+            }
+        )
+        
+        # Send seller notification
+        await send_email(
+            to_email=seller.get("email"),
+            subject=f"Sale Complete - {listing.get('title', 'Auction Item')}",
+            template="sale_notification",
+            data={
+                "seller_name": seller.get("name", "Seller"),
+                "item_title": listing.get("title"),
+                "hammer_price": breakdown.get("hammer_price"),
+                "seller_payout": breakdown.get("seller_payout"),
+                "buyer_name": buyer.get("name")
+            }
+        )
+        
+        logger.info(f"Sent purchase confirmation emails for listing {listing['id']}")
+        
+    except Exception as e:
+        logger.error(f"Failed to send purchase confirmation emails: {e}")
+
+
+async def _send_vehicle_fees_confirmation(db, auction, buyer_id, breakdown, invoice_id):
+    """Send confirmation email with Bank Draft instructions for vehicle purchase"""
+    try:
+        buyer = await db.users.find_one({"id": buyer_id})
+        seller = await db.users.find_one({"id": auction.get("seller_id")})
+        
+        if not buyer or not seller:
+            return
+        
+        from services.email_service import send_email
+        
+        await send_email(
+            to_email=buyer.get("email"),
+            subject="BidVex Fees Paid - Bank Draft Required",
+            template="vehicle_fees_confirmation",
+            data={
+                "buyer_name": buyer.get("name"),
+                "vehicle_title": auction.get("title", "Vehicle"),
+                "fees_paid": breakdown.get("buyer_total"),
+                "hammer_price_due": breakdown.get("hammer_price"),
+                "seller_name": seller.get("name"),
+                "seller_address": seller.get("address", "Contact seller for address"),
+                "deadline_days": 14,
+                "invoice_id": invoice_id
+            }
+        )
+        
+        logger.info(f"Sent vehicle fees confirmation for auction {auction['id']}")
+        
+    except Exception as e:
+        logger.error(f"Failed to send vehicle fees confirmation: {e}")
+
+
+async def _generate_and_store_invoice(db, listing, buyer_id, breakdown, invoice_id):
+    """Generate PDF invoice and store URL in database"""
+    try:
+        from services.invoice_generator import generate_marketplace_invoice
+        
+        # Get buyer and seller info
+        buyer = await db.users.find_one({"id": buyer_id})
+        seller = await db.users.find_one({"id": listing["seller_id"]})
+        
+        # Generate PDF and upload to cloud storage
+        invoice_url = await generate_marketplace_invoice(
+            db=db,
+            invoice_id=invoice_id,
+            listing=listing,
+            buyer=buyer,
+            seller=seller,
+            breakdown=breakdown,
+            language=buyer.get("preferred_language", "en")
+        )
+        
+        # Store invoice record
+        await db.invoices.insert_one({
+            "id": invoice_id,
+            "listing_id": listing["id"],
+            "buyer_id": buyer_id,
+            "seller_id": listing["seller_id"],
+            "breakdown": breakdown,
+            "pdf_url": invoice_url,
+            "type": "marketplace_purchase",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+        
+        # Update listing with invoice URL
+        await db.listings.update_one(
+            {"id": listing["id"]},
+            {"$set": {"invoice_url": invoice_url}}
+        )
+        
+        logger.info(f"Generated and stored invoice {invoice_id}")
+        
+    except Exception as e:
+        logger.error(f"Failed to generate invoice: {e}")
+
+
+async def _generate_vehicle_fees_invoice(db, auction, buyer_id, breakdown, invoice_id):
+    """Generate PDF invoice for vehicle BidVex fees"""
+    try:
+        from services.invoice_generator import generate_vehicle_fees_invoice
+        
+        buyer = await db.users.find_one({"id": buyer_id})
+        seller = await db.users.find_one({"id": auction.get("seller_id")})
+        
+        invoice_url = await generate_vehicle_fees_invoice(
+            db=db,
+            invoice_id=invoice_id,
+            auction=auction,
+            buyer=buyer,
+            seller=seller,
+            breakdown=breakdown,
+            language=buyer.get("preferred_language", "en")
+        )
+        
+        await db.invoices.insert_one({
+            "id": invoice_id,
+            "auction_id": auction["id"],
+            "buyer_id": buyer_id,
+            "seller_id": auction.get("seller_id"),
+            "breakdown": breakdown,
+            "pdf_url": invoice_url,
+            "type": "vehicle_fees",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+        
+        await db.vehicle_auctions.update_one(
+            {"id": auction["id"]},
+            {"$set": {"invoice_url": invoice_url}}
+        )
+        
+        logger.info(f"Generated vehicle fees invoice {invoice_id}")
+        
+    except Exception as e:
+        logger.error(f"Failed to generate vehicle fees invoice: {e}")
+
