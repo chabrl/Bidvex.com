@@ -11,6 +11,7 @@ Build and maintain a sophisticated full-stack auction platform (BidVex) with:
 - Full bilingual support (EN/FR) ✅ **COMPLETED**
 - Hybrid Fee Calculation Engine ✅ **COMPLETED**
 - Quebec Tax & Invoicing Engine ✅ **COMPLETED**
+- Total Cost Calculator Frontend ✅ **COMPLETED**
 - **Enterprise Vehicle Auction Module** (standalone, Copart/IAA quality)
 
 ## Architecture
@@ -26,10 +27,35 @@ Background Jobs: APScheduler
 i18n: react-i18next (EN/FR bilingual support)
 ```
 
-## Current Status: ✅ QUEBEC TAX & INVOICING ENGINE COMPLETE
+## Current Status: ✅ TOTAL COST CALCULATOR COMPLETE
 
 ### Session Summary (Mar 10, 2026 - Latest Update)
-Implemented Quebec Tax & Compliance Engine with API endpoints and comprehensive test suite.
+
+**Frontend Total Cost Calculator Implementation:**
+- Created `PriceBreakdown.js` component with real-time tax calculations
+- Updated `BidConfirmationDialog.js` to use new tax API
+- Integrated into `ListingDetailPage.js` bid form
+- Debounced API calls (300ms) to avoid excessive requests while typing
+
+**Features Implemented:**
+- Real-time cost breakdown when user types bid amount
+- Shows: Your Bid, Buyer's Premium, Platform Fee (vehicles), Taxes (GST/QST), Estimated Total
+- Vehicle Exception Note: "Only BidVex fees and taxes are paid online. Hammer price paid directly to seller"
+- Business seller taxation indicator
+- Private seller tax savings display
+- Premium member discount hint
+- Bilingual support (EN/FR)
+
+**New Frontend Files:**
+- `/app/frontend/src/components/PriceBreakdown.js` - Total Cost Calculator component
+
+**Testing Results (iteration_35.json):**
+- **84 Backend Tests Passing** (36 tax engine + 28 API endpoint + 20 fee calculation)
+- All API endpoints verified:
+  - POST /api/payments/tax/calculate ✅
+  - GET /api/payments/tax/vehicle ✅
+  - GET /api/payments/tax/general ✅
+  - GET /api/payments/tax/rates ✅
 
 **Quebec Tax Rates:**
 | Tax | Rate | Registration |
@@ -38,46 +64,10 @@ Implemented Quebec Tax & Compliance Engine with API endpoints and comprehensive 
 | QST (Provincial) | 9.975% | 1234567890TQ0001 |
 | Combined | 14.975% | - |
 
-**VEHICLE Auctions (Hybrid Payment):**
-- Stripe charges: (Buyer Premium + Platform Fee) + 14.975% Tax
-- Hammer Price: Paid directly to seller via Bank Draft (NOT through Stripe)
-- Next Steps message guides buyer on Bank Draft payment within 14 days
-
-**GENERAL Auctions (Full Stripe):**
-- BidVex Fees: Always taxed at 14.975%
-- Hammer Price Tax:
-  - Private seller (is_business=false): NO tax on hammer price
-  - Business seller (is_business=true): +14.975% tax collected on seller's behalf
-
-**New API Endpoints Created:**
-- `POST /api/payments/tax/calculate` - Full tax-inclusive payment calculation
-- `GET /api/payments/tax/vehicle` - Vehicle auction payment with tax
-- `GET /api/payments/tax/general` - General auction payment with tax
-- `GET /api/payments/tax/structure` - Quebec tax structure documentation
-- `GET /api/payments/tax/rates` - Current Quebec tax rates
-
-**Files Created/Updated:**
-- `/app/backend/services/tax_engine.py` - Quebec tax calculation engine (already existed)
-- `/app/backend/routes/payments.py` - Added 5 new tax API endpoints
-- `/app/backend/tests/test_tax_engine.py` - 36 comprehensive tests (all passing)
-
-**Testing:** All 36 pytest tests passing for tax engine, 20 tests for fee engine
-- Vehicle payment calculations (basic, premium, VIP tiers)
-- General payment calculations (private vs business seller)
-- Stripe parameter generation (amounts in cents)
-- Invoice line item generation
-- Tax structure summary
-
-**Example Calculation - $10,000 Vehicle (Basic Tier):**
-```
-Buyer Premium (5%): $500
-Platform Fee (2.5%): $250
-BidVex Fees Subtotal: $750
-GST (5%): $37.50
-QST (9.975%): $74.81
-Stripe Charge: $862.31
-Seller Balance Due (Bank Draft): $10,000
-```
+**Example Calculations Verified:**
+- Vehicle $10,000 (Basic): Stripe charge $862.31, Seller balance $10,000
+- General $1,000 (Business Seller): Buyer total $1,207.24
+- General $1,000 (Private Seller): Buyer total $1,057.49 (saves $149.75)
    - Marketplace: place_bid, current_bid, buy_now, ends_in, reserve_met, lot_details
    - Settings: account_info, payout_settings, notification_prefs, verify_identity, security_settings
 
