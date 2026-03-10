@@ -22,6 +22,7 @@ import MessageSellerModal from '../components/MessageSellerModal';
 import RateSellerModal from '../components/RateSellerModal';
 import AuctioneerInfo from '../components/AuctioneerInfo';
 import BidConfirmationDialog from '../components/BidConfirmationDialog';
+import PriceBreakdown from '../components/PriceBreakdown';
 import PrivateSaleBadge, { BusinessSellerBadge } from '../components/PrivateSaleBadge';
 import Lightbox from 'yet-another-react-lightbox';
 import 'yet-another-react-lightbox/styles.css';
@@ -461,6 +462,17 @@ const ListingDetailPage = () => {
                         data-testid="bid-amount-input"
                       />
                     </div>
+                    
+                    {/* Real-time Price Breakdown */}
+                    <PriceBreakdown
+                      bidAmount={parseFloat(bidAmount) || 0}
+                      category={listing.category}
+                      buyerTier={user?.subscription_tier || 'basic'}
+                      sellerTier={seller?.subscription_tier || 'basic'}
+                      sellerIsBusiness={seller?.is_tax_registered || seller?.account_type === 'business'}
+                      compact={true}
+                    />
+                    
                     <Button type="submit" className="w-full gradient-button text-white border-0" data-testid="place-bid-btn">
                       <DollarSign className="mr-2 h-4 w-4" />
                       {t('listing.placeBid')}
@@ -703,7 +715,10 @@ const ListingDetailPage = () => {
         onConfirm={confirmPlaceBid}
         bidAmount={pendingBidAmount}
         listingTitle={listing?.title}
-        sellerIsBusiness={seller?.is_tax_registered || false}
+        category={listing?.category || 'general'}
+        sellerIsBusiness={seller?.is_tax_registered || seller?.account_type === 'business' || false}
+        buyerTier={user?.subscription_tier || 'basic'}
+        sellerTier={seller?.subscription_tier || 'basic'}
         region={listing?.region || 'QC'}
         loading={placingBid}
       />
