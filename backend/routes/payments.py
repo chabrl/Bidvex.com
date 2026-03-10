@@ -596,3 +596,207 @@ async def get_subscription_benefits():
 
 
 from datetime import timedelta
+
+# Import the tax engine for Quebec-compliant calculations
+from services.tax_engine import (
+    calculate_vehicle_payment,
+    calculate_general_payment,
+    get_tax_structure_summary,
+    SellerInfo,
+    VehiclePaymentResult,
+    GeneralPaymentResult,
+    GST_RATE,
+    QST_RATE,
+    BIDVEX_GST_NUMBER,
+    BIDVEX_QST_NUMBER,
+)
+
+
+# ========== TAX & COMPLIANCE ENDPOINTS ==========
+
+class TaxCalculationRequest(BaseModel):
+    """Request model for tax-inclusive payment calculation"""
+    hammer_price: float = Field(..., gt=0, description="Winning bid amount in dollars")
+    category: str = Field(default="general", description="Auction category: 'vehicle' or 'general'")
+    buyer_tier: str = Field(default="basic", description="Buyer subscription tier")
+    seller_tier: str = Field(default="basic", description="Seller subscription tier")
+    seller_is_business: bool = Field(default=False, description="Whether seller is a registered business")
+    seller_gst_number: Optional[str] = Field(default=None, description="Seller's GST registration number")
+    seller_qst_number: Optional[str] = Field(default=None, description="Seller's QST registration number")
+
+
+@payments_router.post("/tax/calculate")
+async def calculate_payment_with_tax(request: TaxCalculationRequest):
+    """
+    Calculate complete payment breakdown with Quebec taxes (GST/QST)
+    
+    Quebec Tax Rates:
+    - GST (Federal): 5%
+    - QST (Provincial): 9.975%
+    - Combined: 14.975%
+    
+    Tax Logic:
+    - VEHICLE auctions: Only BidVex fees are charged via Stripe (with tax).
+      Hammer price is paid directly to seller via Bank Draft.
+    - GENERAL auctions: Full amount through Stripe.
+      - Private seller: No tax on hammer price
+      - Business seller: 14.975% tax on hammer price (collected for seller)
+    """
+    category_lower = request.category.lower()
+    
+    if category_lower in ["vehicle", "car", "auto", "automobile", "truck", "motorcycle"]:
+        # Vehicle payment - only fees through Stripe
+        result = calculate_vehicle_payment(
+            hammer_price=request.hammer_price,
+            buyer_tier=request.buyer_tier
+        )
+        return {
+            "payment_type": "vehicle",
+            "description": "Vehicle auction - BidVex fees charged via Stripe, hammer price paid directly to seller",
+            **result.to_dict()
+        }
+    else:
+        # General payment - full amount through Stripe
+        seller_info = SellerInfo(
+            is_business=request.seller_is_business,
+            gst_number=request.seller_gst_number,
+            qst_number=request.seller_qst_number
+        ) if request.seller_is_business else None
+        
+        result = calculate_general_payment(
+            hammer_price=request.hammer_price,
+            buyer_tier=request.buyer_tier,
+            seller_tier=request.seller_tier,
+            seller_is_business=request.seller_is_business,
+            seller_info=seller_info
+        )
+        return {
+            "payment_type": "general",
+            "description": "General auction - full amount charged via Stripe",
+            **result.to_dict()
+        }
+
+
+@payments_router.get("/tax/vehicle")
+async def calculate_vehicle_payment_with_tax(
+    price: float,
+    buyer_tier: str = "basic"
+):
+    """
+    Calculate vehicle auction payment with Quebec taxes
+    
+    IMPORTANT: For vehicles, only BidVex fees are charged through Stripe.
+    The hammer price is paid directly to seller via Bank Draft.
+    
+    Stripe charges: (Buyer Premium + Platform Fee) + 14.975% Tax
+    
+    Example for $10,000 vehicle (basic tier):
+    - Buyer Premium (5%): $500
+    - Platform Fee (2.5%): $250
+    - Subtotal: $750
+    - GST (5%): $37.50
+    - QST (9.975%): $74.81
+    - Total Stripe Charge: $862.31
+    - Balance due to seller (Bank Draft): $10,000
+    """
+    result = calculate_vehicle_payment(
+        hammer_price=price,
+        buyer_tier=buyer_tier
+    )
+    
+    return {
+        "auction_type": "vehicle",
+        "payment_method": "hybrid",
+        "description": "BidVex fees charged via Stripe, hammer price via Bank Draft to seller",
+        **result.to_dict()
+    }
+
+
+@payments_router.get("/tax/general")
+async def calculate_general_payment_with_tax(
+    price: float,
+    buyer_tier: str = "basic",
+    seller_tier: str = "basic",
+    seller_is_business: bool = False
+):
+    """
+    Calculate general auction payment with Quebec taxes
+    
+    Tax Logic:
+    - BidVex fees: Always taxed at 14.975%
+    - Hammer price:
+      - Private seller (is_business=false): NO tax on hammer price
+      - Business seller (is_business=true): 14.975% tax (collected for seller via Stripe Connect)
+    
+    Example for $1,000 item (basic tier, private seller):
+    - Hammer price: $1,000
+    - Buyer Premium (5%): $50
+    - GST on fees (5%): $2.50
+    - QST on fees (9.975%): $4.99
+    - Total buyer pays: $1,057.49
+    
+    Example for $1,000 item (basic tier, business seller):
+    - Hammer price: $1,000
+    - GST on item (5%): $50
+    - QST on item (9.975%): $99.75
+    - Buyer Premium (5%): $50
+    - GST on fees (5%): $2.50
+    - QST on fees (9.975%): $4.99
+    - Total buyer pays: $1,207.24
+    """
+    result = calculate_general_payment(
+        hammer_price=price,
+        buyer_tier=buyer_tier,
+        seller_tier=seller_tier,
+        seller_is_business=seller_is_business
+    )
+    
+    return {
+        "auction_type": "general",
+        "payment_method": "stripe_full",
+        "description": "Full amount charged via Stripe" + (
+            " (tax collected on behalf of business seller)" if seller_is_business else ""
+        ),
+        **result.to_dict()
+    }
+
+
+@payments_router.get("/tax/structure")
+async def get_tax_structure():
+    """
+    Get Quebec tax structure documentation
+    
+    Returns:
+    - Tax rates (GST, QST, combined)
+    - BidVex registration numbers
+    - Vehicle vs General auction tax treatment
+    - Private vs Business seller tax logic
+    """
+    return get_tax_structure_summary()
+
+
+@payments_router.get("/tax/rates")
+async def get_tax_rates():
+    """
+    Get current Quebec tax rates
+    """
+    return {
+        "jurisdiction": "Quebec, Canada",
+        "gst": {
+            "name": "Goods and Services Tax (Federal)",
+            "rate": float(GST_RATE),
+            "rate_display": "5%",
+            "registration": BIDVEX_GST_NUMBER
+        },
+        "qst": {
+            "name": "Quebec Sales Tax (Provincial)",
+            "rate": float(QST_RATE),
+            "rate_display": "9.975%",
+            "registration": BIDVEX_QST_NUMBER
+        },
+        "combined": {
+            "name": "Total Quebec Tax",
+            "rate": float(GST_RATE) + float(QST_RATE),
+            "rate_display": "14.975%"
+        }
+    }

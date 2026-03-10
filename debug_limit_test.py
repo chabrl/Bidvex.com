@@ -6,7 +6,7 @@ Debug script to test if limit is causing the visibility issue
 import asyncio
 import aiohttp
 
-BASE_URL = "https://auction-bilingual.preview.emergentagent.com/api"
+BASE_URL = "https://quebec-payments.preview.emergentagent.com/api"
 
 async def debug_limit():
     async with aiohttp.ClientSession() as session:

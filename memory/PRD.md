@@ -10,6 +10,7 @@ Build and maintain a sophisticated full-stack auction platform (BidVex) with:
 - Canadian tax compliance system
 - Full bilingual support (EN/FR) ✅ **COMPLETED**
 - Hybrid Fee Calculation Engine ✅ **COMPLETED**
+- Quebec Tax & Invoicing Engine ✅ **COMPLETED**
 - **Enterprise Vehicle Auction Module** (standalone, Copart/IAA quality)
 
 ## Architecture
@@ -19,46 +20,64 @@ Backend: FastAPI (Python)
 Database: MongoDB Atlas (Cloud)
 Authentication: JWT + Emergent Google Auth
 AI: OpenAI GPT-4 via emergentintegrations
-Payments: Stripe (via emergentintegrations) + Hybrid Fee Engine
+Payments: Stripe (via emergentintegrations) + Hybrid Fee Engine + Tax Engine
 Email: SendGrid
 Background Jobs: APScheduler
 i18n: react-i18next (EN/FR bilingual support)
 ```
 
-## Current Status: ✅ HYBRID FEE CALCULATION ENGINE COMPLETE
+## Current Status: ✅ QUEBEC TAX & INVOICING ENGINE COMPLETE
 
 ### Session Summary (Mar 10, 2026 - Latest Update)
-Implemented Hybrid Fee Calculation Engine for Stripe with differentiated fee structures:
+Implemented Quebec Tax & Compliance Engine with API endpoints and comprehensive test suite.
 
-**VEHICLE Auctions:**
-- Buyer pays: Bid + (Bid × Tier Buyer Premium) + (Bid × 2.5% Platform Fee)
-- Seller receives: 100% of Final Bid
-- BidVex keeps: Buyer Premium + Platform Fee
+**Quebec Tax Rates:**
+| Tax | Rate | Registration |
+|-----|------|--------------|
+| GST (Federal) | 5% | 123456789RT0001 |
+| QST (Provincial) | 9.975% | 1234567890TQ0001 |
+| Combined | 14.975% | - |
 
-**GENERAL Auctions:**
-- Buyer pays: Bid + (Bid × Tier Buyer Premium)
-- Seller receives: Bid - (Bid × Tier Seller Commission)
-- BidVex keeps: Buyer Premium + Seller Commission
+**VEHICLE Auctions (Hybrid Payment):**
+- Stripe charges: (Buyer Premium + Platform Fee) + 14.975% Tax
+- Hammer Price: Paid directly to seller via Bank Draft (NOT through Stripe)
+- Next Steps message guides buyer on Bank Draft payment within 14 days
 
-**Fee Rates by Tier:**
-| Tier | Buyer Premium | Seller Commission |
-|------|---------------|-------------------|
-| Basic/Standard | 5.0% | 4.0% |
-| Premium | 3.5% | 2.5% |
-| VIP Elite | 3.0% | 2.0% |
+**GENERAL Auctions (Full Stripe):**
+- BidVex Fees: Always taxed at 14.975%
+- Hammer Price Tax:
+  - Private seller (is_business=false): NO tax on hammer price
+  - Business seller (is_business=true): +14.975% tax collected on seller's behalf
 
-**API Endpoints Created:**
-- `POST /api/payments/fees/calculate` - Full fee calculation with JSON body
-- `GET /api/payments/fees/calculate-hybrid` - Fee calculation via query params
-- `GET /api/payments/fees/vehicle` - Vehicle-specific fees
-- `GET /api/payments/fees/general` - General auction fees
-- `GET /api/payments/fees/structure` - Fee structure documentation
+**New API Endpoints Created:**
+- `POST /api/payments/tax/calculate` - Full tax-inclusive payment calculation
+- `GET /api/payments/tax/vehicle` - Vehicle auction payment with tax
+- `GET /api/payments/tax/general` - General auction payment with tax
+- `GET /api/payments/tax/structure` - Quebec tax structure documentation
+- `GET /api/payments/tax/rates` - Current Quebec tax rates
 
-**Files Created:**
-- `/app/backend/services/fee_calculation_engine.py` - Core fee calculation logic
-- `/app/backend/tests/test_fee_calculation.py` - 20 comprehensive tests (all passing)
+**Files Created/Updated:**
+- `/app/backend/services/tax_engine.py` - Quebec tax calculation engine (already existed)
+- `/app/backend/routes/payments.py` - Added 5 new tax API endpoints
+- `/app/backend/tests/test_tax_engine.py` - 36 comprehensive tests (all passing)
 
-**Testing:** All 20 pytest tests passing, API endpoints verified via curl
+**Testing:** All 36 pytest tests passing for tax engine, 20 tests for fee engine
+- Vehicle payment calculations (basic, premium, VIP tiers)
+- General payment calculations (private vs business seller)
+- Stripe parameter generation (amounts in cents)
+- Invoice line item generation
+- Tax structure summary
+
+**Example Calculation - $10,000 Vehicle (Basic Tier):**
+```
+Buyer Premium (5%): $500
+Platform Fee (2.5%): $250
+BidVex Fees Subtotal: $750
+GST (5%): $37.50
+QST (9.975%): $74.81
+Stripe Charge: $862.31
+Seller Balance Due (Bank Draft): $10,000
+```
    - Marketplace: place_bid, current_bid, buy_now, ends_in, reserve_met, lot_details
    - Settings: account_info, payout_settings, notification_prefs, verify_identity, security_settings
 

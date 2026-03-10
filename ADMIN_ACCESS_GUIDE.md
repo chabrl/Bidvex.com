@@ -11,7 +11,7 @@ Your test admin account has been created and is ready to use.
 ```
 Email:    admin@admin.bazario.com
 Password: Admin123!
-URL:      https://auction-bilingual.preview.emergentagent.com
+URL:      https://quebec-payments.preview.emergentagent.com
 ```
 
 ---
@@ -19,7 +19,7 @@ URL:      https://auction-bilingual.preview.emergentagent.com
 ## 📍 How to Access the Admin Panel
 
 ### Step 1: Login
-1. Go to: `https://auction-bilingual.preview.emergentagent.com/auth`
+1. Go to: `https://quebec-payments.preview.emergentagent.com/auth`
 2. Enter credentials:
    - Email: `admin@admin.bazario.com`
    - Password: `Admin123!`
@@ -34,7 +34,7 @@ After login, you have **3 ways** to access the admin panel:
 - Click it to go directly to admin dashboard
 
 **Option 2: Direct URL**
-- Navigate to: `https://auction-bilingual.preview.emergentagent.com/admin`
+- Navigate to: `https://quebec-payments.preview.emergentagent.com/admin`
 
 **Option 3: From any dashboard**
 - The admin button appears in the user dropdown menu
