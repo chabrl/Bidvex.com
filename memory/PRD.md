@@ -1,6 +1,6 @@
 # BidVex Auction Platform - Product Requirements Document
 
-## Last Updated: March 9, 2026
+## Last Updated: March 10, 2026
 
 ## Original Problem Statement
 Build and maintain a sophisticated full-stack auction platform (BidVex) with:
@@ -24,30 +24,39 @@ Background Jobs: APScheduler
 i18n: react-i18next (EN/FR bilingual support)
 ```
 
-## Current Status: ✅ i18n BILINGUAL SUPPORT COMPLETE
+## Current Status: ✅ i18n P0 LOCALIZATION FIXES COMPLETE
 
-### Session Summary (Mar 9, 2026 - Latest Update)
-Completed full internationalization (i18n) implementation including:
-- Legal Pages Migration (separate EN/FR components)
-- Marketplace & Settings dictionary updates
-- UI Component Audit
+### Session Summary (Mar 10, 2026 - Latest Update)
+Fixed critical localization key mismatches and missing content:
+- Fixed profile page key leaks (profile.profileTab → "Profil")
+- Fixed seller action buttons (green bar) translation
+- Fixed footer links translation
+- Added maintenance translations
 
-**i18n Features Implemented:**
+**Fixes Applied:**
 
-1. ✅ **Language Switcher (EN | FR)**
-   - Clean toggle button in main navigation/header
-   - Located near login/profile area (industry standard)
-   - EN button highlighted when English active
-   - FR button highlighted when French active
-   - Uses data-testid for testing: language-toggle, language-en-btn, language-fr-btn
+1. ✅ **Profile Page Keys Synced**
+   - Added `profile` section to both JSON files
+   - Keys: profileTab, paymentTab, subscription, notificationsTab, trustStatus, completeVerification, personalInformation, updateDetails, companyName, taxNumber
 
-2. ✅ **Translation Coverage**
-   - Navigation: Home/Accueil, Marketplace/Marché, Lots Auction/Enchères par lots, Vehicles/Enchères de véhicules
-   - Hero Section: Discover/Découvrez, Bid/Misez, Win/Gagnez
-   - Trust Badges: Secure Payments/Paiements sécurisés, Verified Sellers/Vendeurs vérifiés
-   - How It Works: Browse/Parcourir, Bid/Miser, Win/Gagner
-   - Login Page: Welcome Back/Bon retour, Email/Courriel, Password/Mot de passe
-   - Footer: Privacy Policy/Politique de Confidentialité, Terms/Conditions d'Utilisation
+2. ✅ **Seller Actions Translated (Green Bar)**
+   - "Become a Seller" → "Devenir vendeur"
+   - "List a Vehicle" → "Inscrire un véhicule"
+   - "My Listings" → "Mes annonces"
+   - "List a Vehicle Now" → "Inscrire un véhicule maintenant"
+   - "Be the First to List!" → "Soyez le premier à inscrire!"
+
+3. ✅ **Footer Links Fixed**
+   - "How It Works" → "Comment ça fonctionne"
+   - "Privacy Policy" → "Politique de confidentialité"
+   - "Terms of Service" → "Conditions d'utilisation"
+   - "Support" → "Soutien"
+   - "All rights reserved" → "Tous droits réservés"
+
+4. ✅ **Maintenance Translations Added**
+   - Full maintenance/coming soon page translations for both EN/FR
+
+**i18n Complete Coverage:**
    - Marketplace: place_bid, current_bid, buy_now, ends_in, reserve_met, lot_details
    - Settings: account_info, payout_settings, notification_prefs, verify_identity, security_settings
 
