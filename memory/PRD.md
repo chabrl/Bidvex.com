@@ -15,6 +15,7 @@ Build and maintain a sophisticated full-stack auction platform (BidVex) with:
 - Marketplace Engine with Stripe Connect ✅ **COMPLETED**
 - Subscription Tier System ✅ **COMPLETED**
 - Seller Earnings Dashboard ✅ **COMPLETED**
+- Trust Status Verification via SetupIntent ✅ **COMPLETED**
 - **Enterprise Vehicle Auction Module** (standalone, Copart/IAA quality)
 
 ## Architecture
@@ -24,64 +25,61 @@ Backend: FastAPI (Python)
 Database: MongoDB Atlas (Cloud)
 Authentication: JWT + Emergent Google Auth
 AI: OpenAI GPT-4 via emergentintegrations
-Payments: Stripe Connect (Destination Charges) + Subscriptions + Tax Engine
+Payments: Stripe Connect + SetupIntents (Trust Verification) + Subscriptions + Tax Engine
 Email: SendGrid
 Background Jobs: APScheduler
 i18n: react-i18next (EN/FR bilingual support)
 PDF Generation: ReportLab (bilingual invoices)
 ```
 
-## Current Status: ✅ SUBSCRIPTION & SELLER DASHBOARD COMPLETE
+## Current Status: ✅ TRUST STATUS VERIFICATION COMPLETE
 
 ### Session Summary (Mar 10, 2026 - Latest Update)
 
-**Subscription Tier System ✅**
-- Stripe Price ID Mappings:
-  - Free: price_1T5V79Bd6Wtvh7hsnp69zu1F
-  - Premium ($180): price_1T5V5xBd6Wtvh7hscWcNnk34
-  - VIP ($300): price_1T5V2bBd6Wtvh7hsqLLmAZSH
+**Trust Status Verification via Stripe SetupIntents ✅**
 
-- Fee Rates by Tier:
-  | Tier | Buyer Premium | Seller Commission | Savings/$1000 |
-  |------|---------------|-------------------|---------------|
-  | Free/Basic | 5.0% | 4.0% | - |
-  | Premium | 3.5% | 2.5% | $30 |
-  | VIP Elite | 3.0% | 2.0% | $40 |
+**Backend Endpoints:**
+- `POST /api/payments/setup-intent` - Creates Stripe SetupIntent for card collection
+- `POST /api/payments/setup-intent/confirm` - Confirms SetupIntent and updates trust_status
+- `GET /api/payments/trust-status` - Returns user's verification status
 
-**New API Endpoints:**
-- `GET /api/payments/subscriptions/tiers` - All tiers with Stripe IDs
-- `GET /api/payments/subscriptions/my-status` - Current user's tier
-- `POST /api/payments/subscriptions/upgrade` - Upgrade checkout
-- `GET /api/payments/subscriptions/fee-rates` - User's current rates
-- `GET /api/payments/seller/earnings` - Financial metrics
-- `GET /api/payments/seller/transactions` - Transaction history
-- `GET /api/users/me/tax-info` - Tax registration info
-- `PUT /api/users/me/tax-info` - Update tax info
-- `POST /api/users/me/stripe-connect/onboard` - Seller onboarding
-- `GET /api/users/me/stripe-connect/status` - Connect status
-- `POST /api/users/me/stripe-connect/dashboard-link` - Stripe dashboard
+**Webhook Handler:**
+- `setup_intent.succeeded` event handler in `/api/webhook/stripe/connect`
+- Automatically saves payment_method_id to Stripe Customer
+- Updates MongoDB: `trust_status = "verified"`, `has_payment_method = true`
 
-**Webhook Integration:**
-- `POST /api/webhook/stripe/connect` - Handles subscription lifecycle:
-  - customer.subscription.created
-  - customer.subscription.updated
-  - customer.subscription.deleted
-  - invoice.paid
-  - checkout.session.completed
+**Frontend Components:**
+- `/app/frontend/src/components/TrustVerification.js`:
+  - `TrustVerificationCard` - Displays verification status and card form
+  - `SetupIntentForm` - Stripe Elements integration for card collection
+  - `BidBlocker` - Warning component for unverified users
+  - `useTrustStatus` - React hook for checking trust status
 
-**New Frontend Components:**
-- `/app/frontend/src/pages/CheckoutPage.js` - Full checkout with cost breakdown
-- `/app/frontend/src/components/SellerEarningsDashboard.js` - Earnings view
-- `/app/frontend/src/components/SubscriptionPlans.js` - Tier selection UI
+**Bid Blocking Logic:**
+- `ListingDetailPage.js` updated to check `canBid` before allowing bids
+- Unverified users see "Verification Required" message with link to settings
+- Bid input and button disabled for unverified users
 
-**New Backend Services:**
-- `/app/backend/services/subscription_service.py` - Centralized tier logic
-- Updated `/app/backend/server.py` - Stripe Connect user endpoints
+**Bilingual Error Messages (EN/FR):**
+```javascript
+ERROR_MESSAGES = {
+  card_declined: "Your card was declined..." / "Votre carte a été refusée...",
+  insufficient_funds: "Insufficient funds..." / "Fonds insuffisants...",
+  expired_card: "Card expired..." / "Carte expirée...",
+  invalid_card: "Invalid card details..." / "Détails invalides...",
+  generic_error: "Valid payment method required..." / "Mode de paiement requis..."
+}
+```
+
+**User Schema Updates:**
+| Field | Type | Description |
+|-------|------|-------------|
+| trust_status | string | "unverified", "pending", "verified" |
+| trust_verified_at | datetime | Timestamp of verification |
+| has_payment_method | boolean | Whether user has valid payment method |
+| default_payment_method_id | string | Stripe PaymentMethod ID |
 
 **Testing: 75 Backend Tests Passing**
-- 36 tax engine tests
-- 20 fee calculation tests  
-- 19 Stripe Connect tests
    - Marketplace: place_bid, current_bid, buy_now, ends_in, reserve_met, lot_details
    - Settings: account_info, payout_settings, notification_prefs, verify_identity, security_settings
 

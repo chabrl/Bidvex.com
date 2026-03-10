@@ -10,10 +10,11 @@ import { Input } from '../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Separator } from '../components/ui/separator';
+import { Alert, AlertDescription } from '../components/ui/alert';
 import { toast } from 'sonner';
 import Countdown from 'react-countdown';
 import confetti from 'canvas-confetti';
-import { Clock, MapPin, Eye, User, DollarSign, MessageCircle, TrendingUp, Wifi, WifiOff, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Clock, MapPin, Eye, User, DollarSign, MessageCircle, TrendingUp, Wifi, WifiOff, AlertCircle, CheckCircle2, Shield } from 'lucide-react';
 import PromotionManagerModal from '../components/PromotionManagerModal';
 import WatchlistButton from '../components/WatchlistButton';
 import SocialShare from '../components/SocialShare';
@@ -24,6 +25,7 @@ import AuctioneerInfo from '../components/AuctioneerInfo';
 import BidConfirmationDialog from '../components/BidConfirmationDialog';
 import PriceBreakdown from '../components/PriceBreakdown';
 import PrivateSaleBadge, { BusinessSellerBadge } from '../components/PrivateSaleBadge';
+import { useTrustStatus, BidBlocker } from '../components/TrustVerification';
 import Lightbox from 'yet-another-react-lightbox';
 import 'yet-another-react-lightbox/styles.css';
 import { useRealtimeBidding } from '../hooks/useRealtimeBidding';
@@ -32,7 +34,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const ListingDetailPage = () => {
   const { id } = useParams();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user, token } = useAuth();
   const navigate = useNavigate();
   const [listing, setListing] = useState(null);
@@ -49,6 +51,10 @@ const ListingDetailPage = () => {
   const [bidConfirmDialogOpen, setBidConfirmDialogOpen] = useState(false);
   const [pendingBidAmount, setPendingBidAmount] = useState(0);
   const [placingBid, setPlacingBid] = useState(false);
+  const [showVerificationPrompt, setShowVerificationPrompt] = useState(false);
+  
+  // Trust status for bid blocking
+  const { isVerified, canBid, loading: trustLoading, refresh: refreshTrustStatus } = useTrustStatus();
   
   // Real-time bidding hook - provides instant updates via WebSocket
   const {
@@ -108,6 +114,17 @@ const ListingDetailPage = () => {
     e.preventDefault();
     if (!token) {
       navigate('/auth', { state: { from: { pathname: `/listing/${id}` } } });
+      return;
+    }
+    
+    // Check trust verification status
+    if (!canBid) {
+      toast.error(
+        i18n.language === 'fr' 
+          ? 'Veuillez vérifier votre compte avant de placer une enchère.'
+          : 'Please verify your account before placing a bid.'
+      );
+      navigate('/profile/settings?tab=payments');
       return;
     }
 
@@ -448,6 +465,30 @@ const ListingDetailPage = () => {
             {!isAuctionEnded && user && listing.seller_id !== user.id && (
               <Card className="glassmorphism">
                 <CardContent className="p-6 space-y-4">
+                  {/* Trust Verification Check */}
+                  {!canBid && !trustLoading && (
+                    <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/30">
+                      <Shield className="h-4 w-4 text-amber-600" />
+                      <AlertDescription className="flex flex-col gap-3">
+                        <span className="text-amber-700 dark:text-amber-400">
+                          {t('listing.verificationRequired', 
+                            { defaultValue: i18n.language === 'fr' 
+                              ? 'Vous devez vérifier votre compte avant de pouvoir enchérir.'
+                              : 'You must verify your account before you can bid.' })}
+                        </span>
+                        <Button 
+                          size="sm" 
+                          onClick={() => navigate('/profile/settings?tab=payments')}
+                          className="w-fit"
+                          data-testid="verify-to-bid-btn"
+                        >
+                          <Shield className="mr-2 h-4 w-4" />
+                          {i18n.language === 'fr' ? 'Vérifier maintenant' : 'Verify Now'}
+                        </Button>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  
                   <form onSubmit={handlePlaceBid} className="space-y-3">
                     <div>
                       <label className="text-sm font-medium mb-2 block">{t('listing.yourBid')}</label>
@@ -459,6 +500,7 @@ const ListingDetailPage = () => {
                         onChange={(e) => setBidAmount(e.target.value)}
                         placeholder={`Min: $${((realtimePrice ?? listing.current_price) + 1).toFixed(2)}`}
                         required
+                        disabled={!canBid}
                         data-testid="bid-amount-input"
                       />
                     </div>
@@ -473,9 +515,23 @@ const ListingDetailPage = () => {
                       compact={true}
                     />
                     
-                    <Button type="submit" className="w-full gradient-button text-white border-0" data-testid="place-bid-btn">
-                      <DollarSign className="mr-2 h-4 w-4" />
-                      {t('listing.placeBid')}
+                    <Button 
+                      type="submit" 
+                      className="w-full gradient-button text-white border-0" 
+                      disabled={!canBid}
+                      data-testid="place-bid-btn"
+                    >
+                      {canBid ? (
+                        <>
+                          <DollarSign className="mr-2 h-4 w-4" />
+                          {t('listing.placeBid')}
+                        </>
+                      ) : (
+                        <>
+                          <Shield className="mr-2 h-4 w-4" />
+                          {i18n.language === 'fr' ? 'Vérification requise' : 'Verification Required'}
+                        </>
+                      )}
                     </Button>
                   </form>
 

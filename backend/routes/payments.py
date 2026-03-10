@@ -15,6 +15,10 @@ from datetime import datetime, timezone
 import logging
 import uuid
 import os
+import stripe
+
+# Configure Stripe API key
+stripe.api_key = os.environ.get('STRIPE_API_KEY', '')
 
 logger = logging.getLogger(__name__)
 
@@ -176,6 +180,205 @@ async def get_subscription_status(
 
 
 # ========== PAYMENT METHODS ==========
+
+@payments_router.post("/setup-intent")
+async def create_setup_intent(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Create a Stripe SetupIntent for collecting payment method
+    
+    This is used for Trust Status verification - a valid payment method
+    automatically verifies the user and allows them to place bids.
+    
+    Returns:
+        client_secret: For use with Stripe Elements/Checkout
+    """
+    import stripe
+    
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    current_user = await _get_current_user(credentials)
+    db = get_db()
+    
+    user = await db.users.find_one({"id": current_user.id})
+    customer_id = user.get("stripe_customer_id")
+    
+    # Create customer if doesn't exist
+    if not customer_id:
+        customer = stripe.Customer.create(
+            email=current_user.email,
+            name=getattr(current_user, 'name', current_user.email),
+            metadata={"user_id": current_user.id, "platform": "bidvex"}
+        )
+        customer_id = customer.id
+        await db.users.update_one(
+            {"id": current_user.id},
+            {"$set": {"stripe_customer_id": customer_id}}
+        )
+    
+    # Create SetupIntent
+    setup_intent = stripe.SetupIntent.create(
+        customer=customer_id,
+        payment_method_types=["card"],
+        metadata={
+            "user_id": current_user.id,
+            "purpose": "trust_verification"
+        }
+    )
+    
+    return {
+        "client_secret": setup_intent.client_secret,
+        "setup_intent_id": setup_intent.id,
+        "customer_id": customer_id
+    }
+
+
+@payments_router.post("/setup-intent/confirm")
+async def confirm_setup_intent(
+    data: Dict[str, str],
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Confirm that a SetupIntent was successful and update trust status
+    
+    Called by frontend after Stripe Elements confirms the payment method.
+    This is a backup in case the webhook doesn't fire immediately.
+    """
+    import stripe
+    
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    setup_intent_id = data.get("setup_intent_id")
+    if not setup_intent_id:
+        raise HTTPException(status_code=400, detail="SetupIntent ID required")
+    
+    current_user = await _get_current_user(credentials)
+    db = get_db()
+    
+    # Retrieve and verify the SetupIntent
+    try:
+        setup_intent = stripe.SetupIntent.retrieve(setup_intent_id)
+        
+        if setup_intent.status != "succeeded":
+            raise HTTPException(
+                status_code=400, 
+                detail="SetupIntent not successful"
+            )
+        
+        # Verify this belongs to the current user
+        if setup_intent.metadata.get("user_id") != current_user.id:
+            raise HTTPException(status_code=403, detail="SetupIntent does not belong to this user")
+        
+        payment_method_id = setup_intent.payment_method
+        
+        # Set as default payment method
+        stripe.Customer.modify(
+            setup_intent.customer,
+            invoice_settings={"default_payment_method": payment_method_id}
+        )
+        
+        # Update user trust status
+        await db.users.update_one(
+            {"id": current_user.id},
+            {"$set": {
+                "trust_status": "verified",
+                "trust_verified_at": datetime.now(timezone.utc).isoformat(),
+                "default_payment_method_id": payment_method_id,
+                "has_payment_method": True,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        # Store payment method record
+        pm = stripe.PaymentMethod.retrieve(payment_method_id)
+        await db.payment_methods.update_one(
+            {"user_id": current_user.id, "stripe_payment_method_id": payment_method_id},
+            {"$set": {
+                "user_id": current_user.id,
+                "stripe_payment_method_id": payment_method_id,
+                "brand": pm.card.brand,
+                "last4": pm.card.last4,
+                "exp_month": pm.card.exp_month,
+                "exp_year": pm.card.exp_year,
+                "is_default": True,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }},
+            upsert=True
+        )
+        
+        return {
+            "status": "success",
+            "trust_status": "verified",
+            "payment_method": {
+                "id": payment_method_id,
+                "brand": pm.card.brand,
+                "last4": pm.card.last4
+            }
+        }
+        
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe error confirming SetupIntent: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@payments_router.get("/trust-status")
+async def get_trust_status(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Get current user's trust verification status
+    
+    Returns:
+        trust_status: "verified", "pending", or "unverified"
+        has_payment_method: Boolean
+        payment_method: Default payment method details (if exists)
+    """
+    import stripe
+    
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    current_user = await _get_current_user(credentials)
+    db = get_db()
+    
+    user = await db.users.find_one({"id": current_user.id})
+    
+    trust_status = user.get("trust_status", "unverified")
+    has_payment_method = user.get("has_payment_method", False)
+    phone_verified = user.get("phone_verified", False)
+    
+    # Get default payment method
+    payment_method = None
+    customer_id = user.get("stripe_customer_id")
+    
+    if customer_id and has_payment_method:
+        try:
+            methods = stripe.PaymentMethod.list(customer=customer_id, type="card", limit=1)
+            if methods.data:
+                pm = methods.data[0]
+                payment_method = {
+                    "id": pm.id,
+                    "brand": pm.card.brand,
+                    "last4": pm.card.last4,
+                    "exp_month": pm.card.exp_month,
+                    "exp_year": pm.card.exp_year
+                }
+        except stripe.error.StripeError:
+            pass
+    
+    return {
+        "trust_status": trust_status,
+        "is_verified": trust_status == "verified",
+        "has_payment_method": has_payment_method,
+        "phone_verified": phone_verified,
+        "payment_method": payment_method,
+        "trust_verified_at": user.get("trust_verified_at"),
+        "can_bid": trust_status == "verified"
+    }
+
 
 @payments_router.post("/payment-methods")
 async def add_payment_method(

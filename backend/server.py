@@ -3238,11 +3238,97 @@ async def stripe_connect_webhook(request: Request):
                 from routes.webhooks import _handle_checkout_completed
                 await _handle_checkout_completed(db, session)
         
+        # Handle SetupIntent succeeded - Trust Verification
+        elif event_type == "setup_intent.succeeded":
+            await _handle_setup_intent_succeeded(db, data)
+        
         return {"status": "ok", "event_type": event_type}
         
     except Exception as e:
         logger.error(f"Webhook processing error: {e}")
         return {"status": "error", "message": str(e)}
+
+
+async def _handle_setup_intent_succeeded(db, setup_intent_data):
+    """
+    Handle setup_intent.succeeded webhook event
+    
+    When a SetupIntent succeeds:
+    1. Save the payment_method_id to the user's Stripe Customer
+    2. Update MongoDB user: trust_status = "verified"
+    3. Store payment method details
+    """
+    customer_id = setup_intent_data.get("customer")
+    payment_method_id = setup_intent_data.get("payment_method")
+    metadata = setup_intent_data.get("metadata", {})
+    user_id = metadata.get("user_id")
+    purpose = metadata.get("purpose")
+    
+    logger.info(f"Processing SetupIntent succeeded: customer={customer_id}, user_id={user_id}")
+    
+    if not customer_id or not payment_method_id:
+        logger.warning("SetupIntent missing customer or payment_method")
+        return
+    
+    # Find user by customer_id or user_id from metadata
+    user = None
+    if user_id:
+        user = await db.users.find_one({"id": user_id})
+    if not user:
+        user = await db.users.find_one({"stripe_customer_id": customer_id})
+    
+    if not user:
+        logger.warning(f"No user found for customer {customer_id}")
+        return
+    
+    user_id = user.get("id")
+    
+    try:
+        # Set as default payment method on customer
+        stripe.Customer.modify(
+            customer_id,
+            invoice_settings={"default_payment_method": payment_method_id}
+        )
+        
+        # Get payment method details
+        pm = stripe.PaymentMethod.retrieve(payment_method_id)
+        
+        # Update user trust status
+        await db.users.update_one(
+            {"id": user_id},
+            {"$set": {
+                "trust_status": "verified",
+                "trust_verified_at": datetime.now(timezone.utc).isoformat(),
+                "default_payment_method_id": payment_method_id,
+                "has_payment_method": True,
+                "stripe_customer_id": customer_id,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        # Store payment method record
+        await db.payment_methods.update_one(
+            {"user_id": user_id, "stripe_payment_method_id": payment_method_id},
+            {"$set": {
+                "user_id": user_id,
+                "stripe_payment_method_id": payment_method_id,
+                "brand": pm.card.brand if pm.card else "unknown",
+                "last4": pm.card.last4 if pm.card else "****",
+                "exp_month": pm.card.exp_month if pm.card else 0,
+                "exp_year": pm.card.exp_year if pm.card else 0,
+                "is_default": True,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }},
+            upsert=True
+        )
+        
+        logger.info(f"Trust status verified for user {user_id}")
+        
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe error in SetupIntent handler: {e}")
+    except Exception as e:
+        logger.error(f"Error processing SetupIntent: {e}")
+
 
 @api_router.post("/payments/promote")
 async def create_promotion_checkout(request: Request, data: Dict[str, Any], current_user: User = Depends(get_current_user)):
