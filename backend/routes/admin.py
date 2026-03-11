@@ -378,7 +378,7 @@ async def override_subscription(
                     status_code=409,
                     detail="Cannot override active Stripe subscription. Cancel Stripe subscription first."
                 )
-        except stripe.error.StripeError:
+        except stripe.StripeError:
             pass
     
     now = datetime.now(timezone.utc)

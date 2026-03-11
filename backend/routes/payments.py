@@ -135,7 +135,7 @@ async def get_checkout_status(session_id: str):
             "customer": session.customer,
             "subscription": session.subscription
         }
-    except stripe.error.StripeError as e:
+    except stripe.StripeError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -173,7 +173,7 @@ async def get_subscription_status(
                 sub.current_period_end,
                 tz=timezone.utc
             ).isoformat()
-        except stripe.error.StripeError:
+        except stripe.StripeError:
             result["stripe_status"] = "error"
     
     return result
@@ -319,7 +319,7 @@ async def confirm_setup_intent(
             }
         }
         
-    except stripe.error.StripeError as e:
+    except stripe.StripeError as e:
         logger.error(f"Stripe error confirming SetupIntent: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -366,7 +366,7 @@ async def get_trust_status(
                     "exp_month": pm.card.exp_month,
                     "exp_year": pm.card.exp_year
                 }
-        except stripe.error.StripeError:
+        except stripe.StripeError:
             pass
     
     return {
@@ -480,7 +480,7 @@ async def delete_payment_method(
     try:
         stripe.PaymentMethod.detach(method_id)
         return {"status": "deleted"}
-    except stripe.error.StripeError as e:
+    except stripe.StripeError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -1471,7 +1471,7 @@ async def get_seller_earnings(
             }
         }
         
-    except stripe.error.StripeError as e:
+    except stripe.StripeError as e:
         logger.error(f"Stripe error getting seller earnings: {e}")
         return {
             "has_connect_account": True,

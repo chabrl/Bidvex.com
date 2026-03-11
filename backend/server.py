@@ -3194,7 +3194,7 @@ async def stripe_connect_webhook(request: Request):
     
     try:
         event = stripe.Webhook.construct_event(body, signature, webhook_secret)
-    except stripe.error.SignatureVerificationError:
+    except stripe.SignatureVerificationError:
         logger.error("Invalid webhook signature")
         raise HTTPException(status_code=400, detail="Invalid signature")
     except Exception as e:
@@ -3324,7 +3324,7 @@ async def _handle_setup_intent_succeeded(db, setup_intent_data):
         
         logger.info(f"Trust status verified for user {user_id}")
         
-    except stripe.error.StripeError as e:
+    except stripe.StripeError as e:
         logger.error(f"Stripe error in SetupIntent handler: {e}")
     except Exception as e:
         logger.error(f"Error processing SetupIntent: {e}")
@@ -7669,7 +7669,7 @@ async def create_subscription_checkout(
             "final_price": final_price
         }
         
-    except stripe.error.StripeError as e:
+    except stripe.StripeError as e:
         logger.error(f"Stripe checkout error: {e}")
         raise HTTPException(status_code=500, detail=f"Payment processing error: {str(e)}")
 
@@ -11079,7 +11079,7 @@ async def get_stripe_connect_status(current_user: User = Depends(get_current_use
                 "eventually_due": list(account.requirements.eventually_due) if account.requirements else []
             }
         }
-    except stripe.error.StripeError as e:
+    except stripe.StripeError as e:
         logger.error(f"Stripe Connect status error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -11098,7 +11098,7 @@ async def get_stripe_connect_dashboard_link(current_user: User = Depends(get_cur
     try:
         login_link = stripe.Account.create_login_link(connect_account_id)
         return {"dashboard_url": login_link.url}
-    except stripe.error.StripeError as e:
+    except stripe.StripeError as e:
         logger.error(f"Stripe dashboard link error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 

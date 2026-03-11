@@ -674,7 +674,7 @@ async def get_stripe_connect_status(
                 "eventually_due": list(account.requirements.eventually_due) if account.requirements else []
             }
         }
-    except stripe.error.StripeError as e:
+    except stripe.StripeError as e:
         logger.error(f"Stripe Connect status error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -703,7 +703,7 @@ async def get_stripe_connect_dashboard_link(
     try:
         login_link = stripe.Account.create_login_link(connect_account_id)
         return {"dashboard_url": login_link.url}
-    except stripe.error.StripeError as e:
+    except stripe.StripeError as e:
         logger.error(f"Stripe dashboard link error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 

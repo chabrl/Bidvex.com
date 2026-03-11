@@ -360,7 +360,7 @@ class SubscriptionPricingService:
                 )
                 logger.info(f"Created Stripe yearly price for {plan_id}: {price.id}")
                 
-        except stripe.error.StripeError as e:
+        except stripe.StripeError as e:
             logger.error(f"Stripe error syncing plan {plan_id}: {e}")
             raise
     
