@@ -3491,7 +3491,7 @@ async def add_payment_method(data: PaymentMethodCreate, current_user: User = Dep
             payment_method=data.payment_method_id,
             customer=current_user.id,
             confirm=True,
-            return_url='https://quebec-payments.preview.emergentagent.com'
+            return_url='https://payment-platform-qa.preview.emergentagent.com'
         )
         
         is_verified = intent.status == 'succeeded' or intent.status == 'requires_capture'
