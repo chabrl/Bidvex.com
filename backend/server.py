@@ -5130,7 +5130,7 @@ async def bid_on_lot(listing_id: str, lot_number: int, data: Dict[str, Any], cur
     
     return response
 
-@app.websocket("/ws/messages/{user_id}")
+@app.websocket("/api/ws/messages/{user_id}")
 async def websocket_messages(websocket: WebSocket, user_id: str):
     await manager.connect_user(websocket, user_id)
     try:
@@ -10097,10 +10097,14 @@ async def sendgrid_webhook(request: Request):
 
 # NOTE: api_router is included at the end of the file after all routes are defined
 
+cors_origins_raw = os.environ.get('CORS_ORIGINS', '')
+cors_origins = [o.strip() for o in cors_origins_raw.split(',') if o.strip()] if cors_origins_raw else ["*"]
+
 app.add_middleware(
     CORSMiddleware, allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=cors_origins,
     allow_methods=["*"], allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # ==================== WISHLIST ENDPOINTS ====================

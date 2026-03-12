@@ -24,7 +24,7 @@ const MessageNotificationListener = () => {
     const connect = () => {
       try {
         // Use the global user notification channel
-        const ws = new WebSocket(`${WS_URL}/ws/messages/${user.id}`);
+        const ws = new WebSocket(`${WS_URL}/api/ws/messages/${user.id}`);
         
         ws.onopen = () => {
           console.log('[NotificationListener] Connected');
