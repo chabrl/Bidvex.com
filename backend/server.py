@@ -3583,42 +3583,47 @@ async def add_payment_method(data: PaymentMethodCreate, current_user: User = Dep
                 {"$set": {"stripe_customer_id": customer_id}}
             )
 
+        # Retrieve and attach the PaymentMethod to the Stripe Customer
         payment_method = stripe.PaymentMethod.retrieve(data.payment_method_id)
         stripe.PaymentMethod.attach(data.payment_method_id, customer=customer_id)
-        
-        intent = stripe.PaymentIntent.create(
-            amount=100,
-            currency='cad',
-            payment_method=data.payment_method_id,
-            customer=customer_id,
-            confirm=True,
-            return_url='https://www.bidvex.com'
+
+        # Set as the customer's default payment method
+        stripe.Customer.modify(
+            customer_id,
+            invoice_settings={"default_payment_method": data.payment_method_id}
         )
-        
-        is_verified = intent.status == 'succeeded' or intent.status == 'requires_capture'
-        
+
         pm_doc = {
             "id": str(uuid.uuid4()),
             "user_id": current_user.id,
             "stripe_payment_method_id": data.payment_method_id,
-            "card_brand": payment_method.card.brand,
-            "last4": payment_method.card.last4,
-            "exp_month": payment_method.card.exp_month,
-            "exp_year": payment_method.card.exp_year,
-            "is_verified": is_verified,
-            "is_default": False,
+            "card_brand": payment_method.card.brand if payment_method.card else "unknown",
+            "last4": payment_method.card.last4 if payment_method.card else "****",
+            "exp_month": payment_method.card.exp_month if payment_method.card else 0,
+            "exp_year": payment_method.card.exp_year if payment_method.card else 0,
+            "is_verified": True,
+            "is_default": True,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
-        
+
         await db.payment_methods.insert_one(pm_doc)
-        
-        if is_verified:
-            try:
-                stripe.PaymentIntent.cancel(intent.id)
-            except Exception:
-                pass
-        
+
+        # Update user trust status
+        await db.users.update_one(
+            {"id": current_user.id},
+            {"$set": {
+                "trust_status": "verified",
+                "has_payment_method": True,
+                "default_payment_method_id": data.payment_method_id,
+                "trust_verified_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+
         return PaymentMethodResponse(**pm_doc)
+    except stripe.StripeError as e:
+        logger.error(f"Stripe error in add_payment_method: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Payment method error: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
