@@ -3190,16 +3190,28 @@ async def stripe_connect_webhook(request: Request):
     body = await request.body()
     signature = request.headers.get("Stripe-Signature")
     
-    webhook_secret = os.environ.get("STRIPE_CONNECT_WEBHOOK_SECRET", os.environ.get("STRIPE_WEBHOOK_SECRET", ""))
+    webhook_secrets = [
+        s for s in [
+            os.environ.get("STRIPE_CONNECT_WEBHOOK_SECRET"),
+            os.environ.get("STRIPE_WEBHOOK_SECRET"),
+            os.environ.get("STRIPE_WEBHOOK_SECRET_2"),
+        ] if s
+    ]
     
-    try:
-        event = stripe.Webhook.construct_event(body, signature, webhook_secret)
-    except stripe.SignatureVerificationError:
-        logger.error("Invalid webhook signature")
+    event = None
+    for secret in webhook_secrets:
+        try:
+            event = stripe.Webhook.construct_event(body, signature, secret)
+            break
+        except stripe.SignatureVerificationError:
+            continue
+        except Exception as e:
+            logger.error(f"Webhook parsing error: {e}")
+            raise HTTPException(status_code=400, detail="Invalid payload")
+    
+    if event is None:
+        logger.error("Invalid webhook signature - none of the configured secrets matched")
         raise HTTPException(status_code=400, detail="Invalid signature")
-    except Exception as e:
-        logger.error(f"Webhook parsing error: {e}")
-        raise HTTPException(status_code=400, detail="Invalid payload")
     
     event_type = event.get("type", "")
     data = event.get("data", {}).get("object", {})
