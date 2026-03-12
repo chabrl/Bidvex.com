@@ -3254,6 +3254,13 @@ async def stripe_connect_webhook(request: Request):
         elif event_type == "setup_intent.succeeded":
             await _handle_setup_intent_succeeded(db, data)
         
+        # Handle PaymentMethod attached - backup for Trust Verification
+        elif event_type == "payment_method.attached":
+            await _handle_payment_method_attached(db, data)
+        
+        else:
+            logger.info(f"Unhandled webhook event type: {event_type}")
+        
         return {"status": "ok", "event_type": event_type}
         
     except Exception as e:
@@ -3340,6 +3347,73 @@ async def _handle_setup_intent_succeeded(db, setup_intent_data):
         logger.error(f"Stripe error in SetupIntent handler: {e}")
     except Exception as e:
         logger.error(f"Error processing SetupIntent: {e}")
+
+
+async def _handle_payment_method_attached(db, pm_data):
+    """
+    Backup handler for payment_method.attached webhook event.
+    
+    If setup_intent.succeeded was missed, this catches the payment method
+    being attached to a customer and verifies trust status.
+    """
+    customer_id = pm_data.get("customer")
+    payment_method_id = pm_data.get("id")
+    
+    if not customer_id or not payment_method_id:
+        return
+    
+    # Find user by customer_id
+    user = await db.users.find_one({"stripe_customer_id": customer_id})
+    if not user:
+        logger.info(f"payment_method.attached: No user for customer {customer_id}")
+        return
+    
+    # Only update if not already verified (avoid overwriting)
+    if user.get("trust_status") == "verified":
+        logger.info(f"payment_method.attached: User {user['id']} already verified, skipping")
+        return
+    
+    user_id = user.get("id")
+    
+    try:
+        pm = stripe.PaymentMethod.retrieve(payment_method_id)
+        
+        stripe.Customer.modify(
+            customer_id,
+            invoice_settings={"default_payment_method": payment_method_id}
+        )
+        
+        await db.users.update_one(
+            {"id": user_id},
+            {"$set": {
+                "trust_status": "verified",
+                "trust_verified_at": datetime.now(timezone.utc).isoformat(),
+                "default_payment_method_id": payment_method_id,
+                "has_payment_method": True,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        await db.payment_methods.update_one(
+            {"user_id": user_id, "stripe_payment_method_id": payment_method_id},
+            {"$set": {
+                "user_id": user_id,
+                "stripe_payment_method_id": payment_method_id,
+                "brand": pm.card.brand if pm.card else "unknown",
+                "last4": pm.card.last4 if pm.card else "****",
+                "exp_month": pm.card.exp_month if pm.card else 0,
+                "exp_year": pm.card.exp_year if pm.card else 0,
+                "is_default": True,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }},
+            upsert=True
+        )
+        
+        logger.info(f"Trust status verified via payment_method.attached for user {user_id}")
+        
+    except Exception as e:
+        logger.error(f"Error in payment_method.attached handler: {e}")
+
 
 
 @api_router.post("/payments/promote")
