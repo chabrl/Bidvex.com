@@ -1,0 +1,72 @@
+{
+  "summary": "BidVex Subscription Reactivate & Invoices Testing - All features verified. Backend: 8/8 tests passed (100%). Frontend: All UI components working - SubscriptionManagement shows Reactivate button when cancelled, Invoices section with download buttons, and Terms of Sale text visible on subscription cards.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Settings Page",
+        "issues": ["WebSocket connection warning in console (non-blocking): 'WebSocket is closed before the connection is established'"]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_subscription_reactivate_invoices.py",
+    "/app/test_reports/pytest/pytest_results_reactivate_invoices.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "POST /api/subscriptions/reactivate correctly sets cancel_at_period_end=False via Stripe API and updates user in DB",
+    "GET /api/invoices returns invoices list with pdf_data excluded (binary) - includes invoice_number, tier_label, total, created_at",
+    "GET /api/invoices/{invoice_id}/download returns PDF binary with correct Content-Type: application/pdf and Content-Disposition: attachment headers",
+    "POST /api/subscriptions/cancel sets cancel_at_period_end=True, keeps status='active' until end of billing period",
+    "GET /api/subscriptions/status returns cancel_at_period_end from Stripe API for real-time accuracy",
+    "SubscriptionManagement component shows Reactivate Plan button (green) when cancel_at_period_end=True",
+    "Invoices section shows invoice list with invoice number, tier, date, amount, and download button",
+    "Terms of Sale text visible on both /pricing page and Settings subscription tab under Buy buttons",
+    "No placeholder texts found ('Stripe integration coming soon!' or 'next phase')"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_subscription_reactivate_invoices.py"
+  ],
+  "success_rate": {
+    "backend": "100% (8/8 tests passed)",
+    "frontend": "100% (All UI components verified)"
+  },
+  "test_credentials": "charbeladmin@bidvex.com / Admin123!",
+  "seed_data_creation": "None - used existing admin account with Premium subscription",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Admin user has Premium subscription (sub_1TADrsBd6Wtvh7hsLSL2swIu). During testing, subscription was cancelled and then reactivated - current state is active, cancel_at_period_end=False. User has 1 invoice: BV-SUB-20260312-3B986C for $206.96 CAD (Premium Plan, Mar 12, 2026).",
+  "features_verified": {
+    "backend_endpoints": {
+      "POST /api/subscriptions/reactivate": "Sets cancel_at_period_end=False, returns success message",
+      "GET /api/invoices": "Returns invoices list without pdf_data binary field",
+      "GET /api/invoices/{invoice_id}/download": "Returns PDF with Content-Type application/pdf and attachment disposition",
+      "POST /api/subscriptions/cancel": "Sets cancel_at_period_end=True, keeps status active",
+      "GET /api/subscriptions/status": "Returns full subscription details including cancel_at_period_end from Stripe"
+    },
+    "frontend_components": {
+      "SubscriptionManagement": "Shows Reactivate Plan button when cancel_at_period_end=True, Cancel Plan when active",
+      "SubscriptionManagement Invoices": "Shows invoice list with download buttons, invoice number, tier, amount",
+      "TrendySubscriptionCards": "Shows Terms of Sale text under Buy buttons: 'By purchasing, you agree that all payments are final and non-refundable'",
+      "Settings Subscription Tab": "All components rendered correctly - status badge, renewal/access date, action buttons"
+    },
+    "removed_placeholders": [
+      "No 'Stripe integration coming soon!' text found",
+      "No 'next phase' placeholder text found"
+    ]
+  },
+  "invoice_details": {
+    "invoice_id": "3b986cca-bf4a-4391-a825-32e4c6d2264c",
+    "invoice_number": "BV-SUB-20260312-3B986C",
+    "tier": "Premium",
+    "total": 206.96,
+    "currency": "CAD",
+    "pdf_download": "Working - returns valid PDF with correct headers"
+  }
+}

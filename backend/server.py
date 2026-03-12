@@ -7742,6 +7742,14 @@ async def create_subscription(
                     )
                     
                     logger.info(f"Subscription upgraded: {updated_sub.id} for user {current_user.id}, new tier={plan_id}")
+
+                    # Generate invoice for the upgrade
+                    price_amount = plan.get("price_yearly", 0)
+                    try:
+                        await _generate_subscription_invoice(db, user, plan_id, price_amount, updated_sub.id)
+                    except Exception as inv_err:
+                        logger.error(f"Invoice generation failed for upgrade: {inv_err}")
+
                     return {
                         "success": True,
                         "subscription_id": updated_sub.id,
@@ -7802,6 +7810,13 @@ async def create_subscription(
         )
 
         logger.info(f"Subscription created: {subscription.id} for user {current_user.id}, tier={plan_id}")
+
+        # Generate invoice
+        price_amount = plan.get("price_yearly", 0)
+        try:
+            await _generate_subscription_invoice(db, user, plan_id, price_amount, subscription.id)
+        except Exception as inv_err:
+            logger.error(f"Invoice generation failed: {inv_err}")
 
         return {
             "success": True,
@@ -7866,6 +7881,34 @@ async def cancel_subscription(current_user: User = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@api_router.post("/subscriptions/reactivate")
+async def reactivate_subscription(current_user: User = Depends(get_current_user)):
+    """Reactivate a subscription that was set to cancel at period end."""
+    user = await db.users.find_one({"id": current_user.id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    sub_id = user.get("stripe_subscription_id")
+    if not sub_id:
+        raise HTTPException(status_code=400, detail="No subscription to reactivate")
+
+    try:
+        updated_sub = stripe.Subscription.modify(sub_id, cancel_at_period_end=False)
+        await db.users.update_one(
+            {"id": current_user.id},
+            {"$set": {
+                "cancel_at_period_end": False,
+                "subscription_status": "active",
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        logger.info(f"Subscription {sub_id} reactivated for user {current_user.id}")
+        return {"success": True, "message": "Your subscription has been reactivated. You will continue to be charged at your next renewal date."}
+    except stripe.StripeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+
 @api_router.get("/subscriptions/status")
 async def get_subscription_status(current_user: User = Depends(get_current_user)):
     """
@@ -7898,6 +7941,182 @@ async def get_subscription_status(current_user: User = Depends(get_current_user)
             result["stripe_status"] = "error"
 
     return result
+
+
+
+# ========== SUBSCRIPTION INVOICES ==========
+
+async def _generate_subscription_invoice(db, user: dict, plan_id: str, price_amount: float, subscription_id: str) -> str:
+    """Generate a subscription invoice PDF and store it in MongoDB. Returns the invoice_id."""
+    from reportlab.lib import colors as rl_colors
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.enums import TA_RIGHT
+
+    invoice_id = str(uuid.uuid4())
+    invoice_number = f"BV-SUB-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{invoice_id[:6].upper()}"
+    now = datetime.now(timezone.utc)
+
+    # Tax calculation (Quebec: GST 5% + QST 9.975%)
+    subtotal = price_amount
+    gst_rate = 0.05
+    qst_rate = 0.09975
+    gst = round(subtotal * gst_rate, 2)
+    qst = round(subtotal * qst_rate, 2)
+    total = round(subtotal + gst + qst, 2)
+
+    tier_label = {"premium": "Premium", "vip": "VIP Elite"}.get(plan_id, plan_id.title())
+
+    # Generate PDF
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=letter, rightMargin=0.75*inch, leftMargin=0.75*inch, topMargin=0.5*inch, bottomMargin=0.5*inch)
+    styles = getSampleStyleSheet()
+
+    BLUE = rl_colors.HexColor("#2563eb")
+    DARK = rl_colors.HexColor("#1e293b")
+    GREEN = rl_colors.HexColor("#10b981")
+    LIGHT = rl_colors.HexColor("#f1f5f9")
+
+    elements = []
+
+    # Header
+    header = Table([
+        [Paragraph("<b>BidVex Inc.</b>", ParagraphStyle('h', fontSize=14, textColor=DARK)),
+         Paragraph("<b>INVOICE</b>", ParagraphStyle('t', fontSize=24, textColor=BLUE, fontName='Helvetica-Bold', alignment=TA_RIGHT))],
+        [Paragraph("123 Auction Street, Montreal, QC<br/>billing@bidvex.com | www.bidvex.com", ParagraphStyle('s', fontSize=8, textColor=rl_colors.gray, leading=11)), ""]
+    ], colWidths=[4*inch, 3*inch])
+    header.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'TOP'), ('ALIGN', (1,0), (1,-1), 'RIGHT')]))
+    elements.append(header)
+    elements.append(Spacer(1, 0.3*inch))
+
+    # Invoice meta
+    meta = Table([
+        ["Invoice #:", invoice_number, "Date:", now.strftime("%B %d, %Y")],
+        ["Status:", "PAID", "Period:", f"{now.strftime('%b %d, %Y')} - {now.replace(year=now.year+1).strftime('%b %d, %Y')}"],
+    ], colWidths=[1*inch, 2.5*inch, 0.8*inch, 2.7*inch])
+    meta.setStyle(TableStyle([
+        ('FONTSIZE', (0,0), (-1,-1), 9),
+        ('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'),
+        ('FONTNAME', (2,0), (2,-1), 'Helvetica-Bold'),
+        ('TEXTCOLOR', (1,1), (1,1), GREEN),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+    ]))
+    elements.append(meta)
+    elements.append(Spacer(1, 0.3*inch))
+
+    # Bill To
+    elements.append(Paragraph("<b>Bill To:</b>", ParagraphStyle('bt', fontSize=10, textColor=DARK, fontName='Helvetica-Bold')))
+    elements.append(Paragraph(f"{user.get('name', user.get('username', 'Customer'))}<br/>{user.get('email', '')}", ParagraphStyle('bd', fontSize=9, textColor=DARK, leading=13)))
+    elements.append(Spacer(1, 0.3*inch))
+
+    # Line items
+    items = [
+        ["Description", "Qty", "Unit Price", "Amount"],
+        [f"{tier_label} Plan — Yearly Subscription", "1", f"${subtotal:,.2f}", f"${subtotal:,.2f}"],
+    ]
+    items_table = Table(items, colWidths=[3.5*inch, 0.8*inch, 1.35*inch, 1.35*inch])
+    items_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), BLUE),
+        ('TEXTCOLOR', (0,0), (-1,0), rl_colors.white),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,-1), 9),
+        ('ALIGN', (1,0), (-1,-1), 'RIGHT'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 10),
+        ('TOPPADDING', (0,0), (-1,-1), 10),
+        ('LINEBELOW', (0,0), (-1,-1), 0.5, rl_colors.HexColor("#e2e8f0")),
+    ]))
+    elements.append(items_table)
+    elements.append(Spacer(1, 0.15*inch))
+
+    # Totals
+    totals = [
+        ["", "Subtotal:", f"${subtotal:,.2f}"],
+        ["", "GST (5%):", f"${gst:,.2f}"],
+        ["", "QST (9.975%):", f"${qst:,.2f}"],
+        ["", "TOTAL CAD:", f"${total:,.2f}"],
+    ]
+    totals_table = Table(totals, colWidths=[3.5*inch, 1.75*inch, 1.75*inch])
+    totals_table.setStyle(TableStyle([
+        ('FONTSIZE', (0,0), (-1,-1), 9),
+        ('ALIGN', (1,0), (-1,-1), 'RIGHT'),
+        ('FONTNAME', (1,-1), (-1,-1), 'Helvetica-Bold'),
+        ('FONTSIZE', (1,-1), (-1,-1), 11),
+        ('TEXTCOLOR', (2,-1), (2,-1), BLUE),
+        ('LINEABOVE', (1,-1), (-1,-1), 2, BLUE),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+    ]))
+    elements.append(totals_table)
+    elements.append(Spacer(1, 0.4*inch))
+
+    # Tax registration
+    elements.append(Paragraph("GST/HSN #: 123456789RT0001 | QST #: 1234567890TQ0001", ParagraphStyle('tax', fontSize=8, textColor=rl_colors.gray)))
+    elements.append(Paragraph("All amounts in Canadian Dollars (CAD). Thank you for your business.", ParagraphStyle('thx', fontSize=8, textColor=rl_colors.gray, spaceBefore=4)))
+
+    doc.build(elements)
+    pdf_bytes = buf.getvalue()
+    buf.close()
+
+    # Store in MongoDB
+    invoice_doc = {
+        "id": invoice_id,
+        "invoice_number": invoice_number,
+        "user_id": user.get("id"),
+        "user_email": user.get("email"),
+        "type": "subscription",
+        "plan_id": plan_id,
+        "tier_label": tier_label,
+        "stripe_subscription_id": subscription_id,
+        "subtotal": subtotal,
+        "gst": gst,
+        "qst": qst,
+        "total": total,
+        "currency": "CAD",
+        "status": "paid",
+        "pdf_data": pdf_bytes,
+        "created_at": now.isoformat(),
+        "period_start": now.isoformat(),
+        "period_end": now.replace(year=now.year + 1).isoformat(),
+    }
+    await db.subscription_invoices.insert_one(invoice_doc)
+    logger.info(f"Subscription invoice {invoice_number} generated for user {user.get('id')}")
+
+    return invoice_id
+
+
+@api_router.get("/invoices")
+async def list_invoices(current_user: User = Depends(get_current_user)):
+    """List all invoices for the current user."""
+    invoices = await db.subscription_invoices.find(
+        {"user_id": current_user.id},
+        {"_id": 0, "pdf_data": 0}
+    ).sort("created_at", -1).to_list(50)
+    return {"invoices": invoices}
+
+
+@api_router.get("/invoices/{invoice_id}/download")
+async def download_invoice(invoice_id: str, current_user: User = Depends(get_current_user)):
+    """Download a PDF invoice."""
+    from fastapi.responses import Response
+
+    invoice = await db.subscription_invoices.find_one(
+        {"id": invoice_id, "user_id": current_user.id}
+    )
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    pdf_data = invoice.get("pdf_data")
+    if not pdf_data:
+        raise HTTPException(status_code=404, detail="PDF not available")
+
+    filename = f"{invoice.get('invoice_number', 'invoice')}.pdf"
+    return Response(
+        content=pdf_data,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
 
 
 # ========== SUBSCRIPTION CHECKOUT WITH COUPON ==========
