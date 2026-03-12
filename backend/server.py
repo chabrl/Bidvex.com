@@ -3568,16 +3568,31 @@ async def websocket_endpoint(
 @api_router.post("/payment-methods")
 async def add_payment_method(data: PaymentMethodCreate, current_user: User = Depends(get_current_user)):
     try:
+        user = await db.users.find_one({"id": current_user.id})
+        customer_id = user.get("stripe_customer_id") if user else None
+
+        if not customer_id:
+            customer = stripe.Customer.create(
+                email=current_user.email,
+                name=getattr(current_user, 'name', current_user.email),
+                metadata={"user_id": current_user.id, "platform": "bidvex"}
+            )
+            customer_id = customer.id
+            await db.users.update_one(
+                {"id": current_user.id},
+                {"$set": {"stripe_customer_id": customer_id}}
+            )
+
         payment_method = stripe.PaymentMethod.retrieve(data.payment_method_id)
-        stripe.PaymentMethod.attach(data.payment_method_id, customer=current_user.id)
+        stripe.PaymentMethod.attach(data.payment_method_id, customer=customer_id)
         
         intent = stripe.PaymentIntent.create(
             amount=100,
-            currency='usd',
+            currency='cad',
             payment_method=data.payment_method_id,
-            customer=current_user.id,
+            customer=customer_id,
             confirm=True,
-            return_url='https://payment-platform-qa.preview.emergentagent.com'
+            return_url='https://www.bidvex.com'
         )
         
         is_verified = intent.status == 'succeeded' or intent.status == 'requires_capture'
@@ -3598,7 +3613,10 @@ async def add_payment_method(data: PaymentMethodCreate, current_user: User = Dep
         await db.payment_methods.insert_one(pm_doc)
         
         if is_verified:
-            stripe.PaymentIntent.cancel(intent.id)
+            try:
+                stripe.PaymentIntent.cancel(intent.id)
+            except Exception:
+                pass
         
         return PaymentMethodResponse(**pm_doc)
     except Exception as e:
