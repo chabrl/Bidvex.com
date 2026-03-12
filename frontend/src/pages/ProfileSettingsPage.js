@@ -548,7 +548,9 @@ const AddCardForm = ({ onSuccess, onCancel }) => {
         onSuccess();
       }
     } catch (error) {
-      toast.error('Failed to add payment method');
+      const detail = error?.response?.data?.detail || error?.message || 'Unknown error';
+      console.error('Add payment method failed:', detail, error);
+      toast.error(`Failed to add payment method: ${detail}`);
     } finally {
       setLoading(false);
     }

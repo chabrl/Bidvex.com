@@ -3567,9 +3567,11 @@ async def websocket_endpoint(
 
 @api_router.post("/payment-methods")
 async def add_payment_method(data: PaymentMethodCreate, current_user: User = Depends(get_current_user)):
+    logger.info(f"add_payment_method called by user={current_user.id}, pm_id={data.payment_method_id}")
     try:
         user = await db.users.find_one({"id": current_user.id})
         customer_id = user.get("stripe_customer_id") if user else None
+        logger.info(f"  stripe_customer_id from DB: {customer_id}")
 
         if not customer_id:
             customer = stripe.Customer.create(
