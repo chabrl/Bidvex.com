@@ -1,6 +1,6 @@
 # BidVex Auction Platform - Product Requirements Document
 
-## Last Updated: March 11, 2026
+## Last Updated: March 12, 2026
 
 ## Original Problem Statement
 Build and maintain a sophisticated full-stack auction platform (BidVex) with:
@@ -34,34 +34,36 @@ PDF Generation: ReportLab (bilingual invoices)
 
 ## Current Status: ✅ STRIPE PRODUCTION KEYS CONFIGURED & VERIFIED
 
-### Session Summary (Mar 11, 2026 - Latest Update)
+### Session Summary (Mar 12, 2026 — Latest Update)
 
-**Stripe Production Configuration ✅**
+**Stripe Subscription System — LIVE ✅**
 
-**Changes Made:**
-- Updated `backend/.env` with live Stripe Secret Key (`sk_live_...`)
-- Added `STRIPE_WEBHOOK_SECRET=whsec_...` to `backend/.env`
-- Added `REACT_APP_STRIPE_PUBLISHABLE_KEY=pk_live_...` to `frontend/.env`
-- Removed hardcoded test publishable keys from `ProfileSettingsPage.js` and `TrustVerification.js`
-- Fixed Stripe SDK v13 compatibility: `stripe.error.X` → `stripe.X` across all backend files (server.py, payments.py, webhooks.py, users.py, admin.py, subscription_pricing.py)
+**Backend:**
+- Created `POST /api/subscriptions/create` endpoint for direct subscription creation
+- Uses user's saved `default_payment_method` — no Stripe Checkout redirect
+- Automatically cancels previous subscription when upgrading/switching tiers
+- Updates MongoDB: `subscription_tier`, `subscription_status`, `stripe_subscription_id`, `subscription_start_date`, `subscription_end_date`
+- Fixed Stripe SDK v13 compatibility: `dict(subscription)` instead of attribute access for `current_period_end`
+- Price-to-tier mapping: Starter=`price_1T5V79Bd6Wtvh7hsnp69zu1F`, Premium=`price_1T5V5xBd6Wtvh7hscWcNnk34`, VIP=`price_1T5V2bBd6Wtvh7hsqLLmAZSH`
 
-**Webhook Security:**
-- Endpoint `/api/webhook/stripe/connect` now strictly verifies signatures using `STRIPE_WEBHOOK_SECRET`
-- Unsigned/invalid requests return HTTP 400
+**Frontend:**
+- Updated `SubscriptionPricingPage.js` buttons from "Select Plan" → "Buy Premium" / "Buy VIP"
+- Calls `POST /api/subscriptions/create` directly (no redirect)
+- Shows "Processing..." spinner during checkout
+- Redirects to /settings on success with toast notification
 
-**Testing: 100% Pass Rate (iteration_37)**
-- 20/20 backend tests passed
-- Frontend: Settings page, Trust Status section, Stripe Elements all verified working
-- SetupIntent API successfully creates real Stripe SetupIntents
-- Webhook rejects invalid signatures
-
-**Known Issues:**
-- WebSocket reconnection console spam (non-blocking, P3)
-- `/login` route returns 404 - login is at `/auth` (consider redirect, P3)
+**Environment Fixes:**
+- Switched to `sk_live` key (was `sk_test` causing mode mismatch with `pk_live` frontend)
+- Fixed `load_dotenv(override=True)` to override stale OS env vars
+- Migrated all 18 users to live-mode Stripe Customer IDs
+- Added `STRIPE_WEBHOOK_SECRET_2` for second webhook endpoint
+- CORS: Explicit origins for `bidvex.com`, `www.bidvex.com`, `api.bidvex.com`
+- Fixed WebSocket route: `/ws/messages/` → `/api/ws/messages/`
+- Fixed `POST /api/payment-methods`: was using `current_user.id` as Stripe customer (wrong), now uses `stripe_customer_id`
 
 ---
 
-### Session Summary (Mar 10, 2026)
+### Session Summary (Mar 11, 2026)
 
 **Trust Status Verification via Stripe SetupIntents ✅**
 

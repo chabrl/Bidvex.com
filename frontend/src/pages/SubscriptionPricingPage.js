@@ -141,12 +141,9 @@ const SubscriptionPricingPage = () => {
     setCheckoutLoading(true);
     try {
       const response = await axios.post(
-        `${API}/subscription/checkout`,
+        `${API}/subscriptions/create`,
         {
-          plan_id: plan.plan_id,
-          billing_period: isYearly ? 'yearly' : 'monthly',
-          coupon_code: couponValidation?.code || null,
-          origin_url: window.location.origin
+          plan_id: plan.plan_id
         },
         {
           headers: {
@@ -155,14 +152,12 @@ const SubscriptionPricingPage = () => {
         }
       );
 
-      if (response.data.success && response.data.checkout_url) {
-        // Redirect to Stripe checkout
-        window.location.href = response.data.checkout_url;
-      } else {
-        toast.error('Failed to create checkout session');
+      if (response.data.success) {
+        toast.success(`Successfully subscribed to ${plan.name}!`);
+        navigate('/settings');
       }
     } catch (error) {
-      const message = error.response?.data?.detail || 'Checkout failed';
+      const message = error.response?.data?.detail || 'Subscription failed';
       toast.error(message);
     } finally {
       setCheckoutLoading(false);
@@ -406,13 +401,24 @@ const SubscriptionPricingPage = () => {
                       if (plan.plan_id === 'free') {
                         toast.info('Free plan is available to all users');
                       } else {
-                        setSelectedPlan(plan);
+                        handleCheckout(plan);
                       }
                     }}
                     data-testid={`select-plan-${plan.plan_id}`}
                   >
-                    {plan.plan_id === 'free' ? 'Current Plan' : 'Select Plan'}
-                    {plan.plan_id !== 'free' && <ArrowRight className="h-4 w-4" />}
+                    {checkoutLoading && selectedPlan?.plan_id === plan.plan_id ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        Processing...
+                      </>
+                    ) : plan.plan_id === 'free' ? (
+                      'Current Plan'
+                    ) : (
+                      <>
+                        Buy {plan.name}
+                        <ArrowRight className="h-4 w-4" />
+                      </>
+                    )}
                   </Button>
                   {/* Stripe Configuration Status */}
                   {plan.plan_id !== 'free' && !stripeReady && (

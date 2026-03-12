@@ -3565,13 +3565,6 @@ async def websocket_endpoint(
     finally:
         manager.disconnect(websocket, listing_id, user_id)
 
-@api_router.get("/debug/server-ip")
-async def get_server_egress_ip():
-    """Temporary endpoint to find the server's outgoing IP for Stripe IP allowlist."""
-    import httpx
-    async with httpx.AsyncClient() as client:
-        resp = await client.get("https://api.ipify.org")
-        return {"egress_ip": resp.text.strip()}
 
 
 @api_router.post("/payment-methods")
@@ -7656,6 +7649,112 @@ async def validate_coupon_code(data: Dict[str, Any]):
     )
     
     return result.dict()
+
+
+# ========== DIRECT SUBSCRIPTION CREATION ==========
+
+PRICE_TO_TIER = {
+    "price_1T5V79Bd6Wtvh7hsnp69zu1F": "free",
+    "price_1T5V5xBd6Wtvh7hscWcNnk34": "premium",
+    "price_1T5V2bBd6Wtvh7hsqLLmAZSH": "vip",
+}
+
+@api_router.post("/subscriptions/create")
+async def create_subscription(
+    data: Dict[str, Any],
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Create a Stripe subscription using the user's saved default payment method.
+    No redirect — charges the card on file directly.
+    """
+    plan_id = data.get("plan_id")  # "premium" or "vip"
+    if plan_id not in ("premium", "vip"):
+        raise HTTPException(status_code=400, detail="Invalid plan. Choose 'premium' or 'vip'.")
+
+    user = await db.users.find_one({"id": current_user.id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    customer_id = user.get("stripe_customer_id")
+    if not customer_id:
+        raise HTTPException(status_code=400, detail="No Stripe customer on file. Please add a payment method first.")
+
+    default_pm = user.get("default_payment_method_id")
+    if not default_pm:
+        raise HTTPException(status_code=400, detail="No payment method on file. Please add a card first.")
+
+    # Look up the Stripe Price ID from the DB
+    pricing_service = get_pricing_service(db)
+    plan = await pricing_service.get_plan(plan_id)
+    if not plan:
+        raise HTTPException(status_code=400, detail="Plan not found")
+
+    stripe_price_id = plan.get("stripe_price_id_yearly")
+    if not stripe_price_id:
+        raise HTTPException(status_code=400, detail="Stripe price not configured for this plan")
+
+    # Cancel existing subscription if upgrading/switching
+    existing_sub_id = user.get("stripe_subscription_id")
+    if existing_sub_id:
+        try:
+            stripe.Subscription.cancel(existing_sub_id)
+            logger.info(f"Cancelled previous subscription {existing_sub_id} for user {current_user.id}")
+        except Exception as e:
+            logger.warning(f"Could not cancel old subscription {existing_sub_id}: {e}")
+
+    try:
+        subscription = stripe.Subscription.create(
+            customer=customer_id,
+            items=[{"price": stripe_price_id}],
+            default_payment_method=default_pm,
+            metadata={
+                "user_id": current_user.id,
+                "plan_id": plan_id,
+                "billing_period": "yearly"
+            }
+        )
+
+        sub_data = dict(subscription)
+        # For yearly plans, period end = billing_cycle_anchor + 1 year
+        start_ts = sub_data.get("start_date") or sub_data.get("billing_cycle_anchor") or sub_data.get("created")
+        if start_ts:
+            start_dt = datetime.fromtimestamp(start_ts, tz=timezone.utc)
+            end_dt = start_dt.replace(year=start_dt.year + 1)
+            end_date = end_dt.isoformat()
+            start_date = start_dt.isoformat()
+        else:
+            start_date = datetime.now(timezone.utc).isoformat()
+            end_date = datetime.now(timezone.utc).replace(year=datetime.now(timezone.utc).year + 1).isoformat()
+
+        # Update user record in MongoDB
+        await db.users.update_one(
+            {"id": current_user.id},
+            {"$set": {
+                "subscription_tier": plan_id,
+                "subscription_status": "active",
+                "stripe_subscription_id": subscription.id,
+                "subscription_source": "stripe",
+                "subscription_start_date": start_date,
+                "subscription_end_date": end_date,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+
+        logger.info(f"Subscription created: {subscription.id} for user {current_user.id}, tier={plan_id}")
+
+        return {
+            "success": True,
+            "subscription_id": subscription.id,
+            "status": subscription.status,
+            "tier": plan_id,
+            "current_period_end": end_date
+        }
+
+    except stripe.StripeError as e:
+        logger.error(f"Stripe subscription creation failed: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 # ========== SUBSCRIPTION CHECKOUT WITH COUPON ==========
 

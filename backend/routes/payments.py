@@ -168,11 +168,14 @@ async def get_subscription_status(
     if user.get("stripe_subscription_id"):
         try:
             sub = stripe.Subscription.retrieve(user["stripe_subscription_id"])
-            result["stripe_status"] = sub.status
-            result["stripe_current_period_end"] = datetime.fromtimestamp(
-                sub.current_period_end,
-                tz=timezone.utc
-            ).isoformat()
+            sub_data = dict(sub)
+            result["stripe_status"] = sub_data.get("status", "unknown")
+            start_ts = sub_data.get("start_date") or sub_data.get("billing_cycle_anchor")
+            if start_ts:
+                end_dt = datetime.fromtimestamp(start_ts, tz=timezone.utc).replace(
+                    year=datetime.fromtimestamp(start_ts, tz=timezone.utc).year + 1
+                )
+                result["stripe_current_period_end"] = end_dt.isoformat()
         except stripe.StripeError:
             result["stripe_status"] = "error"
     
