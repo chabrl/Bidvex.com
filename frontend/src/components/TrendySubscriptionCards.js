@@ -133,11 +133,35 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
     },
   ];
 
-  const handleUpgrade = (tierId) => {
-    if (onUpgrade) {
-      onUpgrade(tierId);
-    } else {
-      toast.info('Stripe integration coming soon!');
+  const [upgrading, setUpgrading] = useState(null);
+
+  const handleUpgrade = async (tierId) => {
+    if (tierId === 'free') return;
+    
+    const token = localStorage.getItem('token');
+    if (!token) {
+      toast.error('Please log in to subscribe');
+      return;
+    }
+
+    setUpgrading(tierId);
+    try {
+      const response = await axios.post(
+        `${API}/subscriptions/create`,
+        { plan_id: tierId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.success) {
+        toast.success(`Successfully subscribed to ${tierId.charAt(0).toUpperCase() + tierId.slice(1)}!`);
+        if (onUpgrade) onUpgrade(tierId);
+        window.location.reload();
+      }
+    } catch (error) {
+      const detail = error?.response?.data?.detail || 'Subscription failed';
+      toast.error(detail);
+    } finally {
+      setUpgrading(null);
     }
   };
 
@@ -274,10 +298,12 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
                   )
                 }`}
                 onClick={() => !isCurrentTier && handleUpgrade(tier.id)}
-                disabled={isCurrentTier || tier.ctaDisabled}
+                disabled={isCurrentTier || tier.ctaDisabled || upgrading === tier.id}
                 data-testid={`upgrade-btn-${tier.id}`}
               >
-                {isCurrentTier ? 'Current Plan' : tier.cta}
+                {upgrading === tier.id ? (
+                  <><RefreshCw className="h-4 w-4 animate-spin mr-2" /> Processing...</>
+                ) : isCurrentTier ? 'Current Plan' : tier.cta}
               </Button>
             </div>
           );
