@@ -36,14 +36,17 @@ PDF Generation: ReportLab (bilingual invoices)
 
 ### Session Summary (Mar 12, 2026 — Latest)
 
-**Subscription Lifecycle:**
+**Subscription Lifecycle + Invoices:**
 - `POST /api/subscriptions/create` — Direct subscription or upgrade with proration
 - `POST /api/subscriptions/cancel` — cancel_at_period_end=True, no refunds, keeps access
+- `POST /api/subscriptions/reactivate` — Reactivate cancelled subscription
 - `GET /api/subscriptions/status` — Full status with Stripe live sync
-- New `SubscriptionManagement.js` panel in Settings: tier, status badge, renewal date, cancel dialog
+- `GET /api/invoices` — List user invoices (excludes binary PDF data)
+- `GET /api/invoices/{id}/download` — Download PDF invoice
+- Invoice generation: auto-generates PDF on subscription create/upgrade with GST (5%) + QST (9.975%)
+- `SubscriptionManagement.js`: Plan status, Active/Cancelling badge, renewal date, Cancel/Reactivate, Invoice list with download
 - Terms of Sale under Buy buttons; removed all "coming soon" placeholders
-- Price IDs: Starter=$0 (`price_1T5V79...`), Premium=$180 (`price_1T5V5x...`), VIP=$300 (`price_1T5V2b...`)
-- Testing: 100% (iteration_38) — 12/12 backend, all frontend verified
+- Testing: 100% (iteration_39) — 8/8 backend, all frontend verified
 
 ---
 
