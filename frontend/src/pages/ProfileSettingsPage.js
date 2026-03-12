@@ -16,6 +16,7 @@ import AvatarUpload from '../components/AvatarUpload';
 import SubscriptionBadge from '../components/SubscriptionBadge';
 import TrustBadge from '../components/TrustBadge';
 import TrendySubscriptionCards from '../components/TrendySubscriptionCards';
+import SubscriptionManagement from '../components/SubscriptionManagement';
 import PersonalizedSavingsCalculator from '../components/PersonalizedSavingsCalculator';
 import { useTranslation } from 'react-i18next';
 
@@ -499,6 +500,9 @@ const ProfileSettingsPage = () => {
                     </p>
                   )}
                 </div>
+
+                {/* Subscription Management Panel */}
+                <SubscriptionManagement />
 
                 {/* Trendy Subscription Cards */}
                 <TrendySubscriptionCards currentTier={user?.subscription_tier || 'free'} />

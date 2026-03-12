@@ -7694,14 +7694,74 @@ async def create_subscription(
     if not stripe_price_id:
         raise HTTPException(status_code=400, detail="Stripe price not configured for this plan")
 
-    # Cancel existing subscription if upgrading/switching
+    # Handle existing subscription — upgrade with proration instead of cancel
     existing_sub_id = user.get("stripe_subscription_id")
     if existing_sub_id:
         try:
-            stripe.Subscription.cancel(existing_sub_id)
-            logger.info(f"Cancelled previous subscription {existing_sub_id} for user {current_user.id}")
-        except Exception as e:
-            logger.warning(f"Could not cancel old subscription {existing_sub_id}: {e}")
+            existing_sub = stripe.Subscription.retrieve(existing_sub_id)
+            existing_status = dict(existing_sub).get("status")
+            
+            if existing_status in ("active", "trialing"):
+                # Upgrade: swap the price item, Stripe handles proration automatically
+                items_data = dict(existing_sub).get("items", {})
+                items_list = items_data.get("data", []) if isinstance(items_data, dict) else []
+                
+                if items_list:
+                    old_item_id = items_list[0].get("id") if isinstance(items_list[0], dict) else items_list[0].id
+                    updated_sub = stripe.Subscription.modify(
+                        existing_sub_id,
+                        items=[{
+                            "id": old_item_id,
+                            "price": stripe_price_id
+                        }],
+                        proration_behavior="create_prorations",
+                        metadata={
+                            "user_id": current_user.id,
+                            "plan_id": plan_id,
+                            "billing_period": "yearly"
+                        }
+                    )
+                    
+                    up_data = dict(updated_sub)
+                    start_ts = up_data.get("start_date") or up_data.get("billing_cycle_anchor") or up_data.get("created")
+                    start_dt = datetime.fromtimestamp(start_ts, tz=timezone.utc) if start_ts else datetime.now(timezone.utc)
+                    end_dt = start_dt.replace(year=start_dt.year + 1)
+                    
+                    await db.users.update_one(
+                        {"id": current_user.id},
+                        {"$set": {
+                            "subscription_tier": plan_id,
+                            "subscription_status": "active",
+                            "stripe_subscription_id": updated_sub.id,
+                            "subscription_source": "stripe",
+                            "subscription_start_date": start_dt.isoformat(),
+                            "subscription_end_date": end_dt.isoformat(),
+                            "cancel_at_period_end": False,
+                            "updated_at": datetime.now(timezone.utc).isoformat()
+                        }}
+                    )
+                    
+                    logger.info(f"Subscription upgraded: {updated_sub.id} for user {current_user.id}, new tier={plan_id}")
+                    return {
+                        "success": True,
+                        "subscription_id": updated_sub.id,
+                        "status": "active",
+                        "tier": plan_id,
+                        "current_period_end": end_dt.isoformat(),
+                        "action": "upgraded"
+                    }
+            else:
+                # Old sub is canceled/past_due — cancel it fully and create new
+                try:
+                    stripe.Subscription.cancel(existing_sub_id)
+                except Exception:
+                    pass
+        except stripe.StripeError as e:
+            logger.warning(f"Could not modify old subscription {existing_sub_id}: {e}")
+            try:
+                stripe.Subscription.cancel(existing_sub_id)
+            except Exception:
+                pass
 
     try:
         subscription = stripe.Subscription.create(
@@ -7754,6 +7814,90 @@ async def create_subscription(
     except stripe.StripeError as e:
         logger.error(f"Stripe subscription creation failed: {e}")
         raise HTTPException(status_code=400, detail=str(e))
+
+
+
+@api_router.post("/subscriptions/cancel")
+async def cancel_subscription(current_user: User = Depends(get_current_user)):
+    """
+    Cancel subscription at period end. No refund — user keeps access until billing cycle ends.
+    """
+    user = await db.users.find_one({"id": current_user.id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    sub_id = user.get("stripe_subscription_id")
+    if not sub_id:
+        raise HTTPException(status_code=400, detail="No active subscription to cancel")
+
+    try:
+        updated_sub = stripe.Subscription.modify(
+            sub_id,
+            cancel_at_period_end=True
+        )
+
+        sub_data = dict(updated_sub)
+        start_ts = sub_data.get("start_date") or sub_data.get("billing_cycle_anchor") or sub_data.get("created")
+        end_dt = None
+        if start_ts:
+            start_dt = datetime.fromtimestamp(start_ts, tz=timezone.utc)
+            end_dt = start_dt.replace(year=start_dt.year + 1)
+
+        await db.users.update_one(
+            {"id": current_user.id},
+            {"$set": {
+                "subscription_status": "active",
+                "cancel_at_period_end": True,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+
+        logger.info(f"Subscription {sub_id} set to cancel at period end for user {current_user.id}")
+
+        return {
+            "success": True,
+            "message": "Your subscription has been set to cancel at the end of the current billing period.",
+            "access_until": end_dt.isoformat() if end_dt else user.get("subscription_end_date"),
+            "tier": user.get("subscription_tier")
+        }
+
+    except stripe.StripeError as e:
+        logger.error(f"Stripe subscription cancellation failed: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@api_router.get("/subscriptions/status")
+async def get_subscription_status(current_user: User = Depends(get_current_user)):
+    """
+    Get detailed subscription status for the management panel.
+    """
+    user = await db.users.find_one({"id": current_user.id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    result = {
+        "tier": user.get("subscription_tier", "free"),
+        "status": user.get("subscription_status", "inactive"),
+        "cancel_at_period_end": user.get("cancel_at_period_end", False),
+        "start_date": user.get("subscription_start_date"),
+        "end_date": user.get("subscription_end_date"),
+        "stripe_subscription_id": user.get("stripe_subscription_id"),
+        "has_payment_method": user.get("has_payment_method", False),
+        "default_payment_method_id": user.get("default_payment_method_id"),
+    }
+
+    # Get live status from Stripe if subscription exists
+    sub_id = user.get("stripe_subscription_id")
+    if sub_id:
+        try:
+            sub = stripe.Subscription.retrieve(sub_id)
+            sub_data = dict(sub)
+            result["stripe_status"] = sub_data.get("status", "unknown")
+            result["cancel_at_period_end"] = sub_data.get("cancel_at_period_end", False)
+        except stripe.StripeError:
+            result["stripe_status"] = "error"
+
+    return result
 
 
 # ========== SUBSCRIPTION CHECKOUT WITH COUPON ==========

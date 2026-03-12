@@ -305,6 +305,13 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
                   <><RefreshCw className="h-4 w-4 animate-spin mr-2" /> Processing...</>
                 ) : isCurrentTier ? 'Current Plan' : tier.cta}
               </Button>
+
+              {/* Terms of Sale */}
+              {!isCurrentTier && tier.id !== 'free' && (
+                <p className="mt-3 text-[11px] leading-relaxed text-slate-400 dark:text-slate-500 text-center">
+                  By purchasing, you agree that all payments are final and non-refundable. If you cancel, access continues until the end of your billing cycle.
+                </p>
+              )}
             </div>
           );
         })}

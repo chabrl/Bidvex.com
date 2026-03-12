@@ -420,6 +420,12 @@ const SubscriptionPricingPage = () => {
                       </>
                     )}
                   </Button>
+                  {/* Terms of Sale */}
+                  {plan.plan_id !== 'free' && (
+                    <p className="mt-2 text-[11px] leading-relaxed text-slate-400 dark:text-slate-500 text-center px-2">
+                      By purchasing, you agree that all payments are final and non-refundable. If you cancel, access continues until the end of your billing cycle.
+                    </p>
+                  )}
                   {/* Stripe Configuration Status */}
                   {plan.plan_id !== 'free' && !stripeReady && (
                     <div className="flex items-center justify-center gap-1 text-xs text-amber-600 dark:text-amber-400">
