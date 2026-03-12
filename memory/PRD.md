@@ -32,7 +32,20 @@ i18n: react-i18next (EN/FR bilingual support)
 PDF Generation: ReportLab (bilingual invoices)
 ```
 
-## Current Status: ✅ STRIPE PRODUCTION KEYS CONFIGURED & VERIFIED
+## Current Status: ✅ FULL SUBSCRIPTION LIFECYCLE COMPLETE
+
+### Session Summary (Mar 12, 2026 — Latest)
+
+**Subscription Lifecycle:**
+- `POST /api/subscriptions/create` — Direct subscription or upgrade with proration
+- `POST /api/subscriptions/cancel` — cancel_at_period_end=True, no refunds, keeps access
+- `GET /api/subscriptions/status` — Full status with Stripe live sync
+- New `SubscriptionManagement.js` panel in Settings: tier, status badge, renewal date, cancel dialog
+- Terms of Sale under Buy buttons; removed all "coming soon" placeholders
+- Price IDs: Starter=$0 (`price_1T5V79...`), Premium=$180 (`price_1T5V5x...`), VIP=$300 (`price_1T5V2b...`)
+- Testing: 100% (iteration_38) — 12/12 backend, all frontend verified
+
+---
 
 ### Session Summary (Mar 12, 2026 — Latest Update)
 
