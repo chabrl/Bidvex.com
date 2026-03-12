@@ -39,7 +39,7 @@ import asyncio
 import aiohttp
 
 ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+load_dotenv(ROOT_DIR / '.env', override=True)
 
 # Add startup logging
 print("[SERVER] Starting BidVex backend initialization...", flush=True)
