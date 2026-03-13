@@ -7984,32 +7984,46 @@ async def get_subscription_status(current_user: User = Depends(get_current_user)
 
 # ========== SUBSCRIPTION INVOICES ==========
 
-async def _generate_subscription_invoice(db, user: dict, plan_id: str, price_amount: float, subscription_id: str, processing_fee: float = 0) -> str:
-    """Generate a subscription invoice PDF and store it in MongoDB. Returns the invoice_id."""
+def _render_subscription_invoice_pdf(invoice_doc: dict) -> bytes:
+    """Render a subscription invoice PDF from stored invoice data. Always uses the latest template."""
     from reportlab.lib import colors as rl_colors
     from reportlab.lib.pagesizes import letter
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.styles import ParagraphStyle
     from reportlab.lib.units import inch
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage
     from reportlab.lib.enums import TA_RIGHT
+    import io as _io
 
-    invoice_id = str(uuid.uuid4())
-    invoice_number = f"BV-SUB-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{invoice_id[:6].upper()}"
-    now = datetime.now(timezone.utc)
+    subtotal = invoice_doc.get("subtotal", 0)
+    gst = invoice_doc.get("gst", 0)
+    qst = invoice_doc.get("qst", 0)
+    stripe_fee = invoice_doc.get("processing_fee", 0)
+    total = invoice_doc.get("total", 0)
+    tier_label = invoice_doc.get("tier_label", "Premium")
+    invoice_number = invoice_doc.get("invoice_number", "N/A")
+    user_name = invoice_doc.get("user_name", "Customer")
+    user_email = invoice_doc.get("user_email", "")
+    created_at = invoice_doc.get("created_at", datetime.now(timezone.utc).isoformat())
+    period_start = invoice_doc.get("period_start", created_at)
+    period_end = invoice_doc.get("period_end", "")
 
-    # Tax & fee calculation (Quebec: GST 5% + QST 9.975%)
-    subtotal = price_amount
-    gst_rate = 0.05
-    qst_rate = 0.09975
-    gst = round(subtotal * gst_rate, 2)
-    qst = round(subtotal * qst_rate, 2)
-    stripe_fee = round(processing_fee, 2)
-    total = round(subtotal + gst + qst + stripe_fee, 2)
+    # Parse dates
+    if isinstance(created_at, str):
+        try:
+            inv_date = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        except Exception:
+            inv_date = datetime.now(timezone.utc)
+    else:
+        inv_date = created_at
+    if isinstance(period_end, str) and period_end:
+        try:
+            end_date = datetime.fromisoformat(period_end.replace("Z", "+00:00"))
+        except Exception:
+            end_date = inv_date.replace(year=inv_date.year + 1)
+    else:
+        end_date = inv_date.replace(year=inv_date.year + 1)
 
-    tier_label = {"premium": "Premium", "vip": "VIP Elite"}.get(plan_id, plan_id.title())
-
-    # Generate PDF
-    buf = io.BytesIO()
+    buf = _io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=letter, rightMargin=0.75*inch, leftMargin=0.75*inch, topMargin=0.5*inch, bottomMargin=0.5*inch)
 
     BLUE = rl_colors.HexColor("#2563eb")
@@ -8020,18 +8034,17 @@ async def _generate_subscription_invoice(db, user: dict, plan_id: str, price_amo
 
     # Header with logo
     logo_path = Path(__file__).parent / "assets" / "bidvex_logo.png"
-    header_left_content = []
     if logo_path.exists():
         try:
             logo = RLImage(str(logo_path), width=1.6*inch, height=0.5*inch, kind='proportional')
-            header_left_content.append(logo)
+            header_left = logo
         except Exception:
-            header_left_content.append(Paragraph("<b>BidVex Inc.</b>", ParagraphStyle('h', fontSize=14, textColor=DARK)))
+            header_left = Paragraph("<b>BidVex Inc.</b>", ParagraphStyle('h', fontSize=14, textColor=DARK))
     else:
-        header_left_content.append(Paragraph("<b>BidVex Inc.</b>", ParagraphStyle('h', fontSize=14, textColor=DARK)))
+        header_left = Paragraph("<b>BidVex Inc.</b>", ParagraphStyle('h', fontSize=14, textColor=DARK))
 
     header = Table([
-        [header_left_content[0],
+        [header_left,
          Paragraph("<b>INVOICE</b>", ParagraphStyle('t', fontSize=24, textColor=BLUE, fontName='Helvetica-Bold', alignment=TA_RIGHT))],
         [Paragraph("103-761 Chalifoux Street, Sherbrooke, QC, J1G 0A8<br/>billing@bidvex.com | www.bidvex.com", ParagraphStyle('s', fontSize=8, textColor=rl_colors.gray, leading=11)), ""]
     ], colWidths=[4*inch, 3*inch])
@@ -8041,8 +8054,8 @@ async def _generate_subscription_invoice(db, user: dict, plan_id: str, price_amo
 
     # Invoice meta
     meta = Table([
-        ["Invoice #:", invoice_number, "Date:", now.strftime("%B %d, %Y")],
-        ["Status:", "PAID", "Period:", f"{now.strftime('%b %d, %Y')} - {now.replace(year=now.year+1).strftime('%b %d, %Y')}"],
+        ["Invoice #:", invoice_number, "Date:", inv_date.strftime("%B %d, %Y")],
+        ["Status:", "PAID", "Period:", f"{inv_date.strftime('%b %d, %Y')} - {end_date.strftime('%b %d, %Y')}"],
     ], colWidths=[1*inch, 2.5*inch, 0.8*inch, 2.7*inch])
     meta.setStyle(TableStyle([
         ('FONTSIZE', (0,0), (-1,-1), 9),
@@ -8056,7 +8069,7 @@ async def _generate_subscription_invoice(db, user: dict, plan_id: str, price_amo
 
     # Bill To
     elements.append(Paragraph("<b>Bill To:</b>", ParagraphStyle('bt', fontSize=10, textColor=DARK, fontName='Helvetica-Bold')))
-    elements.append(Paragraph(f"{user.get('name', user.get('username', 'Customer'))}<br/>{user.get('email', '')}", ParagraphStyle('bd', fontSize=9, textColor=DARK, leading=13)))
+    elements.append(Paragraph(f"{user_name}<br/>{user_email}", ParagraphStyle('bd', fontSize=9, textColor=DARK, leading=13)))
     elements.append(Spacer(1, 0.3*inch))
 
     # Line items
@@ -8112,12 +8125,32 @@ async def _generate_subscription_invoice(db, user: dict, plan_id: str, price_amo
     doc.build(elements)
     pdf_bytes = buf.getvalue()
     buf.close()
+    return pdf_bytes
 
-    # Store in MongoDB
+
+async def _generate_subscription_invoice(db, user: dict, plan_id: str, price_amount: float, subscription_id: str, processing_fee: float = 0) -> str:
+    """Generate a subscription invoice record and store it in MongoDB. Returns the invoice_id."""
+    invoice_id = str(uuid.uuid4())
+    invoice_number = f"BV-SUB-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{invoice_id[:6].upper()}"
+    now = datetime.now(timezone.utc)
+
+    # Tax & fee calculation (Quebec: GST 5% + QST 9.975%)
+    subtotal = price_amount
+    gst_rate = 0.05
+    qst_rate = 0.09975
+    gst = round(subtotal * gst_rate, 2)
+    qst = round(subtotal * qst_rate, 2)
+    stripe_fee = round(processing_fee, 2)
+    total = round(subtotal + gst + qst + stripe_fee, 2)
+
+    tier_label = {"premium": "Premium", "vip": "VIP Elite"}.get(plan_id, plan_id.title())
+
+    # Store in MongoDB (no pdf_data - PDF is rendered dynamically on download)
     invoice_doc = {
         "id": invoice_id,
         "invoice_number": invoice_number,
         "user_id": user.get("id"),
+        "user_name": user.get("name", user.get("username", "Customer")),
         "user_email": user.get("email"),
         "type": "subscription",
         "plan_id": plan_id,
@@ -8130,7 +8163,6 @@ async def _generate_subscription_invoice(db, user: dict, plan_id: str, price_amo
         "total": total,
         "currency": "CAD",
         "status": "paid",
-        "pdf_data": pdf_bytes,
         "created_at": now.isoformat(),
         "period_start": now.isoformat(),
         "period_end": now.replace(year=now.year + 1).isoformat(),
@@ -8153,18 +8185,23 @@ async def list_invoices(current_user: User = Depends(get_current_user)):
 
 @api_router.get("/invoices/{invoice_id}/download")
 async def download_invoice(invoice_id: str, current_user: User = Depends(get_current_user)):
-    """Download a PDF invoice."""
+    """Download a PDF invoice — always regenerated from stored data using the latest template."""
     from fastapi.responses import Response
 
     invoice = await db.subscription_invoices.find_one(
-        {"id": invoice_id, "user_id": current_user.id}
+        {"id": invoice_id, "user_id": current_user.id},
+        {"_id": 0}
     )
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
-    pdf_data = invoice.get("pdf_data")
-    if not pdf_data:
-        raise HTTPException(status_code=404, detail="PDF not available")
+    # If user_name is missing from old records, look it up
+    if not invoice.get("user_name"):
+        user = await db.users.find_one({"id": current_user.id})
+        invoice["user_name"] = user.get("name", user.get("username", "Customer")) if user else "Customer"
+
+    # Render PDF dynamically (always uses latest template with logo, address, tax numbers)
+    pdf_data = _render_subscription_invoice_pdf(invoice)
 
     filename = f"{invoice.get('invoice_number', 'invoice')}.pdf"
     return Response(
