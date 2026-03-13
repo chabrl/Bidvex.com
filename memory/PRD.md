@@ -32,19 +32,24 @@ i18n: react-i18next (EN/FR bilingual support)
 PDF Generation: ReportLab (bilingual invoices)
 ```
 
-## Current Status: ✅ BILLING FINALIZATION & UI VERIFIED
+## Current Status: ✅ BILLING FINALIZATION & INVOICE FIX VERIFIED
 
 ### Session Summary (Mar 13, 2026 — Latest)
 
-**Billing Finalization & UI Overhaul Verification:**
-- `GET /api/subscriptions/price-breakdown` — Returns subtotal + GST + QST + Stripe processing fee + total
-- Stripe fee-on-top: 2.9% + $0.30 calculated server-side, charged on top of taxes
-- Branded PDF invoices: BidVex logo, address (103-761 Chalifoux St, Sherbrooke, QC), tax numbers (GST/HSN #706766367RT0001, QST #1233530880TQ0001)
+**Bug Fix: PDF Invoice Download (User-Reported)**
+- Root cause: PDFs were pre-generated at subscription time and stored as binary in MongoDB. Redeploying code didn't update existing invoices.
+- Fix: Refactored to dynamically render PDF on every download using `_render_subscription_invoice_pdf()`. No more stored binary.
+- Logo optimized from 1.4MB to 39KB (resized to 400px wide)
+- Vehicle invoice template (pdf_invoice.py) also updated with correct branding
+- All invoices now always show latest template with correct logo, address, and tax numbers
+
+**Billing Finalization & UI Overhaul:**
+- `GET /api/subscriptions/price-breakdown` — Premium: $180 + $9 GST + $17.96 QST + $6.49 fee = $213.45
+- Branded PDF invoices: BidVex logo, address (103-761 Chalifoux St), tax numbers (GST/HSN #706766367RT0001, QST #1233530880TQ0001)
 - Settings page glassmorphism UI overhaul with responsive tabs
 - Price breakdown toggle on Premium/VIP subscription cards
 - Badge overlap fix (BEST VALUE / CURRENT PLAN mutually exclusive)
-- Vehicle invoice template (pdf_invoice.py) updated with official branding
-- Testing: 100% (iteration_40) — 9/9 backend, all frontend verified
+- Testing: 100% (iteration_41) — 7/7 backend, all frontend verified
 
 ---
 
