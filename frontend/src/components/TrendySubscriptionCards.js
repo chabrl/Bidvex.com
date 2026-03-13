@@ -19,6 +19,8 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
   const [hoveredCard, setHoveredCard] = useState(null);
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [breakdowns, setBreakdowns] = useState({});
+  const [expandedBreakdown, setExpandedBreakdown] = useState(null);
 
   useEffect(() => {
     fetchPlans();
@@ -29,6 +31,15 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
       const response = await axios.get(`${API}/subscription-plans`);
       if (response.data.success) {
         setPlans(response.data.plans || []);
+        // Fetch price breakdowns for paid plans
+        const bdMap = {};
+        for (const planId of ['premium', 'vip']) {
+          try {
+            const bd = await axios.get(`${API}/subscriptions/price-breakdown?plan_id=${planId}`);
+            bdMap[planId] = bd.data;
+          } catch { /* skip */ }
+        }
+        setBreakdowns(bdMap);
       }
     } catch (error) {
       console.error('Error fetching plans:', error);
@@ -192,7 +203,7 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
               data-testid={`subscription-card-${tier.id}`}
             >
               {/* Badge */}
-              {tier.badge && (
+              {tier.badge && !isCurrentTier && (
                 <div className={`absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full text-xs font-bold tracking-wide shadow-lg ${tier.badgeClass}`}>
                   {tier.badge}
                 </div>
@@ -200,8 +211,8 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
 
               {/* Current Plan Indicator */}
               {isCurrentTier && (
-                <div className="absolute -top-3 right-4 px-3 py-1 bg-green-500 text-white text-xs font-semibold rounded-full shadow-md">
-                  CURRENT
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-green-500 text-white text-xs font-semibold rounded-full shadow-md">
+                  CURRENT PLAN
                 </div>
               )}
 
@@ -250,6 +261,51 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
                   <span className="inline-block mt-2 px-3 py-1 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400 text-xs font-semibold rounded-full">
                     2 Months Free!
                   </span>
+                )}
+
+                {/* Price Breakdown Toggle */}
+                {tier.id !== 'free' && breakdowns[tier.id] && (
+                  <div className="mt-3">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setExpandedBreakdown(expandedBreakdown === tier.id ? null : tier.id); }}
+                      className={`text-xs font-medium underline underline-offset-2 transition-colors ${
+                        tier.darkTheme ? 'text-amber-400/80 hover:text-amber-300' : 'text-blue-600 dark:text-blue-400 hover:text-blue-700'
+                      }`}
+                      data-testid={`price-breakdown-toggle-${tier.id}`}
+                    >
+                      {expandedBreakdown === tier.id ? 'Hide' : 'View'} price breakdown
+                    </button>
+                    {expandedBreakdown === tier.id && (
+                      <div className={`mt-2 mx-auto max-w-[240px] text-left rounded-lg p-3 text-xs space-y-1.5 ${
+                        tier.darkTheme 
+                          ? 'bg-white/10 text-slate-300 border border-white/10' 
+                          : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+                      }`} data-testid={`price-breakdown-${tier.id}`}>
+                        <div className="flex justify-between">
+                          <span>Subtotal</span>
+                          <span className="font-medium">${formatPrice(breakdowns[tier.id].subtotal)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>GST (5%)</span>
+                          <span className="font-medium">${formatPrice(breakdowns[tier.id].gst)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>QST (9.975%)</span>
+                          <span className="font-medium">${formatPrice(breakdowns[tier.id].qst)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Processing fee</span>
+                          <span className="font-medium">${formatPrice(breakdowns[tier.id].processing_fee)}</span>
+                        </div>
+                        <div className={`flex justify-between pt-1.5 border-t font-semibold ${
+                          tier.darkTheme ? 'border-white/20 text-white' : 'border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white'
+                        }`}>
+                          <span>Total</span>
+                          <span>${formatPrice(breakdowns[tier.id].total)} CAD</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -309,8 +365,8 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
               {/* Terms of Sale */}
               {!isCurrentTier && tier.id !== 'free' && (
                 <div className="mt-3 space-y-2">
-                  <p className="text-[11px] leading-relaxed text-slate-400 dark:text-slate-500 text-center">
-                    Total includes GST (5%), QST (9.975%), and a processing fee (2.9% + $0.30). By purchasing, you agree that all payments are final and non-refundable. If you cancel, access continues until the end of your billing cycle.
+                  <p className={`text-[11px] leading-relaxed text-center ${tier.darkTheme ? 'text-slate-500' : 'text-slate-400 dark:text-slate-500'}`}>
+                    By purchasing, you agree that all payments are final and non-refundable. If you cancel, access continues until the end of your billing cycle.
                   </p>
                 </div>
               )}

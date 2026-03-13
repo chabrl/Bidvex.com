@@ -22,9 +22,9 @@ logger = logging.getLogger(__name__)
 
 # Platform info
 PLATFORM_NAME = os.environ.get("PLATFORM_LEGAL_NAME", "BidVex Inc.")
-PLATFORM_ADDRESS = "123 Auction Street, Toronto, ON M5V 1A1"
-PLATFORM_GST = os.environ.get("PLATFORM_GST_NUMBER", "123456789RT0001")
-PLATFORM_QST = os.environ.get("PLATFORM_QST_NUMBER", "1234567890TQ0001")
+PLATFORM_ADDRESS = "103-761 Chalifoux Street, Sherbrooke, QC, J1G 0A8"
+PLATFORM_GST = os.environ.get("PLATFORM_GST_NUMBER", "706766367RT0001")
+PLATFORM_QST = os.environ.get("PLATFORM_QST_NUMBER", "1233530880TQ0001")
 PLATFORM_PHONE = "1-800-BIDVEX"
 PLATFORM_EMAIL = "billing@bidvex.com"
 PLATFORM_WEBSITE = "www.bidvex.com"
