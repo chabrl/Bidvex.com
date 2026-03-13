@@ -1,6 +1,6 @@
 # BidVex Auction Platform - Product Requirements Document
 
-## Last Updated: March 12, 2026
+## Last Updated: March 13, 2026
 
 ## Original Problem Statement
 Build and maintain a sophisticated full-stack auction platform (BidVex) with:
@@ -32,9 +32,23 @@ i18n: react-i18next (EN/FR bilingual support)
 PDF Generation: ReportLab (bilingual invoices)
 ```
 
-## Current Status: ✅ FULL SUBSCRIPTION LIFECYCLE COMPLETE
+## Current Status: ✅ BILLING FINALIZATION & UI VERIFIED
 
-### Session Summary (Mar 12, 2026 — Latest)
+### Session Summary (Mar 13, 2026 — Latest)
+
+**Billing Finalization & UI Overhaul Verification:**
+- `GET /api/subscriptions/price-breakdown` — Returns subtotal + GST + QST + Stripe processing fee + total
+- Stripe fee-on-top: 2.9% + $0.30 calculated server-side, charged on top of taxes
+- Branded PDF invoices: BidVex logo, address (103-761 Chalifoux St, Sherbrooke, QC), tax numbers (GST/HSN #706766367RT0001, QST #1233530880TQ0001)
+- Settings page glassmorphism UI overhaul with responsive tabs
+- Price breakdown toggle on Premium/VIP subscription cards
+- Badge overlap fix (BEST VALUE / CURRENT PLAN mutually exclusive)
+- Vehicle invoice template (pdf_invoice.py) updated with official branding
+- Testing: 100% (iteration_40) — 9/9 backend, all frontend verified
+
+---
+
+### Session Summary (Mar 12, 2026)
 
 **Subscription Lifecycle + Invoices:**
 - `POST /api/subscriptions/create` — Direct subscription or upgrade with proration
