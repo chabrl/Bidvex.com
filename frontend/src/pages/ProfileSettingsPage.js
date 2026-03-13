@@ -102,75 +102,78 @@ const ProfileSettingsPage = () => {
   };
 
   return (
-    <div className="min-h-screen py-8 px-4 bg-slate-50 dark:bg-slate-900" data-testid="profile-settings-page">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6" style={{ color: '#1a1a1a' }}>
+    <div className="min-h-screen py-6 sm:py-8 px-3 sm:px-4 bg-gradient-to-br from-slate-50 via-white to-blue-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-blue-950/20" data-testid="profile-settings-page">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
           {t('profile.accountSettings')}
         </h1>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          {/* Professional Tab Navigation - Flat Design */}
-          <TabsList className="flex w-full bg-transparent border-b-2 border-slate-200 dark:border-slate-700">
+          {/* Responsive Tab Navigation */}
+          <TabsList className="flex w-full overflow-x-auto scrollbar-none bg-white/60 dark:bg-slate-800/60 backdrop-blur-xl border border-slate-200/80 dark:border-slate-700/60 rounded-2xl p-1.5 shadow-sm gap-1 no-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
             <TabsTrigger 
               value="profile" 
               data-testid="profile-tab"
-              className="bg-transparent"
+              className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium data-[state=active]:bg-white data-[state=active]:dark:bg-slate-700 data-[state=active]:shadow-sm data-[state=active]:text-blue-600 data-[state=active]:dark:text-blue-400 text-slate-500 dark:text-slate-400 transition-all"
             >
-              <User className="h-[18px] w-[18px]" />
-              {t('profile.profileTab')}
+              <User className="h-4 w-4" />
+              <span className="hidden sm:inline">{t('profile.profileTab')}</span>
+              <span className="sm:hidden">Profile</span>
             </TabsTrigger>
             <TabsTrigger 
               value="payment" 
               data-testid="payment-tab"
-              className="bg-transparent"
+              className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium data-[state=active]:bg-white data-[state=active]:dark:bg-slate-700 data-[state=active]:shadow-sm data-[state=active]:text-blue-600 data-[state=active]:dark:text-blue-400 text-slate-500 dark:text-slate-400 transition-all"
             >
-              <CreditCard className="h-[18px] w-[18px]" />
-              {t('profile.paymentTab')}
+              <Shield className="h-4 w-4" />
+              <span className="hidden sm:inline">{t('profile.paymentTab')}</span>
+              <span className="sm:hidden">Payment</span>
               {!user?.has_payment_method && (
-                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" title="Action required"></span>
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" title="Action required"></span>
               )}
             </TabsTrigger>
             <TabsTrigger 
               value="subscription" 
               data-testid="subscription-tab"
-              className="bg-transparent"
+              className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium data-[state=active]:bg-white data-[state=active]:dark:bg-slate-700 data-[state=active]:shadow-sm data-[state=active]:text-blue-600 data-[state=active]:dark:text-blue-400 text-slate-500 dark:text-slate-400 transition-all"
             >
-              <Crown className="h-[18px] w-[18px]" />
-              {t('profile.subscription')}
+              <Crown className="h-4 w-4" />
+              <span className="hidden sm:inline">{t('profile.subscription')}</span>
+              <span className="sm:hidden">Plans</span>
             </TabsTrigger>
             <TabsTrigger 
               value="notifications" 
               data-testid="notifications-tab"
-              className="bg-transparent"
+              className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium data-[state=active]:bg-white data-[state=active]:dark:bg-slate-700 data-[state=active]:shadow-sm data-[state=active]:text-blue-600 data-[state=active]:dark:text-blue-400 text-slate-500 dark:text-slate-400 transition-all"
             >
-              <Bell className="h-[18px] w-[18px]" />
-              {t('profile.notificationsTab')}
+              <Bell className="h-4 w-4" />
+              <span className="hidden sm:inline">{t('profile.notificationsTab')}</span>
+              <span className="sm:hidden">Alerts</span>
             </TabsTrigger>
           </TabsList>
 
-          {/* Trust Status Card */}
-          <Card className="bg-gradient-to-r from-slate-50 to-cyan-50 dark:from-slate-900 dark:to-cyan-900/20 border-slate-200 dark:border-slate-700">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-[#1E3A8A] to-[#06B6D4] flex items-center justify-center">
-                    <Shield className="h-5 w-5 text-white" />
-                  </div>
-                  <div>
-                    <p className="font-medium" style={{ color: '#1a1a1a' }}>
-                      {t('profile.trustStatus') || 'Trust Status'}
-                    </p>
-                    <p className="text-sm" style={{ color: '#64748b' }}>
-                      {t('profile.completeVerification') || 'Complete verification to bid and sell'}
-                    </p>
-                  </div>
+          {/* Trust Status Card — Glass Style */}
+          <div className="rounded-2xl bg-white/70 dark:bg-slate-800/50 backdrop-blur-xl border border-slate-200/80 dark:border-slate-700/60 shadow-sm p-4 sm:p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                  <Shield className="h-5 w-5 text-white" />
                 </div>
-                <TrustBadge 
-                  phoneVerified={user?.phone_verified} 
-                  hasPaymentMethod={user?.has_payment_method}
-                  size="default"
-                />
+                <div>
+                  <p className="font-semibold text-sm text-slate-900 dark:text-white">
+                    {t('profile.trustStatus') || 'Trust Status'}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {t('profile.completeVerification') || 'Complete verification to bid and sell'}
+                  </p>
+                </div>
               </div>
+              <TrustBadge 
+                phoneVerified={user?.phone_verified} 
+                hasPaymentMethod={user?.has_payment_method}
+                size="default"
+              />
+            </div>
               
               {/* Action prompts for incomplete verification */}
               {(!user?.phone_verified || !user?.has_payment_method) && (
@@ -199,11 +202,10 @@ const ProfileSettingsPage = () => {
                   )}
                 </div>
               )}
-            </CardContent>
-          </Card>
+          </div>
 
           <TabsContent value="profile">
-            <Card className="glassmorphism">
+            <div className="rounded-2xl bg-white/70 dark:bg-slate-800/50 backdrop-blur-xl border border-slate-200/80 dark:border-slate-700/60 shadow-sm">
               <CardHeader>
                 <CardTitle>{t('profile.personalInformation')}</CardTitle>
                 <CardDescription>{t('profile.updateDetails')}</CardDescription>
@@ -341,13 +343,13 @@ const ProfileSettingsPage = () => {
                   </Button>
                 </form>
               </CardContent>
-            </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="payment">
-            <Card className="glassmorphism">
+            <div className="rounded-2xl bg-white/70 dark:bg-slate-800/50 backdrop-blur-xl border border-slate-200/80 dark:border-slate-700/60 shadow-sm">
               <CardHeader>
-                <CardTitle>Payment Methods</CardTitle>
+                <CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5 text-blue-500" />Payment Methods</CardTitle>
                 <CardDescription>Manage your payment methods for bidding</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -413,13 +415,13 @@ const ProfileSettingsPage = () => {
                   </Card>
                 )}
               </CardContent>
-            </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="notifications">
-            <Card className="glassmorphism">
+            <div className="rounded-2xl bg-white/70 dark:bg-slate-800/50 backdrop-blur-xl border border-slate-200/80 dark:border-slate-700/60 shadow-sm">
               <CardHeader>
-                <CardTitle className="text-slate-900 dark:text-white">Notification Preferences</CardTitle>
+                <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-white"><Bell className="h-5 w-5 text-blue-500" />Notification Preferences</CardTitle>
                 <CardDescription className="text-slate-600 dark:text-slate-400">Choose how you want to be notified</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -454,12 +456,12 @@ const ProfileSettingsPage = () => {
                   </div>
                 </div>
               </CardContent>
-            </Card>
+            </div>
           </TabsContent>
 
           {/* Subscription Tab */}
           <TabsContent value="subscription">
-            <Card className="glassmorphism">
+            <div className="rounded-2xl bg-white/70 dark:bg-slate-800/50 backdrop-blur-xl border border-slate-200/80 dark:border-slate-700/60 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Crown className="h-5 w-5 text-yellow-500" />
@@ -510,7 +512,7 @@ const ProfileSettingsPage = () => {
                 {/* Personalized Savings Calculator */}
                 <PersonalizedSavingsCalculator currentTier={user?.subscription_tier || 'free'} />
               </CardContent>
-            </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </div>

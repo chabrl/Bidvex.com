@@ -35,7 +35,7 @@ Password: Admin123!
 ## Testing
 
 You can now log in to BidVex using the new admin credentials:
-- Live URL: https://payment-platform-qa.preview.emergentagent.com
+- Live URL: https://payment-checkout-10.preview.emergentagent.com
 - Navigate to login page
 - Use the new credentials above
 

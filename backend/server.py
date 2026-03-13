@@ -7659,6 +7659,42 @@ PRICE_TO_TIER = {
     "price_1T5V2bBd6Wtvh7hsqLLmAZSH": "vip",
 }
 
+
+def _calculate_stripe_fee(amount_after_tax: float) -> float:
+    """Calculate Stripe processing fee (2.9% + $0.30 CAD) using fee-on-top formula."""
+    # To charge user the fee: total = (amount + 0.30) / (1 - 0.029)
+    # Fee = total - amount
+    total_with_fee = round((amount_after_tax + 0.30) / (1 - 0.029), 2)
+    return round(total_with_fee - amount_after_tax, 2)
+
+
+@api_router.get("/subscriptions/price-breakdown")
+async def get_price_breakdown(plan_id: str):
+    """Get full price breakdown including taxes and processing fee for a plan."""
+    pricing_service = get_pricing_service(db)
+    plan = await pricing_service.get_plan(plan_id)
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+
+    subtotal = plan.get("price_yearly", 0)
+    gst = round(subtotal * 0.05, 2)
+    qst = round(subtotal * 0.09975, 2)
+    amount_after_tax = round(subtotal + gst + qst, 2)
+    processing_fee = _calculate_stripe_fee(amount_after_tax) if subtotal > 0 else 0
+    total = round(amount_after_tax + processing_fee, 2)
+
+    return {
+        "plan_id": plan_id,
+        "plan_name": plan.get("name", plan_id.title()),
+        "subtotal": subtotal,
+        "gst": gst,
+        "qst": qst,
+        "processing_fee": processing_fee,
+        "total": total,
+        "currency": "CAD"
+    }
+
+
 @api_router.post("/subscriptions/create")
 async def create_subscription(
     data: Dict[str, Any],
@@ -7745,8 +7781,9 @@ async def create_subscription(
 
                     # Generate invoice for the upgrade
                     price_amount = plan.get("price_yearly", 0)
+                    fee = _calculate_stripe_fee(round(price_amount + price_amount * 0.05 + price_amount * 0.09975, 2)) if price_amount > 0 else 0
                     try:
-                        await _generate_subscription_invoice(db, user, plan_id, price_amount, updated_sub.id)
+                        await _generate_subscription_invoice(db, user, plan_id, price_amount, updated_sub.id, fee)
                     except Exception as inv_err:
                         logger.error(f"Invoice generation failed for upgrade: {inv_err}")
 
@@ -7813,8 +7850,9 @@ async def create_subscription(
 
         # Generate invoice
         price_amount = plan.get("price_yearly", 0)
+        fee = _calculate_stripe_fee(round(price_amount + price_amount * 0.05 + price_amount * 0.09975, 2)) if price_amount > 0 else 0
         try:
-            await _generate_subscription_invoice(db, user, plan_id, price_amount, subscription.id)
+            await _generate_subscription_invoice(db, user, plan_id, price_amount, subscription.id, fee)
         except Exception as inv_err:
             logger.error(f"Invoice generation failed: {inv_err}")
 
@@ -7946,46 +7984,56 @@ async def get_subscription_status(current_user: User = Depends(get_current_user)
 
 # ========== SUBSCRIPTION INVOICES ==========
 
-async def _generate_subscription_invoice(db, user: dict, plan_id: str, price_amount: float, subscription_id: str) -> str:
+async def _generate_subscription_invoice(db, user: dict, plan_id: str, price_amount: float, subscription_id: str, processing_fee: float = 0) -> str:
     """Generate a subscription invoice PDF and store it in MongoDB. Returns the invoice_id."""
     from reportlab.lib import colors as rl_colors
     from reportlab.lib.pagesizes import letter
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import inch
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage
     from reportlab.lib.enums import TA_RIGHT
 
     invoice_id = str(uuid.uuid4())
     invoice_number = f"BV-SUB-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{invoice_id[:6].upper()}"
     now = datetime.now(timezone.utc)
 
-    # Tax calculation (Quebec: GST 5% + QST 9.975%)
+    # Tax & fee calculation (Quebec: GST 5% + QST 9.975%)
     subtotal = price_amount
     gst_rate = 0.05
     qst_rate = 0.09975
     gst = round(subtotal * gst_rate, 2)
     qst = round(subtotal * qst_rate, 2)
-    total = round(subtotal + gst + qst, 2)
+    stripe_fee = round(processing_fee, 2)
+    total = round(subtotal + gst + qst + stripe_fee, 2)
 
     tier_label = {"premium": "Premium", "vip": "VIP Elite"}.get(plan_id, plan_id.title())
 
     # Generate PDF
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=letter, rightMargin=0.75*inch, leftMargin=0.75*inch, topMargin=0.5*inch, bottomMargin=0.5*inch)
-    styles = getSampleStyleSheet()
 
     BLUE = rl_colors.HexColor("#2563eb")
     DARK = rl_colors.HexColor("#1e293b")
     GREEN = rl_colors.HexColor("#10b981")
-    LIGHT = rl_colors.HexColor("#f1f5f9")
 
     elements = []
 
-    # Header
+    # Header with logo
+    logo_path = Path(__file__).parent / "assets" / "bidvex_logo.png"
+    header_left_content = []
+    if logo_path.exists():
+        try:
+            logo = RLImage(str(logo_path), width=1.6*inch, height=0.5*inch, kind='proportional')
+            header_left_content.append(logo)
+        except Exception:
+            header_left_content.append(Paragraph("<b>BidVex Inc.</b>", ParagraphStyle('h', fontSize=14, textColor=DARK)))
+    else:
+        header_left_content.append(Paragraph("<b>BidVex Inc.</b>", ParagraphStyle('h', fontSize=14, textColor=DARK)))
+
     header = Table([
-        [Paragraph("<b>BidVex Inc.</b>", ParagraphStyle('h', fontSize=14, textColor=DARK)),
+        [header_left_content[0],
          Paragraph("<b>INVOICE</b>", ParagraphStyle('t', fontSize=24, textColor=BLUE, fontName='Helvetica-Bold', alignment=TA_RIGHT))],
-        [Paragraph("123 Auction Street, Montreal, QC<br/>billing@bidvex.com | www.bidvex.com", ParagraphStyle('s', fontSize=8, textColor=rl_colors.gray, leading=11)), ""]
+        [Paragraph("103-761 Chalifoux Street, Sherbrooke, QC, J1G 0A8<br/>billing@bidvex.com | www.bidvex.com", ParagraphStyle('s', fontSize=8, textColor=rl_colors.gray, leading=11)), ""]
     ], colWidths=[4*inch, 3*inch])
     header.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'TOP'), ('ALIGN', (1,0), (1,-1), 'RIGHT')]))
     elements.append(header)
@@ -8014,8 +8062,11 @@ async def _generate_subscription_invoice(db, user: dict, plan_id: str, price_amo
     # Line items
     items = [
         ["Description", "Qty", "Unit Price", "Amount"],
-        [f"{tier_label} Plan — Yearly Subscription", "1", f"${subtotal:,.2f}", f"${subtotal:,.2f}"],
+        [f"{tier_label} Plan \u2014 Yearly Subscription", "1", f"${subtotal:,.2f}", f"${subtotal:,.2f}"],
     ]
+    if stripe_fee > 0:
+        items.append(["Processing Fee (Stripe)", "1", f"${stripe_fee:,.2f}", f"${stripe_fee:,.2f}"])
+
     items_table = Table(items, colWidths=[3.5*inch, 0.8*inch, 1.35*inch, 1.35*inch])
     items_table.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), BLUE),
@@ -8035,8 +8086,11 @@ async def _generate_subscription_invoice(db, user: dict, plan_id: str, price_amo
         ["", "Subtotal:", f"${subtotal:,.2f}"],
         ["", "GST (5%):", f"${gst:,.2f}"],
         ["", "QST (9.975%):", f"${qst:,.2f}"],
-        ["", "TOTAL CAD:", f"${total:,.2f}"],
     ]
+    if stripe_fee > 0:
+        totals.append(["", "Processing Fee:", f"${stripe_fee:,.2f}"])
+    totals.append(["", "TOTAL CAD:", f"${total:,.2f}"])
+
     totals_table = Table(totals, colWidths=[3.5*inch, 1.75*inch, 1.75*inch])
     totals_table.setStyle(TableStyle([
         ('FONTSIZE', (0,0), (-1,-1), 9),
@@ -8051,8 +8105,8 @@ async def _generate_subscription_invoice(db, user: dict, plan_id: str, price_amo
     elements.append(totals_table)
     elements.append(Spacer(1, 0.4*inch))
 
-    # Tax registration
-    elements.append(Paragraph("GST/HSN #: 123456789RT0001 | QST #: 1234567890TQ0001", ParagraphStyle('tax', fontSize=8, textColor=rl_colors.gray)))
+    # Tax registration - OFFICIAL numbers
+    elements.append(Paragraph("GST/HSN #: 706766367RT0001 | QST #: 1233530880TQ0001", ParagraphStyle('tax', fontSize=8, textColor=rl_colors.gray)))
     elements.append(Paragraph("All amounts in Canadian Dollars (CAD). Thank you for your business.", ParagraphStyle('thx', fontSize=8, textColor=rl_colors.gray, spaceBefore=4)))
 
     doc.build(elements)
@@ -8072,6 +8126,7 @@ async def _generate_subscription_invoice(db, user: dict, plan_id: str, price_amo
         "subtotal": subtotal,
         "gst": gst,
         "qst": qst,
+        "processing_fee": stripe_fee,
         "total": total,
         "currency": "CAD",
         "status": "paid",

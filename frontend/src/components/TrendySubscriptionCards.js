@@ -308,9 +308,11 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
 
               {/* Terms of Sale */}
               {!isCurrentTier && tier.id !== 'free' && (
-                <p className="mt-3 text-[11px] leading-relaxed text-slate-400 dark:text-slate-500 text-center">
-                  By purchasing, you agree that all payments are final and non-refundable. If you cancel, access continues until the end of your billing cycle.
-                </p>
+                <div className="mt-3 space-y-2">
+                  <p className="text-[11px] leading-relaxed text-slate-400 dark:text-slate-500 text-center">
+                    Total includes GST (5%), QST (9.975%), and a processing fee (2.9% + $0.30). By purchasing, you agree that all payments are final and non-refundable. If you cancel, access continues until the end of your billing cycle.
+                  </p>
+                </div>
               )}
             </div>
           );

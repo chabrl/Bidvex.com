@@ -11,7 +11,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = "https://payment-platform-qa.preview.emergentagent.com/api"
+BASE_URL = "https://payment-checkout-10.preview.emergentagent.com/api"
 ADMIN_EMAIL = "admin@bazario.com"
 ADMIN_PASSWORD = "Admin123!"
 
@@ -314,7 +314,7 @@ class BidVexAnniversaryTester:
                         print(f"   - Content preview: {content[:100]}...")
                 elif response.status == 404:
                     # Try alternative path
-                    async with self.session.get("https://payment-platform-qa.preview.emergentagent.com/public/sw.js") as alt_response:
+                    async with self.session.get("https://payment-checkout-10.preview.emergentagent.com/public/sw.js") as alt_response:
                         if alt_response.status == 200:
                             content = await alt_response.text()
                             print(f"✅ Service worker script found at alternative path")

@@ -7,7 +7,7 @@ import pytest
 import requests
 import os
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://payment-platform-qa.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://payment-checkout-10.preview.emergentagent.com').rstrip('/')
 
 # Admin credentials
 ADMIN_EMAIL = "charbeladmin@bidvex.com"

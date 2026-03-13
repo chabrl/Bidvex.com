@@ -11,7 +11,7 @@ import time
 from datetime import datetime, timezone, timedelta
 
 # Configuration
-BASE_URL = "https://payment-platform-qa.preview.emergentagent.com/api"
+BASE_URL = "https://payment-checkout-10.preview.emergentagent.com/api"
 ADMIN_EMAIL = "super.admin@admin.bazario.com"
 ADMIN_PASSWORD = "SuperAdmin123!"
 USER_EMAIL = "phase6.user@bazario.com"

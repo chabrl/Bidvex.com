@@ -8,7 +8,7 @@ import aiohttp
 import json
 import traceback
 
-BASE_URL = "https://payment-platform-qa.preview.emergentagent.com/api"
+BASE_URL = "https://payment-checkout-10.preview.emergentagent.com/api"
 ADMIN_EMAIL = "admin@bazario.com"
 ADMIN_PASSWORD = "Admin123!"
 
