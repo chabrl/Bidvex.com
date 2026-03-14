@@ -11986,7 +11986,75 @@ async def verify_partner(
         "timestamp": now,
     })
     
+    # Send Verification Success email (Task 6)
+    base_url = os.environ.get("REACT_APP_BACKEND_URL", "https://www.bidvex.com")
+    company = user_doc.get("partner_company_name", "Partner")
+    rate_info = f"{custom_rate*100:.1f}%" if custom_rate else "not yet set — you can configure it per listing"
+    _send_partner_email(
+        to_email=user_doc.get("email"),
+        subject="Welcome to the BidVex Partner Network!",
+        html_content=f"""
+        <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;color:#1e293b;">
+          <div style="background:#2563eb;padding:24px 28px;border-radius:12px 12px 0 0;">
+            <h1 style="color:#fff;margin:0;font-size:22px;">You're Verified!</h1>
+            <p style="color:#bfdbfe;margin:6px 0 0;font-size:14px;">{company} is now a BidVex Partner</p>
+          </div>
+          <div style="padding:28px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;">
+            <p>Congratulations! Your application has been reviewed and approved. Your account now has full partner privileges.</p>
+            
+            <h2 style="color:#2563eb;font-size:16px;margin:24px 0 8px;">What's Unlocked</h2>
+            <ul style="color:#475569;font-size:14px;line-height:1.8;">
+              <li><strong>Verified Auction Firm</strong> badge on all your listings</li>
+              <li><strong>3% platform fee</strong> — the lowest in the industry</li>
+              <li>Direct Stripe Connect payouts to your bank</li>
+              <li>Custom buyer premium rates per auction</li>
+            </ul>
+            
+            <h2 style="color:#2563eb;font-size:16px;margin:24px 0 8px;">Setting Your Premiums</h2>
+            <p style="font-size:14px;color:#475569;line-height:1.7;">
+              When creating a new listing, you'll see a <strong>"Buyer's Premium"</strong> field.
+              You can set any rate — 10%, 15%, 18%, or any custom percentage.
+              If you leave it empty, no buyer premium will be applied.
+              Your current default rate is: <strong>{rate_info}</strong>.
+            </p>
+            <p style="font-size:14px;color:#475569;line-height:1.7;">
+              The buyer premium is collected on top of the hammer price and transferred
+              directly to your connected Stripe account, along with the hammer price.
+              BidVex only retains the 3% platform fee.
+            </p>
+            
+            <div style="margin:24px 0;text-align:center;">
+              <a href="{base_url}/settings" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Go to Partner Dashboard</a>
+            </div>
+            
+            <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;" />
+            <p style="color:#94a3b8;font-size:12px;">
+              Questions? Contact us at <a href="mailto:partners@bidvex.ca" style="color:#2563eb;">partners@bidvex.ca</a>
+            </p>
+          </div>
+        </div>
+        """
+    )
+    
     return {"success": True, "message": f"Partner {user_doc.get('email')} verified successfully."}
+
+
+def _send_partner_email(to_email: str, subject: str, html_content: str):
+    """Send email via SendGrid if configured."""
+    try:
+        sendgrid_key = os.environ.get("SENDGRID_API_KEY", "")
+        if not sendgrid_key or sendgrid_key.startswith("SG.your"):
+            logger.info(f"SendGrid not configured — skipping email to {to_email}")
+            return
+        import sendgrid
+        from sendgrid.helpers.mail import Mail, Email, To, Content
+        sg = sendgrid.SendGridAPIClient(api_key=sendgrid_key)
+        from_email = Email(os.environ.get("SENDGRID_FROM_EMAIL", "noreply@bidvex.com"), "BidVex Partner Team")
+        mail = Mail(from_email=from_email, to_emails=To(to_email), subject=subject, html_content=Content("text/html", html_content))
+        sg.client.mail.send.post(request_body=mail.get())
+        logger.info(f"Email sent to {to_email}: {subject}")
+    except Exception as e:
+        logger.warning(f"Failed to send email to {to_email}: {e}")
 
 
 @api_router.post("/admin/partners/{user_id}/reject")
@@ -12020,6 +12088,38 @@ async def reject_partner(
         "details": {"reason": reason},
         "timestamp": now,
     })
+    
+    # Send Rejection email (Task 6)
+    user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "email": 1, "partner_company_name": 1})
+    if user_doc:
+        _send_partner_email(
+            to_email=user_doc.get("email"),
+            subject="BidVex Partner Application — Update",
+            html_content=f"""
+            <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;color:#1e293b;">
+              <div style="background:#475569;padding:24px 28px;border-radius:12px 12px 0 0;">
+                <h1 style="color:#fff;margin:0;font-size:22px;">Application Update</h1>
+              </div>
+              <div style="padding:28px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;">
+                <p>Dear {user_doc.get('partner_company_name', 'Applicant')},</p>
+                <p>Thank you for your interest in the BidVex Partner Network. After reviewing your submitted credentials, we are unable to approve your application at this time.</p>
+                
+                <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px;margin:16px 0;">
+                  <p style="margin:0;font-size:14px;color:#991b1b;"><strong>Reason:</strong> {reason}</p>
+                </div>
+                
+                <p style="font-size:14px;color:#475569;">If you believe this is an error or have additional documentation to submit, please reach out to our team directly.</p>
+                
+                <div style="margin:20px 0;text-align:center;">
+                  <a href="mailto:partners@bidvex.ca" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Contact partners@bidvex.ca</a>
+                </div>
+                
+                <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;" />
+                <p style="color:#94a3b8;font-size:12px;">This is an automated message from BidVex Inc.</p>
+              </div>
+            </div>
+            """
+        )
     
     return {"success": True, "message": "Partner application rejected."}
 
@@ -12095,6 +12195,292 @@ async def checkout_fee_breakdown(
         breakdown["fee_model"] = "standard"
     
     return breakdown
+
+
+# ========== ADMIN FINANCE & COMMAND CENTER (Task 4) ==========
+
+@api_router.get("/admin/finance/revenue-summary")
+async def admin_revenue_summary(current_user: User = Depends(get_current_user)):
+    """Admin: Revenue dashboard — collected fees, partner fees, standard commissions."""
+    if current_user.role not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Aggregate from transactions collection
+    pipeline = [
+        {"$match": {"status": {"$in": ["completed", "paid", "succeeded"]}}},
+        {"$group": {
+            "_id": None,
+            "total_hammer_volume": {"$sum": "$hammer_price"},
+            "total_platform_fees": {"$sum": "$platform_fee"},
+            "total_buyer_premiums": {"$sum": "$buyer_premium"},
+            "total_processing_fees": {"$sum": "$processing_fee"},
+            "total_transactions": {"$sum": 1},
+        }}
+    ]
+    results = await db.transactions.aggregate(pipeline).to_list(1)
+    agg = results[0] if results else {}
+    
+    # Partner-specific stats
+    partner_pipeline = [
+        {"$match": {"status": {"$in": ["completed", "paid", "succeeded"]}, "is_partner_transaction": True}},
+        {"$group": {
+            "_id": None,
+            "partner_hammer_volume": {"$sum": "$hammer_price"},
+            "partner_platform_fees": {"$sum": "$platform_fee"},
+            "partner_buyer_premiums": {"$sum": "$buyer_premium"},
+            "partner_transaction_count": {"$sum": 1},
+        }}
+    ]
+    partner_results = await db.transactions.aggregate(partner_pipeline).to_list(1)
+    partner_agg = partner_results[0] if partner_results else {}
+    
+    # User counts
+    total_users = await db.users.count_documents({})
+    active_partners = await db.users.count_documents({"is_partner": True, "partner_verification_status": "verified"})
+    pending_partners = await db.users.count_documents({"partner_verification_status": "pending"})
+    
+    # Active auction stats
+    active_auctions = await db.listings.count_documents({"status": "active"})
+    total_listings = await db.listings.count_documents({})
+    partner_listings = await db.listings.count_documents({"is_partner_listing": True, "status": "active"})
+    
+    # Subscription revenue
+    sub_invoices = await db.subscription_invoices.find(
+        {"status": "paid"}, {"_id": 0, "total": 1}
+    ).to_list(1000)
+    subscription_revenue = sum(inv.get("total", 0) for inv in sub_invoices)
+    
+    return {
+        "revenue": {
+            "total_hammer_volume": agg.get("total_hammer_volume", 0),
+            "total_platform_fees": agg.get("total_platform_fees", 0),
+            "total_buyer_premiums": agg.get("total_buyer_premiums", 0),
+            "total_processing_fees": agg.get("total_processing_fees", 0),
+            "total_transactions": agg.get("total_transactions", 0),
+            "subscription_revenue": subscription_revenue,
+        },
+        "partner_revenue": {
+            "hammer_volume": partner_agg.get("partner_hammer_volume", 0),
+            "platform_fees_collected": partner_agg.get("partner_platform_fees", 0),
+            "buyer_premiums": partner_agg.get("partner_buyer_premiums", 0),
+            "transaction_count": partner_agg.get("partner_transaction_count", 0),
+        },
+        "users": {
+            "total": total_users,
+            "active_partners": active_partners,
+            "pending_partners": pending_partners,
+        },
+        "auctions": {
+            "active": active_auctions,
+            "total": total_listings,
+            "partner_active": partner_listings,
+        }
+    }
+
+
+@api_router.get("/admin/finance/transactions")
+async def admin_transaction_logs(
+    page: int = 1,
+    limit: int = 25,
+    partner_only: bool = False,
+    search: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """Admin: Searchable transaction history with partner/BidVex fee split."""
+    if current_user.role not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    query = {}
+    if partner_only:
+        query["is_partner_transaction"] = True
+    if search:
+        query["$or"] = [
+            {"listing_title": {"$regex": search, "$options": "i"}},
+            {"buyer_email": {"$regex": search, "$options": "i"}},
+            {"seller_email": {"$regex": search, "$options": "i"}},
+            {"partner_company": {"$regex": search, "$options": "i"}},
+        ]
+    
+    skip = (page - 1) * limit
+    total = await db.transactions.count_documents(query)
+    transactions = await db.transactions.find(
+        query, {"_id": 0}
+    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    
+    return {
+        "transactions": transactions,
+        "total": total,
+        "page": page,
+        "pages": (total + limit - 1) // limit,
+    }
+
+
+@api_router.post("/admin/users/{user_id}/pause")
+async def admin_pause_user(user_id: str, current_user: User = Depends(get_current_user)):
+    """Admin: Pause (suspend) a user account."""
+    if current_user.role not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    user_doc = await db.users.find_one({"id": user_id})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    new_status = "paused" if user_doc.get("status") != "paused" else "active"
+    await db.users.update_one({"id": user_id}, {"$set": {"status": new_status, "updated_at": datetime.now(timezone.utc).isoformat()}})
+    
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()), "action": f"user_{new_status}",
+        "admin_id": current_user.id, "target_user_id": user_id,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"success": True, "new_status": new_status}
+
+
+@api_router.delete("/admin/users/{user_id}")
+async def admin_delete_user(user_id: str, current_user: User = Depends(get_current_user)):
+    """Admin: Soft-delete a user account."""
+    if current_user.role not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    if user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+    
+    await db.users.update_one({"id": user_id}, {"$set": {"status": "deleted", "updated_at": datetime.now(timezone.utc).isoformat()}})
+    
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()), "action": "user_deleted",
+        "admin_id": current_user.id, "target_user_id": user_id,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"success": True, "message": "User account deleted."}
+
+
+@api_router.post("/admin/partners/{user_id}/toggle")
+async def admin_toggle_partner(user_id: str, current_user: User = Depends(get_current_user)):
+    """Admin: One-click toggle is_partner status (for already-reviewed applications)."""
+    if current_user.role not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    user_doc = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    new_partner = not user_doc.get("is_partner", False)
+    now = datetime.now(timezone.utc).isoformat()
+    update = {
+        "is_partner": new_partner,
+        "partner_verification_status": "verified" if new_partner else "unverified",
+        "updated_at": now,
+    }
+    if new_partner:
+        update["partner_verified_at"] = now
+    
+    await db.users.update_one({"id": user_id}, {"$set": update})
+    
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()), "action": f"partner_toggled_{'on' if new_partner else 'off'}",
+        "admin_id": current_user.id, "target_user_id": user_id,
+        "timestamp": now,
+    })
+    return {"success": True, "is_partner": new_partner}
+
+
+# ========== MARKETPLACE FILTER COUNTS (Task 5) ==========
+
+_filter_counts_cache = {"data": None, "expires_at": 0}
+
+@api_router.get("/marketplace/filter-counts")
+async def marketplace_filter_counts():
+    """
+    Dynamic filter counts for marketplace sidebar.
+    Cached for 60 seconds to prevent performance issues with thousands of items.
+    Returns: auctioneers (partner companies), categories, locations with item counts.
+    """
+    import time
+    now = time.time()
+    if _filter_counts_cache["data"] and _filter_counts_cache["expires_at"] > now:
+        return _filter_counts_cache["data"]
+    
+    # Auctioneer counts (verified partners with active listings)
+    auctioneer_pipeline = [
+        {"$match": {"status": "active", "is_partner_listing": True}},
+        {"$group": {"_id": "$seller_id", "count": {"$sum": 1}}},
+    ]
+    auctioneer_results = await db.listings.aggregate(auctioneer_pipeline).to_list(100)
+    
+    # Enrich with partner company names
+    auctioneers = []
+    for a in auctioneer_results:
+        seller = await db.users.find_one(
+            {"id": a["_id"], "is_partner": True},
+            {"_id": 0, "partner_company_name": 1, "id": 1}
+        )
+        if seller and seller.get("partner_company_name"):
+            auctioneers.append({
+                "id": seller["id"],
+                "name": seller["partner_company_name"],
+                "count": a["count"],
+            })
+    
+    # Category counts
+    cat_pipeline = [
+        {"$match": {"status": "active"}},
+        {"$group": {"_id": "$category", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+    ]
+    category_results = await db.listings.aggregate(cat_pipeline).to_list(100)
+    categories = [{"name": c["_id"], "count": c["count"]} for c in category_results if c["_id"]]
+    
+    # Also check multi-item listings
+    multi_cat_pipeline = [
+        {"$match": {"status": "active"}},
+        {"$group": {"_id": "$category", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+    ]
+    multi_cat_results = await db.multi_item_listings.aggregate(multi_cat_pipeline).to_list(100)
+    for mc in multi_cat_results:
+        if mc["_id"]:
+            existing = next((c for c in categories if c["name"] == mc["_id"]), None)
+            if existing:
+                existing["count"] += mc["count"]
+            else:
+                categories.append({"name": mc["_id"], "count": mc["count"]})
+    categories.sort(key=lambda x: x["count"], reverse=True)
+    
+    # Location counts (region/province)
+    loc_pipeline = [
+        {"$match": {"status": "active", "region": {"$ne": None}}},
+        {"$group": {"_id": {"region": "$region", "city": "$city"}, "count": {"$sum": 1}}},
+    ]
+    loc_results = await db.listings.aggregate(loc_pipeline).to_list(200)
+    
+    regions = {}
+    for loc in loc_results:
+        region = loc["_id"].get("region", "Other")
+        city = loc["_id"].get("city")
+        if region not in regions:
+            regions[region] = {"count": 0, "cities": {}}
+        regions[region]["count"] += loc["count"]
+        if city:
+            regions[region]["cities"][city] = regions[region]["cities"].get(city, 0) + loc["count"]
+    
+    locations = [
+        {"region": r, "count": data["count"], "cities": [{"name": c, "count": cnt} for c, cnt in data["cities"].items()]}
+        for r, data in sorted(regions.items(), key=lambda x: x[1]["count"], reverse=True)
+    ]
+    
+    total_active = await db.listings.count_documents({"status": "active"})
+    
+    result = {
+        "auctioneers": auctioneers,
+        "categories": categories,
+        "locations": locations,
+        "total_active_items": total_active,
+    }
+    
+    _filter_counts_cache["data"] = result
+    _filter_counts_cache["expires_at"] = now + 60  # Cache 60s
+    
+    return result
+
 
 
 # ========== STRIPE CONNECT USER ENDPOINTS ==========

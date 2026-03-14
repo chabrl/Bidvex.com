@@ -39,6 +39,7 @@ import CouponManager from './admin/CouponManager';
 import SubscriptionAnalytics from './admin/SubscriptionAnalytics';
 import SiteModeManager from './admin/SiteModeManager';
 import PartnerManager from './admin/PartnerManager';
+import FinanceDashboard from './admin/FinanceDashboard';
 import { 
   Users, Package, Gavel, Shield, TrendingUp, Bell, Settings, FileText, 
   MessageSquare, DollarSign, Search, Image, CreditCard, Megaphone, 
@@ -55,6 +56,7 @@ const PRIMARY_TABS = [
   { id: 'settings', label: 'Settings', icon: '⚙️', lucideIcon: Settings },
   { id: 'banners', label: 'Banners', icon: '🎨', lucideIcon: Image },
   { id: 'analytics', label: 'Analytics', icon: '📊', lucideIcon: TrendingUp },
+  { id: 'partners-finance', label: 'Partners & Finance', icon: '💰', lucideIcon: Building2 },
   { id: 'logs', label: 'Admin Logs', icon: '📋', lucideIcon: FileText },
 ];
 
@@ -324,6 +326,8 @@ const AdminDashboard = () => {
           case 'reports': return <ReportManager />;
           default: return <AnalyticsDashboard />;
         }
+      case 'partners-finance':
+        return <FinanceDashboard />;
       case 'logs':
         return (
           <div className="space-y-4">

@@ -1,33 +1,23 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import FlattenedMarketplace from '../components/FlattenedMarketplace';
+import MarketplaceSidebar from '../components/MarketplaceSidebar';
 import { Badge } from '../components/ui/badge';
-import { Package, Sparkles, User, Zap, ShoppingBag } from 'lucide-react';
+import { ShoppingBag, Sparkles, User, Zap } from 'lucide-react';
 
-/**
- * Marketplace Page - Flattened Item-Centric View
- * 
- * This is the main marketplace view showing individual items/lots as standalone cards.
- * Key features:
- * - Individual item cards (not grouped by auction)
- * - Dynamic Private Sale / Business Sale badges
- * - Live countdown timers per item
- * - Quick Bid functionality
- * - "Show Private Sales Only" filter toggle
- */
 const MarketplacePage = () => {
   const { t } = useTranslation();
+  const [sidebarFilters, setSidebarFilters] = useState({});
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900" data-testid="marketplace-page">
-      {/* Gradient Hero Header */}
+      {/* Hero */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-900 via-slate-900 to-cyan-900 opacity-95" />
         <div className="absolute inset-0 opacity-20">
           <div className="absolute top-0 left-1/4 w-96 h-96 rounded-full blur-[150px] bg-cyan-500" />
           <div className="absolute bottom-0 right-1/4 w-96 h-96 rounded-full blur-[150px] bg-blue-500" />
         </div>
-        
         <div className="relative container mx-auto max-w-7xl py-10 px-4">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
@@ -40,10 +30,9 @@ const MarketplacePage = () => {
                 </h1>
               </div>
               <p className="max-w-2xl text-lg drop-shadow-md" style={{ color: '#BFDBFE' }}>
-                {t('marketplace.subtitle', 'Browse individual items from estate sales and multi-lot auctions. Each item has its own countdown timer and bidding.')}
+                {t('marketplace.subtitle', 'Browse individual items from estate sales and multi-lot auctions.')}
               </p>
             </div>
-            
             <div className="flex flex-wrap gap-2">
               <Badge className="bg-white/10 backdrop-blur border-cyan-400/30 px-4 py-2" style={{ color: '#FFFFFF' }}>
                 <Sparkles className="h-4 w-4 mr-2 text-yellow-400" />
@@ -62,13 +51,28 @@ const MarketplacePage = () => {
         </div>
       </div>
 
-      {/* Flattened Marketplace Component */}
-      <FlattenedMarketplace 
-        showFilters={true}
-        showHeader={false}
-        variant="full"
-        limit={50}
-      />
+      {/* Content with Sidebar */}
+      <div className="container mx-auto max-w-7xl px-4 py-6">
+        <div className="flex gap-6">
+          {/* Sidebar - mobile trigger + desktop fixed */}
+          <MarketplaceSidebar onFiltersChange={setSidebarFilters} />
+          
+          {/* Main Content */}
+          <div className="flex-1 min-w-0">
+            {/* Mobile filter button row */}
+            <div className="lg:hidden mb-4">
+              <MarketplaceSidebar onFiltersChange={setSidebarFilters} />
+            </div>
+            <FlattenedMarketplace 
+              showFilters={true}
+              showHeader={false}
+              variant="full"
+              limit={50}
+              externalFilters={sidebarFilters}
+            />
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
