@@ -32,23 +32,29 @@ i18n: react-i18next (EN/FR bilingual support)
 PDF Generation: ReportLab (bilingual invoices)
 ```
 
-## Current Status: ✅ BILLING FINALIZATION & INVOICE FIX VERIFIED
+## Current Status: ✅ PARTNER ACCOUNT SYSTEM PHASE 1 COMPLETE
 
-### Session Summary (Mar 13, 2026 — Latest)
+### Session Summary (Mar 14, 2026 — Latest)
 
-**Bug Fix: PDF Invoice Download (User-Reported)**
-- Root cause: PDFs were pre-generated at subscription time and stored as binary in MongoDB. Redeploying code didn't update existing invoices.
-- Fix: Refactored to dynamically render PDF on every download using `_render_subscription_invoice_pdf()`. No more stored binary.
-- Logo optimized from 1.4MB to 39KB (resized to 400px wide)
-- Vehicle invoice template (pdf_invoice.py) also updated with correct branding
-- All invoices now always show latest template with correct logo, address, and tax numbers
+**Partner Account System - Phase 1 Implementation:**
+- Database: Added `is_partner`, `partner_verification_status`, `custom_premium_rate` + 7 other partner fields to User model
+- Added `custom_buyer_premium_rate` and `is_partner_listing` to Listing model
+- Fee Engine: Net-Zero Stripe fee recovery formula: `Total = (Net + 0.30) / (1 - 0.029)`
+- Fee Constants: Buyer Premium 5%, Seller Commission 4%, Partner Platform Fee 3%
+- Partner fee calculation: `calculate_partner_checkout()` with custom buyer premium
+- Standard fee calculation: `calculate_standard_checkout()` with subscription discounts
+- Partner Application: POST /api/partner/apply (multipart file upload: NEQ proof + certifications)
+- Admin Management: GET /api/admin/partners, POST /verify, POST /reject, PUT /premium-rate
+- Fee Preview: GET /api/partner/fee-preview, GET /api/checkout/fee-breakdown
+- Frontend: /become-a-partner landing page (exempt from maintenance mode)
+- Admin: PartnerManager component in admin panel under Marketplace section
+- Navbar: "Become a Partner" link in user dropdown
+- Listing creation auto-tags partner listings with is_partner_listing=true
+- Testing: 100% (iteration_42) — 16/16 backend, all frontend verified
 
-**Billing Finalization & UI Overhaul:**
-- `GET /api/subscriptions/price-breakdown` — Premium: $180 + $9 GST + $17.96 QST + $6.49 fee = $213.45
-- Branded PDF invoices: BidVex logo, address (103-761 Chalifoux St), tax numbers (GST/HSN #706766367RT0001, QST #1233530880TQ0001)
-- Settings page glassmorphism UI overhaul with responsive tabs
-- Price breakdown toggle on Premium/VIP subscription cards
-- Badge overlap fix (BEST VALUE / CURRENT PLAN mutually exclusive)
+**Previous Bug Fix (Mar 13, 2026):**
+- PDF Invoice Dynamic Rendering: Fixed invoices to regenerate on download with latest template
+- All invoices now show correct logo, address (103-761 Chalifoux St), tax numbers
 - Testing: 100% (iteration_41) — 7/7 backend, all frontend verified
 
 ---
