@@ -32,11 +32,16 @@ i18n: react-i18next (EN/FR bilingual support)
 PDF Generation: ReportLab (bilingual invoices)
 ```
 
-## Current Status: ✅ PHASE 2 — STRIPE MIGRATION, PARTNER UX & CHECKOUT UI COMPLETE
+## Current Status: ✅ PHASE 2 COMPLETE — ALL TASKS FINALIZED
 
 ### Session Summary (Mar 14, 2026 — Latest)
 
-**Phase 2: Stripe Migration & UI**
+**Phase 2 Finalization: Admin Command Center & Marketplace Sidebar**
+- Task 4a — Marketplace Sidebar: Integrated MarketplaceSidebar into LotsMarketplacePage (/lots) with two-column layout. Added city/seller_id params to multi-item-listings API. Auctioneer filter prominent at top.
+- Task 4b — Admin Finance Dashboard: Redesigned with "Collected Fees (Your Revenue)" hero card ($206.96). Fee breakdown: 3% Platform Fee, Stripe Cost Recovery (2.9%+$0.30), Subscription Revenue. Partner Revenue Breakdown section. Three sub-tabs: Revenue Overview, Partner Accounts, Transaction Logs.
+- Testing: 100% (iteration_44) — 19/19 backend + all frontend verified
+
+**Phase 2: Stripe Migration & UI (Completed Earlier)**
 - Task 1 — Stripe Connect Destination Charges: Added `calculate_partner_listing_checkout()` to stripe_connect_service.py. Partner fund routing: Hammer+BP to connected account, 3% platform fee as application_fee. Standard routing preserved. Payment endpoint detects `is_partner_listing` flag.
 - Task 2 — Partner Page UX: Redesigned /become-a-partner with professional hero, 4 benefit cards (3% Fee, Custom Premium, Verified Badge, Stripe Payouts), ROI section ($50K example), removed fee comparison table. Dark theme, responsive layout.
 - Task 3 — Checkout UI Itemization: Updated CheckoutPage.js with isPartnerListing detection, partner company badge, platform fee display (3% partner / 2.5% vehicle), "Secure Processing Fee" label with (2.9% + $0.30) transparency.

@@ -1,5 +1,32 @@
 # BidVex Changelog
 
+## March 14, 2026 - Phase 2 Finalization: Admin Command Center & Marketplace Sidebar
+
+### Task 4a: Marketplace Sidebar Filter Integration (LotsMarketplacePage)
+- Integrated `MarketplaceSidebar` component into `/lots` (LotsMarketplacePage) with two-column layout
+- Replaced 800+ lines of inline filters with reusable sidebar (Auctioneer, Category, Location sections)
+- Wired sidebar filter state to `/api/multi-item-listings` API calls
+- Added `city` and `seller_id` query params to backend multi-item-listings endpoint
+- Grid/List view toggle preserved, market stats bar streamlined
+- Sidebar fetches dynamic counts from `/api/marketplace/filter-counts` (60s cache TTL)
+
+### Task 4b: Admin Finance Dashboard Enhancement
+- Redesigned `FinanceDashboard.js` with **"Collected Fees (Your Revenue)"** as the #1 hero card
+- Clear fee breakdown: 3% Platform Fee vs Stripe Cost Recovery (2.9%+$0.30) vs Subscription Revenue
+- Secondary cards: Hammer Volume, Buyer Premiums, Transactions, Active Auctions
+- Partner Revenue Breakdown section with 3% Fees from Partners, Buyer Premiums (Partner), Partner Transactions
+- User & Auction quick stats: Total, Partners, Pending
+- Three sub-tabs: Revenue Overview, Partner Accounts, Transaction Logs
+- Partner Accounts: filter by All/Pending/Verified/Rejected, review dialog, toggle/pause/delete actions
+- Transaction Logs: searchable, paginated, Partner Only filter, fee split columns
+
+### Testing
+- Backend: 19/19 tests passed (100%) — iteration_44
+- Frontend: All UI verified (100%)
+- Test file: `/app/backend/tests/test_phase2_marketplace_finance.py`
+
+---
+
 ## March 14, 2026 - Phase 2: Stripe Migration, Partner UX & Checkout UI
 
 ### Task 1: Stripe Connect Destination Charges

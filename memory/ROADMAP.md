@@ -11,9 +11,11 @@
 - [x] Phase 2: Partner Page UX Refinement (removed fee table, professional layout)
 - [x] Phase 2: Checkout UI Itemization (Hammer, BP, Platform Fee, Secure Processing Fee)
 - [x] Phase 2: Email Onboarding Logic (ready, pending live SendGrid keys)
+- [x] Phase 2: Admin Command Center — Revenue tracker, fee breakdown, partner management, transaction logs
+- [x] Phase 2: Marketplace Sidebar Filter — Integrated into both MarketplacePage and LotsMarketplacePage
 
 ## P1 - High Priority
-- [ ] **Task 4: Admin Command Center** — Revenue tracker, transaction logs, auction stats, user CRUD, 'Partners & Finance' tab in admin
+- [ ] **Email Settings Admin Panel** — Section in Admin Dashboard to paste SendGrid API key and send test email
 - [ ] Provide live SendGrid API keys to activate partner onboarding emails
 - [ ] User live testing of partner application + verification flow in production
 
