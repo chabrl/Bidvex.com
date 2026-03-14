@@ -13,7 +13,7 @@ import {
   DollarSign, TrendingUp, Users, Building2, Gavel, CreditCard,
   Search, FileText, ExternalLink, Shield, Loader2, ToggleLeft,
   ToggleRight, Trash2, Eye, ChevronLeft, ChevronRight, Clock,
-  ArrowUpDown, Percent, Landmark
+  ArrowUpDown, Percent, Landmark, Download
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -377,6 +377,31 @@ const FinanceDashboard = () => {
             <Button variant={partnerOnly ? 'default' : 'outline'} size="sm"
               onClick={() => { setPartnerOnly(!partnerOnly); setTxPage(1); }} className="text-xs" data-testid="tx-partner-filter">
               <Building2 className="w-3.5 h-3.5 mr-1" /> Partner Only
+            </Button>
+            <Button variant="outline" size="sm" className="text-xs" data-testid="tx-export-csv"
+              onClick={() => {
+                const params = new URLSearchParams({ partner_only: partnerOnly });
+                if (txSearch) params.set('search', txSearch);
+                const url = `${API}/admin/finance/transactions/export?${params}`;
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', '');
+                // Add auth header via fetch + blob
+                fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+                  .then(r => r.blob())
+                  .then(blob => {
+                    const blobUrl = window.URL.createObjectURL(blob);
+                    link.href = blobUrl;
+                    link.download = `bidvex_transactions_${new Date().toISOString().slice(0,10)}.csv`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(blobUrl);
+                    toast.success('CSV exported successfully.');
+                  })
+                  .catch(() => toast.error('Export failed.'));
+              }}>
+              <Download className="w-3.5 h-3.5 mr-1" /> Export CSV
             </Button>
           </div>
 

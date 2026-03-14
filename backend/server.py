@@ -11804,13 +11804,17 @@ async def apply_for_partner(
 
     # ===== AUTOMATED EMAIL ONBOARDING (Task 5) =====
     try:
-        sendgrid_key = os.environ.get("SENDGRID_API_KEY", "")
-        if sendgrid_key and not sendgrid_key.startswith("SG.your"):
+        _sg_config = None
+        try:
+            _sg_config = await _get_sendgrid_config()
+        except Exception:
+            pass
+        if _sg_config:
             import sendgrid
             from sendgrid.helpers.mail import Mail, Email, To, Content
             
-            sg = sendgrid.SendGridAPIClient(api_key=sendgrid_key)
-            from_email = Email(os.environ.get("SENDGRID_FROM_EMAIL", "noreply@bidvex.com"), "BidVex Partner Team")
+            sg = sendgrid.SendGridAPIClient(api_key=_sg_config["api_key"])
+            from_email = Email(_sg_config["from_email"], _sg_config["from_name"])
             
             # 1) Applicant auto-reply
             applicant_html = f"""
@@ -11869,7 +11873,7 @@ async def apply_for_partner(
             
             logger.info(f"Partner onboarding emails sent for {current_user.email}")
         else:
-            logger.info("SendGrid not configured — partner onboarding emails skipped.")
+            logger.info("SendGrid not configured — partner onboarding emails skipped. Configure via Admin > Email Settings.")
     except Exception as e:
         logger.warning(f"Failed to send partner onboarding emails: {e}")
         # Don't block the application submission if email fails
@@ -12055,17 +12059,46 @@ async def verify_partner(
     return {"success": True, "message": f"Partner {user_doc.get('email')} verified successfully."}
 
 
-def _send_partner_email(to_email: str, subject: str, html_content: str):
-    """Send email via SendGrid if configured."""
+async def _get_sendgrid_config():
+    """Get SendGrid config: checks DB-stored key first, then env var."""
     try:
-        sendgrid_key = os.environ.get("SENDGRID_API_KEY", "")
-        if not sendgrid_key or sendgrid_key.startswith("SG.your"):
-            logger.info(f"SendGrid not configured — skipping email to {to_email}")
-            return
+        doc = await db.settings.find_one({"key": "sendgrid"}, {"_id": 0})
+        if doc and doc.get("api_key") and not doc["api_key"].startswith("SG.your"):
+            return {
+                "api_key": doc["api_key"],
+                "from_email": doc.get("from_email", "noreply@bidvex.com"),
+                "from_name": doc.get("from_name", "BidVex Partner Team"),
+                "source": "database",
+            }
+    except Exception:
+        pass
+    env_key = os.environ.get("SENDGRID_API_KEY", "")
+    if env_key and not env_key.startswith("SG.your"):
+        return {
+            "api_key": env_key,
+            "from_email": os.environ.get("SENDGRID_FROM_EMAIL", "noreply@bidvex.com"),
+            "from_name": "BidVex Partner Team",
+            "source": "environment",
+        }
+    return None
+
+
+def _send_partner_email(to_email: str, subject: str, html_content: str):
+    """Send email via SendGrid if configured (sync wrapper for backward compat)."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+        config = loop.run_until_complete(_get_sendgrid_config())
+    except RuntimeError:
+        config = None
+    if not config:
+        logger.info(f"SendGrid not configured — skipping email to {to_email}")
+        return
+    try:
         import sendgrid
         from sendgrid.helpers.mail import Mail, Email, To, Content
-        sg = sendgrid.SendGridAPIClient(api_key=sendgrid_key)
-        from_email = Email(os.environ.get("SENDGRID_FROM_EMAIL", "noreply@bidvex.com"), "BidVex Partner Team")
+        sg = sendgrid.SendGridAPIClient(api_key=config["api_key"])
+        from_email = Email(config["from_email"], config["from_name"])
         mail = Mail(from_email=from_email, to_emails=To(to_email), subject=subject, html_content=Content("text/html", html_content))
         sg.client.mail.send.post(request_body=mail.get())
         logger.info(f"Email sent to {to_email}: {subject}")
@@ -12164,6 +12197,207 @@ async def update_partner_premium_rate(
     )
     
     return {"success": True, "message": f"Partner premium rate updated to {rate*100:.1f}%."}
+
+
+# ========== EMAIL SETTINGS (Self-Service Admin Panel) ==========
+
+@api_router.get("/admin/email-settings")
+async def get_email_settings(current_user: User = Depends(get_current_user)):
+    """Admin: Get current email configuration status."""
+    if current_user.role not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    doc = await db.settings.find_one({"key": "sendgrid"}, {"_id": 0})
+    config = await _get_sendgrid_config()
+    
+    # Mask the API key for display
+    masked_key = None
+    if doc and doc.get("api_key"):
+        k = doc["api_key"]
+        masked_key = k[:5] + "..." + k[-4:] if len(k) > 12 else "***configured***"
+    
+    return {
+        "configured": config is not None,
+        "source": config["source"] if config else None,
+        "masked_key": masked_key,
+        "from_email": doc.get("from_email", "noreply@bidvex.com") if doc else "noreply@bidvex.com",
+        "from_name": doc.get("from_name", "BidVex Partner Team") if doc else "BidVex Partner Team",
+        "last_test_at": doc.get("last_test_at") if doc else None,
+        "last_test_status": doc.get("last_test_status") if doc else None,
+    }
+
+
+@api_router.post("/admin/email-settings")
+async def save_email_settings(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
+    """Admin: Save SendGrid API key and sender config to database."""
+    if current_user.role not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    api_key = data.get("api_key", "").strip()
+    from_email = data.get("from_email", "noreply@bidvex.com").strip()
+    from_name = data.get("from_name", "BidVex Partner Team").strip()
+    
+    if not api_key:
+        raise HTTPException(status_code=400, detail="API key is required.")
+    if not api_key.startswith("SG."):
+        raise HTTPException(status_code=400, detail="Invalid SendGrid API key format. Keys start with 'SG.'")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    await db.settings.update_one(
+        {"key": "sendgrid"},
+        {"$set": {
+            "key": "sendgrid",
+            "api_key": api_key,
+            "from_email": from_email,
+            "from_name": from_name,
+            "updated_at": now,
+            "updated_by": current_user.id,
+        }},
+        upsert=True
+    )
+    
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "action": "email_settings_updated",
+        "admin_id": current_user.id,
+        "details": {"from_email": from_email},
+        "timestamp": now,
+    })
+    
+    return {"success": True, "message": "SendGrid settings saved. Use 'Send Test Email' to verify."}
+
+
+@api_router.post("/admin/email-settings/test")
+async def test_email_settings(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
+    """Admin: Send a test email to verify SendGrid configuration."""
+    if current_user.role not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    recipient = data.get("recipient", current_user.email).strip()
+    if not recipient or "@" not in recipient:
+        raise HTTPException(status_code=400, detail="Valid recipient email required.")
+    
+    config = await _get_sendgrid_config()
+    if not config:
+        raise HTTPException(status_code=400, detail="SendGrid is not configured. Save your API key first.")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    test_html = f"""
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;color:#1e293b;">
+      <div style="background:linear-gradient(135deg,#2563eb,#06b6d4);padding:24px 28px;border-radius:12px 12px 0 0;">
+        <h1 style="color:#fff;margin:0;font-size:22px;">BidVex Email Test</h1>
+        <p style="color:#bfdbfe;margin:6px 0 0;font-size:14px;">Configuration verified successfully</p>
+      </div>
+      <div style="padding:28px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;">
+        <p>This is a test email from your BidVex Admin panel.</p>
+        <p>If you're reading this, your SendGrid integration is working correctly.</p>
+        <table style="font-size:14px;color:#475569;margin:16px 0;border-collapse:collapse;">
+          <tr><td style="padding:4px 12px 4px 0;font-weight:bold;">Sent by:</td><td>{current_user.email}</td></tr>
+          <tr><td style="padding:4px 12px 4px 0;font-weight:bold;">From:</td><td>{config['from_email']}</td></tr>
+          <tr><td style="padding:4px 12px 4px 0;font-weight:bold;">Source:</td><td>{config['source']}</td></tr>
+          <tr><td style="padding:4px 12px 4px 0;font-weight:bold;">Timestamp:</td><td>{now}</td></tr>
+        </table>
+        <p style="font-size:13px;color:#64748b;">Partner onboarding emails (application received, verification, rejection) are now active.</p>
+        <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;" />
+        <p style="color:#94a3b8;font-size:12px;">BidVex Inc. — 103-761 Chalifoux Street, Sherbrooke, QC, J1G 0A8</p>
+      </div>
+    </div>
+    """
+    
+    try:
+        import sendgrid as sg_lib
+        from sendgrid.helpers.mail import Mail, Email, To, Content
+        sg = sg_lib.SendGridAPIClient(api_key=config["api_key"])
+        from_email = Email(config["from_email"], config["from_name"])
+        mail = Mail(from_email=from_email, to_emails=To(recipient), subject="BidVex Email Test — Configuration Verified", html_content=Content("text/html", test_html))
+        response = sg.client.mail.send.post(request_body=mail.get())
+        status = response.status_code
+        
+        # Record test result
+        await db.settings.update_one(
+            {"key": "sendgrid"},
+            {"$set": {"last_test_at": now, "last_test_status": "success", "last_test_recipient": recipient}}
+        )
+        
+        await db.admin_logs.insert_one({
+            "id": str(uuid.uuid4()),
+            "action": "email_test_sent",
+            "admin_id": current_user.id,
+            "details": {"recipient": recipient, "status_code": status},
+            "timestamp": now,
+        })
+        
+        return {"success": True, "message": f"Test email sent to {recipient}. Check your inbox.", "status_code": status}
+    except Exception as e:
+        await db.settings.update_one(
+            {"key": "sendgrid"},
+            {"$set": {"last_test_at": now, "last_test_status": f"failed: {str(e)}"}}
+        )
+        raise HTTPException(status_code=400, detail=f"Email send failed: {str(e)}")
+
+
+# ========== TRANSACTION CSV EXPORT ==========
+
+@api_router.get("/admin/finance/transactions/export")
+async def export_transactions_csv(
+    partner_only: bool = False,
+    search: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """Admin: Export all transactions as CSV for accounting."""
+    if current_user.role not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    query = {}
+    if partner_only:
+        query["is_partner_transaction"] = True
+    if search:
+        query["$or"] = [
+            {"listing_title": {"$regex": search, "$options": "i"}},
+            {"buyer_email": {"$regex": search, "$options": "i"}},
+            {"seller_email": {"$regex": search, "$options": "i"}},
+            {"partner_company": {"$regex": search, "$options": "i"}},
+        ]
+    
+    transactions = await db.transactions.find(query, {"_id": 0}).sort("created_at", -1).to_list(10000)
+    
+    import csv, io
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Header row
+    writer.writerow([
+        "Date", "Item", "Buyer Email", "Seller Email", "Type",
+        "Hammer Price", "Buyer Premium", "Platform Fee", "Processing Fee",
+        "Partner Payout", "Stripe Charge ID", "Partner Company"
+    ])
+    
+    for tx in transactions:
+        writer.writerow([
+            tx.get("created_at", ""),
+            tx.get("listing_title", tx.get("listing_id", "")),
+            tx.get("buyer_email", ""),
+            tx.get("seller_email", ""),
+            "Partner" if tx.get("is_partner_transaction") else "Standard",
+            tx.get("hammer_price", 0),
+            tx.get("buyer_premium", 0),
+            tx.get("application_fee", tx.get("platform_fee", 0)),
+            tx.get("processing_fee", 0),
+            tx.get("partner_payout", tx.get("seller_payout", 0)),
+            tx.get("stripe_charge_id", ""),
+            tx.get("partner_company", ""),
+        ])
+    
+    csv_content = output.getvalue()
+    output.close()
+    
+    from starlette.responses import Response
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=bidvex_transactions_{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"}
+    )
+
 
 
 @api_router.get("/partner/fee-preview")

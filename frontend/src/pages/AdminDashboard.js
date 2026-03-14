@@ -40,6 +40,7 @@ import SubscriptionAnalytics from './admin/SubscriptionAnalytics';
 import SiteModeManager from './admin/SiteModeManager';
 import PartnerManager from './admin/PartnerManager';
 import FinanceDashboard from './admin/FinanceDashboard';
+import EmailSettings from './admin/EmailSettings';
 import { 
   Users, Package, Gavel, Shield, TrendingUp, Bell, Settings, FileText, 
   MessageSquare, DollarSign, Search, Image, CreditCard, Megaphone, 
@@ -96,6 +97,10 @@ const SECONDARY_TABS = {
   analytics: [
     { id: 'dashboard', label: 'Dashboard', icon: '📈', lucideIcon: TrendingUp },
     { id: 'reports', label: 'Reports', icon: '📑', lucideIcon: FileText },
+  ],
+  'partners-finance': [
+    { id: 'finance-overview', label: 'Finance Dashboard', icon: '📊', lucideIcon: TrendingUp },
+    { id: 'email-settings', label: 'Email Settings', icon: '✉️', lucideIcon: Mail },
   ],
   logs: [
     { id: 'action-history', label: 'Action History', icon: '📜', lucideIcon: History },
@@ -327,7 +332,10 @@ const AdminDashboard = () => {
           default: return <AnalyticsDashboard />;
         }
       case 'partners-finance':
-        return <FinanceDashboard />;
+        switch (secondaryTab) {
+          case 'email-settings': return <EmailSettings />;
+          default: return <FinanceDashboard />;
+        }
       case 'logs':
         return (
           <div className="space-y-4">
