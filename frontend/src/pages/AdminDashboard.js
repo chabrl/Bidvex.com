@@ -38,11 +38,12 @@ import PricingManager from './admin/PricingManager';
 import CouponManager from './admin/CouponManager';
 import SubscriptionAnalytics from './admin/SubscriptionAnalytics';
 import SiteModeManager from './admin/SiteModeManager';
+import PartnerManager from './admin/PartnerManager';
 import { 
   Users, Package, Gavel, Shield, TrendingUp, Bell, Settings, FileText, 
   MessageSquare, DollarSign, Search, Image, CreditCard, Megaphone, 
   Activity, AlertTriangle, ChevronRight, Power, Zap, Eye, History,
-  ToggleLeft, ToggleRight, Clock, Mail, Sliders, Car, Send, Bot, Ticket, BarChart3, Globe
+  ToggleLeft, ToggleRight, Clock, Mail, Sliders, Car, Send, Bot, Ticket, BarChart3, Globe, Building2
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -67,6 +68,7 @@ const SECONDARY_TABS = {
     { id: 'tax-verification', label: 'Tax Verification', icon: '🛡️', lucideIcon: Shield },
     { id: 'auctions', label: 'Auction Control', icon: '🔨', lucideIcon: Gavel },
     { id: 'categories', label: 'Categories', icon: '📂', lucideIcon: Settings },
+    { id: 'partner-applications', label: 'Partner Applications', icon: '🏢', lucideIcon: Building2 },
   ],
   vehicles: [
     { id: 'vehicle-admin', label: 'Vehicle Administration', icon: '🚗', lucideIcon: Car },
@@ -286,6 +288,7 @@ const AdminDashboard = () => {
           case 'tax-verification': return <TaxVerificationQueue />;
           case 'auctions': return <AuctionControl />;
           case 'categories': return <CategoryManager />;
+          case 'partner-applications': return <PartnerManager />;
           default: return <EnhancedUserManager />;
         }
       case 'vehicles':

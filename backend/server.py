@@ -694,6 +694,18 @@ class User(BaseModel):
     
     # Auction Terms Agreement tracking
     auction_agreements: Dict[str, datetime] = Field(default_factory=dict)  # {auction_id: agreement_timestamp}
+    
+    # ========== PARTNER ACCOUNT FIELDS ==========
+    is_partner: bool = False  # True for verified auction firms / liquidators
+    partner_verification_status: str = "unverified"  # unverified, pending, verified, rejected
+    partner_company_name: Optional[str] = None  # Registered auction firm name
+    partner_neq: Optional[str] = None  # Quebec Enterprise Number
+    partner_certifications: List[str] = Field(default_factory=list)  # URLs to uploaded credential files
+    partner_neq_document: Optional[str] = None  # URL to uploaded NEQ proof file
+    partner_applied_at: Optional[str] = None  # ISO timestamp of application
+    partner_verified_at: Optional[str] = None  # ISO timestamp of verification
+    partner_rejection_reason: Optional[str] = None  # Admin rejection reason
+    custom_premium_rate: Optional[float] = None  # Partner-specific buyer premium rate (e.g., 0.18 for 18%)
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -707,6 +719,14 @@ class TokenResponse(BaseModel):
 # =========================================
 # UNIFIED FEE ENGINE
 # =========================================
+
+# Fee Constants
+STANDARD_BUYER_PREMIUM_RATE = 0.05   # 5% buyer premium (standard)
+STANDARD_SELLER_COMMISSION_RATE = 0.04  # 4% seller commission (standard)
+PARTNER_PLATFORM_FEE_RATE = 0.03     # 3% platform fee for partners
+STRIPE_PERCENTAGE_FEE = 0.029        # 2.9% Stripe processing fee
+STRIPE_FIXED_FEE = 0.30              # $0.30 Stripe fixed fee
+
 class FeeCalculation(BaseModel):
     """Fee calculation result for buyers and sellers"""
     base_amount: float
@@ -715,6 +735,63 @@ class FeeCalculation(BaseModel):
     total_amount: float
     is_premium_member: bool
     discount_applied: float
+
+def calculate_stripe_fee_recovery(desired_net: float) -> float:
+    """
+    Net-Zero fee recovery: calculate the total to charge so BidVex nets exactly desired_net
+    after Stripe takes 2.9% + $0.30.
+    Formula: Total = (desired_net + 0.30) / (1 - 0.029)
+    Returns the Stripe fee portion (total - desired_net).
+    """
+    total_to_charge = (desired_net + STRIPE_FIXED_FEE) / (1 - STRIPE_PERCENTAGE_FEE)
+    return round(total_to_charge - desired_net, 2)
+
+def calculate_partner_checkout(hammer_price: float, custom_buyer_premium_rate: float = 0.0) -> dict:
+    """
+    Partner fee calculation. Partner fee (3%) overrides ALL subscription discounts.
+    - Platform fee: 3% of Hammer Price (collected by BidVex as application_fee_amount)
+    - Buyer Premium: custom rate set by partner (e.g., 18%)
+    - Stripe fee: recovered from buyer (Net-Zero)
+    """
+    platform_fee = round(hammer_price * PARTNER_PLATFORM_FEE_RATE, 2)
+    buyer_premium = round(hammer_price * custom_buyer_premium_rate, 2)
+    desired_net = hammer_price + buyer_premium + platform_fee
+    stripe_fee = calculate_stripe_fee_recovery(desired_net)
+    total_to_charge = round(desired_net + stripe_fee, 2)
+    
+    return {
+        "hammer_price": hammer_price,
+        "buyer_premium_rate": custom_buyer_premium_rate,
+        "buyer_premium": buyer_premium,
+        "platform_fee_rate": PARTNER_PLATFORM_FEE_RATE,
+        "platform_fee": platform_fee,
+        "stripe_fee_recovery": stripe_fee,
+        "total_to_charge_buyer": total_to_charge,
+        "transfer_to_partner": round(hammer_price + buyer_premium, 2),
+        "application_fee": round(platform_fee + stripe_fee, 2),
+    }
+
+def calculate_standard_checkout(hammer_price: float, buyer_subscription_tier: str = "free") -> dict:
+    """
+    Standard (non-partner) fee calculation.
+    - Buyer premium: 5% (with subscription discounts)
+    - Seller commission: 4% (with subscription discounts)
+    - Stripe fee: recovered from buyer (Net-Zero)
+    """
+    buyer_calc = calculate_buyer_fees(hammer_price, buyer_subscription_tier)
+    desired_net = hammer_price + buyer_calc.fee_amount
+    stripe_fee = calculate_stripe_fee_recovery(desired_net)
+    total_to_charge = round(desired_net + stripe_fee, 2)
+    
+    return {
+        "hammer_price": hammer_price,
+        "buyer_premium_rate": buyer_calc.fee_percentage / 100,
+        "buyer_premium": buyer_calc.fee_amount,
+        "seller_commission_rate": STANDARD_SELLER_COMMISSION_RATE,
+        "seller_commission": round(hammer_price * STANDARD_SELLER_COMMISSION_RATE, 2),
+        "stripe_fee_recovery": stripe_fee,
+        "total_to_charge_buyer": total_to_charge,
+    }
 
 def calculate_buyer_fees(hammer_price: float, subscription_tier: str = "free") -> FeeCalculation:
     """
@@ -833,6 +910,9 @@ class Listing(BaseModel):
     views: int = 0
     shipping_info: Optional[Dict[str, Any]] = None  # {available, methods, rates, delivery_time}
     visit_availability: Optional[Dict[str, Any]] = None  # {offered, dates, instructions}
+    # Partner auction fields
+    custom_buyer_premium_rate: Optional[float] = None  # Partner-set buyer premium (e.g., 0.18 for 18%)
+    is_partner_listing: bool = False  # True if listed by a verified partner
 
 class BidCreate(BaseModel):
     listing_id: str
@@ -2175,6 +2255,15 @@ async def create_listing(
     )
     listing_dict = listing.model_dump()
     
+    # Auto-tag partner listings & set custom buyer premium
+    seller_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
+    if seller_doc and seller_doc.get("is_partner") and seller_doc.get("partner_verification_status") == "verified":
+        listing_dict["is_partner_listing"] = True
+        listing_dict["custom_buyer_premium_rate"] = seller_doc.get("custom_premium_rate")
+    else:
+        listing_dict["is_partner_listing"] = False
+        listing_dict["custom_buyer_premium_rate"] = None
+    
     # Add legal agreement metadata
     listing_dict["agreement_metadata"] = agreement_metadata
     
@@ -2400,9 +2489,9 @@ async def get_marketplace_items(
                 "total_lots_in_auction": len(auction.get("lots", [])),
                 "seller_id": auction.get("seller_id"),
                 "seller_is_business": seller_is_business,  # For Private Sale badge
+                "is_partner_listing": auction.get("is_partner_listing", False),
                 
                 # Location
-                "city": auction.get("city"),
                 "region": auction.get("region"),
                 "country": auction.get("country"),
                 
@@ -2477,6 +2566,7 @@ async def get_marketplace_items(
             "total_lots_in_auction": 0,
             "seller_id": listing.get("seller_id"),
             "seller_is_business": seller_is_business,
+            "is_partner_listing": listing.get("is_partner_listing", False),
             
             # Location
             "city": listing.get("city"),
@@ -11605,6 +11695,334 @@ except ImportError as e:
     logger.warning(f"⚠️ Could not load modular routers: {e}")
     import traceback
     traceback.print_exc()
+
+
+
+# ========== PARTNER ACCOUNT SYSTEM ==========
+
+@api_router.post("/partner/apply")
+async def apply_for_partner(
+    company_name: str = Form(...),
+    neq_number: str = Form(...),
+    neq_document: UploadFile = File(...),
+    certification_documents: List[UploadFile] = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Submit a partner application with mandatory NEQ proof and professional certifications.
+    Sets partner_verification_status to 'pending'.
+    """
+    # Check not already partner or pending
+    user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
+    if user_doc and user_doc.get("is_partner"):
+        raise HTTPException(status_code=400, detail="Account is already a verified partner.")
+    if user_doc and user_doc.get("partner_verification_status") == "pending":
+        raise HTTPException(status_code=400, detail="You already have a pending partner application.")
+
+    # Validate file types (PDF, JPG, PNG only)
+    allowed_types = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+    
+    if neq_document.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="NEQ document must be PDF, JPG, PNG, or WebP.")
+    
+    for cert_doc in certification_documents:
+        if cert_doc.content_type not in allowed_types:
+            raise HTTPException(status_code=400, detail=f"Certification file '{cert_doc.filename}' must be PDF, JPG, PNG, or WebP.")
+
+    # Store files
+    upload_dir = Path("uploads/partner_docs")
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    base_url = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001")
+
+    # Save NEQ document
+    neq_contents = await neq_document.read()
+    if len(neq_contents) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="NEQ document must be less than 10MB.")
+    neq_ext = neq_document.filename.split('.')[-1] if '.' in neq_document.filename else 'pdf'
+    neq_filename = f"neq_{current_user.id}_{uuid.uuid4().hex[:8]}.{neq_ext}"
+    with open(upload_dir / neq_filename, "wb") as f:
+        f.write(neq_contents)
+    neq_url = f"{base_url}/api/uploads/partner_docs/{neq_filename}"
+
+    # Save certification documents
+    cert_urls = []
+    for cert_doc in certification_documents:
+        cert_contents = await cert_doc.read()
+        if len(cert_contents) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail=f"File '{cert_doc.filename}' must be less than 10MB.")
+        cert_ext = cert_doc.filename.split('.')[-1] if '.' in cert_doc.filename else 'pdf'
+        cert_filename = f"cert_{current_user.id}_{uuid.uuid4().hex[:8]}.{cert_ext}"
+        with open(upload_dir / cert_filename, "wb") as f:
+            f.write(cert_contents)
+        cert_urls.append(f"{base_url}/api/uploads/partner_docs/{cert_filename}")
+
+    # Update user document
+    now = datetime.now(timezone.utc).isoformat()
+    await db.users.update_one(
+        {"id": current_user.id},
+        {"$set": {
+            "is_partner": False,
+            "partner_verification_status": "pending",
+            "partner_company_name": company_name,
+            "partner_neq": neq_number,
+            "partner_neq_document": neq_url,
+            "partner_certifications": cert_urls,
+            "partner_applied_at": now,
+            "updated_at": now,
+        }}
+    )
+
+    # Log the application for admin audit
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "action": "partner_application_submitted",
+        "user_id": current_user.id,
+        "user_email": current_user.email,
+        "details": {
+            "company_name": company_name,
+            "neq_number": neq_number,
+            "num_certifications": len(cert_urls),
+        },
+        "timestamp": now,
+    })
+
+    return {
+        "success": True,
+        "message": "Partner application submitted. Our team will review your documents and reach out at partners@bidvex.ca.",
+        "verification_status": "pending"
+    }
+
+
+@api_router.get("/partner/status")
+async def get_partner_status(current_user: User = Depends(get_current_user)):
+    """Get the current user's partner account status."""
+    user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {
+        "is_partner": user_doc.get("is_partner", False),
+        "verification_status": user_doc.get("partner_verification_status", "unverified"),
+        "company_name": user_doc.get("partner_company_name"),
+        "neq_number": user_doc.get("partner_neq"),
+        "applied_at": user_doc.get("partner_applied_at"),
+        "verified_at": user_doc.get("partner_verified_at"),
+        "rejection_reason": user_doc.get("partner_rejection_reason"),
+        "custom_premium_rate": user_doc.get("custom_premium_rate"),
+    }
+
+
+@api_router.get("/uploads/partner_docs/{filename}")
+async def serve_partner_document(filename: str, current_user: User = Depends(get_current_user)):
+    """Serve uploaded partner documents (auth required)."""
+    from fastapi.responses import FileResponse
+    file_path = Path("uploads/partner_docs") / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    # Only allow the owner or admin to access
+    user_doc = await db.users.find_one({"id": current_user.id})
+    is_owner = filename.startswith(f"neq_{current_user.id}") or filename.startswith(f"cert_{current_user.id}")
+    if not is_owner and user_doc.get("role") not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    return FileResponse(str(file_path))
+
+
+# ========== ADMIN PARTNER MANAGEMENT ==========
+
+@api_router.get("/admin/partners")
+async def get_partner_applications(
+    status: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """Admin: List all partner applications, optionally filtered by status."""
+    if current_user.role not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    query = {"partner_verification_status": {"$in": ["pending", "verified", "rejected"]}}
+    if status:
+        query["partner_verification_status"] = status
+    
+    users = await db.users.find(
+        query,
+        {"_id": 0, "password": 0}
+    ).sort("partner_applied_at", -1).to_list(100)
+    
+    applications = []
+    for u in users:
+        applications.append({
+            "id": u.get("id"),
+            "email": u.get("email"),
+            "name": u.get("name"),
+            "account_type": u.get("account_type"),
+            "partner_company_name": u.get("partner_company_name"),
+            "partner_neq": u.get("partner_neq"),
+            "partner_neq_document": u.get("partner_neq_document"),
+            "partner_certifications": u.get("partner_certifications", []),
+            "partner_verification_status": u.get("partner_verification_status"),
+            "partner_applied_at": u.get("partner_applied_at"),
+            "partner_verified_at": u.get("partner_verified_at"),
+            "partner_rejection_reason": u.get("partner_rejection_reason"),
+            "is_partner": u.get("is_partner", False),
+            "custom_premium_rate": u.get("custom_premium_rate"),
+        })
+    
+    return {"applications": applications, "total": len(applications)}
+
+
+@api_router.post("/admin/partners/{user_id}/verify")
+async def verify_partner(
+    user_id: str,
+    data: Dict[str, Any],
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Admin: Verify a partner application. Sets is_partner=True and verification_status=verified.
+    Optionally sets a custom_premium_rate for the partner.
+    The 3% partner platform fee overrides ALL subscription-based fee discounts.
+    """
+    if current_user.role not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    user_doc = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user_doc.get("partner_verification_status") != "pending":
+        raise HTTPException(status_code=400, detail=f"User is not in pending status (current: {user_doc.get('partner_verification_status')})")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    custom_rate = data.get("custom_premium_rate")
+    
+    update = {
+        "is_partner": True,
+        "partner_verification_status": "verified",
+        "partner_verified_at": now,
+        "partner_rejection_reason": None,
+        "updated_at": now,
+    }
+    if custom_rate is not None:
+        update["custom_premium_rate"] = float(custom_rate)
+    
+    await db.users.update_one({"id": user_id}, {"$set": update})
+    
+    # Admin audit log
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "action": "partner_verified",
+        "admin_id": current_user.id,
+        "target_user_id": user_id,
+        "details": {"custom_premium_rate": custom_rate},
+        "timestamp": now,
+    })
+    
+    return {"success": True, "message": f"Partner {user_doc.get('email')} verified successfully."}
+
+
+@api_router.post("/admin/partners/{user_id}/reject")
+async def reject_partner(
+    user_id: str,
+    data: Dict[str, Any],
+    current_user: User = Depends(get_current_user)
+):
+    """Admin: Reject a partner application with a reason."""
+    if current_user.role not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    reason = data.get("reason", "Application does not meet requirements.")
+    now = datetime.now(timezone.utc).isoformat()
+    
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {
+            "is_partner": False,
+            "partner_verification_status": "rejected",
+            "partner_rejection_reason": reason,
+            "updated_at": now,
+        }}
+    )
+    
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "action": "partner_rejected",
+        "admin_id": current_user.id,
+        "target_user_id": user_id,
+        "details": {"reason": reason},
+        "timestamp": now,
+    })
+    
+    return {"success": True, "message": "Partner application rejected."}
+
+
+@api_router.put("/admin/partners/{user_id}/premium-rate")
+async def update_partner_premium_rate(
+    user_id: str,
+    data: Dict[str, Any],
+    current_user: User = Depends(get_current_user)
+):
+    """Admin: Update a verified partner's custom buyer premium rate."""
+    if current_user.role not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    user_doc = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user_doc or not user_doc.get("is_partner"):
+        raise HTTPException(status_code=400, detail="User is not a verified partner.")
+    
+    rate = data.get("custom_premium_rate")
+    if rate is None or not isinstance(rate, (int, float)) or rate < 0:
+        raise HTTPException(status_code=400, detail="custom_premium_rate must be a non-negative number (e.g., 0.18 for 18%).")
+    
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"custom_premium_rate": float(rate), "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    return {"success": True, "message": f"Partner premium rate updated to {rate*100:.1f}%."}
+
+
+@api_router.get("/partner/fee-preview")
+async def partner_fee_preview(
+    hammer_price: float,
+    custom_buyer_premium_rate: float = 0.0,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Preview the fee breakdown for a partner listing.
+    Shows: Hammer, Buyer Premium, Platform Fee (3%), Stripe Recovery, Total.
+    """
+    if hammer_price <= 0:
+        raise HTTPException(status_code=400, detail="Hammer price must be positive.")
+    
+    breakdown = calculate_partner_checkout(hammer_price, custom_buyer_premium_rate)
+    return breakdown
+
+
+@api_router.get("/checkout/fee-breakdown")
+async def checkout_fee_breakdown(
+    listing_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get the full fee breakdown for a listing checkout.
+    Auto-detects partner vs standard listing and applies correct fee model.
+    """
+    listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    
+    hammer_price = listing.get("current_price", 0)
+    is_partner = listing.get("is_partner_listing", False)
+    
+    if is_partner:
+        custom_rate = listing.get("custom_buyer_premium_rate", 0.0) or 0.0
+        breakdown = calculate_partner_checkout(hammer_price, custom_rate)
+        breakdown["fee_model"] = "partner"
+    else:
+        # Get buyer's subscription tier for discount
+        buyer_doc = await db.users.find_one({"id": current_user.id})
+        buyer_tier = buyer_doc.get("subscription_tier", "free") if buyer_doc else "free"
+        breakdown = calculate_standard_checkout(hammer_price, buyer_tier)
+        breakdown["fee_model"] = "standard"
+    
+    return breakdown
 
 
 # ========== STRIPE CONNECT USER ENDPOINTS ==========

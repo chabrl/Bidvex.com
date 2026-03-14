@@ -46,6 +46,7 @@ import EmailMarketingPricing from './pages/EmailMarketingPricing';
 import SubscriptionPricingPage from './pages/SubscriptionPricingPage';
 import MaintenancePage from './pages/MaintenancePage';
 import CheckoutPage from './pages/CheckoutPage';
+import BecomePartnerPage from './pages/BecomePartnerPage';
 
 // Vehicle Auction Module (Standalone)
 import VehicleAuctionsPage from './pages/vehicles/VehicleAuctionsPage';
@@ -153,7 +154,8 @@ const MaintenanceGuard = ({ children }) => {
   
   // Always allow access to auth page for admin login
   const isAuthRoute = location.pathname === '/auth';
-  if (isAuthRoute) {
+  const isPartnerRoute = location.pathname === '/become-a-partner';
+  if (isAuthRoute || isPartnerRoute) {
     return children;
   }
   
@@ -285,6 +287,7 @@ const App = () => {
           } />
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
           <Route path="/terms-of-service" element={<TermsOfServicePage />} />
+          <Route path="/become-a-partner" element={<BecomePartnerPage />} />
           <Route path="/client-marketing" element={
             <ProtectedRoute><ClientEmailMarketing /></ProtectedRoute>
           } />

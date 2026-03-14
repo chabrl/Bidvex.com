@@ -6,7 +6,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { 
   Moon, Sun, User, LogOut, LayoutDashboard, 
   MessageCircle, DollarSign, Shield, Menu, X,
-  Home, ShoppingBag, Gavel, ChevronDown, Car
+  Home, ShoppingBag, Gavel, ChevronDown, Car, Building2
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -263,6 +263,14 @@ const Navbar = () => {
                       >
                         <DollarSign className="mr-3 h-4 w-4 text-muted-foreground" />
                         {t('nav.affiliateDashboard')}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => navigate('/become-a-partner')} 
+                        data-testid="become-partner-link"
+                        className="cursor-pointer"
+                      >
+                        <Building2 className="mr-3 h-4 w-4 text-muted-foreground" />
+                        Become a Partner
                       </DropdownMenuItem>
                     </div>
                     <DropdownMenuSeparator />
