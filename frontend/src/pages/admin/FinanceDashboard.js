@@ -11,9 +11,9 @@ import {
 import { toast } from 'sonner';
 import {
   DollarSign, TrendingUp, Users, Building2, Gavel, CreditCard,
-  Search, FileText, ExternalLink, Shield, CheckCircle, XCircle,
-  Loader2, ToggleLeft, ToggleRight, Trash2, Eye, ChevronLeft,
-  ChevronRight, Clock, ArrowUpDown
+  Search, FileText, ExternalLink, Shield, Loader2, ToggleLeft,
+  ToggleRight, Trash2, Eye, ChevronLeft, ChevronRight, Clock,
+  ArrowUpDown, Percent, Landmark
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -60,7 +60,7 @@ const FinanceDashboard = () => {
       setTransactions(res.data.transactions || []);
       setTxTotal(res.data.total || 0);
       setTxPages(res.data.pages || 0);
-    } catch { /* empty is fine */ }
+    } catch { /* silent */ }
     finally { setTxLoading(false); }
   }, [token, txPage, partnerOnly, txSearch]);
 
@@ -69,7 +69,7 @@ const FinanceDashboard = () => {
       const params = partnerFilter !== 'all' ? `?status=${partnerFilter}` : '';
       const res = await axios.get(`${API}/admin/partners${params}`, { headers });
       setPartners(res.data.applications || []);
-    } catch { /* empty */ }
+    } catch { /* silent */ }
   }, [token, partnerFilter]);
 
   useEffect(() => { fetchRevenue(); }, [fetchRevenue]);
@@ -141,13 +141,57 @@ const FinanceDashboard = () => {
             <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-slate-400" /></div>
           ) : (
             <>
-              {/* Revenue Cards */}
+              {/* PRIMARY: Collected Fees — The #1 metric */}
+              <Card className="border-2 border-emerald-200 dark:border-emerald-800 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30" data-testid="collected-fees-hero">
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider mb-1">Collected Fees (Your Revenue)</p>
+                      <p className="text-3xl font-bold text-emerald-800 dark:text-emerald-300" data-testid="total-collected-fees">
+                        {fmt((r.total_platform_fees || 0) + (r.total_processing_fees || 0) + (r.subscription_revenue || 0))}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-emerald-100 dark:bg-emerald-900/50 rounded-xl">
+                      <Landmark className="w-7 h-7 text-emerald-600 dark:text-emerald-400" />
+                    </div>
+                  </div>
+                  {/* Fee Breakdown */}
+                  <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-emerald-200 dark:border-emerald-800">
+                    <div data-testid="fee-platform">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Percent className="w-3.5 h-3.5 text-emerald-600" />
+                        <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400">3% Platform Fee</span>
+                      </div>
+                      <p className="text-lg font-bold text-emerald-800 dark:text-emerald-300">{fmt(r.total_platform_fees)}</p>
+                      <p className="text-[10px] text-emerald-600 dark:text-emerald-500 mt-0.5">From all auction sales</p>
+                    </div>
+                    <div data-testid="fee-stripe-recovery">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <CreditCard className="w-3.5 h-3.5 text-slate-500" />
+                        <span className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Stripe Cost Recovery</span>
+                      </div>
+                      <p className="text-lg font-bold text-slate-700 dark:text-slate-300">{fmt(r.total_processing_fees)}</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">2.9% + $0.30 passed to buyer</p>
+                    </div>
+                    <div data-testid="fee-subscriptions">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <CreditCard className="w-3.5 h-3.5 text-violet-500" />
+                        <span className="text-[11px] font-medium text-violet-600 dark:text-violet-400">Subscription Revenue</span>
+                      </div>
+                      <p className="text-lg font-bold text-violet-700 dark:text-violet-300">{fmt(r.subscription_revenue)}</p>
+                      <p className="text-[10px] text-violet-500 mt-0.5">Premium & VIP plans</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Secondary Stats Grid */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {[
                   { label: 'Hammer Volume', value: fmt(r.total_hammer_volume), icon: Gavel, color: 'text-blue-600' },
-                  { label: 'Platform Fees', value: fmt(r.total_platform_fees), icon: DollarSign, color: 'text-emerald-600' },
-                  { label: 'Subscription Rev.', value: fmt(r.subscription_revenue), icon: CreditCard, color: 'text-violet-600' },
-                  { label: 'Transactions', value: r.total_transactions, icon: ArrowUpDown, color: 'text-amber-600' },
+                  { label: 'Buyer Premiums', value: fmt(r.total_buyer_premiums), icon: DollarSign, color: 'text-amber-600' },
+                  { label: 'Transactions', value: r.total_transactions || 0, icon: ArrowUpDown, color: 'text-slate-600' },
+                  { label: 'Active Auctions', value: a.active || 0, icon: Gavel, color: 'text-cyan-600' },
                 ].map((c, i) => (
                   <Card key={i} data-testid={`revenue-card-${i}`}>
                     <CardContent className="p-4">
@@ -163,44 +207,44 @@ const FinanceDashboard = () => {
                 ))}
               </div>
 
-              {/* Partner Revenue */}
+              {/* Partner Revenue Section */}
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm flex items-center gap-2">
-                    <Building2 className="w-4 h-4 text-blue-500" /> Partner Revenue
+                    <Building2 className="w-4 h-4 text-blue-500" /> Partner Revenue Breakdown
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                     <div>
-                      <p className="text-[11px] text-slate-500">Hammer Volume</p>
+                      <p className="text-[11px] text-slate-500">Partner Hammer Volume</p>
                       <p className="font-semibold">{fmt(pr.hammer_volume)}</p>
                     </div>
                     <div>
-                      <p className="text-[11px] text-slate-500">3% Fees Collected</p>
+                      <p className="text-[11px] text-slate-500">3% Fees from Partners</p>
                       <p className="font-semibold text-emerald-600">{fmt(pr.platform_fees_collected)}</p>
                     </div>
                     <div>
-                      <p className="text-[11px] text-slate-500">Buyer Premiums</p>
+                      <p className="text-[11px] text-slate-500">Buyer Premiums (Partner)</p>
                       <p className="font-semibold">{fmt(pr.buyer_premiums)}</p>
                     </div>
                     <div>
-                      <p className="text-[11px] text-slate-500">Transactions</p>
-                      <p className="font-semibold">{pr.transaction_count}</p>
+                      <p className="text-[11px] text-slate-500">Partner Transactions</p>
+                      <p className="font-semibold">{pr.transaction_count || 0}</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* User & Auction Stats */}
+              {/* User & Auction Quick Stats */}
               <div className="grid sm:grid-cols-2 gap-3">
                 <Card>
                   <CardContent className="p-4">
                     <p className="text-xs text-slate-500 font-medium mb-2">User Accounts</p>
                     <div className="flex gap-4 text-sm">
-                      <div><span className="font-bold text-lg">{u.total}</span> <span className="text-slate-500">Total</span></div>
-                      <div><span className="font-bold text-lg text-emerald-600">{u.active_partners}</span> <span className="text-slate-500">Partners</span></div>
-                      <div><span className="font-bold text-lg text-amber-600">{u.pending_partners}</span> <span className="text-slate-500">Pending</span></div>
+                      <div><span className="font-bold text-lg">{u.total || 0}</span> <span className="text-slate-500">Total</span></div>
+                      <div><span className="font-bold text-lg text-emerald-600">{u.active_partners || 0}</span> <span className="text-slate-500">Partners</span></div>
+                      <div><span className="font-bold text-lg text-amber-600">{u.pending_partners || 0}</span> <span className="text-slate-500">Pending</span></div>
                     </div>
                   </CardContent>
                 </Card>
@@ -208,9 +252,9 @@ const FinanceDashboard = () => {
                   <CardContent className="p-4">
                     <p className="text-xs text-slate-500 font-medium mb-2">Auctions</p>
                     <div className="flex gap-4 text-sm">
-                      <div><span className="font-bold text-lg">{a.total}</span> <span className="text-slate-500">Total</span></div>
-                      <div><span className="font-bold text-lg text-blue-600">{a.active}</span> <span className="text-slate-500">Active</span></div>
-                      <div><span className="font-bold text-lg text-violet-600">{a.partner_active}</span> <span className="text-slate-500">Partner</span></div>
+                      <div><span className="font-bold text-lg">{a.total || 0}</span> <span className="text-slate-500">Total</span></div>
+                      <div><span className="font-bold text-lg text-blue-600">{a.active || 0}</span> <span className="text-slate-500">Active</span></div>
+                      <div><span className="font-bold text-lg text-violet-600">{a.partner_active || 0}</span> <span className="text-slate-500">Partner</span></div>
                     </div>
                   </CardContent>
                 </Card>

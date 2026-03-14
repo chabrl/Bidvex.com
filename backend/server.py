@@ -4786,8 +4786,12 @@ async def get_multi_item_listings(
     status: Optional[str] = None,
     category: Optional[str] = None,
     region: Optional[str] = None,
+    city: Optional[str] = None,
     currency: Optional[str] = None,
-    search: Optional[str] = None
+    search: Optional[str] = None,
+    seller_id: Optional[str] = None,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
 ):
     # Build query filter
     query = {}
@@ -4807,9 +4811,21 @@ async def get_multi_item_listings(
     if region:
         query["region"] = region
     
+    # City filter
+    if city:
+        query["city"] = city
+    
     # Currency filter
     if currency:
         query["currency"] = currency
+    
+    # Seller / Auctioneer filter (comma-separated IDs)
+    if seller_id:
+        ids = [s.strip() for s in seller_id.split(",") if s.strip()]
+        if len(ids) == 1:
+            query["seller_id"] = ids[0]
+        elif len(ids) > 1:
+            query["seller_id"] = {"$in": ids}
     
     # Search filter (title or description)
     if search:
