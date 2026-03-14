@@ -1,5 +1,39 @@
 # BidVex Changelog
 
+## March 14, 2026 - Bug Fixes: 6 Marketplace & Partner Page Issues
+
+### Issue 1: React "Objects are not valid as a Child" Error (FIXED)
+- Root cause: `confirmBid` in FlattenedMarketplace.js, `handleBid` in VehicleDetailPage.js, and `placeBid` in VehicleAuctionContext.js all passed `error.response.data.detail` directly to toast — when it was a Pydantic validation error array `[{type,loc,msg,input,url}]`, React crashed trying to render the object.
+- Fix: All three catch blocks now extract `.msg` string from validation error objects before rendering.
+
+### Issue 2: Marketplace Card Layout Overflow (FIXED)
+- Root cause: Card used `space-y-3` with no flex structure, so buttons at bottom could overflow on narrow cards.
+- Fix: Card uses `flex flex-col` with `flex-1` spacer to push pricing/actions to bottom. Buttons use `h-9 text-sm` for consistent sizing. Grid reduced to `lg:grid-cols-3` (from `xl:grid-cols-4`) when sidebar is present.
+
+### Issue 3: "Become a Partner" Light Mode Theming (FIXED)
+- Root cause: Page was hardcoded with `bg-slate-950` dark background, making it unreadable in light mode.
+- Fix: Full rewrite with `bg-white dark:bg-slate-950` + semantic dark/light classes. Benefit cards now use colored borders (`border-emerald-200 dark:border-emerald-500/20`) and light backgrounds (`bg-emerald-50 dark:bg-gradient-to-br`).
+
+### Issue 4: Item Routing Correction (FIXED)
+- Root cause: All items linked to `/lots/${item.auction_id}`. Standalone listings (no parent auction) have `auction_id=null`, routing to `/lots/null` (404).
+- Fix: Smart routing: `detailLink = item.auction_id ? /lots/${item.auction_id} : /listing/${item.id}`. "Lot #X" parent link only renders when both `auction_id` AND `lot_number` exist.
+
+### Issue 5: Seller Badge Logic (FIXED)
+- Root cause: No check for `is_partner_listing` in ItemCard component.
+- Fix: Added purple "Verified Partner" badge (`<Badge data-testid="partner-badge">`) when `item.is_partner_listing` is true. Badge stacks vertically with Private Sale/Business badge.
+
+### Issue 6: General Polish (VERIFIED)
+- Removed duplicate MarketplaceSidebar rendering in MarketplacePage.js
+- Fixed skeleton loader grid to match 3-column layout
+- Cleaned up inline styles, replaced with semantic Tailwind dark/light classes
+- Card content uses `flex-col flex-1` for consistent bottom-aligned actions
+
+### Testing
+- Backend: 9/9 tests passed (100%) — iteration_46
+- Frontend: All 6 issues verified (100%)
+
+---
+
 ## March 14, 2026 - P1: Email Settings Panel & CSV Export
 
 ### Email Settings Admin Panel

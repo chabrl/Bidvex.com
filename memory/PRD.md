@@ -32,9 +32,18 @@ i18n: react-i18next (EN/FR bilingual support)
 PDF Generation: ReportLab (bilingual invoices)
 ```
 
-## Current Status: ✅ PHASE 2 COMPLETE + P1 EMAIL SETTINGS & CSV EXPORT
+## Current Status: ✅ PHASE 2 COMPLETE + P1 DONE + BUG FIXES VERIFIED
 
 ### Session Summary (Mar 14, 2026 — Latest)
+
+**Bug Fixes: 6 Marketplace & Partner Page Issues (All Fixed)**
+- Issue 1: React "Objects are not valid as a Child" — Pydantic error objects now extracted to string before rendering in toast
+- Issue 2: Card layout overflow — Cards use flex-col with spacer, grid reduced to 3-col with sidebar
+- Issue 3: Partner page light mode — Full rewrite with bg-white dark:bg-slate-950 + semantic classes
+- Issue 4: Item routing — Standalone items (auction_id=null) now route to /listing/:id, not /lots/null
+- Issue 5: Seller badges — "Verified Partner" purple badge shows on cards when is_partner_listing=true
+- Issue 6: General polish — Removed duplicate sidebar, fixed skeleton grid, cleaned inline styles
+- Testing: 100% (iteration_46) — 9/9 backend + all frontend verified
 
 **P1: Email Settings Panel & CSV Export**
 - Built self-service Email Settings panel under Admin > Partners & Finance > Email Settings
