@@ -32,9 +32,18 @@ i18n: react-i18next (EN/FR bilingual support)
 PDF Generation: ReportLab (bilingual invoices)
 ```
 
-## Current Status: ✅ PHASE 2 COMPLETE — ALL TASKS FINALIZED
+## Current Status: ✅ PHASE 2 COMPLETE + P1 EMAIL SETTINGS & CSV EXPORT
 
 ### Session Summary (Mar 14, 2026 — Latest)
+
+**P1: Email Settings Panel & CSV Export**
+- Built self-service Email Settings panel under Admin > Partners & Finance > Email Settings
+- SendGrid API key stored in MongoDB `settings` collection (not env var), with masked display
+- "Send Test Email" button verifies configuration in real-time
+- "Automated Partner Emails" section shows status of 3 email triggers (Application Received, Verified, Rejected)
+- Partner application endpoint (`apply_for_partner`) now checks DB-stored key via `_get_sendgrid_config()` before env var
+- CSV export button in Transaction Logs tab — downloads filtered transactions with auth header
+- Testing: 100% (iteration_45) — 20/20 backend + all frontend verified
 
 **Phase 2 Finalization: Admin Command Center & Marketplace Sidebar**
 - Task 4a — Marketplace Sidebar: Integrated MarketplaceSidebar into LotsMarketplacePage (/lots) with two-column layout. Added city/seller_id params to multi-item-listings API. Auctioneer filter prominent at top.

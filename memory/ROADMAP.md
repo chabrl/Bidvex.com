@@ -15,8 +15,10 @@
 - [x] Phase 2: Marketplace Sidebar Filter — Integrated into both MarketplacePage and LotsMarketplacePage
 
 ## P1 - High Priority
-- [ ] **Email Settings Admin Panel** — Section in Admin Dashboard to paste SendGrid API key and send test email
-- [ ] Provide live SendGrid API keys to activate partner onboarding emails
+- [x] **Email Settings Admin Panel** — Self-service SendGrid key management + Send Test Email
+- [x] **CSV Export for Transaction Logs** — Download filtered transactions for accounting
+- [x] **DB-stored SendGrid config** — Partner emails auto-activate when key is saved via admin panel
+- [ ] User provides live SendGrid API key and tests the flow
 - [ ] User live testing of partner application + verification flow in production
 
 ## P2 - Medium Priority

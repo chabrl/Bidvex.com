@@ -1,5 +1,42 @@
 # BidVex Changelog
 
+## March 14, 2026 - P1: Email Settings Panel & CSV Export
+
+### Email Settings Admin Panel
+- New self-service panel at Admin > Partners & Finance > Email Settings
+- SendGrid API key stored in MongoDB `settings` collection with `key: "sendgrid"`
+- Status banner shows Connected/Inactive with key source (database/environment)
+- API key field with masked display (SG.xx...xxxx), show/hide toggle
+- Sender Email and Sender Name configurable
+- "Send Test Email" button with recipient input — sends branded verification email
+- "Automated Partner Emails" section shows status of 3 triggers: Application Received, Verified, Rejected
+- Last test timestamp and pass/fail status displayed
+
+### CSV Transaction Export
+- New "Export CSV" button in Transaction Logs tab (next to "Partner Only" filter)
+- Downloads all transactions matching current filters (search + partner_only)
+- CSV columns: Date, Item, Buyer/Seller Email, Type, Hammer Price, BP, Platform Fee, Processing Fee, Payout, Stripe ID, Partner Company
+- Auth-protected download via fetch + blob approach
+
+### DB-Stored SendGrid Configuration
+- `_get_sendgrid_config()` async helper checks DB first, then env var fallback
+- `_send_partner_email()` updated to use DB-stored key
+- Partner application email onboarding (Task 5) now uses `_get_sendgrid_config()` 
+- Once admin saves a valid key via the panel, all partner emails auto-activate
+
+### Backend Endpoints Added
+- `GET /api/admin/email-settings` — Returns config status with masked key
+- `POST /api/admin/email-settings` — Validates SG. prefix, upserts to settings collection
+- `POST /api/admin/email-settings/test` — Sends test email, records last_test_at/status
+- `GET /api/admin/finance/transactions/export` — CSV export with filters
+
+### Testing
+- Backend: 20/20 tests passed (100%) — iteration_45
+- Frontend: All UI verified (100%)
+- Test file: `/app/backend/tests/test_email_settings_csv_export.py`
+
+---
+
 ## March 14, 2026 - Phase 2 Finalization: Admin Command Center & Marketplace Sidebar
 
 ### Task 4a: Marketplace Sidebar Filter Integration (LotsMarketplacePage)
