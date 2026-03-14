@@ -50,7 +50,8 @@ const FlattenedMarketplace = ({
   limit = 50, 
   showFilters = true,
   showHeader = true,
-  variant = 'full' // 'full', 'compact', 'homepage'
+  variant = 'full', // 'full', 'compact', 'homepage'
+  externalFilters = {}
 }) => {
   const { t } = useTranslation();
   const { user, token } = useAuth();
@@ -206,7 +207,15 @@ const FlattenedMarketplace = ({
       // Refresh items
       fetchItems();
     } catch (error) {
-      const message = error.response?.data?.detail || 'Failed to place bid';
+      const detail = error.response?.data?.detail;
+      let message = 'Failed to place bid';
+      if (typeof detail === 'string') {
+        message = detail;
+      } else if (Array.isArray(detail)) {
+        message = detail.map(e => (typeof e === 'string' ? e : e?.msg || '')).filter(Boolean).join(', ') || message;
+      } else if (detail && typeof detail === 'object') {
+        message = detail.msg || JSON.stringify(detail);
+      }
       toast.error(message);
     } finally {
       setPlacingBid(false);
@@ -214,7 +223,7 @@ const FlattenedMarketplace = ({
   };
 
   return (
-    <div className={variant === 'homepage' ? '' : 'container mx-auto px-4 py-8'}>
+    <div className={variant === 'homepage' ? '' : variant === 'full' ? '' : 'container mx-auto px-4 py-8'}>
       {/* Header */}
       {showHeader && (
         <div className="mb-6">
@@ -325,14 +334,14 @@ const FlattenedMarketplace = ({
 
       {/* Items Grid */}
       {loading && items.length === 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {[...Array(8)].map((_, i) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {[...Array(6)].map((_, i) => (
             <Card key={i} className="animate-pulse">
-              <div className="h-48 bg-gray-200 rounded-t-lg"></div>
+              <div className="h-52 bg-gray-200 dark:bg-slate-700 rounded-t-lg"></div>
               <CardContent className="p-4 space-y-2">
-                <div className="h-4 bg-gray-200 rounded"></div>
-                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                <div className="h-8 bg-gray-200 rounded mt-4"></div>
+                <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded"></div>
+                <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-3/4"></div>
+                <div className="h-8 bg-gray-200 dark:bg-slate-700 rounded mt-4"></div>
               </CardContent>
             </Card>
           ))}
@@ -357,7 +366,7 @@ const FlattenedMarketplace = ({
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {items.map((item) => (
             <ItemCard 
               key={item.id} 
@@ -544,12 +553,14 @@ const ItemCard = ({ item, onQuickBid, trackClick }) => {
   };
 
   const isPrivateSale = !item.seller_is_business;
+  // Smart routing: standalone listings go to /listing/:id, multi-lot items go to /lots/:auctionId
+  const detailLink = item.auction_id ? `/lots/${item.auction_id}` : `/listing/${item.id}`;
 
   return (
-    <Card className="group hover:shadow-xl transition-all duration-300 overflow-hidden border-0 shadow-md">
+    <Card className="group hover:shadow-xl transition-all duration-300 overflow-hidden border-0 shadow-md flex flex-col" data-testid="marketplace-item-card">
       {/* Image Container */}
       <Link
-        to={`/lots/${item.auction_id}`}
+        to={detailLink}
         onClick={() => trackClick(item.id)}
         className="block"
       >
@@ -566,17 +577,24 @@ const ItemCard = ({ item, onQuickBid, trackClick }) => {
             </div>
           )}
 
-          {/* Top Left - Seller Type Badge */}
-          <div className="absolute top-3 left-3 z-10">
+          {/* Top Left - Badges stack */}
+          <div className="absolute top-3 left-3 z-10 flex flex-col gap-1.5">
             {isPrivateSale ? (
-              <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 shadow-lg">
+              <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 shadow-lg text-xs">
                 <User className="h-3 w-3 mr-1" />
                 Private Sale
               </Badge>
             ) : (
-              <Badge className="bg-blue-100 text-blue-700 border-blue-200">
+              <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-xs">
                 <ShieldCheck className="h-3 w-3 mr-1" />
                 Business
+              </Badge>
+            )}
+            {/* Verified Partner Badge */}
+            {item.is_partner_listing && (
+              <Badge className="bg-violet-600 text-white border-0 shadow-lg text-xs" data-testid="partner-badge">
+                <ShieldCheck className="h-3 w-3 mr-1" />
+                Verified Partner
               </Badge>
             )}
           </div>
@@ -609,16 +627,15 @@ const ItemCard = ({ item, onQuickBid, trackClick }) => {
         </div>
       </Link>
 
-      <CardContent className="p-4 space-y-3" style={{ '--item-title-color': '#1a1a1a' }} data-testid="item-card">
+      <CardContent className="p-4 flex flex-col flex-1 gap-2.5" data-testid="item-card">
         {/* Title */}
         <Link
-          to={`/lots/${item.auction_id}`}
+          to={detailLink}
           onClick={() => trackClick(item.id)}
           className="block"
         >
           <h3 
-            className="font-semibold text-lg line-clamp-2 item-card-title hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors"
-            style={{ color: 'var(--item-title-color, #1a1a1a)', fontWeight: 600 }}
+            className="font-semibold text-base line-clamp-2 text-slate-900 dark:text-white hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors"
             data-testid="item-title"
           >
             {item.title}
@@ -627,24 +644,23 @@ const ItemCard = ({ item, onQuickBid, trackClick }) => {
 
         {/* Location */}
         {item.city && (
-          <div 
-            className="flex items-center text-sm location-text"
-            style={{ color: '#6b7280' }}
-            data-location="true"
-          >
-            <MapPin className="h-3.5 w-3.5 mr-1" style={{ color: '#6b7280' }} />
-            {item.city}, {item.region}
+          <div className="flex items-center text-sm text-slate-500 dark:text-slate-400">
+            <MapPin className="h-3.5 w-3.5 mr-1 flex-shrink-0" />
+            <span className="truncate">{item.city}, {item.region}</span>
           </div>
         )}
 
         {/* Tax Savings Banner (Private Sale) */}
         {isPrivateSale && (
-          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-3 py-2 text-xs">
-            <span className="font-medium" style={{ color: '#15803d' }}>
-              🎉 Save ~15% - No tax on item price!
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-3 py-1.5 text-xs">
+            <span className="font-medium text-green-700 dark:text-green-400">
+              Save ~15% - No tax on item price!
             </span>
           </div>
         )}
+
+        {/* Spacer to push pricing and actions to the bottom */}
+        <div className="flex-1" />
 
         {/* Pricing */}
         <div className="space-y-1">
@@ -666,29 +682,33 @@ const ItemCard = ({ item, onQuickBid, trackClick }) => {
         </div>
 
         {/* Parent Auction Link */}
-        <div className="text-xs text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-200 dark:border-slate-700">
-          Lot #{item.lot_number} of{' '}
-          <Link
-            to={`/lots/${item.auction_id}`}
-            className="text-cyan-600 dark:text-cyan-400 hover:underline inline-flex items-center gap-1"
-          >
-            {item.parent_auction_title}
-            <ExternalLink className="h-3 w-3" />
-          </Link>
-        </div>
+        {item.auction_id && item.lot_number && (
+          <div className="text-xs text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-200 dark:border-slate-700">
+            Lot #{item.lot_number} of{' '}
+            <Link
+              to={`/lots/${item.auction_id}`}
+              className="text-cyan-600 dark:text-cyan-400 hover:underline inline-flex items-center gap-1"
+            >
+              {item.parent_auction_title || 'Auction'}
+              <ExternalLink className="h-3 w-3" />
+            </Link>
+          </div>
+        )}
 
-        {/* Actions */}
-        <div className="flex gap-2 pt-2">
+        {/* Actions — always at bottom */}
+        <div className="flex gap-2 pt-1">
           <Button
             onClick={(e) => onQuickBid(item, e)}
-            className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-500 text-white hover:from-blue-700 hover:to-cyan-600"
+            size="sm"
+            className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-500 text-white hover:from-blue-700 hover:to-cyan-600 h-9 text-sm"
+            data-testid="quick-bid-btn"
           >
-            <Zap className="h-4 w-4 mr-1" />
+            <Zap className="h-3.5 w-3.5 mr-1 flex-shrink-0" />
             Quick Bid
           </Button>
-          <Link to={`/lots/${item.auction_id}`} className="flex-1">
-            <Button variant="outline" className="w-full border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200">
-              <Eye className="h-4 w-4 mr-1" />
+          <Link to={detailLink} className="flex-1">
+            <Button variant="outline" size="sm" className="w-full border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 h-9 text-sm" data-testid="view-item-btn">
+              <Eye className="h-3.5 w-3.5 mr-1 flex-shrink-0" />
               View
             </Button>
           </Link>

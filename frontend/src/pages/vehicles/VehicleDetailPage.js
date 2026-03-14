@@ -251,7 +251,16 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
       setBidAmount((amount + (vehicle?.bid_increment || 100)).toString());
       
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to place bid');
+      const detail = error.response?.data?.detail;
+      let message = 'Failed to place bid';
+      if (typeof detail === 'string') {
+        message = detail;
+      } else if (Array.isArray(detail)) {
+        message = detail.map(e => (typeof e === 'string' ? e : e?.msg || '')).filter(Boolean).join(', ') || message;
+      } else if (detail && typeof detail === 'object') {
+        message = detail.msg || JSON.stringify(detail);
+      }
+      toast.error(message);
     } finally {
       setBidding(false);
     }

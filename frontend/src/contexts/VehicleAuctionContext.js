@@ -226,9 +226,14 @@ export const VehicleAuctionProvider = ({ children }) => {
       });
       return { success: true, data: response.data };
     } catch (error) {
+      const detail = error.response?.data?.detail;
+      let msg = 'Bid failed';
+      if (typeof detail === 'string') msg = detail;
+      else if (Array.isArray(detail)) msg = detail.map(e => (typeof e === 'string' ? e : e?.msg || '')).filter(Boolean).join(', ') || msg;
+      else if (detail && typeof detail === 'object') msg = detail.msg || JSON.stringify(detail);
       return { 
         success: false, 
-        error: error.response?.data?.detail || 'Bid failed' 
+        error: msg
       };
     }
   }, [getAuthHeaders]);

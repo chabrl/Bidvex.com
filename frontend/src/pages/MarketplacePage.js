@@ -54,15 +54,11 @@ const MarketplacePage = () => {
       {/* Content with Sidebar */}
       <div className="container mx-auto max-w-7xl px-4 py-6">
         <div className="flex gap-6">
-          {/* Sidebar - mobile trigger + desktop fixed */}
+          {/* Sidebar — renders desktop fixed + mobile Sheet internally */}
           <MarketplaceSidebar onFiltersChange={setSidebarFilters} />
           
           {/* Main Content */}
           <div className="flex-1 min-w-0">
-            {/* Mobile filter button row */}
-            <div className="lg:hidden mb-4">
-              <MarketplaceSidebar onFiltersChange={setSidebarFilters} />
-            </div>
             <FlattenedMarketplace 
               showFilters={true}
               showHeader={false}
