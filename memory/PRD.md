@@ -32,18 +32,24 @@ i18n: react-i18next (EN/FR bilingual support)
 PDF Generation: ReportLab (bilingual invoices)
 ```
 
-## Current Status: ✅ PHASE 2 COMPLETE + P1 DONE + BUG FIXES VERIFIED
+## Current Status: ✅ PHASE 2 COMPLETE + P1 DONE + ALL BUG FIXES VERIFIED
 
 ### Session Summary (Mar 14, 2026 — Latest)
 
-**Bug Fixes: 6 Marketplace & Partner Page Issues (All Fixed)**
-- Issue 1: React "Objects are not valid as a Child" — Pydantic error objects now extracted to string before rendering in toast
-- Issue 2: Card layout overflow — Cards use flex-col with spacer, grid reduced to 3-col with sidebar
-- Issue 3: Partner page light mode — Full rewrite with bg-white dark:bg-slate-950 + semantic classes
-- Issue 4: Item routing — Standalone items (auction_id=null) now route to /listing/:id, not /lots/null
-- Issue 5: Seller badges — "Verified Partner" purple badge shows on cards when is_partner_listing=true
-- Issue 6: General polish — Removed duplicate sidebar, fixed skeleton grid, cleaned inline styles
-- Testing: 100% (iteration_46) — 9/9 backend + all frontend verified
+**Bug Fixes: Homepage, Routing & Validation (4 Issues Fixed)**
+- Issue 1: "Verify Now" button 404 — Route fixed from `/profile/settings` to `/settings?tab=payments`
+- Issue 2: Rate Seller validation — Added `auction_type='single'` prop, user-friendly "must win an item" message, Pydantic error extraction
+- Issue 3: Homepage raw translation keys — Added `hotItems='Trending Now'`, `justListed='Fresh Arrivals'`, `views`, `new`, `freshAuctions`, `activeBidding` to both EN and FR i18n
+- Issue 4: Homepage light mode — HotItemsSection uses Tailwind dark: prefix for theme-aware bg, cards have white bg in light mode with shadows
+- Testing: 100% (iteration_47) — 10/10 backend + all 14 features verified
+
+**Bug Fixes: Marketplace & Partner Page (6 Issues Fixed)**
+- React "Objects are not valid as a Child" — Pydantic error objects extracted to string in 3 components
+- Card layout overflow — flex-col, 3-col grid, properly sized buttons
+- Partner page light mode — Full rewrite with semantic dark/light classes
+- Item routing — Standalone items route to /listing/:id, lot items to /lots/:auctionId
+- Seller badges — "Verified Partner" purple badge on is_partner_listing cards
+- Testing: 100% (iteration_46)
 
 **P1: Email Settings Panel & CSV Export**
 - Built self-service Email Settings panel under Admin > Partners & Finance > Email Settings

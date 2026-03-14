@@ -1,5 +1,29 @@
 # BidVex Changelog
 
+## March 14, 2026 - Bug Fixes: Homepage Translation Keys, Routing & Validation (4 Issues)
+
+### Issue 1: Verify Now Button 404 (FIXED)
+- Root cause: Button linked to `/profile/settings?tab=payments` which doesn't exist; correct route is `/settings?tab=payments`
+- Fix: Updated navigate call in ListingDetailPage.js
+
+### Issue 2: Rate Seller Missing auction_type (FIXED)
+- Root cause: RateSellerModal didn't pass `auction_type` field in payload, backend required it
+- Fix: Added `auctionType="single"` prop from ListingDetailPage, default in modal. Added user-friendly error: "You must win at least one item from this seller to leave a rating!" when user hasn't participated. Pydantic error extraction added.
+
+### Issue 3: Homepage Raw Translation Keys (FIXED)
+- Root cause: Keys `homepage.hotItems`, `homepage.hotItemsDesc`, `homepage.justListed`, `homepage.freshAuctions`, `homepage.views`, `homepage.new`, `homepage.activeBidding` were referenced in JSX but not defined in i18n.js
+- Fix: Added all missing keys to both EN and FR translations. EN: "Trending Now", "Fresh Arrivals", etc. FR: "Tendances", "Nouveautés", etc.
+
+### Issue 4: Homepage Light Mode Polish (FIXED)
+- Root cause: HotItemsSection used hardcoded dark gradient via inline `style={{ background: ... }}` — invisible in light mode
+- Fix: Replaced with Tailwind `bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:bg-none` + `hidden dark:block` for dark-mode-only gradient overlay. Cards use `bg-white dark:bg-white/5` for proper theming.
+
+### Testing
+- Backend: 10/10 tests passed (100%) — iteration_47
+- Frontend: All 14 features verified (100%)
+
+---
+
 ## March 14, 2026 - Bug Fixes: 6 Marketplace & Partner Page Issues
 
 ### Issue 1: React "Objects are not valid as a Child" Error (FIXED)
