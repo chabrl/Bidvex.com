@@ -11786,6 +11786,78 @@ async def apply_for_partner(
         "timestamp": now,
     })
 
+    # ===== AUTOMATED EMAIL ONBOARDING (Task 5) =====
+    try:
+        sendgrid_key = os.environ.get("SENDGRID_API_KEY", "")
+        if sendgrid_key and not sendgrid_key.startswith("SG.your"):
+            import sendgrid
+            from sendgrid.helpers.mail import Mail, Email, To, Content
+            
+            sg = sendgrid.SendGridAPIClient(api_key=sendgrid_key)
+            from_email = Email(os.environ.get("SENDGRID_FROM_EMAIL", "noreply@bidvex.com"), "BidVex Partner Team")
+            
+            # 1) Applicant auto-reply
+            applicant_html = f"""
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; color: #1e293b;">
+              <h2 style="color: #2563eb;">Thank You for Applying</h2>
+              <p>Dear {current_user.email.split('@')[0].title()},</p>
+              <p>Thank you for applying to the <strong>BidVex Partner Network</strong>. Our team is currently reviewing your NEQ and professional credentials.</p>
+              <p><strong>Expected turnaround: 24-48 hours.</strong></p>
+              <p>If we need additional information, we will reach out to you directly.</p>
+              <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+              <p style="color: #64748b; font-size: 13px;">Application Summary:</p>
+              <ul style="color: #475569; font-size: 13px;">
+                <li>Company: <strong>{company_name}</strong></li>
+                <li>NEQ: <strong>{neq_number}</strong></li>
+                <li>Documents: {len(cert_urls)} certification(s) + NEQ proof</li>
+              </ul>
+              <p style="color: #64748b; font-size: 12px; margin-top: 20px;">
+                Questions? Contact us at <a href="mailto:partners@bidvex.ca" style="color: #2563eb;">partners@bidvex.ca</a>
+              </p>
+            </div>
+            """
+            applicant_mail = Mail(
+                from_email=from_email,
+                to_emails=To(current_user.email),
+                subject="BidVex Partner Application — Under Review",
+                html_content=Content("text/html", applicant_html)
+            )
+            sg.client.mail.send.post(request_body=applicant_mail.get())
+            
+            # 2) Internal alert to partners@bidvex.ca
+            cert_links = "".join([f'<li><a href="{url}">{url.split("/")[-1]}</a></li>' for url in cert_urls])
+            internal_html = f"""
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1e293b;">
+              <h2 style="color: #dc2626;">New Partner Application</h2>
+              <table style="font-size: 14px; border-collapse: collapse;">
+                <tr><td style="padding: 4px 12px 4px 0; font-weight: bold;">Applicant:</td><td>{current_user.email}</td></tr>
+                <tr><td style="padding: 4px 12px 4px 0; font-weight: bold;">Company:</td><td>{company_name}</td></tr>
+                <tr><td style="padding: 4px 12px 4px 0; font-weight: bold;">NEQ:</td><td>{neq_number}</td></tr>
+                <tr><td style="padding: 4px 12px 4px 0; font-weight: bold;">Applied At:</td><td>{now}</td></tr>
+              </table>
+              <h3 style="margin-top: 16px;">Submitted Documents:</h3>
+              <ul>
+                <li><a href="{neq_url}">NEQ Proof</a></li>
+                {cert_links}
+              </ul>
+              <p style="margin-top: 16px;"><a href="{base_url}/admin" style="color: #2563eb; font-weight: bold;">Review in Admin Panel</a></p>
+            </div>
+            """
+            internal_mail = Mail(
+                from_email=from_email,
+                to_emails=To("partners@bidvex.ca"),
+                subject=f"[ACTION REQUIRED] New Partner Application: {company_name}",
+                html_content=Content("text/html", internal_html)
+            )
+            sg.client.mail.send.post(request_body=internal_mail.get())
+            
+            logger.info(f"Partner onboarding emails sent for {current_user.email}")
+        else:
+            logger.info("SendGrid not configured — partner onboarding emails skipped.")
+    except Exception as e:
+        logger.warning(f"Failed to send partner onboarding emails: {e}")
+        # Don't block the application submission if email fails
+
     return {
         "success": True,
         "message": "Partner application submitted. Our team will review your documents and reach out at partners@bidvex.ca.",

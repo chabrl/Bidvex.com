@@ -36,6 +36,9 @@ const CheckoutPage = () => {
   const [listing, setListing] = useState(null);
   const [checkoutType, setCheckoutType] = useState(null);
   const [sellerIsTaxRegistered, setSellerIsTaxRegistered] = useState(false);
+  const [isPartnerListing, setIsPartnerListing] = useState(false);
+  const [partnerCompany, setPartnerCompany] = useState(null);
+  const [feeModelLabel, setFeeModelLabel] = useState(null);
   
   // Check for success/cancelled status from Stripe redirect
   const status = searchParams.get('status');
@@ -74,6 +77,9 @@ const CheckoutPage = () => {
       setBreakdown(previewRes.data.breakdown);
       setCheckoutType(previewRes.data.checkout_type);
       setSellerIsTaxRegistered(previewRes.data.seller_is_tax_registered);
+      setIsPartnerListing(previewRes.data.is_partner_listing || false);
+      setPartnerCompany(previewRes.data.partner_company || null);
+      setFeeModelLabel(previewRes.data.fee_model_label || null);
       
     } catch (err) {
       console.error('Failed to load checkout:', err);
@@ -228,9 +234,16 @@ const CheckoutPage = () => {
                   {isFrench ? 'Détail des coûts' : 'Cost Breakdown'}
                 </CardTitle>
                 <CardDescription>
-                  {isVehicle 
-                    ? (isFrench ? 'Paiement hybride - Frais BidVex seulement' : 'Hybrid Payment - BidVex Fees Only')
-                    : (isFrench ? 'Paiement complet via Stripe' : 'Full Payment via Stripe')}
+                  {isPartnerListing
+                    ? (isFrench ? 'Encans professionnels' : 'Professional Partner Auction')
+                    : isVehicle 
+                      ? (isFrench ? 'Paiement hybride - Frais BidVex seulement' : 'Hybrid Payment - BidVex Fees Only')
+                      : (isFrench ? 'Paiement complet via Stripe' : 'Full Payment via Stripe')}
+                  {partnerCompany && (
+                    <span className="ml-2 inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                      <Shield className="h-3 w-3" /> {partnerCompany}
+                    </span>
+                  )}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -283,11 +296,13 @@ const CheckoutPage = () => {
                       <span>{formatCurrency(breakdown?.buyer_premium)}</span>
                     </div>
                     
-                    {isVehicle && breakdown?.platform_fee > 0 && (
+                    {(isVehicle || isPartnerListing) && breakdown?.platform_fee > 0 && (
                       <div className="flex justify-between">
                         <span>
                           {isFrench ? 'Frais plateforme' : 'Platform Fee'}
-                          <span className="text-slate-400 ml-1">(2.5%)</span>
+                          <span className="text-slate-400 ml-1">
+                            ({isPartnerListing ? '3%' : '2.5%'})
+                          </span>
                         </span>
                         <span>{formatCurrency(breakdown?.platform_fee)}</span>
                       </div>
@@ -313,7 +328,7 @@ const CheckoutPage = () => {
                     <div className="flex items-center gap-2">
                       <CreditCard className="h-4 w-4 text-amber-600" />
                       <span className="font-medium">
-                        {isFrench ? 'Frais de traitement' : 'Processing Fee'}
+                        {isFrench ? 'Frais de traitement sécurisé' : 'Secure Processing Fee'}
                       </span>
                       <span className="text-xs text-amber-600">(2.9% + $0.30)</span>
                     </div>
@@ -321,8 +336,8 @@ const CheckoutPage = () => {
                   </div>
                   <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
                     {isFrench 
-                      ? 'Frais de traitement de carte de crédit'
-                      : 'Credit card processing fee'}
+                      ? 'Frais de traitement par carte de crédit — transparent et sans majoration'
+                      : 'Credit card processing cost — transparent, no markup'}
                   </p>
                 </div>
                 

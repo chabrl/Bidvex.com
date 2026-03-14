@@ -1028,6 +1028,7 @@ async def get_tax_rates():
 from services.stripe_connect_service import (
     calculate_general_checkout,
     calculate_vehicle_checkout,
+    calculate_partner_listing_checkout,
     create_destination_charge,
     create_vehicle_payment_session,
     STRIPE_PERCENTAGE_FEE,
@@ -1082,10 +1083,43 @@ async def create_auction_checkout(
     # Determine if this is a vehicle auction
     category = listing.get("category", "").lower()
     is_vehicle = any(keyword in category for keyword in ["vehicle", "car", "auto", "truck", "motorcycle"])
+    is_partner = listing.get("is_partner_listing", False)
     
     hammer_price = listing.get("current_price", listing.get("starting_price", 0))
     
-    if is_vehicle:
+    if is_partner:
+        # Partner listing — 3% platform fee, custom buyer premium, destination charge
+        seller_connect_id = seller.get("stripe_connect_account_id")
+        if not seller_connect_id:
+            raise HTTPException(
+                status_code=400, 
+                detail="Partner has not completed Stripe Connect onboarding."
+            )
+        
+        custom_bp_rate = listing.get("custom_buyer_premium_rate", 0.0) or 0.0
+        partner_is_tax_registered = seller.get("is_tax_registered", False)
+        
+        breakdown = calculate_partner_listing_checkout(
+            hammer_price=hammer_price,
+            custom_buyer_premium_rate=custom_bp_rate,
+            partner_is_tax_registered=partner_is_tax_registered,
+            include_processing_fee=True
+        )
+        
+        result = await create_destination_charge(
+            db=db,
+            listing_id=request.listing_id,
+            buyer_id=current_user.id,
+            breakdown=breakdown,
+            return_url=request.return_url,
+            seller_connect_account_id=seller_connect_id
+        )
+        
+        return {
+            "checkout_type": "partner",
+            **result
+        }
+    elif is_vehicle:
         # Vehicle auction - only BidVex fees via Stripe
         breakdown = calculate_vehicle_checkout(
             hammer_price=hammer_price,
@@ -1163,6 +1197,7 @@ async def preview_checkout_breakdown(
     
     category = listing.get("category", "").lower()
     is_vehicle = any(keyword in category for keyword in ["vehicle", "car", "auto", "truck", "motorcycle"])
+    is_partner = listing.get("is_partner_listing", False)
     
     hammer_price = listing.get("current_price", listing.get("starting_price", 0))
     
@@ -1170,7 +1205,29 @@ async def preview_checkout_breakdown(
     if hasattr(current_user, 'subscription_tier'):
         buyer_tier = current_user.subscription_tier
     
-    if is_vehicle:
+    if is_partner:
+        # Partner listing — custom buyer premium, 3% platform fee
+        custom_bp_rate = listing.get("custom_buyer_premium_rate", 0.0) or 0.0
+        partner_is_tax_registered = seller.get("is_tax_registered", False) if seller else False
+        
+        breakdown = calculate_partner_listing_checkout(
+            hammer_price=hammer_price,
+            custom_buyer_premium_rate=custom_bp_rate,
+            partner_is_tax_registered=partner_is_tax_registered,
+            include_processing_fee=True
+        )
+        
+        bp_label = f"Buyer's Premium ({custom_bp_rate*100:.1f}%)" if custom_bp_rate > 0 else "Buyer's Premium"
+        
+        return {
+            "checkout_type": "partner",
+            "breakdown": breakdown.to_dict(),
+            "is_partner_listing": True,
+            "partner_company": seller.get("partner_company_name") if seller else None,
+            "seller_is_tax_registered": partner_is_tax_registered,
+            "fee_model_label": "Partner Auction",
+        }
+    elif is_vehicle:
         breakdown = calculate_vehicle_checkout(
             hammer_price=hammer_price,
             buyer_tier=buyer_tier

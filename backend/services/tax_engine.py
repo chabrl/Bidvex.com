@@ -39,10 +39,10 @@ QST_RATE = Decimal("0.09975")       # 9.975% Quebec QST
 COMBINED_TAX_RATE = Decimal("0.14975")  # 14.975% Combined
 
 # BidVex Tax Registration Numbers (Quebec)
-BIDVEX_GST_NUMBER = "123456789RT0001"  # Federal GST/HST Registration
-BIDVEX_QST_NUMBER = "1234567890TQ0001"  # Quebec QST Registration
+BIDVEX_GST_NUMBER = "706766367RT0001"  # Federal GST/HST Registration
+BIDVEX_QST_NUMBER = "1233530880TQ0001"  # Quebec QST Registration
 BIDVEX_LEGAL_NAME = "BidVex Inc."
-BIDVEX_ADDRESS = "761 Chalifoux Street, Sherbrooke, Quebec, Canada J1G 0A8"
+BIDVEX_ADDRESS = "103-761 Chalifoux Street, Sherbrooke, QC, J1G 0A8"
 
 
 class AuctionCategory(str, Enum):
@@ -79,6 +79,7 @@ SELLER_COMMISSION_RATES = {
 }
 
 VEHICLE_PLATFORM_FEE_RATE = Decimal("0.025")  # 2.5%
+PARTNER_PLATFORM_FEE_RATE = Decimal("0.03")   # 3% — overrides all subscription discounts
 
 
 def _round_currency(amount: Decimal) -> Decimal:

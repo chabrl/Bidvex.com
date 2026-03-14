@@ -43,6 +43,7 @@ from services.tax_engine import (
     BUYER_PREMIUM_RATES,
     SELLER_COMMISSION_RATES,
     VEHICLE_PLATFORM_FEE_RATE,
+    PARTNER_PLATFORM_FEE_RATE,
     _round_currency,
     _to_cents,
     _normalize_tier
@@ -340,6 +341,120 @@ def calculate_vehicle_checkout(
         
         seller_payout=hammer,  # Seller receives full hammer via Bank Draft
         seller_receives_tax=Decimal("0")  # Tax handled separately if business
+    )
+
+
+def calculate_partner_listing_checkout(
+    hammer_price: float,
+    custom_buyer_premium_rate: float = 0.0,
+    partner_is_tax_registered: bool = False,
+    include_processing_fee: bool = True
+) -> CheckoutBreakdown:
+    """
+    Calculate checkout breakdown for PARTNER listings.
+    
+    Partner fee model (overrides ALL subscription discounts):
+    - Platform Fee: Fixed 3% of Hammer Price (collected by BidVex)
+    - Buyer Premium: Custom rate set by partner (e.g., 18%)
+    - Stripe fee: Recovered from buyer via Net-Zero gross-up
+    - Transfer to partner: Hammer + Buyer Premium
+    - Application fee: Platform Fee (3%) + tax on fees + Stripe recovery
+    
+    Args:
+        hammer_price: Winning bid amount
+        custom_buyer_premium_rate: Partner's custom buyer premium (e.g., 0.18 for 18%)
+        partner_is_tax_registered: Whether partner has GST/QST registration
+        include_processing_fee: Whether to add processing fee to buyer total
+    """
+    hammer = Decimal(str(hammer_price))
+    bp_rate = Decimal(str(custom_buyer_premium_rate))
+    
+    # Partner-specific rates (override subscription discounts)
+    buyer_premium = _round_currency(hammer * bp_rate)
+    platform_fee = _round_currency(hammer * PARTNER_PLATFORM_FEE_RATE)
+    
+    # BidVex fees = platform fee only (buyer premium goes to partner)
+    bidvex_fees_subtotal = platform_fee
+    
+    # Taxes on hammer (only if partner is tax registered)
+    if partner_is_tax_registered:
+        gst_on_hammer = _round_currency(hammer * GST_RATE)
+        qst_on_hammer = _round_currency(hammer * QST_RATE)
+    else:
+        gst_on_hammer = Decimal("0")
+        qst_on_hammer = Decimal("0")
+    hammer_tax_total = gst_on_hammer + qst_on_hammer
+    
+    # Tax on BidVex fees (platform fee) — always applies
+    gst_on_fees = _round_currency(bidvex_fees_subtotal * GST_RATE)
+    qst_on_fees = _round_currency(bidvex_fees_subtotal * QST_RATE)
+    fees_tax_total = gst_on_fees + qst_on_fees
+    
+    # Tax on buyer premium (if partner is registered, tax on BP goes to partner)
+    gst_on_bp = _round_currency(buyer_premium * GST_RATE) if partner_is_tax_registered else Decimal("0")
+    qst_on_bp = _round_currency(buyer_premium * QST_RATE) if partner_is_tax_registered else Decimal("0")
+    bp_tax_total = gst_on_bp + qst_on_bp
+    
+    total_tax = hammer_tax_total + fees_tax_total + bp_tax_total
+    
+    # Subtotal before processing
+    subtotal_before_processing = hammer + buyer_premium + total_tax
+    
+    # Gross-up for Stripe processing fee
+    if include_processing_fee:
+        gross_amount = _gross_up(subtotal_before_processing)
+        processing_fee = gross_amount - subtotal_before_processing
+    else:
+        processing_fee = Decimal("0")
+        gross_amount = subtotal_before_processing
+    
+    buyer_total = gross_amount
+    
+    # Stripe parameters:
+    # Transfer to partner = Hammer + BP + hammer_tax + bp_tax (partner remits tax)
+    transfer_to_partner = hammer + buyer_premium + hammer_tax_total + bp_tax_total
+    
+    # Application fee (BidVex keeps) = Platform fee + fee taxes + processing fee
+    application_fee = platform_fee + fees_tax_total + processing_fee
+    
+    return CheckoutBreakdown(
+        hammer_price=hammer,
+        buyer_tier="partner",
+        seller_tier="partner",
+        seller_is_tax_registered=partner_is_tax_registered,
+        is_vehicle=False,
+        
+        buyer_premium_rate=bp_rate,
+        buyer_premium=buyer_premium,
+        seller_commission_rate=Decimal("0"),  # No seller commission for partners
+        seller_commission=Decimal("0"),
+        platform_fee=platform_fee,
+        
+        bidvex_fees_subtotal=bidvex_fees_subtotal,
+        
+        gst_on_hammer=gst_on_hammer,
+        qst_on_hammer=qst_on_hammer,
+        hammer_tax_total=hammer_tax_total,
+        
+        gst_on_fees=gst_on_fees,
+        qst_on_fees=qst_on_fees,
+        fees_tax_total=fees_tax_total,
+        
+        total_tax=total_tax,
+        
+        processing_fee=processing_fee,
+        processing_fee_display=processing_fee,
+        
+        subtotal_before_tax=hammer + buyer_premium,
+        buyer_total=buyer_total,
+        buyer_total_cents=_to_cents(buyer_total),
+        
+        stripe_charge_amount_cents=_to_cents(buyer_total),
+        stripe_application_fee_cents=_to_cents(application_fee),
+        stripe_transfer_amount_cents=_to_cents(transfer_to_partner),
+        
+        seller_payout=transfer_to_partner,
+        seller_receives_tax=hammer_tax_total + bp_tax_total
     )
 
 
