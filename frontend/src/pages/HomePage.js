@@ -10,7 +10,7 @@ import { Badge } from '../components/ui/badge';
 import { 
   ArrowRight, Gavel, TrendingUp, Shield, Users, Award, Flame, 
   Search, Trophy, CreditCard, Sparkles, Clock, CheckCircle2,
-  Zap, Play, ChevronRight, Timer
+  Zap, Play, ChevronRight, Timer, Package
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -426,81 +426,66 @@ const HotItemsSection = ({ items, navigate }) => {
   return (
     <section 
       ref={ref} 
-      className="py-20 px-4 text-white relative overflow-hidden"
-      style={{
-        background: 'linear-gradient(135deg, #1E3A8A 0%, #0F172A 40%, #06B6D4 100%)'
-      }}
+      className="py-20 px-4 relative overflow-hidden bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:bg-none dark:text-white"
+      style={{ '--hot-dark-bg': 'linear-gradient(135deg, #1E3A8A 0%, #0F172A 40%, #06B6D4 100%)' }}
     >
-      {/* Brand-aligned Background Orbs */}
-      <div className="absolute inset-0 opacity-30">
-        <div className="absolute top-0 left-1/4 w-96 h-96 rounded-full blur-[150px]" style={{ backgroundColor: '#06B6D4' }} />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 rounded-full blur-[150px]" style={{ backgroundColor: '#1E3A8A' }} />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full blur-[200px]" style={{ backgroundColor: '#22D3EE', opacity: 0.15 }} />
+      {/* Dark mode gradient background */}
+      <div className="absolute inset-0 hidden dark:block" style={{ background: 'linear-gradient(135deg, #1E3A8A 0%, #0F172A 40%, #06B6D4 100%)' }} />
+      {/* Background Orbs */}
+      <div className="absolute inset-0 opacity-20 dark:opacity-30">
+        <div className="absolute top-0 left-1/4 w-96 h-96 rounded-full blur-[150px] bg-cyan-400 dark:bg-cyan-500" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 rounded-full blur-[150px] bg-blue-400 dark:bg-blue-800" />
       </div>
 
       <div className="relative max-w-7xl mx-auto">
-        {/* Header with fallback visibility */}
+        {/* Header */}
         <div className={`flex items-center justify-between mb-12 transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
           <div className="flex items-center gap-4">
             <div className="p-3 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl shadow-lg shadow-orange-500/30">
               <Flame className="h-8 w-8 text-white" />
             </div>
             <div>
-              <h2 className="text-3xl md:text-4xl font-bold" style={{ color: '#FFFFFF' }}>{t('homepage.hotItems')}</h2>
-              <p style={{ color: 'rgba(165, 243, 252, 0.9)' }}>{t('homepage.hotItemsDesc')}</p>
+              <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white">{t('homepage.hotItems')}</h2>
+              <p className="text-slate-600 dark:text-cyan-200/90">{t('homepage.hotItemsDesc')}</p>
             </div>
           </div>
           <Button 
             onClick={() => navigate('/marketplace?sort=hot')} 
-            className="hidden md:flex items-center gap-1 px-5 py-2 rounded-md font-semibold transition-all hover:-translate-y-0.5 whitespace-nowrap"
-            style={{ 
-              backgroundColor: 'transparent',
-              border: '2px solid rgba(6, 182, 212, 0.6)',
-              color: '#FFFFFF',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(6, 182, 212, 0.2)';
-              e.currentTarget.style.borderColor = '#06B6D4';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.borderColor = 'rgba(6, 182, 212, 0.6)';
-            }}
+            variant="outline"
+            className="hidden md:flex items-center gap-1 px-5 py-2 rounded-md font-semibold transition-all hover:-translate-y-0.5 whitespace-nowrap border-2 border-slate-300 dark:border-cyan-500/60 text-slate-700 dark:text-white hover:border-cyan-500 hover:text-cyan-600 dark:hover:bg-cyan-500/20 dark:hover:border-cyan-400"
           >
             {t('homepage.viewAll')} <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
         </div>
 
-        {/* Cards Grid with staggered wave animation */}
+        {/* Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {items.map((item, index) => (
             <Card 
               key={item.id}
-              className={`hover-glow-cyan cursor-pointer overflow-hidden bg-white/5 backdrop-blur-md border border-white/20 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+              className={`hover-glow-cyan cursor-pointer overflow-hidden border shadow-lg hover:shadow-xl transition-all duration-700 bg-white dark:bg-white/5 dark:backdrop-blur-md border-slate-200 dark:border-white/20 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
               style={{ transitionDelay: `${index * 150}ms` }}
               onClick={() => navigate(`/listing/${item.id}`)}
+              data-testid="hot-item-card"
             >
               <div className="relative h-52 overflow-hidden">
                 {item.images?.[0] ? (
                   <img src={item.images[0]} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 hover:scale-110" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #1E3A8A 0%, #0F172A 100%)' }}>
-                    <span className="text-5xl">📦</span>
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 dark:from-blue-900 dark:to-slate-900">
+                    <Package className="h-16 w-16 text-slate-300 dark:text-slate-600" />
                   </div>
                 )}
-                <Badge className="absolute top-3 right-3 bg-gradient-to-r from-orange-500 to-red-500 text-white border-0 shadow-lg font-semibold">
-                  🔥 {item.views || 0} {t('homepage.views')}
+                <Badge className="absolute top-3 right-3 bg-gradient-to-r from-orange-500 to-red-500 text-white border-0 shadow-lg font-semibold text-xs">
+                  <Flame className="h-3 w-3 mr-1" /> {item.views || 0} {t('homepage.views')}
                 </Badge>
                 
-                {/* Live Activity Indicator with Vibrant Cyan */}
+                {/* Live Activity Indicator */}
                 <div className="absolute bottom-3 left-3 right-3">
                   <div className="bg-slate-900/90 backdrop-blur-md rounded-lg px-3 py-2 flex items-center gap-2 border border-cyan-500/30">
                     <span 
-                      className="w-2.5 h-2.5 rounded-full animate-pulse shadow-lg"
-                      style={{ 
-                        backgroundColor: '#06B6D4',
-                        boxShadow: '0 0 10px #06B6D4, 0 0 20px rgba(6, 182, 212, 0.5)'
-                      }} 
+                      className="w-2.5 h-2.5 rounded-full animate-pulse shadow-lg bg-cyan-500"
+                      style={{ boxShadow: '0 0 10px #06B6D4, 0 0 20px rgba(6, 182, 212, 0.5)' }} 
                     />
                     <span className="text-xs text-cyan-100 font-medium">{t('homepage.activeBidding')}</span>
                   </div>
@@ -508,20 +493,16 @@ const HotItemsSection = ({ items, navigate }) => {
               </div>
               
               <CardContent className="p-5">
-                <h3 className="font-semibold text-lg mb-3 line-clamp-1" style={{ color: '#FFFFFF' }}>{item.title}</h3>
+                <h3 className="font-semibold text-lg mb-3 line-clamp-1 text-slate-900 dark:text-white">{item.title}</h3>
                 <div className="flex justify-between items-end">
                   <div>
-                    <p className="text-xs uppercase tracking-wider font-medium" style={{ color: 'rgba(165, 243, 252, 0.8)' }}>{t('homepage.currentBid')}</p>
-                    <p className="text-2xl font-bold" style={{ color: '#22D3EE' }}>${item.current_price?.toFixed(2)}</p>
+                    <p className="text-xs uppercase tracking-wider font-medium text-slate-500 dark:text-cyan-200/80">{t('homepage.currentBid')}</p>
+                    <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-300">${item.current_price?.toFixed(2)}</p>
                   </div>
                   <Button 
                     size="sm" 
-                    className="font-bold shadow-lg transition-all hover:-translate-y-0.5 whitespace-nowrap"
-                    style={{ 
-                      background: 'linear-gradient(135deg, #06B6D4 0%, #22D3EE 100%)',
-                      color: '#0F172A',
-                      boxShadow: '0 4px 15px rgba(6, 182, 212, 0.4)'
-                    }}
+                    className="font-bold shadow-lg transition-all hover:-translate-y-0.5 whitespace-nowrap bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-cyan-600 hover:to-blue-600"
+                    data-testid="hot-bid-now-btn"
                   >
                     {t('homepage.bidNow')}
                   </Button>
@@ -535,14 +516,9 @@ const HotItemsSection = ({ items, navigate }) => {
         <div className="flex md:hidden justify-center mt-8">
           <Button 
             onClick={() => navigate('/marketplace?sort=hot')} 
-            className="font-bold px-8 py-3 whitespace-nowrap"
-            style={{ 
-              background: 'linear-gradient(135deg, #06B6D4 0%, #22D3EE 100%)',
-              color: '#0F172A',
-              boxShadow: '0 4px 20px rgba(6, 182, 212, 0.4)'
-            }}
+            className="font-bold px-8 py-3 whitespace-nowrap bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-cyan-600 hover:to-blue-600"
           >
-            {t('homepage.viewAllHotItems')} <ChevronRight className="ml-1 h-4 w-4" />
+            {t('homepage.viewAll')} <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
         </div>
       </div>

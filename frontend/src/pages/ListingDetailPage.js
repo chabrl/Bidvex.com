@@ -478,7 +478,7 @@ const ListingDetailPage = () => {
                         </span>
                         <Button 
                           size="sm" 
-                          onClick={() => navigate('/profile/settings?tab=payments')}
+                          onClick={() => navigate('/settings?tab=payments')}
                           className="w-fit"
                           data-testid="verify-to-bid-btn"
                         >
@@ -747,6 +747,7 @@ const ListingDetailPage = () => {
           onClose={() => setRateSellerModalOpen(false)}
           sellerId={listing.seller_id}
           auctionId={listing.id}
+          auctionType="single"
           auctionTitle={listing.title}
         />
       )}
