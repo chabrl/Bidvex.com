@@ -3288,19 +3288,25 @@ async def stripe_connect_webhook(request: Request):
         ] if s
     ]
     
+    if not webhook_secrets:
+        logger.error("CRITICAL: No Stripe webhook secrets configured in environment variables")
+        raise HTTPException(status_code=500, detail="Webhook not configured")
+    
     event = None
+    last_error = None
     for secret in webhook_secrets:
         try:
             event = stripe.Webhook.construct_event(body, signature, secret)
             break
-        except stripe.SignatureVerificationError:
+        except stripe.SignatureVerificationError as e:
+            last_error = str(e)
             continue
         except Exception as e:
             logger.error(f"Webhook parsing error: {e}")
             raise HTTPException(status_code=400, detail="Invalid payload")
     
     if event is None:
-        logger.error("Invalid webhook signature - none of the configured secrets matched")
+        logger.error(f"Invalid webhook signature - none of {len(webhook_secrets)} configured secrets matched. Last error: {last_error}")
         raise HTTPException(status_code=400, detail="Invalid signature")
     
     event_type = event.get("type", "")
