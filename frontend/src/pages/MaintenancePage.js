@@ -1,6 +1,6 @@
 /**
  * MaintenancePage - Coming Soon / Maintenance Mode Landing Page
- * Modern startup-style design for BidVex auction platform
+ * Professional design for BidVex auction platform
  * Features: Email subscription, responsive design, animated elements, bilingual (EN/FR)
  */
 
@@ -18,7 +18,6 @@ import { Input } from '../components/ui/input';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-// BidVex Logo URL
 const BIDVEX_LOGO = 'https://customer-assets.emergentagent.com/job_aa51ced5-053b-417a-a5ea-c63c2febfff9/artifacts/xkt9mtpw_logo%20app.png';
 
 const MaintenancePage = ({ mode = 'coming_soon', message, expectedBack, socialLinks }) => {
@@ -33,12 +32,9 @@ const MaintenancePage = ({ mode = 'coming_soon', message, expectedBack, socialLi
   const toggleLanguage = () => {
     const newLang = currentLang === 'en' ? 'fr' : 'en';
     i18n.changeLanguage(newLang);
-    try {
-      localStorage.setItem('bidvex_language', newLang);
-    } catch (e) {}
+    try { localStorage.setItem('bidvex_language', newLang); } catch {}
   };
 
-  // Social media icons with dynamic links
   const socialMediaIcons = [
     { icon: Twitter, href: socialLinks?.twitter || '#', label: 'Twitter' },
     { icon: Facebook, href: socialLinks?.facebook || '#', label: 'Facebook' },
@@ -46,31 +42,22 @@ const MaintenancePage = ({ mode = 'coming_soon', message, expectedBack, socialLi
     { icon: Linkedin, href: socialLinks?.linkedin || '#', label: 'LinkedIn' }
   ];
 
-  // Calculate countdown if expectedBack is provided
   useEffect(() => {
-    if (expectedBack) {
-      const targetDate = new Date(expectedBack);
-      const updateCountdown = () => {
-        const now = new Date();
-        const diff = targetDate - now;
-        
-        if (diff <= 0) {
-          setCountdown(null);
-          return;
-        }
-        
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-        
-        setCountdown({ days, hours, minutes, seconds });
-      };
-      
-      updateCountdown();
-      const interval = setInterval(updateCountdown, 1000);
-      return () => clearInterval(interval);
-    }
+    if (!expectedBack) return;
+    const targetDate = new Date(expectedBack);
+    const update = () => {
+      const diff = targetDate - new Date();
+      if (diff <= 0) { setCountdown(null); return; }
+      setCountdown({
+        days: Math.floor(diff / 86400000),
+        hours: Math.floor((diff % 86400000) / 3600000),
+        minutes: Math.floor((diff % 3600000) / 60000),
+        seconds: Math.floor((diff % 60000) / 1000)
+      });
+    };
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
   }, [expectedBack]);
 
   const handleSubscribe = async (e) => {
@@ -79,167 +66,123 @@ const MaintenancePage = ({ mode = 'coming_soon', message, expectedBack, socialLi
       toast.error(t('maintenance.invalidEmail'));
       return;
     }
-
     setSubmitting(true);
     try {
-      const response = await axios.post(`${API}/subscribe`, { email });
-      if (response.data.success) {
+      const res = await axios.post(`${API}/subscribe`, { email });
+      if (res.data.success) {
         setSubscribed(true);
-        toast.success(response.data.message);
+        toast.success(res.data.message);
       }
-    } catch (error) {
-      const errorMsg = error.response?.data?.detail || t('maintenance.subscriptionFailed');
-      toast.error(errorMsg);
-    } finally {
-      setSubmitting(false);
-    }
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      toast.error(typeof detail === 'string' ? detail : t('maintenance.subscriptionFailed'));
+    } finally { setSubmitting(false); }
   };
 
-  const isMaintenanceMode = mode === 'maintenance';
+  const isMaint = mode === 'maintenance';
+
+  const features = [
+    { icon: Gavel, title: t('maintenance.featureLiveAuctions'), desc: t('maintenance.featureLiveAuctionsDesc') },
+    { icon: Shield, title: t('maintenance.featureSecurePlatform'), desc: t('maintenance.featureSecurePlatformDesc') },
+    { icon: TrendingUp, title: t('maintenance.featureGreatDeals'), desc: t('maintenance.featureGreatDealsDesc') }
+  ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white overflow-hidden">
-      {/* Animated Background Elements */}
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white overflow-hidden" data-testid="maintenance-page">
+      {/* Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {/* Gradient Orbs */}
         <div className="absolute top-1/4 -left-20 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-teal-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-purple-500/10 rounded-full blur-3xl" />
-        
-        {/* Floating Auction Icons */}
-        <div className="absolute top-20 left-[10%] opacity-20 animate-bounce" style={{ animationDuration: '3s' }}>
-          <Gavel className="h-12 w-12" />
-        </div>
-        <div className="absolute top-40 right-[15%] opacity-20 animate-bounce" style={{ animationDuration: '4s', animationDelay: '0.5s' }}>
-          <TrendingUp className="h-10 w-10" />
-        </div>
-        <div className="absolute bottom-32 left-[20%] opacity-20 animate-bounce" style={{ animationDuration: '3.5s', animationDelay: '1s' }}>
-          <Shield className="h-8 w-8" />
-        </div>
-        <div className="absolute bottom-48 right-[25%] opacity-20 animate-bounce" style={{ animationDuration: '4.5s', animationDelay: '1.5s' }}>
-          <Users className="h-10 w-10" />
-        </div>
-        
         {/* Grid Pattern */}
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiMyMDI4MzgiIGZpbGwtb3BhY2l0eT0iMC40Ij48cGF0aCBkPSJNMzYgMzRoLTJ2LTRoMnY0em0wLTZoLTJ2LTRoMnY0em0wLTZoLTJ2LTRoMnY0em0wLTZoLTJWMTJoMnY0em0wLTZoLTJWNmgydjR6bTAgMzBoLTJ2LTRoMnY0em0wIDZoLTJ2LTRoMnY0em0tNi0zNmgtMnYtNGgydjR6bTAgNmgtMnYtNGgydjR6bTAgNmgtMnYtNGgydjR6bTAgNmgtMnYtNGgydjR6bTAgNmgtMnYtNGgydjR6bTAgNmgtMnYtNGgydjR6bTAgNmgtMnYtNGgydjR6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-30" />
       </div>
 
-      {/* Main Content */}
       <div className="relative z-10 min-h-screen flex flex-col">
-        {/* Header with Logo */}
-        <header className="py-8 px-6">
-          <div className="max-w-6xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {/* BidVex Logo */}
-              <img 
-                src={BIDVEX_LOGO} 
-                alt="BidVex" 
-                className="h-12 w-12 object-contain rounded-xl"
-              />
-              <span className="text-2xl font-bold bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
+        {/* Header */}
+        <header className="py-6 sm:py-8 px-4 sm:px-6">
+          <div className="max-w-5xl mx-auto flex items-center justify-between">
+            {/* Logo — clean spacing, no overlap */}
+            <div className="flex items-center gap-3" data-testid="maintenance-logo">
+              <img src={BIDVEX_LOGO} alt="BidVex" className="h-10 w-10 sm:h-12 sm:w-12 object-contain rounded-xl flex-shrink-0" />
+              <span className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
                 BidVex
               </span>
             </div>
-            
-            <div className="flex items-center gap-3">
-              {/* Admin Access Link - Hidden but accessible */}
-              <a
-                href="/admin"
-                className="flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded-full hover:bg-white/10 transition-colors opacity-50 hover:opacity-100"
-                title="Admin Access"
-              >
+
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Admin Access */}
+              <a href="/admin" className="p-2 bg-white/5 border border-white/10 rounded-full hover:bg-white/10 transition-colors opacity-40 hover:opacity-100" title="Admin Access">
                 <Lock className="h-4 w-4" />
               </a>
-              
               {/* Language Toggle */}
-              <button
-                onClick={toggleLanguage}
-                className="flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded-full hover:bg-white/10 transition-colors"
-                aria-label="Toggle language"
-              >
+              <button onClick={toggleLanguage} className="flex items-center gap-1.5 px-3 py-2 bg-white/5 border border-white/10 rounded-full hover:bg-white/10 transition-colors text-sm" aria-label="Toggle language" data-testid="lang-toggle">
                 <Globe className="h-4 w-4" />
-                <span className="text-sm font-medium">{currentLang.toUpperCase()}</span>
+                <span className="font-medium">{currentLang.toUpperCase()}</span>
               </button>
-              
               {/* Status Badge */}
-              <div className={`px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 ${
-                isMaintenanceMode 
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                  : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-              }`}>
-                <div className={`w-2 h-2 rounded-full animate-pulse ${isMaintenanceMode ? 'bg-amber-400' : 'bg-blue-400'}`} />
-                {isMaintenanceMode ? t('maintenance.statusBadgeMaintenance') : t('maintenance.statusBadgeComingSoon')}
+              <div className={`hidden sm:flex px-3 py-1.5 rounded-full text-xs font-medium items-center gap-2 ${
+                isMaint ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+              }`} data-testid="status-badge">
+                <div className={`w-2 h-2 rounded-full animate-pulse ${isMaint ? 'bg-amber-400' : 'bg-blue-400'}`} />
+                {isMaint ? t('maintenance.statusBadgeMaintenance') : t('maintenance.statusBadgeComingSoon')}
               </div>
             </div>
           </div>
         </header>
 
-        {/* Hero Section */}
-        <main className="flex-1 flex items-center justify-center px-6 py-12">
-          <div className="max-w-4xl mx-auto text-center">
-            {/* Main Headline */}
-            <div className="mb-8">
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full border border-white/10 mb-6">
-                <Sparkles className="h-4 w-4 text-yellow-400" />
-                <span className="text-sm text-blue-200">
-                  {isMaintenanceMode ? t('maintenance.maintenanceTagline') : t('maintenance.tagline')}
-                </span>
-              </div>
-              
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
-                {isMaintenanceMode ? (
-                  <>
-                    {t('maintenance.headlineMaintenance')}
-                    <span className="block bg-gradient-to-r from-blue-400 via-teal-400 to-blue-400 bg-clip-text text-transparent">
-                      {t('maintenance.maintenanceHighlight')}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    {t('maintenance.headlineComingSoon')}
-                    <span className="block bg-gradient-to-r from-blue-400 via-teal-400 to-blue-400 bg-clip-text text-transparent">
-                      {t('maintenance.headlineHighlight')}
-                    </span>
-                  </>
-                )}
-              </h1>
-              
-              <p className="text-lg sm:text-xl text-slate-300 max-w-2xl mx-auto leading-relaxed">
-                {message || (isMaintenanceMode 
-                  ? t('maintenance.defaultDescriptionMaintenance')
-                  : t('maintenance.defaultDescriptionComingSoon')
-                )}
-              </p>
+        {/* Hero */}
+        <main className="flex-1 flex items-center justify-center px-4 sm:px-6 py-8 sm:py-12">
+          <div className="max-w-3xl mx-auto text-center">
+            {/* Shimmer Pill */}
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/15 mb-6 relative overflow-hidden" data-testid="tagline-pill">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" style={{ backgroundSize: '200% 100%' }} />
+              <Sparkles className="h-4 w-4 text-yellow-400 relative z-10" />
+              <span className="text-sm text-blue-200 relative z-10">
+                {isMaint ? t('maintenance.maintenanceTagline') : t('maintenance.tagline')}
+              </span>
             </div>
 
-            {/* Countdown Timer */}
+            {/* Headline */}
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-6 leading-tight" data-testid="headline">
+              {isMaint ? t('maintenance.headlineMaintenance') : t('maintenance.headlineComingSoon')}
+              <span className="block bg-gradient-to-r from-blue-400 via-teal-400 to-blue-400 bg-clip-text text-transparent">
+                {isMaint ? t('maintenance.maintenanceHighlight') : t('maintenance.headlineHighlight')}
+              </span>
+            </h1>
+
+            <p className="text-base sm:text-lg text-slate-300 max-w-xl mx-auto leading-relaxed mb-8" data-testid="description">
+              {message || (isMaint ? t('maintenance.defaultDescriptionMaintenance') : t('maintenance.defaultDescriptionComingSoon'))}
+            </p>
+
+            {/* Countdown */}
             {countdown && (
               <div className="mb-10">
                 <p className="text-sm text-slate-400 mb-4">
-                  {isMaintenanceMode ? t('maintenance.expectedBackIn') : t('maintenance.launchingIn')}
+                  {isMaint ? t('maintenance.expectedBackIn') : t('maintenance.launchingIn')}
                 </p>
-                <div className="flex justify-center gap-4">
+                <div className="flex justify-center gap-3 sm:gap-4">
                   {[
                     { value: countdown.days, label: t('maintenance.days') },
                     { value: countdown.hours, label: t('maintenance.hours') },
                     { value: countdown.minutes, label: t('maintenance.minutes') },
                     { value: countdown.seconds, label: t('maintenance.seconds') }
                   ].map((item) => (
-                    <div key={item.label} className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl px-4 sm:px-6 py-4">
-                      <div className="text-3xl sm:text-4xl font-bold text-white">{String(item.value).padStart(2, '0')}</div>
-                      <div className="text-xs text-slate-400 uppercase tracking-wider">{item.label}</div>
+                    <div key={item.label} className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-xl px-3 sm:px-5 py-3">
+                      <div className="text-2xl sm:text-3xl font-bold text-white tabular-nums">{String(item.value).padStart(2, '0')}</div>
+                      <div className="text-[10px] sm:text-xs text-slate-400 uppercase tracking-wider mt-0.5">{item.label}</div>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Email Subscription Form */}
+            {/* Email Subscription */}
             <div className="max-w-md mx-auto mb-12">
               {!subscribed ? (
                 <form onSubmit={handleSubscribe} className="space-y-4">
-                  <p className="text-slate-300 mb-4">
-                    <Bell className="h-4 w-4 inline mr-2" />
+                  <p className="text-slate-300 text-sm flex items-center justify-center gap-2 mb-3">
+                    <Bell className="h-4 w-4" />
                     {t('maintenance.getNotified')}
                   </p>
                   <div className="flex flex-col sm:flex-row gap-3">
@@ -250,7 +193,7 @@ const MaintenancePage = ({ mode = 'coming_soon', message, expectedBack, socialLi
                         placeholder={t('maintenance.emailPlaceholder')}
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="pl-12 h-14 bg-white/5 border-white/10 text-white placeholder:text-slate-400 focus:border-blue-400 focus:ring-blue-400/20 rounded-xl"
+                        className="pl-12 h-12 bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:border-blue-400 focus:ring-blue-400/20 rounded-xl"
                         disabled={submitting}
                         data-testid="subscribe-email-input"
                       />
@@ -258,43 +201,40 @@ const MaintenancePage = ({ mode = 'coming_soon', message, expectedBack, socialLi
                     <Button
                       type="submit"
                       disabled={submitting}
-                      className="h-14 px-8 bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-600 hover:to-teal-600 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/25 transition-all duration-300 hover:shadow-blue-500/40"
+                      className="h-12 px-6 bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-600 hover:to-teal-600 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all"
                       data-testid="subscribe-button"
                     >
                       {submitting ? (
                         <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
                       ) : (
-                        <>
-                          {t('maintenance.notifyMe')}
-                          <ArrowRight className="ml-2 h-5 w-5" />
-                        </>
+                        <>{t('maintenance.notifyMe')} <ArrowRight className="ml-2 h-4 w-4" /></>
                       )}
                     </Button>
                   </div>
                 </form>
               ) : (
                 <div className="p-6 bg-green-500/10 border border-green-500/30 rounded-2xl" data-testid="subscription-success">
-                  <CheckCircle className="h-12 w-12 text-green-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-green-300 mb-2">{t('maintenance.successTitle')}</h3>
-                  <p className="text-slate-300">
-                    {t('maintenance.successMessage')}
-                  </p>
+                  <CheckCircle className="h-10 w-10 text-green-400 mx-auto mb-3" />
+                  <h3 className="text-lg font-semibold text-green-300 mb-1">{t('maintenance.successTitle')}</h3>
+                  <p className="text-sm text-slate-300">{t('maintenance.successMessage')}</p>
                 </div>
               )}
             </div>
 
-            {/* Feature Highlights */}
-            {!isMaintenanceMode && (
-              <div className="grid sm:grid-cols-3 gap-6 max-w-3xl mx-auto mb-12">
-                {[
-                  { icon: Gavel, title: t('maintenance.featureLiveAuctions'), desc: t('maintenance.featureLiveAuctionsDesc') },
-                  { icon: Shield, title: t('maintenance.featureSecurePlatform'), desc: t('maintenance.featureSecurePlatformDesc') },
-                  { icon: TrendingUp, title: t('maintenance.featureGreatDeals'), desc: t('maintenance.featureGreatDealsDesc') }
-                ].map((feature) => (
-                  <div key={feature.title} className="p-6 bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl hover:bg-white/10 transition-colors">
-                    <feature.icon className="h-8 w-8 text-blue-400 mx-auto mb-4" />
-                    <h3 className="font-semibold mb-2">{feature.title}</h3>
-                    <p className="text-sm text-slate-400">{feature.desc}</p>
+            {/* Feature Cards */}
+            {!isMaint && (
+              <div className="grid sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
+                {features.map((f, i) => (
+                  <div
+                    key={i}
+                    className="flex flex-col items-center text-center p-5 bg-white/[0.04] backdrop-blur-lg border border-white/10 rounded-2xl hover:bg-white/[0.08] transition-all duration-300"
+                    data-testid={`feature-card-${i}`}
+                  >
+                    <div className="w-11 h-11 rounded-xl bg-blue-500/15 flex items-center justify-center mb-3">
+                      <f.icon className="h-5 w-5 text-blue-400" />
+                    </div>
+                    <h3 className="font-semibold text-sm text-white mb-1.5">{f.title}</h3>
+                    <p className="text-xs text-slate-400 leading-relaxed">{f.desc}</p>
                   </div>
                 ))}
               </div>
@@ -303,44 +243,47 @@ const MaintenancePage = ({ mode = 'coming_soon', message, expectedBack, socialLi
         </main>
 
         {/* Footer */}
-        <footer className="py-8 px-6 border-t border-white/10">
-          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-sm text-slate-400">
-              © {new Date().getFullYear()} BidVex. {currentLang === 'fr' ? 'Tous droits réservés.' : 'All rights reserved.'}
+        <footer className="py-6 px-4 sm:px-6 border-t border-white/10">
+          <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-xs text-slate-500">
+              &copy; {new Date().getFullYear()} BidVex. {currentLang === 'fr' ? 'Tous droits réservés.' : 'All rights reserved.'}
             </p>
-            
-            {/* Social Links - Dynamic from admin settings */}
-            <div className="flex items-center gap-4">
-              {socialMediaIcons.filter(s => s.href && s.href !== '#').length > 0 ? (
-                // Show only configured social links
-                socialMediaIcons.filter(s => s.href && s.href !== '#').map((social) => (
-                  <a
-                    key={social.label}
-                    href={social.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={social.label}
-                    className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+            <div className="flex items-center gap-3" data-testid="social-icons">
+              {socialMediaIcons.map((s) => {
+                const isActive = s.href && s.href !== '#';
+                const Wrapper = isActive ? 'a' : 'div';
+                const props = isActive ? { href: s.href, target: '_blank', rel: 'noopener noreferrer' } : {};
+                return (
+                  <Wrapper
+                    key={s.label}
+                    {...props}
+                    aria-label={s.label}
+                    className={`w-9 h-9 flex items-center justify-center rounded-full border transition-colors ${
+                      isActive
+                        ? 'bg-white/5 border-white/15 text-slate-400 hover:text-white hover:bg-white/10 cursor-pointer'
+                        : 'bg-white/[0.02] border-white/5 text-slate-600'
+                    }`}
+                    data-testid={`social-${s.label.toLowerCase()}`}
                   >
-                    <social.icon className="h-5 w-5" />
-                  </a>
-                ))
-              ) : (
-                // Show all as placeholders if none configured
-                socialMediaIcons.map((social) => (
-                  <div
-                    key={social.label}
-                    aria-label={social.label}
-                    className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 border border-white/10 text-slate-400 opacity-50"
-                  >
-                    <social.icon className="h-5 w-5" />
-                  </div>
-                ))
-              )}
+                    <s.icon className="h-4 w-4" />
+                  </Wrapper>
+                );
+              })}
             </div>
           </div>
         </footer>
       </div>
+
+      {/* Shimmer animation CSS */}
+      <style>{`
+        @keyframes shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+        .animate-shimmer {
+          animation: shimmer 3s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   );
 };
