@@ -281,7 +281,7 @@ def lots_won_template(data: Dict[str, Any], lang: str = "en") -> str:
                 <li>{t('payment_methods_accepted', lang)}</li>
                 <li>{t('etransfer', lang)}</li>
             </ul>
-            <p><strong>{t('payment_deadline', lang)}:</strong> {data.get('payment_deadline', t('within_3_business_days', lang) if lang == 'en' else 'Dans les 3 jours ouvrables')}</p>
+            <p><strong>{t('payment_deadline', lang)}:</strong> {data.get('payment_deadline', t('within_3_business_days', lang) if lang == 'en' else 'Dans les 14 jours suivant la clôture')}</p>
             
             <p style="margin-top: 20px;"><strong>{t('questions', lang)}</strong> {t('contact_us', lang, data['buyer']['phone'])}</p>
         </div>

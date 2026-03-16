@@ -41,6 +41,7 @@ const ProfileSettingsPage = () => {
   });
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [showAddCard, setShowAddCard] = useState(false);
+  const [recommendationsEnabled, setRecommendationsEnabled] = useState(true);
 
   // Handler to switch to payment tab and open add card form
   const handleAddPaymentClick = () => {
@@ -59,6 +60,7 @@ const ProfileSettingsPage = () => {
         preferred_language: user.preferred_language || 'en',
         preferred_currency: user.preferred_currency || 'CAD',
       });
+      setRecommendationsEnabled(user.personalized_recommendations !== false);
       fetchPaymentMethods();
     }
   }, [user]);
@@ -87,6 +89,17 @@ const ProfileSettingsPage = () => {
 
   const handleAvatarUpdate = async (avatarDataUrl) => {
     await axios.put(`${API}/profile`, { picture: avatarDataUrl });
+  };
+
+  const handleToggleRecommendations = async (checked) => {
+    setRecommendationsEnabled(checked);
+    try {
+      await updateUserPreferences({ personalized_recommendations: checked });
+      toast.success(checked ? 'Personalized recommendations enabled' : 'Personalized recommendations disabled');
+    } catch {
+      setRecommendationsEnabled(!checked);
+      toast.error('Failed to update preference');
+    }
   };
 
   const handleDeletePaymentMethod = async (methodId) => {
@@ -454,6 +467,26 @@ const ProfileSettingsPage = () => {
                     </div>
                     <Switch defaultChecked className="data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-slate-300 dark:data-[state=unchecked]:bg-slate-600" />
                   </div>
+                </div>
+
+                {/* Personalized Recommendations */}
+                <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">Privacy &amp; AI</h3>
+                  <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700" data-testid="recommendations-toggle-row">
+                    <div>
+                      <p className="font-medium text-slate-900 dark:text-white">Personalized Recommendations</p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">Receive AI-powered item suggestions based on your browsing and bidding activity</p>
+                    </div>
+                    <Switch
+                      checked={recommendationsEnabled}
+                      onCheckedChange={handleToggleRecommendations}
+                      className="data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-slate-300 dark:data-[state=unchecked]:bg-slate-600"
+                      data-testid="recommendations-toggle"
+                    />
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-500 mt-2 pl-1">
+                    Disabling this will not affect core bidding or platform functionality. See our <a href="/legal#privacy" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">Privacy Policy (Section 6)</a> for details.
+                  </p>
                 </div>
               </CardContent>
             </div>

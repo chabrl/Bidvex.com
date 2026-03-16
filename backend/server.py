@@ -707,6 +707,8 @@ class User(BaseModel):
     partner_verified_at: Optional[str] = None  # ISO timestamp of verification
     partner_rejection_reason: Optional[str] = None  # Admin rejection reason
     custom_premium_rate: Optional[float] = None  # Partner-specific buyer premium rate (e.g., 0.18 for 18%)
+    # Personalized recommendations opt-out
+    personalized_recommendations: bool = True  # False = opted out of AI recommendations
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -725,6 +727,7 @@ class TokenResponse(BaseModel):
 STANDARD_BUYER_PREMIUM_RATE = 0.05   # 5% buyer premium (standard)
 STANDARD_SELLER_COMMISSION_RATE = 0.04  # 4% seller commission (standard)
 PARTNER_PLATFORM_FEE_RATE = 0.03     # 3% platform fee for partners
+PARTNER_ANNUAL_ACCESS_FEE = 100.00   # $100 CAD/year platform access fee for partners
 STRIPE_PERCENTAGE_FEE = 0.029        # 2.9% Stripe processing fee
 STRIPE_FIXED_FEE = 0.30              # $0.30 Stripe fixed fee
 
@@ -1161,6 +1164,7 @@ class ProfileUpdate(BaseModel):
     longitude: Optional[float] = None
     language: Optional[str] = None
     picture: Optional[str] = None
+    personalized_recommendations: Optional[bool] = None
 
 class LocationSearchParams(BaseModel):
     latitude: float
@@ -2154,7 +2158,7 @@ async def get_seller_listings(seller_id: str, limit: int = 20, skip: int = 0):
 
 @api_router.put("/users/me")
 async def update_profile(updates: Dict[str, Any], current_user: User = Depends(get_current_user)):
-    allowed_fields = ["name", "phone", "address", "company_name", "tax_number", "bank_details", "language", "picture", "preferred_language", "preferred_currency", "subscription_tier", "bio", "bio_fr", "privacy_settings"]
+    allowed_fields = ["name", "phone", "address", "company_name", "tax_number", "bank_details", "language", "picture", "preferred_language", "preferred_currency", "subscription_tier", "bio", "bio_fr", "privacy_settings", "personalized_recommendations"]
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
     
     # Validate bio length
@@ -9946,7 +9950,7 @@ async def generate_lots_won_invoice(
         "is_premium_member": buyer_fees.is_premium_member,
         "tax_rate_gst": auction.get('tax_rate_gst', 5.0),
         "tax_rate_qst": auction.get('tax_rate_qst', 9.975),
-        "payment_deadline": "Within 3 business days",
+        "payment_deadline": "Within 14 days of auction close",
         "currency": auction.get('currency', 'CAD')  # Include auction currency
     }
     
@@ -10096,7 +10100,7 @@ async def generate_payment_letter(
         "premium_percentage": premium_percentage,
         "total_tax": total_tax,
         "grand_total": grand_total,
-        "payment_deadline": auction.get('payment_deadline', 'Within 3 business days') if isinstance(auction.get('payment_deadline'), str) else "Within 3 business days"
+        "payment_deadline": auction.get('payment_deadline', 'Within 14 days of auction close') if isinstance(auction.get('payment_deadline'), str) else "Within 14 days of auction close"
     }
     
     # Generate HTML using bilingual template

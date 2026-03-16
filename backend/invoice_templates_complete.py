@@ -21,7 +21,7 @@ def payment_letter_template(data: Dict[str, Any], lang: str = "en") -> str:
     premium_amount = data['premium_amount']
     total_tax = data['total_tax']
     grand_total = data['grand_total']
-    payment_deadline = data.get('payment_deadline', 'Within 3 business days')
+    payment_deadline = data.get('payment_deadline', 'Within 14 days of auction close')
     
     html = f"""
     <!DOCTYPE html>

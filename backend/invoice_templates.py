@@ -284,7 +284,7 @@ def lots_won_template(data: Dict[str, Any], lang: str = "en") -> str:
                 <li>Visa / Mastercard</li>
                 <li>Interac e-Transfer to: payments@bidvex.com</li>
             </ul>
-            <p><strong>Payment Deadline:</strong> {data.get('payment_deadline', 'Within 3 business days')}</p>
+            <p><strong>Payment Deadline:</strong> {data.get('payment_deadline', 'Within 14 days of auction close')}</p>
             
             {f'''
             <h3 style="margin-top: 20px;">PICKUP INFORMATION</h3>
@@ -320,7 +320,7 @@ def payment_letter_template(data: Dict[str, Any]) -> str:
     grand_total = data['grand_total']
     
     # Format payment deadline
-    payment_deadline = data.get('payment_deadline', 'Within 3 business days')
+    payment_deadline = data.get('payment_deadline', 'Within 14 days of auction close')
     
     html = f"""
     <!DOCTYPE html>
