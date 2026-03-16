@@ -7,28 +7,31 @@
 - [x] Stripe Fee-on-Top Model
 - [x] Settings Page UI Overhaul
 - [x] Partner Account System Phase 1 (Model, Onboarding, Admin, Fee Engine)
-- [x] Phase 2: Stripe Connect Destination Charges (partner fund routing, checkout preview)
-- [x] Phase 2: Partner Page UX Refinement (removed fee table, professional layout)
-- [x] Phase 2: Checkout UI Itemization (Hammer, BP, Platform Fee, Secure Processing Fee)
-- [x] Phase 2: Email Onboarding Logic (ready, pending live SendGrid keys)
-- [x] Phase 2: Admin Command Center — Revenue tracker, fee breakdown, partner management, transaction logs
-- [x] Phase 2: Marketplace Sidebar Filter — Integrated into both MarketplacePage and LotsMarketplacePage
+- [x] Phase 2: Stripe Connect Destination Charges
+- [x] Phase 2: Partner Page UX Refinement
+- [x] Phase 2: Checkout UI Itemization
+- [x] Phase 2: Email Onboarding Logic
+- [x] Phase 2: Admin Command Center
+- [x] Phase 2: Marketplace Sidebar Filter
+- [x] Sign-up Terms & Policy Consent (Clickwrap) ✅ NEW
+- [x] Admin RBAC Team Management ✅ NEW
+- [x] AI Chatbot (Claude Sonnet 4.5) ✅ NEW
 
 ## P1 - High Priority
-- [x] **Email Settings Admin Panel** — Self-service SendGrid key management + Send Test Email
-- [x] **CSV Export for Transaction Logs** — Download filtered transactions for accounting
-- [x] **DB-stored SendGrid config** — Partner emails auto-activate when key is saved via admin panel
-- [ ] User provides live SendGrid API key and tests the flow
-- [ ] User live testing of partner application + verification flow in production
+- [x] Email Settings Admin Panel
+- [x] CSV Export for Transaction Logs
+- [x] DB-stored SendGrid config
+- [ ] Refactor server.py into modular routers
+- [ ] User live testing of partner application + verification flow
 
 ## P2 - Medium Priority
-- [ ] Phase 3: Editable buyer premium in auction creation UI for partners
-- [ ] Phase 3: Partner Pro subscription tier
-- [ ] Phase 3: "Verified Auction Firm" badge displayed on partner listings
+- [ ] Cache marketplace filter counts
 - [ ] PDF Invoice Cloud Storage
-- [ ] Refactor server.py into modular routers
+- [ ] Editable buyer premium in auction creation UI for partners
+- [ ] Partner Pro subscription tier
 
 ## P3 - Low Priority
 - [ ] Cookie consent translation integration with i18n
 - [ ] "Email to Friend" feature for vehicle listings
 - [ ] Database indexing on `auction_id` in bids collection
+- [ ] "Verified Auction Firm" badge on partner listings
