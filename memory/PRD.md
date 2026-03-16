@@ -38,6 +38,23 @@ PDF Generation: ReportLab (bilingual invoices)
 
 ## Current Status: ALL P0 FEATURES COMPLETE
 
+### Session Update (Mar 16, 2026 — Legal & Partner Fee Update)
+
+**Legal Page Overhaul:**
+- Replaced placeholder content with live text from bidvex.com/terms-of-service and bidvex.com/privacy-policy
+- Added Section 7.2: Partner Account Fees ($100 CAD/year + 3% hammer commission, BP flexibility)
+- Added Section 7.4: All fees in CAD, GST/QST applied on top
+- Added Section 9: Listing Promotions & Marketing (non-refundable, pay-as-you-go emails final)
+- Updated Section 10.3: Subscription/platform fees non-refundable
+- Updated address across all sections: 103-761 Chalifoux Street, Sherbrooke, QC
+
+**Partner Signup Flow:**
+- Business account signup shows Partner Account Fees (CAD) disclosure before terms checkbox
+- Become-a-Partner page application form shows fee summary (3 items) and NEQ verification note
+- Chatbot updated with partner fee knowledge ($100/year + 3%), promotions policy, and address
+
+**Testing:** iteration_49 — 100% backend, 100% frontend (15/15 features verified)
+
 ### Session Summary (Mar 16, 2026 — Latest)
 
 **3 New Features Implemented:**
