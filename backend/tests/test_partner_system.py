@@ -18,7 +18,7 @@ import os
 import io
 import uuid
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://bidvex-b2b-phase2.preview.emergentagent.com')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://bidvex-three-launch.preview.emergentagent.com')
 
 # Admin credentials
 ADMIN_EMAIL = "charbeladmin@bidvex.com"
