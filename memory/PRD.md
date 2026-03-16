@@ -38,6 +38,21 @@ PDF Generation: ReportLab (bilingual invoices)
 
 ## Current Status: ALL P0 FEATURES COMPLETE
 
+### Session Update (Mar 16, 2026 — Logic & Legal Sync)
+
+**Logic Changes Implemented:**
+- Payment deadline updated from "3 business days" to "14 days of auction close" across all invoice templates
+- Late penalty: Verified 2% monthly rate (LATE_PAYMENT_MONTHLY_RATE=0.02) already in place
+- Partner fees hardcoded: PARTNER_PLATFORM_FEE_RATE=0.03 (3%), PARTNER_ANNUAL_ACCESS_FEE=100.00 ($100 CAD/year)
+- Anti-sniping: Verified 2-minute extension active for all auction types
+- Bid retraction: 1-hour window documented in legal (no retraction endpoint exists — bids are binding by design)
+- Personalized Recommendations: Added opt-out toggle to Account Settings > Notifications tab
+- Footer: Added mailing address (103-761 Chalifoux Street, Sherbrooke, QC J1G 0A8), updated copyright to "© 2026 BidVex Inc."
+- Signup checkbox: Confirmed linking to /legal#terms (March 2026 version)
+- User model: Added `personalized_recommendations: bool = True` field
+
+**Testing:** iteration_50 — 100% backend, 100% frontend (16/16 verified)
+
 ### Session Update (Mar 16, 2026 — Legal & Partner Fee Update)
 
 **Legal Page Overhaul:**
