@@ -38,6 +38,21 @@ PDF Generation: ReportLab (bilingual invoices)
 
 ## Current Status: ALL P0 FEATURES COMPLETE
 
+### Session Update (Mar 16, 2026 — Subscription Pricing Migration)
+
+**Pricing Changes:**
+- Premium: $213.45/month → **$180 CAD/year + taxes**
+- VIP Elite: $355.54/month → **$300 CAD/year + taxes**
+- All "monthly" billing references removed, replaced with "annually (yearly)"
+- "+ taxes" suffix added to all price mentions
+- GST/QST checkout footnote added to fee tables
+- Backend subscription_service.py: display strings, interval, tier benefits all updated
+- AI chatbot system prompt updated with new yearly pricing
+- Full codebase sweep: zero old price strings ($213.45/$355.54) in production code
+
+**Files Updated:** subscription_service.py, ai_assistant_v2.py, LegalPage.js, TermsEN.jsx, PrivacyEN.jsx, TermsFR.jsx, PrivacyFR.jsx, Footer.js, invoice_templates_*.py
+**Testing:** iteration_51 — 100% backend, 100% frontend
+
 ### Session Update (Mar 16, 2026 — Logic & Legal Sync)
 
 **Logic Changes Implemented:**
