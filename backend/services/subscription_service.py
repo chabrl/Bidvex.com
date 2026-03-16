@@ -4,8 +4,8 @@ Handles subscription tier management, Stripe price mappings, and tier-based fee 
 
 Stripe Price IDs:
 - Free: price_1T5V79Bd6Wtvh7hsnp69zu1F
-- Premium ($180.00): price_1T5V5xBd6Wtvh7hscWcNnk34
-- VIP ($300.00): price_1T5V2bBd6Wtvh7hsqLLmAZSH
+- Premium ($180.00 CAD/year): price_1T5V5xBd6Wtvh7hscWcNnk34
+- VIP ($300.00 CAD/year): price_1T5V2bBd6Wtvh7hsqLLmAZSH
 """
 
 import os
@@ -42,10 +42,10 @@ PRICE_ID_TO_TIER = {
 
 # Subscription prices (for display)
 SUBSCRIPTION_PRICES = {
-    "free": {"amount": 0, "currency": "CAD", "interval": "month", "display": "Free"},
-    "basic": {"amount": 0, "currency": "CAD", "interval": "month", "display": "Free"},
-    "premium": {"amount": 18000, "currency": "CAD", "interval": "month", "display": "$180.00/month"},
-    "vip": {"amount": 30000, "currency": "CAD", "interval": "month", "display": "$300.00/month"},
+    "free": {"amount": 0, "currency": "CAD", "interval": "year", "display": "Free"},
+    "basic": {"amount": 0, "currency": "CAD", "interval": "year", "display": "Free"},
+    "premium": {"amount": 18000, "currency": "CAD", "interval": "year", "display": "$180.00 CAD/year + taxes"},
+    "vip": {"amount": 30000, "currency": "CAD", "interval": "year", "display": "$300.00 CAD/year + taxes"},
 }
 
 # Fee rates by tier (synchronized with tax_engine.py)
@@ -89,7 +89,7 @@ TIER_BENEFITS = {
         "name": "Premium",
         "buyer_premium": "3.5%",
         "seller_commission": "2.5%",
-        "price": "$180/month",
+        "price": "$180 CAD/year + taxes",
         "features": [
             "Reduced buyer premium (3.5%)",
             "Reduced seller commission (2.5%)",
@@ -103,7 +103,7 @@ TIER_BENEFITS = {
         "name": "VIP Elite",
         "buyer_premium": "3.0%",
         "seller_commission": "2.0%",
-        "price": "$300/month",
+        "price": "$300 CAD/year + taxes",
         "features": [
             "Lowest buyer premium (3.0%)",
             "Lowest seller commission (2.0%)",
@@ -163,7 +163,7 @@ def get_all_tiers() -> Dict[str, Any]:
                 "id": "premium",
                 "name": "Premium",
                 "price": 18000,
-                "price_display": "$180/month",
+                "price_display": "$180 CAD/year + taxes",
                 "stripe_price_id": STRIPE_PRICE_IDS["premium"],
                 **TIER_BENEFITS["premium"]
             },
@@ -171,7 +171,7 @@ def get_all_tiers() -> Dict[str, Any]:
                 "id": "vip",
                 "name": "VIP Elite",
                 "price": 30000,
-                "price_display": "$300/month",
+                "price_display": "$300 CAD/year + taxes",
                 "stripe_price_id": STRIPE_PRICE_IDS["vip"],
                 **TIER_BENEFITS["vip"]
             }

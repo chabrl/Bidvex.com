@@ -105,17 +105,18 @@ const LegalPage = () => {
               {/* 7 */}
               <h3 className="text-lg font-semibold">7. Fees, Taxes, and Payment Structure</h3>
               <h4 className="font-semibold">7.1 User Tiers</h4>
-              <p>Upon registration, users are assigned to a specific tier. This tier dictates the applicable Buyer Premium and Seller Commission. All amounts are in Canadian Dollars (CAD).</p>
+              <p>Upon registration, users are assigned to a specific tier. This tier dictates the applicable Buyer Premium and Seller Commission. All amounts are in Canadian Dollars (CAD). Subscriptions are billed annually (yearly).</p>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm border-collapse border border-border">
                   <thead><tr className="bg-muted"><th className="border border-border p-2 text-left">Tier</th><th className="border border-border p-2 text-left">Buyer Premium</th><th className="border border-border p-2 text-left">Seller Commission</th></tr></thead>
                   <tbody>
                     <tr><td className="border border-border p-2">Standard</td><td className="border border-border p-2">5.0%</td><td className="border border-border p-2">4.0%</td></tr>
-                    <tr><td className="border border-border p-2">Premium ($213.45 CAD/mo)</td><td className="border border-border p-2">3.5%</td><td className="border border-border p-2">2.5%</td></tr>
-                    <tr><td className="border border-border p-2">VIP Elite ($355.54 CAD/mo)</td><td className="border border-border p-2">3.0%</td><td className="border border-border p-2">2.0%</td></tr>
+                    <tr><td className="border border-border p-2">Premium ($180 CAD/yr + taxes)</td><td className="border border-border p-2">3.5%</td><td className="border border-border p-2">2.5%</td></tr>
+                    <tr><td className="border border-border p-2">VIP Elite ($300 CAD/yr + taxes)</td><td className="border border-border p-2">3.0%</td><td className="border border-border p-2">2.0%</td></tr>
                   </tbody>
                 </table>
               </div>
+              <p className="text-xs text-muted-foreground mt-2">GST/QST will be calculated and added at checkout based on the user's jurisdiction.</p>
 
               <h4 className="font-semibold">7.2 Partner Account Fees</h4>
               <p>Verified Partner accounts (licensed auctioneers, bankruptcy trustees, liquidators) are subject to the following fee structure. All amounts are in Canadian Dollars (CAD):</p>

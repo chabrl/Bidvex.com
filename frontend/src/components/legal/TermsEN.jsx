@@ -244,7 +244,7 @@ export const TermsEN = () => {
             <div className="space-y-4">
               <div>
                 <h3 className="font-semibold text-lg mb-3">7.1 User Tiers</h3>
-                <p className="mb-3">Upon registration, users are assigned to a specific tier. This tier dictates the applicable Buyer Premium and Seller Commission. All amounts are in Canadian Dollars (CAD).</p>
+                <p className="mb-3">Upon registration, users are assigned to a specific tier. This tier dictates the applicable Buyer Premium and Seller Commission. All amounts are in Canadian Dollars (CAD). Subscriptions are billed annually (yearly).</p>
                 
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">
@@ -262,18 +262,19 @@ export const TermsEN = () => {
                         <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center">4.0%</td>
                       </tr>
                       <tr className="bg-blue-50 dark:bg-blue-950/30">
-                        <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 font-medium text-blue-700 dark:text-blue-300">Premium ($213.45 CAD/mo)</td>
+                        <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 font-medium text-blue-700 dark:text-blue-300">Premium ($180 CAD/yr + taxes)</td>
                         <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center text-blue-700 dark:text-blue-300">3.5%</td>
                         <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center text-blue-700 dark:text-blue-300">2.5%</td>
                       </tr>
                       <tr className="bg-amber-50 dark:bg-amber-950/30">
-                        <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 font-medium text-amber-700 dark:text-amber-300">VIP Elite ($355.54 CAD/mo)</td>
+                        <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 font-medium text-amber-700 dark:text-amber-300">VIP Elite ($300 CAD/yr + taxes)</td>
                         <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center text-amber-700 dark:text-amber-300">3.0%</td>
                         <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center text-amber-700 dark:text-amber-300">2.0%</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">GST/QST will be calculated and added at checkout based on the user's jurisdiction.</p>
               </div>
               
               <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
