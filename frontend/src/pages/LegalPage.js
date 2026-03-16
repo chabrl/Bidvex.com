@@ -1,116 +1,338 @@
 import React from 'react';
-import { useTranslation } from 'react-i18next';
 import { Card, CardContent } from '../components/ui/card';
 import { ScrollText, Shield, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const LegalPage = () => {
-  const { t } = useTranslation();
-
   return (
     <div className="min-h-screen bg-background py-12 px-4">
       <div className="max-w-4xl mx-auto space-y-10">
         {/* Header */}
         <div className="text-center space-y-3">
-          <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary mb-4">
+          <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary mb-4" data-testid="legal-back-link">
             <ArrowLeft className="h-4 w-4" /> Back to Home
           </Link>
           <h1 className="text-4xl font-bold tracking-tight" data-testid="legal-page-title">Legal</h1>
-          <p className="text-muted-foreground">Terms of Service and Privacy Policy for BidVex</p>
+          <p className="text-muted-foreground">Terms &amp; Conditions and Privacy Policy for BidVex Inc.</p>
         </div>
 
-        {/* Terms of Service */}
+        {/* ──────────────────── TERMS & CONDITIONS ──────────────────── */}
         <Card id="terms" data-testid="terms-section">
           <CardContent className="pt-6 space-y-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
                 <ScrollText className="h-6 w-6 text-blue-600" />
               </div>
-              <h2 className="text-2xl font-bold">Terms of Service</h2>
+              <h2 className="text-2xl font-bold">BidVex Terms &amp; Conditions</h2>
             </div>
-            <p className="text-sm text-muted-foreground">Last updated: March 14, 2026</p>
+            <p className="text-sm text-muted-foreground">Last Updated: March 2026</p>
 
-            <div className="prose prose-sm dark:prose-invert max-w-none space-y-4">
-              <h3 className="text-lg font-semibold">1. Acceptance of Terms</h3>
-              <p>By creating an account on BidVex, you agree to be bound by these Terms of Service. If you do not agree, you may not use the platform.</p>
+            <div className="prose prose-sm dark:prose-invert max-w-none space-y-5">
 
-              <h3 className="text-lg font-semibold">2. Eligibility</h3>
-              <p>You must be at least 18 years old and legally capable of entering binding contracts. By using BidVex, you represent and warrant that you meet these requirements.</p>
+              {/* 1 */}
+              <h3 className="text-lg font-semibold">1. Introduction &amp; Acceptance of Terms</h3>
+              <p>Welcome to BidVex. These Terms &amp; Conditions ("Terms") form a legally binding agreement between you ("User," "you," or "your") and BidVex Inc. ("BidVex," "we," "us," or "our"). These Terms govern your access to and use of our online auction platform, website, and related services (collectively, "the Platform").</p>
+              <p><strong>By registering for an account, browsing the Platform, or participating in an auction,</strong> you acknowledge that you have read, understood, and agree to be bound by these Terms, as well as our Privacy Policy. If you do not agree to these Terms, you must not access or use the Platform.</p>
+              <p>BidVex facilitates online auctions for various items, including but not limited to vehicles, consumer goods, and commercial services.</p>
 
-              <h3 className="text-lg font-semibold">3. Account Responsibilities</h3>
-              <p>You are responsible for maintaining the confidentiality of your account credentials. All activities under your account are your responsibility. You agree to immediately notify BidVex of any unauthorized use.</p>
-
-              <h3 className="text-lg font-semibold">4. Bidding & Transactions</h3>
-              <p>All bids placed on BidVex are legally binding commitments to purchase. Once a bid is placed, it cannot be retracted. Winning bidders are obligated to complete the transaction within 14 days. A 2% monthly late penalty applies to overdue payments.</p>
-
-              <h3 className="text-lg font-semibold">5. Fees & Pricing</h3>
-              <p>BidVex charges the following fees:</p>
+              {/* 2 */}
+              <h3 className="text-lg font-semibold">2. Platform Role &amp; Disclaimers</h3>
+              <h4 className="font-semibold">2.1 Independent Marketplace</h4>
+              <p>BidVex is a digital marketplace and is not a seller, dealer, broker, owner, bailee, or agent of any listed items. BidVex does not have possession of, title to, or ownership rights in any item listed for sale.</p>
+              <h4 className="font-semibold">2.2 Transaction Parties</h4>
+              <p>All sales are completed directly between the buyer and the seller. BidVex is not a party to the actual transaction between buyers and sellers. We do not transfer legal ownership of items from the seller to the buyer.</p>
+              <h4 className="font-semibold">2.3 BidVex Disclaimers</h4>
+              <p>BidVex does not and cannot:</p>
               <ul className="list-disc pl-6 space-y-1">
-                <li><strong>Buyer Premium:</strong> 5% (Standard), 3.5% (Premium), 3% (VIP Elite)</li>
-                <li><strong>Seller Commission:</strong> 4% (Standard), 2.5% (Premium), 2% (VIP Elite)</li>
-                <li><strong>Platform Fee:</strong> 2.5% on partner listings, 3% on partner transactions</li>
+                <li>Inspect, certify, guarantee, or verify the condition, safety, legality, accuracy, or quality of listed items;</li>
+                <li>Handle or coordinate delivery, transport, storage, or logistics for any items;</li>
+                <li>Provide any warranties, express or implied, regarding the items; or</li>
+                <li>Accept responsibility for, or guarantee the resolution of, any disputes between buyers and sellers.</li>
               </ul>
-              <p>Subscription tiers: Free ($0/mo), Premium ($213.45/mo), VIP Elite ($355.54/mo).</p>
 
-              <h3 className="text-lg font-semibold">6. No Refund Policy</h3>
-              <p><strong>All payments, including subscription fees and auction transaction fees, are final and non-refundable.</strong> No partial refunds, pro-rated refunds, or credits will be issued. You may cancel your subscription at any time to prevent future billing, but the current billing period will not be refunded.</p>
+              {/* 3 */}
+              <h3 className="text-lg font-semibold">3. User Accounts</h3>
+              <h4 className="font-semibold">3.1 Registration</h4>
+              <p>To participate in auctions, you are required to register and maintain a user account.</p>
+              <h4 className="font-semibold">3.2 User Responsibilities</h4>
+              <p>By creating an account, you agree to:</p>
+              <ul className="list-disc pl-6 space-y-1">
+                <li>Provide accurate, current, and complete information during the registration process;</li>
+                <li>Maintain the security of your account by protecting your password and restricting access;</li>
+                <li>Assume all responsibility for all activities that occur under your account; and</li>
+                <li>Immediately report any unauthorized access or use of your account to BidVex.</li>
+              </ul>
+              <h4 className="font-semibold">3.3 Eligibility</h4>
+              <p>You must be at least <strong>eighteen (18) years of age</strong> and possess the legal capacity to enter into binding contracts to register for an account and use the Platform.</p>
 
-              <h3 className="text-lg font-semibold">7. Anti-Sniping</h3>
-              <p>BidVex uses an anti-sniping system. If a bid is placed in the final 2 minutes of an auction, the timer extends by 2 minutes from the time of the bid. This ensures fairness for all participants.</p>
+              {/* 4 */}
+              <h3 className="text-lg font-semibold">4. Seller Responsibilities</h3>
+              <h4 className="font-semibold">4.1 Seller Covenants</h4>
+              <p>Sellers must adhere to the following obligations:</p>
+              <ul className="list-disc pl-6 space-y-1">
+                <li>Provide accurate, complete, and detailed descriptions, specifications, and high-quality images of listed items;</li>
+                <li>Confirm and guarantee legal ownership or the specific legal right to sell the listed items;</li>
+                <li>Fully disclose any known defects, liens, encumbrances, or restrictions on the items;</li>
+                <li>Comply with all applicable laws and regulations regarding the sale of the items;</li>
+                <li>Complete the sale of an item with the winning bidder in a timely manner; and</li>
+                <li>Respond promptly and professionally to buyer inquiries.</li>
+              </ul>
+              <h4 className="font-semibold">4.2 Prohibited Listings</h4>
+              <p>Sellers are strictly prohibited from listing items that are illegal, counterfeit, stolen, hazardous, recallable, or otherwise restricted by law or BidVex policy.</p>
 
-              <h3 className="text-lg font-semibold">8. Prohibited Conduct</h3>
-              <p>You may not use BidVex for any illegal purposes, engage in shill bidding, create multiple accounts, or manipulate auction outcomes. Violations may result in immediate account termination.</p>
+              {/* 5 */}
+              <h3 className="text-lg font-semibold">5. Buyer Responsibilities</h3>
+              <h4 className="font-semibold">5.1 Due Diligence</h4>
+              <p>Buyers acknowledge that it is their sole responsibility to inspect items, ask questions of the seller, or arrange third-party inspections before placing a bid, as needed.</p>
+              <h4 className="font-semibold">5.2 Legally Binding Bids</h4>
+              <p>By placing a bid, you are making a <strong>legally binding offer</strong> to purchase the item if your bid is the highest at the close of the auction, subject to any reserve price.</p>
+              <h4 className="font-semibold">5.3 Completion of Transaction</h4>
+              <p>If you are the winning bidder, you agree to complete the payment within the specified deadlines and arrange for the delivery or pickup of the item directly with the seller.</p>
+              <h4 className="font-semibold">5.4 Accurate Information</h4>
+              <p>Buyers must provide accurate shipping and contact information to ensure successful communication and transaction completion.</p>
 
-              <h3 className="text-lg font-semibold">9. Limitation of Liability</h3>
-              <p>BidVex acts as a marketplace platform and is not a party to transactions between buyers and sellers. Items are sold "as is, where is." BidVex is not responsible for the condition, legality, or quality of listed items.</p>
+              {/* 6 */}
+              <h3 className="text-lg font-semibold">6. Bidding &amp; Auction Rules</h3>
+              <h4 className="font-semibold">6.1 Binding Bids</h4>
+              <p>All bids placed on the Platform are legally binding contractual obligations.</p>
+              <h4 className="font-semibold">6.2 Bid Retraction</h4>
+              <p>Bid retractions are not permitted except in exceptional and limited circumstances, such as a material typographical error, and only if requested within <strong>one (1) hour</strong> of placing the bid.</p>
+              <h4 className="font-semibold">6.3 Reserve Prices</h4>
+              <p>Sellers may set a "Reserve Price" (the confidential minimum price the seller is willing to accept). The item will not be sold unless the Reserve Price is met.</p>
+              <h4 className="font-semibold">6.4 Anti-Sniping Policy</h4>
+              <p>If a bid is placed within the final <strong>two (2) minutes</strong> of an auction's scheduled end time, the auction duration will be extended by an additional two (2) minutes. This ensures a fair bidding process.</p>
 
-              <h3 className="text-lg font-semibold">10. Governing Law</h3>
-              <p>These Terms are governed by the laws of the Province of Quebec and the federal laws of Canada applicable therein.</p>
+              {/* 7 */}
+              <h3 className="text-lg font-semibold">7. Fees, Taxes, and Payment Structure</h3>
+              <h4 className="font-semibold">7.1 User Tiers</h4>
+              <p>Upon registration, users are assigned to a specific tier. This tier dictates the applicable Buyer Premium and Seller Commission. All amounts are in Canadian Dollars (CAD).</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border-collapse border border-border">
+                  <thead><tr className="bg-muted"><th className="border border-border p-2 text-left">Tier</th><th className="border border-border p-2 text-left">Buyer Premium</th><th className="border border-border p-2 text-left">Seller Commission</th></tr></thead>
+                  <tbody>
+                    <tr><td className="border border-border p-2">Standard</td><td className="border border-border p-2">5.0%</td><td className="border border-border p-2">4.0%</td></tr>
+                    <tr><td className="border border-border p-2">Premium ($213.45 CAD/mo)</td><td className="border border-border p-2">3.5%</td><td className="border border-border p-2">2.5%</td></tr>
+                    <tr><td className="border border-border p-2">VIP Elite ($355.54 CAD/mo)</td><td className="border border-border p-2">3.0%</td><td className="border border-border p-2">2.0%</td></tr>
+                  </tbody>
+                </table>
+              </div>
 
-              <h3 className="text-lg font-semibold">11. Contact</h3>
-              <p>For questions about these Terms, contact us at <a href="mailto:support@bidvex.com" className="text-primary hover:underline">support@bidvex.com</a>.</p>
+              <h4 className="font-semibold">7.2 Partner Account Fees</h4>
+              <p>Verified Partner accounts (licensed auctioneers, bankruptcy trustees, liquidators) are subject to the following fee structure. All amounts are in Canadian Dollars (CAD):</p>
+              <ul className="list-disc pl-6 space-y-1">
+                <li><strong>Annual Platform Access Fee:</strong> A flat fee of <strong>$100.00 CAD per year</strong> is charged for access to Partner-level platform features.</li>
+                <li><strong>Hammer Price Commission:</strong> A <strong>3% platform fee</strong> is charged on the final "hammer price" (winning bid amount) of every item listed by a Partner.</li>
+                <li><strong>Buyer's Premium Flexibility:</strong> Partners retain the full right to set their own Buyer's Premium (BP) independently of the platform fee. The BP is collected by the Partner and is not subject to the 3% commission.</li>
+              </ul>
+              <p>Partner accounts are subject to manual verification of business registration (NEQ) before they may list items on the Platform.</p>
+
+              <h4 className="font-semibold">7.3 Additional Fees</h4>
+              <p>A mandatory <strong>Platform Fee of 2.5%</strong> is applied to all completed transactions for vehicles only.</p>
+
+              <h4 className="font-semibold">7.4 Taxes</h4>
+              <p>All prices and fees quoted on this page are exclusive of taxes. <strong>GST (Goods and Services Tax) and QST (Quebec Sales Tax)</strong> are applied on top of all platform fees, commissions, and subscription charges in accordance with Canadian and Quebec tax law. Tax calculations are based on the final sale price and the jurisdiction of the transaction.</p>
+
+              <h4 className="font-semibold">7.5 Payment Terms</h4>
+              <p>Full payment for all winning bids is due within <strong>fourteen (14) days</strong> of the auction close.</p>
+              <p><strong>Late Payments:</strong> Payments not received by the due date may incur a late payment penalty of <strong>2% per month</strong> (24% per annum) on the outstanding balance.</p>
+
+              <h4 className="font-semibold">7.6 Payment Processing</h4>
+              <p>All payments are handled via <strong>Stripe</strong>, a secure third-party payment processor. BidVex does not store, possess, or have access to any full credit card or bank account payment information.</p>
+
+              {/* 8 */}
+              <h3 className="text-lg font-semibold">8. "AS-IS / WHERE-IS" Clause</h3>
+              <p className="uppercase text-xs leading-relaxed font-medium">
+                YOU EXPRESSLY AGREE THAT ALL ITEMS LISTED ON THE PLATFORM ARE SOLD "AS-IS, WHERE-IS," WITH ALL FAULTS AND DEFECTS, AND WITHOUT ANY WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING ANY WARRANTY OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE. BIDVEX IS NOT RESPONSIBLE FOR THE CONDITION, SAFETY, LEGALITY, OR ACCURACY OF ANY ITEM OR FOR ANY DISPUTES BETWEEN USERS.
+              </p>
+
+              {/* 9 */}
+              <h3 className="text-lg font-semibold">9. Listing Promotions &amp; Marketing</h3>
+              <h4 className="font-semibold">9.1 Promotional Services</h4>
+              <p>BidVex offers optional paid listing promotions (e.g., Featured Listing, Highlighted Listing, Homepage Spotlight) to increase visibility for sellers. Promotional fees are quoted in Canadian Dollars (CAD) and are subject to GST/QST.</p>
+              <h4 className="font-semibold">9.2 Non-Refundable</h4>
+              <p><strong>All listing promotions are non-refundable once activated.</strong> Once a promotion is applied to a listing, no refund, credit, or cancellation will be issued regardless of the auction outcome.</p>
+              <h4 className="font-semibold">9.3 Pay-As-You-Go Marketing Emails</h4>
+              <p><strong>Pay-as-you-go marketing email campaigns are billed immediately upon purchase and are final.</strong> No refunds or credits will be issued for unused email quota or campaign performance.</p>
+
+              {/* 10 */}
+              <h3 className="text-lg font-semibold">10. Dispute Resolution</h3>
+              <h4 className="font-semibold">10.1 Direct Resolution</h4>
+              <p>In the event of a dispute between a buyer and a seller, the parties agree to first attempt to resolve the issue directly and in good faith.</p>
+              <h4 className="font-semibold">10.2 Mediation by Support</h4>
+              <p>If the parties are unable to resolve the dispute, they may contact BidVex Support within <strong>seven (7) days</strong> of the transaction close. BidVex may, at its sole discretion, attempt to mediate the dispute, but BidVex is not obligated to do so.</p>
+              <h4 className="font-semibold">10.3 Refunds</h4>
+              <p>Refunds, returns, or adjustments are at the sole discretion of the seller unless BidVex determines that an item was significantly misrepresented in the listing. <strong>Subscription fees and platform service fees are non-refundable.</strong></p>
+
+              {/* 11 */}
+              <h3 className="text-lg font-semibold">11. Intellectual Property</h3>
+              <h4 className="font-semibold">11.1 Ownership</h4>
+              <p>All content and materials on the Platform, including the BidVex logo, text, graphics, images, video, code, and software are the property of BidVex Inc. or its licensors and are protected by copyright, trademark, and other intellectual property laws.</p>
+              <h4 className="font-semibold">11.2 Use Restrictions</h4>
+              <ul className="list-disc pl-6 space-y-1">
+                <li>Users are prohibited from copying, reproducing, modifying, distributing, or selling any Content without prior written permission.</li>
+                <li>The use of our trademarks, logos, or branding without express authorization is prohibited.</li>
+                <li>You are not permitted to use "scraping," "data mining," or automated agents to collect information from the Platform.</li>
+              </ul>
+
+              {/* 12 */}
+              <h3 className="text-lg font-semibold">12. Prohibited Conduct</h3>
+              <p>Users are strictly prohibited from engaging in the following conduct:</p>
+              <ul className="list-disc pl-6 space-y-1">
+                <li>Engaging in fraud, shill bidding, or any form of bid manipulation or artificial inflation;</li>
+                <li>Harassing, threatening, or defrauding other users or BidVex employees;</li>
+                <li>Posting spam, viruses, or malicious code that may harm the Platform or users;</li>
+                <li>Circumventing BidVex fees or manipulating the auction process;</li>
+                <li>Creating multiple accounts to bypass restrictions or manipulate auctions; or</li>
+                <li>Engaging in any conduct that violates applicable laws or regulations.</li>
+              </ul>
+              <p>Violations of this section may result in immediate suspension or termination of your account, and may result in legal action.</p>
+
+              {/* 13 */}
+              <h3 className="text-lg font-semibold">13. Limitation of Liability</h3>
+              <p className="uppercase text-xs leading-relaxed font-medium">
+                TO THE FULLEST EXTENT PERMITTED BY LAW, BIDVEX PROVIDES THE PLATFORM "AS IS" AND "AS AVAILABLE." BIDVEX SHALL NOT BE LIABLE FOR: THE ACCURACY, COMPLETENESS, OR RELIABILITY OF ITEM DESCRIPTIONS; THE ACTIONS, OMISSIONS, OR CONDUCT OF BUYERS OR SELLERS; ANY LOSSES, DAMAGES, OR HARM ARISING FROM DOWNTIME, ERRORS, OR TECHNICAL INTERRUPTIONS; OR ANY DIRECT, INDIRECT, INCIDENTAL, CONSEQUENTIAL, SPECIAL, OR PUNITIVE DAMAGES. OUR MAXIMUM AGGREGATE LIABILITY SHALL NOT EXCEED THE TOTAL FEES PAID BY YOU TO BIDVEX IN THE TWELVE (12) MONTHS PRIOR TO THE CLAIM.
+              </p>
+
+              {/* 14 */}
+              <h3 className="text-lg font-semibold">14. Suspension &amp; Termination</h3>
+              <h4 className="font-semibold">14.1 BidVex's Right</h4>
+              <p>BidVex reserves the right, at its sole discretion, to suspend, terminate, or restrict your account and access to the Platform if you violate these Terms or engage in conduct harmful to BidVex or its users.</p>
+              <h4 className="font-semibold">14.2 User Closing Account</h4>
+              <p>You may close your BidVex account at any time. However, closing your account does not release you from any outstanding obligations, including legally binding bids and payment requirements.</p>
+
+              {/* 15 */}
+              <h3 className="text-lg font-semibold">15. Changes to Terms &amp; Conditions</h3>
+              <p>BidVex reserves the right to update or modify these Terms at any time. Significant changes will be communicated to registered users via email and platform notifications. Your continued use of the Platform after the effective date of any changes constitutes your acceptance of the new Terms.</p>
+
+              {/* 16 */}
+              <h3 className="text-lg font-semibold">16. Governing Law &amp; Jurisdiction</h3>
+              <p>These Terms and your use of the Platform are governed by and construed in accordance with the laws of the <strong>Province of Quebec</strong> and the federal laws of Canada applicable therein. Any disputes arising out of or related to these Terms shall be resolved exclusively in the courts of <strong>Montreal, Quebec</strong>.</p>
+
+              {/* 17 */}
+              <h3 className="text-lg font-semibold">17. Contact Information</h3>
+              <p>BidVex Legal &amp; Data Protection Officer</p>
+              <p><strong>Email:</strong> <a href="mailto:support@bidvex.com" className="text-primary hover:underline">support@bidvex.com</a></p>
+              <p><strong>Mailing Address:</strong><br />103-761 Chalifoux Street<br />Sherbrooke, Quebec, Canada<br />J1G 0A8</p>
+              <p className="text-xs text-muted-foreground mt-4">&copy; 2026 BidVex Inc. All rights reserved.</p>
             </div>
           </CardContent>
         </Card>
 
-        {/* Privacy Policy */}
+        {/* ──────────────────── PRIVACY POLICY ──────────────────── */}
         <Card id="privacy" data-testid="privacy-section">
           <CardContent className="pt-6 space-y-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
                 <Shield className="h-6 w-6 text-green-600" />
               </div>
-              <h2 className="text-2xl font-bold">Privacy Policy</h2>
+              <h2 className="text-2xl font-bold">BidVex Privacy Policy</h2>
             </div>
-            <p className="text-sm text-muted-foreground">Last updated: March 14, 2026</p>
+            <p className="text-sm text-muted-foreground">Last Updated: March 2026</p>
 
-            <div className="prose prose-sm dark:prose-invert max-w-none space-y-4">
-              <h3 className="text-lg font-semibold">1. Information We Collect</h3>
-              <p>We collect information you provide when registering (name, email, phone, address, business details), transaction data (bids, purchases, payments), and usage data (IP address, device information, browsing activity).</p>
+            <div className="prose prose-sm dark:prose-invert max-w-none space-y-5">
 
-              <h3 className="text-lg font-semibold">2. How We Use Your Information</h3>
-              <p>We use your information to operate the platform, process transactions, verify identity, prevent fraud, comply with tax regulations, send transactional emails, and improve our services.</p>
+              {/* 1 */}
+              <h3 className="text-lg font-semibold">1. Introduction</h3>
+              <p>At BidVex Inc. ("BidVex," "we," "us," or "our"), we are committed to protecting the privacy and security of your personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your data when you use our online auction platform ("the Platform").</p>
+              <p><strong>Compliance:</strong> This policy is designed to comply with the <strong>Act respecting the protection of personal information in the private sector (Quebec Law 25)</strong>, the <strong>Personal Information Protection and Electronic Documents Act (PIPEDA)</strong>, and the <strong>General Data Protection Regulation (GDPR)</strong>.</p>
 
-              <h3 className="text-lg font-semibold">3. Data Sharing</h3>
-              <p>We may share your information with payment processors (Stripe), email service providers (SendGrid), law enforcement when required by law, and other users as necessary to complete transactions (e.g., seller sees buyer name after winning).</p>
+              {/* 2 */}
+              <h3 className="text-lg font-semibold">2. Information We Collect</h3>
+              <p>To provide a secure and efficient auction environment, we collect the following categories of data:</p>
+              <h4 className="font-semibold">2.1 Sellers (including Vehicle &amp; Equipment sections)</h4>
+              <ul className="list-disc pl-6 space-y-1">
+                <li><strong>Identity &amp; Verification Data:</strong> Full name, date of birth, and government-issued ID (for identity verification and fraud prevention).</li>
+                <li><strong>Contact Data:</strong> Email address, telephone number, and physical business/residential address.</li>
+                <li><strong>Business Data:</strong> Business name, tax ID numbers (including NEQ), and dealer licenses (where applicable).</li>
+                <li><strong>Asset Data:</strong> VINs, vehicle/equipment history reports, make, model, year, photos, and related ownership documentation.</li>
+                <li><strong>Financial Data:</strong> Banking details and settlement information for payouts.</li>
+              </ul>
+              <h4 className="font-semibold">2.2 Buyers</h4>
+              <ul className="list-disc pl-6 space-y-1">
+                <li><strong>Identity Data:</strong> Full name and username.</li>
+                <li><strong>Contact Data:</strong> Email address, telephone number, and billing/shipping address.</li>
+                <li><strong>Payment Data:</strong> Credit card and payment method details. <em>Note: All payment data is processed securely via Stripe; BidVex does not store full credit card numbers.</em></li>
+                <li><strong>Transaction Data:</strong> Bidding history, watchlist items, and records of won auctions.</li>
+              </ul>
+              <h4 className="font-semibold">2.3 Technical Data (All Users)</h4>
+              <p>IP address, browser type and version, time zone setting, device identifiers, and operating system information for security monitoring and platform optimization.</p>
 
-              <h3 className="text-lg font-semibold">4. Canadian Tax Compliance</h3>
-              <p>BidVex collects tax registration numbers (GST/HST, QST) from sellers as required by Canadian Revenue Agency regulations. This information is stored securely and used solely for tax reporting purposes.</p>
+              {/* 3 */}
+              <h3 className="text-lg font-semibold">3. Purpose of Processing</h3>
+              <p>We process your personal data based on the following legal grounds:</p>
+              <ul className="list-disc pl-6 space-y-1">
+                <li><strong>Contractual Necessity:</strong> To facilitate bidding, buying, and selling transactions.</li>
+                <li><strong>Identity Verification:</strong> To maintain a high-trust marketplace and prevent fraud.</li>
+                <li><strong>Communication:</strong> To enable secure messaging between buyers and sellers.</li>
+                <li><strong>Payment Processing:</strong> To securely handle transaction fees via Stripe.</li>
+                <li><strong>Improvement:</strong> To analyze usage patterns and optimize recommendations.</li>
+                <li><strong>Legal Compliance:</strong> To satisfy tax, accounting, and AML obligations.</li>
+              </ul>
 
-              <h3 className="text-lg font-semibold">5. Data Security</h3>
-              <p>We implement industry-standard security measures including encrypted data transmission (TLS/SSL), secure password hashing (bcrypt), and regular security audits. However, no system is 100% secure.</p>
+              {/* 4 */}
+              <h3 className="text-lg font-semibold">4. Information Sharing &amp; Disclosure</h3>
+              <p>We do not sell your personal data to third parties. Disclosure occurs only in the following contexts:</p>
+              <ul className="list-disc pl-6 space-y-1">
+                <li><strong>Transaction Completion:</strong> Upon the conclusion of a successful auction, the winning buyer and the seller receive each other's contact information to finalize logistics.</li>
+                <li><strong>Public Profile:</strong> Trust indicators, verified badges, and user ratings are displayed publicly to maintain community transparency.</li>
+                <li><strong>Service Providers:</strong> We share data with trusted partners strictly for operational purposes: Stripe (payments), SendGrid (email), Twilio (SMS), AWS/GCP (hosting).</li>
+                <li><strong>Legal Authorities:</strong> We may disclose data if required by law, court order, or to protect the rights and safety of our users.</li>
+              </ul>
 
-              <h3 className="text-lg font-semibold">6. Data Retention</h3>
-              <p>We retain your data for as long as your account is active, plus 7 years for tax and legal compliance. You may request account deletion, subject to legal retention requirements.</p>
+              {/* 5 */}
+              <h3 className="text-lg font-semibold">5. Cookies &amp; Tracking</h3>
+              <p>We use cookies to enhance your experience and analyze traffic:</p>
+              <ul className="list-disc pl-6 space-y-1">
+                <li><strong>Essential Cookies:</strong> Required for core platform functionality (e.g., staying logged in).</li>
+                <li><strong>Analytics Cookies:</strong> Help us understand how users interact with the site.</li>
+                <li><strong>Personalization Cookies:</strong> Remember your preferences, such as language (English/French).</li>
+                <li><strong>Marketing Cookies:</strong> Used to deliver relevant advertisements. Opt-out available via Google Ads Settings.</li>
+              </ul>
 
-              <h3 className="text-lg font-semibold">7. Your Rights</h3>
-              <p>Under applicable Canadian privacy laws, you have the right to access your personal data, request corrections, request deletion (subject to legal requirements), and withdraw consent for marketing communications.</p>
+              {/* 6 */}
+              <h3 className="text-lg font-semibold">6. AI-Powered Recommendation Engine</h3>
+              <p>BidVex utilizes a proprietary recommendation engine to suggest items based on your browsing and search history, past bidding and purchase patterns, and items added to your "Watchlist."</p>
+              <p><strong>Opt-Out:</strong> Users may disable personalized recommendations in their Account Settings. This will not affect core bidding or platform functionality.</p>
 
-              <h3 className="text-lg font-semibold">8. Cookies</h3>
-              <p>BidVex uses essential cookies for authentication and session management, and optional analytics cookies to improve the user experience. You can manage cookie preferences through our cookie consent banner.</p>
+              {/* 7 */}
+              <h3 className="text-lg font-semibold">7. Data Security</h3>
+              <p>We implement industry-leading security measures to protect your data, including:</p>
+              <ul className="list-disc pl-6 space-y-1">
+                <li><strong>TLS/SSL:</strong> Encryption in transit</li>
+                <li><strong>AES-256:</strong> Encryption at rest</li>
+                <li><strong>PCI-DSS:</strong> Payment compliance</li>
+                <li><strong>MFA:</strong> Multi-factor authentication</li>
+                <li><strong>Role-Based Access Control</strong></li>
+                <li><strong>24/7 Security Monitoring</strong></li>
+              </ul>
 
-              <h3 className="text-lg font-semibold">9. Contact</h3>
-              <p>For privacy inquiries, contact our Data Protection Officer at <a href="mailto:privacy@bidvex.com" className="text-primary hover:underline">privacy@bidvex.com</a>.</p>
+              {/* 8 */}
+              <h3 className="text-lg font-semibold">8. Your Privacy Rights</h3>
+              <p>Depending on your jurisdiction (Quebec, Canada, or EU), you have the following rights:</p>
+              <ul className="list-disc pl-6 space-y-1">
+                <li><strong>Access:</strong> The right to request a copy of the personal data we hold about you.</li>
+                <li><strong>Correction:</strong> The right to fix inaccurate or incomplete information.</li>
+                <li><strong>Deletion (Right to be Forgotten):</strong> The right to request the removal of your data, subject to legal retention requirements.</li>
+                <li><strong>Portability:</strong> The right to receive your data in a structured, machine-readable format.</li>
+                <li><strong>Withdrawal of Consent:</strong> The right to stop processing for specific purposes (e.g., marketing).</li>
+              </ul>
+              <p><strong>To exercise these rights,</strong> please contact our Data Protection Officer at <a href="mailto:support@bidvex.com" className="text-primary hover:underline">support@bidvex.com</a>.</p>
+
+              {/* 9 */}
+              <h3 className="text-lg font-semibold">9. Data Retention</h3>
+              <ul className="list-disc pl-6 space-y-1">
+                <li><strong>Account Data:</strong> Retained for the duration of your active account and up to 7 years after closure.</li>
+                <li><strong>Transaction Records:</strong> Retained for 7 years to comply with Canadian and Quebec tax and legal obligations.</li>
+                <li><strong>Identification Documents:</strong> Deleted once verification is successfully completed, unless otherwise required for ongoing fraud prevention.</li>
+              </ul>
+
+              {/* 10 */}
+              <h3 className="text-lg font-semibold">10. Contact Us</h3>
+              <p>For questions regarding this policy or our data practices, please contact:</p>
+              <p>BidVex Data Protection Officer</p>
+              <p><strong>Email:</strong> <a href="mailto:support@bidvex.com" className="text-primary hover:underline">support@bidvex.com</a></p>
+              <p><strong>Mailing Address:</strong><br />103-761 Chalifoux Street<br />Sherbrooke, Quebec, Canada<br />J1G 0A8</p>
+              <p className="text-xs text-muted-foreground mt-4">&copy; 2026 BidVex Inc. All rights reserved.</p>
             </div>
           </CardContent>
         </Card>

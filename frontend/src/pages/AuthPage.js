@@ -351,6 +351,16 @@ const AuthPage = () => {
                         data-testid="tax-number-input"
                       />
                     </div>
+                    {/* Partner Fee Disclosure for Business Accounts */}
+                    <div className="rounded-lg border border-blue-200 dark:border-blue-500/30 bg-blue-50/60 dark:bg-blue-500/5 p-3 space-y-1.5" data-testid="partner-fee-signup-notice">
+                      <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">Partner Account Fees (CAD)</p>
+                      <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                        If you apply as a Partner (licensed auctioneer/liquidator), the following fees apply:
+                        <strong> $100.00 CAD/year</strong> platform access fee + <strong>3% commission</strong> on the final hammer price per item.
+                        You set your own Buyer's Premium independently. All fees are subject to GST/QST.
+                      </p>
+                      <p className="text-[10px] text-amber-600 dark:text-amber-400">Partner accounts require manual NEQ (business registration) verification before listing.</p>
+                    </div>
                   </>
                 )}
 

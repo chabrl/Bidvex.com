@@ -280,6 +280,31 @@ const BecomePartnerPage = () => {
                   <p>Our team will review your application within 24-48 hours and contact you at <span className="text-slate-700 dark:text-slate-300">partners@bidvex.ca</span>.</p>
                 </div>
 
+                {/* Partner Fee Disclosure */}
+                <div className="rounded-lg border-2 border-blue-200 dark:border-blue-500/30 bg-blue-50/50 dark:bg-blue-500/5 p-4 space-y-2" data-testid="partner-fee-disclosure">
+                  <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wide">Partner Fee Summary (CAD)</p>
+                  <ul className="text-xs text-slate-700 dark:text-slate-300 space-y-1.5 list-none pl-0">
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-500 font-bold mt-px">1.</span>
+                      <span><strong>Annual Platform Fee:</strong> $100.00 CAD/year flat fee for Partner-level access. GST/QST applied.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-500 font-bold mt-px">2.</span>
+                      <span><strong>Hammer Price Commission:</strong> 3% platform fee on the final hammer price of every item you list. GST/QST applied.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-500 font-bold mt-px">3.</span>
+                      <span><strong>Buyer's Premium:</strong> You set your own BP rate independently &mdash; it is not subject to the 3% commission.</span>
+                    </li>
+                  </ul>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-500 pt-1">All fees are in Canadian Dollars (CAD). GST and QST are applied on top of all platform fees.</p>
+                </div>
+
+                {/* NEQ Verification Note */}
+                <div className="rounded-lg bg-amber-50 dark:bg-amber-500/5 border border-amber-200 dark:border-amber-500/20 p-3 text-[11px] text-amber-700 dark:text-amber-300 leading-relaxed" data-testid="partner-neq-verification-note">
+                  <strong>Verification Required:</strong> Partner accounts are subject to manual verification of your business registration (NEQ) before you may list vehicles or other items on BidVex. Expect 24-48 hours for review.
+                </div>
+
                 <Button
                   type="submit"
                   disabled={submitting || !companyName || !neqNumber || !neqFile || certFiles.length === 0}
