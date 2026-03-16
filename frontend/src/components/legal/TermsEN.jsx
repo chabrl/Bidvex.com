@@ -34,6 +34,7 @@ export const TermsEN = () => {
                 <li><a href="#as-is" className="hover:underline">AS-IS / WHERE-IS Clause</a></li>
               </ol>
               <ol className="list-decimal pl-6 space-y-1 text-blue-600 dark:text-blue-400" start={9}>
+                <li><a href="#promotions" className="hover:underline">Listing Promotions & Marketing</a></li>
                 <li><a href="#disputes" className="hover:underline">Dispute Resolution</a></li>
                 <li><a href="#ip" className="hover:underline">Intellectual Property</a></li>
                 <li><a href="#prohibited" className="hover:underline">Prohibited Conduct</a></li>
@@ -243,7 +244,7 @@ export const TermsEN = () => {
             <div className="space-y-4">
               <div>
                 <h3 className="font-semibold text-lg mb-3">7.1 User Tiers</h3>
-                <p className="mb-3">Upon registration, users are assigned to a specific tier. This tier dictates the applicable Buyer Premium and Seller Commission.</p>
+                <p className="mb-3">Upon registration, users are assigned to a specific tier. This tier dictates the applicable Buyer Premium and Seller Commission. All amounts are in Canadian Dollars (CAD).</p>
                 
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">
@@ -261,12 +262,12 @@ export const TermsEN = () => {
                         <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center">4.0%</td>
                       </tr>
                       <tr className="bg-blue-50 dark:bg-blue-950/30">
-                        <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 font-medium text-blue-700 dark:text-blue-300">Premium</td>
+                        <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 font-medium text-blue-700 dark:text-blue-300">Premium ($213.45 CAD/mo)</td>
                         <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center text-blue-700 dark:text-blue-300">3.5%</td>
                         <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center text-blue-700 dark:text-blue-300">2.5%</td>
                       </tr>
                       <tr className="bg-amber-50 dark:bg-amber-950/30">
-                        <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 font-medium text-amber-700 dark:text-amber-300">VIP Elite</td>
+                        <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 font-medium text-amber-700 dark:text-amber-300">VIP Elite ($355.54 CAD/mo)</td>
                         <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center text-amber-700 dark:text-amber-300">3.0%</td>
                         <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center text-amber-700 dark:text-amber-300">2.0%</td>
                       </tr>
@@ -276,17 +277,28 @@ export const TermsEN = () => {
               </div>
               
               <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-                <h3 className="font-semibold text-lg mb-2">7.2 Additional Fees</h3>
+                <h3 className="font-semibold text-lg mb-2">7.2 Partner Account Fees</h3>
+                <p className="mb-2">Verified Partner accounts (licensed auctioneers, bankruptcy trustees, liquidators) are subject to the following fee structure. All amounts are in Canadian Dollars (CAD):</p>
+                <ul className="list-disc pl-6 space-y-1">
+                  <li><strong>Annual Platform Access Fee:</strong> A flat fee of <strong>$100.00 CAD per year</strong> is charged for access to Partner-level platform features.</li>
+                  <li><strong>Hammer Price Commission:</strong> A <strong>3% platform fee</strong> is charged on the final "hammer price" (winning bid amount) of every item listed by a Partner.</li>
+                  <li><strong>Buyer's Premium Flexibility:</strong> Partners retain the full right to set their own Buyer's Premium (BP) independently of the platform fee. The BP is collected by the Partner and is not subject to the 3% commission.</li>
+                </ul>
+                <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">Partner accounts are subject to manual verification of business registration (NEQ) before they may list items on the Platform.</p>
+              </div>
+              
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
+                <h3 className="font-semibold text-lg mb-2">7.3 Additional Fees</h3>
                 <p>A mandatory <strong>Platform Fee of 2.5%</strong> is applied to all completed transactions for vehicles only.</p>
               </div>
               
               <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-                <h3 className="font-semibold text-lg mb-2">7.3 Taxes</h3>
-                <p>Taxes (including GST, PST, HST, and QST, as applicable) are added to the final invoice. Tax calculations are based on the final sale price and the jurisdiction of the transaction.</p>
+                <h3 className="font-semibold text-lg mb-2">7.4 Taxes</h3>
+                <p>All prices and fees quoted on this page are exclusive of taxes. <strong>GST (Goods and Services Tax) and QST (Quebec Sales Tax)</strong> are applied on top of all platform fees, commissions, and subscription charges in accordance with Canadian and Quebec tax law. Tax calculations are based on the final sale price and the jurisdiction of the transaction.</p>
               </div>
               
               <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
-                <h3 className="font-semibold text-lg mb-2 text-amber-800 dark:text-amber-200">7.4 Payment Terms</h3>
+                <h3 className="font-semibold text-lg mb-2 text-amber-800 dark:text-amber-200">7.5 Payment Terms</h3>
                 <p className="text-amber-700 dark:text-amber-300 mb-2">Full payment for all winning bids is due within <strong>fourteen (14) days</strong> of the auction close.</p>
                 <p className="text-amber-700 dark:text-amber-300"><strong>Late Payments:</strong> Payments not received by the due date may incur a late payment penalty of <strong>2% per month</strong> (24% per annum) on the outstanding balance.</p>
               </div>
@@ -294,7 +306,7 @@ export const TermsEN = () => {
               <div className="flex items-start gap-3 p-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
                 <CreditCard className="h-6 w-6 text-green-600 mt-0.5 flex-shrink-0" />
                 <div>
-                  <h3 className="font-semibold text-green-800 dark:text-green-200">7.5 Payment Processing</h3>
+                  <h3 className="font-semibold text-green-800 dark:text-green-200">7.6 Payment Processing</h3>
                   <p className="text-green-700 dark:text-green-300">All payments are handled via <strong>Stripe</strong>, a secure third-party payment processor. BidVex does not store, possess, or have access to any full credit card or bank account payment information.</p>
                 </div>
               </div>
@@ -315,45 +327,70 @@ export const TermsEN = () => {
             </div>
           </section>
 
-          {/* 9. Disputes */}
+          {/* 9. Listing Promotions */}
+          <section id="promotions">
+            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
+              <span className="w-8 h-8 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center text-green-600 text-sm font-bold">9</span>
+              Listing Promotions &amp; Marketing
+            </h2>
+            
+            <div className="space-y-4">
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
+                <h3 className="font-semibold">9.1 Promotional Services</h3>
+                <p>BidVex offers optional paid listing promotions (e.g., Featured Listing, Highlighted Listing, Homepage Spotlight) to increase visibility for sellers. Promotional fees are quoted in Canadian Dollars (CAD) and are subject to GST/QST.</p>
+              </div>
+              
+              <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                <h3 className="font-semibold text-red-800 dark:text-red-200">9.2 Non-Refundable</h3>
+                <p className="text-red-700 dark:text-red-300"><strong>All listing promotions are non-refundable once activated.</strong> Once a promotion is applied to a listing, no refund, credit, or cancellation will be issued regardless of the auction outcome.</p>
+              </div>
+              
+              <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                <h3 className="font-semibold text-red-800 dark:text-red-200">9.3 Pay-As-You-Go Marketing Emails</h3>
+                <p className="text-red-700 dark:text-red-300"><strong>Pay-as-you-go marketing email campaigns are billed immediately upon purchase and are final.</strong> No refunds or credits will be issued for unused email quota or campaign performance.</p>
+              </div>
+            </div>
+          </section>
+
+          {/* 10. Disputes */}
           <section id="disputes">
             <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">9</span>
+              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">10</span>
               <Scale className="h-5 w-5" /> Dispute Resolution
             </h2>
             
             <div className="space-y-4">
               <div className="border-l-4 border-blue-500 pl-4">
-                <h3 className="font-semibold">9.1 Direct Resolution</h3>
+                <h3 className="font-semibold">10.1 Direct Resolution</h3>
                 <p>In the event of a dispute between a buyer and a seller, the parties agree to first attempt to resolve the issue directly and in good faith.</p>
               </div>
               
               <div className="border-l-4 border-blue-500 pl-4">
-                <h3 className="font-semibold">9.2 Mediation by Support</h3>
+                <h3 className="font-semibold">10.2 Mediation by Support</h3>
                 <p>If the parties are unable to resolve the dispute, they may contact BidVex Support within <strong>seven (7) days</strong> of the transaction close. BidVex may, at its sole discretion, attempt to mediate the dispute, but BidVex is not obligated to do so.</p>
               </div>
               
               <div className="border-l-4 border-blue-500 pl-4">
-                <h3 className="font-semibold">9.3 Refunds</h3>
-                <p>Refunds, returns, or adjustments are at the sole discretion of the seller unless BidVex determines that an item was significantly misrepresented in the listing.</p>
+                <h3 className="font-semibold">10.3 Refunds</h3>
+                <p>Refunds, returns, or adjustments are at the sole discretion of the seller unless BidVex determines that an item was significantly misrepresented in the listing. <strong>Subscription fees and platform service fees are non-refundable.</strong></p>
               </div>
             </div>
           </section>
 
-          {/* 10. IP */}
+          {/* 11. IP */}
           <section id="ip">
             <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">10</span>
+              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">11</span>
               Intellectual Property
             </h2>
             
             <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 mb-4">
-              <h3 className="font-semibold mb-2">10.1 Ownership</h3>
+              <h3 className="font-semibold mb-2">11.1 Ownership</h3>
               <p>All content and materials on the Platform, including the BidVex logo, text, graphics, images, video, code, and software are the property of BidVex Inc. or its licensors and are protected by copyright, trademark, and other intellectual property laws.</p>
             </div>
             
             <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-              <h3 className="font-semibold mb-2">10.2 Use Restrictions</h3>
+              <h3 className="font-semibold mb-2">11.2 Use Restrictions</h3>
               <ul className="list-disc pl-6 space-y-1">
                 <li>Users are prohibited from copying, reproducing, modifying, distributing, or selling any Content without prior written permission.</li>
                 <li>The use of our trademarks, logos, or branding without express authorization is prohibited.</li>
@@ -362,10 +399,10 @@ export const TermsEN = () => {
             </div>
           </section>
 
-          {/* 11. Prohibited */}
+          {/* 12. Prohibited */}
           <section id="prohibited">
             <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center text-red-600 text-sm font-bold">11</span>
+              <span className="w-8 h-8 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center text-red-600 text-sm font-bold">12</span>
               <Ban className="h-5 w-5 text-red-600" /> Prohibited Conduct
             </h2>
             
@@ -385,10 +422,10 @@ export const TermsEN = () => {
             </div>
           </section>
 
-          {/* 12. Liability */}
+          {/* 13. Liability */}
           <section id="liability">
             <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">12</span>
+              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">13</span>
               Limitation of Liability
             </h2>
             
@@ -408,48 +445,48 @@ export const TermsEN = () => {
             </div>
           </section>
 
-          {/* 13. Termination */}
+          {/* 14. Termination */}
           <section id="termination">
             <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">13</span>
+              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">14</span>
               Suspension & Termination
             </h2>
             
             <div className="grid gap-4">
               <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-                <h3 className="font-semibold mb-2">13.1 BidVex's Right</h3>
+                <h3 className="font-semibold mb-2">14.1 BidVex's Right</h3>
                 <p>BidVex reserves the right, at its sole discretion, to suspend, terminate, or restrict your account and access to the Platform if you violate these Terms or engage in conduct harmful to BidVex or its users.</p>
               </div>
               
               <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-                <h3 className="font-semibold mb-2">13.2 User Closing Account</h3>
+                <h3 className="font-semibold mb-2">14.2 User Closing Account</h3>
                 <p>You may close your BidVex account at any time. However, closing your account does not release you from any outstanding obligations, including legally binding bids and payment requirements.</p>
               </div>
             </div>
           </section>
 
-          {/* 14. Changes */}
+          {/* 15. Changes */}
           <section id="changes">
             <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">14</span>
+              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">15</span>
               Changes to Terms & Conditions
             </h2>
             <p>BidVex reserves the right to update or modify these Terms at any time. Significant changes will be communicated to registered users via email and platform notifications. Your continued use of the Platform after the effective date of any changes constitutes your acceptance of the new Terms.</p>
           </section>
 
-          {/* 15. Governing Law */}
+          {/* 16. Governing Law */}
           <section id="governing">
             <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">15</span>
+              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">16</span>
               <Scale className="h-5 w-5" /> Governing Law & Jurisdiction
             </h2>
             <p>These Terms and your use of the Platform are governed by and construed in accordance with the laws of the <strong>Province of Quebec</strong> and the federal laws of Canada applicable therein. Any disputes arising out of or related to these Terms shall be resolved exclusively in the courts of <strong>Montreal, Quebec</strong>.</p>
           </section>
 
-          {/* 16. Contact */}
+          {/* 17. Contact */}
           <section id="contact" className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-6">
             <h2 className="text-2xl font-semibold mb-4 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">16</span>
+              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">17</span>
               Contact Information
             </h2>
             <p className="font-semibold text-lg mb-4">BidVex Legal & Data Protection Officer</p>
@@ -462,7 +499,7 @@ export const TermsEN = () => {
                 <MapPin className="h-5 w-5 text-blue-600 mt-0.5" />
                 <div>
                   <strong>Mailing Address:</strong><br />
-                  761 Chalifoux Street<br />
+                  103-761 Chalifoux Street<br />
                   Sherbrooke, Quebec, Canada<br />
                   J1G 0A8
                 </div>
@@ -472,7 +509,7 @@ export const TermsEN = () => {
 
           {/* Footer */}
           <div className="text-center text-sm text-muted-foreground pt-6 border-t">
-            <p>© 2026 BidVex. All rights reserved.</p>
+            <p>&copy; 2026 BidVex Inc. All rights reserved.</p>
           </div>
         </CardContent>
       </Card>

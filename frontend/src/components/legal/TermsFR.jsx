@@ -462,7 +462,7 @@ export const TermsFR = () => {
                 <MapPin className="h-5 w-5 text-blue-600 mt-0.5" />
                 <div>
                   <strong>Adresse postale :</strong><br />
-                  761, rue Chalifoux<br />
+                  103-761, rue Chalifoux<br />
                   Sherbrooke (Québec) Canada<br />
                   J1G 0A8
                 </div>
@@ -472,7 +472,7 @@ export const TermsFR = () => {
 
           {/* Pied de page */}
           <div className="text-center text-sm text-muted-foreground pt-6 border-t">
-            <p>© 2026 BidVex. Tous droits réservés.</p>
+            <p>&copy; 2026 BidVex Inc. Tous droits réservés.</p>
           </div>
         </CardContent>
       </Card>

@@ -462,7 +462,7 @@ export const PrivacyFR = () => {
                   <div>
                     <p className="text-sm text-slate-500">Adresse postale</p>
                     <p className="font-medium">
-                      761, rue Chalifoux<br />
+                      103-761, rue Chalifoux<br />
                       Sherbrooke (Québec) Canada<br />
                       J1G 0A8
                     </p>
@@ -474,7 +474,7 @@ export const PrivacyFR = () => {
 
           {/* Pied de page */}
           <div className="text-center text-sm text-muted-foreground pt-6 border-t">
-            <p>© 2026 BidVex. Tous droits réservés.</p>
+            <p>&copy; 2026 BidVex Inc. Tous droits réservés.</p>
           </div>
         </CardContent>
       </Card>
