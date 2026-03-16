@@ -41,6 +41,7 @@ import SiteModeManager from './admin/SiteModeManager';
 import PartnerManager from './admin/PartnerManager';
 import FinanceDashboard from './admin/FinanceDashboard';
 import EmailSettings from './admin/EmailSettings';
+import TeamManager from '../components/admin/TeamManager';
 import { 
   Users, Package, Gavel, Shield, TrendingUp, Bell, Settings, FileText, 
   MessageSquare, DollarSign, Search, Image, CreditCard, Megaphone, 
@@ -58,6 +59,7 @@ const PRIMARY_TABS = [
   { id: 'banners', label: 'Banners', icon: '🎨', lucideIcon: Image },
   { id: 'analytics', label: 'Analytics', icon: '📊', lucideIcon: TrendingUp },
   { id: 'partners-finance', label: 'Partners & Finance', icon: '💰', lucideIcon: Building2 },
+  { id: 'team', label: 'Team', icon: '👥', lucideIcon: Users },
   { id: 'logs', label: 'Admin Logs', icon: '📋', lucideIcon: FileText },
 ];
 
@@ -101,6 +103,9 @@ const SECONDARY_TABS = {
   'partners-finance': [
     { id: 'finance-overview', label: 'Finance Dashboard', icon: '📊', lucideIcon: TrendingUp },
     { id: 'email-settings', label: 'Email Settings', icon: '✉️', lucideIcon: Mail },
+  ],
+  team: [
+    { id: 'team-members', label: 'Team Members & Invites', icon: '👥', lucideIcon: Users },
   ],
   logs: [
     { id: 'action-history', label: 'Action History', icon: '📜', lucideIcon: History },
@@ -336,6 +341,8 @@ const AdminDashboard = () => {
           case 'email-settings': return <EmailSettings />;
           default: return <FinanceDashboard />;
         }
+      case 'team':
+        return <TeamManager />;
       case 'logs':
         return (
           <div className="space-y-4">

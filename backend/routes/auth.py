@@ -58,6 +58,7 @@ class UserCreate(BaseModel):
     company_name: Optional[str] = ""
     tax_number: Optional[str] = ""
     bank_details: Optional[str] = ""
+    terms_agreed: bool = False
 
 
 class SessionCreate(BaseModel):
@@ -137,6 +138,10 @@ async def register(user_data: UserCreate, request: Request):
     - Applies geolocation-based currency enforcement
     - Generates affiliate code for referral program
     """
+    # Validate terms consent
+    if not user_data.terms_agreed:
+        raise HTTPException(status_code=400, detail="You must agree to the Terms of Service and Privacy Policy to create an account.")
+    
     # Check existing user
     existing = await db.users.find_one({"email": user_data.email})
     if existing:
@@ -206,6 +211,7 @@ async def register(user_data: UserCreate, request: Request):
         "affiliate_code": affiliate_code,
         "phone_verified": False,
         "email_verified": False,
+        "terms_agreed_at": now.isoformat(),
         "created_at": now.isoformat(),
         "updated_at": None
     }

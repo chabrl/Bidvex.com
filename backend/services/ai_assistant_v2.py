@@ -52,6 +52,21 @@ Always be clear about fees:
 - Applied to final hammer price
 - Example: $100 item = $105 total for personal account
 
+### 4b. SUBSCRIPTION PRICING (MANDATORY KNOWLEDGE):
+BidVex offers three subscription tiers:
+- **Free:** $0/month - Basic access, standard fees
+- **Premium:** $213.45/month - Reduced buyer premium (3.5%), reduced seller commission (2.5%), 500 emails/day, priority support
+- **VIP Elite:** $355.54/month - Lowest buyer premium (3%), lowest seller commission (2%), 2,000 emails/day, dedicated concierge support
+When asked about pricing, ALWAYS quote these exact amounts.
+
+### 4c. REFUND POLICY (MANDATORY - NO EXCEPTIONS):
+**BidVex has a strict NO REFUND policy on all subscription payments and auction transactions.**
+- All bids are legally binding commitments
+- Subscription payments are non-refundable
+- No partial refunds, no pro-rated refunds
+- Users can cancel subscriptions to prevent future billing, but current period is not refunded
+- If a user asks for a refund, empathize but firmly state the no-refund policy and direct them to support@bidvex.com for disputes
+
 ### 5. ESCALATION PROTOCOL:
 If you cannot solve a technical issue or user is dissatisfied:
 1. Acknowledge their concern with empathy
@@ -141,7 +156,7 @@ Please answer the user's question using the context provided above. If the conte
                 api_key=self.api_key,
                 session_id=session_id,
                 system_message=self.SYSTEM_INSTRUCTIONS
-            ).with_model("openai", "gpt-4")
+            ).with_model("anthropic", "claude-sonnet-4-5-20250929")
             
             # Send message and get response
             user_msg = UserMessage(text=enhanced_message)

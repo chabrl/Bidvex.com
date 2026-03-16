@@ -639,6 +639,7 @@ class UserCreate(BaseModel):
     company_name: Optional[str] = None
     tax_number: Optional[str] = None
     bank_details: Optional[Dict[str, str]] = None
+    terms_agreed: bool = False
 
 class User(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -1279,6 +1280,10 @@ async def get_current_user_optional(request: Request, credentials: Optional[HTTP
 
 @api_router.post("/auth/register", response_model=TokenResponse)
 async def register(user_data: UserCreate, request: Request):
+    # Validate terms consent
+    if not user_data.terms_agreed:
+        raise HTTPException(status_code=400, detail="You must agree to the Terms of Service and Privacy Policy to create an account.")
+    
     existing = await db.users.find_one({"email": user_data.email})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -1317,6 +1322,7 @@ async def register(user_data: UserCreate, request: Request):
     user_dict = user.model_dump()
     user_dict["password"] = hashed_pwd
     user_dict["affiliate_code"] = affiliate_code  # Add affiliate code
+    user_dict["terms_agreed_at"] = datetime.now(timezone.utc).isoformat()
     user_dict["created_at"] = user_dict["created_at"].isoformat()
     await db.users.insert_one(user_dict)
     
@@ -11712,6 +11718,15 @@ try:
     # For now, they serve as the modular foundation.
     
     logger.info("✅ Modular router framework initialized")
+    
+    # Import and include team router for RBAC
+    try:
+        from routes.team import team_router, set_team_db
+        set_team_db(db)
+        app.include_router(team_router)
+        logger.info("✅ Team RBAC router loaded")
+    except ImportError as e:
+        logger.warning(f"⚠️ Could not load team router: {e}")
     
 except ImportError as e:
     logger.warning(f"⚠️ Could not load modular routers: {e}")

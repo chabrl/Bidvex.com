@@ -47,6 +47,8 @@ import SubscriptionPricingPage from './pages/SubscriptionPricingPage';
 import MaintenancePage from './pages/MaintenancePage';
 import CheckoutPage from './pages/CheckoutPage';
 import BecomePartnerPage from './pages/BecomePartnerPage';
+import LegalPage from './pages/LegalPage';
+import InviteAcceptPage from './pages/InviteAcceptPage';
 
 // Vehicle Auction Module (Standalone)
 import VehicleAuctionsPage from './pages/vehicles/VehicleAuctionsPage';
@@ -155,7 +157,9 @@ const MaintenanceGuard = ({ children }) => {
   // Always allow access to auth page for admin login
   const isAuthRoute = location.pathname === '/auth';
   const isPartnerRoute = location.pathname === '/become-a-partner';
-  if (isAuthRoute || isPartnerRoute) {
+  const isLegalRoute = location.pathname === '/legal';
+  const isInviteRoute = location.pathname.startsWith('/invite/');
+  if (isAuthRoute || isPartnerRoute || isLegalRoute || isInviteRoute) {
     return children;
   }
   
@@ -287,6 +291,8 @@ const App = () => {
           } />
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
           <Route path="/terms-of-service" element={<TermsOfServicePage />} />
+          <Route path="/legal" element={<LegalPage />} />
+          <Route path="/invite/:token" element={<InviteAcceptPage />} />
           <Route path="/become-a-partner" element={<BecomePartnerPage />} />
           <Route path="/client-marketing" element={
             <ProtectedRoute><ClientEmailMarketing /></ProtectedRoute>

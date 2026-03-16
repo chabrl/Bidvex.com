@@ -8,7 +8,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from 'sonner';
-import { Loader2, Lock, Eye, EyeOff, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Loader2, Lock, Eye, EyeOff, AlertTriangle, CheckCircle, Square, CheckSquare } from 'lucide-react';
 import axios from 'axios';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -29,6 +29,7 @@ const AuthPage = () => {
     address: '',
     company_name: '',
     tax_number: '',
+    terms_agreed: false,
   });
 
   // Forced Password Reset State
@@ -352,13 +353,38 @@ const AuthPage = () => {
                     </div>
                   </>
                 )}
+
+                {/* Terms & Privacy Consent */}
+                <div className="flex items-start gap-3 p-3 border rounded-lg bg-muted/30">
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, terms_agreed: !prev.terms_agreed }))}
+                    className="mt-0.5 flex-shrink-0"
+                    data-testid="terms-checkbox"
+                  >
+                    {formData.terms_agreed
+                      ? <CheckSquare className="h-5 w-5 text-primary" />
+                      : <Square className="h-5 w-5 text-muted-foreground" />
+                    }
+                  </button>
+                  <label className="text-sm text-muted-foreground leading-relaxed">
+                    I agree to the{' '}
+                    <a href="/legal#terms" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium" data-testid="terms-link">
+                      Terms of Service
+                    </a>{' '}
+                    and{' '}
+                    <a href="/legal#privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium" data-testid="privacy-link">
+                      Privacy Policy
+                    </a>
+                  </label>
+                </div>
               </>
             )}
             
             <Button
               type="submit"
               className="w-full gradient-button text-white border-0"
-              disabled={loading}
+              disabled={loading || (!isLogin && !formData.terms_agreed)}
               data-testid="submit-auth-btn"
             >
               {loading ? (
