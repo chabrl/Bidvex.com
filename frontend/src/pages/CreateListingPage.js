@@ -35,6 +35,9 @@ const CreateListingPage = () => {
     auction_end_date: '',
   });
 
+  // Buyer's Premium — default to org setting
+  const [buyersPremiumPercent, setBuyersPremiumPercent] = useState('');
+
   // Shipping & Visit Options
   const [shippingInfo, setShippingInfo] = useState({
     available: false,
@@ -60,7 +63,11 @@ const CreateListingPage = () => {
       ...prev,
       auction_end_date: tomorrow.toISOString().slice(0, 16)
     }));
-  }, []);
+    // Pre-fill buyer's premium from org/partner setting
+    if (user?.custom_premium_rate != null) {
+      setBuyersPremiumPercent(String(Math.round(user.custom_premium_rate * 100 * 100) / 100));
+    }
+  }, [user]);
 
   const fetchCategories = async () => {
     try {
@@ -113,6 +120,8 @@ const CreateListingPage = () => {
         auction_end_date: new Date(formData.auction_end_date).toISOString(),
         shipping_info: shippingInfo.available ? shippingInfo : null,
         visit_availability: visitAvailability.offered ? visitAvailability : null,
+        // Convert percent → rate (e.g. 15 → 0.15), null if blank (org default applies server-side)
+        buyers_premium_rate: buyersPremiumPercent !== '' ? parseFloat(buyersPremiumPercent) / 100 : null,
         // Mandatory Binding Agreement
         agreement_accepted: finalAgreementAccepted,
       };
@@ -280,6 +289,24 @@ const CreateListingPage = () => {
                     data-testid="buy-now-price-input"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="buyers_premium_percent">Buyer's Premium (%)</Label>
+                <Input
+                  id="buyers_premium_percent"
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  max="50"
+                  placeholder={user?.custom_premium_rate != null ? `Org default: ${(user.custom_premium_rate * 100).toFixed(1)}%` : 'e.g. 15'}
+                  value={buyersPremiumPercent}
+                  onChange={(e) => setBuyersPremiumPercent(e.target.value)}
+                  data-testid="buyers-premium-input"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Percentage charged on top of the winning bid. Leave blank to use your organization default.
+                </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

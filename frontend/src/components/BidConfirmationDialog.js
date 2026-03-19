@@ -27,11 +27,12 @@ const BidConfirmationDialog = ({
   bidAmount, 
   listingTitle,
   category = 'general',
-  sellerIsBusiness = true, // Default to business (tax applies)
+  sellerIsBusiness = true,
   buyerTier = 'basic',
   sellerTier = 'basic',
   region = 'QC',
-  loading = false
+  loading = false,
+  buyersPremiumRate = null
 }) => {
   const [costBreakdown, setCostBreakdown] = useState(null);
   const [calculating, setCalculating] = useState(false);
@@ -45,7 +46,7 @@ const BidConfirmationDialog = ({
     if (isOpen && bidAmount > 0) {
       fetchCostBreakdown();
     }
-  }, [isOpen, bidAmount, sellerIsBusiness, category, buyerTier, sellerTier]);
+  }, [isOpen, bidAmount, sellerIsBusiness, category, buyerTier, sellerTier, buyersPremiumRate]);
 
   const fetchCostBreakdown = async () => {
     setCalculating(true);
@@ -57,7 +58,8 @@ const BidConfirmationDialog = ({
         category: category,
         buyer_tier: buyerTier,
         seller_tier: sellerTier,
-        seller_is_business: sellerIsBusiness
+        seller_is_business: sellerIsBusiness,
+        buyers_premium_rate: buyersPremiumRate
       });
       
       setCostBreakdown(response.data);
@@ -66,7 +68,8 @@ const BidConfirmationDialog = ({
       setError('Unable to calculate costs. Please try again.');
       
       // Fallback calculation if API fails
-      const buyerPremium = bidAmount * 0.05;
+      const effectivePremiumRate = buyersPremiumRate ?? 0.05;
+      const buyerPremium = bidAmount * effectivePremiumRate;
       const platformFee = isVehicle ? bidAmount * 0.025 : 0;
       const taxRate = 0.14975; // Quebec GST + QST
       const taxOnHammer = sellerIsBusiness && !isVehicle ? bidAmount * taxRate : 0;
@@ -76,7 +79,7 @@ const BidConfirmationDialog = ({
         payment_type: isVehicle ? 'vehicle' : 'general',
         hammer_price: bidAmount,
         buyer_premium: buyerPremium,
-        buyer_premium_rate: 0.05,
+        buyer_premium_rate: effectivePremiumRate,
         platform_fee: platformFee,
         bidvex_fees_subtotal: buyerPremium + platformFee,
         bidvex_fees_tax_total: taxOnFees,
@@ -227,18 +230,18 @@ const BidConfirmationDialog = ({
                 </div>
               )}
 
-              {/* Total Out-of-Pocket */}
-              <div className="bg-gradient-to-r from-[#1E3A8A]/10 to-[#06B6D4]/10 rounded-lg p-4">
+              {/* Total Estimated Price */}
+              <div className="bg-gradient-to-r from-[#1E3A8A]/10 to-[#06B6D4]/10 rounded-lg p-4" data-testid="bid-total-estimated">
                 <div className="flex justify-between items-center">
                   <div>
                     <span className="font-bold text-lg">
-                      {isVehicle ? 'Pay Now via Stripe' : 'Total Out-of-Pocket'}
+                      {isVehicle ? 'Pay Now via Stripe' : 'Total Estimated Price'}
                     </span>
                     <p className="text-xs text-muted-foreground">
-                      {isVehicle ? 'BidVex fees + taxes only' : 'Final cost if you win'}
+                      {isVehicle ? 'BidVex fees + taxes only' : 'Bid + Premium + Taxes'}
                     </p>
                   </div>
-                  <span className="text-2xl font-bold text-[#1E3A8A]">
+                  <span className="text-2xl font-bold text-[#1E3A8A]" data-testid="bid-total-amount">
                     ${(isVehicle ? costBreakdown.stripe_charge_total : costBreakdown.buyer_total)?.toFixed(2)}
                   </span>
                 </div>

@@ -232,6 +232,8 @@ class EmailDataBuilder:
         winning_bid: float,
         currency: str = "CAD",
     ) -> Dict[str, Any]:
+        premium_rate = listing.get("custom_buyer_premium_rate") or 0.05
+        premium_amount = round(winning_bid * premium_rate, 2)
         return {
             "first_name": user.get("name", "").split()[0] if user.get("name") else "",
             "listing_title": listing.get("title"),
@@ -241,6 +243,8 @@ class EmailDataBuilder:
             "seller_name": listing.get("seller_name", "Seller"),
             "payment_url": f'https://bidvex.com/payment/{listing.get("id")}',
             "invoice_url": f'https://bidvex.com/invoice/{listing.get("id")}',
+            "buyers_premium_percent": f"{premium_rate * 100:.1f}",
+            "buyers_premium_amount": f"{premium_amount:.2f}",
         }
 
     @staticmethod
@@ -258,6 +262,8 @@ class EmailDataBuilder:
             "tax": f"{invoice.get('tax', 0):.2f}",
             "shipping": f"{invoice.get('shipping', 0):.2f}",
             "invoice_pdf_url": invoice.get("pdf_url"),
+            "buyers_premium_percent": f"{invoice.get('buyers_premium_rate', 0.05) * 100:.1f}",
+            "buyers_premium_amount": f"{invoice.get('buyers_premium_amount', 0):.2f}",
             "payment_method": invoice.get("payment_method", "Credit Card"),
         }
 

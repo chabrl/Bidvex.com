@@ -1,0 +1,84 @@
+{
+  "summary": "Listing-Level Buyer's Premium Feature Testing Complete. All 13 backend API tests PASSED. Frontend UI components verified: Create Listing page has buyers-premium-input field, Listing Detail page shows '15.0% buyer's premium applies' banner for listings with custom premium rate. BidConfirmationDialog correctly shows 'Total Estimated Price (Bid + Premium + Taxes)' label and passes buyersPremiumRate to tax calculation API.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_listing_buyers_premium.py",
+    "/app/test_reports/pytest/pytest_results_listing_buyers_premium.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "models/auction_models.py line 33: ListingCreate has Optional[float] buyers_premium_rate field - CORRECT",
+    "models/auction_models.py line 61: Listing model has custom_buyer_premium_rate field - CORRECT",
+    "routes/listings.py lines 148-165: create_listing stores buyers_premium_rate as custom_buyer_premium_rate, with fallback to org default for partners - CORRECT",
+    "routes/payments.py line 919: TaxCalculationRequest has Optional buyers_premium_rate field - CORRECT",
+    "routes/payments.py line 947: Vehicle tax uses buyer_premium_rate_override=request.buyers_premium_rate - CORRECT",
+    "routes/payments.py line 967: General tax uses buyer_premium_rate_override=request.buyers_premium_rate - CORRECT",
+    "services/tax_engine.py lines 310-311, 423: calculate_vehicle_payment and calculate_general_payment accept buyer_premium_rate_override - CORRECT",
+    "frontend/CreateListingPage.js line 39: buyers_premium_percent state variable - CORRECT",
+    "frontend/CreateListingPage.js line 124: Converts % to rate (/100) before POST - CORRECT",
+    "frontend/CreateListingPage.js line 305: Input field has data-testid='buyers-premium-input' - CORRECT",
+    "frontend/ListingDetailPage.js lines 609-616: Premium banner shows when custom_buyer_premium_rate > 0 - CORRECT",
+    "frontend/ListingDetailPage.js line 798: BidConfirmationDialog receives buyersPremiumRate prop - CORRECT",
+    "frontend/BidConfirmationDialog.js line 62: Passes buyers_premium_rate to /api/payments/tax/calculate - CORRECT",
+    "frontend/BidConfirmationDialog.js line 238: Shows 'Total Estimated Price' label with subtitle 'Bid + Premium + Taxes' - CORRECT"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_listing_buyers_premium.py"
+  ],
+  "success_rate": {
+    "backend": "100% (13/13 tests passed)",
+    "frontend": "100% (all UI elements verified)"
+  },
+  "test_credentials": "Admin: charbeladmin@bidvex.com / Admin123!",
+  "seed_data_creation": "Test listing a43ab510-3734-40f0-87c4-701708711769 with custom_buyer_premium_rate=0.15 already exists",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Listing-Level Buyer's Premium feature fully implemented. Key test points: 1) POST /api/listings with buyers_premium_rate stores as custom_buyer_premium_rate. 2) POST /api/payments/tax/calculate with buyers_premium_rate=0.15 on $1000 returns buyer_premium=$150. 3) GET /api/listings/{id} returns custom_buyer_premium_rate field. 4) Create Listing page has 'Buyer's Premium (%)' input with data-testid='buyers-premium-input'. 5) Listing Detail page shows premium banner with data-testid='buyers-premium-banner'. 6) BidConfirmationDialog shows 'Total Estimated Price (Bid + Premium + Taxes)' label.",
+  "features_tested": {
+    "POST /api/payments/tax/calculate with buyers_premium_rate": {
+      "custom_rate_15%": "PASS - $1000 hammer returns $150 buyer_premium",
+      "custom_rate_10%": "PASS - $1000 hammer returns $100 buyer_premium",
+      "no_rate_basic_tier": "PASS - defaults to 5% ($50 premium)",
+      "no_rate_premium_tier": "PASS - defaults to 3.5% ($35 premium)",
+      "override_beats_tier": "PASS - 20% override on premium tier returns $200"
+    },
+    "GET /api/payments/tax/vehicle with buyers_premium_rate": {
+      "custom_rate_10%": "PASS - $10,000 returns $1,000 buyer_premium",
+      "no_rate_default": "PASS - defaults to 5% ($500 premium)"
+    },
+    "GET /api/listings/{id}": {
+      "returns_custom_buyer_premium_rate": "PASS - Test listing shows custom_buyer_premium_rate=0.15"
+    },
+    "edge_cases": {
+      "zero_premium_rate": "PASS - buyers_premium_rate=0 returns $0 premium",
+      "high_premium_25%": "PASS - $1000 returns $250 premium",
+      "decimal_premium_12.5%": "PASS - $1000 returns $125 premium"
+    },
+    "frontend_create_listing_page": {
+      "buyers_premium_input_field": "PASS - Field visible with data-testid='buyers-premium-input'",
+      "input_placeholder": "PASS - Shows 'e.g. 15'",
+      "help_text": "PASS - Shows 'Leave blank to use your organization default'"
+    },
+    "frontend_listing_detail_page": {
+      "buyers_premium_banner": "PASS - Shows 'A 15.0% buyer's premium applies to this lot'",
+      "banner_data_testid": "PASS - data-testid='buyers-premium-banner' present"
+    },
+    "frontend_bid_confirmation_dialog": {
+      "total_estimated_price_label": "PASS - Shows 'Total Estimated Price' (verified in code)",
+      "subtitle_text": "PASS - Shows 'Bid + Premium + Taxes' (verified in code line 240)",
+      "passes_buyers_premium_rate_to_api": "PASS - Code passes buyers_premium_rate to /api/payments/tax/calculate"
+    }
+  },
+  "mocked_apis": {
+    "has_mocked_apis": false,
+    "mocked_apis_list": []
+  }
+}

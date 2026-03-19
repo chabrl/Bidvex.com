@@ -300,7 +300,8 @@ async def generate_vehicle_invoice(
             buyer_name=winner_user.get("full_name", winner_user.get("email")),
             vehicle_title=buyer_invoice["vehicle_title"],
             final_price=float(buyer_pricing.hammer_price),
-            invoice_id=buyer_invoice["id"]
+            invoice_id=buyer_invoice["id"],
+            buyers_premium_rate=float(vehicle_listing.get("custom_buyer_premium_rate") or 0.05)
         )
         
         # Send auction sold email to seller

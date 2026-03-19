@@ -34,7 +34,8 @@ const PriceBreakdown = ({
   sellerTier = 'basic',
   sellerIsBusiness = false,
   compact = false,
-  className = ''
+  className = '',
+  buyersPremiumRate = null
 }) => {
   const { t, i18n } = useTranslation();
   const [breakdown, setBreakdown] = useState(null);
@@ -69,7 +70,8 @@ const PriceBreakdown = ({
           category: category,
           buyer_tier: buyerTier,
           seller_tier: sellerTier,
-          seller_is_business: sellerIsBusiness
+          seller_is_business: sellerIsBusiness,
+          buyers_premium_rate: buyersPremiumRate
         });
 
         setBreakdown(response.data);

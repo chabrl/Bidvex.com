@@ -916,6 +916,7 @@ class TaxCalculationRequest(BaseModel):
     seller_is_business: bool = Field(default=False, description="Whether seller is a registered business")
     seller_gst_number: Optional[str] = Field(default=None, description="Seller's GST registration number")
     seller_qst_number: Optional[str] = Field(default=None, description="Seller's QST registration number")
+    buyers_premium_rate: Optional[float] = Field(default=None, description="Listing-level buyer premium rate (e.g. 0.15 for 15%)")
 
 
 @payments_router.post("/tax/calculate")
@@ -941,7 +942,8 @@ async def calculate_payment_with_tax(request: TaxCalculationRequest):
         # Vehicle payment - only fees through Stripe
         result = calculate_vehicle_payment(
             hammer_price=request.hammer_price,
-            buyer_tier=request.buyer_tier
+            buyer_tier=request.buyer_tier,
+            buyer_premium_rate_override=request.buyers_premium_rate
         )
         return {
             "payment_type": "vehicle",
@@ -961,7 +963,8 @@ async def calculate_payment_with_tax(request: TaxCalculationRequest):
             buyer_tier=request.buyer_tier,
             seller_tier=request.seller_tier,
             seller_is_business=request.seller_is_business,
-            seller_info=seller_info
+            seller_info=seller_info,
+            buyer_premium_rate_override=request.buyers_premium_rate
         )
         return {
             "payment_type": "general",
@@ -973,7 +976,8 @@ async def calculate_payment_with_tax(request: TaxCalculationRequest):
 @payments_router.get("/tax/vehicle")
 async def calculate_vehicle_payment_with_tax(
     price: float,
-    buyer_tier: str = "basic"
+    buyer_tier: str = "basic",
+    buyers_premium_rate: Optional[float] = None
 ):
     """
     Calculate vehicle auction payment with Quebec taxes
@@ -983,18 +987,12 @@ async def calculate_vehicle_payment_with_tax(
     
     Stripe charges: (Buyer Premium + Platform Fee) + 14.975% Tax
     
-    Example for $10,000 vehicle (basic tier):
-    - Buyer Premium (5%): $500
-    - Platform Fee (2.5%): $250
-    - Subtotal: $750
-    - GST (5%): $37.50
-    - QST (9.975%): $74.81
-    - Total Stripe Charge: $862.31
-    - Balance due to seller (Bank Draft): $10,000
+    If buyers_premium_rate is provided, overrides the tier default.
     """
     result = calculate_vehicle_payment(
         hammer_price=price,
-        buyer_tier=buyer_tier
+        buyer_tier=buyer_tier,
+        buyer_premium_rate_override=buyers_premium_rate
     )
     
     return {

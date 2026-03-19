@@ -12,9 +12,12 @@ from typing import Optional
 from services.tax_engine import (
     calculate_gst_qst,
     calculate_tax,
+    calculate_vehicle_payment,
+    calculate_general_payment,
     get_tax_structure_summary,
     get_tax_rates_for_currency,
     invoice_tax_lines,
+    BUYER_PREMIUM_RATES,
     GST_RATE,
     QST_RATE,
     BIDVEX_GST_NUMBER,
@@ -31,6 +34,7 @@ class TaxCalcRequest(BaseModel):
     """Request body for tax calculation."""
     subtotal: float = Field(..., gt=0, description="Pre-tax amount in dollars")
     currency: str = Field(default="CAD", description="Currency code (only CAD is taxed)")
+    buyers_premium_rate: Optional[float] = Field(default=None, description="Listing-level buyer premium rate (e.g. 0.15 for 15%)")
 
 
 class TaxCalcResponse(BaseModel):
@@ -45,6 +49,8 @@ class TaxCalcResponse(BaseModel):
     currency: str
     gst_registration: str
     qst_registration: str
+    buyers_premium_rate: Optional[float] = None
+    buyers_premium_amount: Optional[float] = None
 
 
 @tax_calc_router.post("/calculate", response_model=TaxCalcResponse)
@@ -54,8 +60,14 @@ async def calculate_tax_endpoint(request: TaxCalcRequest):
 
     Uses Decimal arithmetic with ROUND_HALF_UP for accounting precision.
     Example: $100.00 -> GST $5.00, QST $9.98, Total $114.98
+
+    If buyers_premium_rate is provided, appends the premium amount to the response.
     """
     result = calculate_gst_qst(request.subtotal, request.currency)
+    if request.buyers_premium_rate is not None:
+        premium_amount = round(request.subtotal * request.buyers_premium_rate, 2)
+        result["buyers_premium_rate"] = request.buyers_premium_rate
+        result["buyers_premium_amount"] = premium_amount
     return result
 
 

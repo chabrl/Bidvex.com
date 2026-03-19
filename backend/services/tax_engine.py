@@ -306,7 +306,8 @@ def calculate_tax(amount: Decimal) -> TaxBreakdown:
 
 def calculate_vehicle_payment(
     hammer_price: float,
-    buyer_tier: str = "basic"
+    buyer_tier: str = "basic",
+    buyer_premium_rate_override: Optional[float] = None
 ) -> VehiclePaymentResult:
     """
     Calculate vehicle auction payment
@@ -315,12 +316,18 @@ def calculate_vehicle_payment(
     The hammer price is paid directly to seller via Bank Draft.
     
     Stripe charges: (Buyer Premium + Platform Fee) + 14.975% Tax
+    
+    If buyer_premium_rate_override is provided (listing-level premium), it takes
+    precedence over the tier-based default.
     """
     hp = Decimal(str(hammer_price))
     b_tier = _normalize_tier(buyer_tier)
     
-    # Calculate BidVex fees
-    buyer_premium_rate = BUYER_PREMIUM_RATES[b_tier]
+    # Calculate BidVex fees — listing override takes precedence
+    if buyer_premium_rate_override is not None:
+        buyer_premium_rate = Decimal(str(buyer_premium_rate_override))
+    else:
+        buyer_premium_rate = BUYER_PREMIUM_RATES[b_tier]
     buyer_premium = _round_currency(hp * buyer_premium_rate)
     platform_fee = _round_currency(hp * VEHICLE_PLATFORM_FEE_RATE)
     bidvex_fees_subtotal = buyer_premium + platform_fee
@@ -412,7 +419,8 @@ def calculate_general_payment(
     buyer_tier: str = "basic",
     seller_tier: str = "basic",
     seller_is_business: bool = False,
-    seller_info: Optional[SellerInfo] = None
+    seller_info: Optional[SellerInfo] = None,
+    buyer_premium_rate_override: Optional[float] = None
 ) -> GeneralPaymentResult:
     """
     Calculate general auction payment
@@ -422,13 +430,19 @@ def calculate_general_payment(
     - Hammer price: 
       - If seller is NOT a business: $0 tax
       - If seller IS a business: +14.975% tax (collected for seller)
+    
+    If buyer_premium_rate_override is provided (listing-level premium), it takes
+    precedence over the tier-based default.
     """
     hp = Decimal(str(hammer_price))
     b_tier = _normalize_tier(buyer_tier)
     s_tier = _normalize_tier(seller_tier)
     
-    # BidVex fees
-    buyer_premium_rate = BUYER_PREMIUM_RATES[b_tier]
+    # BidVex fees — listing override takes precedence
+    if buyer_premium_rate_override is not None:
+        buyer_premium_rate = Decimal(str(buyer_premium_rate_override))
+    else:
+        buyer_premium_rate = BUYER_PREMIUM_RATES[b_tier]
     buyer_premium = _round_currency(hp * buyer_premium_rate)
     
     seller_commission_rate = SELLER_COMMISSION_RATES[s_tier]

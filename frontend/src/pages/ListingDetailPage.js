@@ -519,6 +519,7 @@ const ListingDetailPage = () => {
                       sellerTier={seller?.subscription_tier || 'basic'}
                       sellerIsBusiness={seller?.is_tax_registered || seller?.account_type === 'business'}
                       compact={true}
+                      buyersPremiumRate={listing.custom_buyer_premium_rate}
                     />
                     
                     <Button 
@@ -602,6 +603,16 @@ const ListingDetailPage = () => {
                   </Button>
                 </CardContent>
               </Card>
+            )}
+
+            {/* Buyer's Premium Transparency Banner */}
+            {listing.custom_buyer_premium_rate != null && listing.custom_buyer_premium_rate > 0 && (
+              <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/20" data-testid="buyers-premium-banner">
+                <DollarSign className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-amber-800 dark:text-amber-300 text-sm font-medium">
+                  A {(listing.custom_buyer_premium_rate * 100).toFixed(1)}% buyer's premium applies to this lot
+                </AlertDescription>
+              </Alert>
             )}
 
             <Card className="glassmorphism">
@@ -784,6 +795,7 @@ const ListingDetailPage = () => {
         sellerTier={seller?.subscription_tier || 'basic'}
         region={listing?.region || 'QC'}
         loading={placingBid}
+        buyersPremiumRate={listing?.custom_buyer_premium_rate}
       />
     </div>
   );

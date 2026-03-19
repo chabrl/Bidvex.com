@@ -880,6 +880,8 @@ class ListingCreate(BaseModel):
     # Seller Agreement (Legal Compliance)
     agreement_accepted: bool = False  # Must be True to create listing
     agreement_metadata: Optional[Dict[str, Any]] = None  # {timestamp, ip_address, user_agent}
+    # Listing-level buyer's premium (rate, e.g. 0.15 for 15%). None = use org/tier default
+    buyers_premium_rate: Optional[float] = None
 
 class AuctionRating(BaseModel):
     """

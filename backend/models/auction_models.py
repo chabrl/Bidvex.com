@@ -29,6 +29,8 @@ class ListingCreate(BaseModel):
     visit_availability: Optional[Dict[str, Any]] = None
     agreement_accepted: bool = False
     agreement_metadata: Optional[Dict[str, Any]] = None
+    # Listing-level buyer's premium (rate, e.g. 0.15 for 15%). None = use org/tier default
+    buyers_premium_rate: Optional[float] = None
 
 
 class Listing(BaseModel):

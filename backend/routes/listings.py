@@ -145,22 +145,31 @@ async def create_listing(
     )
     listing_dict = listing.model_dump()
 
-    # Auto-tag partner listings & set custom buyer premium
+    # Auto-tag partner listings & set buyer premium
     seller_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
     if seller_doc and seller_doc.get("is_partner") and seller_doc.get("partner_verification_status") == "verified":
         listing_dict["is_partner_listing"] = True
-        listing_dict["custom_buyer_premium_rate"] = seller_doc.get("custom_premium_rate")
         listing_dict["is_verified_firm"] = seller_doc.get("is_verified_firm", False)
+        # Listing-level premium: use form value → org default → None
+        if listing_data.buyers_premium_rate is not None:
+            listing_dict["custom_buyer_premium_rate"] = listing_data.buyers_premium_rate
+        else:
+            listing_dict["custom_buyer_premium_rate"] = seller_doc.get("custom_premium_rate")
     else:
         listing_dict["is_partner_listing"] = False
-        listing_dict["custom_buyer_premium_rate"] = None
         listing_dict["is_verified_firm"] = False
+        # Non-partner: use form value if provided, else None (tier default applies at calc time)
+        if listing_data.buyers_premium_rate is not None:
+            listing_dict["custom_buyer_premium_rate"] = listing_data.buyers_premium_rate
+        else:
+            listing_dict["custom_buyer_premium_rate"] = None
 
     listing_dict["agreement_metadata"] = agreement_metadata
     listing_dict["auction_end_date"] = listing_dict["auction_end_date"].isoformat()
     listing_dict["created_at"] = listing_dict["created_at"].isoformat()
     await db.listings.insert_one(listing_dict)
-    return listing
+    listing_dict.pop("_id", None)
+    return listing_dict
 
 
 @listings_router.get("/listings", response_model=List[Listing])

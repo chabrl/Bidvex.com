@@ -466,11 +466,14 @@ async def send_auction_won_email(
     buyer_name: str,
     vehicle_title: str,
     final_price: float,
-    invoice_id: str
+    invoice_id: str,
+    buyers_premium_rate: float = 0.05
 ) -> Dict[str, Any]:
     """Send email when a buyer wins an auction"""
+    premium_amount = round(final_price * buyers_premium_rate, 2)
+    premium_pct = f"{buyers_premium_rate * 100:.1f}"
     content = f"""
-    <h2 style="margin: 0 0 20px 0; color: #2563eb;">🎉 You Won!</h2>
+    <h2 style="margin: 0 0 20px 0; color: #2563eb;">You Won!</h2>
     
     <p style="color: #475569; line-height: 1.6;">
         Congratulations {buyer_name}!
@@ -488,6 +491,18 @@ async def send_auction_won_email(
             {_format_currency(final_price)}
         </p></td></tr></table>
     
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;"><tr><td style="background-color: #f8fafc; border-radius: 8px; padding: 15px;">
+        <table width="100%" style="font-size: 14px; color: #1e293b;">
+            <tr>
+                <td style="padding: 6px 0;"><strong>Buyer's Premium ({premium_pct}%):</strong></td>
+                <td style="padding: 6px 0; text-align: right;">{_format_currency(premium_amount)}</td>
+            </tr>
+            <tr>
+                <td style="padding: 6px 0; color: #64748b; font-size: 12px;" colspan="2">Plus applicable taxes (GST/QST). See invoice for full breakdown.</td>
+            </tr>
+        </table>
+    </td></tr></table>
+    
     <p style="color: #475569; line-height: 1.6;">
         An invoice has been generated with the full breakdown of fees and taxes. 
         Please complete payment within 14 days.
@@ -504,7 +519,7 @@ async def send_auction_won_email(
     
     return await send_email(
         to_email=buyer_email,
-        subject=f"🎉 Congratulations! You Won: {vehicle_title}",
+        subject=f"Congratulations! You Won: {vehicle_title}",
         html_content=_base_template(content, "Auction Won")
     )
 
