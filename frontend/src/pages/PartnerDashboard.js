@@ -25,6 +25,7 @@ export default function PartnerDashboard() {
   const [billingLoading, setBillingLoading] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
+  const [invoiceLoading, setInvoiceLoading] = useState(false);
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -110,7 +111,6 @@ export default function PartnerDashboard() {
   const { partner, subscription, stats } = dashboard;
   const isFeePaid = partner.platform_fee_paid;
   const isActive = isFeePaid && subscription?.status === 'active';
-  const [invoiceLoading, setInvoiceLoading] = useState(false);
 
   const handleDownloadInvoice = async () => {
     setInvoiceLoading(true);
