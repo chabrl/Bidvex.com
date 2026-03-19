@@ -489,11 +489,12 @@ async def reset_password(request: ResetPasswordRequest):
             if email_service.is_configured():
                 from config.email_templates import EmailTemplates, EmailDataBuilder
                 
+                lang = user_doc.get('preferred_language', 'en')
                 result = await email_service.send_email(
                     to=user_doc["email"],
-                    template_id=EmailTemplates.PASSWORD_CHANGED,
+                    template_id=EmailTemplates.get_id(EmailTemplates.PASSWORD_CHANGED, lang),
                     dynamic_data=EmailDataBuilder.password_changed_email(user_doc),
-                    language=user_doc.get('preferred_language', 'en')
+                    language=lang
                 )
                 
                 if result['success']:
