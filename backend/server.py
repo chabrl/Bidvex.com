@@ -17,6 +17,7 @@ from apscheduler.triggers.cron import CronTrigger
 from services.email_service import get_email_service
 from services.sms_notification_service import get_sms_notification_service
 from services.email_marketing import get_marketing_service, SEGMENT_FILTERS, CAMPAIGN_STATUS
+from services.tax_engine import calculate_gst_qst
 import os
 import logging
 import uuid
@@ -3908,9 +3909,8 @@ async def get_price_breakdown(plan_id: str):
         raise HTTPException(status_code=404, detail="Plan not found")
 
     subtotal = plan.get("price_yearly", 0)
-    gst = round(subtotal * 0.05, 2)
-    qst = round(subtotal * 0.09975, 2)
-    amount_after_tax = round(subtotal + gst + qst, 2)
+    tax = calculate_gst_qst(subtotal)
+    amount_after_tax = tax["total_with_tax"]
     processing_fee = _calculate_stripe_fee(amount_after_tax) if subtotal > 0 else 0
     total = round(amount_after_tax + processing_fee, 2)
 
@@ -3918,8 +3918,8 @@ async def get_price_breakdown(plan_id: str):
         "plan_id": plan_id,
         "plan_name": plan.get("name", plan_id.title()),
         "subtotal": subtotal,
-        "gst": gst,
-        "qst": qst,
+        "gst": tax["gst_amount"],
+        "qst": tax["qst_amount"],
         "processing_fee": processing_fee,
         "total": total,
         "currency": "CAD"
@@ -4012,7 +4012,7 @@ async def create_subscription(
 
                     # Generate invoice for the upgrade
                     price_amount = plan.get("price_yearly", 0)
-                    fee = _calculate_stripe_fee(round(price_amount + price_amount * 0.05 + price_amount * 0.09975, 2)) if price_amount > 0 else 0
+                    fee = _calculate_stripe_fee(calculate_gst_qst(price_amount)["total_with_tax"]) if price_amount > 0 else 0
                     try:
                         await _generate_subscription_invoice(db, user, plan_id, price_amount, updated_sub.id, fee)
                     except Exception as inv_err:
@@ -4081,7 +4081,7 @@ async def create_subscription(
 
         # Generate invoice
         price_amount = plan.get("price_yearly", 0)
-        fee = _calculate_stripe_fee(round(price_amount + price_amount * 0.05 + price_amount * 0.09975, 2)) if price_amount > 0 else 0
+        fee = _calculate_stripe_fee(calculate_gst_qst(price_amount)["total_with_tax"]) if price_amount > 0 else 0
         try:
             await _generate_subscription_invoice(db, user, plan_id, price_amount, subscription.id, fee)
         except Exception as inv_err:
@@ -4365,14 +4365,13 @@ async def _generate_subscription_invoice(db, user: dict, plan_id: str, price_amo
     invoice_number = f"BV-SUB-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{invoice_id[:6].upper()}"
     now = datetime.now(timezone.utc)
 
-    # Tax & fee calculation (Quebec: GST 5% + QST 9.975%)
+    # Tax & fee calculation via central tax engine (Quebec: GST 5% + QST 9.975%)
     subtotal = price_amount
-    gst_rate = 0.05
-    qst_rate = 0.09975
-    gst = round(subtotal * gst_rate, 2)
-    qst = round(subtotal * qst_rate, 2)
+    tax = calculate_gst_qst(subtotal)
+    gst = tax["gst_amount"]
+    qst = tax["qst_amount"]
     stripe_fee = round(processing_fee, 2)
-    total = round(subtotal + gst + qst + stripe_fee, 2)
+    total = round(tax["total_with_tax"] + stripe_fee, 2)
 
     tier_label = {"premium": "Premium", "vip": "VIP Elite"}.get(plan_id, plan_id.title())
 
@@ -7336,9 +7335,16 @@ try:
     try:
         from routes.watchlist import watchlist_router
         api_router.include_router(watchlist_router)
-        logger.info("✅ Watchlist router loaded")
+        logger.info("Watchlist router loaded")
     except Exception as e:
-        logger.warning(f"⚠️ Could not load watchlist router: {e}")
+        logger.warning(f"Could not load watchlist router: {e}")
+
+    try:
+        from routes.tax import tax_calc_router
+        api_router.include_router(tax_calc_router)
+        logger.info("Tax Calculation router loaded")
+    except Exception as e:
+        logger.warning(f"Could not load tax calc router: {e}")
     
 except ImportError as e:
     logger.warning(f"⚠️ Could not load modular routers: {e}")

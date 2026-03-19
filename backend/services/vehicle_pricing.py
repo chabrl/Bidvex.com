@@ -64,8 +64,8 @@ PLATFORM_FEE_RATE = Decimal("0.025")  # 2.5%
 
 # ============= TAX RATES =============
 
-# Federal GST
-GST_RATE = Decimal("0.05")  # 5%
+# Federal GST — imported from central tax engine
+from services.tax_engine import GST_RATE
 
 # Provincial taxes
 PROVINCIAL_TAX_RATES = {
