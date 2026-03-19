@@ -1,6 +1,6 @@
 # BidVex Auction Platform - Product Requirements Document
 
-## Last Updated: February 2026
+## Last Updated: March 2026
 
 ## Original Problem Statement
 Build and maintain a sophisticated full-stack auction platform (BidVex) with real-time bidding, multi-item auctions, partner accounts, Stripe Connect payments, admin dashboard, AI chatbot, Canadian tax compliance, and full bilingual support (EN/FR).
@@ -20,20 +20,21 @@ Jobs: APScheduler | i18n: react-i18next | PDF: ReportLab
 ## Backend Route Architecture
 ```
 /app/backend/
-├── server.py              (~11,300 lines — auth, dashboard, payments, admin settings)
+├── server.py              (~11,000 lines — dashboard, payments, admin settings)
 │   ├── routes/
-│   │   ├── admin.py          # Partner/user admin logic
+│   │   ├── auth.py           # Authentication (login, register, password reset, sessions)
+│   │   ├── admin.py          # Partner/user admin logic + verified firm toggle
 │   │   ├── auctions.py       # Auction lifecycle + bids + anti-sniping + buy-now + auto-bid
 │   │   ├── listings.py       # Single + multi-item CRUD, terms, deletion requests
 │   │   ├── marketplace.py    # Marketplace browsing/search/filter
+│   │   ├── ai_chat.py | fees.py | notifications.py | watchlist.py
+│   │   ├── webhooks.py       # Partner activation/deactivation via Stripe
+│   │   ├── payments.py | team.py | vehicles.py
 ├── deps.py                (User model, shared auth)
-├── routes/
-│   ├── admin.py           (1,395 lines — User/partner mgmt, email settings)
-│   ├── marketplace.py     (474 lines — Browse, search, filter, promoted)
-│   ├── ai_chat.py | fees.py | notifications.py | watchlist.py
-│   ├── webhooks.py        (Partner activation/deactivation via Stripe)
-│   ├── payments.py | team.py | vehicles.py | auctions.py
-└── services/subscription_service.py
+└── services/
+    ├── email_notifications.py  # Outlook-safe table-based email templates
+    ├── cloud_storage.py        # Local file-based cloud storage mock
+    └── subscription_service.py
 ```
 
 ## All Completed Features (P0)
@@ -46,20 +47,14 @@ Jobs: APScheduler | i18n: react-i18next | PDF: ReportLab
 - **Pay-to-Activate** ($100 CAD/year recurring) with soft-lock on expiry
 - **Stripe Customer Portal** for partner billing/invoices/tax receipts
 - **Partner Dashboard** (`/partner/dashboard`) — subscription status, billing portal, listing stats, recent activity, account details, soft-lock banner
-- **Refactoring**: Phase 1 (AI, Fees, Notifications, Watchlist), Phase 2 (Admin/Partner), Phase 3 (Marketplace), Phase 4 (Admin user mgmt cleanup from server.py), Phase 5 (Listings + Bids extraction) — ~2,930 lines extracted
+- **Refactoring**: Phase 1-5 complete (~2,930 lines extracted from server.py)
+- **P3 Trust & Compliance**: Verified Firm Badge, Bilingual Cookie Consent, Auth Refactor, Outlook Email Fix
 
-## Session Log (Mar 19, 2026)
-1. Pay-to-Activate Partner Flow — $100 CAD/year recurring Stripe subscription
-2. Phase 2 Refactor — Partner admin routes → routes/admin.py
-3. Phase 3 Refactor — Marketplace routes → routes/marketplace.py
-4. Stripe Customer Portal — POST /api/partner/manage-billing
-5. Tests updated — 28 legacy + 14 new partner tests all pass
-6. **Partner Dashboard page** — Standalone `/partner/dashboard` with:
-   - Subscription & Billing card (Stripe Portal for invoices & tax receipts)
-   - Soft Lock banner with Pay Now when fee unpaid
-   - Listing Stats grid (active, total, bids, multi-lot)
-   - Account Details (company, 3% fee, premium rate, Connect status)
-   - Recent Activity feed | Quick Links
+## P3 Trust & Compliance (Completed Mar 19, 2026)
+1. **Auth Refactor** — Extracted all auth logic from server.py to routes/auth.py (login, register, forgot-password, reset, sessions, force-reset)
+2. **Verified Firm Badge** — Admin toggle endpoint, VerifiedBadge.js component, displayed on listing cards and detail pages
+3. **Bilingual Cookie Consent** — i18next-powered EN/FR banner with Accept All, Reject All, Manage Preferences; persists in localStorage
+4. **Outlook Email Fix** — Converted all email templates to table-based layouts with inline CSS, replaced linear-gradient with solid background-color
 
 ## Test Credentials
 - **Admin:** `charbeladmin@bidvex.com` / `Admin123!`
@@ -68,19 +63,26 @@ Jobs: APScheduler | i18n: react-i18next | PDF: ReportLab
 - iteration_52.json — Pay-to-Activate (100%)
 - iteration_53.json — Phase 2/3 refactor + Stripe Portal (100%)
 - iteration_54.json — Partner Dashboard (100%, 42 total tests)
+- iteration_57.json — P3 Trust & Compliance (100%, 12/12 backend + frontend)
 
 ## Upcoming Tasks
 
 ### P1 - High Priority
-- [x] server.py Phase 4: Deduplicate admin user mgmt routes (673 lines removed, moved to routes/admin.py)
-- [x] server.py Phase 5: Extract listings CRUD, bids, multi-item auctions (1460 lines → routes/listings.py + routes/auctions.py)
+- [x] server.py Phase 4: Deduplicate admin user mgmt routes
+- [x] server.py Phase 5: Extract listings CRUD, bids, multi-item auctions
+- [ ] Continue refactoring server.py: Extract payments, user dashboards, remaining modules
 
 ### P2 - Medium Priority
 - [x] Cache marketplace filter counts — 5-min Stale-While-Revalidate in-memory cache
 - [x] PDF Invoice cloud storage — HMAC-signed URLs, persistent at /data/invoices/
 - [x] Database indexing — background indexes on bids, lot_bids, auto_bids, invoices, subscription_invoices
 - [ ] Partner Pro subscription tier
+- [ ] Swap local PDF invoice storage mock with real cloud service (S3/GCS)
 
 ### P3 - Low Priority
-- [ ] Cookie consent i18n | "Email to Friend" | DB indexing on auction_id
-- [ ] "Verified Auction Firm" badge on partner listings
+- [x] Cookie consent i18n
+- [x] "Verified Auction Firm" badge on partner listings
+- [x] Auth refactor to routes/auth.py
+- [x] Outlook email template fix (table-based layouts)
+- [ ] "Email to Friend" feature
+- [ ] Expand tests/test_emails.py to cover all 40+ templates
