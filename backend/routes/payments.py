@@ -65,9 +65,13 @@ def get_db():
 # ========== CHECKOUT ENDPOINTS ==========
 
 class CheckoutRequest(BaseModel):
-    price_id: str
-    success_url: str
-    cancel_url: str
+    # Subscription checkout fields
+    price_id: Optional[str] = None
+    success_url: Optional[str] = None
+    cancel_url: Optional[str] = None
+    # Legacy listing checkout fields
+    listing_id: Optional[str] = None
+    origin_url: Optional[str] = None
 
 
 @payments_router.post("/checkout")
@@ -75,51 +79,98 @@ async def create_checkout_session(
     data: CheckoutRequest,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
-    """Create Stripe checkout session for subscription"""
+    """
+    Unified checkout endpoint.
+    - With price_id → subscription checkout
+    - With listing_id → listing purchase checkout
+    """
     import stripe
-    
+
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentication required")
-    
+
     current_user = await _get_current_user(credentials)
     db = get_db()
-    
-    # Get or create Stripe customer
+
     user = await db.users.find_one({"id": current_user.id})
-    customer_id = user.get("stripe_customer_id")
-    
+    customer_id = user.get("stripe_customer_id") if user else None
+
     if not customer_id:
-        # Create new Stripe customer
         customer = stripe.Customer.create(
             email=current_user.email,
-            name=current_user.name,
-            metadata={"user_id": current_user.id}
+            name=getattr(current_user, "name", current_user.email),
+            metadata={"user_id": current_user.id},
         )
         customer_id = customer.id
-        
         await db.users.update_one(
             {"id": current_user.id},
-            {"$set": {"stripe_customer_id": customer_id}}
+            {"$set": {"stripe_customer_id": customer_id}},
         )
-    
-    # Create checkout session
+
+    # ── Listing purchase checkout ──
+    if data.listing_id:
+        listing = await db.listings.find_one({"id": data.listing_id}, {"_id": 0})
+        if not listing:
+            raise HTTPException(status_code=404, detail="Listing not found")
+
+        buyer_fee = 0.05 if getattr(current_user, "account_type", "personal") == "personal" else 0.045
+        total_amount = listing["current_price"] * (1 + buyer_fee)
+        amount_cents = int(round(total_amount * 100))
+
+        origin = data.origin_url or "https://bidvex.com"
+        session = stripe.checkout.Session.create(
+            customer=customer_id,
+            payment_method_types=["card"],
+            line_items=[{
+                "price_data": {
+                    "currency": "cad",
+                    "unit_amount": amount_cents,
+                    "product_data": {"name": listing.get("title", "Auction Purchase")},
+                },
+                "quantity": 1,
+            }],
+            mode="payment",
+            success_url=f"{origin}/payment/success?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{origin}/listing/{data.listing_id}",
+            metadata={
+                "user_id": current_user.id,
+                "listing_id": data.listing_id,
+                "buyer_fee": str(buyer_fee),
+                "type": "listing_purchase",
+            },
+        )
+
+        # Record transaction
+        txn = {
+            "id": str(uuid.uuid4()),
+            "session_id": session.id,
+            "user_id": current_user.id,
+            "listing_id": data.listing_id,
+            "amount": total_amount,
+            "currency": "cad",
+            "payment_status": "pending",
+            "metadata": {"buyer_fee": str(buyer_fee)},
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.payment_transactions.insert_one(txn)
+
+        return {"url": session.url, "session_id": session.id}
+
+    # ── Subscription checkout ──
+    if not data.price_id or not data.success_url:
+        raise HTTPException(status_code=400, detail="price_id and success_url are required for subscription checkout")
+
     session = stripe.checkout.Session.create(
         customer=customer_id,
         payment_method_types=["card"],
-        line_items=[{
-            "price": data.price_id,
-            "quantity": 1
-        }],
+        line_items=[{"price": data.price_id, "quantity": 1}],
         mode="subscription",
         success_url=data.success_url,
-        cancel_url=data.cancel_url,
-        metadata={"user_id": current_user.id}
+        cancel_url=data.cancel_url or data.success_url,
+        metadata={"user_id": current_user.id},
     )
-    
-    return {
-        "session_id": session.id,
-        "url": session.url
-    }
+
+    return {"session_id": session.id, "url": session.url}
 
 
 @payments_router.get("/status/{session_id}")
@@ -388,85 +439,96 @@ async def add_payment_method(
     data: Dict[str, str],
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
-    """Add a payment method to user's account"""
+    """Add a payment method, store in DB, and update trust status."""
     import stripe
-    
+
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentication required")
-    
+
     current_user = await _get_current_user(credentials)
     db = get_db()
-    
+
     payment_method_id = data.get("payment_method_id")
     if not payment_method_id:
         raise HTTPException(status_code=400, detail="Payment method ID required")
-    
-    user = await db.users.find_one({"id": current_user.id})
-    customer_id = user.get("stripe_customer_id")
-    
-    if not customer_id:
-        # Create customer first
-        customer = stripe.Customer.create(
-            email=current_user.email,
-            name=current_user.name
+
+    try:
+        user = await db.users.find_one({"id": current_user.id})
+        customer_id = user.get("stripe_customer_id") if user else None
+
+        if not customer_id:
+            customer = stripe.Customer.create(
+                email=current_user.email,
+                name=getattr(current_user, 'name', current_user.email),
+                metadata={"user_id": current_user.id, "platform": "bidvex"},
+            )
+            customer_id = customer.id
+            await db.users.update_one(
+                {"id": current_user.id},
+                {"$set": {"stripe_customer_id": customer_id}},
+            )
+
+        payment_method = stripe.PaymentMethod.retrieve(payment_method_id)
+        stripe.PaymentMethod.attach(payment_method_id, customer=customer_id)
+
+        stripe.Customer.modify(
+            customer_id,
+            invoice_settings={"default_payment_method": payment_method_id},
         )
-        customer_id = customer.id
+
+        pm_doc = {
+            "id": str(uuid.uuid4()),
+            "user_id": current_user.id,
+            "stripe_payment_method_id": payment_method_id,
+            "card_brand": payment_method.card.brand if payment_method.card else "unknown",
+            "last4": payment_method.card.last4 if payment_method.card else "****",
+            "exp_month": payment_method.card.exp_month if payment_method.card else 0,
+            "exp_year": payment_method.card.exp_year if payment_method.card else 0,
+            "is_verified": True,
+            "is_default": True,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        await db.payment_methods.insert_one(pm_doc)
+
+        # Update user trust status
         await db.users.update_one(
             {"id": current_user.id},
-            {"$set": {"stripe_customer_id": customer_id}}
+            {"$set": {
+                "trust_status": "verified",
+                "has_payment_method": True,
+                "default_payment_method_id": payment_method_id,
+                "trust_verified_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }},
         )
-    
-    # Attach payment method
-    stripe.PaymentMethod.attach(
-        payment_method_id,
-        customer=customer_id
-    )
-    
-    # Set as default
-    stripe.Customer.modify(
-        customer_id,
-        invoice_settings={"default_payment_method": payment_method_id}
-    )
-    
-    return {"status": "success", "payment_method_id": payment_method_id}
+
+        del pm_doc["_id"]  # MongoDB adds _id after insert
+        return pm_doc
+
+    except stripe.StripeError as e:
+        logger.error(f"Stripe error in add_payment_method: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Payment method error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @payments_router.get("/payment-methods")
 async def get_payment_methods(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
-    """Get user's saved payment methods"""
-    import stripe
-    
+    """Get user's saved payment methods from DB."""
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentication required")
-    
+
     current_user = await _get_current_user(credentials)
     db = get_db()
-    
-    user = await db.users.find_one({"id": current_user.id})
-    customer_id = user.get("stripe_customer_id")
-    
-    if not customer_id:
-        return {"payment_methods": []}
-    
-    methods = stripe.PaymentMethod.list(
-        customer=customer_id,
-        type="card"
-    )
-    
-    return {
-        "payment_methods": [
-            {
-                "id": pm.id,
-                "brand": pm.card.brand,
-                "last4": pm.card.last4,
-                "exp_month": pm.card.exp_month,
-                "exp_year": pm.card.exp_year
-            }
-            for pm in methods.data
-        ]
-    }
+
+    methods = await db.payment_methods.find(
+        {"user_id": current_user.id}, {"_id": 0}
+    ).to_list(100)
+    return methods
 
 
 @payments_router.delete("/payment-methods/{method_id}")
@@ -474,17 +536,28 @@ async def delete_payment_method(
     method_id: str,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
-    """Delete a payment method"""
+    """Delete a payment method from Stripe and DB."""
     import stripe
-    
+
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentication required")
-    
+
+    current_user = await _get_current_user(credentials)
+    db = get_db()
+
+    method = await db.payment_methods.find_one(
+        {"id": method_id, "user_id": current_user.id}
+    )
+    if not method:
+        raise HTTPException(status_code=404, detail="Payment method not found")
+
     try:
-        stripe.PaymentMethod.detach(method_id)
-        return {"status": "deleted"}
-    except stripe.StripeError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        stripe.PaymentMethod.detach(method["stripe_payment_method_id"])
+    except Exception:
+        pass
+
+    await db.payment_methods.delete_one({"id": method_id})
+    return {"message": "Payment method deleted"}
 
 
 # ========== PROMOTIONS ==========

@@ -1415,3 +1415,143 @@ async def toggle_verified_firm(
 
     return {"success": True, "is_verified_firm": is_verified}
 
+
+
+
+# ========== ADMIN EMAIL PREVIEW / TEST SEND ==========
+
+@admin_router.get("/email-preview/{template_key}")
+async def admin_email_preview(
+    template_key: str,
+    language: str = "en",
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """
+    Send a test email with mock data to the admin's own address.
+
+    Uses the verified bilingual template dictionary ({"en": "d-...", "fr": "d-..."}).
+    Supports all 54 templates via their logical key name.
+
+    Example: GET /api/admin/email-preview/PASSWORD_RESET?language=fr
+    """
+    admin_user_obj = await require_admin(credentials)
+
+    from config.email_templates import EmailTemplates
+
+    # Build lookup from EmailTemplates class attributes
+    template_map = {}
+    for attr_name in dir(EmailTemplates):
+        val = getattr(EmailTemplates, attr_name)
+        if isinstance(val, dict) and "en" in val and "fr" in val:
+            template_map[attr_name] = val
+
+    key_upper = template_key.upper()
+    if key_upper not in template_map:
+        available = sorted(template_map.keys())
+        raise HTTPException(
+            status_code=404,
+            detail=f"Template '{template_key}' not found. Available: {available}",
+        )
+
+    template_dict = template_map[key_upper]
+    template_id = EmailTemplates.get_id(template_dict, language)
+
+    # Get admin user document for recipient address
+    admin_db = get_db()
+    admin_user = await admin_db.users.find_one({"id": admin_user_obj.id}, {"_id": 0})
+
+    # Build mock dynamic data covering all possible template variables
+    mock_data = {
+        "first_name": admin_user.get("name", "Admin").split()[0],
+        "full_name": admin_user.get("name", "Admin User"),
+        "email": admin_user.get("email"),
+        "login_url": "https://bidvex.com/auth",
+        "explore_url": "https://bidvex.com/marketplace",
+        "account_type": "Admin",
+        # Auth
+        "reset_url": "https://bidvex.com/reset-password?token=PREVIEW_TOKEN",
+        "reset_link": "https://bidvex.com/reset-password?token=PREVIEW_TOKEN",
+        "expires_in_hours": 1,
+        "expiry_time": "1 hour",
+        "verification_code": "123456",
+        "change_time": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        # Bidding
+        "listing_title": "[Preview] 2019 John Deere 5075E Tractor",
+        "listing_url": "https://bidvex.com/listing/preview-123",
+        "listing_image": "",
+        "bid_amount": "4,250.00",
+        "new_bid_amount": "4,500.00",
+        "currency": "CAD",
+        "current_high_bid": "4,250.00",
+        "auction_end_date": (datetime.now(timezone.utc) + timedelta(days=3)).strftime("%B %d, %Y at %I:%M %p UTC"),
+        "bid_now_url": "https://bidvex.com/listing/preview-123#bid",
+        # Auction won
+        "winning_bid": "4,500.00",
+        "seller_name": "Maple Leaf Auctions Inc.",
+        "payment_url": "https://bidvex.com/payment/preview-123",
+        "invoice_url": "https://bidvex.com/invoice/preview-123",
+        # Financial
+        "invoice_number": "BV-2026-PREV-0001",
+        "invoice_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "total_amount": "4,725.00",
+        "subtotal": "4,500.00",
+        "tax": "585.00",
+        "shipping": "0.00",
+        "invoice_pdf_url": "https://bidvex.com/invoices/preview.pdf",
+        "payment_method": "Visa ending in 4242",
+        "items": [{"name": "[Preview] John Deere 5075E", "quantity": 1, "price": "4,500.00"}],
+        # Seller
+        "listing_approved_url": "https://bidvex.com/listing/preview-123",
+        "rejection_reason": "Missing required photos",
+        "bidder_name": "Jean-Pierre Tremblay",
+        "bid_count": 12,
+        # Communication
+        "sender_name": "BidVex Support",
+        "message_preview": "This is a preview email to test the template rendering in your email client.",
+        "messages_url": "https://bidvex.com/messages",
+        "sender_profile_url": "https://bidvex.com/seller/preview",
+        "announcement_title": "[Preview] Platform Update",
+        "announcement_body": "This is a preview of the announcement email template.",
+        # Admin
+        "report_type": "Suspicious Activity",
+        "report_details": "This is a preview of the admin report email template.",
+        "suspension_reason": "Terms of Service violation (preview)",
+        # Support
+        "support_email": "support@bidvex.com",
+        "ticket_id": "PREV-001",
+        # Affiliate
+        "commission_amount": "45.00",
+        "referral_name": "New User",
+        "earnings_total": "450.00",
+        "earnings_period": "March 2026",
+    }
+
+    if not _email_service:
+        return {
+            "status": "preview_only",
+            "message": "Email service not configured. Template details below.",
+            "template_key": key_upper,
+            "template_id": template_id,
+            "language": language,
+            "recipient": admin_user.get("email"),
+            "mock_data": mock_data,
+        }
+
+    try:
+        result = await _email_service.send_email(
+            to=admin_user["email"],
+            template_id=template_id,
+            dynamic_data=mock_data,
+            language=language,
+        )
+        return {
+            "status": "sent",
+            "template_key": key_upper,
+            "template_id": template_id,
+            "language": language,
+            "recipient": admin_user["email"],
+            "sendgrid_status": result.get("status_code") if isinstance(result, dict) else "202",
+        }
+    except Exception as e:
+        logger.error(f"Email preview send error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to send preview: {str(e)}")

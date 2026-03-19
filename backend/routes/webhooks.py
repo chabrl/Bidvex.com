@@ -159,36 +159,58 @@ async def handle_sendgrid_webhook(request: Request):
 
 # ========== STRIPE WEBHOOKS ==========
 
+def _verify_stripe_event(payload: bytes, sig_header: str):
+    """Verify Stripe webhook signature using all configured secrets."""
+    import stripe
+    import os
+
+    secrets = [
+        s for s in [
+            os.environ.get("STRIPE_CONNECT_WEBHOOK_SECRET"),
+            os.environ.get("STRIPE_WEBHOOK_SECRET"),
+            os.environ.get("STRIPE_WEBHOOK_SECRET_2"),
+        ] if s
+    ]
+
+    if not secrets:
+        # No secrets configured — parse payload without verification
+        return json.loads(payload)
+
+    if not sig_header:
+        return json.loads(payload)
+
+    last_error = None
+    for secret in secrets:
+        try:
+            return stripe.Webhook.construct_event(payload, sig_header, secret)
+        except stripe.SignatureVerificationError as e:
+            last_error = str(e)
+            continue
+
+    logger.error(f"Stripe signature verification failed with {len(secrets)} secrets. Last: {last_error}")
+    raise HTTPException(status_code=400, detail="Invalid signature")
+
+
 @webhooks_router.post("/stripe")
 async def handle_stripe_webhook(request: Request):
     """
-    Handle Stripe webhook events for payment/subscription tracking.
+    Unified Stripe webhook handler.
+    Handles subscription lifecycle, checkout completion, trust verification.
+    Uses multi-secret verification (Connect + standard secrets).
     """
     import stripe
-    import os
-    
+
     try:
         payload = await request.body()
         sig_header = request.headers.get("stripe-signature")
-        endpoint_secret = os.environ.get("STRIPE_WEBHOOK_SECRET")
-        
-        # Verify webhook signature if secret is configured
-        if endpoint_secret and sig_header:
-            try:
-                event = stripe.Webhook.construct_event(
-                    payload, sig_header, endpoint_secret
-                )
-            except stripe.SignatureVerificationError:
-                logger.error("Stripe webhook signature verification failed")
-                raise HTTPException(status_code=400, detail="Invalid signature")
-        else:
-            event = json.loads(payload)
-        
-        event_type = event.get("type")
-        data = event.get("data", {}).get("object", {})
-        
+
+        event = _verify_stripe_event(payload, sig_header)
+
+        event_type = event.get("type") if isinstance(event, dict) else event["type"]
+        data = (event.get("data", {}) if isinstance(event, dict) else event["data"]).get("object", {})
+
         db = get_db()
-        
+
         # Log the event
         await db.stripe_events.insert_one({
             "id": event.get("id"),
@@ -196,34 +218,55 @@ async def handle_stripe_webhook(request: Request):
             "data": data,
             "created_at": datetime.now(timezone.utc).isoformat()
         })
-        
-        # Process subscription events
+
+        logger.info(f"Processing Stripe webhook: {event_type}")
+
+        # --- Subscription lifecycle ---
         if event_type == "customer.subscription.created":
             await _handle_subscription_created(db, data)
-            
         elif event_type == "customer.subscription.updated":
             await _handle_subscription_updated(db, data)
-            
         elif event_type == "customer.subscription.deleted":
             await _handle_subscription_deleted(db, data)
-            
+
+        # --- Invoice events ---
         elif event_type == "invoice.payment_succeeded":
             await _handle_payment_succeeded(db, data)
-            
         elif event_type == "invoice.payment_failed":
             await _handle_payment_failed(db, data)
-        
-        # Process checkout session completed (auction purchases)
+        elif event_type == "invoice.paid":
+            # For subscription-related invoices, delegate to subscription handler
+            if data.get("subscription"):
+                subscription_id = data["subscription"]
+                subscription_data = stripe.Subscription.retrieve(subscription_id)
+                await handle_subscription_event(db, event_type, subscription_data)
+
+        # --- Checkout completion ---
         elif event_type == "checkout.session.completed":
-            await _handle_checkout_completed(db, data)
-        
+            session_type = data.get("metadata", {}).get("type", "")
+            if session_type == "subscription_upgrade":
+                pass  # handled by subscription events above
+            else:
+                await _handle_checkout_completed(db, data)
+
+        # --- Trust verification ---
+        elif event_type == "setup_intent.succeeded":
+            await _handle_setup_intent_succeeded(db, data)
+        elif event_type == "payment_method.attached":
+            await _handle_payment_method_attached(db, data)
+
+        else:
+            logger.info(f"Unhandled Stripe event: {event_type}")
+
         return {"status": "ok", "event_type": event_type}
-        
+
+    except HTTPException:
+        raise
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON")
     except Exception as e:
-        logger.error(f"Error processing Stripe webhook: {e}")
-        raise HTTPException(status_code=500, detail="Internal error")
+        logger.error(f"Stripe webhook error: {e}")
+        return {"status": "error", "message": str(e)}
 
 
 async def _handle_subscription_created(db, subscription):
@@ -735,3 +778,149 @@ async def _generate_vehicle_fees_invoice(db, auction, buyer_id, breakdown, invoi
     except Exception as e:
         logger.error(f"Failed to generate vehicle fees invoice: {e}")
 
+
+
+
+# ========== TRUST VERIFICATION HANDLERS ==========
+
+async def _handle_setup_intent_succeeded(db, setup_intent_data):
+    """
+    Handle setup_intent.succeeded webhook event.
+
+    When a SetupIntent succeeds:
+    1. Save the payment_method_id to the user's Stripe Customer
+    2. Update MongoDB user: trust_status = "verified"
+    3. Store payment method details
+    """
+    import stripe
+
+    customer_id = setup_intent_data.get("customer")
+    payment_method_id = setup_intent_data.get("payment_method")
+    metadata = setup_intent_data.get("metadata", {})
+    user_id = metadata.get("user_id")
+
+    logger.info(f"Processing SetupIntent succeeded: customer={customer_id}, user_id={user_id}")
+
+    if not customer_id or not payment_method_id:
+        logger.warning("SetupIntent missing customer or payment_method")
+        return
+
+    user = None
+    if user_id:
+        user = await db.users.find_one({"id": user_id})
+    if not user:
+        user = await db.users.find_one({"stripe_customer_id": customer_id})
+
+    if not user:
+        logger.warning(f"No user found for customer {customer_id}")
+        return
+
+    user_id = user.get("id")
+
+    try:
+        stripe.Customer.modify(
+            customer_id,
+            invoice_settings={"default_payment_method": payment_method_id},
+        )
+
+        pm = stripe.PaymentMethod.retrieve(payment_method_id)
+
+        await db.users.update_one(
+            {"id": user_id},
+            {"$set": {
+                "trust_status": "verified",
+                "trust_verified_at": datetime.now(timezone.utc).isoformat(),
+                "default_payment_method_id": payment_method_id,
+                "has_payment_method": True,
+                "stripe_customer_id": customer_id,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }},
+        )
+
+        await db.payment_methods.update_one(
+            {"user_id": user_id, "stripe_payment_method_id": payment_method_id},
+            {"$set": {
+                "user_id": user_id,
+                "stripe_payment_method_id": payment_method_id,
+                "brand": pm.card.brand if pm.card else "unknown",
+                "last4": pm.card.last4 if pm.card else "****",
+                "exp_month": pm.card.exp_month if pm.card else 0,
+                "exp_year": pm.card.exp_year if pm.card else 0,
+                "is_default": True,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }},
+            upsert=True,
+        )
+
+        logger.info(f"Trust status verified for user {user_id}")
+
+    except stripe.StripeError as e:
+        logger.error(f"Stripe error in SetupIntent handler: {e}")
+    except Exception as e:
+        logger.error(f"Error processing SetupIntent: {e}")
+
+
+async def _handle_payment_method_attached(db, pm_data):
+    """
+    Backup handler for payment_method.attached webhook event.
+
+    If setup_intent.succeeded was missed, this catches the payment method
+    being attached to a customer and verifies trust status.
+    """
+    import stripe
+
+    customer_id = pm_data.get("customer")
+    payment_method_id = pm_data.get("id")
+
+    if not customer_id or not payment_method_id:
+        return
+
+    user = await db.users.find_one({"stripe_customer_id": customer_id})
+    if not user:
+        logger.info(f"payment_method.attached: No user for customer {customer_id}")
+        return
+
+    if user.get("trust_status") == "verified":
+        logger.info(f"payment_method.attached: User {user['id']} already verified, skipping")
+        return
+
+    user_id = user.get("id")
+
+    try:
+        pm = stripe.PaymentMethod.retrieve(payment_method_id)
+
+        stripe.Customer.modify(
+            customer_id,
+            invoice_settings={"default_payment_method": payment_method_id},
+        )
+
+        await db.users.update_one(
+            {"id": user_id},
+            {"$set": {
+                "trust_status": "verified",
+                "trust_verified_at": datetime.now(timezone.utc).isoformat(),
+                "default_payment_method_id": payment_method_id,
+                "has_payment_method": True,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }},
+        )
+
+        await db.payment_methods.update_one(
+            {"user_id": user_id, "stripe_payment_method_id": payment_method_id},
+            {"$set": {
+                "user_id": user_id,
+                "stripe_payment_method_id": payment_method_id,
+                "brand": pm.card.brand if pm.card else "unknown",
+                "last4": pm.card.last4 if pm.card else "****",
+                "exp_month": pm.card.exp_month if pm.card else 0,
+                "exp_year": pm.card.exp_year if pm.card else 0,
+                "is_default": True,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }},
+            upsert=True,
+        )
+
+        logger.info(f"Trust status verified via payment_method.attached for user {user_id}")
+
+    except Exception as e:
+        logger.error(f"Error in payment_method.attached handler: {e}")
