@@ -20,7 +20,12 @@ Jobs: APScheduler | i18n: react-i18next | PDF: ReportLab
 ## Backend Route Architecture
 ```
 /app/backend/
-├── server.py              (~12,700 lines — listings CRUD, bids, auth, auctions)
+├── server.py              (~11,300 lines — auth, dashboard, payments, admin settings)
+│   ├── routes/
+│   │   ├── admin.py          # Partner/user admin logic
+│   │   ├── auctions.py       # Auction lifecycle + bids + anti-sniping + buy-now + auto-bid
+│   │   ├── listings.py       # Single + multi-item CRUD, terms, deletion requests
+│   │   ├── marketplace.py    # Marketplace browsing/search/filter
 ├── deps.py                (User model, shared auth)
 ├── routes/
 │   ├── admin.py           (1,395 lines — User/partner mgmt, email settings)
@@ -41,7 +46,7 @@ Jobs: APScheduler | i18n: react-i18next | PDF: ReportLab
 - **Pay-to-Activate** ($100 CAD/year recurring) with soft-lock on expiry
 - **Stripe Customer Portal** for partner billing/invoices/tax receipts
 - **Partner Dashboard** (`/partner/dashboard`) — subscription status, billing portal, listing stats, recent activity, account details, soft-lock banner
-- **Refactoring**: Phase 1 (AI, Fees, Notifications, Watchlist), Phase 2 (Admin/Partner), Phase 3 (Marketplace), Phase 4 (Admin user mgmt cleanup from server.py) — ~2,070 lines extracted
+- **Refactoring**: Phase 1 (AI, Fees, Notifications, Watchlist), Phase 2 (Admin/Partner), Phase 3 (Marketplace), Phase 4 (Admin user mgmt cleanup from server.py), Phase 5 (Listings + Bids extraction) — ~2,930 lines extracted
 
 ## Session Log (Mar 19, 2026)
 1. Pay-to-Activate Partner Flow — $100 CAD/year recurring Stripe subscription
@@ -68,7 +73,7 @@ Jobs: APScheduler | i18n: react-i18next | PDF: ReportLab
 
 ### P1 - High Priority
 - [x] server.py Phase 4: Deduplicate admin user mgmt routes (673 lines removed, moved to routes/admin.py)
-- [ ] server.py Phase 5: Extract listings CRUD, bids, multi-item auctions
+- [x] server.py Phase 5: Extract listings CRUD, bids, multi-item auctions (1460 lines → routes/listings.py + routes/auctions.py)
 
 ### P2 - Medium Priority
 - [ ] Cache marketplace filter counts (Redis/in-memory)
