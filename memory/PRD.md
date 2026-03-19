@@ -76,8 +76,9 @@ Jobs: APScheduler | i18n: react-i18next | PDF: ReportLab
 - [x] server.py Phase 5: Extract listings CRUD, bids, multi-item auctions (1460 lines → routes/listings.py + routes/auctions.py)
 
 ### P2 - Medium Priority
-- [ ] Cache marketplace filter counts (Redis/in-memory)
-- [ ] PDF Invoice cloud storage
+- [x] Cache marketplace filter counts — 5-min Stale-While-Revalidate in-memory cache
+- [x] PDF Invoice cloud storage — HMAC-signed URLs, persistent at /data/invoices/
+- [x] Database indexing — background indexes on bids, lot_bids, auto_bids, invoices, subscription_invoices
 - [ ] Partner Pro subscription tier
 
 ### P3 - Low Priority
