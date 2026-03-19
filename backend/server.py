@@ -2237,6 +2237,13 @@ async def create_listing(
     # ========== HIGH-TRUST GATEKEEPING ==========
     # Server-side verification check (unless admin)
     if current_user.role != 'admin':
+        # Partner fee check: verified partners must have paid annual fee
+        if current_user.is_partner and not current_user.platform_fee_paid:
+            raise HTTPException(
+                status_code=403,
+                detail="Your annual partner fee is required to create listings. Please complete your payment to activate your account."
+            )
+        
         # Check phone verification
         if not current_user.phone_verified:
             raise HTTPException(
@@ -4636,6 +4643,13 @@ async def create_multi_item_listing(
         "user_id": current_user.id,
         "user_email": current_user.email
     }
+    
+    # ========== PARTNER FEE GATEKEEPING ==========
+    if current_user.is_partner and not current_user.platform_fee_paid:
+        raise HTTPException(
+            status_code=403,
+            detail="Your annual partner fee is required to create listings. Please complete your payment to activate your account."
+        )
     
     # ========== ENFORCE MARKETPLACE SETTINGS ==========
     settings = await get_marketplace_settings()
@@ -11302,6 +11316,10 @@ try:
     api_router.include_router(payments_router)
     logger.info("✅ Payments & Fee Calculation router loaded")
     
+    # Include webhooks router for Stripe/SendGrid events
+    api_router.include_router(webhooks_router)
+    logger.info("✅ Webhooks router loaded")
+    
     # Note: users, marketing, admin, webhooks routers contain endpoints
     # that are still duplicated in server.py. They will be fully activated after
     # removing duplicates from server.py in a future refactoring pass.
@@ -11599,9 +11617,42 @@ async def get_partner_applications(
             "partner_rejection_reason": u.get("partner_rejection_reason"),
             "is_partner": u.get("is_partner", False),
             "custom_premium_rate": u.get("custom_premium_rate"),
+            "platform_fee_paid": u.get("platform_fee_paid", False),
+            "partner_subscription_id": u.get("partner_subscription_id"),
         })
     
     return {"applications": applications, "total": len(applications)}
+
+
+async def _get_or_create_partner_fee_price():
+    """Get or create the $100 CAD/year partner fee Stripe Price."""
+    setting = await db.settings.find_one({"key": "partner_fee_price_id"}, {"_id": 0})
+    if setting and setting.get("price_id"):
+        try:
+            price = stripe.Price.retrieve(setting["price_id"])
+            if price.active:
+                return setting["price_id"]
+        except Exception:
+            pass
+
+    product = stripe.Product.create(
+        name="BidVex Partner Annual Fee",
+        description="Annual platform access fee for BidVex Partner accounts ($100 CAD/year)",
+        metadata={"type": "partner_annual_fee"}
+    )
+    price = stripe.Price.create(
+        product=product.id,
+        unit_amount=10000,
+        currency="cad",
+        recurring={"interval": "year"},
+        metadata={"type": "partner_annual_fee"}
+    )
+    await db.settings.update_one(
+        {"key": "partner_fee_price_id"},
+        {"$set": {"key": "partner_fee_price_id", "price_id": price.id, "product_id": product.id}},
+        upsert=True
+    )
+    return price.id
 
 
 @api_router.post("/admin/partners/{user_id}/verify")
@@ -11611,9 +11662,9 @@ async def verify_partner(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Admin: Verify a partner application. Sets is_partner=True and verification_status=verified.
-    Optionally sets a custom_premium_rate for the partner.
-    The 3% partner platform fee overrides ALL subscription-based fee discounts.
+    Admin: Verify a partner application.
+    Creates a Stripe Checkout Session for the $100 CAD/year annual fee.
+    Partner account remains locked until payment is completed via webhook.
     """
     if current_user.role not in ["admin", "superadmin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
@@ -11627,11 +11678,13 @@ async def verify_partner(
     now = datetime.now(timezone.utc).isoformat()
     custom_rate = data.get("custom_premium_rate")
     
+    # Mark as verified but NOT fee-paid yet (Pay-to-Activate)
     update = {
         "is_partner": True,
         "partner_verification_status": "verified",
         "partner_verified_at": now,
         "partner_rejection_reason": None,
+        "platform_fee_paid": False,
         "updated_at": now,
     }
     if custom_rate is not None:
@@ -11639,33 +11692,88 @@ async def verify_partner(
     
     await db.users.update_one({"id": user_id}, {"$set": update})
     
+    # Create Stripe Checkout Session for annual partner fee
+    checkout_url = None
+    try:
+        price_id = await _get_or_create_partner_fee_price()
+        base_url = os.environ.get("REACT_APP_BACKEND_URL", "https://www.bidvex.com")
+        
+        # Create or get Stripe customer for this user
+        customer_id = user_doc.get("stripe_customer_id")
+        if not customer_id:
+            customer = stripe.Customer.create(
+                email=user_doc.get("email"),
+                name=user_doc.get("name", ""),
+                metadata={"user_id": user_id, "type": "partner"}
+            )
+            customer_id = customer.id
+            await db.users.update_one({"id": user_id}, {"$set": {"stripe_customer_id": customer_id}})
+        
+        session = stripe.checkout.Session.create(
+            mode="subscription",
+            customer=customer_id,
+            line_items=[{"price": price_id, "quantity": 1}],
+            metadata={"user_id": user_id, "type": "partner_activation"},
+            success_url=f"{base_url}/settings?partner_payment=success",
+            cancel_url=f"{base_url}/settings?partner_payment=cancelled",
+            subscription_data={
+                "metadata": {"user_id": user_id, "type": "partner_annual_fee"}
+            },
+        )
+        checkout_url = session.url
+        
+        # Store checkout session reference
+        await db.users.update_one({"id": user_id}, {"$set": {
+            "partner_checkout_session_id": session.id,
+            "partner_checkout_url": checkout_url,
+        }})
+    except Exception as e:
+        logger.error(f"Failed to create Stripe checkout for partner {user_id}: {e}")
+    
     # Admin audit log
     await db.admin_logs.insert_one({
         "id": str(uuid.uuid4()),
         "action": "partner_verified",
         "admin_id": current_user.id,
         "target_user_id": user_id,
-        "details": {"custom_premium_rate": custom_rate},
+        "details": {"custom_premium_rate": custom_rate, "checkout_url": checkout_url},
         "timestamp": now,
     })
     
-    # Send Verification Success email (Task 6)
+    # Send Verification + Payment email
     base_url = os.environ.get("REACT_APP_BACKEND_URL", "https://www.bidvex.com")
     company = user_doc.get("partner_company_name", "Partner")
     rate_info = f"{custom_rate*100:.1f}%" if custom_rate else "not yet set — you can configure it per listing"
+    
+    payment_section = ""
+    if checkout_url:
+        payment_section = f"""
+            <h2 style="color:#2563eb;font-size:16px;margin:24px 0 8px;">Complete Your Activation</h2>
+            <p style="font-size:14px;color:#475569;line-height:1.7;">
+              To activate your partner account, please complete the annual platform fee payment of <strong>$100 CAD/year + applicable taxes</strong>.
+              Your account features will be unlocked immediately upon payment.
+            </p>
+            <div style="margin:24px 0;text-align:center;">
+              <a href="{checkout_url}" style="display:inline-block;background:#16a34a;color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">Pay $100 CAD/year &rarr; Activate Now</a>
+            </div>
+            <p style="font-size:12px;color:#94a3b8;text-align:center;">This is a recurring annual subscription. You can cancel anytime from your account settings.</p>
+        """
+    
     _send_partner_email(
         to_email=user_doc.get("email"),
-        subject="Welcome to the BidVex Partner Network!",
+        subject="BidVex Partner Application Approved — Complete Your Payment",
         html_content=f"""
         <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;color:#1e293b;">
           <div style="background:#2563eb;padding:24px 28px;border-radius:12px 12px 0 0;">
-            <h1 style="color:#fff;margin:0;font-size:22px;">You're Verified!</h1>
-            <p style="color:#bfdbfe;margin:6px 0 0;font-size:14px;">{company} is now a BidVex Partner</p>
+            <h1 style="color:#fff;margin:0;font-size:22px;">Application Approved!</h1>
+            <p style="color:#bfdbfe;margin:6px 0 0;font-size:14px;">{company} has been approved as a BidVex Partner</p>
           </div>
           <div style="padding:28px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;">
-            <p>Congratulations! Your application has been reviewed and approved. Your account now has full partner privileges.</p>
+            <p>Congratulations! Your application has been reviewed and approved.</p>
             
-            <h2 style="color:#2563eb;font-size:16px;margin:24px 0 8px;">What's Unlocked</h2>
+            {payment_section}
+            
+            <h2 style="color:#2563eb;font-size:16px;margin:24px 0 8px;">What You'll Unlock</h2>
             <ul style="color:#475569;font-size:14px;line-height:1.8;">
               <li><strong>Verified Auction Firm</strong> badge on all your listings</li>
               <li><strong>3% platform fee</strong> — the lowest in the industry</li>
@@ -11680,15 +11788,6 @@ async def verify_partner(
               If you leave it empty, no buyer premium will be applied.
               Your current default rate is: <strong>{rate_info}</strong>.
             </p>
-            <p style="font-size:14px;color:#475569;line-height:1.7;">
-              The buyer premium is collected on top of the hammer price and transferred
-              directly to your connected Stripe account, along with the hammer price.
-              BidVex only retains the 3% platform fee.
-            </p>
-            
-            <div style="margin:24px 0;text-align:center;">
-              <a href="{base_url}/settings" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Go to Partner Dashboard</a>
-            </div>
             
             <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;" />
             <p style="color:#94a3b8;font-size:12px;">
@@ -11699,7 +11798,11 @@ async def verify_partner(
         """
     )
     
-    return {"success": True, "message": f"Partner {user_doc.get('email')} verified successfully."}
+    return {
+        "success": True,
+        "message": f"Partner {user_doc.get('email')} verified. Payment link sent via email.",
+        "checkout_url": checkout_url,
+    }
 
 
 async def _get_sendgrid_config():
@@ -11977,6 +12080,71 @@ async def test_email_settings(data: Dict[str, Any], current_user: User = Depends
             {"$set": {"last_test_at": now, "last_test_status": f"failed: {str(e)}"}}
         )
         raise HTTPException(status_code=400, detail=f"Email send failed: {str(e)}")
+
+
+# ========== PARTNER PAYMENT STATUS & RE-CHECKOUT ==========
+
+@api_router.get("/partner/payment-status")
+async def get_partner_payment_status(current_user: User = Depends(get_current_user)):
+    """Get current partner's payment status and checkout URL if needed."""
+    if not current_user.is_partner:
+        raise HTTPException(status_code=400, detail="Not a partner account")
+    
+    user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
+    
+    result = {
+        "is_partner": True,
+        "platform_fee_paid": user_doc.get("platform_fee_paid", False),
+        "partner_verification_status": user_doc.get("partner_verification_status"),
+        "partner_subscription_id": user_doc.get("partner_subscription_id"),
+        "checkout_url": user_doc.get("partner_checkout_url"),
+    }
+    return result
+
+
+@api_router.post("/partner/create-checkout")
+async def create_partner_checkout(current_user: User = Depends(get_current_user)):
+    """Create a new Stripe Checkout Session for partner fee payment."""
+    if not current_user.is_partner:
+        raise HTTPException(status_code=400, detail="Not a partner account")
+    if current_user.platform_fee_paid:
+        raise HTTPException(status_code=400, detail="Annual fee already paid")
+    
+    try:
+        price_id = await _get_or_create_partner_fee_price()
+        base_url = os.environ.get("REACT_APP_BACKEND_URL", "https://www.bidvex.com")
+        
+        customer_id = current_user.stripe_customer_id
+        if not customer_id:
+            customer = stripe.Customer.create(
+                email=current_user.email,
+                name=current_user.name,
+                metadata={"user_id": current_user.id, "type": "partner"}
+            )
+            customer_id = customer.id
+            await db.users.update_one({"id": current_user.id}, {"$set": {"stripe_customer_id": customer_id}})
+        
+        session = stripe.checkout.Session.create(
+            mode="subscription",
+            customer=customer_id,
+            line_items=[{"price": price_id, "quantity": 1}],
+            metadata={"user_id": current_user.id, "type": "partner_activation"},
+            success_url=f"{base_url}/settings?partner_payment=success",
+            cancel_url=f"{base_url}/settings?partner_payment=cancelled",
+            subscription_data={
+                "metadata": {"user_id": current_user.id, "type": "partner_annual_fee"}
+            },
+        )
+        
+        await db.users.update_one({"id": current_user.id}, {"$set": {
+            "partner_checkout_session_id": session.id,
+            "partner_checkout_url": session.url,
+        }})
+        
+        return {"checkout_url": session.url}
+    except Exception as e:
+        logger.error(f"Failed to create partner checkout: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create payment session")
 
 
 # ========== TRANSACTION CSV EXPORT ==========
@@ -12265,6 +12433,10 @@ async def admin_toggle_partner(user_id: str, current_user: User = Depends(get_cu
     }
     if new_partner:
         update["partner_verified_at"] = now
+        update["platform_fee_paid"] = False  # Requires payment activation
+    else:
+        update["platform_fee_paid"] = False
+        update["partner_subscription_id"] = None
     
     await db.users.update_one({"id": user_id}, {"$set": update})
     

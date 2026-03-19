@@ -286,9 +286,62 @@ async def _handle_subscription_updated(db, subscription):
 
 
 async def _handle_subscription_deleted(db, subscription):
-    """Handle subscription cancellation"""
+    """Handle subscription cancellation — includes partner soft lock"""
     customer_id = subscription.get("customer")
+    subscription_id = subscription.get("id")
+    subscription_metadata = subscription.get("metadata", {})
     
+    # Check if this is a partner annual fee subscription
+    if subscription_metadata.get("type") == "partner_annual_fee":
+        user_id = subscription_metadata.get("user_id")
+        if user_id:
+            await db.users.update_one(
+                {"id": user_id},
+                {"$set": {
+                    "platform_fee_paid": False,
+                    "partner_subscription_id": None,
+                    "partner_fee_expired_at": datetime.now(timezone.utc).isoformat(),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }}
+            )
+            # Create notification about expired fee
+            await db.notifications.insert_one({
+                "id": f"notif_{user_id}_{datetime.now(timezone.utc).isoformat()}",
+                "user_id": user_id,
+                "type": "partner_fee_expired",
+                "title": "Partner Fee Expired",
+                "message": "Your annual partner fee has expired. Please update your payment method to resume listing.",
+                "read": False,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+            logger.info(f"Partner soft-locked due to subscription cancellation: user={user_id}")
+            return
+    
+    # Also check by partner_subscription_id in case metadata is missing
+    partner_user = await db.users.find_one({"partner_subscription_id": subscription_id})
+    if partner_user:
+        await db.users.update_one(
+            {"id": partner_user["id"]},
+            {"$set": {
+                "platform_fee_paid": False,
+                "partner_subscription_id": None,
+                "partner_fee_expired_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }}
+        )
+        await db.notifications.insert_one({
+            "id": f"notif_{partner_user['id']}_{datetime.now(timezone.utc).isoformat()}",
+            "user_id": partner_user["id"],
+            "type": "partner_fee_expired",
+            "title": "Partner Fee Expired",
+            "message": "Your annual partner fee has expired. Please update your payment method to resume listing.",
+            "read": False,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        logger.info(f"Partner soft-locked (by subscription match): user={partner_user['id']}")
+        return
+    
+    # Standard subscription cancellation
     user = await db.users.find_one({"stripe_customer_id": customer_id})
     if not user:
         return
@@ -307,12 +360,35 @@ async def _handle_subscription_deleted(db, subscription):
 
 
 async def _handle_payment_succeeded(db, invoice):
-    """Handle successful payment"""
+    """Handle successful payment — includes partner re-activation on renewal"""
     customer_id = invoice.get("customer")
+    subscription_id = invoice.get("subscription")
     
     user = await db.users.find_one({"stripe_customer_id": customer_id})
     if not user:
         return
+    
+    # Check if this is a partner subscription renewal payment
+    if subscription_id and user.get("partner_subscription_id") == subscription_id:
+        if not user.get("platform_fee_paid"):
+            await db.users.update_one(
+                {"id": user["id"]},
+                {"$set": {
+                    "platform_fee_paid": True,
+                    "partner_fee_paid_at": datetime.now(timezone.utc).isoformat(),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }}
+            )
+            await db.notifications.insert_one({
+                "id": f"notif_{user['id']}_{datetime.now(timezone.utc).isoformat()}",
+                "user_id": user["id"],
+                "type": "partner_reactivated",
+                "title": "Partner Account Re-Activated",
+                "message": "Your annual partner fee payment was successful. Your partner features are restored!",
+                "read": False,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+            logger.info(f"Partner re-activated via subscription renewal: user={user['id']}")
     
     # Log payment
     await db.payments.insert_one({
@@ -326,12 +402,34 @@ async def _handle_payment_succeeded(db, invoice):
 
 
 async def _handle_payment_failed(db, invoice):
-    """Handle failed payment"""
+    """Handle failed payment — includes partner soft lock on recurring failure"""
     customer_id = invoice.get("customer")
+    subscription_id = invoice.get("subscription")
     
     user = await db.users.find_one({"stripe_customer_id": customer_id})
     if not user:
         return
+    
+    # Check if this is a partner subscription payment failure
+    if subscription_id and user.get("partner_subscription_id") == subscription_id:
+        await db.users.update_one(
+            {"id": user["id"]},
+            {"$set": {
+                "platform_fee_paid": False,
+                "partner_fee_payment_failed_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }}
+        )
+        await db.notifications.insert_one({
+            "id": f"notif_{user['id']}_{datetime.now(timezone.utc).isoformat()}",
+            "user_id": user["id"],
+            "type": "partner_fee_payment_failed",
+            "title": "Partner Fee Payment Failed",
+            "message": "Your annual partner fee payment failed. Please update your payment method to continue listing.",
+            "read": False,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        logger.info(f"Partner soft-locked due to payment failure: user={user['id']}")
     
     # Log failed payment
     await db.payments.insert_one({
@@ -343,8 +441,6 @@ async def _handle_payment_failed(db, invoice):
         "failure_reason": invoice.get("last_finalization_error", {}).get("message"),
         "created_at": datetime.now(timezone.utc).isoformat()
     })
-    
-    # Could send notification to user about failed payment
 
 
 def _map_price_to_tier(price_id: str) -> str:
@@ -355,17 +451,49 @@ def _map_price_to_tier(price_id: str) -> str:
 async def _handle_checkout_completed(db, session):
     """
     Handle checkout.session.completed webhook for auction purchases
-    
-    This triggers when buyer completes payment via Stripe Checkout.
-    Actions:
-    1. Update listing/auction status to "Paid"
-    2. Send confirmation emails to buyer and seller
-    3. Generate and store PDF invoice
+    AND partner activation payments.
     """
     session_id = session.get("id")
     metadata = session.get("metadata", {})
     
     payment_type = metadata.get("type")
+    
+    logger.info(f"Processing checkout completed: {session_id}, type: {payment_type}")
+    
+    # ── Partner Activation Checkout ──
+    if payment_type == "partner_activation":
+        user_id = metadata.get("user_id")
+        if not user_id:
+            logger.warning("Partner activation checkout missing user_id in metadata")
+            return
+        
+        subscription_id = session.get("subscription")
+        
+        await db.users.update_one(
+            {"id": user_id},
+            {"$set": {
+                "platform_fee_paid": True,
+                "partner_subscription_id": subscription_id,
+                "partner_fee_paid_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }}
+        )
+        
+        logger.info(f"Partner activated via checkout: user={user_id}, subscription={subscription_id}")
+        
+        # Create a notification for the user
+        await db.notifications.insert_one({
+            "id": f"notif_{user_id}_{datetime.now(timezone.utc).isoformat()}",
+            "user_id": user_id,
+            "type": "partner_activated",
+            "title": "Partner Account Activated",
+            "message": "Your annual partner fee payment was successful. Your partner features are now fully unlocked!",
+            "read": False,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        return
+    
+    # ── Standard Auction Purchase Checkout ──
     invoice_id = metadata.get("invoice_id")
     
     logger.info(f"Processing checkout completed: {session_id}, type: {payment_type}")

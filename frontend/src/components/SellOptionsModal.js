@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
@@ -6,8 +6,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
-import { Package, Layers, ArrowRight, Lock } from 'lucide-react';
+import { Package, Layers, ArrowRight, Lock, AlertTriangle, CreditCard, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import axios from 'axios';
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 /**
  * SellOptionsModal Component
@@ -15,22 +18,45 @@ import { toast } from 'sonner';
  * 1. Create Single Item Listing
  * 2. Create Multi-Item Auction
  * 
- * Multi-Item Auction visibility is controlled by:
- * - User has business account, OR
- * - Admin has enabled allow_all_users_multi_lot flag
+ * Partner accounts with unpaid fees see a lockdown banner instead.
  */
 const SellOptionsModal = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const { canCreateMultiLot } = useFeatureFlags();
+  const [paymentLoading, setPaymentLoading] = useState(false);
+
+  const isPartnerLocked = user?.is_partner && !user?.platform_fee_paid;
 
   const handleSelectOption = (path) => {
+    if (isPartnerLocked) {
+      toast.error('Please complete your annual partner fee payment first.');
+      return;
+    }
     if (path === '/create-multi-item-listing' && !canCreateMultiLot(user)) {
       toast.error('Multi-lot auctions are restricted to business accounts. Please upgrade your account.');
       return;
     }
     onClose();
     navigate(path);
+  };
+
+  const handlePayPartnerFee = async () => {
+    setPaymentLoading(true);
+    try {
+      const res = await axios.post(`${API}/partner/create-checkout`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data.checkout_url) {
+        window.location.href = res.data.checkout_url;
+      } else {
+        toast.error('Unable to create payment session. Please contact support.');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to create payment session.');
+    } finally {
+      setPaymentLoading(false);
+    }
   };
   
   const canAccessMultiLot = canCreateMultiLot(user);
@@ -46,10 +72,43 @@ const SellOptionsModal = ({ isOpen, onClose }) => {
         </DialogHeader>
 
         <div className="grid md:grid-cols-2 gap-4 mt-4">
+          {/* Partner Fee Lockdown Banner */}
+          {isPartnerLocked && (
+            <div className="md:col-span-2 rounded-lg border border-amber-200 bg-amber-50 p-5" data-testid="partner-fee-lockdown-banner">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-amber-900 text-sm">Annual Partner Fee Required</h3>
+                  <p className="text-sm text-amber-700 mt-1">
+                    Your partner application has been approved, but your annual fee of <strong>$100 CAD/year + taxes</strong> is required to activate listing capabilities.
+                  </p>
+                  <Button
+                    onClick={handlePayPartnerFee}
+                    disabled={paymentLoading}
+                    className="mt-3 bg-amber-600 hover:bg-amber-700 text-white"
+                    size="sm"
+                    data-testid="partner-pay-fee-btn"
+                  >
+                    {paymentLoading ? (
+                      <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Processing...</>
+                    ) : (
+                      <><CreditCard className="h-4 w-4 mr-1.5" /> Pay Annual Fee &rarr;</>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Single Item Listing Option */}
           <Card 
-            className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105 border-2 hover:border-primary"
+            className={`transition-all duration-200 border-2 ${
+              isPartnerLocked 
+                ? 'opacity-50 cursor-not-allowed bg-gray-50' 
+                : 'cursor-pointer hover:shadow-lg hover:scale-105 hover:border-primary'
+            }`}
             onClick={() => handleSelectOption('/create-listing')}
+            data-testid="sell-option-single"
           >
             <CardContent className="p-6">
               <div className="flex flex-col items-center text-center space-y-4">

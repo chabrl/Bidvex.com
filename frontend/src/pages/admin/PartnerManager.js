@@ -57,10 +57,15 @@ const PartnerManager = () => {
     try {
       const data = {};
       if (customRate) data.custom_premium_rate = parseFloat(customRate) / 100;
-      await axios.post(`${API}/admin/partners/${selectedApp.id}/verify`, data, {
+      const res = await axios.post(`${API}/admin/partners/${selectedApp.id}/verify`, data, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      toast.success(`Partner ${selectedApp.email} verified!`);
+      const checkoutUrl = res.data?.checkout_url;
+      if (checkoutUrl) {
+        toast.success(`Partner verified! Payment link sent to ${selectedApp.email}.`, { duration: 6000 });
+      } else {
+        toast.success(`Partner ${selectedApp.email} verified! (Stripe checkout could not be created — check Stripe config)`);
+      }
       setReviewDialog(false);
       fetchApplications();
     } catch (err) {
@@ -94,6 +99,14 @@ const PartnerManager = () => {
     pending: 'bg-amber-100 text-amber-800 border-amber-200',
     verified: 'bg-emerald-100 text-emerald-800 border-emerald-200',
     rejected: 'bg-red-100 text-red-800 border-red-200',
+  };
+
+  const feeStatusBadge = (app) => {
+    if (app.partner_verification_status !== 'verified') return null;
+    if (app.platform_fee_paid) {
+      return <Badge className="text-[10px] px-1.5 py-0 bg-green-100 text-green-700 border-green-200">Fee Paid</Badge>;
+    }
+    return <Badge className="text-[10px] px-1.5 py-0 bg-orange-100 text-orange-700 border-orange-200">Fee Pending</Badge>;
   };
 
   const statusIcons = { pending: Clock, verified: CheckCircle, rejected: XCircle };
@@ -184,6 +197,7 @@ const PartnerManager = () => {
                           <StatusIcon className="w-3 h-3 mr-1 inline" />
                           {app.partner_verification_status}
                         </Badge>
+                        {feeStatusBadge(app)}
                       </div>
                       <div className="text-xs text-slate-500 mt-1 space-x-3">
                         <span>{app.name} ({app.email})</span>
@@ -270,6 +284,17 @@ const PartnerManager = () => {
                   <p className="text-xs text-slate-400 italic">No documents uploaded.</p>
                 )}
               </div>
+
+              {/* Fee Status for verified partners */}
+              {selectedApp.partner_verification_status === 'verified' && (
+                <div className={`rounded-md p-3 text-sm ${selectedApp.platform_fee_paid ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-orange-50 border border-orange-200 text-orange-700'}`}>
+                  {selectedApp.platform_fee_paid ? (
+                    <span className="flex items-center gap-1.5"><CheckCircle className="w-4 h-4" /> Annual fee paid — account fully active</span>
+                  ) : (
+                    <span className="flex items-center gap-1.5"><Clock className="w-4 h-4" /> Annual fee pending — listing capabilities locked until payment</span>
+                  )}
+                </div>
+              )}
 
               {/* Custom Premium Rate */}
               {selectedApp.partner_verification_status === 'pending' && (

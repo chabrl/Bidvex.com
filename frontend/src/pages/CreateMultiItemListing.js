@@ -2281,6 +2281,37 @@ const CreateMultiItemListing = () => {
     );
   }
 
+  // Partner Fee Lockdown
+  if (user?.is_partner && !user?.platform_fee_paid) {
+    return (
+      <div className="min-h-screen py-8 px-4" data-testid="partner-fee-lockdown-page">
+        <div className="max-w-lg mx-auto">
+          <Card className="border-amber-200 bg-amber-50">
+            <CardHeader>
+              <CardTitle className="text-xl font-bold text-amber-900 flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-amber-600" /> Annual Partner Fee Required
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-amber-700">
+                Your annual partner fee of <strong>$100 CAD/year + taxes</strong> has not been paid.
+                Please complete your payment to activate listing capabilities.
+              </p>
+              <div className="flex gap-2">
+                <Button onClick={() => navigate('/settings')} className="bg-amber-600 hover:bg-amber-700 text-white" size="sm">
+                  Go to Settings
+                </Button>
+                <Button onClick={() => navigate('/')} variant="outline" size="sm">
+                  Back to Home
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen py-8 px-4">
       <div className="max-w-6xl mx-auto">

@@ -73,6 +73,8 @@ class User(BaseModel):
     updated_at: Optional[Any] = None
     custom_premium_rate: Optional[float] = None
     personalized_recommendations: bool = True
+    platform_fee_paid: bool = False
+    partner_subscription_id: Optional[str] = None
 
 
 # ─── Auth Dependencies ───
