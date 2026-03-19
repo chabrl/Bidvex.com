@@ -322,7 +322,7 @@ class TestAIChatbotClaude:
         print(f"✓ AI chat responds with message of length {len(data['message'])}")
 
     def test_ai_chat_knows_premium_price(self, admin_headers):
-        """Chatbot knows Premium price is $213.45/month"""
+        """Chatbot knows Premium price is $180/year + taxes"""
         payload = {"message": "What is the price of the Premium subscription?"}
         response = requests.post(f"{BASE_URL}/api/ai-chat/message", json=payload, headers=admin_headers)
         
@@ -331,12 +331,12 @@ class TestAIChatbotClaude:
         data = response.json()
         message = data["message"].lower()
         
-        # Check if response mentions Premium price
-        assert "213" in message or "$213.45" in data["message"], f"Premium price not mentioned: {data['message'][:200]}"
-        print(f"✓ AI knows Premium price ($213.45)")
+        # Check if response mentions Premium price ($180/year)
+        assert "180" in message or "$180" in data["message"], f"Premium price not mentioned: {data['message'][:200]}"
+        print(f"✓ AI knows Premium price ($180/year)")
 
     def test_ai_chat_knows_vip_price(self, admin_headers):
-        """Chatbot knows VIP price is $355.54/month"""
+        """Chatbot knows VIP price is $300/year + taxes"""
         payload = {"message": "How much does VIP Elite subscription cost?"}
         response = requests.post(f"{BASE_URL}/api/ai-chat/message", json=payload, headers=admin_headers)
         
@@ -345,9 +345,9 @@ class TestAIChatbotClaude:
         data = response.json()
         message = data["message"]
         
-        # Check if response mentions VIP price
-        assert "355" in message or "$355.54" in message, f"VIP price not mentioned: {message[:200]}"
-        print(f"✓ AI knows VIP Elite price ($355.54)")
+        # Check if response mentions VIP price ($300/year)
+        assert "300" in message or "$300" in message, f"VIP price not mentioned: {message[:200]}"
+        print(f"✓ AI knows VIP Elite price ($300/year)")
 
     def test_ai_chat_knows_refund_policy(self, admin_headers):
         """Chatbot knows about No Refund policy"""
@@ -364,6 +364,123 @@ class TestAIChatbotClaude:
         has_refund_info = any(kw in message for kw in refund_keywords)
         assert has_refund_info, f"Refund policy not mentioned: {data['message'][:300]}"
         print("✓ AI knows about No Refund policy")
+
+
+# ============================================================
+# FEATURE 4: Partner Pay-to-Activate & Billing Portal Tests
+# ============================================================
+
+class TestPartnerPayToActivate:
+    """Tests for the Partner $100 CAD/year Pay-to-Activate system"""
+
+    def test_partner_payment_status_non_partner(self, admin_headers):
+        """Non-partner users get 400 for payment-status"""
+        response = requests.get(f"{BASE_URL}/api/partner/payment-status", headers=admin_headers)
+        assert response.status_code == 400
+        assert "Not a partner" in response.json().get("detail", "")
+        print("✓ Non-partner correctly rejected from payment-status")
+
+    def test_partner_create_checkout_non_partner(self, admin_headers):
+        """Non-partner users get 400 for create-checkout"""
+        response = requests.post(f"{BASE_URL}/api/partner/create-checkout", headers=admin_headers)
+        assert response.status_code == 400
+        assert "Not a partner" in response.json().get("detail", "")
+        print("✓ Non-partner correctly rejected from create-checkout")
+
+    def test_partner_manage_billing_non_partner(self, admin_headers):
+        """Non-partner users get 400 for manage-billing"""
+        response = requests.post(f"{BASE_URL}/api/partner/manage-billing", headers=admin_headers)
+        assert response.status_code == 400
+        assert "Not a partner" in response.json().get("detail", "")
+        print("✓ Non-partner correctly rejected from manage-billing")
+
+    def test_admin_partners_list(self, admin_headers):
+        """Admin can list partner applications"""
+        response = requests.get(f"{BASE_URL}/api/admin/partners", headers=admin_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert "applications" in data
+        assert "total" in data
+        print(f"✓ Admin partner list works — {data['total']} applications")
+
+    def test_admin_partners_filter_by_status(self, admin_headers):
+        """Admin can filter partner applications by status"""
+        for status in ["pending", "verified", "rejected"]:
+            response = requests.get(f"{BASE_URL}/api/admin/partners?status={status}", headers=admin_headers)
+            assert response.status_code == 200
+            data = response.json()
+            for app in data["applications"]:
+                assert app["partner_verification_status"] == status
+        print("✓ Admin partner filter by status works")
+
+    def test_admin_email_settings_get(self, admin_headers):
+        """Admin can get email settings"""
+        response = requests.get(f"{BASE_URL}/api/admin/email-settings", headers=admin_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert "configured" in data
+        assert "source" in data
+        print(f"✓ Email settings accessible — configured: {data['configured']}")
+
+    def test_marketplace_items_accessible(self):
+        """Marketplace items endpoint is public and working"""
+        response = requests.get(f"{BASE_URL}/api/marketplace/items?limit=5")
+        assert response.status_code == 200
+        data = response.json()
+        assert "items" in data
+        assert "total" in data
+        print(f"✓ Marketplace items works — {data['total']} total items")
+
+    def test_marketplace_filter_counts_accessible(self):
+        """Marketplace filter counts endpoint is public and working"""
+        response = requests.get(f"{BASE_URL}/api/marketplace/filter-counts")
+        assert response.status_code == 200
+        data = response.json()
+        assert "categories" in data
+        assert "locations" in data
+        assert "total_active_items" in data
+        print(f"✓ Filter counts works — {data['total_active_items']} active items")
+
+    def test_promoted_listings_accessible(self):
+        """Promoted listings endpoint is public and working"""
+        response = requests.get(f"{BASE_URL}/api/promoted-listings")
+        assert response.status_code == 200
+        data = response.json()
+        assert "listings" in data
+        assert "total" in data
+        print(f"✓ Promoted listings works — {data['total']} promoted")
+
+    def test_partner_application_has_fee_status(self, admin_headers):
+        """Partner applications include platform_fee_paid field"""
+        response = requests.get(f"{BASE_URL}/api/admin/partners", headers=admin_headers)
+        assert response.status_code == 200
+        data = response.json()
+        if data["total"] > 0:
+            app = data["applications"][0]
+            assert "platform_fee_paid" in app, "Missing platform_fee_paid field"
+            print(f"✓ Partner app has platform_fee_paid: {app['platform_fee_paid']}")
+        else:
+            print("✓ No partner applications to check (skipped)")
+
+    def test_webhook_handles_partner_activation(self):
+        """Webhook processes partner activation events gracefully"""
+        payload = {
+            "id": "evt_test_partner_activation",
+            "type": "checkout.session.completed",
+            "data": {
+                "object": {
+                    "id": "cs_test_123",
+                    "subscription": "sub_test_partner_123",
+                    "metadata": {
+                        "user_id": "nonexistent_test_id",
+                        "type": "partner_activation"
+                    }
+                }
+            }
+        }
+        response = requests.post(f"{BASE_URL}/api/webhooks/stripe", json=payload)
+        assert response.status_code == 200
+        print("✓ Webhook processes partner activation event gracefully")
 
 
 # ============================================================
