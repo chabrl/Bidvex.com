@@ -1,6 +1,6 @@
 # BidVex Auction Platform - Product Requirements Document
 
-## Last Updated: March 16, 2026
+## Last Updated: March 19, 2026
 
 ## Original Problem Statement
 Build and maintain a sophisticated full-stack auction platform (BidVex) with:
@@ -18,9 +18,10 @@ Build and maintain a sophisticated full-stack auction platform (BidVex) with:
 - Enterprise Vehicle Auction Module
 - Partner Account System with Stripe Connect
 - Admin Command Center with financial reporting
-- **Sign-up Terms & Policy Consent (Clickwrap)** NEW
-- **Admin RBAC Team Management** NEW
-- **AI Chatbot (Claude Sonnet 4.5)** NEW
+- Sign-up Terms & Policy Consent (Clickwrap)
+- Admin RBAC Team Management
+- AI Chatbot (Claude Sonnet 4.5)
+- **Pay-to-Activate Partner Flow** NEW
 
 ## Architecture
 ```
@@ -29,7 +30,7 @@ Backend: FastAPI (Python)
 Database: MongoDB Atlas (Cloud)
 Authentication: JWT + Emergent Google Auth
 AI: Claude Sonnet 4.5 via emergentintegrations (upgraded from GPT-4)
-Payments: Stripe Connect + SetupIntents + Subscriptions + Tax Engine
+Payments: Stripe Connect + SetupIntents + Subscriptions + Tax Engine + Partner Fee Subscriptions
 Email: SendGrid
 Background Jobs: APScheduler
 i18n: react-i18next (EN/FR bilingual support)
@@ -38,127 +39,62 @@ PDF Generation: ReportLab (bilingual invoices)
 
 ## Current Status: ALL P0 FEATURES COMPLETE
 
-### Session Update (Mar 16, 2026 — server.py Modular Refactor Phase 1)
+### Session Update (Mar 19, 2026 — Pay-to-Activate Partner Feature)
 
-**Extracted 842 lines from server.py into 5 modular route files + shared deps:**
-- `routes/ai_chat.py` (186 lines) — AI chatbot endpoints (Claude Sonnet 4.5)
-- `routes/fees.py` (158 lines) — Fee calculator, buyer cost, seller net, subscription benefits
-- `routes/notifications.py` (90 lines) — Notification CRUD
-- `routes/watchlist.py` (322 lines) — Watchlist + Wishlist + Lot watching
-- `deps.py` (118 lines) — Shared User model, auth dependencies, db reference
-- `routes/team.py` (338 lines) — Already existed from RBAC feature
+**Pay-to-Activate Implementation:**
+- Admin verifies partner → Stripe Checkout Session created for $100 CAD/year recurring subscription
+- Email sent with payment link via SendGrid
+- Partner marked as `is_partner=True`, `platform_fee_paid=False` until payment
+- Webhook handles `checkout.session.completed` → sets `platform_fee_paid=True`
+- Webhook handles `customer.subscription.deleted` → soft-locks partner (`platform_fee_paid=False`)
+- Webhook handles `invoice.payment_failed` → soft-locks partner
+- Webhook handles `invoice.payment_succeeded` → re-activates partner after failed payment
+- Listing creation (single + multi-item) blocked for partners with `platform_fee_paid=False`
+- Frontend lockdown UI: banner in SellOptionsModal, lockdown pages in CreateListingPage and CreateMultiItemListing
+- Partner Manager UI updated with Fee Paid/Fee Pending badges
+- New endpoints: `GET /api/partner/payment-status`, `POST /api/partner/create-checkout`
 
-**server.py:** 15,007 → 14,165 lines (-842). All 6 modular routes tested and working. No regressions.
-
-### Session Update (Mar 16, 2026 — Subscription Pricing Migration)
-
-**Pricing Changes:**
-- Premium: $213.45/month → **$180 CAD/year + taxes**
-- VIP Elite: $355.54/month → **$300 CAD/year + taxes**
-- All "monthly" billing references removed, replaced with "annually (yearly)"
-- "+ taxes" suffix added to all price mentions
-- GST/QST checkout footnote added to fee tables
-- Backend subscription_service.py: display strings, interval, tier benefits all updated
-- AI chatbot system prompt updated with new yearly pricing
-- Full codebase sweep: zero old price strings ($213.45/$355.54) in production code
-
-**Files Updated:** subscription_service.py, ai_assistant_v2.py, LegalPage.js, TermsEN.jsx, PrivacyEN.jsx, TermsFR.jsx, PrivacyFR.jsx, Footer.js, invoice_templates_*.py
-**Testing:** iteration_51 — 100% backend, 100% frontend
-
-### Session Update (Mar 16, 2026 — Logic & Legal Sync)
-
-**Logic Changes Implemented:**
-- Payment deadline updated from "3 business days" to "14 days of auction close" across all invoice templates
-- Late penalty: Verified 2% monthly rate (LATE_PAYMENT_MONTHLY_RATE=0.02) already in place
-- Partner fees hardcoded: PARTNER_PLATFORM_FEE_RATE=0.03 (3%), PARTNER_ANNUAL_ACCESS_FEE=100.00 ($100 CAD/year)
-- Anti-sniping: Verified 2-minute extension active for all auction types
-- Bid retraction: 1-hour window documented in legal (no retraction endpoint exists — bids are binding by design)
-- Personalized Recommendations: Added opt-out toggle to Account Settings > Notifications tab
-- Footer: Added mailing address (103-761 Chalifoux Street, Sherbrooke, QC J1G 0A8), updated copyright to "© 2026 BidVex Inc."
-- Signup checkbox: Confirmed linking to /legal#terms (March 2026 version)
-- User model: Added `personalized_recommendations: bool = True` field
-
-**Testing:** iteration_50 — 100% backend, 100% frontend (16/16 verified)
-
-### Session Update (Mar 16, 2026 — Legal & Partner Fee Update)
-
-**Legal Page Overhaul:**
-- Replaced placeholder content with live text from bidvex.com/terms-of-service and bidvex.com/privacy-policy
-- Added Section 7.2: Partner Account Fees ($100 CAD/year + 3% hammer commission, BP flexibility)
-- Added Section 7.4: All fees in CAD, GST/QST applied on top
-- Added Section 9: Listing Promotions & Marketing (non-refundable, pay-as-you-go emails final)
-- Updated Section 10.3: Subscription/platform fees non-refundable
-- Updated address across all sections: 103-761 Chalifoux Street, Sherbrooke, QC
-
-**Partner Signup Flow:**
-- Business account signup shows Partner Account Fees (CAD) disclosure before terms checkbox
-- Become-a-Partner page application form shows fee summary (3 items) and NEQ verification note
-- Chatbot updated with partner fee knowledge ($100/year + 3%), promotions policy, and address
-
-**Testing:** iteration_49 — 100% backend, 100% frontend (15/15 features verified)
-
-### Session Summary (Mar 16, 2026 — Latest)
-
-**3 New Features Implemented:**
-
-1. **Sign-up Terms & Policy Consent (Clickwrap)**
-   - Backend: `terms_agreed` field added to UserCreate model, validated on registration (400 error if false)
-   - `terms_agreed_at` timestamp stored in user document
-   - Frontend: Mandatory checkbox on signup form with Square/CheckSquare icons
-   - Links to `/legal#terms` and `/legal#privacy` open in new tab
-   - "Create Account" button disabled until checkbox is checked
-   - `/legal` page consolidates Terms of Service and Privacy Policy
-   - Testing: 100% (iteration_48) — Backend + Frontend verified
-
-2. **Admin RBAC Team Management**
-   - Backend: New `routes/team.py` with full CRUD API
-   - Roles: Admin (full access), Manager (operations), Support (view-only)
-   - Unique invite link system: admin generates link, team member accepts and creates account
-   - Endpoints: invite, accept, list members, list invitations, update role, remove member, cancel invitation
-   - Frontend: TeamManager component in Admin Dashboard under "Team" primary tab
-   - InviteAcceptPage for accepting invitations at `/invite/:token`
-   - Testing: 100% (iteration_48) — 11 backend + 4 frontend tests passed
-
-3. **AI Chatbot (Claude Sonnet 4.5)**
-   - Upgraded from GPT-4 to Claude Sonnet 4.5 via emergentintegrations
-   - Updated system prompt with pricing knowledge: $213.45 Premium, $355.54 VIP
-   - Added No Refund policy enforcement to chatbot responses
-   - Existing widget (AIAssistant.js) continues to work seamlessly
-   - Testing: 100% (iteration_48) — Chatbot responds correctly about pricing and policies
-
-**New API Endpoints:**
-- `POST /api/team/invite` — Invite team member (admin only)
-- `GET /api/team/invite/{token}/info` — Get invitation details
-- `POST /api/team/invite/{token}/accept` — Accept invitation and create account
-- `GET /api/team/members` — List team members (admin only)
-- `GET /api/team/invitations` — List invitations (admin only)
-- `PUT /api/team/members/{id}/role` — Update member role (admin only)
-- `DELETE /api/team/members/{id}` — Remove team member (admin only)
-- `DELETE /api/team/invitations/{id}` — Cancel invitation (admin only)
-- `GET /api/team/permissions` — Get current user's permissions
-- `GET /api/team/roles` — Get role definitions
-
-**New Files Created:**
-- `/app/backend/routes/team.py` — RBAC team management API
-- `/app/frontend/src/pages/LegalPage.js` — Consolidated legal page
-- `/app/frontend/src/pages/InviteAcceptPage.js` — Invite acceptance page
-- `/app/frontend/src/components/admin/TeamManager.js` — Admin team management UI
+**Bug Fixed:**
+- webhooks_router was not mounted in api_router (404 on /api/webhooks/stripe) — FIXED
 
 **Files Modified:**
-- `/app/backend/server.py` — Added terms_agreed to UserCreate, team router registration
-- `/app/backend/routes/auth.py` — Added terms_agreed validation
-- `/app/backend/services/ai_assistant_v2.py` — Switched to Claude Sonnet 4.5, added pricing/refund knowledge
-- `/app/frontend/src/pages/AuthPage.js` — Added consent checkbox
-- `/app/frontend/src/pages/AdminDashboard.js` — Added Team tab
-- `/app/frontend/src/App.js` — Added /legal and /invite/:token routes
+- `/app/backend/deps.py` — Added `platform_fee_paid`, `partner_subscription_id` to User model
+- `/app/backend/server.py` — Modified verify_partner, added _get_or_create_partner_fee_price, partner payment endpoints, listing permission checks, partner toggle updates
+- `/app/backend/routes/webhooks.py` — Enhanced all handlers for partner activation/deactivation/renewal
+- `/app/frontend/src/components/SellOptionsModal.js` — Partner fee lockdown banner
+- `/app/frontend/src/pages/CreateListingPage.js` — Partner fee lockdown page
+- `/app/frontend/src/pages/CreateMultiItemListing.js` — Partner fee lockdown page
+- `/app/frontend/src/pages/admin/PartnerManager.js` — Fee status badges, updated verify handler
 
-**New Database Collections:**
-- `team_invitations` — Team invitation records (email, role, token, status, expires_at)
+**Testing:** iteration_52 — 100% backend (16/16 passed), frontend code verified
 
-**User Schema Updates:**
-- `terms_agreed_at` (datetime) — Timestamp of terms consent
-- `team_member` (boolean) — Whether user is a team member
-- `team_joined_at` (datetime) — When user joined the team
+### Previous Session Updates
+
+**Session (Mar 16, 2026 — server.py Modular Refactor Phase 1)**
+- Extracted 842 lines from server.py into 5 modular route files + shared deps
+- routes/ai_chat.py, routes/fees.py, routes/notifications.py, routes/watchlist.py, deps.py
+
+**Session (Mar 16, 2026 — Subscription Pricing Migration)**
+- Premium: $180 CAD/year + taxes, VIP Elite: $300 CAD/year + taxes
+- All monthly billing references replaced with yearly
+
+**Session (Mar 16, 2026 — Logic & Legal Sync)**
+- 14-day payment window, recommendation opt-out toggle, footer address update
+
+**Session (Mar 16, 2026 — 3 New Features)**
+- Sign-up Terms & Policy Consent, Admin RBAC Team Management, AI Chatbot (Claude Sonnet 4.5)
+
+## New API Endpoints (Mar 19, 2026)
+- `GET /api/partner/payment-status` — Get partner payment status and checkout URL
+- `POST /api/partner/create-checkout` — Create new Stripe Checkout Session for partner fee
+
+## User Schema Updates (Mar 19, 2026)
+- `platform_fee_paid` (boolean, default: False) — Whether partner has paid annual fee
+- `partner_subscription_id` (string, optional) — Stripe subscription ID for partner fee
+- `partner_checkout_session_id` (string) — Last Stripe Checkout Session ID
+- `partner_checkout_url` (string) — Last Stripe Checkout URL
+- `partner_fee_paid_at` (datetime) — When fee was last paid
+- `partner_fee_expired_at` (datetime) — When fee expired
 
 ## Test Credentials
 - **Admin:** `charbeladmin@bidvex.com` / `Admin123!`
@@ -166,13 +102,13 @@ PDF Generation: ReportLab (bilingual invoices)
 ## Upcoming Tasks (Prioritized)
 
 ### P1 - High Priority
-- [ ] Refactor monolithic `server.py` into modular route files
+- [ ] Refactor server.py Phase 2: Move partner admin endpoints to routes/admin.py
+- [ ] Refactor server.py Phase 3: Extract listings/marketplace logic
 
 ### P2 - Medium Priority
 - [ ] Cache marketplace filter counts for performance
 - [ ] PDF Invoice cloud storage
-- [ ] Editable buyer premium in auction creation UI for partners
-- [ ] Partner Pro subscription tier
+- [ ] Update outdated test file (test_new_features_iteration_48.py)
 
 ### P3 - Low Priority
 - [ ] Cookie consent translation (i18n integration)
