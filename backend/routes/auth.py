@@ -20,7 +20,7 @@ import aiohttp
 logger = logging.getLogger(__name__)
 
 # Router setup
-auth_router = APIRouter(prefix="/api/auth", tags=["Authentication"])
+auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
 security = HTTPBearer(auto_error=False)
 
 # Password hashing
@@ -229,8 +229,8 @@ async def register(user_data: UserCreate, request: Request):
     # Generate token
     token = create_access_token({"sub": user_id, "email": user_data.email, "role": "user"})
     
-    # Prepare response (exclude password)
-    user_response = {k: v for k, v in user_doc.items() if k != "password"}
+    # Prepare response (exclude password and _id)
+    user_response = {k: v for k, v in user_doc.items() if k not in ["password", "_id"]}
     
     return {
         "access_token": token,

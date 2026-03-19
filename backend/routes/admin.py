@@ -1395,11 +1395,14 @@ async def test_email_settings(
         raise HTTPException(status_code=400, detail=f"Email send failed: {str(e)}")
 
 
-@admin_router.post("/admin/partners/{partner_id}/verified-firm")
-async def toggle_verified_firm(partner_id: str, data: dict, current_user=Depends(get_admin_current_user)):
+@admin_router.post("/partners/{partner_id}/verified-firm")
+async def toggle_verified_firm(
+    partner_id: str,
+    data: dict,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
     """Admin toggle for 'Verified Auction Firm' badge."""
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
+    await require_admin(credentials)
 
     is_verified = data.get("is_verified_firm", False)
 

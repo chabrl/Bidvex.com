@@ -114,7 +114,7 @@ def _base_template(content: str, title: str = "BidVex Notification") -> str:
                     <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
                         <!-- Header -->
                         <tr>
-                            <td style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); padding: 30px; border-radius: 12px 12px 0 0;">
+                            <td style="background-color: #2563eb; padding: 30px; border-radius: 12px 12px 0 0;">
                                 <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: bold;">
                                     🚗 BidVex Vehicle Auctions
                                 </h1>
@@ -156,7 +156,7 @@ async def send_invoice_created_email(invoice: Dict[str, Any]) -> Dict[str, Any]:
         Congratulations! Your winning bid has been processed. Here are your invoice details:
     </p>
     
-    <div style="background-color: #f8fafc; border-radius: 8px; padding: 20px; margin: 20px 0;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;"><tr><td style="background-color: #f8fafc; border-radius: 8px; padding: 20px;">
         <table width="100%" style="font-size: 14px; color: #1e293b;">
             <tr>
                 <td style="padding: 8px 0;"><strong>Invoice #:</strong></td>
@@ -183,16 +183,15 @@ async def send_invoice_created_email(invoice: Dict[str, Any]) -> Dict[str, Any]:
                 </td>
             </tr>
         </table>
-    </div>
+    </td></tr></table>
     
-    <div style="text-align: center; margin: 30px 0;">
-        <a href="{FRONTEND_URL}/vehicle-auctions/invoices/{invoice.get('id')}" 
-           style="display: inline-block; background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); 
-                  color: #ffffff; text-decoration: none; padding: 14px 30px; border-radius: 8px; 
-                  font-weight: bold; font-size: 16px;">
-            View & Pay Invoice
-        </a>
-    </div>
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
+        <tr>
+            <td align="center" style="background-color: #2563eb; padding: 14px 30px; border-radius: 8px;">
+                <a href="{FRONTEND_URL}/vehicle-auctions/invoices/{invoice.get('id')}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">View & Pay Invoice</a>
+            </td>
+        </tr>
+    </table>
     
     <p style="color: #64748b; font-size: 13px; line-height: 1.6;">
         Payment is due within 14 days. Late payments may incur a 2% monthly penalty.
@@ -215,14 +214,12 @@ async def send_payment_confirmation_email(invoice: Dict[str, Any]) -> Dict[str, 
         Thank you! Your payment has been successfully processed.
     </p>
     
-    <div style="background-color: #d1fae5; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
-        <p style="margin: 0; color: #065f46; font-size: 14px;">Payment Confirmed</p>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background-color: #d1fae5; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">        <p style="margin: 0; color: #065f46; font-size: 14px;">Payment Confirmed</p>
         <p style="margin: 10px 0 0 0; color: #065f46; font-size: 28px; font-weight: bold;">
             {_format_currency(invoice.get('paid_amount', invoice.get('total_amount', 0)))}
-        </p>
-    </div>
+        </p></td></tr></table>
     
-    <div style="background-color: #f8fafc; border-radius: 8px; padding: 20px; margin: 20px 0;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;"><tr><td style="background-color: #f8fafc; border-radius: 8px; padding: 20px;">
         <table width="100%" style="font-size: 14px; color: #1e293b;">
             <tr>
                 <td style="padding: 8px 0;"><strong>Invoice #:</strong></td>
@@ -237,19 +234,19 @@ async def send_payment_confirmation_email(invoice: Dict[str, Any]) -> Dict[str, 
                 <td style="padding: 8px 0; text-align: right;">{_format_date(invoice.get('paid_at', datetime.now(timezone.utc)))}</td>
             </tr>
         </table>
-    </div>
+    </td></tr></table>
     
     <p style="color: #475569; line-height: 1.6;">
         The seller has been notified and will coordinate vehicle pickup/delivery with you.
     </p>
     
-    <div style="text-align: center; margin: 30px 0;">
-        <a href="{FRONTEND_URL}/vehicle-auctions/invoices/{invoice.get('id')}" 
-           style="display: inline-block; background-color: #f1f5f9; color: #1e293b; 
-                  text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 500;">
-            View Receipt
-        </a>
-    </div>
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
+        <tr>
+            <td align="center" style="background-color: #f1f5f9; padding: 14px 30px; border-radius: 8px;">
+                <a href="{FRONTEND_URL}/vehicle-auctions/invoices/{invoice.get('id')}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">View Receipt</a>
+            </td>
+        </tr>
+    </table>
     """
     
     return await send_email(
@@ -269,7 +266,7 @@ async def send_invoice_overdue_email(invoice: Dict[str, Any], days_overdue: int)
         Please make payment immediately to avoid additional penalties.
     </p>
     
-    <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 20px; margin: 20px 0;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;"><tr><td style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 20px;">
         <table width="100%" style="font-size: 14px; color: #1e293b;">
             <tr>
                 <td style="padding: 8px 0;"><strong>Invoice #:</strong></td>
@@ -292,21 +289,20 @@ async def send_invoice_overdue_email(invoice: Dict[str, Any], days_overdue: int)
                 </td>
             </tr>
         </table>
-    </div>
+    </td></tr></table>
     
     <p style="color: #991b1b; font-size: 13px; line-height: 1.6; background-color: #fef2f2; padding: 15px; border-radius: 8px;">
         <strong>Warning:</strong> Continued non-payment may result in account suspension and 
         additional collection actions.
     </p>
     
-    <div style="text-align: center; margin: 30px 0;">
-        <a href="{FRONTEND_URL}/vehicle-auctions/invoices/{invoice.get('id')}" 
-           style="display: inline-block; background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); 
-                  color: #ffffff; text-decoration: none; padding: 14px 30px; border-radius: 8px; 
-                  font-weight: bold; font-size: 16px;">
-            Pay Now
-        </a>
-    </div>
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
+        <tr>
+            <td align="center" style="background-color: #dc2626; padding: 14px 30px; border-radius: 8px;">
+                <a href="{FRONTEND_URL}/vehicle-auctions/invoices/{invoice.get('id')}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">Pay Now</a>
+            </td>
+        </tr>
+    </table>
     """
     
     return await send_email(
@@ -337,25 +333,22 @@ async def send_document_approved_email(
         Great news! Your <strong>{doc_name}</strong> document has been reviewed and approved.
     </p>
     
-    <div style="background-color: #d1fae5; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
-        <p style="margin: 0; color: #065f46; font-size: 18px; font-weight: bold;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background-color: #d1fae5; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">        <p style="margin: 0; color: #065f46; font-size: 18px; font-weight: bold;">
             ✓ {doc_name} Verified
-        </p>
-    </div>
+        </p></td></tr></table>
     
     <p style="color: #475569; line-height: 1.6;">
         You can now continue with your seller verification process. Once all required documents 
         are approved, you'll be able to list vehicles for auction.
     </p>
     
-    <div style="text-align: center; margin: 30px 0;">
-        <a href="{FRONTEND_URL}/vehicle-auctions/seller/register" 
-           style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
-                  color: #ffffff; text-decoration: none; padding: 14px 30px; border-radius: 8px; 
-                  font-weight: bold; font-size: 16px;">
-            View Verification Status
-        </a>
-    </div>
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
+        <tr>
+            <td align="center" style="background-color: #10b981; padding: 14px 30px; border-radius: 8px;">
+                <a href="{FRONTEND_URL}/vehicle-auctions/seller/register" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">View Verification Status</a>
+            </td>
+        </tr>
+    </table>
     """
     
     return await send_email(
@@ -385,10 +378,8 @@ async def send_document_rejected_email(
         Unfortunately, your <strong>{doc_name}</strong> document could not be approved.
     </p>
     
-    <div style="background-color: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px; padding: 20px; margin: 20px 0;">
-        <p style="margin: 0 0 10px 0; color: #92400e; font-weight: bold;">Reason:</p>
-        <p style="margin: 0; color: #92400e;">{rejection_reason}</p>
-    </div>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background-color: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px; padding: 20px; margin: 20px 0;">        <p style="margin: 0 0 10px 0; color: #92400e; font-weight: bold;">Reason:</p>
+        <p style="margin: 0; color: #92400e;">{rejection_reason}</p></td></tr></table>
     
     <p style="color: #475569; line-height: 1.6;">
         Please upload a new document that addresses the issue above. Make sure your document:
@@ -401,14 +392,13 @@ async def send_document_rejected_email(
         <li>Is in PDF, JPG, or PNG format</li>
     </ul>
     
-    <div style="text-align: center; margin: 30px 0;">
-        <a href="{FRONTEND_URL}/vehicle-auctions/seller/register" 
-           style="display: inline-block; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); 
-                  color: #ffffff; text-decoration: none; padding: 14px 30px; border-radius: 8px; 
-                  font-weight: bold; font-size: 16px;">
-            Re-upload Document
-        </a>
-    </div>
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
+        <tr>
+            <td align="center" style="background-color: #f59e0b; padding: 14px 30px; border-radius: 8px;">
+                <a href="{FRONTEND_URL}/vehicle-auctions/seller/register" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">Re-upload Document</a>
+            </td>
+        </tr>
+    </table>
     """
     
     return await send_email(
@@ -437,12 +427,10 @@ async def send_seller_approved_email(
         Your <strong>{seller_type_name}</strong> seller account has been fully verified and approved!
     </p>
     
-    <div style="background-color: #d1fae5; border-radius: 8px; padding: 30px; margin: 20px 0; text-align: center;">
-        <p style="margin: 0; color: #065f46; font-size: 14px;">Account Status</p>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background-color: #d1fae5; border-radius: 8px; padding: 30px; margin: 20px 0; text-align: center;">        <p style="margin: 0; color: #065f46; font-size: 14px;">Account Status</p>
         <p style="margin: 10px 0 0 0; color: #065f46; font-size: 24px; font-weight: bold;">
             ✓ APPROVED
-        </p>
-    </div>
+        </p></td></tr></table>
     
     <p style="color: #475569; line-height: 1.6;">
         You can now:
@@ -455,14 +443,13 @@ async def send_seller_approved_email(
         <li>Receive payments directly to your account</li>
     </ul>
     
-    <div style="text-align: center; margin: 30px 0;">
-        <a href="{FRONTEND_URL}/vehicle-auctions/create" 
-           style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
-                  color: #ffffff; text-decoration: none; padding: 14px 30px; border-radius: 8px; 
-                  font-weight: bold; font-size: 16px;">
-            List Your First Vehicle
-        </a>
-    </div>
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
+        <tr>
+            <td align="center" style="background-color: #10b981; padding: 14px 30px; border-radius: 8px;">
+                <a href="{FRONTEND_URL}/vehicle-auctions/create" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">List Your First Vehicle</a>
+            </td>
+        </tr>
+    </table>
     """
     
     return await send_email(
@@ -493,29 +480,26 @@ async def send_auction_won_email(
         You are the winning bidder for:
     </p>
     
-    <div style="background-color: #eff6ff; border: 2px solid #2563eb; border-radius: 8px; padding: 25px; margin: 20px 0; text-align: center;">
-        <p style="margin: 0; color: #1e40af; font-size: 20px; font-weight: bold;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background-color: #eff6ff; border: 2px solid #2563eb; border-radius: 8px; padding: 25px; margin: 20px 0; text-align: center;">        <p style="margin: 0; color: #1e40af; font-size: 20px; font-weight: bold;">
             {vehicle_title}
         </p>
         <p style="margin: 15px 0 0 0; color: #1e293b; font-size: 14px;">Winning Bid</p>
         <p style="margin: 5px 0 0 0; color: #2563eb; font-size: 32px; font-weight: bold;">
             {_format_currency(final_price)}
-        </p>
-    </div>
+        </p></td></tr></table>
     
     <p style="color: #475569; line-height: 1.6;">
         An invoice has been generated with the full breakdown of fees and taxes. 
         Please complete payment within 14 days.
     </p>
     
-    <div style="text-align: center; margin: 30px 0;">
-        <a href="{FRONTEND_URL}/vehicle-auctions/invoices/{invoice_id}" 
-           style="display: inline-block; background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); 
-                  color: #ffffff; text-decoration: none; padding: 14px 30px; border-radius: 8px; 
-                  font-weight: bold; font-size: 16px;">
-            View Invoice & Pay
-        </a>
-    </div>
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
+        <tr>
+            <td align="center" style="background-color: #2563eb; padding: 14px 30px; border-radius: 8px;">
+                <a href="{FRONTEND_URL}/vehicle-auctions/invoices/{invoice_id}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">View Invoice & Pay</a>
+            </td>
+        </tr>
+    </table>
     """
     
     return await send_email(
@@ -545,13 +529,11 @@ async def send_auction_sold_email(
         Your vehicle has been successfully sold at auction:
     </p>
     
-    <div style="background-color: #d1fae5; border-radius: 8px; padding: 25px; margin: 20px 0; text-align: center;">
-        <p style="margin: 0; color: #065f46; font-size: 18px; font-weight: bold;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background-color: #d1fae5; border-radius: 8px; padding: 25px; margin: 20px 0; text-align: center;">        <p style="margin: 0; color: #065f46; font-size: 18px; font-weight: bold;">
             {vehicle_title}
-        </p>
-    </div>
+        </p></td></tr></table>
     
-    <div style="background-color: #f8fafc; border-radius: 8px; padding: 20px; margin: 20px 0;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;"><tr><td style="background-color: #f8fafc; border-radius: 8px; padding: 20px;">
         <table width="100%" style="font-size: 14px; color: #1e293b;">
             <tr>
                 <td style="padding: 8px 0;"><strong>Sale Price:</strong></td>
@@ -568,20 +550,19 @@ async def send_auction_sold_email(
                 </td>
             </tr>
         </table>
-    </div>
+    </td></tr></table>
     
     <p style="color: #475569; line-height: 1.6;">
         Your payout will be processed once the buyer completes payment (typically within 14 days).
     </p>
     
-    <div style="text-align: center; margin: 30px 0;">
-        <a href="{FRONTEND_URL}/vehicle-auctions/seller/financials" 
-           style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
-                  color: #ffffff; text-decoration: none; padding: 14px 30px; border-radius: 8px; 
-                  font-weight: bold; font-size: 16px;">
-            View Financials
-        </a>
-    </div>
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
+        <tr>
+            <td align="center" style="background-color: #10b981; padding: 14px 30px; border-radius: 8px;">
+                <a href="{FRONTEND_URL}/vehicle-auctions/seller/financials" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">View Financials</a>
+            </td>
+        </tr>
+    </table>
     """
     
     return await send_email(
@@ -633,7 +614,7 @@ async def send_bid_placed_email(
         Your bid has been successfully placed on:
     </p>
     
-    <div style="background-color: #eff6ff; border: 2px solid #2563eb; border-radius: 8px; padding: 25px; margin: 20px 0;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;"><tr><td style="background-color: #eff6ff; border: 2px solid #2563eb; border-radius: 8px; padding: 25px;">
         <p style="margin: 0 0 15px 0; color: #1e40af; font-size: 18px; font-weight: bold;">
             {listing_title}
         </p>
@@ -651,25 +632,22 @@ async def send_bid_placed_email(
                 </td>
             </tr>
         </table>
-    </div>
+    </td></tr></table>
     
-    <div style="background-color: {'#d1fae5' if is_leading else '#fef3c7'}; border-radius: 8px; padding: 15px; margin: 20px 0; text-align: center;">
-        <p style="margin: 0; color: {'#065f46' if is_leading else '#92400e'}; font-size: 16px; font-weight: bold;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background-color: {'#d1fae5' if is_leading else '#fef3c7'}; border-radius: 8px; padding: 15px; margin: 20px 0; text-align: center;">        <p style="margin: 0; color: {'#065f46' if is_leading else '#92400e'}; font-size: 16px; font-weight: bold;">
             {status_text}
         </p>
         <p style="margin: 8px 0 0 0; color: {'#065f46' if is_leading else '#92400e'}; font-size: 13px;">
             {status_message}
-        </p>
-    </div>
+        </p></td></tr></table>
     
-    <div style="text-align: center; margin: 30px 0;">
-        <a href="{FRONTEND_URL}/listing/{listing_id}" 
-           style="display: inline-block; background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); 
-                  color: #ffffff; text-decoration: none; padding: 14px 30px; border-radius: 8px; 
-                  font-weight: bold; font-size: 16px;">
-            View Auction
-        </a>
-    </div>
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
+        <tr>
+            <td align="center" style="background-color: #2563eb; padding: 14px 30px; border-radius: 8px;">
+                <a href="{FRONTEND_URL}/listing/{listing_id}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">View Auction</a>
+            </td>
+        </tr>
+    </table>
     
     <p style="color: #64748b; font-size: 13px; line-height: 1.6;">
         <strong>Tip:</strong> Add this item to your watchlist to get notifications when the auction is about to end.
@@ -717,7 +695,7 @@ async def send_outbid_email(
         Someone has placed a higher bid on an item you're watching:
     </p>
     
-    <div style="background-color: #fef2f2; border: 2px solid #dc2626; border-radius: 8px; padding: 25px; margin: 20px 0;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;"><tr><td style="background-color: #fef2f2; border: 2px solid #dc2626; border-radius: 8px; padding: 25px;">
         <p style="margin: 0 0 15px 0; color: #991b1b; font-size: 18px; font-weight: bold;">
             {listing_title}
         </p>
@@ -741,22 +719,19 @@ async def send_outbid_email(
                 </td>
             </tr>
         </table>
-    </div>
+    </td></tr></table>
     
-    <div style="background-color: #eff6ff; border-radius: 8px; padding: 15px; margin: 20px 0; text-align: center;">
-        <p style="margin: 0; color: #1e40af; font-size: 14px;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background-color: #eff6ff; border-radius: 8px; padding: 15px; margin: 20px 0; text-align: center;">        <p style="margin: 0; color: #1e40af; font-size: 14px;">
             <strong>Suggested next bid:</strong> {_format_currency(suggested_bid)} or higher
-        </p>
-    </div>
+        </p></td></tr></table>
     
-    <div style="text-align: center; margin: 30px 0;">
-        <a href="{FRONTEND_URL}/listing/{listing_id}" 
-           style="display: inline-block; background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); 
-                  color: #ffffff; text-decoration: none; padding: 14px 30px; border-radius: 8px; 
-                  font-weight: bold; font-size: 16px;">
-            Bid Again Now
-        </a>
-    </div>
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
+        <tr>
+            <td align="center" style="background-color: #dc2626; padding: 14px 30px; border-radius: 8px;">
+                <a href="{FRONTEND_URL}/listing/{listing_id}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">Bid Again Now</a>
+            </td>
+        </tr>
+    </table>
     
     <p style="color: #64748b; font-size: 13px; line-height: 1.6;">
         Don't miss out! Place a higher bid to get back in the lead.
@@ -793,7 +768,7 @@ async def send_subscription_reminder_email(
         Your <strong>{plan_name}</strong> subscription will expire in <strong>{days_remaining} days</strong>.
     </p>
     
-    <div style="background-color: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px; padding: 20px; margin: 20px 0;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;"><tr><td style="background-color: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px; padding: 20px;">
         <table width="100%" style="font-size: 14px; color: #1e293b;">
             <tr>
                 <td style="padding: 8px 0;"><strong>Current Plan:</strong></td>
@@ -808,21 +783,20 @@ async def send_subscription_reminder_email(
                 <td style="padding: 8px 0; text-align: right; color: #d97706; font-weight: bold;">{days_remaining}</td>
             </tr>
         </table>
-    </div>
+    </td></tr></table>
     
     <p style="color: #475569; line-height: 1.6;">
         To continue enjoying {plan_name} benefits (reduced fees, priority support, and more), 
         please contact support to renew your subscription.
     </p>
     
-    <div style="text-align: center; margin: 30px 0;">
-        <a href="{FRONTEND_URL}/settings/subscription" 
-           style="display: inline-block; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); 
-                  color: #ffffff; text-decoration: none; padding: 14px 30px; border-radius: 8px; 
-                  font-weight: bold; font-size: 16px;">
-            View Subscription
-        </a>
-    </div>
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
+        <tr>
+            <td align="center" style="background-color: #f59e0b; padding: 14px 30px; border-radius: 8px;">
+                <a href="{FRONTEND_URL}/settings/subscription" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">View Subscription</a>
+            </td>
+        </tr>
+    </table>
     
     <p style="color: #64748b; font-size: 13px; line-height: 1.6;">
         If your subscription expires, your account will be downgraded to the Free plan automatically.
@@ -856,29 +830,26 @@ async def send_subscription_expired_email(
         downgraded to the <strong>Free</strong> plan.
     </p>
     
-    <div style="background-color: #f1f5f9; border-radius: 8px; padding: 20px; margin: 20px 0;">
-        <h4 style="margin: 0 0 15px 0; color: #334155;">What's Changed:</h4>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background-color: #f1f5f9; border-radius: 8px; padding: 20px; margin: 20px 0;">        <h4 style="margin: 0 0 15px 0; color: #334155;">What's Changed:</h4>
         <ul style="margin: 0; padding: 0 0 0 20px; color: #475569; line-height: 1.8;">
             <li>Monthly listing limit reduced</li>
             <li>Buyer premium discounts removed</li>
             <li>Seller commission discounts removed</li>
             <li>Priority support no longer available</li>
-        </ul>
-    </div>
+        </ul></td></tr></table>
     
     <p style="color: #475569; line-height: 1.6;">
         Don't worry! Your existing listings will remain active. To regain your {plan_name} benefits, 
         please contact support to renew your subscription.
     </p>
     
-    <div style="text-align: center; margin: 30px 0;">
-        <a href="{FRONTEND_URL}/settings/subscription" 
-           style="display: inline-block; background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%); 
-                  color: #ffffff; text-decoration: none; padding: 14px 30px; border-radius: 8px; 
-                  font-weight: bold; font-size: 16px;">
-            Renew Subscription
-        </a>
-    </div>
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
+        <tr>
+            <td align="center" style="background-color: #1e3a5f; padding: 14px 30px; border-radius: 8px;">
+                <a href="{FRONTEND_URL}/settings/subscription" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">Renew Subscription</a>
+            </td>
+        </tr>
+    </table>
     
     <p style="color: #64748b; font-size: 13px; line-height: 1.6;">
         Thank you for being a {plan_name} member. We hope to see you back soon!
@@ -912,14 +883,12 @@ async def send_subscription_upgraded_email(
         Great news! Your subscription has been updated to <strong>{plan_name}</strong>.
     </p>
     
-    <div style="background-color: #d1fae5; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
-        <p style="margin: 0; color: #065f46; font-size: 24px; font-weight: bold;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background-color: #d1fae5; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">        <p style="margin: 0; color: #065f46; font-size: 24px; font-weight: bold;">
             {plan_name}
         </p>
         <p style="margin: 10px 0 0 0; color: #10b981; font-size: 14px;">
             Active until {end_date}
-        </p>
-    </div>
+        </p></td></tr></table>
     
     <h4 style="margin: 25px 0 15px 0; color: #334155;">Your {plan_name} Benefits:</h4>
     <ul style="margin: 0; padding: 0 0 0 20px; color: #475569; line-height: 1.8;">
@@ -930,14 +899,13 @@ async def send_subscription_upgraded_email(
         {"<li>Dedicated account manager</li>" if new_plan == 'vip' else ""}
     </ul>
     
-    <div style="text-align: center; margin: 30px 0;">
-        <a href="{FRONTEND_URL}/marketplace" 
-           style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
-                  color: #ffffff; text-decoration: none; padding: 14px 30px; border-radius: 8px; 
-                  font-weight: bold; font-size: 16px;">
-            Start Exploring
-        </a>
-    </div>
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
+        <tr>
+            <td align="center" style="background-color: #10b981; padding: 14px 30px; border-radius: 8px;">
+                <a href="{FRONTEND_URL}/marketplace" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">Start Exploring</a>
+            </td>
+        </tr>
+    </table>
     """
     
     return await send_email(

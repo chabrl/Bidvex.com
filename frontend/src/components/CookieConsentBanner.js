@@ -171,8 +171,9 @@ const CookieConsentBanner = () => {
               <Button
                 onClick={handleAcceptAll}
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3"
+                data-testid="cookie-accept-all"
               >
-                Accept All Cookies
+                {t('cookie.accept', 'Accept All Cookies')}
               </Button>
               {showPreferences && (
                 <Button
