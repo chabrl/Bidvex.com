@@ -38,6 +38,18 @@ PDF Generation: ReportLab (bilingual invoices)
 
 ## Current Status: ALL P0 FEATURES COMPLETE
 
+### Session Update (Mar 16, 2026 — server.py Modular Refactor Phase 1)
+
+**Extracted 842 lines from server.py into 5 modular route files + shared deps:**
+- `routes/ai_chat.py` (186 lines) — AI chatbot endpoints (Claude Sonnet 4.5)
+- `routes/fees.py` (158 lines) — Fee calculator, buyer cost, seller net, subscription benefits
+- `routes/notifications.py` (90 lines) — Notification CRUD
+- `routes/watchlist.py` (322 lines) — Watchlist + Wishlist + Lot watching
+- `deps.py` (118 lines) — Shared User model, auth dependencies, db reference
+- `routes/team.py` (338 lines) — Already existed from RBAC feature
+
+**server.py:** 15,007 → 14,165 lines (-842). All 6 modular routes tested and working. No regressions.
+
 ### Session Update (Mar 16, 2026 — Subscription Pricing Migration)
 
 **Pricing Changes:**
