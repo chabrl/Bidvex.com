@@ -1,92 +1,103 @@
-<analysis>**original_problem_statement**: The user wants to build a professional B2B auction platform named BidVex. The project began by refactoring a retail marketplace to support Partner Accounts (Phase 1) and migrating the payment system to Stripe Connect with an advanced Admin Command Center (Phase 2).
-
-Recent work has focused on resolving a series of critical bugs and UI/UX regressions, including fixing React rendering errors, correcting responsive layouts, implementing missing UI elements like seller badges, fixing i18n translation key errors, updating live SendGrid API keys, and resolving a failing Stripe Connect webhook.
-
-The current task is to implement three major new features as requested by the user:
-1.  **Sign-up Flow:** Add a mandatory 'Clickwrap' agreement for Terms of Service and Privacy Policy.
-2.  **Admin Panel:** Implement Role-Based Access Control (RBAC) to allow the admin to add team members with tiered permissions (Admin, Manager, Support).
-3.  **AI Chatbot:** Integrate a Feature-Aware AI Chatbot using Claude Sonnet 4.5 to provide support based on the platform's current capabilities.
+<analysis>**original_problem_statement**: The user wants to continue the development of their B2B auction platform, BidVex. The immediate task is to perform a major backend refactoring (Phase 2) by extracting more routes from the monolithic  file. Concurrently, a new 'Pay-to-Activate' business logic needs to be implemented for Partner accounts. This involves generating a one-time Stripe payment for a 00 CAD annual fee upon partner approval, locking their account until the fee is paid, and using a webhook to automatically unlock their account upon successful payment.
 
 **User's preferred language**: English
 
 **what currently exists?**
-The application is a full-stack React/FastAPI/MongoDB B2B auction platform. It has a complete partner account system, Stripe Connect for payments, an advanced admin dashboard with financial reporting, a filterable marketplace, and live SendGrid integration for emails. The platform is stable after a series of recent bug fixes addressing UI/UX, routing, and backend integrations. The agent has just planned the implementation for the next three major features (Sign-up Consent, Admin RBAC, AI Chatbot) and received user approval and technical specifications.
+The application is a stable, full-stack B2B auction platform (React/FastAPI/MongoDB) with numerous features, including partner accounts, Stripe Connect for payments, an admin dashboard with RBAC, a filterable marketplace, and an AI chatbot. A significant (Phase 1) refactoring of the backend has already been completed, modularizing several route groups (AI, Fees, Notifications, Watchlist) out of the main  file. All subscription pricing has been migrated to a yearly model (80/00 CAD + taxes). The agent has just analyzed the codebase to plan the next phase of work.
 
 **Last working item**:
-    - Last item agent was working: The agent was preparing to implement three new features: Sign-up Terms & Policy Consent, Admin RBAC, and an AI Chatbot. The agent gathered specific requirements from the user (e.g., use Claude Sonnet 4.5, a single  page, unique invite links for RBAC) and fetched the integration playbook for the chatbot. The next step is to begin implementation.
+    - Last item agent was working: The agent was in the planning and analysis stage for the user's latest request. This involved mapping out the remaining route groups (Admin, Invoices, Messages) within  for extraction and investigating the current partner approval and Stripe webhook logic to prepare for implementing the 'Pay-to-Activate' feature.
     - Status: NOT STARTED
     - Agent Testing Done: N
-    - Which testing method agent to use? both. After all three features are implemented, the testing agent must be used to validate the new end-to-end flows: signup consent, RBAC permissions, and chatbot functionality.
+    - Which testing method agent to use? both. Backend testing via  and ============================= test session starts ==============================
+platform linux -- Python 3.11.14, pytest-8.4.2, pluggy-1.6.0
+rootdir: /app
+plugins: anyio-4.11.0, langsmith-0.6.2
+collected 639 items / 3 errors
+
+==================================== ERRORS ====================================
+_______ ERROR collecting backend/tests/test_ai_guard_fraud_detection.py ________
+backend/tests/test_ai_guard_fraud_detection.py:12: in <module>
+    raise ValueError("REACT_APP_BACKEND_URL environment variable must be set")
+E   ValueError: REACT_APP_BACKEND_URL environment variable must be set
+________ ERROR collecting backend/tests/test_bid_email_notifications.py ________
+backend/tests/test_bid_email_notifications.py:20: in <module>
+    raise ValueError("REACT_APP_BACKEND_URL environment variable must be set")
+E   ValueError: REACT_APP_BACKEND_URL environment variable must be set
+___ ERROR collecting backend/tests/test_iteration_49_chatbot_partner_fees.py ___
+backend/tests/test_iteration_49_chatbot_partner_fees.py:12: in <module>
+    BASE_URL = os.environ.get('REACT_APP_BACKEND_URL').rstrip('/')
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: 'NoneType' object has no attribute 'rstrip'
+=============================== warnings summary ===============================
+../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+ERROR backend/tests/test_ai_guard_fraud_detection.py - ValueError: REACT_APP_...
+ERROR backend/tests/test_bid_email_notifications.py - ValueError: REACT_APP_B...
+ERROR backend/tests/test_iteration_49_chatbot_partner_fees.py - AttributeErro...
+!!!!!!!!!!!!!!!!!!! Interrupted: 3 errors during collection !!!!!!!!!!!!!!!!!!!!
+========================= 1 warning, 3 errors in 2.00s ========================= will be essential for the new payment and webhook logic. Frontend testing using the screenshot tool will be needed to verify the UI lockdown for unpaid partners. A full regression test using the testing agent is highly recommended after this multi-part task is complete.
     - User Testing Done: N
 
 **All Pending/In progress Issue list**:
-There are no pending bugs. All work is focused on new feature development, which is listed in the In progress Task List.
+There are no pending bugs. All current work is focused on new feature development and refactoring.
 
 **In progress Task List**:
-  - Task 1: Implement Mandatory Terms & Policy Consent (P0)
-  - Task 2: Implement Admin Panel RBAC (P0)
-  - Task 3: Implement AI Chatbot (P0)
+  - Task 1: Refactor  (Phase 2) (P0)
+  - Task 2: Implement Partner 'Pay-to-Activate' Logic (P0)
+  - Task 3: Enhance Webhook for Partner Activation (P0)
 
  Task Detail:
   - Task 1: 
-     - **Where to resume**: 
-        - **Backend**: Modify the user registration model () to store consent and the registration route () to validate it.
-        - **Frontend**: Create a  page and add a mandatory checkbox with links to the  registration form.
-     - **What will be achieved with this?**: A legally compliant user registration process.
+     - **Where to resume**: The agent has already identified the route groups and their line ranges. The next step is to create the new files (, , ), move the corresponding code from , adjust them to use the shared , remove the extracted code from , and register the new routers.
+     - **What will be achieved with this?**: Further modularization of the backend codebase, significantly improving maintainability and isolating feature logic.
      - **Status**:  NOT STARTED
-     - **Should Test frontend/backend/both after fix?**: both
+     - **Should Test frontend/backend/both after fix?**: backend
      - **Blocked on something**: None.
 
   - Task 2: 
      - **Where to resume**: 
-        - **Backend**: Create new DB models for team invitations and add a  field to the  model. Develop new API endpoints for inviting/managing team members and accepting invites.
-        - **Frontend**: Create a new Team management section in the  and a page for accepting invitations.
-     - **What will be achieved with this?**: Allows the admin to delegate platform management to team members with specific permissions.
+        - **Backend**: Add a new boolean field  to the  model in .
+        - **Backend**: Modify the partner approval endpoint () to generate a one-time Stripe Checkout session for the 00 CAD annual fee, instead of immediately activating the partner.
+        - **Backend**: Add permission checks to listing/auction creation endpoints to block access if a user is a partner but  is .
+        - **Frontend**: Implement UI changes to notify verified-but-unpaid partners that payment is required and disable access to creation tools.
+     - **What will be achieved with this?**: An automated, monetized onboarding flow for new partners.
      - **Status**:  NOT STARTED
      - **Should Test frontend/backend/both after fix?**: both
      - **Blocked on something**: None.
   
   - Task 3: 
      - **Where to resume**: 
-        - **Backend**: Following the integration playbook, create a new chatbot endpoint. Implement the logic to call the Claude Sonnet 4.5 API via  using the Emergent LLM Key.
-        - **Frontend**: Create a reusable, sitewide chatbot widget component that communicates with the new backend endpoint.
-     - **What will be achieved with this?**: An AI-powered assistant to improve user support and engagement.
+        - **Backend**: Update the Stripe webhook handler in  (or ). It needs to listen for  and/or  events. The handler logic must identify if the payment is for the partner activation fee, find the associated user, and update their  flag to .
+     - **What will be achieved with this?**: Fully automated activation of partner accounts upon successful payment, closing the loop on the 'Pay-to-Activate' feature.
      - **Status**:  NOT STARTED
-     - **Should Test frontend/backend/both after fix?**: both
+     - **Should Test frontend/backend/both after fix?**: backend
      - **Blocked on something**: None.
 
 **Upcoming and Future Tasks**
 *   **Upcoming Tasks:**
-    *   **P1: Refactor :** The main backend file has become monolithic and should be broken down into modular route files in the  directory for better maintainability.
+    *   **P1:  Refactor (Phase 3)**: Extract the remaining large, interleaved modules (e.g., listings/marketplace, multi-item auctions) from .
 *   **Future Tasks:**
-    *   **P2: Cache Marketplace Filters:** Implement caching for the  endpoint to improve performance.
-    *   **P2: PDF Invoice Cloud Storage:** Revisit the deferred requirement to save generated PDF invoices to cloud storage.
-    *   **P3: Cookie Consent Translation:** Integrate the cookie consent modal with the  system for French translation.
-    *   **P3: Database Indexing:** Add an index to the  field in the  collection to improve query performance.
-    -   **P3: Email to Friend Feature:** Implement a share-by-email option for vehicle listings.
+    *   **P2**: Cache Marketplace Filters: Implement caching for the  endpoint to improve performance.
+    *   **P2**: PDF Invoice Cloud Storage: Revisit the deferred requirement to save generated PDF invoices to cloud storage.
+    *   **P3**: Cookie Consent Translation: Integrate the cookie consent modal with the  system for French translation.
+    *   **P3**: Database Indexing: Add an index to the  field in the  collection to improve query performance.
+    *   **P3**: Email to Friend Feature: Implement a share-by-email option for vehicle listings.
 
 **Completed work in this session**
-- **Stripe Webhook Fix**: Diagnosed and fixed a failing Stripe Connect webhook by adding the correct  to the environment and improving endpoint logging.
-- **SendGrid Integration Update**: Updated the environment with the user's new production SendGrid API key and sender identity (), and confirmed the connection is live.
-- **Critical Bug Fixes (6 items)**:
-  - Fixed a React rendering error during bidding by correctly parsing API error messages.
-  - Resolved marketplace card layout issues (button overflow, responsiveness).
-  - Corrected the Become a Partner page theming for light mode.
-  - Fixed marketplace item card routing to point to correct detail pages.
-  - Added missing Verified Partner and seller badges to item cards.
-- **UX Polish & Bug Fixes (4 items)**:
-  - Fixed a broken Verify Now redirect link.
-  - Added validation to the Rate Seller feature, requiring a user to have won an item first.
-  - Fixed missing translation keys on the Home Page and polished the UI for light mode.
-- **Production UI Cleanup**:
-  - Removed all DEBUG toast notifications from the production UI, converting them to console logs.
-  - Polished the Coming Soon / Maintenance page by fixing translation keys, resolving layout issues (icon overlaps, alignment), and verifying the Notify Me form functionality.
+- ** Refactor (Phase 1)**: Extracted 842 lines (AI Chat, Fees, Notifications, Watchlist) from  into five new modular route files and a shared , improving code organization.
+- **Legal Content Sync**: Fixed outdated content on the old standalone  and  pages to match the master  page, including address and copyright updates.
+- **Business Logic Updates**: Implemented a 14-day payment window, added a user profile toggle to opt-out of recommendations, and updated all hardcoded payment deadlines in invoice templates.
+- **Subscription Pricing Migration**: Migrated subscription prices from monthly to annual (80/00 CAD + taxes) across the entire application, including all legal pages, backend logic, and the AI chatbot's knowledge base.
+- **Stripe Webhook DNS Issue Diagnosis**: Correctly identified a failing Stripe webhook as a DNS/connectivity issue with , not a code bug, and advised the user on the proper path for production deployment.
+- **Implemented 3 Major Features**: Successfully implemented and tested Sign-up Consent, Admin RBAC, and an upgraded AI Chatbot.
 
 **Earlier issues found/mentioned but not fixed**
-   - **PDF Invoice Cloud Storage**: Requirement to save PDFs to cloud storage was acknowledged but deferred.
-   - **Cookie Consent Translation**: The cookie consent dialog is not yet translated.
-   - **Database Indexing**: Recommendation to index the  collection on  has not been implemented.
-   - **Refactor **: Acknowledged but not yet actioned.
+   - **Outdated Test File**: The testing agent noted that  contains outdated assertions related to old subscription prices. This test file should be updated to reflect the current pricing model.
 
 **Known issue recurrence from previous fork**
   - None.
@@ -95,86 +106,159 @@ There are no pending bugs. All work is focused on new feature development, which
 
 
 **Key Technical Concepts**
-- **Role-Based Access Control (RBAC)**: To be implemented for admin team management.
-- **Clickwrap Agreement**: To be implemented for signup consent.
-- **LLM Integration (Claude Sonnet 4.5)**: To be implemented for the AI chatbot using the  library and the Emergent LLM Key.
-- **Webhook Signature Verification**: Successfully debugged and fixed a failing Stripe Connect webhook by correctly configuring the signing secret.
-- **Environment Variable Management**: Diagnosed and resolved issues with missing/incorrect environment variables for third-party services (Stripe, SendGrid).
+- **Monolithic to Modular Refactoring**: The ongoing process of breaking down the large  file into feature-specific, maintainable route modules.
+- **Pay-to-Activate Workflow**: Implementing a business process where user verification triggers a mandatory payment step, which in turn enables feature access.
+- **Conditional Feature Access**: Using a database flag () to programmatically enable or disable parts of the application for specific users.
+- **Targeted Webhook Handling**: Enhancing a webhook to listen for specific events related to a particular product/payment to trigger a downstream business process (account activation).
 
 **key DB schema**
-  - **users**: To be modified with:
-    -  (DateTime)
-    -  (String, e.g., admin, manager, support)
-  - **team_invitations**: New collection to be created with fields like , , , , .
+  - **users**: To be modified with  (Boolean, default: ).
 
 **All files of reference**
-*   : Will be modified for signup consent.
-*   : Will be modified for the signup consent UI.
-*   : Will be modified to include the team management UI.
-*   : Recently fixed for the Stripe webhook; is a candidate for major refactoring.
-*   Playbook from : Contains instructions for Claude Sonnet 4.5 integration.
+*   : The main monolithic file currently undergoing refactoring.
+*   : The destination directory for all new modular route files.
+*    or : Contains the Stripe webhook logic that needs to be enhanced.
+*   : Contains shared dependencies like  for the new route modules.
 
 **Areas that need refactoring**:
-- The monolithic  file should be broken down into separate route files under  to improve code organization and maintainability.
+-  remains the top priority. Phase 2 will extract Admin, Invoicing, and Messages routes. The remaining ~14k lines, primarily dealing with admin functions, marketplace listings, and complex auction logic, will need to be tackled in future phases.
 
 **key api endpoints**
-- **Existing (Recently Fixed/Added)**:
-  - : Now returns .
-  - : Sets the SendGrid API key in the database.
-  - : Verifies the SendGrid connection.
-  - : Exports financial transactions as CSV.
-- **Upcoming**:
-  - : To be updated to require .
-  - : To invite a new team member.
-  - : For a user to accept a team invitation.
-  - : To send a message to the AI chatbot.
+- **To Be Modified**:
+    - : Logic will be changed to generate a Stripe Checkout session instead of direct activation. Will be moved to .
+    - : Handler logic in  will be expanded to process the partner activation fee payment.
+- **To Be Protected**:
+    - All endpoints related to creating listings and managing auctions will require a new permission check for  and .
 
 **Critical Info for New Agent**
-1.  **Three-Part Task**: Your immediate goal is to implement the three new features approved by the user: Sign-up Consent, Admin RBAC, and an AI Chatbot.
-2.  **User Specs are Clear**: The user has provided specific implementation choices: a single  page, unique invite links for RBAC, and Claude Sonnet 4.5 for the chatbot. Adhere to these choices.
-3.  **Use the Playbook**: The integration playbook for the Claude Sonnet 4.5 chatbot has already been fetched. Use it as the source of truth for the chatbot implementation.
-4.  **Implementation Order**: Start by building the backend models and API endpoints for all three features. Once the backend is ready, implement the corresponding frontend components.
-5.  **Comprehensive Testing**: This is a large feature set. After implementation is complete, use the  to conduct a thorough end-to-end test of all new functionality and check for regressions.
+1.  **Dual Task: Refactor & Implement**: Your work is twofold: continue the  refactor (Phase 2: Admin, Invoices, Messages) while simultaneously building the 'Pay-to-Activate' feature. These tasks are linked, as the partner approval logic lives in an endpoint you will be refactoring.
+2.  **Payment Flow is Key**: The core of the new feature is the payment workflow. The  endpoint should generate a Stripe checkout link. The webhook must listen for the successful payment and update the  flag in the database. The user's ability to create listings is contingent on this flag being .
+3.  **Use Shared Dependencies**: When extracting routes, ensure all authentication and permission checks are handled by importing dependencies from the existing  module to maintain security and consistency.
+4.  **Do Not Modify Server Config**: The previous Stripe webhook failure was a DNS issue, not a code issue. Do not attempt to configure Nginx, Certbot, or manage DNS in this preview environment. Your task is to write production-ready code that the user can deploy on their own infrastructure.
 
 **documents and test reports created in this job**
 *   
 *   
 *   
-*    (updated)
-*    (updated)
-*    (updated)
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User (latest)**: Approved the plan for the 3 new features (Terms, RBAC, Chatbot) and provided specific implementation choices.
-2.  **Agent**: Proposed a detailed plan for the 3 new features and asked for clarification.
-3.  **User**: Requested the implementation of 3 new features: Mandatory Terms & Policy Consent, Admin RBAC, and AI Chatbot Synchronization.
-4.  **Agent**: Confirmed the Stripe webhook fix was successful.
-5.  **User**: Provided the correct Stripe Connect webhook signing secret ().
-6.  **Agent**: Asked the user to provide the signing secret for the Stripe Connect webhook after diagnosing the root cause of the failure.
-7.  **User**: Reported that the Stripe Connect webhook was failing with 23 failed attempts.
-8.  **Agent**: Confirmed that the new SendGrid API key was updated and the connection is live.
-9.  **User**: Provided the new production SendGrid API key and requested sender identity updates.
-10. **Agent**: Finished polishing the Maintenance/Coming Soon page.
+1.  **User (latest)**: Approved the Phase 1 refactor and outlined the requirements for Phase 2: extract Admin/Invoices/Messages routes, implement the 'Pay-to-Activate' logic with a 00 fee, and secure the webhook to handle payment confirmation. (PENDING IMPLEMENTATION)
+2.  **Agent**: Confirmed completion of the Phase 1 refactor. (COMPLETED)
+3.  **User**: Asked the agent to proceed with the next task (refactoring ). (ADDRESSED)
+4.  **Agent**: Guided the user on using the Save to GitHub feature instead of direct usage: git [-v | --version] [-h | --help] [-C <path>] [-c <name>=<value>]
+           [--exec-path[=<path>]] [--html-path] [--man-path] [--info-path]
+           [-p | --paginate | -P | --no-pager] [--no-replace-objects] [--bare]
+           [--git-dir=<path>] [--work-tree=<path>] [--namespace=<name>]
+           [--super-prefix=<path>] [--config-env=<name>=<envvar>]
+           <command> [<args>]
+
+These are common Git commands used in various situations:
+
+start a working area (see also: git help tutorial)
+   clone     Clone a repository into a new directory
+   init      Create an empty Git repository or reinitialize an existing one
+
+work on the current change (see also: git help everyday)
+   add       Add file contents to the index
+   mv        Move or rename a file, a directory, or a symlink
+   restore   Restore working tree files
+   rm        Remove files from the working tree and from the index
+
+examine the history and state (see also: git help revisions)
+   bisect    Use binary search to find the commit that introduced a bug
+   diff      Show changes between commits, commit and working tree, etc
+   grep      Print lines matching a pattern
+   log       Show commit logs
+   show      Show various types of objects
+   status    Show the working tree status
+
+grow, mark and tweak your common history
+   branch    List, create, or delete branches
+   commit    Record changes to the repository
+   merge     Join two or more development histories together
+   rebase    Reapply commits on top of another base tip
+   reset     Reset current HEAD to the specified state
+   switch    Switch branches
+   tag       Create, list, delete or verify a tag object signed with GPG
+
+collaborate (see also: git help workflows)
+   fetch     Download objects and refs from another repository
+   pull      Fetch from and integrate with another repository or a local branch
+   push      Update remote refs along with associated objects
+
+'git help -a' and 'git help -g' list available subcommands and some
+concept guides. See 'git help <command>' or 'git help <concept>'
+to read about a specific subcommand or concept.
+See 'git help git' for an overview of the system. commands. (COMPLETED)
+5.  **User**: Provided usage: git [-v | --version] [-h | --help] [-C <path>] [-c <name>=<value>]
+           [--exec-path[=<path>]] [--html-path] [--man-path] [--info-path]
+           [-p | --paginate | -P | --no-pager] [--no-replace-objects] [--bare]
+           [--git-dir=<path>] [--work-tree=<path>] [--namespace=<name>]
+           [--super-prefix=<path>] [--config-env=<name>=<envvar>]
+           <command> [<args>]
+
+These are common Git commands used in various situations:
+
+start a working area (see also: git help tutorial)
+   clone     Clone a repository into a new directory
+   init      Create an empty Git repository or reinitialize an existing one
+
+work on the current change (see also: git help everyday)
+   add       Add file contents to the index
+   mv        Move or rename a file, a directory, or a symlink
+   restore   Restore working tree files
+   rm        Remove files from the working tree and from the index
+
+examine the history and state (see also: git help revisions)
+   bisect    Use binary search to find the commit that introduced a bug
+   diff      Show changes between commits, commit and working tree, etc
+   grep      Print lines matching a pattern
+   log       Show commit logs
+   show      Show various types of objects
+   status    Show the working tree status
+
+grow, mark and tweak your common history
+   branch    List, create, or delete branches
+   commit    Record changes to the repository
+   merge     Join two or more development histories together
+   rebase    Reapply commits on top of another base tip
+   reset     Reset current HEAD to the specified state
+   switch    Switch branches
+   tag       Create, list, delete or verify a tag object signed with GPG
+
+collaborate (see also: git help workflows)
+   fetch     Download objects and refs from another repository
+   pull      Fetch from and integrate with another repository or a local branch
+   push      Update remote refs along with associated objects
+
+'git help -a' and 'git help -g' list available subcommands and some
+concept guides. See 'git help <command>' or 'git help <concept>'
+to read about a specific subcommand or concept.
+See 'git help git' for an overview of the system. commands, attempting to push code. (ADDRESSED)
+6.  **Agent**: Asked for clarification on the user's production deployment plan, advising against modifying the preview environment's server config. (COMPLETED)
+7.  **User**: Stated they pointed a DNS A-record to the server and requested Nginx/Certbot configuration. (ADDRESSED)
+8.  **User**: Asked for the server's public IP address. (COMPLETED)
+9.  **Agent**: Sent the webhook DNS issue to the user for a decision. (COMPLETED)
+10. **Agent**: Diagnosed the Stripe webhook failure as a DNS issue. (COMPLETED)
 
 **Project Health Check:**
-- **Broken**: None.
-- **Mocked**: The content for the new  page will be placeholder text initially.
+- **Broken**: None
+- **Mocked**: None
 
 **3rd Party Integrations**
-*   **Stripe**: Live integration for Subscriptions and Stripe Connect. Requires User API Key.
-*   **SendGrid**: Live integration for automated emails. Requires User API Key.
-*   **Claude Sonnet 4.5 (Anthropic)**: To be integrated for the AI Chatbot. Uses the **Emergent LLM Key**.
-*   **react-i18next**: For frontend internationalization.
-*   **fpdf2**: For backend PDF invoice generation.
+*   **Stripe**: Live integration for Subscriptions and Stripe Connect. Requires User API Key. To be expanded for one-time partner fee payments.
+*   **SendGrid**: Live integration for transactional emails. Requires User API Key.
+*   **Claude Sonnet 4.5 (Anthropic)**: Integrated for the AI Chatbot. Uses the **Emergent LLM Key**.
+*   **react-i18next**: Used for frontend internationalization.
+*   **fpdf2**: Used for backend PDF invoice generation.
 
 **Testing status**
-  - Testing agent used after significant changes: YES. Consistently used after each batch of fixes, with the last run passing 100%.
-  - Troubleshoot agent used after agent stuck in loop: NO
-  - Test files created: None new in the last session.
-  - Known regressions: None.
+  - Testing agent used after significant changes: YES. The last run () confirmed the subscription pricing migration was successful with a 100% pass rate.
+  - Test files created: None new.
+  - Known regressions: An old test file () contains outdated price assertions and should be updated.
 
 **Credentials to test flow:**
 *   **Admin:**  / 
 
 **What agent forgot to execute**
-- Nothing was forgotten. The agent has correctly prioritized the user's explicit requests. Lower priority tasks like refactoring  and caching API endpoints are noted for future work.</analysis>
+- Nothing was forgotten in the last session. The agent correctly identified and fixed an issue with outdated legal pages when prompted by the user. The next logical step is to address the outdated test file assertions.</analysis>

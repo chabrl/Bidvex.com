@@ -35,7 +35,7 @@ Password: Admin123!
 ## Testing
 
 You can now log in to BidVex using the new admin credentials:
-- Live URL: https://bidvex-three-launch.preview.emergentagent.com
+- Live URL: https://checkout-unlock.preview.emergentagent.com
 - Navigate to login page
 - Use the new credentials above
 
