@@ -89,8 +89,9 @@ const EnhancedUserManager = () => {
         axios.get(`${API}${endpoint}`, { headers }),
         axios.get(`${API}/admin/analytics/users`, { headers })
       ]);
-      setUsers(usersRes.data);
-      setFilteredUsers(usersRes.data);
+      const usersData = Array.isArray(usersRes.data) ? usersRes.data : (usersRes.data.users || []);
+      setUsers(usersData);
+      setFilteredUsers(usersData);
       setAnalytics(analyticsRes.data);
     } catch (error) {
       toast.error('Failed to load users');
