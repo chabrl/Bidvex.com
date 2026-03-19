@@ -1,0 +1,46 @@
+{
+  "timestamp": "2026-03-19T15:31:07.184078",
+  "recipient": "info@bidvex.com",
+  "total": 6,
+  "passed": 6,
+  "failed": 0,
+  "results": [
+    {
+      "key": "auth_welcome_en",
+      "lang": "en",
+      "status_code": 202,
+      "error": null
+    },
+    {
+      "key": "auth_welcome_fr",
+      "lang": "fr",
+      "status_code": 202,
+      "error": null
+    },
+    {
+      "key": "bid_winning_en",
+      "lang": "en",
+      "status_code": 202,
+      "error": null
+    },
+    {
+      "key": "bid_winning_fr",
+      "lang": "fr",
+      "status_code": 202,
+      "error": null
+    },
+    {
+      "key": "fin_invoice_issued_en",
+      "lang": "en",
+      "status_code": 202,
+      "error": null
+    },
+    {
+      "key": "fin_invoice_issued_fr",
+      "lang": "fr",
+      "status_code": 202,
+      "error": null
+    }
+  ],
+  "flagged": []
+}
