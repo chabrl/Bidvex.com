@@ -232,7 +232,7 @@ const Navbar = () => {
                     </div>
                     
                     {/* Partner Dashboard */}
-                    {user.is_partner && (
+                    {(user.is_partner || user.role === 'admin' || user.role === 'superadmin') && (
                       <>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem 

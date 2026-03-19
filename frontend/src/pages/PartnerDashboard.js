@@ -41,7 +41,7 @@ export default function PartnerDashboard() {
   }, [token, navigate]);
 
   useEffect(() => {
-    if (!user?.is_partner) {
+    if (!user?.is_partner && user?.role !== 'admin' && user?.role !== 'superadmin') {
       navigate('/');
       return;
     }

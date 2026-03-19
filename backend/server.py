@@ -11260,7 +11260,7 @@ async def serve_partner_document(filename: str, current_user: User = Depends(get
 @api_router.get("/partner/payment-status")
 async def get_partner_payment_status(current_user: User = Depends(get_current_user)):
     """Get current partner's payment status and checkout URL if needed."""
-    if not current_user.is_partner:
+    if not current_user.is_partner and current_user.role not in ["admin", "superadmin"]:
         raise HTTPException(status_code=400, detail="Not a partner account")
     
     user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
@@ -11278,7 +11278,7 @@ async def get_partner_payment_status(current_user: User = Depends(get_current_us
 @api_router.post("/partner/create-checkout")
 async def create_partner_checkout(current_user: User = Depends(get_current_user)):
     """Create a new Stripe Checkout Session for partner fee payment."""
-    if not current_user.is_partner:
+    if not current_user.is_partner and current_user.role not in ["admin", "superadmin"]:
         raise HTTPException(status_code=400, detail="Not a partner account")
     if current_user.platform_fee_paid:
         raise HTTPException(status_code=400, detail="Annual fee already paid")
@@ -11324,7 +11324,7 @@ async def create_partner_checkout(current_user: User = Depends(get_current_user)
 async def create_partner_billing_portal(current_user: User = Depends(get_current_user)):
     """Create a Stripe Customer Portal session for partner billing management.
     Partners can download invoices (with GST/QST), update payment methods, and manage subscriptions."""
-    if not current_user.is_partner:
+    if not current_user.is_partner and current_user.role not in ["admin", "superadmin"]:
         raise HTTPException(status_code=400, detail="Not a partner account")
     
     user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
@@ -11351,8 +11351,8 @@ async def create_partner_billing_portal(current_user: User = Depends(get_current
 
 @api_router.get("/partner/dashboard")
 async def get_partner_dashboard(current_user: User = Depends(get_current_user)):
-    """Get aggregated dashboard data for partner accounts."""
-    if not current_user.is_partner:
+    """Get aggregated dashboard data for partner accounts. Admins can also access."""
+    if not current_user.is_partner and current_user.role not in ["admin", "superadmin"]:
         raise HTTPException(status_code=400, detail="Not a partner account")
     
     user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0, "password": 0})
