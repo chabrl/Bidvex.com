@@ -639,6 +639,85 @@ def get_tax_structure_summary() -> Dict[str, Any]:
     }
 
 
+def calculate_gst_qst(subtotal: float, currency: str = "CAD") -> Dict[str, Any]:
+    """
+    Simple GST/QST calculator for invoices and templates.
+
+    Returns a flat dict with rounded-to-2-decimal values suitable for
+    SendGrid template variables ({{gst_amount}}, {{qst_amount}}, etc.)
+    and Stripe reconciliation.
+
+    For non-CAD currencies, returns zero tax.
+    """
+    if currency != "CAD":
+        return {
+            "subtotal": round(subtotal, 2),
+            "gst_rate": 0.0,
+            "gst_amount": 0.0,
+            "qst_rate": 0.0,
+            "qst_amount": 0.0,
+            "total_tax": 0.0,
+            "total_with_tax": round(subtotal, 2),
+            "currency": currency,
+            "gst_registration": BIDVEX_GST_NUMBER,
+            "qst_registration": BIDVEX_QST_NUMBER,
+        }
+
+    amt = Decimal(str(subtotal))
+    gst = _round_currency(amt * GST_RATE)
+    qst = _round_currency(amt * QST_RATE)
+    total_tax = gst + qst
+    total_with_tax = _round_currency(amt + total_tax)
+
+    return {
+        "subtotal": float(_round_currency(amt)),
+        "gst_rate": float(GST_RATE),
+        "gst_amount": float(gst),
+        "qst_rate": float(QST_RATE),
+        "qst_amount": float(qst),
+        "total_tax": float(total_tax),
+        "total_with_tax": float(total_with_tax),
+        "currency": "CAD",
+        "gst_registration": BIDVEX_GST_NUMBER,
+        "qst_registration": BIDVEX_QST_NUMBER,
+    }
+
+
+def get_tax_rates_for_currency(currency: str) -> Dict[str, float]:
+    """Get applicable tax rates based on currency (CAD → GST+QST, else zero)."""
+    if currency == "CAD":
+        return {"tax_rate_gst": float(GST_RATE) * 100, "tax_rate_qst": float(QST_RATE) * 100}
+    return {"tax_rate_gst": 0.0, "tax_rate_qst": 0.0}
+
+
+def invoice_tax_lines(subtotal: float, currency: str = "CAD") -> list:
+    """
+    Generate tax line items for invoice templates and SendGrid dynamic data.
+
+    Returns a list of dicts each with {label, rate, amount, registration}.
+    """
+    tax = calculate_gst_qst(subtotal, currency)
+    if currency != "CAD":
+        return []
+
+    return [
+        {
+            "label": "GST (TPS)",
+            "rate": "5%",
+            "amount": f"{tax['gst_amount']:.2f}",
+            "amount_raw": tax["gst_amount"],
+            "registration": BIDVEX_GST_NUMBER,
+        },
+        {
+            "label": "QST (TVQ)",
+            "rate": "9.975%",
+            "amount": f"{tax['qst_amount']:.2f}",
+            "amount_raw": tax["qst_amount"],
+            "registration": BIDVEX_QST_NUMBER,
+        },
+    ]
+
+
 # ============= EXPORTS =============
 
 __all__ = [
@@ -649,6 +728,9 @@ __all__ = [
     "VehiclePaymentResult",
     "GeneralPaymentResult",
     "calculate_tax",
+    "calculate_gst_qst",
+    "get_tax_rates_for_currency",
+    "invoice_tax_lines",
     "calculate_vehicle_payment",
     "calculate_general_payment",
     "get_tax_structure_summary",

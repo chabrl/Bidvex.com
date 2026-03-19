@@ -11,7 +11,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = "https://cookie-consent-i18n.preview.emergentagent.com/api"
+BASE_URL = "https://tax-precision.preview.emergentagent.com/api"
 ADMIN_EMAIL = "admin@bazario.com"
 ADMIN_PASSWORD = "Admin123!"
 TEST_USER_EMAIL = "buynowtester@bazario.com"

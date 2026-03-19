@@ -1,7 +1,7 @@
 # BidVex Production Launch - Comprehensive Functional Verification Results
 
 **Test Date:** January 2026  
-**Test URL:** https://cookie-consent-i18n.preview.emergentagent.com/api  
+**Test URL:** https://tax-precision.preview.emergentagent.com/api  
 **Tester:** Testing Agent (E2)
 
 ---
@@ -299,7 +299,7 @@
 
 ## TEST ENVIRONMENT
 
-- **Backend URL:** https://cookie-consent-i18n.preview.emergentagent.com/api
+- **Backend URL:** https://tax-precision.preview.emergentagent.com/api
 - **Test Users Created:**
   - Admin: charbeladmin@bidvex.com
   - Buyer: buyer.test@bidvex.com

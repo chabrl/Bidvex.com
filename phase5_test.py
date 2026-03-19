@@ -12,7 +12,7 @@ from typing import Dict, Any, Optional, List
 import os
 
 # Configuration
-BASE_URL = "https://cookie-consent-i18n.preview.emergentagent.com/api"
+BASE_URL = "https://tax-precision.preview.emergentagent.com/api"
 
 # Test users
 ADMIN_EMAIL = "admin@admin.bazario.com"
