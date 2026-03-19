@@ -21,80 +21,76 @@ Build and maintain a sophisticated full-stack auction platform (BidVex) with:
 - Sign-up Terms & Policy Consent (Clickwrap)
 - Admin RBAC Team Management
 - AI Chatbot (Claude Sonnet 4.5)
-- **Pay-to-Activate Partner Flow** NEW
+- Pay-to-Activate Partner Flow ($100 CAD/year recurring)
+- Stripe Customer Portal for partner billing
 
 ## Architecture
 ```
 Frontend: React + TailwindCSS + Shadcn/UI
-Backend: FastAPI (Python) 
+Backend: FastAPI (Python) — Modular route architecture
 Database: MongoDB Atlas (Cloud)
 Authentication: JWT + Emergent Google Auth
-AI: Claude Sonnet 4.5 via emergentintegrations (upgraded from GPT-4)
-Payments: Stripe Connect + SetupIntents + Subscriptions + Tax Engine + Partner Fee Subscriptions
+AI: Claude Sonnet 4.5 via emergentintegrations
+Payments: Stripe Connect + Subscriptions + Partner Fee Subscriptions + Customer Portal
 Email: SendGrid
 Background Jobs: APScheduler
 i18n: react-i18next (EN/FR bilingual support)
 PDF Generation: ReportLab (bilingual invoices)
 ```
 
+## Backend Architecture (Modular Routes)
+```
+/app/backend/
+├── server.py              (~13,365 lines — listings CRUD, bids, auth, auctions, etc.)
+├── deps.py                (Shared dependencies — User model, auth functions)
+├── routes/
+│   ├── admin.py           (1,395 lines — User mgmt, partner admin, email settings)
+│   ├── marketplace.py     (474 lines — Browse, search, filter, promoted listings)
+│   ├── ai_chat.py         (AI chatbot endpoints)
+│   ├── fees.py            (Fee calculation endpoints)
+│   ├── notifications.py   (Notification endpoints)
+│   ├── watchlist.py       (Watchlist endpoints)
+│   ├── webhooks.py        (Stripe/SendGrid webhooks — partner activation/deactivation)
+│   ├── payments.py        (Stripe Connect payment endpoints)
+│   ├── team.py            (RBAC team management)
+│   ├── vehicles.py        (Vehicle auction module)
+│   └── auctions.py        (Auction lifecycle management)
+└── services/
+    └── subscription_service.py (Subscription tier logic)
+```
+
 ## Current Status: ALL P0 FEATURES COMPLETE
 
-### Session Update (Mar 19, 2026 — Pay-to-Activate Partner Feature)
+### Session Updates (Mar 19, 2026)
 
-**Pay-to-Activate Implementation:**
-- Admin verifies partner → Stripe Checkout Session created for $100 CAD/year recurring subscription
-- Email sent with payment link via SendGrid
-- Partner marked as `is_partner=True`, `platform_fee_paid=False` until payment
-- Webhook handles `checkout.session.completed` → sets `platform_fee_paid=True`
-- Webhook handles `customer.subscription.deleted` → soft-locks partner (`platform_fee_paid=False`)
-- Webhook handles `invoice.payment_failed` → soft-locks partner
-- Webhook handles `invoice.payment_succeeded` → re-activates partner after failed payment
-- Listing creation (single + multi-item) blocked for partners with `platform_fee_paid=False`
-- Frontend lockdown UI: banner in SellOptionsModal, lockdown pages in CreateListingPage and CreateMultiItemListing
-- Partner Manager UI updated with Fee Paid/Fee Pending badges
-- New endpoints: `GET /api/partner/payment-status`, `POST /api/partner/create-checkout`
+**Phase 2 Refactoring — Admin Routes Extraction:**
+- Moved partner admin endpoints from server.py to routes/admin.py: verify, reject, toggle, premium-rate, email settings
+- Fixed admin.py auth: replaced broken HTTPAuthorizationCredentials proxy with direct JWT decode in require_admin()
+- admin.py now contains both user management (pre-existing) and partner management (newly extracted)
 
-**Bug Fixed:**
-- webhooks_router was not mounted in api_router (404 on /api/webhooks/stripe) — FIXED
+**Phase 3 Refactoring — Marketplace Routes Extraction:**
+- Created NEW routes/marketplace.py (474 lines)
+- Moved: GET /marketplace/items, GET /marketplace/filter-counts, POST /listings/search/location, GET /promoted-listings, POST /marketplace/items/{item_id}/track-click
+- server.py reduced from ~14,337 to ~13,365 lines (~970 line reduction)
 
-**Files Modified:**
-- `/app/backend/deps.py` — Added `platform_fee_paid`, `partner_subscription_id` to User model
-- `/app/backend/server.py` — Modified verify_partner, added _get_or_create_partner_fee_price, partner payment endpoints, listing permission checks, partner toggle updates
-- `/app/backend/routes/webhooks.py` — Enhanced all handlers for partner activation/deactivation/renewal
-- `/app/frontend/src/components/SellOptionsModal.js` — Partner fee lockdown banner
-- `/app/frontend/src/pages/CreateListingPage.js` — Partner fee lockdown page
-- `/app/frontend/src/pages/CreateMultiItemListing.js` — Partner fee lockdown page
-- `/app/frontend/src/pages/admin/PartnerManager.js` — Fee status badges, updated verify handler
+**Stripe Customer Portal Integration:**
+- New endpoint: POST /api/partner/manage-billing
+- Generates Stripe Customer Portal session for partners to manage billing, download invoices, update payment methods
 
-**Testing:** iteration_52 — 100% backend (16/16 passed), frontend code verified
+**Test Suite Updated:**
+- test_new_features_iteration_48.py updated: $213.45/$355.54 monthly → $180/$300 yearly pricing
+- Added 11 new tests for partner fee endpoints, marketplace, and webhooks
+- All 28 tests pass (iteration_53 — 100%)
 
-### Previous Session Updates
+### Previous Session (Mar 19, 2026 — Pay-to-Activate)
+- Partner verification → $100 CAD/year Stripe recurring subscription
+- Webhook handles activation/deactivation/renewal
+- Frontend lockdown UI for unpaid partners
 
-**Session (Mar 16, 2026 — server.py Modular Refactor Phase 1)**
-- Extracted 842 lines from server.py into 5 modular route files + shared deps
-- routes/ai_chat.py, routes/fees.py, routes/notifications.py, routes/watchlist.py, deps.py
-
-**Session (Mar 16, 2026 — Subscription Pricing Migration)**
-- Premium: $180 CAD/year + taxes, VIP Elite: $300 CAD/year + taxes
-- All monthly billing references replaced with yearly
-
-**Session (Mar 16, 2026 — Logic & Legal Sync)**
-- 14-day payment window, recommendation opt-out toggle, footer address update
-
-**Session (Mar 16, 2026 — 3 New Features)**
-- Sign-up Terms & Policy Consent, Admin RBAC Team Management, AI Chatbot (Claude Sonnet 4.5)
-
-## New API Endpoints (Mar 19, 2026)
-- `GET /api/partner/payment-status` — Get partner payment status and checkout URL
-- `POST /api/partner/create-checkout` — Create new Stripe Checkout Session for partner fee
-
-## User Schema Updates (Mar 19, 2026)
-- `platform_fee_paid` (boolean, default: False) — Whether partner has paid annual fee
-- `partner_subscription_id` (string, optional) — Stripe subscription ID for partner fee
-- `partner_checkout_session_id` (string) — Last Stripe Checkout Session ID
-- `partner_checkout_url` (string) — Last Stripe Checkout URL
-- `partner_fee_paid_at` (datetime) — When fee was last paid
-- `partner_fee_expired_at` (datetime) — When fee expired
+## API Endpoints (New/Modified in This Session)
+- `POST /api/partner/manage-billing` — Stripe Customer Portal session (NEW)
+- All admin partner endpoints now served from routes/admin.py (MOVED)
+- All marketplace endpoints now served from routes/marketplace.py (MOVED)
 
 ## Test Credentials
 - **Admin:** `charbeladmin@bidvex.com` / `Admin123!`
@@ -102,13 +98,13 @@ PDF Generation: ReportLab (bilingual invoices)
 ## Upcoming Tasks (Prioritized)
 
 ### P1 - High Priority
-- [ ] Refactor server.py Phase 2: Move partner admin endpoints to routes/admin.py
-- [ ] Refactor server.py Phase 3: Extract listings/marketplace logic
+- [ ] Refactor server.py Phase 4: Remove duplicated admin user mgmt endpoints (now in admin.py but also still in server.py)
+- [ ] Refactor server.py Phase 5: Extract listings CRUD, bids, multi-item auctions
 
 ### P2 - Medium Priority
-- [ ] Cache marketplace filter counts for performance
+- [ ] Cache marketplace filter counts for performance (Redis/in-memory)
 - [ ] PDF Invoice cloud storage
-- [ ] Update outdated test file (test_new_features_iteration_48.py)
+- [ ] Partner Dashboard page (subscription status, invoices, payment method management)
 
 ### P3 - Low Priority
 - [ ] Cookie consent translation (i18n integration)

@@ -16,22 +16,26 @@
 - [x] Sign-up Terms & Policy Consent (Clickwrap)
 - [x] Admin RBAC Team Management
 - [x] AI Chatbot (Claude Sonnet 4.5)
-- [x] Pay-to-Activate Partner Flow ($100 CAD/year) NEW
+- [x] Pay-to-Activate Partner Flow ($100 CAD/year)
+- [x] Stripe Customer Portal for partner billing
+- [x] server.py Refactor Phase 1 (AI Chat, Fees, Notifications, Watchlist)
+- [x] server.py Refactor Phase 2 (Partner admin → routes/admin.py)
+- [x] server.py Refactor Phase 3 (Marketplace → routes/marketplace.py)
+- [x] Test suite updated with current pricing ($180/$300/year, $100 partner fee)
 
 ## P1 - High Priority
 - [x] Email Settings Admin Panel
 - [x] CSV Export for Transaction Logs
 - [x] DB-stored SendGrid config
-- [x] server.py Refactor Phase 1 (AI Chat, Fees, Notifications, Watchlist)
-- [ ] server.py Refactor Phase 2 (Partner admin endpoints → routes/admin.py)
-- [ ] server.py Refactor Phase 3 (Listings/marketplace extraction)
+- [ ] server.py Refactor Phase 4: Deduplicate admin user mgmt routes
+- [ ] server.py Refactor Phase 5: Extract listings CRUD, bids, multi-item auctions
 
 ## P2 - Medium Priority
-- [ ] Cache marketplace filter counts
+- [ ] Cache marketplace filter counts (Redis/in-memory)
 - [ ] PDF Invoice Cloud Storage
+- [ ] Partner Dashboard page (subscription, invoices, payment method)
 - [ ] Editable buyer premium in auction creation UI for partners
 - [ ] Partner Pro subscription tier
-- [ ] Update outdated test file (test_new_features_iteration_48.py)
 
 ## P3 - Low Priority
 - [ ] Cookie consent translation integration with i18n
