@@ -17,7 +17,7 @@ Email: SendGrid (54 verified dynamic templates, bilingual EN/FR)
 Jobs: APScheduler | i18n: react-i18next | PDF: ReportLab
 ```
 
-## Backend Route Architecture (Post Phase 7)
+## Backend Route Architecture (Post Phase 8)
 ```
 /app/backend/
 ├── server.py              (~9,623 lines — admin settings, messaging, affiliates, misc)
@@ -30,16 +30,20 @@ Jobs: APScheduler | i18n: react-i18next | PDF: ReportLab
 │   ├── payments.py        # Unified checkout, payment-methods CRUD, subscriptions, fees
 │   ├── webhooks.py        # Stripe + SendGrid webhooks, trust verification handlers
 │   ├── dashboard.py       # Seller + buyer dashboards
-│   ├── profiles.py        # User profiles, ratings, trust score, tax, GDPR, Stripe Connect (NEW)
+│   ├── profiles.py        # User profiles, ratings, trust score, tax, GDPR, Stripe Connect
+│   ├── tax.py             # Tax calculation API (GST/QST via services/tax_engine.py) (NEW)
+│   ├── tax_reports.py     # CRA compliance and tax report generation (admin only)
 │   ├── ai_chat.py | fees.py | notifications.py | watchlist.py
 │   └── team.py | vehicles.py
 ├── config/
 │   └── email_templates.py # Verified SendGrid template IDs (bilingual EN/FR dicts)
 ├── deps.py                # User model, shared auth
 └── services/
-    ├── email_service.py        # SendGrid Dynamic Template sender
-    ├── email_notifications.py  # Outlook-safe table-based HTML email templates
-    ├── cloud_storage.py        # Local file-based cloud storage mock
+    ├── tax_engine.py            # Authoritative tax engine (Decimal, ROUND_HALF_UP)
+    ├── vehicle_pricing.py       # Vehicle pricing (imports GST_RATE from tax_engine)
+    ├── email_service.py         # SendGrid Dynamic Template sender
+    ├── email_notifications.py   # Outlook-safe table-based HTML email templates
+    ├── cloud_storage.py         # Local file-based cloud storage mock
     └── subscription_service.py
 ```
 
@@ -53,9 +57,9 @@ Jobs: APScheduler | i18n: react-i18next | PDF: ReportLab
 - Pay-to-Activate ($100 CAD/year) | Stripe Customer Portal | Partner Dashboard
 
 ### Refactoring Phases 1-5: ~2,930 lines extracted
-- Auth → routes/auth.py | Admin → routes/admin.py
-- Listings CRUD → routes/listings.py | Auctions/Bidding → routes/auctions.py
-- Marketplace → routes/marketplace.py
+- Auth -> routes/auth.py | Admin -> routes/admin.py
+- Listings CRUD -> routes/listings.py | Auctions/Bidding -> routes/auctions.py
+- Marketplace -> routes/marketplace.py
 
 ### P3: Trust & Compliance
 - Verified Firm Badge | Bilingual Cookie Consent | Auth Refactor
@@ -65,16 +69,22 @@ Jobs: APScheduler | i18n: react-i18next | PDF: ReportLab
 - Payments dedup | Dashboard extraction | Webhook consolidation | Admin email preview
 
 ### Phase 7: Profile Modularization (926 lines, Completed Mar 19, 2026)
-- **20 endpoints extracted** to routes/profiles.py:
-  - User lookup: GET /users/{id}, /users/{id}/profile-summary
-  - Profile update: PUT /users/me (with preferred_language en/fr validation), PUT /profile
-  - User stats: GET /users/me/stats
-  - Ratings: POST /ratings, GET /users/{id}/ratings
-  - Seller: GET /sellers/{id}, GET /sellers/{id}/trust-score
-  - Tax: PUT /users/me/tax-profile, GET/PUT /users/me/tax-info
-  - Stripe Connect: POST/GET /users/me/stripe-connect/onboard|status|dashboard-link
-  - GDPR: POST /user/request-data-deletion, GET /user/data-deletion-status, POST /user/cancel-data-deletion, GET /user/export-data
-  - Upload: POST /upload-document
+- 20 endpoints extracted to routes/profiles.py
+
+### Phase 8: Tax Logic Modularization (Completed Mar 19, 2026)
+- **Created `routes/tax.py`** with 4 endpoints:
+  - `POST /api/tax-calc/calculate` — GST/QST calculation with Decimal precision
+  - `GET /api/tax-calc/rates` — Current tax rates and registration info
+  - `GET /api/tax-calc/structure` — Full tax jurisdiction documentation
+  - `GET /api/tax-calc/invoice-lines` — Invoice-ready tax line items
+- **Eliminated all inline float-based tax calculations** from `server.py`:
+  - `get_price_breakdown` (line 3911)
+  - subscription upgrade fee calc (line 4015)
+  - subscription create fee calc (line 4084)
+  - `_generate_subscription_invoice` (lines 4370-4375)
+- **Removed duplicate `GST_RATE` constant** from `services/vehicle_pricing.py` (now imports from `tax_engine`)
+- **Verified ROUND_HALF_UP** accounting precision: $100.00 -> GST $5.00 + QST $9.98
+- All 24/24 tests passed (iteration_61.json)
 
 ## server.py Size History
 - Start: ~11,055 lines
@@ -83,13 +93,16 @@ Jobs: APScheduler | i18n: react-i18next | PDF: ReportLab
 - **Total extracted: ~1,432 lines**
 
 ## Key API Endpoints
-- `POST /api/auth/login|register|forgot-password` → routes/auth.py
-- `PUT /api/users/me` (name, preferred_language en/fr) → routes/profiles.py
-- `GET /api/sellers/{id}/trust-score` → routes/profiles.py
-- `GET /api/dashboard/seller|buyer` → routes/dashboard.py
-- `POST /api/payments/checkout` → routes/payments.py
-- `POST /api/webhooks/stripe` → routes/webhooks.py
-- `GET /api/admin/email-preview/{key}?language=en|fr` → routes/admin.py
+- `POST /api/auth/login|register|forgot-password` -> routes/auth.py
+- `PUT /api/users/me` (name, preferred_language en/fr) -> routes/profiles.py
+- `GET /api/sellers/{id}/trust-score` -> routes/profiles.py
+- `GET /api/dashboard/seller|buyer` -> routes/dashboard.py
+- `POST /api/payments/checkout` -> routes/payments.py
+- `POST /api/webhooks/stripe` -> routes/webhooks.py
+- `GET /api/admin/email-preview/{key}?language=en|fr` -> routes/admin.py
+- `POST /api/tax-calc/calculate` -> routes/tax.py (NEW)
+- `GET /api/tax-calc/rates` -> routes/tax.py (NEW)
+- `GET /api/tax-calc/invoice-lines` -> routes/tax.py (NEW)
 
 ## Test Credentials
 - **Admin:** `charbeladmin@bidvex.com` / `Admin123!`
@@ -99,6 +112,7 @@ Jobs: APScheduler | i18n: react-i18next | PDF: ReportLab
 - iteration_58.json — Template audit + Outlook fix (100%, 14/14)
 - iteration_59.json — Phase 6 Modularization (100%, 21/21)
 - iteration_60.json — Phase 7 Profile Modularization (100%, 23/23)
+- iteration_61.json — Phase 8 Tax Modularization (100%, 24/24)
 
 ## Upcoming Tasks
 
@@ -114,4 +128,4 @@ Jobs: APScheduler | i18n: react-i18next | PDF: ReportLab
 - [ ] Expand tests/test_emails.py to cover all 40+ templates
 
 ## Mocked Services
-- Cloud storage for PDF invoices → local directory `/data/invoices/` with HMAC-signed URLs
+- Cloud storage for PDF invoices -> local directory `/data/invoices/` with HMAC-signed URLs
