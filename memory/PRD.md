@@ -1,6 +1,6 @@
 # BidVex Auction Platform - Product Requirements Document
 
-## Last Updated: March 19, 2026
+## Last Updated: February 2026
 
 ## Original Problem Statement
 Build and maintain a sophisticated full-stack auction platform (BidVex) with real-time bidding, multi-item auctions, partner accounts, Stripe Connect payments, admin dashboard, AI chatbot, Canadian tax compliance, and full bilingual support (EN/FR).
@@ -20,7 +20,7 @@ Jobs: APScheduler | i18n: react-i18next | PDF: ReportLab
 ## Backend Route Architecture
 ```
 /app/backend/
-├── server.py              (~13,400 lines — listings CRUD, bids, auth, auctions)
+├── server.py              (~12,700 lines — listings CRUD, bids, auth, auctions)
 ├── deps.py                (User model, shared auth)
 ├── routes/
 │   ├── admin.py           (1,395 lines — User/partner mgmt, email settings)
@@ -41,7 +41,7 @@ Jobs: APScheduler | i18n: react-i18next | PDF: ReportLab
 - **Pay-to-Activate** ($100 CAD/year recurring) with soft-lock on expiry
 - **Stripe Customer Portal** for partner billing/invoices/tax receipts
 - **Partner Dashboard** (`/partner/dashboard`) — subscription status, billing portal, listing stats, recent activity, account details, soft-lock banner
-- **Refactoring**: Phase 1 (AI, Fees, Notifications, Watchlist), Phase 2 (Admin/Partner), Phase 3 (Marketplace) — ~1,400 lines extracted
+- **Refactoring**: Phase 1 (AI, Fees, Notifications, Watchlist), Phase 2 (Admin/Partner), Phase 3 (Marketplace), Phase 4 (Admin user mgmt cleanup from server.py) — ~2,070 lines extracted
 
 ## Session Log (Mar 19, 2026)
 1. Pay-to-Activate Partner Flow — $100 CAD/year recurring Stripe subscription
@@ -67,7 +67,7 @@ Jobs: APScheduler | i18n: react-i18next | PDF: ReportLab
 ## Upcoming Tasks
 
 ### P1 - High Priority
-- [ ] server.py Phase 4: Deduplicate admin user mgmt routes
+- [x] server.py Phase 4: Deduplicate admin user mgmt routes (673 lines removed, moved to routes/admin.py)
 - [ ] server.py Phase 5: Extract listings CRUD, bids, multi-item auctions
 
 ### P2 - Medium Priority

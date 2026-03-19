@@ -9,7 +9,7 @@ import {
   CreditCard, FileText, ExternalLink, Settings, Plus,
   BarChart3, Package, Gavel, AlertTriangle, CheckCircle,
   Clock, CalendarDays, DollarSign, ArrowRight, Loader2,
-  Shield, TrendingUp, RefreshCw, XCircle
+  Shield, TrendingUp, RefreshCw, XCircle, PartyPopper
 } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
@@ -19,11 +19,12 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 export default function PartnerDashboard() {
   const { user, token, refreshUser } = useAuth();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [billingLoading, setBillingLoading] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -50,13 +51,19 @@ export default function PartnerDashboard() {
 
   useEffect(() => {
     const status = searchParams.get('partner_payment');
+    const sessionId = searchParams.get('session_id');
     if (status === 'success') {
-      toast.success('Payment successful! Your partner account is now fully active.');
+      setShowCelebration(true);
       if (refreshUser) refreshUser();
+      // Clean URL params after showing celebration
+      setSearchParams({}, { replace: true });
+      // Auto-dismiss celebration after 8 seconds
+      setTimeout(() => setShowCelebration(false), 8000);
     } else if (status === 'cancelled') {
       toast.info('Payment was cancelled. You can complete it anytime from this dashboard.');
+      setSearchParams({}, { replace: true });
     }
-  }, [searchParams, refreshUser]);
+  }, [searchParams, refreshUser, setSearchParams]);
 
   const handleManageBilling = async () => {
     setBillingLoading(true);
@@ -112,7 +119,7 @@ export default function PartnerDashboard() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950" data-testid="partner-dashboard">
       {/* Soft Lock Banner */}
-      {!isFeePaid && (
+      {!isFeePaid && !showCelebration && (
         <div className="bg-amber-500 text-white" data-testid="partner-softlock-banner">
           <div className="max-w-6xl mx-auto px-4 py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
@@ -142,6 +149,44 @@ export default function PartnerDashboard() {
       )}
 
       <div className="max-w-6xl mx-auto px-4 py-8">
+        {/* Celebration Banner (one-time after successful payment) */}
+        {showCelebration && (
+          <div 
+            className="mb-6 rounded-xl border-2 border-emerald-300 bg-gradient-to-r from-emerald-50 to-teal-50 p-6 shadow-lg animate-in fade-in slide-in-from-top-4 duration-500"
+            data-testid="celebration-banner"
+          >
+            <div className="flex items-start gap-4">
+              <div className="h-12 w-12 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                <PartyPopper className="h-6 w-6 text-emerald-600" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-xl font-bold text-emerald-900">Account Activated!</h2>
+                <p className="text-sm text-emerald-700 mt-1">
+                  Your annual partner fee has been processed successfully. All partner features are now unlocked — you can create listings, manage auctions, and access your full dashboard.
+                </p>
+                <div className="flex items-center gap-3 mt-4">
+                  <Button 
+                    onClick={() => navigate('/create-listing')}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                    size="sm"
+                    data-testid="celebration-create-listing-btn"
+                  >
+                    <Plus className="h-4 w-4 mr-1.5" /> Create Your First Listing
+                  </Button>
+                  <Button 
+                    onClick={() => setShowCelebration(false)}
+                    variant="ghost"
+                    size="sm"
+                    className="text-emerald-600"
+                  >
+                    Dismiss
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
           <div>

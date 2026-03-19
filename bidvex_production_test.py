@@ -19,7 +19,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional, List
 
 # Configuration
-BASE_URL = "https://checkout-unlock.preview.emergentagent.com/api"
+BASE_URL = "https://partner-onboard-fix-1.preview.emergentagent.com/api"
 
 # Test credentials
 ADMIN_EMAIL = "charbeladmin@bidvex.com"
@@ -155,7 +155,7 @@ class BidVexProductionTester:
             if results["sub_tests"].get("affiliate_stats"):
                 affiliate_code = data.get('affiliate_code')
                 if affiliate_code:
-                    referral_link = f"https://checkout-unlock.preview.emergentagent.com?ref={affiliate_code}"
+                    referral_link = f"https://partner-onboard-fix-1.preview.emergentagent.com?ref={affiliate_code}"
                     print(f"\n🔗 Referral Link: {referral_link}")
                     results["sub_tests"]["referral_link"] = True
                 else:

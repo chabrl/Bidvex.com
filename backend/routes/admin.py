@@ -1040,9 +1040,9 @@ async def verify_partner(
             mode="subscription",
             customer=customer_id,
             line_items=[{"price": price_id, "quantity": 1}],
-            metadata={"user_id": user_id, "type": "partner_activation"},
-            success_url=f"{base_url}/settings?partner_payment=success",
-            cancel_url=f"{base_url}/settings?partner_payment=cancelled",
+            metadata={"user_id": user_id, "type": "partner_activation", "business_name": user_doc.get("partner_company_name", user_doc.get("name", ""))},
+            success_url=f"{base_url}/partner/dashboard?session_id={{CHECKOUT_SESSION_ID}}&partner_payment=success",
+            cancel_url=f"{base_url}/partner/dashboard?partner_payment=cancelled",
             subscription_data={
                 "metadata": {"user_id": user_id, "type": "partner_annual_fee"}
             },
