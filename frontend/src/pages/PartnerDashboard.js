@@ -110,6 +110,32 @@ export default function PartnerDashboard() {
   const { partner, subscription, stats } = dashboard;
   const isFeePaid = partner.platform_fee_paid;
   const isActive = isFeePaid && subscription?.status === 'active';
+  const [invoiceLoading, setInvoiceLoading] = useState(false);
+
+  const handleDownloadInvoice = async () => {
+    setInvoiceLoading(true);
+    try {
+      const res = await axios.get(`${API}/invoices`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const invoices = res.data.invoices || [];
+      if (invoices.length === 0) {
+        toast.info('No invoices available yet.');
+        return;
+      }
+      const latest = invoices[0];
+      const url = latest.download_url;
+      if (url) {
+        window.open(`${process.env.REACT_APP_BACKEND_URL}${url}`, '_blank');
+      } else {
+        window.open(`${API}/invoices/${latest.id}/download`, '_blank');
+      }
+    } catch (err) {
+      toast.error('Failed to fetch invoices.');
+    } finally {
+      setInvoiceLoading(false);
+    }
+  };
 
   const formatDate = (iso) => {
     if (!iso) return '—';
@@ -307,6 +333,18 @@ export default function PartnerDashboard() {
                         )}
                       </Button>
                       <Button
+                        onClick={handleDownloadInvoice}
+                        variant="outline"
+                        disabled={invoiceLoading}
+                        data-testid="download-invoice-btn"
+                      >
+                        {invoiceLoading ? (
+                          <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Loading...</>
+                        ) : (
+                          <><DollarSign className="h-4 w-4 mr-1.5" /> Download Latest Invoice</>
+                        )}
+                      </Button>
+                      <Button
                         onClick={handleManageBilling}
                         variant="outline"
                         disabled={billingLoading}
@@ -332,7 +370,7 @@ export default function PartnerDashboard() {
                 </div>
 
                 <p className="text-xs text-slate-400">
-                  Your GST/QST tax receipts are available through the Stripe billing portal. Click "View Invoices & Tax Receipts" above.
+                  Your GST/QST tax receipts are available through the Stripe billing portal, or download your latest invoice directly using the button above.
                 </p>
               </CardContent>
             </Card>

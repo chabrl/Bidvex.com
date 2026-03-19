@@ -5915,18 +5915,24 @@ async def _generate_subscription_invoice(db, user: dict, plan_id: str, price_amo
 
 @api_router.get("/invoices")
 async def list_invoices(current_user: User = Depends(get_current_user)):
-    """List all invoices for the current user."""
+    """List all invoices for the current user, each with a fresh signed download URL."""
+    from services.cloud_storage import generate_signed_url
     invoices = await db.subscription_invoices.find(
         {"user_id": current_user.id},
         {"_id": 0, "pdf_data": 0}
     ).sort("created_at", -1).to_list(50)
+
+    for inv in invoices:
+        inv["download_url"] = generate_signed_url(inv["id"])
+
     return {"invoices": invoices}
 
 
 @api_router.get("/invoices/{invoice_id}/download")
 async def download_invoice(invoice_id: str, current_user: User = Depends(get_current_user)):
-    """Download a PDF invoice — always regenerated from stored data using the latest template."""
+    """Download a PDF invoice — generates, stores in cloud, and returns."""
     from fastapi.responses import Response
+    from services.cloud_storage import store_invoice_pdf, retrieve_invoice_pdf
 
     invoice = await db.subscription_invoices.find_one(
         {"id": invoice_id, "user_id": current_user.id},
@@ -5935,13 +5941,31 @@ async def download_invoice(invoice_id: str, current_user: User = Depends(get_cur
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
-    # If user_name is missing from old records, look it up
+    # Try serving from cloud storage first
+    storage_path = invoice.get("storage_path")
+    if storage_path:
+        pdf_data = await retrieve_invoice_pdf(storage_path)
+        if pdf_data:
+            filename = f"{invoice.get('invoice_number', 'invoice')}.pdf"
+            return Response(
+                content=pdf_data,
+                media_type="application/pdf",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+            )
+
+    # Fallback: render dynamically, then store for next time
     if not invoice.get("user_name"):
         user = await db.users.find_one({"id": current_user.id})
         invoice["user_name"] = user.get("name", user.get("username", "Customer")) if user else "Customer"
 
-    # Render PDF dynamically (always uses latest template with logo, address, tax numbers)
     pdf_data = _render_subscription_invoice_pdf(invoice)
+
+    # Persist to cloud storage
+    path = await store_invoice_pdf(invoice_id, pdf_data, subfolder="subscription")
+    await db.subscription_invoices.update_one(
+        {"id": invoice_id},
+        {"$set": {"storage_path": path}}
+    )
 
     filename = f"{invoice.get('invoice_number', 'invoice')}.pdf"
     return Response(
@@ -5949,6 +5973,54 @@ async def download_invoice(invoice_id: str, current_user: User = Depends(get_cur
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )
+
+
+@api_router.get("/invoices/download/{invoice_id}")
+async def download_invoice_signed(invoice_id: str, expires: int = 0, sig: str = ""):
+    """
+    Public signed-URL download endpoint. No auth required — the HMAC signature IS the auth.
+    """
+    from fastapi.responses import Response
+    from services.cloud_storage import verify_signature, retrieve_invoice_pdf
+
+    if not verify_signature(invoice_id, expires, sig):
+        raise HTTPException(status_code=403, detail="Link expired or invalid signature")
+
+    # Look up in both invoice collections
+    invoice = await db.subscription_invoices.find_one({"id": invoice_id}, {"_id": 0})
+    if not invoice:
+        invoice = await db.invoices.find_one({"id": invoice_id}, {"_id": 0})
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    storage_path = invoice.get("storage_path")
+    if storage_path:
+        pdf_data = await retrieve_invoice_pdf(storage_path)
+        if pdf_data:
+            filename = f"{invoice.get('invoice_number', 'invoice')}.pdf"
+            return Response(
+                content=pdf_data,
+                media_type="application/pdf",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+            )
+
+    # Generate on demand if no stored file (subscription invoices)
+    if invoice.get("type") == "subscription":
+        if not invoice.get("user_name"):
+            user = await db.users.find_one({"id": invoice.get("user_id")})
+            invoice["user_name"] = user.get("name", "Customer") if user else "Customer"
+        from services.cloud_storage import store_invoice_pdf
+        pdf_data = _render_subscription_invoice_pdf(invoice)
+        path = await store_invoice_pdf(invoice_id, pdf_data, subfolder="subscription")
+        await db.subscription_invoices.update_one({"id": invoice_id}, {"$set": {"storage_path": path}})
+        filename = f"{invoice.get('invoice_number', 'invoice')}.pdf"
+        return Response(
+            content=pdf_data,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        )
+
+    raise HTTPException(status_code=404, detail="Invoice PDF not available")
 
 
 # ========== SUBSCRIPTION CHECKOUT WITH COUPON ==========
@@ -7252,24 +7324,30 @@ async def generate_lots_won_invoice(
         # Fallback to original template if bilingual not available
         html_content = lots_won_template(template_data)
     
-    # Create user invoice directory
-    invoice_dir = Path(f"/app/invoices/{user_id}")
-    invoice_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Generate PDF
-    pdf_filename = f"LotsWon_{auction_id}_{int(datetime.now().timestamp())}.pdf"
-    pdf_path = invoice_dir / pdf_filename
-    
-    generate_pdf_from_html(html_content, pdf_path)
-    
+    # Generate PDF to temp path, then persist to cloud storage
+    import tempfile
+    from services.cloud_storage import store_invoice_pdf, generate_signed_url
+
+    invoice_id = str(uuid.uuid4())
+
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    generate_pdf_from_html(html_content, tmp_path)
+    pdf_bytes = tmp_path.read_bytes()
+    tmp_path.unlink(missing_ok=True)
+
+    storage_path = await store_invoice_pdf(invoice_id, pdf_bytes, subfolder="lots_won")
+    download_url = generate_signed_url(invoice_id)
+
     # Save invoice record to database
     invoice_record = {
-        "id": str(uuid.uuid4()),
+        "id": invoice_id,
         "invoice_number": invoice_number,
         "invoice_type": "lots_won",
         "user_id": user_id,
         "auction_id": auction_id,
-        "pdf_path": str(pdf_path),
+        "storage_path": storage_path,
+        "download_url": download_url,
         "generated_date": datetime.now(timezone.utc).isoformat(),
         "status": "generated"
     }
@@ -7278,7 +7356,7 @@ async def generate_lots_won_invoice(
     return {
         "success": True,
         "invoice_number": invoice_number,
-        "pdf_path": str(pdf_path),
+        "download_url": download_url,
         "paddle_number": paddle_record['paddle_number'],
         "message": "Invoice generated successfully"
     }
@@ -7402,24 +7480,30 @@ async def generate_payment_letter(
     from invoice_templates_complete import payment_letter_template
     html_content = payment_letter_template(template_data, lang=lang)
     
-    # Create user invoice directory
-    invoice_dir = Path(f"/app/invoices/{user_id}")
-    invoice_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Generate PDF
-    pdf_filename = f"PaymentLetter_{auction_id}.pdf"
-    pdf_path = invoice_dir / pdf_filename
-    
-    generate_pdf_from_html(html_content, pdf_path)
-    
+    # Generate PDF and persist to cloud storage
+    import tempfile
+    from services.cloud_storage import store_invoice_pdf, generate_signed_url
+
+    invoice_id = str(uuid.uuid4())
+
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    generate_pdf_from_html(html_content, tmp_path)
+    pdf_bytes = tmp_path.read_bytes()
+    tmp_path.unlink(missing_ok=True)
+
+    storage_path = await store_invoice_pdf(invoice_id, pdf_bytes, subfolder="payment_letter")
+    download_url = generate_signed_url(invoice_id)
+
     # Save invoice record
     invoice_record = {
-        "id": str(uuid.uuid4()),
+        "id": invoice_id,
         "invoice_number": invoice_number,
         "invoice_type": "payment_letter",
         "user_id": user_id,
         "auction_id": auction_id,
-        "pdf_path": str(pdf_path),
+        "storage_path": storage_path,
+        "download_url": download_url,
         "generated_date": datetime.now(timezone.utc).isoformat(),
         "status": "generated"
     }
@@ -7428,7 +7512,7 @@ async def generate_payment_letter(
     return {
         "success": True,
         "invoice_number": invoice_number,
-        "pdf_path": str(pdf_path),
+        "download_url": download_url,
         "paddle_number": paddle_record['paddle_number'],
         "amount_due": grand_total,
         "message": "Payment letter generated successfully"
@@ -7439,7 +7523,9 @@ async def get_user_invoices(
     user_id: str,
     current_user: User = Depends(get_current_user)
 ):
-    """Get all invoices for a user"""
+    """Get all invoices for a user, each with a fresh signed download URL."""
+    from services.cloud_storage import generate_signed_url
+
     if current_user.account_type != "admin" and current_user.id != user_id:
         raise HTTPException(status_code=403, detail="Not authorized")
     
@@ -7448,6 +7534,7 @@ async def get_user_invoices(
     for invoice in invoices:
         if isinstance(invoice.get('generated_date'), str):
             invoice['generated_date'] = datetime.fromisoformat(invoice['generated_date'])
+        invoice["download_url"] = generate_signed_url(invoice["id"])
     
     return invoices
 
@@ -7513,21 +7600,29 @@ async def generate_seller_statement(
     
     html_content = seller_statement_template(template_data, lang=lang)
     
-    invoice_dir = Path(f"/app/invoices/{seller_id}")
-    invoice_dir.mkdir(parents=True, exist_ok=True)
-    
-    pdf_filename = f"SellerStatement_{auction_id}.pdf"
-    pdf_path = invoice_dir / pdf_filename
-    
-    generate_pdf_from_html(html_content, pdf_path)
-    
+    # Generate PDF and persist to cloud storage
+    import tempfile
+    from services.cloud_storage import store_invoice_pdf, generate_signed_url
+
+    invoice_id = str(uuid.uuid4())
+
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    generate_pdf_from_html(html_content, tmp_path)
+    pdf_bytes = tmp_path.read_bytes()
+    tmp_path.unlink(missing_ok=True)
+
+    storage_path = await store_invoice_pdf(invoice_id, pdf_bytes, subfolder="seller_statement")
+    download_url = generate_signed_url(invoice_id)
+
     invoice_record = {
-        "id": str(uuid.uuid4()),
+        "id": invoice_id,
         "invoice_number": f"STMT-{auction_id[:8]}",
         "invoice_type": "seller_statement",
         "user_id": seller_id,
         "auction_id": auction_id,
-        "pdf_path": str(pdf_path),
+        "storage_path": storage_path,
+        "download_url": download_url,
         "generated_date": datetime.now(timezone.utc).isoformat(),
         "status": "generated"
     }
@@ -7535,7 +7630,7 @@ async def generate_seller_statement(
     
     return {
         "success": True,
-        "pdf_path": str(pdf_path),
+        "download_url": download_url,
         "message": "Seller statement generated successfully"
     }
 
@@ -7590,21 +7685,29 @@ async def generate_seller_receipt(
     
     html_content = seller_receipt_template(template_data, lang=lang)
     
-    invoice_dir = Path(f"/app/invoices/{seller_id}")
-    invoice_dir.mkdir(parents=True, exist_ok=True)
-    
-    pdf_filename = f"SellerReceipt_{auction_id}.pdf"
-    pdf_path = invoice_dir / pdf_filename
-    
-    generate_pdf_from_html(html_content, pdf_path)
-    
+    # Generate PDF and persist to cloud storage
+    import tempfile
+    from services.cloud_storage import store_invoice_pdf, generate_signed_url
+
+    invoice_id = str(uuid.uuid4())
+
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    generate_pdf_from_html(html_content, tmp_path)
+    pdf_bytes = tmp_path.read_bytes()
+    tmp_path.unlink(missing_ok=True)
+
+    storage_path = await store_invoice_pdf(invoice_id, pdf_bytes, subfolder="seller_receipt")
+    download_url = generate_signed_url(invoice_id)
+
     invoice_record = {
-        "id": str(uuid.uuid4()),
+        "id": invoice_id,
         "invoice_number": template_data['receipt_number'],
         "invoice_type": "seller_receipt",
         "user_id": seller_id,
         "auction_id": auction_id,
-        "pdf_path": str(pdf_path),
+        "storage_path": storage_path,
+        "download_url": download_url,
         "generated_date": datetime.now(timezone.utc).isoformat(),
         "status": "generated"
     }
@@ -7612,7 +7715,7 @@ async def generate_seller_receipt(
     
     return {
         "success": True,
-        "pdf_path": str(pdf_path),
+        "download_url": download_url,
         "receipt_number": template_data['receipt_number'],
         "message": "Seller receipt generated successfully"
     }
@@ -11326,3 +11429,42 @@ async def seed_categories():
     except Exception as e:
         print(f"[SERVER] ERROR during startup: {e}", flush=True)
         logger.error(f"Error during startup: {e}")
+
+
+@app.on_event("startup")
+async def create_database_indexes():
+    """Create background indexes for performance-critical queries."""
+    try:
+        from pymongo import ASCENDING
+        # Bids collection — used by anti-sniping, bid history, winner determination
+        await db.bids.create_index(
+            [("listing_id", ASCENDING)],
+            background=True,
+            name="idx_bids_listing_id",
+        )
+        # Lot bids — multi-item auction bidding
+        await db.lot_bids.create_index(
+            [("listing_id", ASCENDING), ("lot_number", ASCENDING)],
+            background=True,
+            name="idx_lot_bids_listing_lot",
+        )
+        # Auto-bids — lookup by user + listing
+        await db.auto_bids.create_index(
+            [("user_id", ASCENDING), ("listing_id", ASCENDING), ("is_active", ASCENDING)],
+            background=True,
+            name="idx_auto_bids_user_listing",
+        )
+        # Invoices — user invoice lookups
+        await db.invoices.create_index(
+            [("user_id", ASCENDING)],
+            background=True,
+            name="idx_invoices_user_id",
+        )
+        await db.subscription_invoices.create_index(
+            [("user_id", ASCENDING)],
+            background=True,
+            name="idx_sub_invoices_user_id",
+        )
+        logger.info("Database indexes created (background)")
+    except Exception as e:
+        logger.warning(f"Index creation note: {e}")

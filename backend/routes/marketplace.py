@@ -12,6 +12,8 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
+import asyncio
+import time
 import logging
 
 logger = logging.getLogger(__name__)
@@ -33,8 +35,13 @@ def get_db():
     return _db
 
 
-# Filter counts cache (60s TTL)
-_filter_counts_cache = {"data": None, "expires_at": 0}
+# ========== STALE-WHILE-REVALIDATE CACHE (5-min TTL) ==========
+_filter_counts_cache = {
+    "data": None,
+    "fresh_until": 0,       # epoch — data is considered fresh until this time
+    "refreshing": False,    # guard to prevent concurrent refresh tasks
+}
+_CACHE_TTL = 300  # 5 minutes
 
 
 class LocationSearchParams(BaseModel):
@@ -341,98 +348,116 @@ async def search_by_location(params: LocationSearchParams):
 
 # ========== FILTER COUNTS ==========
 
+async def _refresh_filter_counts():
+    """Background task: recompute filter counts and update the cache."""
+    global _filter_counts_cache
+    try:
+        db = get_db()
+
+        # Auctioneer counts
+        auctioneer_pipeline = [
+            {"$match": {"status": "active", "is_partner_listing": True}},
+            {"$group": {"_id": "$seller_id", "count": {"$sum": 1}}},
+        ]
+        auctioneer_results = await db.listings.aggregate(auctioneer_pipeline).to_list(100)
+
+        auctioneers = []
+        for a in auctioneer_results:
+            seller = await db.users.find_one(
+                {"id": a["_id"], "is_partner": True},
+                {"_id": 0, "partner_company_name": 1, "id": 1}
+            )
+            if seller and seller.get("partner_company_name"):
+                auctioneers.append({
+                    "id": seller["id"],
+                    "name": seller["partner_company_name"],
+                    "count": a["count"],
+                })
+
+        # Category counts (single + multi combined)
+        cat_pipeline = [
+            {"$match": {"status": "active"}},
+            {"$group": {"_id": "$category", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}},
+        ]
+        category_results = await db.listings.aggregate(cat_pipeline).to_list(100)
+        categories = [{"name": c["_id"], "count": c["count"]} for c in category_results if c["_id"]]
+
+        multi_cat_results = await db.multi_item_listings.aggregate(cat_pipeline).to_list(100)
+        for mc in multi_cat_results:
+            if mc["_id"]:
+                existing = next((c for c in categories if c["name"] == mc["_id"]), None)
+                if existing:
+                    existing["count"] += mc["count"]
+                else:
+                    categories.append({"name": mc["_id"], "count": mc["count"]})
+        categories.sort(key=lambda x: x["count"], reverse=True)
+
+        # Location counts
+        loc_pipeline = [
+            {"$match": {"status": "active", "region": {"$ne": None}}},
+            {"$group": {"_id": {"region": "$region", "city": "$city"}, "count": {"$sum": 1}}},
+        ]
+        loc_results = await db.listings.aggregate(loc_pipeline).to_list(200)
+
+        regions = {}
+        for loc in loc_results:
+            region = loc["_id"].get("region", "Other")
+            city = loc["_id"].get("city")
+            if region not in regions:
+                regions[region] = {"count": 0, "cities": {}}
+            regions[region]["count"] += loc["count"]
+            if city:
+                regions[region]["cities"][city] = regions[region]["cities"].get(city, 0) + loc["count"]
+
+        locations = [
+            {"region": r, "count": data["count"], "cities": [{"name": c, "count": cnt} for c, cnt in data["cities"].items()]}
+            for r, data in sorted(regions.items(), key=lambda x: x[1]["count"], reverse=True)
+        ]
+
+        total_active = await db.listings.count_documents({"status": "active"})
+
+        result = {
+            "auctioneers": auctioneers,
+            "categories": categories,
+            "locations": locations,
+            "total_active_items": total_active,
+        }
+
+        _filter_counts_cache["data"] = result
+        _filter_counts_cache["fresh_until"] = time.time() + _CACHE_TTL
+        logger.info("Filter counts cache refreshed")
+
+    except Exception as e:
+        logger.error(f"Background filter-counts refresh failed: {e}")
+    finally:
+        _filter_counts_cache["refreshing"] = False
+
+
 @marketplace_router.get("/marketplace/filter-counts")
 async def marketplace_filter_counts():
     """
     Dynamic filter counts for marketplace sidebar.
-    Cached for 60 seconds to prevent performance issues.
+    Stale-While-Revalidate: serves cached data instantly
+    and refreshes in the background when stale.
     """
-    import time
-    db = get_db()
-    
     now = time.time()
-    if _filter_counts_cache["data"] and _filter_counts_cache["expires_at"] > now:
-        return _filter_counts_cache["data"]
-    
-    # Auctioneer counts
-    auctioneer_pipeline = [
-        {"$match": {"status": "active", "is_partner_listing": True}},
-        {"$group": {"_id": "$seller_id", "count": {"$sum": 1}}},
-    ]
-    auctioneer_results = await db.listings.aggregate(auctioneer_pipeline).to_list(100)
-    
-    auctioneers = []
-    for a in auctioneer_results:
-        seller = await db.users.find_one(
-            {"id": a["_id"], "is_partner": True},
-            {"_id": 0, "partner_company_name": 1, "id": 1}
-        )
-        if seller and seller.get("partner_company_name"):
-            auctioneers.append({
-                "id": seller["id"],
-                "name": seller["partner_company_name"],
-                "count": a["count"],
-            })
-    
-    # Category counts
-    cat_pipeline = [
-        {"$match": {"status": "active"}},
-        {"$group": {"_id": "$category", "count": {"$sum": 1}}},
-        {"$sort": {"count": -1}},
-    ]
-    category_results = await db.listings.aggregate(cat_pipeline).to_list(100)
-    categories = [{"name": c["_id"], "count": c["count"]} for c in category_results if c["_id"]]
-    
-    multi_cat_pipeline = [
-        {"$match": {"status": "active"}},
-        {"$group": {"_id": "$category", "count": {"$sum": 1}}},
-        {"$sort": {"count": -1}},
-    ]
-    multi_cat_results = await db.multi_item_listings.aggregate(multi_cat_pipeline).to_list(100)
-    for mc in multi_cat_results:
-        if mc["_id"]:
-            existing = next((c for c in categories if c["name"] == mc["_id"]), None)
-            if existing:
-                existing["count"] += mc["count"]
-            else:
-                categories.append({"name": mc["_id"], "count": mc["count"]})
-    categories.sort(key=lambda x: x["count"], reverse=True)
-    
-    # Location counts
-    loc_pipeline = [
-        {"$match": {"status": "active", "region": {"$ne": None}}},
-        {"$group": {"_id": {"region": "$region", "city": "$city"}, "count": {"$sum": 1}}},
-    ]
-    loc_results = await db.listings.aggregate(loc_pipeline).to_list(200)
-    
-    regions = {}
-    for loc in loc_results:
-        region = loc["_id"].get("region", "Other")
-        city = loc["_id"].get("city")
-        if region not in regions:
-            regions[region] = {"count": 0, "cities": {}}
-        regions[region]["count"] += loc["count"]
-        if city:
-            regions[region]["cities"][city] = regions[region]["cities"].get(city, 0) + loc["count"]
-    
-    locations = [
-        {"region": r, "count": data["count"], "cities": [{"name": c, "count": cnt} for c, cnt in data["cities"].items()]}
-        for r, data in sorted(regions.items(), key=lambda x: x[1]["count"], reverse=True)
-    ]
-    
-    total_active = await db.listings.count_documents({"status": "active"})
-    
-    result = {
-        "auctioneers": auctioneers,
-        "categories": categories,
-        "locations": locations,
-        "total_active_items": total_active,
-    }
-    
-    _filter_counts_cache["data"] = result
-    _filter_counts_cache["expires_at"] = now + 60
-    
-    return result
+    cache = _filter_counts_cache
+
+    # FRESH — return immediately
+    if cache["data"] and cache["fresh_until"] > now:
+        return cache["data"]
+
+    # STALE — return stale data, kick off background refresh
+    if cache["data"]:
+        if not cache["refreshing"]:
+            cache["refreshing"] = True
+            asyncio.ensure_future(_refresh_filter_counts())
+        return cache["data"]
+
+    # COLD (first request ever) — must wait for data
+    await _refresh_filter_counts()
+    return cache["data"] or {"auctioneers": [], "categories": [], "locations": [], "total_active_items": 0}
 
 
 # ========== PROMOTED LISTINGS ==========
