@@ -142,6 +142,8 @@ DEFAULT_EMAIL_TEMPLATES = {
     "affiliate_commission_earned_fr": "d-df3d97fe87b34060b5b6dee14977efcd",
     "affiliate_referral_notification_en": "d-da95ceff24c54d39b15a29e56d804ee9",
     "affiliate_referral_notification_fr": "d-32a08f1a11a7441186944747602cfd53",
+    "affiliate_program_summary_en": "d-ea4ab5b49ce9448fa552303fa5e9e2cd",
+    "affiliate_program_summary_fr": "d-b7e970f39ce748c0bc3773a5a5606a91",
 }
 
 # Email template categories for admin UI
