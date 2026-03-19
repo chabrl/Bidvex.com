@@ -11323,7 +11323,7 @@ async def create_partner_checkout(current_user: User = Depends(get_current_user)
 @api_router.post("/partner/manage-billing")
 async def create_partner_billing_portal(current_user: User = Depends(get_current_user)):
     """Create a Stripe Customer Portal session for partner billing management.
-    Partners can download invoices, update payment methods, and manage subscriptions."""
+    Partners can download invoices (with GST/QST), update payment methods, and manage subscriptions."""
     if not current_user.is_partner:
         raise HTTPException(status_code=400, detail="Not a partner account")
     
@@ -11334,14 +11334,96 @@ async def create_partner_billing_portal(current_user: User = Depends(get_current
     
     try:
         base_url = os.environ.get("REACT_APP_BACKEND_URL", "https://www.bidvex.com")
+        
+        # Configure portal to open on invoices/billing history page
         session = stripe.billing_portal.Session.create(
             customer=customer_id,
-            return_url=f"{base_url}/settings",
+            return_url=f"{base_url}/partner/dashboard",
+            flow_data={
+                "type": "subscription_update_confirm",
+            } if False else None,  # No flow_data — default portal view shows invoices
         )
         return {"url": session.url}
     except Exception as e:
         logger.error(f"Failed to create billing portal session: {e}")
         raise HTTPException(status_code=500, detail="Failed to create billing portal session")
+
+
+@api_router.get("/partner/dashboard")
+async def get_partner_dashboard(current_user: User = Depends(get_current_user)):
+    """Get aggregated dashboard data for partner accounts."""
+    if not current_user.is_partner:
+        raise HTTPException(status_code=400, detail="Not a partner account")
+    
+    user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0, "password": 0})
+    
+    # Listing stats
+    active_listings = await db.listings.count_documents({"seller_id": current_user.id, "status": "active"})
+    total_listings = await db.listings.count_documents({"seller_id": current_user.id})
+    active_multi = await db.multi_item_listings.count_documents({"seller_id": current_user.id, "status": "active"})
+    total_multi = await db.multi_item_listings.count_documents({"seller_id": current_user.id})
+    
+    # Bid stats
+    bid_pipeline = [
+        {"$match": {"seller_id": current_user.id}},
+        {"$group": {"_id": None, "total_bids": {"$sum": "$bid_count"}}},
+    ]
+    bid_results = await db.listings.aggregate(bid_pipeline).to_list(1)
+    total_bids = bid_results[0]["total_bids"] if bid_results else 0
+    
+    # Subscription info from Stripe if available
+    subscription_info = None
+    sub_id = user_doc.get("partner_subscription_id")
+    if sub_id:
+        try:
+            sub = stripe.Subscription.retrieve(sub_id)
+            subscription_info = {
+                "status": sub.status,
+                "current_period_start": datetime.fromtimestamp(sub.current_period_start, tz=timezone.utc).isoformat(),
+                "current_period_end": datetime.fromtimestamp(sub.current_period_end, tz=timezone.utc).isoformat(),
+                "cancel_at_period_end": sub.cancel_at_period_end,
+                "plan_amount": sub.items.data[0].price.unit_amount / 100 if sub.items.data else 100,
+                "plan_currency": sub.items.data[0].price.currency if sub.items.data else "cad",
+                "plan_interval": sub.items.data[0].price.recurring.interval if sub.items.data else "year",
+            }
+        except Exception as e:
+            logger.warning(f"Failed to retrieve partner subscription {sub_id}: {e}")
+    
+    # Recent activity (last 5 listing actions)
+    recent_listings = await db.listings.find(
+        {"seller_id": current_user.id},
+        {"_id": 0, "id": 1, "title": 1, "status": 1, "created_at": 1, "bid_count": 1, "current_price": 1}
+    ).sort("created_at", -1).limit(5).to_list(5)
+    
+    recent_multi = await db.multi_item_listings.find(
+        {"seller_id": current_user.id},
+        {"_id": 0, "id": 1, "title": 1, "status": 1, "created_at": 1, "lots": 1}
+    ).sort("created_at", -1).limit(5).to_list(5)
+    
+    for m in recent_multi:
+        m["lot_count"] = len(m.pop("lots", []))
+    
+    return {
+        "partner": {
+            "company_name": user_doc.get("partner_company_name"),
+            "email": user_doc.get("email"),
+            "verified_at": user_doc.get("partner_verified_at"),
+            "custom_premium_rate": user_doc.get("custom_premium_rate"),
+            "platform_fee_paid": user_doc.get("platform_fee_paid", False),
+            "partner_fee_paid_at": user_doc.get("partner_fee_paid_at"),
+            "stripe_connect_status": user_doc.get("stripe_connect_status"),
+        },
+        "subscription": subscription_info,
+        "stats": {
+            "active_listings": active_listings + active_multi,
+            "total_listings": total_listings + total_multi,
+            "active_single": active_listings,
+            "active_multi": active_multi,
+            "total_bids_received": total_bids,
+        },
+        "recent_listings": recent_listings,
+        "recent_multi_auctions": recent_multi,
+    }
 
 
 # ========== TRANSACTION CSV EXPORT ==========

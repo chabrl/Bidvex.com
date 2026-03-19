@@ -47,6 +47,7 @@ import SubscriptionPricingPage from './pages/SubscriptionPricingPage';
 import MaintenancePage from './pages/MaintenancePage';
 import CheckoutPage from './pages/CheckoutPage';
 import BecomePartnerPage from './pages/BecomePartnerPage';
+import PartnerDashboard from './pages/PartnerDashboard';
 import LegalPage from './pages/LegalPage';
 import InviteAcceptPage from './pages/InviteAcceptPage';
 
@@ -294,6 +295,9 @@ const App = () => {
           <Route path="/legal" element={<LegalPage />} />
           <Route path="/invite/:token" element={<InviteAcceptPage />} />
           <Route path="/become-a-partner" element={<BecomePartnerPage />} />
+          <Route path="/partner/dashboard" element={
+            <ProtectedRoute><PartnerDashboard /></ProtectedRoute>
+          } />
           <Route path="/client-marketing" element={
             <ProtectedRoute><ClientEmailMarketing /></ProtectedRoute>
           } />

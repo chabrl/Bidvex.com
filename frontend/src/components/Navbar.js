@@ -231,6 +231,21 @@ const Navbar = () => {
                       </DropdownMenuItem>
                     </div>
                     
+                    {/* Partner Dashboard */}
+                    {user.is_partner && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          onClick={() => navigate('/partner/dashboard')} 
+                          data-testid="partner-dashboard-link"
+                          className="cursor-pointer text-blue-600 font-semibold"
+                        >
+                          <Shield className="mr-3 h-4 w-4" />
+                          Partner Dashboard
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                    
                     {/* Admin Access */}
                     {(user.role === 'admin' || user.role === 'superadmin' || user.account_type === 'admin' || user.email?.endsWith('@admin.bazario.com')) && (
                       <>
