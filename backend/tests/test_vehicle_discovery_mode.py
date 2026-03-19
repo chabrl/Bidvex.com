@@ -13,7 +13,7 @@ import requests
 import os
 import uuid
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://partner-onboard-fix-1.preview.emergentagent.com')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://cookie-consent-i18n.preview.emergentagent.com')
 
 # Test credentials
 ADMIN_EMAIL = "charbeladmin@bidvex.com"

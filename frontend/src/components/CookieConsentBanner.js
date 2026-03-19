@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { X, Cookie, Settings, Shield, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from './ui/button';
 import { Switch } from './ui/switch';
+import { useTranslation } from 'react-i18next';
 
 const CookieConsentBanner = () => {
+  const { t } = useTranslation();
   const [showBanner, setShowBanner] = useState(false);
   const [showPreferences, setShowPreferences] = useState(false);
   const [preferences, setPreferences] = useState({
@@ -70,10 +72,10 @@ const CookieConsentBanner = () => {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                    🍪 We Value Your Privacy
+                    {t('cookie.title', 'We Value Your Privacy')}
                   </h3>
                   <p className="text-sm text-slate-600 dark:text-slate-400">
-                    BidVex uses cookies to enhance your auction experience
+                    {t('cookie.subtitle', 'BidVex uses cookies to enhance your auction experience')}
                   </p>
                 </div>
               </div>
@@ -89,9 +91,7 @@ const CookieConsentBanner = () => {
           {/* Content */}
           <div className="p-6">
             <p className="text-sm text-slate-700 dark:text-slate-300 mb-4">
-              We use cookies and similar technologies to provide our services, personalize your 
-              auction recommendations, and analyze site traffic. By clicking &quot;Accept All&quot;, you 
-              consent to our use of cookies. You can manage your preferences below.
+              {t('cookie.message')}
             </p>
 
             {/* Manage Preferences Toggle */}
@@ -100,7 +100,7 @@ const CookieConsentBanner = () => {
               className="flex items-center gap-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline mb-4"
             >
               <Settings className="h-4 w-4" />
-              Manage Cookie Preferences
+              {t('cookie.managePrefs', 'Manage Cookie Preferences')}
               {showPreferences ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </button>
 
@@ -112,11 +112,11 @@ const CookieConsentBanner = () => {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <Shield className="h-4 w-4 text-green-600" />
-                      <span className="font-semibold text-slate-900 dark:text-white">Essential Cookies</span>
-                      <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-0.5 rounded">Required</span>
+                      <span className="font-semibold text-slate-900 dark:text-white">{t('cookie.essential', 'Essential Cookies')}</span>
+                      <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-0.5 rounded">{t('cookie.alwaysActive', 'Always Active')}</span>
                     </div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                      Required for basic site functionality, security, and fraud prevention.
+                      {t('cookie.essentialDesc', 'Required for basic site functionality, security, and auction operations.')}
                     </p>
                   </div>
                   <Switch checked={true} disabled className="opacity-50" />
@@ -125,9 +125,9 @@ const CookieConsentBanner = () => {
                 {/* Analytics Cookies */}
                 <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-lg">
                   <div className="flex-1">
-                    <span className="font-semibold text-slate-900 dark:text-white">Analytics Cookies</span>
+                    <span className="font-semibold text-slate-900 dark:text-white">{t('cookie.analytics', 'Analytics Cookies')}</span>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                      Help us understand how visitors interact with our auction platform.
+                      {t('cookie.analyticsDesc', 'Help us understand how visitors interact with our platform to improve features.')}
                     </p>
                   </div>
                   <Switch 
@@ -139,9 +139,9 @@ const CookieConsentBanner = () => {
                 {/* Personalization Cookies */}
                 <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-lg">
                   <div className="flex-1">
-                    <span className="font-semibold text-slate-900 dark:text-white">Personalization Cookies</span>
+                    <span className="font-semibold text-slate-900 dark:text-white">{t('cookie.personalization', 'Personalization Cookies')}</span>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                      Enable personalized auction recommendations based on your bidding patterns.
+                      {t('cookie.personalizationDesc', 'Enable personalized auction recommendations and saved preferences.')}
                     </p>
                   </div>
                   <Switch 
@@ -153,9 +153,9 @@ const CookieConsentBanner = () => {
                 {/* Marketing Cookies */}
                 <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-lg">
                   <div className="flex-1">
-                    <span className="font-semibold text-slate-900 dark:text-white">Marketing Cookies</span>
+                    <span className="font-semibold text-slate-900 dark:text-white">{t('cookie.marketing', 'Marketing Cookies')}</span>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                      Used to show you relevant promoted listings and advertisements.
+                      {t('cookie.marketingDesc', 'Used to deliver relevant advertisements and track campaign effectiveness.')}
                     </p>
                   </div>
                   <Switch 
@@ -180,7 +180,7 @@ const CookieConsentBanner = () => {
                   variant="outline"
                   className="flex-1 border-2 border-slate-300 dark:border-slate-600 font-semibold py-3"
                 >
-                  Save Preferences
+                  {t('cookie.savePrefs', 'Save Preferences')}
                 </Button>
               )}
               <Button
@@ -188,7 +188,7 @@ const CookieConsentBanner = () => {
                 variant="ghost"
                 className="flex-1 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold py-3"
               >
-                Reject Non-Essential
+                {t('cookie.decline', 'Reject All')}
               </Button>
             </div>
 

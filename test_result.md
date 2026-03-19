@@ -541,7 +541,7 @@ This is a deeper issue than just language synchronization. The i18n instance is 
 7. Count English text leakage (must be <5%)
 
 ### Test Credentials
-- Test URL: https://partner-onboard-fix-1.preview.emergentagent.com
+- Test URL: https://cookie-consent-i18n.preview.emergentagent.com
 - Admin: charbeladmin@bidvex.com / Admin123!
 
 ---
@@ -1153,7 +1153,7 @@ useEffect(() => {
 6. Verify no regressions (currency toggle absent, theme toggle working)
 
 ### Test Credentials
-- Test URL: https://partner-onboard-fix-1.preview.emergentagent.com
+- Test URL: https://cookie-consent-i18n.preview.emergentagent.com
 
 ---
 
@@ -1408,7 +1408,7 @@ useEffect(() => {
 4. `final_functionality_test.png` - Interactive elements confirmed
 
 ### Live URL Performance
-- **URL**: https://partner-onboard-fix-1.preview.emergentagent.com
+- **URL**: https://cookie-consent-i18n.preview.emergentagent.com
 - **Response time**: Fast loading across all pages
 - **Stability**: No crashes or errors during testing
 - **Cross-page navigation**: Working smoothly
@@ -1622,7 +1622,7 @@ Location: `/app/frontend/src/pages/LotsMarketplacePage.js`
 - Clear cascade on parent change (selecting new country clears province and city)
 
 ### Live URL
-https://partner-onboard-fix-1.preview.emergentagent.com
+https://cookie-consent-i18n.preview.emergentagent.com
 
 ### Test Credentials
 - Admin: charbeladmin@bidvex.com / Admin123!
@@ -1636,7 +1636,7 @@ https://partner-onboard-fix-1.preview.emergentagent.com
 **❌ SELLER OBLIGATIONS SECTIONS NOT FOUND ON PUBLIC LOT DETAIL PAGE**
 
 #### 1. Navigation & Access
-- ✅ **Live URL accessible** - https://partner-onboard-fix-1.preview.emergentagent.com
+- ✅ **Live URL accessible** - https://cookie-consent-i18n.preview.emergentagent.com
 - ✅ **Lots marketplace loaded** - Found 50 auctions (5 lots) in All Regions
 - ✅ **Lot detail page accessible** - Successfully navigated to specific lot: /lots/8b46c78a-3e22-4233-be13-ce709f1d3ee6
 
@@ -1702,7 +1702,7 @@ https://partner-onboard-fix-1.preview.emergentagent.com
 **✅ SELLER OBLIGATIONS SECTIONS NOW DISPLAYING SUCCESSFULLY ON LIVE URL**
 
 #### 1. Navigation & Access
-- ✅ **Live URL accessible** - https://partner-onboard-fix-1.preview.emergentagent.com/lots
+- ✅ **Live URL accessible** - https://cookie-consent-i18n.preview.emergentagent.com/lots
 - ✅ **Lots marketplace loaded** - Found 50 auctions (5 lots) in All Regions
 - ✅ **Lot detail pages accessible** - Successfully tested multiple listings with seller obligations data
 
@@ -1805,7 +1805,7 @@ https://partner-onboard-fix-1.preview.emergentagent.com
 - Admin: charbeladmin@bidvex.com / Admin123!
 
 ### Live URL
-- https://partner-onboard-fix-1.preview.emergentagent.com
+- https://cookie-consent-i18n.preview.emergentagent.com
 
 ### Test Results Summary
 
@@ -2104,7 +2104,7 @@ https://partner-onboard-fix-1.preview.emergentagent.com
 #### Test Credentials Used
 - **Email**: charbeladmin@bidvex.com
 - **Password**: Admin123!
-- **Test URL**: https://partner-onboard-fix-1.preview.emergentagent.com/auth
+- **Test URL**: https://cookie-consent-i18n.preview.emergentagent.com/auth
 
 #### 1. Login Flow Testing - FULLY VERIFIED ✅
 
@@ -2521,7 +2521,7 @@ Verify that Privacy Policy and Terms & Conditions are now editable in the Admin 
 
 #### Test Credentials Used
 - **Admin**: charbeladmin@bidvex.com / Admin123!
-- **Test URL**: https://partner-onboard-fix-1.preview.emergentagent.com
+- **Test URL**: https://cookie-consent-i18n.preview.emergentagent.com
 
 ---
 
@@ -2837,7 +2837,7 @@ The Privacy Policy and Terms & Conditions editing feature in the Admin Panel is 
 **✅ ALL BILINGUAL (EN/FR) LEGAL PAGES FEATURES WORKING PERFECTLY**
 
 #### Test URL
-- **Live URL**: https://partner-onboard-fix-1.preview.emergentagent.com
+- **Live URL**: https://cookie-consent-i18n.preview.emergentagent.com
 - **Test Date**: January 13, 2026
 - **Tester**: Testing Agent (E2)
 

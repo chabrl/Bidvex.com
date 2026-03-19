@@ -1393,3 +1393,22 @@ async def test_email_settings(
             {"$set": {"last_test_at": now, "last_test_status": f"failed: {str(e)}"}}
         )
         raise HTTPException(status_code=400, detail=f"Email send failed: {str(e)}")
+
+
+@admin_router.post("/admin/partners/{partner_id}/verified-firm")
+async def toggle_verified_firm(partner_id: str, data: dict, current_user=Depends(get_admin_current_user)):
+    """Admin toggle for 'Verified Auction Firm' badge."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    is_verified = data.get("is_verified_firm", False)
+
+    result = await _db.users.update_one(
+        {"id": partner_id, "is_partner": True},
+        {"$set": {"is_verified_firm": is_verified}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Partner not found")
+
+    return {"success": True, "is_verified_firm": is_verified}
+

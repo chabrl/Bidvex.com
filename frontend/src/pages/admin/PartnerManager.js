@@ -17,7 +17,7 @@ import {
 import { toast } from 'sonner';
 import {
   Building2, CheckCircle, Clock, XCircle, FileText, ExternalLink,
-  Shield, DollarSign, Loader2, Search, Eye
+  Shield, ShieldCheck, DollarSign, Loader2, Search, Eye
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -293,6 +293,41 @@ const PartnerManager = () => {
                   ) : (
                     <span className="flex items-center gap-1.5"><Clock className="w-4 h-4" /> Annual fee pending — listing capabilities locked until payment</span>
                   )}
+                </div>
+              )}
+
+              {/* Verified Auction Firm Toggle */}
+              {selectedApp.partner_verification_status === 'verified' && (
+                <div className="flex items-center justify-between rounded-md p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <div>
+                      <p className="text-sm font-medium">Verified Auction Firm</p>
+                      <p className="text-[10px] text-slate-500">Display trust badge on listings & profile</p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={selectedApp.is_verified_firm ? 'default' : 'outline'}
+                    className={selectedApp.is_verified_firm ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
+                    data-testid="toggle-verified-firm-btn"
+                    onClick={async () => {
+                      try {
+                        const newVal = !selectedApp.is_verified_firm;
+                        await axios.post(`${API}/admin/partners/${selectedApp.id}/verified-firm`,
+                          { is_verified_firm: newVal },
+                          { headers: { Authorization: `Bearer ${token}` } }
+                        );
+                        setSelectedApp(prev => ({ ...prev, is_verified_firm: newVal }));
+                        setApplications(prev => prev.map(a => a.id === selectedApp.id ? { ...a, is_verified_firm: newVal } : a));
+                        toast.success(newVal ? 'Verified Firm badge granted' : 'Verified Firm badge removed');
+                      } catch (err) {
+                        toast.error('Failed to update verified status');
+                      }
+                    }}
+                  >
+                    {selectedApp.is_verified_firm ? 'Badge Active' : 'Grant Badge'}
+                  </Button>
                 </div>
               )}
 

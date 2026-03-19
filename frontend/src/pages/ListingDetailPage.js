@@ -25,6 +25,7 @@ import AuctioneerInfo from '../components/AuctioneerInfo';
 import BidConfirmationDialog from '../components/BidConfirmationDialog';
 import PriceBreakdown from '../components/PriceBreakdown';
 import PrivateSaleBadge, { BusinessSellerBadge } from '../components/PrivateSaleBadge';
+import { VerifiedBadge } from '../components/VerifiedBadge';
 import { useTrustStatus, BidBlocker } from '../components/TrustVerification';
 import Lightbox from 'yet-another-react-lightbox';
 import 'yet-another-react-lightbox/styles.css';
@@ -348,6 +349,11 @@ const ListingDetailPage = () => {
               {/* Business Seller Badge - Show for registered businesses */}
               {seller && seller.is_tax_registered && (
                 <BusinessSellerBadge variant="default" className="mb-4" />
+              )}
+
+              {/* Verified Auction Firm Badge */}
+              {seller && seller.is_verified_firm && (
+                <div className="mb-4"><VerifiedBadge size="md" /></div>
               )}
 
               <Separator className="my-4" />

@@ -723,6 +723,27 @@ const buildEnglishResources = () => ({
     sellerBenefits: enTranslations.sellerActions?.sellerBenefits || 'Join thousands of sellers',
     earnMore: enTranslations.sellerActions?.earnMore || 'Earn more with competitive fees',
   },
+  // Cookie consent
+  cookie: {
+    message: 'We use cookies and similar technologies to provide our services, personalize your auction recommendations, and analyze site traffic. By clicking "Accept All", you consent to our use of cookies in accordance with our Privacy Policy and Quebec\'s Law 25.',
+    accept: 'Accept All',
+    decline: 'Reject All',
+    learnMore: 'Learn more',
+    title: 'We Value Your Privacy',
+    subtitle: 'BidVex uses cookies to enhance your auction experience',
+    managePrefs: 'Manage Cookie Preferences',
+    savePrefs: 'Save Preferences',
+    essential: 'Essential Cookies',
+    essentialDesc: 'Required for basic site functionality, security, and auction operations.',
+    analytics: 'Analytics Cookies',
+    analyticsDesc: 'Help us understand how visitors interact with our platform to improve features.',
+    personalization: 'Personalization Cookies',
+    personalizationDesc: 'Enable personalized auction recommendations and saved preferences.',
+    marketing: 'Marketing Cookies',
+    marketingDesc: 'Used to deliver relevant advertisements and track campaign effectiveness.',
+    alwaysActive: 'Always Active',
+  },
+  verifiedFirm: 'Verified Firm',
 });
 
 // Build French resources from JSON + legacy keys for backward compatibility
@@ -1387,6 +1408,27 @@ const buildFrenchResources = () => ({
     sellerBenefits: frTranslations.sellerActions?.sellerBenefits || 'Rejoignez des milliers de vendeurs',
     earnMore: frTranslations.sellerActions?.earnMore || 'Gagnez plus avec des frais compétitifs',
   },
+  // Cookie consent
+  cookie: {
+    message: 'Nous utilisons des témoins (cookies) et des technologies similaires pour offrir nos services, personnaliser vos recommandations d\'enchères et analyser le trafic du site. En cliquant « Tout accepter », vous consentez à notre utilisation de témoins conformément à notre Politique de confidentialité et à la Loi 25 du Québec.',
+    accept: 'Tout accepter',
+    decline: 'Tout refuser',
+    learnMore: 'En savoir plus',
+    title: 'Nous respectons votre vie privée',
+    subtitle: 'BidVex utilise des témoins pour améliorer votre expérience',
+    managePrefs: 'Gérer les préférences de témoins',
+    savePrefs: 'Enregistrer les préférences',
+    essential: 'Témoins essentiels',
+    essentialDesc: 'Nécessaires au fonctionnement de base du site, à la sécurité et aux opérations d\'enchères.',
+    analytics: 'Témoins analytiques',
+    analyticsDesc: 'Nous aident à comprendre comment les visiteurs interagissent avec notre plateforme.',
+    personalization: 'Témoins de personnalisation',
+    personalizationDesc: 'Permettent des recommandations d\'enchères personnalisées et la sauvegarde de vos préférences.',
+    marketing: 'Témoins de marketing',
+    marketingDesc: 'Utilisés pour diffuser des publicités pertinentes et mesurer l\'efficacité des campagnes.',
+    alwaysActive: 'Toujours actif',
+  },
+  verifiedFirm: 'Firme vérifiée',
 });
 
 const resources = {

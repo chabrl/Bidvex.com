@@ -227,7 +227,7 @@ async def register(user_data: UserCreate, request: Request):
     })
     
     # Generate token
-    token = create_access_token({"sub": user_id})
+    token = create_access_token({"sub": user_id, "email": user_data.email, "role": "user"})
     
     # Prepare response (exclude password)
     user_response = {k: v for k, v in user_doc.items() if k != "password"}
@@ -240,7 +240,7 @@ async def register(user_data: UserCreate, request: Request):
 
 
 @auth_router.post("/login")
-async def login(credentials: UserLogin):
+async def login(credentials: UserLogin, request: Request):
     """
     Authenticate user with email and password
     
@@ -253,9 +253,31 @@ async def login(credentials: UserLogin):
     
     if not verify_password(credentials.password, user_doc.get("password", "")):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-    # Generate token
-    token = create_access_token({"sub": user_doc["id"]})
+
+    if user_doc.get("status") == "suspended":
+        raise HTTPException(status_code=403, detail="Account suspended. Please contact support.")
+
+    if user_doc.get("status") == "deactivated":
+        raise HTTPException(status_code=403, detail="Account deactivated. Please contact support to reactivate.")
+
+    # Track last login
+    client_ip = get_client_ip(request)
+    user_agent = request.headers.get("user-agent", "unknown") if request else "unknown"
+    await db.users.update_one(
+        {"email": credentials.email},
+        {"$set": {
+            "last_login": datetime.now(timezone.utc).isoformat(),
+            "last_login_ip": client_ip,
+            "last_login_user_agent": user_agent,
+        }}
+    )
+
+    # Generate token with role for RBAC
+    token = create_access_token({
+        "sub": user_doc["id"],
+        "email": user_doc["email"],
+        "role": user_doc.get("role", "user"),
+    })
     
     # Prepare response (exclude password and _id)
     user_response = {k: v for k, v in user_doc.items() if k not in ["password", "_id"]}
@@ -531,3 +553,58 @@ async def verify_reset_token(token: str):
 
 # Export the router
 __all__ = ['auth_router', 'set_auth_db', 'get_current_user_from_token']
+
+
+@auth_router.post("/force-reset-password")
+async def force_reset_password(request: Request):
+    """
+    Complete forced password reset for admin-created accounts.
+    Used when password_reset_required = true.
+    """
+    from jose import JWTError
+    body = await request.json()
+    reset_token = body.get("reset_token", "")
+    new_password = body.get("new_password", "")
+
+    try:
+        payload = jwt.decode(reset_token, jwt_secret, algorithms=["HS256"])
+        user_id = payload.get("sub")
+        purpose = payload.get("purpose")
+        if purpose != "password_reset":
+            raise HTTPException(status_code=400, detail="Invalid token purpose")
+    except (JWTError, jwt.PyJWTError) as e:
+        raise HTTPException(status_code=400, detail=f"Invalid or expired token: {str(e)}")
+
+    user_doc = await db.users.find_one({"id": user_id})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not user_doc.get("password_reset_required", False):
+        raise HTTPException(status_code=400, detail="Password reset not required for this account")
+
+    if len(new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
+
+    hashed_password = hash_password(new_password)
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {
+            "password": hashed_password,
+            "password_reset_required": False,
+            "password_changed_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }}
+    )
+    await db.sessions.delete_many({"user_id": user_id})
+
+    await db.admin_audit_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "action": "force_password_reset_completed",
+        "target_user_id": user_id,
+        "target_email": user_doc.get("email"),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+
+    logger.info(f"Forced password reset completed for user {user_id}")
+    return {"success": True, "message": "Password reset successful. Please log in with your new password."}
+

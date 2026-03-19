@@ -12,6 +12,7 @@ import {
 import Countdown from 'react-countdown';
 import WishlistHeartButton from '../components/WishlistHeartButton';
 import MarketplaceSidebar from '../components/MarketplaceSidebar';
+import { VerifiedBadge } from '../components/VerifiedBadge';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -88,6 +89,7 @@ const LotsMarketplacePage = () => {
             )}
           </div>
           <div className="absolute top-3 left-3 flex flex-wrap gap-2">
+            {listing.is_verified_firm && <VerifiedBadge />}
             {listing.is_featured && (
               <Badge className="bg-orange-500 text-white border-0 shadow-lg">
                 <Star className="h-3 w-3 mr-1 fill-white" /> FEATURED
