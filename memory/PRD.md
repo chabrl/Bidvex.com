@@ -1,6 +1,6 @@
 # BidVex Auction Platform - Product Requirements Document
 
-## Last Updated: March 2026
+## Last Updated: March 19, 2026
 
 ## Original Problem Statement
 Build and maintain a sophisticated full-stack auction platform (BidVex) with real-time bidding, multi-item auctions, partner accounts, Stripe Connect payments, admin dashboard, AI chatbot, Canadian tax compliance, and full bilingual support (EN/FR).
@@ -17,22 +17,24 @@ Email: SendGrid (54 verified dynamic templates, bilingual EN/FR)
 Jobs: APScheduler | i18n: react-i18next | PDF: ReportLab
 ```
 
-## Backend Route Architecture
+## Backend Route Architecture (Post Phase 6)
 ```
 /app/backend/
-├── server.py              (~11,000 lines — dashboard, payments, admin settings)
+├── server.py              (~10,549 lines — admin settings, user profiles, misc)
 ├── routes/
-│   ├── auth.py           # Authentication (login, register, password reset, sessions)
-│   ├── admin.py          # Partner/user admin logic + verified firm toggle
-│   ├── auctions.py       # Auction lifecycle + bids + anti-sniping + buy-now + auto-bid
-│   ├── listings.py       # Single + multi-item CRUD, terms, deletion requests
-│   ├── marketplace.py    # Marketplace browsing/search/filter
+│   ├── auth.py            # Authentication (login, register, password reset, sessions)
+│   ├── admin.py           # Partner/user admin + verified firm toggle + email-preview
+│   ├── auctions.py        # Auction lifecycle + bids + anti-sniping + buy-now + auto-bid
+│   ├── listings.py        # Single + multi-item CRUD, terms, deletion requests
+│   ├── marketplace.py     # Marketplace browsing/search/filter
+│   ├── payments.py        # Unified checkout, payment-methods CRUD, subscriptions, fees
+│   ├── webhooks.py        # Stripe + SendGrid webhooks, trust verification handlers
+│   ├── dashboard.py       # Seller + buyer dashboards (NEW)
 │   ├── ai_chat.py | fees.py | notifications.py | watchlist.py
-│   ├── webhooks.py       # Partner activation/deactivation via Stripe
-│   ├── payments.py | team.py | vehicles.py
+│   └── team.py | vehicles.py
 ├── config/
 │   └── email_templates.py # Verified SendGrid template IDs (bilingual EN/FR dicts)
-├── deps.py               (User model, shared auth)
+├── deps.py                # User model, shared auth
 └── services/
     ├── email_service.py        # SendGrid Dynamic Template sender
     ├── email_notifications.py  # Outlook-safe table-based HTML email templates
@@ -40,42 +42,56 @@ Jobs: APScheduler | i18n: react-i18next | PDF: ReportLab
     └── subscription_service.py
 ```
 
-## All Completed Features (P0)
+## Completed Phases
+
+### P0: Core Platform
 - Vehicle Auction Module | Live Stripe Subscription Engine
 - PDF Invoices (bilingual, tax compliant) | Stripe Fee-on-Top Model
-- Partner Account System (onboarding, admin, fee engine, Connect)
-- Admin Command Center | Marketplace Sidebar Filter
-- Sign-up Consent (Clickwrap) | Admin RBAC Team Management
+- Partner Account System | Admin Command Center | Marketplace Sidebar Filter
 - AI Chatbot (Claude Sonnet 4.5) | Subscription Pricing ($180/$300/year)
-- Pay-to-Activate ($100 CAD/year recurring) with soft-lock on expiry
-- Stripe Customer Portal for partner billing/invoices/tax receipts
-- Partner Dashboard (`/partner/dashboard`)
-- Refactoring: Phase 1-5 complete (~2,930 lines extracted from server.py)
-- P3 Trust & Compliance: Verified Firm Badge, Bilingual Cookie Consent, Auth Refactor
-- Outlook Email Fix: Table-based layouts, solid background-color
-- SendGrid Template Audit: Replaced invalid category IDs with 54 verified individual template IDs
+- Pay-to-Activate ($100 CAD/year) | Stripe Customer Portal | Partner Dashboard
 
-## SendGrid Template Config
-- **Config file**: `/app/backend/config/email_templates.py`
-- **Format**: `EmailTemplates.PASSWORD_RESET = {"en": "d-dbfba...", "fr": "d-9084..."}`
-- **Resolution**: `EmailTemplates.get_id(template, language)` with EN fallback
-- **Verified list**: `/app/backend/tests/email_test_report.json` (54 templates, all 202)
-- **Runtime dict**: `server.py:DEFAULT_EMAIL_TEMPLATES` (lines 82-147)
+### Refactoring Phases 1-5: ~2,930 lines extracted
+- Auth → routes/auth.py
+- Admin → routes/admin.py
+- Listings CRUD → routes/listings.py
+- Auctions/Bidding → routes/auctions.py
+- Marketplace → routes/marketplace.py
+
+### P3: Trust & Compliance
+- Verified Firm Badge (admin toggle + UI badge)
+- Bilingual Cookie Consent (i18next EN/FR)
+- Auth Refactor (server.py → routes/auth.py)
+- Outlook Email Fix (table-based layouts, solid background-color)
+- SendGrid Template Audit (54 verified template IDs, bilingual dict format)
+
+### Phase 6: Modularization (Completed Mar 19, 2026)
+- **Payments dedup**: Removed duplicate payment endpoints from server.py; unified /checkout handles both listing purchases + subscriptions; payment-methods CRUD now stores in DB with trust verification
+- **Dashboard extraction**: Moved /dashboard/seller and /dashboard/buyer to routes/dashboard.py
+- **Webhook consolidation**: Moved _handle_setup_intent_succeeded and _handle_payment_method_attached to routes/webhooks.py; added multi-secret verification
+- **Admin email preview**: New GET /api/admin/email-preview/{template_key}?language=en|fr sends test email with mock data to admin's address; supports all 27 template keys (54 total EN/FR)
+- **Net reduction**: 506 lines removed from server.py (11,055 → 10,549)
+
+## Key API Endpoints
+- `POST /api/auth/login|register|forgot-password` → routes/auth.py
+- `GET /api/dashboard/seller|buyer` → routes/dashboard.py
+- `POST /api/payments/checkout` (listing_id or price_id) → routes/payments.py
+- `GET|POST|DELETE /api/payments/payment-methods` → routes/payments.py
+- `POST /api/webhooks/stripe` → routes/webhooks.py (multi-secret)
+- `GET /api/admin/email-preview/{key}?language=en|fr` → routes/admin.py
 
 ## Test Credentials
 - **Admin:** `charbeladmin@bidvex.com` / `Admin123!`
 
 ## Test Reports
-- iteration_52.json — Pay-to-Activate (100%)
-- iteration_53.json — Phase 2/3 refactor + Stripe Portal (100%)
-- iteration_54.json — Partner Dashboard (100%, 42 total tests)
 - iteration_57.json — P3 Trust & Compliance (100%, 12/12)
 - iteration_58.json — Template audit + Outlook fix (100%, 14/14)
+- iteration_59.json — Phase 6 Modularization (100%, 21/21)
 
 ## Upcoming Tasks
 
 ### P1 - High Priority
-- [ ] Continue refactoring server.py: Extract payments, user dashboards, remaining modules
+- [ ] Continue refactoring server.py: Extract user profiles, tax, messages, affiliate modules
 
 ### P2 - Medium Priority
 - [ ] Partner Pro subscription tier
@@ -84,3 +100,6 @@ Jobs: APScheduler | i18n: react-i18next | PDF: ReportLab
 ### P3 - Low Priority
 - [ ] "Email to Friend" feature
 - [ ] Expand tests/test_emails.py to cover all 40+ templates
+
+## Mocked Services
+- Cloud storage for PDF invoices → local directory `/data/invoices/` with HMAC-signed URLs
