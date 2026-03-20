@@ -23,10 +23,12 @@ Full-stack auction marketplace with localized currency, tax compliance, 4-tier s
 - UX: Mobile swipeable carousels, comparison view, responsive design, SEO
 - Security: Rate limiting (slowapi), Stripe webhook verification, HMAC signed URLs
 - Email: 5 Partner Pro lifecycle templates (41 pytest tests)
+- Database: Production indexes (27 total across 14 collections), idempotent script at scripts/apply_indexes.py
 
 ## Launch Status
 - **GO** — See /app/memory/LAUNCH_CHECKLIST.md
-- 2 manual items: Cloudflare CDN setup, MongoDB index creation
+- MongoDB indexes: DONE (27 indexes applied, all verified)
+- 1 manual item remaining: Cloudflare CDN setup
 
 ## Credentials
 - Admin: `charbeladmin@bidvex.com` / `Admin123!`
