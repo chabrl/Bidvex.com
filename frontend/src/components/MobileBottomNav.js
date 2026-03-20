@@ -57,7 +57,7 @@ const MobileBottomNav = () => {
       {/* Sell Menu Overlay */}
       {showSellMenu && (
         <div 
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setShowSellMenu(false)}
         >
           <div 
@@ -103,8 +103,8 @@ const MobileBottomNav = () => {
       )}
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 z-50 md:hidden">
-        <div className="flex justify-around items-center h-16 max-w-screen-sm mx-auto px-2">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 z-50 lg:hidden safe-area-bottom">
+        <div className="flex justify-around items-center h-14 sm:h-16 max-w-screen-sm mx-auto px-1 sm:px-2">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.path);
@@ -123,8 +123,8 @@ const MobileBottomNav = () => {
                 } ${showSellMenu && item.key === 'sell' ? 'text-primary' : ''}`}
                 aria-label={item.label}
               >
-                <Icon className={`h-6 w-6 mb-1 ${active || (showSellMenu && item.key === 'sell') ? 'stroke-[2.5]' : ''}`} />
-                <span className={`text-xs ${active || (showSellMenu && item.key === 'sell') ? 'font-semibold' : 'font-normal'}`}>
+                <Icon className={`h-5 w-5 sm:h-6 sm:w-6 mb-0.5 sm:mb-1 ${active || (showSellMenu && item.key === 'sell') ? 'stroke-[2.5]' : ''}`} />
+                <span className={`text-[10px] sm:text-xs ${active || (showSellMenu && item.key === 'sell') ? 'font-semibold' : 'font-normal'}`}>
                   {item.label}
                 </span>
               </button>

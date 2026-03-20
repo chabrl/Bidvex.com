@@ -37,7 +37,7 @@ const HeroBanner = () => {
   };
 
   return (
-    <section className="relative min-h-[600px] md:min-h-[700px] px-4 py-20 overflow-hidden">
+    <section className="relative min-h-[480px] sm:min-h-[560px] lg:min-h-[700px] px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20 overflow-hidden">
       {/* Animated Gradient Background */}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-teal-500/10 animate-gradient-shift"></div>
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
@@ -70,10 +70,10 @@ const HeroBanner = () => {
       />
 
       <div className="max-w-6xl mx-auto relative z-10">
-        <div className="text-center space-y-8">
+        <div className="text-center space-y-5 sm:space-y-8">
           {/* Kinetic Typography Headline */}
           <motion.h1
-            className="text-5xl sm:text-6xl lg:text-7xl font-bold leading-tight"
+            className="text-3xl sm:text-5xl lg:text-7xl font-bold leading-tight"
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, ease: "easeOut" }}
@@ -114,7 +114,7 @@ const HeroBanner = () => {
 
           {/* Subline */}
           <motion.p
-            className="text-xl sm:text-2xl text-muted-foreground max-w-3xl mx-auto font-medium"
+            className="text-base sm:text-xl lg:text-2xl text-muted-foreground max-w-3xl mx-auto font-medium"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.7, duration: 0.6 }}
@@ -137,11 +137,11 @@ const HeroBanner = () => {
                   placeholder="Search for items, categories, or sellers..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-12 pr-32 py-6 text-lg rounded-full border-2 shadow-lg focus:shadow-xl transition-shadow"
+                  className="w-full pl-12 pr-24 sm:pr-32 py-4 sm:py-6 text-base sm:text-lg rounded-full border-2 shadow-lg focus:shadow-xl transition-shadow"
                 />
                 <Button
                   type="submit"
-                  className="absolute right-2 gradient-button text-white border-0 rounded-full px-6"
+                  className="absolute right-2 gradient-button text-white border-0 rounded-full px-4 sm:px-6 text-sm sm:text-base"
                 >
                   Search
                 </Button>
@@ -157,7 +157,7 @@ const HeroBanner = () => {
             transition={{ delay: 1.1, duration: 0.5 }}
           >
             <Button
-              className="gradient-button text-white border-0 text-lg px-8 py-6 rounded-full shadow-lg hover:shadow-xl transition-shadow group"
+              className="gradient-button text-white border-0 text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 rounded-full shadow-lg hover:shadow-xl transition-shadow group w-full sm:w-auto"
               onClick={() => navigate('/marketplace')}
             >
               Browse Auctions
@@ -165,7 +165,7 @@ const HeroBanner = () => {
             </Button>
             <Button
               variant="outline"
-              className="text-lg px-8 py-6 rounded-full border-2 shadow-lg hover:shadow-xl transition-shadow"
+              className="text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 rounded-full border-2 shadow-lg hover:shadow-xl transition-shadow w-full sm:w-auto"
               onClick={() => navigate('/how-it-works')}
             >
               How Bidding Works

@@ -314,26 +314,26 @@ const LiveAuctionsSection = ({ items, navigate }) => {
   if (!items.length) return null;
 
   return (
-    <section ref={ref} className="py-16 px-4 bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800">
+    <section ref={ref} className="py-12 sm:py-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800">
       <div className="max-w-7xl mx-auto">
-        <div className={`flex items-center justify-between mb-10 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <Clock className="h-8 w-8 text-red-500" />
+        <div className={`flex items-center justify-between mb-8 sm:mb-10 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+            <div className="relative shrink-0">
+              <Clock className="h-6 w-6 sm:h-8 sm:w-8 text-red-500" />
               <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-ping" />
               <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full" />
             </div>
-            <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-slate-50">{t('homepage.endingSoon')}</h2>
-              <p className="text-slate-600 dark:text-slate-300">{t('homepage.endingSoonDesc')}</p>
+            <div className="min-w-0">
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 dark:text-slate-50 truncate">{t('homepage.endingSoon')}</h2>
+              <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 truncate">{t('homepage.endingSoonDesc')}</p>
             </div>
           </div>
-          <Button onClick={() => navigate('/marketplace?sort=ending')} variant="outline" className="hidden md:flex border-2 border-slate-300 dark:border-cyan-500/50 hover:border-cyan-500 hover:text-cyan-600 dark:text-slate-200 dark:hover:text-cyan-400">
+          <Button onClick={() => navigate('/marketplace?sort=ending')} variant="outline" className="hidden sm:flex border-2 border-slate-300 dark:border-cyan-500/50 hover:border-cyan-500 hover:text-cyan-600 dark:text-slate-200 dark:hover:text-cyan-400 whitespace-nowrap shrink-0">
             {t('homepage.viewAll')} <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {items.slice(0, 4).map((item, index) => (
             <LiveAuctionCard key={item.id} item={item} index={index} isVisible={isVisible} navigate={navigate} />
           ))}
@@ -377,7 +377,7 @@ const LiveAuctionCard = ({ item, index, isVisible, navigate }) => {
       style={{ transitionDelay: `${index * 100}ms` }}
       onClick={() => navigate(`/listing/${item.id}`)}
     >
-      <div className="relative h-48 overflow-hidden bg-slate-100 dark:bg-slate-700">
+      <div className="relative h-40 sm:h-48 overflow-hidden bg-slate-100 dark:bg-slate-700">
         {item.images?.[0] ? (
           <img src={item.images[0]} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
         ) : (
@@ -399,8 +399,8 @@ const LiveAuctionCard = ({ item, index, isVisible, navigate }) => {
         </div>
       </div>
       
-      <CardContent className="p-5">
-        <h3 className="font-semibold text-lg mb-3 line-clamp-1 text-slate-900 dark:text-slate-50">{item.title}</h3>
+      <CardContent className="p-4 sm:p-5">
+        <h3 className="font-semibold text-base sm:text-lg mb-2 sm:mb-3 line-clamp-1 text-slate-900 dark:text-slate-50">{item.title}</h3>
         <div className="flex justify-between items-end">
           <div>
             <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('homepage.currentBid')}</p>
@@ -427,7 +427,7 @@ const HotItemsSection = ({ items, navigate }) => {
   return (
     <section 
       ref={ref} 
-      className="py-20 px-4 relative overflow-hidden bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:bg-none dark:text-white"
+      className="py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-8 relative overflow-hidden bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:bg-none dark:text-white"
       style={{ '--hot-dark-bg': 'linear-gradient(135deg, #1E3A8A 0%, #0F172A 40%, #06B6D4 100%)' }}
     >
       {/* Dark mode gradient background */}
@@ -440,27 +440,27 @@ const HotItemsSection = ({ items, navigate }) => {
 
       <div className="relative max-w-7xl mx-auto">
         {/* Header */}
-        <div className={`flex items-center justify-between mb-12 transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl shadow-lg shadow-orange-500/30">
-              <Flame className="h-8 w-8 text-white" />
+        <div className={`flex items-center justify-between mb-8 sm:mb-12 transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+            <div className="p-2.5 sm:p-3 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl shadow-lg shadow-orange-500/30 shrink-0">
+              <Flame className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
             </div>
-            <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white">{t('homepage.hotItems')}</h2>
-              <p className="text-slate-600 dark:text-cyan-200/90">{t('homepage.hotItemsDesc')}</p>
+            <div className="min-w-0">
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 dark:text-white truncate">{t('homepage.hotItems')}</h2>
+              <p className="text-sm sm:text-base text-slate-600 dark:text-cyan-200/90 truncate">{t('homepage.hotItemsDesc')}</p>
             </div>
           </div>
           <Button 
             onClick={() => navigate('/marketplace?sort=hot')} 
             variant="outline"
-            className="hidden md:flex items-center gap-1 px-5 py-2 rounded-md font-semibold transition-all hover:-translate-y-0.5 whitespace-nowrap border-2 border-slate-300 dark:border-cyan-500/60 text-slate-700 dark:text-white hover:border-cyan-500 hover:text-cyan-600 dark:hover:bg-cyan-500/20 dark:hover:border-cyan-400"
+            className="hidden sm:flex items-center gap-1 px-5 py-2 rounded-md font-semibold transition-all hover:-translate-y-0.5 whitespace-nowrap border-2 border-slate-300 dark:border-cyan-500/60 text-slate-700 dark:text-white hover:border-cyan-500 hover:text-cyan-600 dark:hover:bg-cyan-500/20 dark:hover:border-cyan-400 shrink-0"
           >
             {t('homepage.viewAll')} <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
         </div>
 
         {/* Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {items.map((item, index) => (
             <Card 
               key={item.id}
@@ -469,7 +469,7 @@ const HotItemsSection = ({ items, navigate }) => {
               onClick={() => navigate(`/listing/${item.id}`)}
               data-testid="hot-item-card"
             >
-              <div className="relative h-52 overflow-hidden">
+              <div className="relative h-44 sm:h-52 overflow-hidden">
                 {item.images?.[0] ? (
                   <img src={item.images[0]} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 hover:scale-110" />
                 ) : (
@@ -493,12 +493,12 @@ const HotItemsSection = ({ items, navigate }) => {
                 </div>
               </div>
               
-              <CardContent className="p-5">
-                <h3 className="font-semibold text-lg mb-3 line-clamp-1 text-slate-900 dark:text-white">{item.title}</h3>
+              <CardContent className="p-4 sm:p-5">
+                <h3 className="font-semibold text-base sm:text-lg mb-2 sm:mb-3 line-clamp-1 text-slate-900 dark:text-white">{item.title}</h3>
                 <div className="flex justify-between items-end">
                   <div>
                     <p className="text-xs uppercase tracking-wider font-medium text-slate-500 dark:text-cyan-200/80">{t('homepage.currentBid')}</p>
-                    <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-300">{formatCurrency(item.current_price)}</p>
+                    <p className="text-xl sm:text-2xl font-bold text-cyan-600 dark:text-cyan-300">{formatCurrency(item.current_price)}</p>
                   </div>
                   <Button 
                     size="sm" 
@@ -514,10 +514,10 @@ const HotItemsSection = ({ items, navigate }) => {
         </div>
 
         {/* Mobile View All Button */}
-        <div className="flex md:hidden justify-center mt-8">
+        <div className="flex sm:hidden justify-center mt-8">
           <Button 
             onClick={() => navigate('/marketplace?sort=hot')} 
-            className="font-bold px-8 py-3 whitespace-nowrap bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-cyan-600 hover:to-blue-600"
+            className="font-bold px-8 py-3 whitespace-nowrap bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-cyan-600 hover:to-blue-600 w-full sm:w-auto"
           >
             {t('homepage.viewAll')} <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
@@ -535,18 +535,18 @@ const FeaturedSection = ({ items, navigate }) => {
   if (!items.length) return null;
 
   return (
-    <section ref={ref} className="py-16 px-4 bg-white dark:bg-slate-900">
+    <section ref={ref} className="py-12 sm:py-16 px-4 sm:px-6 lg:px-8 bg-white dark:bg-slate-900">
       <div className="max-w-7xl mx-auto">
-        <div className={`text-center mb-12 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+        <div className={`text-center mb-8 sm:mb-12 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
           <Badge className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white border-0 mb-4 px-4 py-2">
             <Sparkles className="h-4 w-4 mr-2 inline" />
             {t('homepage.featured')}
           </Badge>
-          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-slate-50 mb-3">{t('homepage.curatedAuctions')}</h2>
-          <p className="text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">{t('homepage.handPicked')}</p>
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 dark:text-slate-50 mb-3">{t('homepage.curatedAuctions')}</h2>
+          <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">{t('homepage.handPicked')}</p>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
           {items.slice(0, 8).map((item, index) => (
             <Card 
               key={item.id}
@@ -563,9 +563,9 @@ const FeaturedSection = ({ items, navigate }) => {
                   </div>
                 )}
               </div>
-              <CardContent className="p-4">
-                <h3 className="font-medium text-sm mb-2 line-clamp-1 text-slate-900 dark:text-slate-50">{item.title}</h3>
-                <p className="text-lg font-bold text-blue-600 dark:text-cyan-400">{formatCurrency(item.current_price)}</p>
+              <CardContent className="p-3 sm:p-4">
+                <h3 className="font-medium text-xs sm:text-sm mb-1 sm:mb-2 line-clamp-1 text-slate-900 dark:text-slate-50">{item.title}</h3>
+                <p className="text-base sm:text-lg font-bold text-blue-600 dark:text-cyan-400">{formatCurrency(item.current_price)}</p>
               </CardContent>
             </Card>
           ))}
@@ -583,19 +583,19 @@ const NewListingsSection = ({ items, navigate }) => {
   if (!items.length) return null;
 
   return (
-    <section ref={ref} className="py-16 px-4 bg-slate-50 dark:bg-slate-900">
+    <section ref={ref} className="py-12 sm:py-16 px-4 sm:px-6 lg:px-8 bg-slate-50 dark:bg-slate-900">
       <div className="max-w-7xl mx-auto">
-        <div className={`flex items-center justify-between mb-10 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-          <div>
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-slate-50">{t('homepage.justListed')}</h2>
-            <p className="text-slate-600 dark:text-slate-300 mt-2">{t('homepage.freshAuctions')}</p>
+        <div className={`flex items-center justify-between mb-8 sm:mb-10 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+          <div className="min-w-0">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 dark:text-slate-50">{t('homepage.justListed')}</h2>
+            <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 mt-1 sm:mt-2">{t('homepage.freshAuctions')}</p>
           </div>
-          <Button onClick={() => navigate('/marketplace?sort=newest')} variant="outline" className="hidden md:flex border-2 border-slate-300 dark:border-cyan-500/50 hover:border-cyan-500 hover:text-cyan-600 dark:text-slate-200 dark:hover:text-cyan-400">
+          <Button onClick={() => navigate('/marketplace?sort=newest')} variant="outline" className="hidden sm:flex border-2 border-slate-300 dark:border-cyan-500/50 hover:border-cyan-500 hover:text-cyan-600 dark:text-slate-200 dark:hover:text-cyan-400 whitespace-nowrap shrink-0">
             {t('homepage.viewAll')} <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
           {items.slice(0, 6).map((item, index) => (
             <Card 
               key={item.id}
@@ -638,25 +638,25 @@ const FeaturesSection = ({ navigate }) => {
   ];
 
   return (
-    <section ref={ref} className="py-20 px-4 bg-white dark:bg-slate-800">
+    <section ref={ref} className="py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-8 bg-white dark:bg-slate-800">
       <div className="max-w-7xl mx-auto">
-        <div className={`text-center mb-12 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-slate-50 mb-3">{t('homepage.whyChooseBidvex')}</h2>
-          <p className="text-slate-600 dark:text-slate-300">{t('homepage.trustedPlatform')}</p>
+        <div className={`text-center mb-8 sm:mb-12 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 dark:text-slate-50 mb-3">{t('homepage.whyChooseBidvex')}</h2>
+          <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300">{t('homepage.trustedPlatform')}</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {features.map((feature, index) => (
             <div 
               key={index}
-              className={`group p-8 rounded-2xl bg-gradient-to-br from-slate-50 to-white dark:from-slate-800 dark:to-slate-700 border border-slate-100 dark:border-slate-600 hover:border-cyan-200 dark:hover:border-cyan-500/50 hover:shadow-xl hover:shadow-cyan-500/10 dark:hover:shadow-cyan-500/20 transition-all duration-500 flex flex-col items-center text-center ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+              className={`group p-5 sm:p-8 rounded-2xl bg-gradient-to-br from-slate-50 to-white dark:from-slate-800 dark:to-slate-700 border border-slate-100 dark:border-slate-600 hover:border-cyan-200 dark:hover:border-cyan-500/50 hover:shadow-xl hover:shadow-cyan-500/10 dark:hover:shadow-cyan-500/20 transition-all duration-500 flex flex-col items-center text-center ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
               style={{ transitionDelay: `${index * 100}ms` }}
             >
               <div className="w-14 h-14 mb-5 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/30 group-hover:scale-110 transition-transform">
                 {feature.icon}
               </div>
-              <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-50 mb-2">{feature.title}</h3>
-              <p className="text-slate-600 dark:text-slate-300 leading-relaxed">{feature.desc}</p>
+              <h3 className="text-lg sm:text-xl font-semibold text-slate-900 dark:text-slate-50 mb-2">{feature.title}</h3>
+              <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed">{feature.desc}</p>
             </div>
           ))}
         </div>
@@ -671,21 +671,21 @@ const TopSellersSection = ({ sellers }) => {
   const [ref, isVisible] = useScrollReveal(0.1);
 
   return (
-    <section ref={ref} className="py-20 px-4 bg-slate-50 dark:bg-slate-900">
+    <section ref={ref} className="py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-8 bg-slate-50 dark:bg-slate-900">
       <div className="max-w-7xl mx-auto">
-        <div className={`text-center mb-12 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+        <div className={`text-center mb-8 sm:mb-12 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
           <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-700 mb-4"><Award className="h-4 w-4 mr-2 inline" />{t('homepage.topPerformers')}</Badge>
-          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-slate-50">{t('homepage.topSellers')}</h2>
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 dark:text-slate-50">{t('homepage.topSellers')}</h2>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {sellers.slice(0, 3).map((seller, idx) => (
             <Card 
               key={seller.user?.id || idx} 
               className={`card-hover-pop overflow-hidden border-0 shadow-lg dark:bg-slate-800/50 dark:backdrop-blur-sm transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
               style={{ transitionDelay: `${idx * 150}ms` }}
             >
-              <CardContent className="p-8 text-center">
+              <CardContent className="p-5 sm:p-8 text-center">
                 <div className="relative inline-block mb-6">
                   {seller.user?.picture ? (
                     <img src={seller.user.picture} alt={seller.user.name} className="w-24 h-24 rounded-full mx-auto ring-4 ring-slate-100 dark:ring-slate-700" />
@@ -732,27 +732,27 @@ const HowItWorksSection = ({ navigate }) => {
   ];
 
   return (
-    <section ref={ref} className="py-20 px-4 bg-gradient-to-br from-blue-600 via-cyan-600 to-blue-700 dark:from-blue-900 dark:via-slate-900 dark:to-slate-900 text-white relative overflow-hidden">
+    <section ref={ref} className="py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-blue-600 via-cyan-600 to-blue-700 dark:from-blue-900 dark:via-slate-900 dark:to-slate-900 text-white relative overflow-hidden">
       {/* Background Effects */}
       <div className="absolute inset-0 opacity-20 dark:opacity-30">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-cyan-300 dark:bg-cyan-500 rounded-full blur-[200px]" />
       </div>
 
       <div className="relative max-w-5xl mx-auto text-center">
-        <div className={`mb-12 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+        <div className={`mb-8 sm:mb-12 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
           <Badge className="bg-white/20 backdrop-blur border-white/30 dark:border-cyan-400/30 mb-4 text-white font-semibold shadow-lg">{t('homepage.gettingStarted')}</Badge>
-          <h2 className="text-3xl md:text-5xl font-bold mb-4 text-white drop-shadow-lg">{t('homepage.howItWorksTitle')}</h2>
-          <p className="max-w-2xl mx-auto text-lg text-white/90 drop-shadow-md">{t('homepage.startWinning')}</p>
+          <h2 className="text-2xl sm:text-3xl lg:text-5xl font-bold mb-3 sm:mb-4 text-white drop-shadow-lg">{t('homepage.howItWorksTitle')}</h2>
+          <p className="max-w-2xl mx-auto text-base sm:text-lg text-white/90 drop-shadow-md">{t('homepage.startWinning')}</p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 mb-12">
+        <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8 mb-8 sm:mb-12">
           {steps.map((step, index) => (
             <div 
               key={index}
               className={`relative transition-all duration-700 hover:scale-105 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
               style={{ transitionDelay: `${(index + 1) * 150}ms` }}
             >
-              <div className="bg-white/15 dark:bg-white/10 backdrop-blur-md rounded-2xl p-8 border border-white/20 dark:border-white/10 hover:bg-white/25 dark:hover:bg-white/15 hover:border-white/40 dark:hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-400/30 dark:hover:shadow-cyan-500/20 transition-all">
+              <div className="bg-white/15 dark:bg-white/10 backdrop-blur-md rounded-2xl p-5 sm:p-8 border border-white/20 dark:border-white/10 hover:bg-white/25 dark:hover:bg-white/15 hover:border-white/40 dark:hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-400/30 dark:hover:shadow-cyan-500/20 transition-all">
                 <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-10 h-10 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-lg shadow-cyan-400/60">
                   {index + 1}
                 </div>
