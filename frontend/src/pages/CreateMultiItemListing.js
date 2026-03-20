@@ -21,6 +21,7 @@ import Papa from 'papaparse';
 import { useDropzone } from 'react-dropzone';
 import RichTextEditor from '../components/RichTextEditor';
 import LocationSelector from '../components/LocationSelector';
+import useGeoLocation from '../hooks/useGeoLocation';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -29,6 +30,7 @@ const CreateMultiItemListing = () => {
   const { user } = useAuth();
   const { canCreateMultiLot } = useFeatureFlags();
   const navigate = useNavigate();
+  const geo = useGeoLocation();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
@@ -610,20 +612,20 @@ const CreateMultiItemListing = () => {
 
   // Render Step Indicator
   const StepIndicator = () => (
-    <div className="flex items-center justify-center mb-8">
+    <div className="flex items-center justify-between md:justify-center mb-8 overflow-x-auto px-2 gap-1 md:gap-0">
       {[1, 2, 3, 4, 5].map(step => (
         <React.Fragment key={step}>
-          <div className={`flex items-center justify-center w-10 h-10 rounded-full font-semibold transition-all ${
+          <div className={`flex items-center justify-center w-9 h-9 md:w-10 md:h-10 rounded-full font-semibold transition-all shrink-0 ${
             step === currentStep 
               ? 'bg-gradient-to-r from-[#009BFF] to-[#0056A6] text-white scale-110' 
               : step < currentStep 
                 ? 'bg-green-500 text-white' 
                 : 'bg-gray-200 dark:bg-gray-700 text-gray-500'
           }`}>
-            {step < currentStep ? <CheckCircle className="h-5 w-5" /> : step}
+            {step < currentStep ? <CheckCircle className="h-4 w-4 md:h-5 md:w-5" /> : step}
           </div>
           {step < 5 && (
-            <div className={`w-16 h-1 mx-2 ${
+            <div className={`w-6 md:w-16 h-1 mx-1 md:mx-2 shrink-0 ${
               step < currentStep ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-700'
             }`} />
           )}
@@ -695,6 +697,7 @@ const CreateMultiItemListing = () => {
           city: formData.city,
           postalCode: formData.postal_code,
         }}
+        geoSuggestion={geo}
         onChange={({ country, region, city, postalCode }) => {
           setFormData(prev => ({
             ...prev,
@@ -839,12 +842,12 @@ const CreateMultiItemListing = () => {
       {/* Upload Method Selection */}
       <Card className="border-2 border-dashed">
         <CardContent className="pt-6">
-          <div className="flex flex-wrap gap-4 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
             <Button
               type="button"
               variant={uploadMethod === 'manual' ? 'default' : 'outline'}
               onClick={() => setUploadMethod('manual')}
-              className={uploadMethod === 'manual' ? 'gradient-button text-white' : ''}
+              className={`min-h-[48px] ${uploadMethod === 'manual' ? 'gradient-button text-white' : ''}`}
             >
               <Edit2 className="mr-2 h-4 w-4" />
               {t('createListing.manual')}
@@ -853,7 +856,7 @@ const CreateMultiItemListing = () => {
               type="button"
               variant={uploadMethod === 'csv' ? 'default' : 'outline'}
               onClick={() => setUploadMethod('csv')}
-              className={uploadMethod === 'csv' ? 'gradient-button text-white' : ''}
+              className={`min-h-[48px] ${uploadMethod === 'csv' ? 'gradient-button text-white' : ''}`}
             >
               <FileText className="mr-2 h-4 w-4" />
               {t('createListing.csvUpload')}
@@ -862,7 +865,7 @@ const CreateMultiItemListing = () => {
               type="button"
               variant={uploadMethod === 'images' ? 'default' : 'outline'}
               onClick={() => setUploadMethod('images')}
-              className={uploadMethod === 'images' ? 'gradient-button text-white' : ''}
+              className={`min-h-[48px] ${uploadMethod === 'images' ? 'gradient-button text-white' : ''}`}
             >
               <ImageIcon className="mr-2 h-4 w-4" />
               {t('createListing.imagesBulk')}
@@ -1072,11 +1075,13 @@ const CreateMultiItemListing = () => {
                     <Label>{t('createListing.startingPrice')} ({formData.currency}) * (1-10,000)</Label>
                     <Input 
                       type="number" 
+                      inputMode="decimal"
                       step="0.01" 
                       min="1"
                       max="10000"
                       value={lot.starting_price} 
                       onChange={(e) => handleLotChange(actualIndex, 'starting_price', e.target.value)} 
+                      className="min-h-[48px]"
                       required 
                     />
                     {validationErrors[actualIndex]?.starting_price && (
@@ -1124,12 +1129,13 @@ const CreateMultiItemListing = () => {
                         <span className="text-muted-foreground">$</span>
                         <Input 
                           type="number" 
+                          inputMode="decimal"
                           step="0.01" 
                           min={lot.starting_price ? (parseFloat(lot.starting_price) * 1.2).toFixed(2) : '1'}
                           value={lot.buy_now_price || ''} 
                           onChange={(e) => handleLotChange(actualIndex, 'buy_now_price', e.target.value)} 
                           placeholder={lot.starting_price ? `Min: $${(parseFloat(lot.starting_price) * 1.2).toFixed(2)}` : 'Enter starting price first'}
-                          className="flex-1"
+                          className="flex-1 min-h-[48px]"
                         />
                       </div>
                       {validationErrors[actualIndex]?.buy_now_price && (
@@ -2343,12 +2349,13 @@ const CreateMultiItemListing = () => {
             )}
 
             {/* Navigation Buttons */}
-            <div className="flex justify-between pt-6 border-t">
+            <div className="flex flex-col-reverse sm:flex-row justify-between gap-3 pt-6 border-t">
               <Button
                 type="button"
                 variant="outline"
                 onClick={goToPrevStep}
                 disabled={currentStep === 1 || loading}
+                className="w-full sm:w-auto min-h-[48px]"
               >
                 <ChevronLeft className="mr-2 h-4 w-4" />
                 {t('common.back')}
@@ -2358,7 +2365,7 @@ const CreateMultiItemListing = () => {
                 <Button
                   type="button"
                   onClick={goToNextStep}
-                  className="gradient-button text-white border-0"
+                  className="w-full sm:w-auto gradient-button text-white border-0 min-h-[48px]"
                 >
                   {t('common.next')}
                   <ChevronRight className="ml-2 h-4 w-4" />
@@ -2367,7 +2374,7 @@ const CreateMultiItemListing = () => {
                 <Button
                   type="button"
                   onClick={handleSubmit}
-                  className="gradient-button text-white border-0"
+                  className="w-full sm:w-auto gradient-button text-white border-0 min-h-[48px]"
                   disabled={loading || !finalAgreementAccepted}
                 >
                   {loading ? (

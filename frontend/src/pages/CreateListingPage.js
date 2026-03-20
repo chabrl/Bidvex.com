@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { toast } from 'sonner';
 import { Loader2, Upload } from 'lucide-react';
 import LocationSelector from '../components/LocationSelector';
+import useGeoLocation from '../hooks/useGeoLocation';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -20,6 +21,7 @@ const CreateListingPage = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const geo = useGeoLocation();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -270,11 +272,13 @@ const CreateListingPage = () => {
                     id="starting_price"
                     name="starting_price"
                     type="number"
+                    inputMode="decimal"
                     step="0.01"
                     min="0.01"
                     value={formData.starting_price}
                     onChange={handleChange}
                     required
+                    className="min-h-[48px]"
                     data-testid="starting-price-input"
                   />
                 </div>
@@ -285,10 +289,12 @@ const CreateListingPage = () => {
                     id="buy_now_price"
                     name="buy_now_price"
                     type="number"
+                    inputMode="decimal"
                     step="0.01"
                     min="0.01"
                     value={formData.buy_now_price}
                     onChange={handleChange}
+                    className="min-h-[48px]"
                     data-testid="buy-now-price-input"
                   />
                 </div>
@@ -319,6 +325,7 @@ const CreateListingPage = () => {
                   city: formData.city,
                   postalCode: formData.postal_code,
                 }}
+                geoSuggestion={geo}
                 onChange={({ country, region, city, postalCode }) => {
                   setFormData(prev => ({
                     ...prev,
@@ -365,7 +372,7 @@ const CreateListingPage = () => {
                   Upload Images from Device
                 </Button>
                 {formData.images.length > 0 && (
-                  <div className="grid grid-cols-3 gap-2 mt-2">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
                     {formData.images.map((img, index) => (
                       <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
                         <img src={img} alt={`Preview ${index + 1}`} className="w-full h-full object-cover" />
@@ -516,7 +523,7 @@ const CreateListingPage = () => {
 
               <Button
                 type="submit"
-                className="w-full gradient-button text-white border-0"
+                className="w-full gradient-button text-white border-0 min-h-[48px] text-base"
                 disabled={loading || !finalAgreementAccepted}
                 data-testid="submit-listing-btn"
               >

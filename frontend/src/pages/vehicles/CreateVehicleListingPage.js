@@ -31,6 +31,7 @@ import {
 
 } from 'lucide-react';
 import LocationSelector from '../../components/LocationSelector';
+import useGeoLocation from '../../hooks/useGeoLocation';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -99,6 +100,7 @@ const CONDITIONS = ['excellent', 'good', 'fair', 'poor', 'unknown'];
 const CreateVehicleListingPage = () => {
   const navigate = useNavigate();
   const { token, user } = useAuth();
+  const geo = useGeoLocation();
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [vinLoading, setVinLoading] = useState(false);
@@ -543,7 +545,7 @@ const CreateVehicleListingPage = () => {
             </div>
             
             {/* Engine */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Engine Size (L)</Label>
                 <Input
@@ -556,6 +558,7 @@ const CreateVehicleListingPage = () => {
                 <Label>Cylinders</Label>
                 <Input
                   type="number"
+                  inputMode="numeric"
                   value={formData.cylinders}
                   onChange={(e) => updateField('cylinders', e.target.value)}
                   placeholder="4"
@@ -565,6 +568,7 @@ const CreateVehicleListingPage = () => {
                 <Label>Horsepower</Label>
                 <Input
                   type="number"
+                  inputMode="numeric"
                   value={formData.horsepower}
                   onChange={(e) => updateField('horsepower', e.target.value)}
                   placeholder="200"
@@ -595,7 +599,7 @@ const CreateVehicleListingPage = () => {
             </div>
             
             {/* Documentation */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Ownership Status *</Label>
                 <Select value={formData.ownership_status} onValueChange={(v) => updateField('ownership_status', v)}>
@@ -751,7 +755,7 @@ const CreateVehicleListingPage = () => {
             </div>
             
             {/* Photo Categories */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {PHOTO_CATEGORIES.map(category => (
                 <Card key={category.id} className={category.required ? 'border-blue-200' : ''}>
                   <CardContent className="p-4">
@@ -838,6 +842,7 @@ const CreateVehicleListingPage = () => {
                 city: formData.location_city,
                 postalCode: formData.location_postal_code,
               }}
+              geoSuggestion={geo}
               onChange={({ country, region, city, postalCode }) => {
                 setFormData(prev => ({
                   ...prev,
@@ -898,49 +903,57 @@ const CreateVehicleListingPage = () => {
             </div>
             
             {/* Pricing */}
-            <div className="grid md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   <DollarSign className="h-4 w-4" /> Starting Price *
                 </Label>
                 <Input
                   type="number"
+                  inputMode="decimal"
                   value={formData.starting_price}
                   onChange={(e) => updateField('starting_price', e.target.value)}
                   placeholder="25000"
+                  className="min-h-[48px]"
                 />
               </div>
               <div className="space-y-2">
                 <Label>Reserve Price</Label>
                 <Input
                   type="number"
+                  inputMode="decimal"
                   value={formData.reserve_price}
                   onChange={(e) => updateField('reserve_price', e.target.value)}
                   placeholder="Optional"
+                  className="min-h-[48px]"
                 />
               </div>
               <div className="space-y-2">
                 <Label>Buy Now Price</Label>
                 <Input
                   type="number"
+                  inputMode="decimal"
                   value={formData.buy_now_price}
                   onChange={(e) => updateField('buy_now_price', e.target.value)}
                   placeholder="Optional"
+                  className="min-h-[48px]"
                 />
               </div>
               <div className="space-y-2">
                 <Label>Bid Increment</Label>
                 <Input
                   type="number"
+                  inputMode="decimal"
                   value={formData.bid_increment}
                   onChange={(e) => updateField('bid_increment', e.target.value)}
                   placeholder="100"
+                  className="min-h-[48px]"
                 />
               </div>
             </div>
             
             {/* Deposit */}
-            <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-lg">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 bg-slate-50 rounded-lg">
               <Checkbox
                 checked={formData.requires_deposit}
                 onCheckedChange={(checked) => updateField('requires_deposit', checked)}
@@ -952,9 +965,10 @@ const CreateVehicleListingPage = () => {
               {formData.requires_deposit && (
                 <Input
                   type="number"
+                  inputMode="decimal"
                   value={formData.deposit_amount}
                   onChange={(e) => updateField('deposit_amount', e.target.value)}
-                  className="w-32"
+                  className="w-full sm:w-32 min-h-[48px]"
                   placeholder="500"
                 />
               )}
@@ -1049,17 +1063,17 @@ const CreateVehicleListingPage = () => {
           
           {/* Progress */}
           <div className="mt-6">
-            <div className="flex justify-between mb-2">
+            <div className="flex justify-between mb-2 overflow-x-auto gap-1 pb-1">
               {STEPS.map((step, index) => {
                 const Icon = step.icon;
                 return (
                   <div 
                     key={step.id}
-                    className={`flex items-center gap-2 text-sm ${
+                    className={`flex items-center gap-1 md:gap-2 text-sm shrink-0 ${
                       index <= currentStep ? 'text-blue-600' : 'text-slate-400'
                     }`}
                   >
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
                       index < currentStep ? 'bg-blue-600 text-white' :
                       index === currentStep ? 'bg-blue-100 text-blue-600 border-2 border-blue-600' :
                       'bg-slate-100'
@@ -1070,7 +1084,7 @@ const CreateVehicleListingPage = () => {
                         <Icon className="h-4 w-4" />
                       )}
                     </div>
-                    <span className="hidden md:inline">{step.title}</span>
+                    <span className="hidden lg:inline text-xs">{step.title}</span>
                   </div>
                 );
               })}
@@ -1105,25 +1119,25 @@ const CreateVehicleListingPage = () => {
         </Card>
 
         {/* Navigation */}
-        <div className="flex justify-between mt-6">
+        <div className="flex flex-col-reverse sm:flex-row justify-between gap-3 mt-6">
           <Button
             variant="outline"
             onClick={prevStep}
             disabled={currentStep === 0}
-            className="gap-2"
+            className="w-full sm:w-auto gap-2 min-h-[48px]"
           >
             <ChevronLeft className="h-4 w-4" /> Previous
           </Button>
           
           {currentStep < STEPS.length - 1 ? (
-            <Button onClick={nextStep} className="gap-2">
+            <Button onClick={nextStep} className="w-full sm:w-auto gap-2 min-h-[48px]">
               Next <ChevronRight className="h-4 w-4" />
             </Button>
           ) : (
             <Button 
               onClick={handleSubmit}
               disabled={loading || getTotalPhotos() < 10}
-              className="gap-2 bg-green-600 hover:bg-green-700"
+              className="w-full sm:w-auto gap-2 bg-green-600 hover:bg-green-700 min-h-[48px]"
               data-testid="submit-listing-btn"
             >
               {loading ? (

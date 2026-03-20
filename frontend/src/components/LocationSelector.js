@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Label } from '../components/ui/label';
 import { Input } from '../components/ui/input';
@@ -30,12 +30,13 @@ const POSTAL_CODE_PATTERNS = {
   },
 };
 
-const LocationSelector = ({ value, onChange, errors: externalErrors }) => {
+const LocationSelector = ({ value, onChange, geoSuggestion, errors: externalErrors }) => {
   const { t } = useTranslation();
   const [manualCity, setManualCity] = useState(false);
   const [regionOpen, setRegionOpen] = useState(false);
   const [cityOpen, setCityOpen] = useState(false);
   const [postalTouched, setPostalTouched] = useState(false);
+  const [geoApplied, setGeoApplied] = useState(false);
 
   const country = value?.country || 'CA';
   const region = value?.region || '';
@@ -76,9 +77,30 @@ const LocationSelector = ({ value, onChange, errors: externalErrors }) => {
     }
   }, []);
 
+  // Auto-apply geo suggestion once (only if all fields are empty)
+  useEffect(() => {
+    if (geoApplied || !geoSuggestion || geoSuggestion.loading) return;
+    if (region || city || postalCode) { setGeoApplied(true); return; }
+
+    const { country: geoCountry, region: geoRegion, city: geoCity } = geoSuggestion;
+    if (geoCountry && (geoCountry === 'CA' || geoCountry === 'US')) {
+      const next = { country: geoCountry, region: '', city: '', postalCode: '' };
+      // Validate region exists in our data
+      if (geoRegion && locationData[geoCountry]?.regions?.[geoRegion]) {
+        next.region = geoRegion;
+        // Validate city exists
+        if (geoCity && locationData[geoCountry].regions[geoRegion].cities
+          .some(c => c.toLowerCase() === geoCity.toLowerCase())) {
+          next.city = geoCity;
+        }
+      }
+      onChange(next);
+    }
+    setGeoApplied(true);
+  }, [geoSuggestion, geoApplied, region, city, postalCode, onChange]);
+
   const update = (field, val) => {
     const next = { country, region, city, postalCode, ...{ [field]: val } };
-    // Reset dependent fields on cascade
     if (field === 'country') {
       next.region = '';
       next.city = '';
@@ -99,7 +121,7 @@ const LocationSelector = ({ value, onChange, errors: externalErrors }) => {
 
   return (
     <div className="space-y-4" data-testid="location-selector">
-      {/* Row 1: Country + Province/State */}
+      {/* Row 1: Country + Province/State — stacks on mobile */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Country */}
         <div className="space-y-2">
@@ -110,9 +132,8 @@ const LocationSelector = ({ value, onChange, errors: externalErrors }) => {
           <Select
             value={country}
             onValueChange={(v) => update('country', v)}
-            data-testid="location-country-select"
           >
-            <SelectTrigger data-testid="location-country-trigger">
+            <SelectTrigger className="min-h-[48px]" data-testid="location-country-trigger">
               <SelectValue placeholder={t('locationSelector.selectCountry', 'Select country')} />
             </SelectTrigger>
             <SelectContent>
@@ -135,7 +156,7 @@ const LocationSelector = ({ value, onChange, errors: externalErrors }) => {
                 variant="outline"
                 role="combobox"
                 aria-expanded={regionOpen}
-                className="w-full justify-between font-normal"
+                className="w-full justify-between font-normal min-h-[48px]"
                 data-testid="location-region-trigger"
               >
                 {region
@@ -180,7 +201,7 @@ const LocationSelector = ({ value, onChange, errors: externalErrors }) => {
         </div>
       </div>
 
-      {/* Row 2: City + Postal Code */}
+      {/* Row 2: City + Postal Code — stacks on mobile */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* City - Searchable or Manual */}
         <div className="space-y-2">
@@ -206,6 +227,7 @@ const LocationSelector = ({ value, onChange, errors: externalErrors }) => {
               value={city}
               onChange={(e) => update('city', e.target.value)}
               placeholder={t('locationSelector.enterCityName', 'Enter city name...')}
+              className="min-h-[48px]"
               data-testid="location-city-manual-input"
             />
           ) : (
@@ -215,7 +237,7 @@ const LocationSelector = ({ value, onChange, errors: externalErrors }) => {
                   variant="outline"
                   role="combobox"
                   aria-expanded={cityOpen}
-                  className="w-full justify-between font-normal"
+                  className="w-full justify-between font-normal min-h-[48px]"
                   disabled={!region}
                   data-testid="location-city-trigger"
                 >
@@ -281,7 +303,10 @@ const LocationSelector = ({ value, onChange, errors: externalErrors }) => {
             onChange={handlePostalChange}
             onBlur={() => setPostalTouched(true)}
             placeholder={postalConfig.placeholder}
+            inputMode={country === 'US' ? 'numeric' : 'text'}
+            autoCapitalize="characters"
             className={cn(
+              'min-h-[48px]',
               postalTouched && postalCode && !postalValid && 'border-red-500 focus-visible:ring-red-500'
             )}
             data-testid="location-postal-code-input"
