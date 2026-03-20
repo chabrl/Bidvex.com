@@ -297,7 +297,11 @@ const LocationSelector = ({ value, onChange, geoSuggestion, errors: externalErro
 
         {/* Postal / ZIP Code */}
         <div className="space-y-2">
-          <Label>{postalConfig.label} *</Label>
+          <Label>
+            {country === 'CA'
+              ? t('locationSelector.postalCode', 'Postal Code')
+              : t('locationSelector.zipCode', 'ZIP Code')} *
+          </Label>
           <Input
             value={postalCode}
             onChange={handlePostalChange}

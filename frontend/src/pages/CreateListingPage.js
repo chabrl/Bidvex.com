@@ -193,12 +193,12 @@ const CreateListingPage = () => {
       <div className="max-w-3xl mx-auto">
         <Card className="glassmorphism">
           <CardHeader>
-            <CardTitle className="text-2xl font-bold">Create New Listing</CardTitle>
+            <CardTitle className="text-2xl font-bold">{t('createListing.createNewListing', 'Create New Listing')}</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="title">Title *</Label>
+                <Label htmlFor="title">{t('createListing.auctionTitle', 'Title')} *</Label>
                 <Input
                   id="title"
                   name="title"
@@ -206,12 +206,12 @@ const CreateListingPage = () => {
                   onChange={handleChange}
                   required
                   data-testid="title-input"
-                  placeholder="Enter a descriptive title"
+                  placeholder={t('createListing.auctionTitlePlaceholder', 'Enter a descriptive title')}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="description">Description *</Label>
+                <Label htmlFor="description">{t('createListing.description', 'Description')} *</Label>
                 <Textarea
                   id="description"
                   name="description"
@@ -220,13 +220,13 @@ const CreateListingPage = () => {
                   required
                   rows={4}
                   data-testid="description-input"
-                  placeholder="Describe your item in detail"
+                  placeholder={t('createListing.descriptionPlaceholder', 'Describe your item in detail')}
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="category">Category *</Label>
+                  <Label htmlFor="category">{t('createListing.category', 'Category')} *</Label>
                   <select
                     id="category"
                     name="category"
@@ -236,7 +236,7 @@ const CreateListingPage = () => {
                     className="w-full px-3 py-2 border border-input rounded-md bg-background"
                     data-testid="category-select"
                   >
-                    <option value="">Select category</option>
+                    <option value="">{t('createListing.selectCategory', 'Select category')}</option>
                     {categories.map((cat) => (
                       <option key={cat.id} value={cat.name_en}>
                         {cat.name_en}
@@ -246,7 +246,7 @@ const CreateListingPage = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="condition">Condition *</Label>
+                  <Label htmlFor="condition">{t('createListing.condition', 'Condition')} *</Label>
                   <select
                     id="condition"
                     name="condition"
@@ -256,18 +256,18 @@ const CreateListingPage = () => {
                     className="w-full px-3 py-2 border border-input rounded-md bg-background"
                     data-testid="condition-select"
                   >
-                    <option value="new">New</option>
-                    <option value="like_new">Like New</option>
-                    <option value="good">Good</option>
-                    <option value="fair">Fair</option>
-                    <option value="poor">Poor</option>
+                    <option value="new">{t('createListing.conditionNew', 'New')}</option>
+                    <option value="like_new">{t('createListing.conditionLikeNew', 'Like New')}</option>
+                    <option value="good">{t('createListing.conditionGood', 'Good')}</option>
+                    <option value="fair">{t('createListing.conditionFair', 'Fair')}</option>
+                    <option value="poor">{t('createListing.conditionPoor', 'Poor')}</option>
                   </select>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="starting_price">Starting Price ($) *</Label>
+                  <Label htmlFor="starting_price">{t('createListing.startingPrice', 'Starting Price')} ($) *</Label>
                   <Input
                     id="starting_price"
                     name="starting_price"
@@ -284,7 +284,7 @@ const CreateListingPage = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="buy_now_price">Buy Now Price ($)</Label>
+                  <Label htmlFor="buy_now_price">{t('createListing.buyNowPrice', 'Buy Now Price')} ($)</Label>
                   <Input
                     id="buy_now_price"
                     name="buy_now_price"
@@ -301,20 +301,20 @@ const CreateListingPage = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="buyers_premium_percent">Buyer's Premium (%)</Label>
+                <Label htmlFor="buyers_premium_percent">{t('createListing.buyersPremium', "Buyer's Premium (%)")}</Label>
                 <Input
                   id="buyers_premium_percent"
                   type="number"
                   step="0.5"
                   min="0"
                   max="50"
-                  placeholder={user?.custom_premium_rate != null ? `Org default: ${(user.custom_premium_rate * 100).toFixed(1)}%` : 'e.g. 15'}
+                  placeholder={user?.custom_premium_rate != null ? `Org default: ${(user.custom_premium_rate * 100).toFixed(1)}%` : t('createListing.buyersPremiumPlaceholder', 'e.g. 15')}
                   value={buyersPremiumPercent}
                   onChange={(e) => setBuyersPremiumPercent(e.target.value)}
                   data-testid="buyers-premium-input"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Percentage charged on top of the winning bid. Leave blank to use your organization default.
+                  {t('createListing.buyersPremiumHint', 'Percentage charged on top of the winning bid. Leave blank to use your organization default.')}
                 </p>
               </div>
 
@@ -339,7 +339,7 @@ const CreateListingPage = () => {
               />
 
               <div className="space-y-2">
-                <Label htmlFor="auction_end_date">Auction End Date *</Label>
+                <Label htmlFor="auction_end_date">{t('createListing.auctionEndDate', 'Auction End Date')} *</Label>
                 <Input
                   id="auction_end_date"
                   name="auction_end_date"
@@ -352,7 +352,7 @@ const CreateListingPage = () => {
               </div>
 
               <div className="space-y-2">
-                <Label>Images</Label>
+                <Label>{t('createListing.images', 'Images')}</Label>
                 <input
                   type="file"
                   accept="image/*"
@@ -369,7 +369,7 @@ const CreateListingPage = () => {
                   data-testid="add-image-btn"
                 >
                   <Upload className="mr-2 h-4 w-4" />
-                  Upload Images from Device
+                  {t('createListing.uploadImages', 'Upload Images')}
                 </Button>
                 {formData.images.length > 0 && (
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
@@ -392,7 +392,7 @@ const CreateListingPage = () => {
               {/* Shipping Options Section */}
               <Card className="border-2">
                 <CardHeader>
-                  <CardTitle className="text-lg">🚚 Shipping Options</CardTitle>
+                  <CardTitle className="text-lg">{t('createListing.shipping', 'Shipping Options')}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center gap-2">
@@ -403,13 +403,13 @@ const CreateListingPage = () => {
                       onChange={(e) => setShippingInfo(prev => ({ ...prev, available: e.target.checked }))}
                       className="w-4 h-4"
                     />
-                    <Label htmlFor="shipping-available">Offer Shipping?</Label>
+                    <Label htmlFor="shipping-available">{t('createListing.offerShipping', 'Offer Shipping?')}</Label>
                   </div>
 
                   {shippingInfo.available && (
                     <div className="space-y-4 ml-6 p-4 border rounded-lg bg-muted/20">
                       <div>
-                        <Label>Shipping Methods</Label>
+                        <Label>{t('createListing.shippingMethods', 'Shipping Methods')}</Label>
                         <div className="space-y-2 mt-2">
                           {['local_pickup', 'standard', 'express'].map(method => (
                             <div key={method} className="flex items-center gap-2">
@@ -448,9 +448,9 @@ const CreateListingPage = () => {
                       </div>
 
                       <div>
-                        <Label>Estimated Delivery Time</Label>
+                        <Label>{t('createListing.deliveryTime', 'Estimated Delivery Time')}</Label>
                         <Input
-                          placeholder="e.g., 3-5 business days"
+                          placeholder={t('createListing.deliveryTimePlaceholder', 'e.g., 3-5 business days')}
                           value={shippingInfo.delivery_time}
                           onChange={(e) => setShippingInfo(prev => ({ ...prev, delivery_time: e.target.value }))}
                         />
@@ -463,7 +463,7 @@ const CreateListingPage = () => {
               {/* Visit Availability Section */}
               <Card className="border-2">
                 <CardHeader>
-                  <CardTitle className="text-lg">🏠 Visit Before Purchase</CardTitle>
+                  <CardTitle className="text-lg">{t('createListing.visitBeforePurchase', 'Visit Before Purchase')}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center gap-2">
@@ -474,13 +474,13 @@ const CreateListingPage = () => {
                       onChange={(e) => setVisitAvailability(prev => ({ ...prev, offered: e.target.checked }))}
                       className="w-4 h-4"
                     />
-                    <Label htmlFor="visit-offered">Allow buyers to schedule a visit?</Label>
+                    <Label htmlFor="visit-offered">{t('createListing.allowVisit', 'Allow buyers to schedule a visit?')}</Label>
                   </div>
 
                   {visitAvailability.offered && (
                     <div className="space-y-4 ml-6 p-4 border rounded-lg bg-green-50 dark:bg-green-900/10">
                       <div>
-                        <Label>Available Dates</Label>
+                        <Label>{t('createListing.availableDates', 'Available Dates')}</Label>
                         <Input
                           placeholder="e.g., Nov 15-20, 2025"
                           value={visitAvailability.dates}
@@ -489,9 +489,9 @@ const CreateListingPage = () => {
                       </div>
 
                       <div>
-                        <Label>Instructions</Label>
+                        <Label>{t('createListing.visitInstructions', 'Instructions')}</Label>
                         <Textarea
-                          placeholder="Provide instructions for scheduling (e.g., contact info, time slots)"
+                          placeholder={t('createListing.visitInstructionsPlaceholder', 'Provide instructions for scheduling (e.g., contact info, time slots)')}
                           value={visitAvailability.instructions}
                           onChange={(e) => setVisitAvailability(prev => ({ ...prev, instructions: e.target.value }))}
                           rows={3}
@@ -528,9 +528,9 @@ const CreateListingPage = () => {
                 data-testid="submit-listing-btn"
               >
                 {loading ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...</>
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t('createListing.creating', 'Creating...')}</>
                 ) : (
-                  'Create Listing'
+                  t('createListing.submitListing', 'Create Listing')
                 )}
               </Button>
             </form>

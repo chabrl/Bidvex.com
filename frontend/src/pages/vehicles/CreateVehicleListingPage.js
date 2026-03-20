@@ -5,6 +5,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -34,15 +35,6 @@ import LocationSelector from '../../components/LocationSelector';
 import useGeoLocation from '../../hooks/useGeoLocation';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
-
-const STEPS = [
-  { id: 'vin', title: 'VIN & Basic Info', icon: Car },
-  { id: 'specs', title: 'Specifications', icon: Settings2 },
-  { id: 'condition', title: 'Condition Report', icon: FileText },
-  { id: 'photos', title: 'Photos & Media', icon: Camera },
-  { id: 'auction', title: 'Auction Settings', icon: DollarSign },
-  { id: 'review', title: 'Review & Submit', icon: CheckCircle },
-];
 
 const BODY_TYPES = [
   { value: 'sedan', label: 'Sedan' },
@@ -99,9 +91,19 @@ const CONDITIONS = ['excellent', 'good', 'fair', 'poor', 'unknown'];
 // Create Vehicle Listing Page Component
 const CreateVehicleListingPage = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { token, user } = useAuth();
   const geo = useGeoLocation();
   const [currentStep, setCurrentStep] = useState(0);
+
+  const STEPS = [
+    { id: 'vin', title: t('vehicleListing.steps.vin', 'VIN & Basic Info'), icon: Car },
+    { id: 'specs', title: t('vehicleListing.steps.specs', 'Specifications'), icon: Settings2 },
+    { id: 'condition', title: t('vehicleListing.steps.condition', 'Condition Report'), icon: FileText },
+    { id: 'photos', title: t('vehicleListing.steps.photos', 'Photos & Media'), icon: Camera },
+    { id: 'auction', title: t('vehicleListing.steps.auction', 'Auction Settings'), icon: DollarSign },
+    { id: 'review', title: t('vehicleListing.steps.review', 'Review & Submit'), icon: CheckCircle },
+  ];
   const [loading, setLoading] = useState(false);
   const [vinLoading, setVinLoading] = useState(false);
   const [sellerProfile, setSellerProfile] = useState(null);
@@ -398,9 +400,9 @@ const CreateVehicleListingPage = () => {
             {/* VIN Input */}
             <div className="space-y-4">
               <div>
-                <Label className="text-base font-semibold">Vehicle Identification Number (VIN)</Label>
+                <Label className="text-base font-semibold">{t('vehicleListing.vinNumber', 'Vehicle Identification Number (VIN)')}</Label>
                 <p className="text-sm text-slate-500 mb-2">
-                  Enter the 17-character VIN to auto-fill vehicle information
+                  {t('vehicleListing.vinPlaceholder', 'Enter the 17-character VIN to auto-fill vehicle information')}
                 </p>
                 <div className="flex gap-2">
                   <Input
@@ -421,7 +423,7 @@ const CreateVehicleListingPage = () => {
                     ) : (
                       <Search className="h-4 w-4" />
                     )}
-                    Decode
+                    {t('vehicleListing.lookupVin', 'Decode')}
                   </Button>
                 </div>
                 <p className="text-xs text-slate-400 mt-1">
@@ -433,7 +435,7 @@ const CreateVehicleListingPage = () => {
             {/* Basic Info */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="space-y-2">
-                <Label>Year *</Label>
+                <Label>{t('vehicleListing.year', 'Year')} *</Label>
                 <Input
                   type="number"
                   value={formData.year}
@@ -444,19 +446,19 @@ const CreateVehicleListingPage = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Make *</Label>
+                <Label>{t('vehicleListing.make', 'Make')} *</Label>
                 <Input
                   value={formData.make}
                   onChange={(e) => updateField('make', e.target.value)}
-                  placeholder="Toyota"
+                  placeholder={t('vehicleListing.makePlaceholder', 'Toyota')}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Model *</Label>
+                <Label>{t('vehicleListing.model', 'Model')} *</Label>
                 <Input
                   value={formData.model}
                   onChange={(e) => updateField('model', e.target.value)}
-                  placeholder="Camry"
+                  placeholder={t('vehicleListing.modelPlaceholder', 'Camry')}
                 />
               </div>
               <div className="space-y-2">
@@ -470,7 +472,7 @@ const CreateVehicleListingPage = () => {
             </div>
             
             <div className="space-y-2">
-              <Label>Body Type *</Label>
+              <Label>{t('vehicleListing.bodyType', 'Body Type')} *</Label>
               <Select value={formData.body_type} onValueChange={(v) => updateField('body_type', v)}>
                 <SelectTrigger>
                   <SelectValue />
@@ -491,7 +493,7 @@ const CreateVehicleListingPage = () => {
             {/* Mileage */}
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
-                <Gauge className="h-4 w-4" /> Mileage (km) *
+                <Gauge className="h-4 w-4" /> {t('vehicleListing.mileage', 'Mileage (km)')} *
               </Label>
               <Input
                 type="number"
@@ -505,7 +507,7 @@ const CreateVehicleListingPage = () => {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
-                  <Settings2 className="h-4 w-4" /> Transmission *
+                  <Settings2 className="h-4 w-4" /> {t('vehicleListing.transmission', 'Transmission')} *
                 </Label>
                 <Select value={formData.transmission} onValueChange={(v) => updateField('transmission', v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -519,7 +521,7 @@ const CreateVehicleListingPage = () => {
               
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
-                  <Fuel className="h-4 w-4" /> Fuel Type *
+                  <Fuel className="h-4 w-4" /> {t('vehicleListing.fuelType', 'Fuel Type')} *
                 </Label>
                 <Select value={formData.fuel_type} onValueChange={(v) => updateField('fuel_type', v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -532,7 +534,7 @@ const CreateVehicleListingPage = () => {
               </div>
               
               <div className="space-y-2">
-                <Label>Drivetrain *</Label>
+                <Label>{t('vehicleListing.driveType', 'Drivetrain')} *</Label>
                 <Select value={formData.drivetrain} onValueChange={(v) => updateField('drivetrain', v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -547,7 +549,7 @@ const CreateVehicleListingPage = () => {
             {/* Engine */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label>Engine Size (L)</Label>
+                <Label>{t('vehicleListing.engineSize', 'Engine Size (L)')}</Label>
                 <Input
                   value={formData.engine_size}
                   onChange={(e) => updateField('engine_size', e.target.value)}
@@ -555,7 +557,7 @@ const CreateVehicleListingPage = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Cylinders</Label>
+                <Label>{t('vehicleListing.cylinders', 'Cylinders')}</Label>
                 <Input
                   type="number"
                   inputMode="numeric"
@@ -565,7 +567,7 @@ const CreateVehicleListingPage = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Horsepower</Label>
+                <Label>{t('vehicleListing.horsepower', 'Horsepower')}</Label>
                 <Input
                   type="number"
                   inputMode="numeric"
@@ -580,7 +582,7 @@ const CreateVehicleListingPage = () => {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
-                  <Palette className="h-4 w-4" /> Exterior Color *
+                  <Palette className="h-4 w-4" /> {t('vehicleListing.exteriorColor', 'Exterior Color')} *
                 </Label>
                 <Input
                   value={formData.exterior_color}
@@ -589,7 +591,7 @@ const CreateVehicleListingPage = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Interior Color *</Label>
+                <Label>{t('vehicleListing.interiorColor', 'Interior Color')} *</Label>
                 <Input
                   value={formData.interior_color}
                   onChange={(e) => updateField('interior_color', e.target.value)}
@@ -749,7 +751,7 @@ const CreateVehicleListingPage = () => {
                   <AlertTriangle className="h-5 w-5 text-yellow-600" />
                 )}
                 <span className="font-medium">
-                  {getTotalPhotos()} / 10 photos uploaded (minimum required)
+                  {getTotalPhotos()} / 10 {t('vehicleListing.photosUploaded', 'photos uploaded')} ({t('vehicleListing.minPhotos', 'minimum required')})
                 </span>
               </div>
             </div>
@@ -906,7 +908,7 @@ const CreateVehicleListingPage = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
-                  <DollarSign className="h-4 w-4" /> Starting Price *
+                  <DollarSign className="h-4 w-4" /> {t('vehicleListing.startingPrice', 'Starting Price')} *
                 </Label>
                 <Input
                   type="number"
@@ -918,7 +920,7 @@ const CreateVehicleListingPage = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Reserve Price</Label>
+                <Label>{t('vehicleListing.reservePrice', 'Reserve Price')}</Label>
                 <Input
                   type="number"
                   inputMode="decimal"
@@ -929,7 +931,7 @@ const CreateVehicleListingPage = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Buy Now Price</Label>
+                <Label>{t('vehicleListing.buyNowPrice', 'Buy Now Price')}</Label>
                 <Input
                   type="number"
                   inputMode="decimal"
@@ -940,7 +942,7 @@ const CreateVehicleListingPage = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Bid Increment</Label>
+                <Label>{t('vehicleListing.bidIncrement', 'Bid Increment')}</Label>
                 <Input
                   type="number"
                   inputMode="decimal"
@@ -959,8 +961,8 @@ const CreateVehicleListingPage = () => {
                 onCheckedChange={(checked) => updateField('requires_deposit', checked)}
               />
               <div className="flex-1">
-                <Label className="cursor-pointer">Require Bid Deposit</Label>
-                <p className="text-sm text-slate-500">Bidders must pay a refundable deposit before bidding</p>
+                <Label className="cursor-pointer">{t('vehicleListing.requireDeposit', 'Require Bid Deposit')}</Label>
+                <p className="text-sm text-slate-500">{t('vehicleListing.depositDescription', 'Bidders must pay a refundable deposit before bidding')}</p>
               </div>
               {formData.requires_deposit && (
                 <Input
@@ -1055,10 +1057,10 @@ const CreateVehicleListingPage = () => {
       <div className="bg-white dark:bg-slate-900 border-b">
         <div className="max-w-4xl mx-auto px-4 py-6">
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-            List Your Vehicle
+            {t('vehicleListing.title', 'List Your Vehicle')}
           </h1>
           <p className="text-slate-500 mt-1">
-            Create a professional vehicle auction listing
+            {t('vehicleListing.subtitle', 'Create a professional vehicle auction listing')}
           </p>
           
           {/* Progress */}
@@ -1126,12 +1128,12 @@ const CreateVehicleListingPage = () => {
             disabled={currentStep === 0}
             className="w-full sm:w-auto gap-2 min-h-[48px]"
           >
-            <ChevronLeft className="h-4 w-4" /> Previous
+            <ChevronLeft className="h-4 w-4" /> {t('vehicleListing.previous', 'Previous')}
           </Button>
           
           {currentStep < STEPS.length - 1 ? (
             <Button onClick={nextStep} className="w-full sm:w-auto gap-2 min-h-[48px]">
-              Next <ChevronRight className="h-4 w-4" />
+              {t('vehicleListing.next', 'Next')} <ChevronRight className="h-4 w-4" />
             </Button>
           ) : (
             <Button 
@@ -1142,11 +1144,11 @@ const CreateVehicleListingPage = () => {
             >
               {loading ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> Creating...
+                  <Loader2 className="h-4 w-4 animate-spin" /> {t('vehicleListing.submitting', 'Creating...')}
                 </>
               ) : (
                 <>
-                  <CheckCircle className="h-4 w-4" /> Submit Listing
+                  <CheckCircle className="h-4 w-4" /> {t('vehicleListing.submitListing', 'Submit Listing')}
                 </>
               )}
             </Button>
