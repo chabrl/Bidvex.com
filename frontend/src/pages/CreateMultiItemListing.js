@@ -20,6 +20,7 @@ import {
 import Papa from 'papaparse';
 import { useDropzone } from 'react-dropzone';
 import RichTextEditor from '../components/RichTextEditor';
+import LocationSelector from '../components/LocationSelector';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -38,9 +39,11 @@ const CreateMultiItemListing = () => {
     title: '',
     description: '',
     category: '',
-    location: '',
-    city: '',
+    country: 'CA',
     region: '',
+    city: '',
+    postal_code: '',
+    location: '',
     auction_end_date: '',
     currency: user?.preferred_currency || 'CAD',
     increment_option: 'tiered', // tiered or simplified
@@ -417,7 +420,7 @@ const CreateMultiItemListing = () => {
   const validateStep = (step) => {
     if (step === 1) {
       if (!formData.title || !formData.description || !formData.category || 
-          !formData.city || !formData.region || !formData.location || !formData.auction_end_date) {
+          !formData.city || !formData.region || !formData.postal_code || !formData.auction_end_date) {
         toast.error(t('createListing.fillRequired', 'Please fill all required fields'));
         return false;
       }
@@ -685,41 +688,24 @@ const CreateMultiItemListing = () => {
           />
         </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="city">{t('createListing.city')} *</Label>
-          <Input 
-            id="city" 
-            name="city" 
-            value={formData.city} 
-            onChange={handleChange} 
-            placeholder={t('createListing.cityPlaceholder', 'e.g., Montreal')}
-            required 
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="region">{t('createListing.region')} *</Label>
-          <Input 
-            id="region" 
-            name="region" 
-            value={formData.region} 
-            onChange={handleChange} 
-            placeholder={t('createListing.regionPlaceholder', 'e.g., Quebec')}
-            required 
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="location">{t('createListing.location')} *</Label>
-          <Input 
-            id="location" 
-            name="location" 
-            value={formData.location} 
-            onChange={handleChange} 
-            placeholder={t('createListing.locationPlaceholder', 'e.g., 123 Main St')}
-            required 
-          />
-        </div>
-      </div>
+      <LocationSelector
+        value={{
+          country: formData.country,
+          region: formData.region,
+          city: formData.city,
+          postalCode: formData.postal_code,
+        }}
+        onChange={({ country, region, city, postalCode }) => {
+          setFormData(prev => ({
+            ...prev,
+            country,
+            region,
+            city,
+            postal_code: postalCode,
+            location: [city, region, postalCode].filter(Boolean).join(', '),
+          }));
+        }}
+      />
       <div className="space-y-2">
         <Label htmlFor="currency" className="flex items-center gap-2">
           💱 {t('createListing.currency')}
@@ -1247,7 +1233,7 @@ const CreateMultiItemListing = () => {
         <CardContent className="space-y-2 text-sm">
           <div><strong>{t("createListing.auctionTitle")}:</strong> {formData.title}</div>
           <div><strong>{t("createListing.category")}:</strong> {formData.category}</div>
-          <div><strong>{t("createListing.location")}:</strong> {formData.city}, {formData.region}</div>
+          <div><strong>{t("createListing.location")}:</strong> {formData.city}, {formData.region} {formData.postal_code}</div>
           <div><strong>{t("createListing.auctionEndDate")}:</strong> {new Date(formData.auction_end_date).toLocaleString()}</div>
         </CardContent>
       </Card>

@@ -1,0 +1,270 @@
+{
+  "CA": {
+    "name": "Canada",
+    "postalCodeRegex": "^[A-Za-z]\\d[A-Za-z]\\s?\\d[A-Za-z]\\d$",
+    "postalCodePlaceholder": "J1J 1J1",
+    "postalCodeLabel": "Postal Code",
+    "regions": {
+      "AB": {
+        "name": "Alberta",
+        "cities": ["Calgary","Edmonton","Red Deer","Lethbridge","St. Albert","Medicine Hat","Grande Prairie","Airdrie","Spruce Grove","Leduc","Fort McMurray","Sherwood Park","Okotoks","Cochrane","Camrose","Wetaskiwin","Brooks","Cold Lake","Canmore","Banff"]
+      },
+      "BC": {
+        "name": "British Columbia",
+        "cities": ["Vancouver","Victoria","Surrey","Burnaby","Kelowna","Kamloops","Nanaimo","Prince George","Chilliwack","Vernon","Courtenay","Penticton","Duncan","Campbell River","Cranbrook","Abbotsford","Coquitlam","North Vancouver","West Vancouver","Langley"]
+      },
+      "MB": {
+        "name": "Manitoba",
+        "cities": ["Winnipeg","Brandon","Steinbach","Thompson","Portage la Prairie","Winkler","Selkirk","Morden","Dauphin","The Pas","Flin Flon","Stonewall"]
+      },
+      "NB": {
+        "name": "New Brunswick",
+        "cities": ["Moncton","Saint John","Fredericton","Dieppe","Miramichi","Edmundston","Bathurst","Campbellton","Riverview","Oromocto","Shediac","Sussex"]
+      },
+      "NL": {
+        "name": "Newfoundland and Labrador",
+        "cities": ["St. John's","Mount Pearl","Corner Brook","Conception Bay South","Paradise","Grand Falls-Windsor","Gander","Happy Valley-Goose Bay","Labrador City","Stephenville","Carbonear","Bay Roberts"]
+      },
+      "NS": {
+        "name": "Nova Scotia",
+        "cities": ["Halifax","Dartmouth","Sydney","Truro","New Glasgow","Glace Bay","Bridgewater","Kentville","Amherst","Antigonish","Wolfville","Yarmouth","Lunenburg"]
+      },
+      "NT": {
+        "name": "Northwest Territories",
+        "cities": ["Yellowknife","Hay River","Inuvik","Fort Smith","Behchoko","Fort Simpson","Norman Wells"]
+      },
+      "NU": {
+        "name": "Nunavut",
+        "cities": ["Iqaluit","Rankin Inlet","Arviat","Baker Lake","Cambridge Bay","Pond Inlet","Pangnirtung"]
+      },
+      "ON": {
+        "name": "Ontario",
+        "cities": ["Toronto","Ottawa","Mississauga","Brampton","Hamilton","London","Markham","Vaughan","Kitchener","Windsor","Richmond Hill","Oakville","Burlington","Oshawa","Barrie","St. Catharines","Guelph","Cambridge","Kingston","Waterloo","Thunder Bay","Sudbury","Brantford","Peterborough","Whitby","Niagara Falls","Belleville","Sarnia","Sault Ste. Marie","North Bay","Cornwall","Welland","Stratford","Chatham-Kent","Woodstock","Orangeville","Orillia","Timmins","Kenora"]
+      },
+      "PE": {
+        "name": "Prince Edward Island",
+        "cities": ["Charlottetown","Summerside","Stratford","Cornwall","Montague","Kensington","Souris"]
+      },
+      "QC": {
+        "name": "Quebec",
+        "cities": ["Montreal","Quebec City","Laval","Gatineau","Longueuil","Sherbrooke","Saguenay","Lévis","Trois-Rivières","Terrebonne","Saint-Jean-sur-Richelieu","Repentigny","Brossard","Drummondville","Saint-Jérôme","Granby","Blainville","Saint-Hyacinthe","Shawinigan","Dollard-des-Ormeaux","Rimouski","Châteauguay","Saint-Eustache","Joliette","Victoriaville","Rouyn-Noranda","Sorel-Tracy","Val-d'Or","Alma","Magog","Thetford Mines","Amos","Baie-Comeau","Sept-Îles","Rivière-du-Loup","Mont-Laurier","Sainte-Thérèse","Chambly","Boucherville","Mascouche","Saint-Bruno-de-Montarville","La Prairie","Varennes","Candiac","Sainte-Julie","Beloeil","Cowansville","Saint-Sauveur","Mont-Tremblant","Lac-Mégantic","Asbestos","Plessisville","Nicolet","Coaticook","Maniwaki","La Tuque","Matane","Gaspé","Percé","Chandler","New Carlisle","Sainte-Anne-des-Monts","Carleton-sur-Mer"]
+      },
+      "SK": {
+        "name": "Saskatchewan",
+        "cities": ["Saskatoon","Regina","Prince Albert","Moose Jaw","Swift Current","Yorkton","North Battleford","Weyburn","Estevan","Lloydminster","Melfort","Humboldt"]
+      },
+      "YT": {
+        "name": "Yukon",
+        "cities": ["Whitehorse","Dawson City","Watson Lake","Haines Junction","Carmacks","Mayo","Teslin"]
+      }
+    }
+  },
+  "US": {
+    "name": "United States",
+    "postalCodeRegex": "^\\d{5}(-\\d{4})?$",
+    "postalCodePlaceholder": "90210",
+    "postalCodeLabel": "ZIP Code",
+    "regions": {
+      "AL": {
+        "name": "Alabama",
+        "cities": ["Birmingham","Montgomery","Huntsville","Mobile","Tuscaloosa","Hoover","Dothan","Auburn","Decatur","Madison","Florence","Gadsden","Vestavia Hills","Prattville","Phenix City"]
+      },
+      "AK": {
+        "name": "Alaska",
+        "cities": ["Anchorage","Fairbanks","Juneau","Sitka","Ketchikan","Wasilla","Kenai","Kodiak","Bethel","Palmer","Homer","Soldotna"]
+      },
+      "AZ": {
+        "name": "Arizona",
+        "cities": ["Phoenix","Tucson","Mesa","Chandler","Scottsdale","Glendale","Gilbert","Tempe","Peoria","Surprise","Yuma","Flagstaff","Goodyear","Avondale","Lake Havasu City"]
+      },
+      "AR": {
+        "name": "Arkansas",
+        "cities": ["Little Rock","Fort Smith","Fayetteville","Springdale","Jonesboro","North Little Rock","Conway","Rogers","Pine Bluff","Bentonville","Hot Springs","Benton","Texarkana","Sherwood","Jacksonville"]
+      },
+      "CA": {
+        "name": "California",
+        "cities": ["Los Angeles","San Diego","San Jose","San Francisco","Fresno","Sacramento","Long Beach","Oakland","Bakersfield","Anaheim","Santa Ana","Riverside","Stockton","Irvine","Chula Vista","Santa Clarita","Fremont","San Bernardino","Modesto","Fontana"]
+      },
+      "CO": {
+        "name": "Colorado",
+        "cities": ["Denver","Colorado Springs","Aurora","Fort Collins","Lakewood","Thornton","Arvada","Westminster","Pueblo","Centennial","Boulder","Greeley","Longmont","Loveland","Castle Rock"]
+      },
+      "CT": {
+        "name": "Connecticut",
+        "cities": ["Bridgeport","New Haven","Stamford","Hartford","Waterbury","Norwalk","Danbury","New Britain","Bristol","Meriden","Milford","West Haven","Middletown","Norwich","Shelton"]
+      },
+      "DE": {
+        "name": "Delaware",
+        "cities": ["Wilmington","Dover","Newark","Middletown","Smyrna","Milford","Seaford","Georgetown","Elsmere","New Castle"]
+      },
+      "FL": {
+        "name": "Florida",
+        "cities": ["Jacksonville","Miami","Tampa","Orlando","St. Petersburg","Hialeah","Tallahassee","Fort Lauderdale","Port St. Lucie","Cape Coral","Pembroke Pines","Hollywood","Gainesville","Miramar","Coral Springs","Clearwater","Palm Bay","Lakeland"]
+      },
+      "GA": {
+        "name": "Georgia",
+        "cities": ["Atlanta","Augusta","Columbus","Macon","Savannah","Athens","Sandy Springs","Roswell","Johns Creek","Albany","Warner Robins","Alpharetta","Marietta","Valdosta","Smyrna","Dunwoody"]
+      },
+      "HI": {
+        "name": "Hawaii",
+        "cities": ["Honolulu","East Honolulu","Pearl City","Hilo","Kailua","Waipahu","Kaneohe","Mililani Town","Kahului","Ewa Gentry"]
+      },
+      "ID": {
+        "name": "Idaho",
+        "cities": ["Boise","Meridian","Nampa","Idaho Falls","Pocatello","Caldwell","Coeur d'Alene","Twin Falls","Lewiston","Post Falls","Rexburg","Eagle"]
+      },
+      "IL": {
+        "name": "Illinois",
+        "cities": ["Chicago","Aurora","Joliet","Naperville","Rockford","Springfield","Elgin","Peoria","Champaign","Waukegan","Cicero","Bloomington","Decatur","Evanston","Schaumburg"]
+      },
+      "IN": {
+        "name": "Indiana",
+        "cities": ["Indianapolis","Fort Wayne","Evansville","South Bend","Carmel","Fishers","Bloomington","Hammond","Gary","Lafayette","Muncie","Terre Haute","Kokomo","Noblesville","Anderson"]
+      },
+      "IA": {
+        "name": "Iowa",
+        "cities": ["Des Moines","Cedar Rapids","Davenport","Sioux City","Iowa City","Waterloo","Ames","West Des Moines","Council Bluffs","Ankeny","Dubuque","Urbandale","Cedar Falls","Marion"]
+      },
+      "KS": {
+        "name": "Kansas",
+        "cities": ["Wichita","Overland Park","Kansas City","Olathe","Topeka","Lawrence","Shawnee","Manhattan","Lenexa","Salina","Hutchinson","Leavenworth","Leawood","Garden City"]
+      },
+      "KY": {
+        "name": "Kentucky",
+        "cities": ["Louisville","Lexington","Bowling Green","Owensboro","Covington","Richmond","Georgetown","Florence","Hopkinsville","Nicholasville","Elizabethtown","Henderson","Frankfort","Paducah"]
+      },
+      "LA": {
+        "name": "Louisiana",
+        "cities": ["New Orleans","Baton Rouge","Shreveport","Metairie","Lafayette","Lake Charles","Kenner","Bossier City","Monroe","Alexandria","Houma","New Iberia","Slidell","Central"]
+      },
+      "ME": {
+        "name": "Maine",
+        "cities": ["Portland","Lewiston","Bangor","South Portland","Auburn","Biddeford","Augusta","Saco","Scarborough","Brunswick","Sanford","Westbrook"]
+      },
+      "MD": {
+        "name": "Maryland",
+        "cities": ["Baltimore","Frederick","Rockville","Gaithersburg","Bowie","Hagerstown","Annapolis","College Park","Salisbury","Laurel","Greenbelt","Cumberland","Westminster","Hyattsville"]
+      },
+      "MA": {
+        "name": "Massachusetts",
+        "cities": ["Boston","Worcester","Springfield","Lowell","Cambridge","New Bedford","Brockton","Quincy","Lynn","Fall River","Newton","Lawrence","Somerville","Framingham","Haverhill"]
+      },
+      "MI": {
+        "name": "Michigan",
+        "cities": ["Detroit","Grand Rapids","Warren","Sterling Heights","Ann Arbor","Lansing","Flint","Dearborn","Livonia","Troy","Westland","Farmington Hills","Kalamazoo","Wyoming","Rochester Hills"]
+      },
+      "MN": {
+        "name": "Minnesota",
+        "cities": ["Minneapolis","St. Paul","Rochester","Bloomington","Duluth","Brooklyn Park","Plymouth","Maple Grove","Woodbury","St. Cloud","Eagan","Eden Prairie","Burnsville","Lakeville","Minnetonka"]
+      },
+      "MS": {
+        "name": "Mississippi",
+        "cities": ["Jackson","Gulfport","Southaven","Hattiesburg","Biloxi","Meridian","Tupelo","Olive Branch","Greenville","Horn Lake","Clinton","Pearl","Madison","Ridgeland"]
+      },
+      "MO": {
+        "name": "Missouri",
+        "cities": ["Kansas City","St. Louis","Springfield","Columbia","Independence","Lee's Summit","O'Fallon","St. Joseph","St. Charles","St. Peters","Blue Springs","Florissant","Joplin","Chesterfield","Jefferson City"]
+      },
+      "MT": {
+        "name": "Montana",
+        "cities": ["Billings","Missoula","Great Falls","Bozeman","Butte","Helena","Kalispell","Havre","Anaconda","Miles City","Belgrade","Livingston"]
+      },
+      "NE": {
+        "name": "Nebraska",
+        "cities": ["Omaha","Lincoln","Bellevue","Grand Island","Kearney","Fremont","Hastings","North Platte","Norfolk","Columbus","Papillion","La Vista","Scottsbluff"]
+      },
+      "NV": {
+        "name": "Nevada",
+        "cities": ["Las Vegas","Henderson","Reno","North Las Vegas","Sparks","Carson City","Fernley","Elko","Mesquite","Boulder City","Fallon","Winnemucca"]
+      },
+      "NH": {
+        "name": "New Hampshire",
+        "cities": ["Manchester","Nashua","Concord","Derry","Dover","Rochester","Salem","Merrimack","Hudson","Londonderry","Keene","Bedford"]
+      },
+      "NJ": {
+        "name": "New Jersey",
+        "cities": ["Newark","Jersey City","Paterson","Elizabeth","Lakewood","Edison","Woodbridge","Toms River","Hamilton","Trenton","Clifton","Camden","Brick","Cherry Hill","Passaic","Union City"]
+      },
+      "NM": {
+        "name": "New Mexico",
+        "cities": ["Albuquerque","Las Cruces","Rio Rancho","Santa Fe","Roswell","Farmington","South Valley","Clovis","Hobbs","Alamogordo","Carlsbad","Gallup"]
+      },
+      "NY": {
+        "name": "New York",
+        "cities": ["New York City","Buffalo","Rochester","Yonkers","Syracuse","Albany","New Rochelle","Mount Vernon","Schenectady","Utica","White Plains","Hempstead","Troy","Niagara Falls","Binghamton","Ithaca"]
+      },
+      "NC": {
+        "name": "North Carolina",
+        "cities": ["Charlotte","Raleigh","Greensboro","Durham","Winston-Salem","Fayetteville","Cary","Wilmington","High Point","Concord","Greenville","Asheville","Gastonia","Jacksonville","Chapel Hill","Huntersville"]
+      },
+      "ND": {
+        "name": "North Dakota",
+        "cities": ["Fargo","Bismarck","Grand Forks","Minot","West Fargo","Williston","Dickinson","Mandan","Jamestown","Wahpeton"]
+      },
+      "OH": {
+        "name": "Ohio",
+        "cities": ["Columbus","Cleveland","Cincinnati","Toledo","Akron","Dayton","Parma","Canton","Youngstown","Lorain","Hamilton","Springfield","Kettering","Elyria","Lakewood","Newark"]
+      },
+      "OK": {
+        "name": "Oklahoma",
+        "cities": ["Oklahoma City","Tulsa","Norman","Broken Arrow","Edmond","Lawton","Moore","Midwest City","Enid","Stillwater","Muskogee","Bartlesville","Owasso","Shawnee"]
+      },
+      "OR": {
+        "name": "Oregon",
+        "cities": ["Portland","Salem","Eugene","Gresham","Hillsboro","Bend","Beaverton","Medford","Springfield","Corvallis","Albany","Tigard","Lake Oswego","Keizer","Grants Pass"]
+      },
+      "PA": {
+        "name": "Pennsylvania",
+        "cities": ["Philadelphia","Pittsburgh","Allentown","Reading","Scranton","Bethlehem","Lancaster","Harrisburg","York","State College","Wilkes-Barre","Chester","Erie","Easton","Lebanon"]
+      },
+      "RI": {
+        "name": "Rhode Island",
+        "cities": ["Providence","Warwick","Cranston","Pawtucket","East Providence","Woonsocket","Coventry","Cumberland","North Providence","South Kingstown","West Warwick","Johnston"]
+      },
+      "SC": {
+        "name": "South Carolina",
+        "cities": ["Charleston","Columbia","North Charleston","Mount Pleasant","Rock Hill","Greenville","Summerville","Goose Creek","Hilton Head Island","Florence","Spartanburg","Myrtle Beach","Aiken"]
+      },
+      "SD": {
+        "name": "South Dakota",
+        "cities": ["Sioux Falls","Rapid City","Aberdeen","Brookings","Watertown","Mitchell","Yankton","Huron","Pierre","Spearfish","Vermillion"]
+      },
+      "TN": {
+        "name": "Tennessee",
+        "cities": ["Nashville","Memphis","Knoxville","Chattanooga","Clarksville","Murfreesboro","Franklin","Jackson","Johnson City","Bartlett","Hendersonville","Kingsport","Collierville","Smyrna","Cleveland"]
+      },
+      "TX": {
+        "name": "Texas",
+        "cities": ["Houston","San Antonio","Dallas","Austin","Fort Worth","El Paso","Arlington","Corpus Christi","Plano","Laredo","Lubbock","Garland","Irving","Amarillo","Grand Prairie","Brownsville","McKinney","Frisco","Pasadena","Mesquite"]
+      },
+      "UT": {
+        "name": "Utah",
+        "cities": ["Salt Lake City","West Valley City","Provo","West Jordan","Orem","Sandy","Ogden","St. George","Layton","South Jordan","Lehi","Millcreek","Taylorsville","Logan"]
+      },
+      "VT": {
+        "name": "Vermont",
+        "cities": ["Burlington","South Burlington","Rutland","Barre","Montpelier","St. Albans","Winooski","Newport","Vergennes","Bennington"]
+      },
+      "VA": {
+        "name": "Virginia",
+        "cities": ["Virginia Beach","Norfolk","Chesapeake","Richmond","Newport News","Alexandria","Hampton","Roanoke","Portsmouth","Suffolk","Lynchburg","Harrisonburg","Charlottesville","Manassas","Fredericksburg"]
+      },
+      "WA": {
+        "name": "Washington",
+        "cities": ["Seattle","Spokane","Tacoma","Vancouver","Bellevue","Kent","Everett","Renton","Federal Way","Yakima","Bellingham","Kirkland","Auburn","Redmond","Olympia","Lakewood"]
+      },
+      "WV": {
+        "name": "West Virginia",
+        "cities": ["Charleston","Huntington","Morgantown","Parkersburg","Wheeling","Weirton","Fairmont","Martinsburg","Beckley","Clarksburg","South Charleston"]
+      },
+      "WI": {
+        "name": "Wisconsin",
+        "cities": ["Milwaukee","Madison","Green Bay","Kenosha","Racine","Appleton","Waukesha","Oshkosh","Eau Claire","Janesville","West Allis","La Crosse","Sheboygan","Wauwatosa","Fond du Lac"]
+      },
+      "WY": {
+        "name": "Wyoming",
+        "cities": ["Cheyenne","Casper","Laramie","Gillette","Rock Springs","Sheridan","Green River","Evanston","Riverton","Jackson","Cody","Rawlins"]
+      }
+    }
+  }
+}

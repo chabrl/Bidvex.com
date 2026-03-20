@@ -22,6 +22,8 @@ class ListingCreate(BaseModel):
     location: str
     city: str
     region: str
+    country: Optional[str] = "CA"
+    postal_code: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     auction_end_date: datetime
@@ -48,6 +50,8 @@ class Listing(BaseModel):
     location: str
     city: str
     region: str
+    country: Optional[str] = "CA"
+    postal_code: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     auction_end_date: datetime
@@ -129,7 +133,7 @@ class Lot(BaseModel):
     extension_count: int = 0
     buy_now_price: Optional[float] = None
     buy_now_enabled: bool = False
-    available_quantity: int = None
+    available_quantity: Optional[int] = None
     sold_quantity: int = 0
     lot_status: str = "active"
     bid_count: int = 0
@@ -147,6 +151,8 @@ class MultiItemListingCreate(BaseModel):
     location: str
     city: str
     region: str
+    country: Optional[str] = "CA"
+    postal_code: Optional[str] = None
     auction_end_date: datetime
     auction_start_date: Optional[datetime] = None
     lots: List[Lot]
@@ -172,6 +178,8 @@ class MultiItemListing(BaseModel):
     location: str
     city: str
     region: str
+    country: Optional[str] = "CA"
+    postal_code: Optional[str] = None
     auction_end_date: datetime
     auction_start_date: Optional[datetime] = None
     lots: List[Lot]

@@ -12,6 +12,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from 'sonner';
 import { Loader2, Upload } from 'lucide-react';
+import LocationSelector from '../components/LocationSelector';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -29,9 +30,11 @@ const CreateListingPage = () => {
     starting_price: '',
     buy_now_price: '',
     images: [],
-    location: '',
-    city: '',
+    country: 'CA',
     region: '',
+    city: '',
+    postal_code: '',
+    location: '',
     auction_end_date: '',
   });
 
@@ -309,43 +312,24 @@ const CreateListingPage = () => {
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="city">City *</Label>
-                  <Input
-                    id="city"
-                    name="city"
-                    value={formData.city}
-                    onChange={handleChange}
-                    required
-                    data-testid="city-input"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="region">Region/State *</Label>
-                  <Input
-                    id="region"
-                    name="region"
-                    value={formData.region}
-                    onChange={handleChange}
-                    required
-                    data-testid="region-input"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="location">Location *</Label>
-                  <Input
-                    id="location"
-                    name="location"
-                    value={formData.location}
-                    onChange={handleChange}
-                    required
-                    data-testid="location-input"
-                  />
-                </div>
-              </div>
+              <LocationSelector
+                value={{
+                  country: formData.country,
+                  region: formData.region,
+                  city: formData.city,
+                  postalCode: formData.postal_code,
+                }}
+                onChange={({ country, region, city, postalCode }) => {
+                  setFormData(prev => ({
+                    ...prev,
+                    country,
+                    region,
+                    city,
+                    postal_code: postalCode,
+                    location: [city, region, postalCode].filter(Boolean).join(', '),
+                  }));
+                }}
+              />
 
               <div className="space-y-2">
                 <Label htmlFor="auction_end_date">Auction End Date *</Label>

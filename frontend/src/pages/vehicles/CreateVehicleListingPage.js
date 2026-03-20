@@ -28,7 +28,9 @@ import {
   Car, Search, CheckCircle, XCircle, Upload, Camera, DollarSign,
   Calendar, MapPin, FileText, AlertTriangle, ChevronRight, ChevronLeft,
   Loader2, Shield, Zap, Info, Settings2, Fuel, Gauge, Palette
+
 } from 'lucide-react';
+import LocationSelector from '../../components/LocationSelector';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -91,19 +93,6 @@ const PHOTO_CATEGORIES = [
   { id: 'other', label: 'Other', required: false },
 ];
 
-const PROVINCES = [
-  { value: 'AB', label: 'Alberta' },
-  { value: 'BC', label: 'British Columbia' },
-  { value: 'MB', label: 'Manitoba' },
-  { value: 'NB', label: 'New Brunswick' },
-  { value: 'NL', label: 'Newfoundland and Labrador' },
-  { value: 'NS', label: 'Nova Scotia' },
-  { value: 'ON', label: 'Ontario' },
-  { value: 'PE', label: 'Prince Edward Island' },
-  { value: 'QC', label: 'Quebec' },
-  { value: 'SK', label: 'Saskatchewan' },
-];
-
 const CONDITIONS = ['excellent', 'good', 'fair', 'poor', 'unknown'];
 
 // Create Vehicle Listing Page Component
@@ -161,8 +150,9 @@ const CreateVehicleListingPage = () => {
     cosmetic_notes: '',
     
     // Location
+    location_country: 'CA',
     location_city: '',
-    location_province: 'QC',
+    location_province: '',
     location_postal_code: '',
     
     // Auction
@@ -841,37 +831,23 @@ const CreateVehicleListingPage = () => {
             </div>
             
             {/* Location */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4" /> City *
-                </Label>
-                <Input
-                  value={formData.location_city}
-                  onChange={(e) => updateField('location_city', e.target.value)}
-                  placeholder="Montreal"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Province *</Label>
-                <Select value={formData.location_province} onValueChange={(v) => updateField('location_province', v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {PROVINCES.map(p => (
-                      <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Postal Code *</Label>
-                <Input
-                  value={formData.location_postal_code}
-                  onChange={(e) => updateField('location_postal_code', e.target.value.toUpperCase())}
-                  placeholder="H2X 1Y4"
-                />
-              </div>
-            </div>
+            <LocationSelector
+              value={{
+                country: formData.location_country,
+                region: formData.location_province,
+                city: formData.location_city,
+                postalCode: formData.location_postal_code,
+              }}
+              onChange={({ country, region, city, postalCode }) => {
+                setFormData(prev => ({
+                  ...prev,
+                  location_country: country,
+                  location_province: region,
+                  location_city: city,
+                  location_postal_code: postalCode,
+                }));
+              }}
+            />
             
             {/* Auction Type */}
             <div className="grid md:grid-cols-2 gap-4">
@@ -1016,7 +992,7 @@ const CreateVehicleListingPage = () => {
                   <p><strong>Starting Price:</strong> ${formData.starting_price}</p>
                   {formData.reserve_price && <p><strong>Reserve:</strong> ${formData.reserve_price}</p>}
                   {formData.buy_now_price && <p><strong>Buy Now:</strong> ${formData.buy_now_price}</p>}
-                  <p><strong>Location:</strong> {formData.location_city}, {formData.location_province}</p>
+                  <p><strong>Location:</strong> {formData.location_city}, {formData.location_province} {formData.location_postal_code}</p>
                   <p><strong>Photos:</strong> {getTotalPhotos()}</p>
                 </CardContent>
               </Card>
