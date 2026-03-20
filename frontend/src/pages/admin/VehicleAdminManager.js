@@ -28,10 +28,12 @@ import {
   DollarSign, Settings2, Percent, Timer, Scale, Award
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/currencyFormatter';
+import { useTranslation } from 'react-i18next';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const formatDate = (date) => {
+  const { t } = useTranslation();
   if (!date) return 'N/A';
   return new Date(date).toLocaleDateString('en-CA', {
     year: 'numeric',
@@ -679,7 +681,7 @@ const VehicleAdminManager = () => {
             {/* Auction Controls */}
             <Card>
               <CardHeader>
-                <CardTitle>Enable Vehicle Auctions</CardTitle>
+                <CardTitle>{t("admin.enableVehicleAuctions")}</CardTitle>
                 <CardDescription>
                   Master switch to enable/disable all vehicle auction functionality.
                   When OFF, the platform operates in discovery-only mode.
@@ -735,7 +737,7 @@ const VehicleAdminManager = () => {
             {/* Listing Controls */}
             <Card>
               <CardHeader>
-                <CardTitle>Enable Vehicle Listing</CardTitle>
+                <CardTitle>{t("admin.enableVehicleListing")}</CardTitle>
                 <CardDescription>
                   Controls whether users can create new vehicle listings.
                   This is separate from auction viewing. Keep OFF until permits are approved.
@@ -840,8 +842,8 @@ const VehicleAdminManager = () => {
         <TabsContent value="audit-logs" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Recent Actions</CardTitle>
-              <CardDescription>Audit trail for vehicle module operations</CardDescription>
+              <CardTitle>{t("admin.recentActions")}</CardTitle>
+              <CardDescription>{t("admin.auditTrail")}</CardDescription>
             </CardHeader>
             <CardContent>
               {auditLogs.length === 0 ? (
@@ -892,7 +894,7 @@ const VehicleAdminManager = () => {
                   <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-slate-600">Standard</span>
-                      <Badge variant="outline">Free Tier</Badge>
+                      <Badge variant="outline">{t("admin.freeTier")}</Badge>
                     </div>
                     <div className="flex items-center gap-2">
                       <Input
@@ -960,7 +962,7 @@ const VehicleAdminManager = () => {
                   <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-slate-600">Standard</span>
-                      <Badge variant="outline">Free Tier</Badge>
+                      <Badge variant="outline">{t("admin.freeTier")}</Badge>
                     </div>
                     <div className="flex items-center gap-2">
                       <Input

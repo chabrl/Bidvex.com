@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { Slider } from './ui/slider';
 import { Card } from './ui/card';
 import { MapPin, Navigation } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const libraries = ['places'];
 const mapContainerStyle = {
@@ -12,6 +13,7 @@ const mapContainerStyle = {
 };
 
 const LocationSearchMap = ({ onLocationSearch }) => {
+  const { t } = useTranslation();
   const [map, setMap] = useState(null);
   const [center, setCenter] = useState({ lat: 40.7128, lng: -74.0060 });
   const [radius, setRadius] = useState(50);
@@ -74,7 +76,7 @@ const LocationSearchMap = ({ onLocationSearch }) => {
     }
   };
 
-  if (loadError) return <div>Error loading maps</div>;
+  if (loadError) return <div>{t("common.errorLoadingMaps")}</div>;
   if (!isLoaded || !apiKey) return <div>Loading maps...</div>;
 
   return (

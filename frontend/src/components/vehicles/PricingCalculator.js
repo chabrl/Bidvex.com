@@ -18,11 +18,13 @@ import {
   CreditCard, HelpCircle
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
+import { useTranslation } from 'react-i18next';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 // Format currency
 const formatCurrency = (amount) => {
+  const { t } = useTranslation();
   return new Intl.NumberFormat('en-CA', {
     style: 'currency',
     currency: 'CAD',
@@ -240,7 +242,7 @@ export const PricingCalculator = ({
         <CardContent className="p-4">
           <div className="flex items-center gap-2 text-slate-500">
             <Calculator className="h-5 w-5" />
-            <span>Enter a bid amount to see pricing breakdown</span>
+            <span>{t("fees.enterBidAmount")}</span>
           </div>
         </CardContent>
       </Card>
@@ -326,7 +328,7 @@ export const PricingCalculator = ({
                       <HelpCircle className="h-3 w-3" />
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Transaction processing and platform service fee</p>
+                      <p>{t("fees.transactionFeeDesc")}</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>

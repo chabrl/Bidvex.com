@@ -18,6 +18,7 @@ import {
 import { toast } from 'sonner';
 import axios from 'axios';
 import { formatCurrency } from '../utils/currencyFormatter';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Real-time bidding panel with quantity-based price calculations
@@ -29,6 +30,7 @@ import { formatCurrency } from '../utils/currencyFormatter';
  * - Fallback polling on disconnect
  */
 const RealtimeBiddingPanel = ({ listing, onBidPlaced }) => {
+  const { t } = useTranslation();
   const { user, login } = useAuth();
   const {
     currentPrice,
@@ -217,7 +219,7 @@ const RealtimeBiddingPanel = ({ listing, onBidPlaced }) => {
           <Alert className="bg-yellow-50 border-yellow-300">
             <Calculator className="h-4 w-4 text-yellow-600" />
             <AlertDescription className="text-yellow-800">
-              <strong>Multi-Item Lot:</strong> This lot contains <strong>{quantity} items</strong>.
+              <strong>Multi-Item Lot:</strong> {t("auction.thisLotContains")} <strong>{quantity} items</strong>.
               Your bid is per unit, and you will be committed to purchasing all items.
             </AlertDescription>
           </Alert>

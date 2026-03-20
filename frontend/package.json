@@ -83,7 +83,8 @@
     "start": "craco start",
     "build": "craco build",
     "test": "craco test",
-    "i18n:audit": "node scripts/i18n-audit.js"
+    "i18n:audit": "node scripts/i18n-audit.js",
+    "predeploy": "node scripts/i18n-audit.js"
   },
   "browserslist": {
     "production": [

@@ -19,7 +19,7 @@ const REPORT_PATH = path.resolve(__dirname, 'i18n-report.txt');
 
 // Files/dirs to skip entirely
 const SKIP_DIRS = ['node_modules', '.git', 'locales', '__tests__', 'test', 'components/ui'];
-const SKIP_FILES = ['i18n.js', 'reportWebVitals.js', 'setupTests.js', 'serviceWorker.js'];
+const SKIP_FILES = ['i18n.js', 'reportWebVitals.js', 'setupTests.js', 'serviceWorker.js', 'PrivacyEN.jsx', 'PrivacyFR.jsx', 'TermsEN.jsx', 'TermsFR.jsx'];
 
 // ─── Utility: recursively collect .js/.jsx files ───
 function collectFiles(dir, files = []) {

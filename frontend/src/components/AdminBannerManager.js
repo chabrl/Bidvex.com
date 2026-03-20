@@ -11,6 +11,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Switch } from './ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { useTranslation } from 'react-i18next';
 import {
   Image as ImageIcon, Link as LinkIcon, Clock, Plus, Trash2, Edit2,
   Eye, EyeOff, Upload, Save, Loader2, RefreshCw
@@ -19,6 +20,7 @@ import {
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const AdminBannerManager = () => {
+  const { t } = useTranslation();
   const [banners, setBanners] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -317,7 +319,7 @@ const BannerForm = ({ banner, setBanner, onSave, onCancel, saving, onImageUpload
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="title">Banner Title</Label>
+          <Label htmlFor="title">{t("admin.bannerTitle")}</Label>
           <Input
             id="title"
             value={banner.title}
@@ -339,7 +341,7 @@ const BannerForm = ({ banner, setBanner, onSave, onCancel, saving, onImageUpload
       </div>
 
       <div className="space-y-2">
-        <Label>Banner Image</Label>
+        <Label>{t("admin.bannerImage")}</Label>
         <div className="flex items-center gap-4">
           <div className="w-48 h-28 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 border-2 border-dashed border-slate-300 dark:border-slate-600">
             {banner.image_url ? (

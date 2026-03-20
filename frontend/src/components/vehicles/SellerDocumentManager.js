@@ -11,6 +11,7 @@ import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Input } from '../../components/ui/input';
 import { Progress } from '../../components/ui/progress';
+import { useTranslation } from 'react-i18next';
 import {
   Upload, FileText, CheckCircle, XCircle, Clock, AlertTriangle,
   Image, File, Trash2, Eye, RefreshCw, Shield, Info
@@ -36,6 +37,7 @@ const DOCUMENT_LABELS = {
 
 // Status badge component
 const StatusBadge = ({ status }) => {
+  const { t } = useTranslation();
   const config = {
     pending: { color: 'bg-amber-100 text-amber-800', icon: Clock, label: 'Pending Review' },
     approved: { color: 'bg-green-100 text-green-800', icon: CheckCircle, label: 'Approved' },
@@ -385,7 +387,7 @@ const SellerDocumentManager = ({ onVerificationComplete }) => {
       {/* Required Documents */}
       <Card>
         <CardHeader>
-          <CardTitle>Required Documents</CardTitle>
+          <CardTitle>{t("vehicles.requiredDocuments")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {requiredDocs.map((docReq) => {

@@ -259,7 +259,7 @@ const FlattenedMarketplace = ({
               onChange={(e) => handleFilterChange('category', e.target.value)}
               className="px-4 py-2 border border-input rounded-md bg-background text-sm"
             >
-              <option value="">All Categories</option>
+              <option value="">{t("marketplace.allCategories")}</option>
               {categories.map((cat) => (
                 <option key={cat.id} value={cat.name_en}>
                   {cat.name_en}
@@ -272,10 +272,10 @@ const FlattenedMarketplace = ({
               onChange={(e) => handleFilterChange('condition', e.target.value)}
               className="px-4 py-2 border border-input rounded-md bg-background text-sm"
             >
-              <option value="">All Conditions</option>
+              <option value="">{t("marketplace.allConditions")}</option>
               <option value="new">New</option>
-              <option value="like_new">Like New</option>
-              <option value="excellent">Excellent</option>
+              <option value="like_new">{t("marketplace.likeNew")}</option>
+              <option value="excellent">{t("marketplace.excellent")}</option>
               <option value="good">Good</option>
               <option value="fair">Fair</option>
             </select>
@@ -285,11 +285,11 @@ const FlattenedMarketplace = ({
               onChange={(e) => handleFilterChange('sort', e.target.value)}
               className="px-4 py-2 border border-input rounded-md bg-background text-sm"
             >
-              <option value="-promoted">Featured First</option>
-              <option value="ending_soon">Ending Soon</option>
+              <option value="-promoted">{t("marketplace.featuredFirst")}</option>
+              <option value="ending_soon">{t("marketplace.endingSoon")}</option>
               <option value="price">Price: Low to High</option>
               <option value="-price">Price: High to Low</option>
-              <option value="-created_at">Newest First</option>
+              <option value="-created_at">{t("marketplace.newestFirst")}</option>
             </select>
 
             <div className="flex gap-2 col-span-2 md:col-span-2">

@@ -4,7 +4,7 @@
 Full-stack auction marketplace with localized currency, tax compliance, 4-tier subscriptions (Free/Premium/Partner Pro/VIP), real-time bidding, and professional seller tools.
 
 ## Tech Stack
-- **Frontend**: React 19, Tailwind CSS, Shadcn/UI, @tanstack/react-query, embla-carousel-react
+- **Frontend**: React 19, Tailwind CSS, Shadcn/UI, @tanstack/react-query, embla-carousel-react, react-i18next
 - **Backend**: FastAPI (37 route modules), MongoDB, Stripe, SendGrid, Emergent Object Storage, slowapi
 - **Architecture**: Modular backend, shared.py for common models, server.py as ~362-line entry point
 
@@ -23,21 +23,25 @@ Full-stack auction marketplace with localized currency, tax compliance, 4-tier s
 - UX: Mobile swipeable carousels, comparison view, responsive design, SEO
 - Security: Rate limiting (slowapi), Stripe webhook verification, HMAC signed URLs
 - Email: 5 Partner Pro lifecycle templates (41 pytest tests)
-- Database: Production indexes (27 total across 14 collections), idempotent script at scripts/apply_indexes.py
-- **i18n**: Full EN/FR translation for Seller Dashboard (77+ keys), i18n.js resource builder fixed to merge JSON translation files
-- **i18n Audit Tool**: Node.js script at `scripts/i18n-audit.js` — detects hardcoded strings, missing/unused keys, EN/FR sync issues. Run via `yarn i18n:audit`
+- Database: Production indexes (27 total across 14 collections)
+- **i18n (COMPLETE)**:
+  - P1: Migrated 567 keys from 2000-line i18n.js builder into JSON files; i18n.js simplified to 60 lines
+  - P2: Fixed 202 hardcoded English strings across 48 source files with real French translations
+  - P3: Cleaned 481 provably dead keys; 907 keys remain, EN/FR in perfect sync
+  - CI: `yarn predeploy` runs i18n audit, exit code 1 blocks deploy on regressions
+  - Audit tool: `yarn i18n:audit` → full report at `scripts/i18n-report.txt`
 
-## i18n Audit Summary (March 20, 2026)
-- 539 keys in sync between EN/FR
-- 202 hardcoded strings detected across 179 files (full report at scripts/i18n-report.txt)
-- 437 keys used via t() but only defined in i18n.js builder (should migrate to JSON)
-- 225 potentially unused JSON keys (review before cleanup)
-- EN/FR files: perfectly in sync
+## Final i18n Audit (March 20, 2026)
+| Metric | Result |
+|--------|--------|
+| Hardcoded strings | **0** |
+| Missing keys | **0** |
+| EN/FR sync | **100% (907 keys)** |
+| Unused keys | **133** (intentionally kept: common utilities, nav, footer, bidErrorGuide) |
+| CI gate | **Active** (`yarn predeploy`) |
 
-## Launch Status
-- **GO** — See /app/memory/LAUNCH_CHECKLIST.md
-- MongoDB indexes: DONE (27 indexes applied, all verified)
-- i18n Seller Dashboard: DONE (zero hardcoded English strings, visually verified in FR mode)
+## Launch Status: GO
+- See `/app/memory/LAUNCH_CHECKLIST.md`
 - 1 manual item remaining: Cloudflare CDN setup
 
 ## Credentials

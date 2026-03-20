@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Crown, Star, Zap, Shield, TrendingUp, Percent, Megaphone, Headphones, Check, Sparkles, RefreshCw, Store, FileSpreadsheet, BarChart3 } from 'lucide-react';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -16,6 +17,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
  * - Interactive hover effects with elevation
  */
 const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
+  const { t } = useTranslation();
   const [hoveredCard, setHoveredCard] = useState(null);
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -333,7 +335,7 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
                           : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
                       }`} data-testid={`price-breakdown-${tier.id}`}>
                         <div className="flex justify-between">
-                          <span>Subtotal</span>
+                          <span>{t("subscription.subtotal")}</span>
                           <span className="font-medium">${formatPrice(breakdowns[tier.id].subtotal)}</span>
                         </div>
                         <div className="flex justify-between">
@@ -345,7 +347,7 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
                           <span className="font-medium">${formatPrice(breakdowns[tier.id].qst)}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span>Processing fee</span>
+                          <span>{t("subscription.processingFee")}</span>
                           <span className="font-medium">${formatPrice(breakdowns[tier.id].processing_fee)}</span>
                         </div>
                         <div className={`flex justify-between pt-1.5 border-t font-semibold ${

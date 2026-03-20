@@ -6,10 +6,12 @@ import { Input } from '../../components/ui/input';
 import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
 import { Megaphone, Plus, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const AnnouncementManager = () => {
+  const { t } = useTranslation();
   const [announcements, setAnnouncements] = useState([]);
   const [showCreate, setShowCreate] = useState(false);
   const [formData, setFormData] = useState({
@@ -82,7 +84,7 @@ const AnnouncementManager = () => {
 
       {showCreate && (
         <Card className="border-2 border-primary">
-          <CardHeader><CardTitle>Create Announcement</CardTitle></CardHeader>
+          <CardHeader><CardTitle>{t("admin.createAnnouncement")}</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-2">Title</label>
@@ -96,10 +98,10 @@ const AnnouncementManager = () => {
               <div>
                 <label className="block text-sm font-medium mb-2">Target Audience</label>
                 <select value={formData.target_audience} onChange={(e) => setFormData({...formData, target_audience: e.target.value})} className="w-full px-3 py-2 border rounded-md">
-                  <option value="all">All Users</option>
-                  <option value="buyers">Buyers Only</option>
-                  <option value="sellers">Sellers Only</option>
-                  <option value="business">Business Accounts</option>
+                  <option value="all">{t("admin.allUsers")}</option>
+                  <option value="buyers">{t("admin.buyersOnly")}</option>
+                  <option value="sellers">{t("admin.sellersOnly")}</option>
+                  <option value="business">{t("admin.businessAccounts")}</option>
                 </select>
               </div>
               <div>

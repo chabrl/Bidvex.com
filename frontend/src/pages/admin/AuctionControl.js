@@ -8,6 +8,7 @@ import { Switch } from '../../components/ui/switch';
 import { Label } from '../../components/ui/label';
 import { Separator } from '../../components/ui/separator';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 import { 
   Settings, Users, Shield, Save, Info, CheckCircle, 
   AlertCircle, Package, Gavel, Clock, UserCheck,
@@ -17,6 +18,7 @@ import {
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const AuctionControl = () => {
+  const { t } = useTranslation();
   // Settings State
   const [settings, setSettings] = useState({
     allowAllUsersMultiLot: true,
@@ -214,7 +216,7 @@ const AuctionControl = () => {
             </div>
             <div>
               <CardTitle className="text-lg font-semibold">Quotas & Abuse Protection</CardTitle>
-              <CardDescription>Set limits to maintain marketplace quality</CardDescription>
+              <CardDescription>{t("admin.setLimitsDesc")}</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -303,7 +305,7 @@ const AuctionControl = () => {
             </div>
             <div>
               <CardTitle className="text-lg font-semibold">Bidding Features</CardTitle>
-              <CardDescription>Configure auction bidding behavior</CardDescription>
+              <CardDescription>{t("admin.configureBidding")}</CardDescription>
             </div>
           </div>
         </CardHeader>

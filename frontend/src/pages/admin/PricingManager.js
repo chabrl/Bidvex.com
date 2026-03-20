@@ -27,6 +27,7 @@ import {
   RefreshCw, Settings, Edit3, TrendingUp, Check, AlertCircle
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/currencyFormatter';
+import { useTranslation } from 'react-i18next';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -38,6 +39,7 @@ const PLAN_CONFIG = {
 };
 
 const PricingManager = () => {
+  const { t } = useTranslation();
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [changelog, setChangelog] = useState([]);
@@ -201,7 +203,7 @@ const PricingManager = () => {
                 >
                   {!plan.is_active && (
                     <div className="absolute top-2 right-2">
-                      <Badge variant="secondary">Inactive</Badge>
+                      <Badge variant="secondary">{t("common.inactive")}</Badge>
                     </div>
                   )}
                   <CardHeader className="pb-2">
@@ -482,7 +484,7 @@ const PricingManager = () => {
 
             {/* Active Toggle */}
             <div className="flex items-center justify-between">
-              <Label>Plan Active</Label>
+              <Label>{t("admin.planActive")}</Label>
               <Switch
                 checked={editData.is_active}
                 onCheckedChange={(checked) => setEditData(d => ({ ...d, is_active: checked }))}

@@ -138,7 +138,7 @@ const LocationSelector = ({ value, onChange, geoSuggestion, errors: externalErro
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="CA">Canada</SelectItem>
-              <SelectItem value="US">United States</SelectItem>
+              <SelectItem value="US">{t("locationSelector.unitedStates")}</SelectItem>
             </SelectContent>
           </Select>
         </div>

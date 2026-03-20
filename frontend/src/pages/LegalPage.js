@@ -2,8 +2,10 @@ import React from 'react';
 import { Card, CardContent } from '../components/ui/card';
 import { ScrollText, Shield, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 const LegalPage = () => {
+  const { t } = useTranslation();
   return (
     <div className="min-h-screen bg-background py-12 px-4">
       <div className="max-w-4xl mx-auto space-y-10">
@@ -63,7 +65,7 @@ const LegalPage = () => {
                 <li>Immediately report any unauthorized access or use of your account to BidVex.</li>
               </ul>
               <h4 className="font-semibold">3.3 Eligibility</h4>
-              <p>You must be at least <strong>eighteen (18) years of age</strong> and possess the legal capacity to enter into binding contracts to register for an account and use the Platform.</p>
+              <p>{t("legal.mustBeAtLeast")} <strong>eighteen (18) years of age</strong> and possess the legal capacity to enter into binding contracts to register for an account and use the Platform.</p>
 
               {/* 4 */}
               <h3 className="text-lg font-semibold">4. Seller Responsibilities</h3>
@@ -134,11 +136,11 @@ const LegalPage = () => {
               <p>All prices and fees quoted on this page are exclusive of taxes. <strong>GST (Goods and Services Tax) and QST (Quebec Sales Tax)</strong> are applied on top of all platform fees, commissions, and subscription charges in accordance with Canadian and Quebec tax law. Tax calculations are based on the final sale price and the jurisdiction of the transaction.</p>
 
               <h4 className="font-semibold">7.5 Payment Terms</h4>
-              <p>Full payment for all winning bids is due within <strong>fourteen (14) days</strong> of the auction close.</p>
-              <p><strong>Late Payments:</strong> Payments not received by the due date may incur a late payment penalty of <strong>2% per month</strong> (24% per annum) on the outstanding balance.</p>
+              <p>{t("legal.fullPaymentDue")} <strong>fourteen (14) days</strong> of the auction close.</p>
+              <p><strong>Late Payments:</strong> {t("legal.latePaymentPenalty")} <strong>2% per month</strong> (24% per annum) on the outstanding balance.</p>
 
               <h4 className="font-semibold">7.6 Payment Processing</h4>
-              <p>All payments are handled via <strong>Stripe</strong>, a secure third-party payment processor. BidVex does not store, possess, or have access to any full credit card or bank account payment information.</p>
+              <p>{t("legal.paymentsHandledVia")} <strong>Stripe</strong>, a secure third-party payment processor. BidVex does not store, possess, or have access to any full credit card or bank account payment information.</p>
 
               {/* 8 */}
               <h3 className="text-lg font-semibold">8. "AS-IS / WHERE-IS" Clause</h3>
@@ -207,7 +209,7 @@ const LegalPage = () => {
 
               {/* 16 */}
               <h3 className="text-lg font-semibold">16. Governing Law &amp; Jurisdiction</h3>
-              <p>These Terms and your use of the Platform are governed by and construed in accordance with the laws of the <strong>Province of Quebec</strong> and the federal laws of Canada applicable therein. Any disputes arising out of or related to these Terms shall be resolved exclusively in the courts of <strong>Montreal, Quebec</strong>.</p>
+              <p>{t("legal.governedByLaws")} <strong>{t("legal.provinceOfQuebec")}</strong> and the federal laws of Canada applicable therein. Any disputes arising out of or related to these Terms shall be resolved exclusively in the courts of <strong>Montreal, Quebec</strong>.</p>
 
               {/* 17 */}
               <h3 className="text-lg font-semibold">17. Contact Information</h3>
@@ -235,7 +237,7 @@ const LegalPage = () => {
               {/* 1 */}
               <h3 className="text-lg font-semibold">1. Introduction</h3>
               <p>At BidVex Inc. ("BidVex," "we," "us," or "our"), we are committed to protecting the privacy and security of your personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your data when you use our online auction platform ("the Platform").</p>
-              <p><strong>Compliance:</strong> This policy is designed to comply with the <strong>Act respecting the protection of personal information in the private sector (Quebec Law 25)</strong>, the <strong>Personal Information Protection and Electronic Documents Act (PIPEDA)</strong>, and the <strong>General Data Protection Regulation (GDPR)</strong>.</p>
+              <p><strong>Compliance:</strong> {t("legal.compliancePolicy")} <strong>Act respecting the protection of personal information in the private sector (Quebec Law 25)</strong>, the <strong>Personal Information Protection and Electronic Documents Act (PIPEDA)</strong>, and the <strong>General Data Protection Regulation (GDPR)</strong>.</p>
 
               {/* 2 */}
               <h3 className="text-lg font-semibold">2. Information We Collect</h3>
@@ -299,9 +301,9 @@ const LegalPage = () => {
               <h3 className="text-lg font-semibold">7. Data Security</h3>
               <p>We implement industry-leading security measures to protect your data, including:</p>
               <ul className="list-disc pl-6 space-y-1">
-                <li><strong>TLS/SSL:</strong> Encryption in transit</li>
-                <li><strong>AES-256:</strong> Encryption at rest</li>
-                <li><strong>PCI-DSS:</strong> Payment compliance</li>
+                <li><strong>TLS/SSL:</strong> {t("legal.encryptionInTransit")}</li>
+                <li><strong>AES-256:</strong> {t("legal.encryptionAtRest")}</li>
+                <li><strong>PCI-DSS:</strong> {t("legal.paymentCompliance")}</li>
                 <li><strong>MFA:</strong> Multi-factor authentication</li>
                 <li><strong>Role-Based Access Control</strong></li>
                 <li><strong>24/7 Security Monitoring</strong></li>

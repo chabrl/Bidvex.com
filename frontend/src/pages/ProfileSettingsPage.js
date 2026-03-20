@@ -363,7 +363,7 @@ const ProfileSettingsPage = () => {
             <div className="rounded-2xl bg-white/70 dark:bg-slate-800/50 backdrop-blur-xl border border-slate-200/80 dark:border-slate-700/60 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5 text-blue-500" />Payment Methods</CardTitle>
-                <CardDescription>Manage your payment methods for bidding</CardDescription>
+                <CardDescription>{t("profile.managePaymentMethods")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {paymentMethods.length > 0 ? (

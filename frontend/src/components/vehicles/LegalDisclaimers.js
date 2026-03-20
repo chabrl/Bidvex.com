@@ -18,6 +18,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '../ui/dialog';
+import { useTranslation } from 'react-i18next';
 import {
   AlertTriangle, Shield, FileText, CheckCircle, Info,
   Clock, CreditCard, Gavel, Eye, Car, Scale, Users,
@@ -26,6 +27,7 @@ import {
 
 // Platform Role Disclaimer
 export const PlatformRoleDisclaimer = ({ compact = false }) => {
+  const { t } = useTranslation();
   if (compact) {
     return (
       <div className="text-xs text-slate-500 flex items-center gap-1" data-testid="platform-disclaimer-compact">
@@ -168,7 +170,7 @@ export const BindingBidNotice = ({ compact = false }) => {
     return (
       <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 dark:bg-slate-800/50 rounded px-2 py-1">
         <Gavel className="h-3 w-3" />
-        <span>All bids are legally binding contracts</span>
+        <span>{t("auction.allBidsBinding")}</span>
       </div>
     );
   }
@@ -358,7 +360,7 @@ export const DepositNotice = ({ amount, isPaid = false }) => (
     </AlertTitle>
     <AlertDescription className={isPaid ? "text-green-700 dark:text-green-300" : "text-blue-700 dark:text-blue-300"}>
       {isPaid ? (
-        <span>Your deposit of <strong>${amount}</strong> has been confirmed. You may now place bids.</span>
+        <span>{t("auction.yourDepositOf")} <strong>${amount}</strong> has been confirmed. You may now place bids.</span>
       ) : (
         <span>
           A refundable deposit of <strong>${amount}</strong> is required before bidding. 

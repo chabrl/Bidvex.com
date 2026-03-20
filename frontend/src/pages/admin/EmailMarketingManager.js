@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from '../../components/ui/select';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 import { 
   Mail, Send, Users, Calendar, BarChart3, Plus, Edit3, 
   Trash2, Eye, Play, Pause, Clock, CheckCircle, XCircle,
@@ -84,6 +85,7 @@ const REGIONS = [
 ];
 
 const EmailMarketingManager = () => {
+  const { t } = useTranslation();
   const { token } = useAuth();
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -400,7 +402,7 @@ const EmailMarketingManager = () => {
         © 2026 BidVex Inc. All rights reserved.
       </p>
       <p style="margin: 10px 0 0; font-size: 12px;">
-        <a href="{{unsubscribe_url}}" style="color: #999;">Unsubscribe</a>
+        <a href="{{unsubscribe_url}}" style="color: #999;">{t("common.unsubscribe")}</a>
       </p>
     </div>
   </div>
@@ -770,12 +772,12 @@ const EmailMarketingManager = () => {
         <Dialog open={testEmailDialogOpen} onOpenChange={setTestEmailDialogOpen}>
           <DialogContent className="w-[95vw] max-w-[400px]">
             <DialogHeader>
-              <DialogTitle>Send Test Email</DialogTitle>
-              <DialogDescription>Preview the campaign in your inbox</DialogDescription>
+              <DialogTitle>{t("admin.sendTestEmail")}</DialogTitle>
+              <DialogDescription>{t("admin.previewCampaign")}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label>Email Address</Label>
+                <Label>{t("admin.emailAddress")}</Label>
                 <Input
                   type="email"
                   value={testEmail}
@@ -798,8 +800,8 @@ const EmailMarketingManager = () => {
         <Dialog open={scheduleDialogOpen} onOpenChange={setScheduleDialogOpen}>
           <DialogContent className="w-[95vw] max-w-[400px]">
             <DialogHeader>
-              <DialogTitle>Schedule Campaign</DialogTitle>
-              <DialogDescription>Choose when to send this campaign</DialogDescription>
+              <DialogTitle>{t("admin.scheduleCampaign")}</DialogTitle>
+              <DialogDescription>{t("admin.chooseWhenToSend")}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
@@ -835,7 +837,7 @@ const EmailMarketingManager = () => {
           <DialogContent className="w-[95vw] max-w-[400px]">
             <DialogHeader>
               <DialogTitle className="text-red-600">Cancel Campaign</DialogTitle>
-              <DialogDescription>This will cancel the scheduled campaign</DialogDescription>
+              <DialogDescription>{t("admin.cancelScheduledCampaign")}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
@@ -849,7 +851,7 @@ const EmailMarketingManager = () => {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>Keep Scheduled</Button>
+              <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>{t("admin.keepScheduled")}</Button>
               <Button variant="destructive" onClick={cancelCampaign} disabled={cancelling} className="gap-2">
                 {cancelling ? <RefreshCw className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
                 Cancel Campaign
@@ -968,11 +970,11 @@ const EmailMarketingManager = () => {
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="all">{t("admin.allStatus")}</SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="scheduled">Scheduled</SelectItem>
+                <SelectItem value="scheduled">{t("admin.scheduled")}</SelectItem>
                 <SelectItem value="sent">Sent</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
+                <SelectItem value="cancelled">{t("admin.cancelled")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -1054,7 +1056,7 @@ const EmailMarketingManager = () => {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>From Name</Label>
+                  <Label>{t("admin.fromName")}</Label>
                   <Input
                     value={campaignData.from_name}
                     onChange={(e) => setCampaignData(prev => ({ ...prev, from_name: e.target.value }))}
@@ -1139,7 +1141,7 @@ const EmailMarketingManager = () => {
                       <SelectValue placeholder="Any" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Any Activity</SelectItem>
+                      <SelectItem value="all">{t("admin.anyActivity")}</SelectItem>
                       {ACTIVITY_STATUS.map(s => (
                         <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                       ))}
@@ -1402,12 +1404,12 @@ const EmailMarketingManager = () => {
       <Dialog open={testEmailDialogOpen} onOpenChange={setTestEmailDialogOpen}>
         <DialogContent className="w-[95vw] max-w-[400px]">
           <DialogHeader>
-            <DialogTitle>Send Test Email</DialogTitle>
-            <DialogDescription>Preview the campaign in your inbox</DialogDescription>
+            <DialogTitle>{t("admin.sendTestEmail")}</DialogTitle>
+            <DialogDescription>{t("admin.previewCampaign")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Email Address</Label>
+              <Label>{t("admin.emailAddress")}</Label>
               <Input
                 type="email"
                 value={testEmail}

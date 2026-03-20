@@ -6,10 +6,12 @@ import { Badge } from '../../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { toast } from 'sonner';
 import { Shield, AlertTriangle, TrendingUp, Users, MessageSquare, Eye, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const TrustSafetyDashboard = () => {
+  const { t } = useTranslation();
   const [trustScores, setTrustScores] = useState([]);
   const [fraudFlags, setFraudFlags] = useState([]);
   const [collusionPatterns, setCollusionPatterns] = useState([]);
@@ -144,7 +146,7 @@ const TrustSafetyDashboard = () => {
         {/* Trust Scores Tab */}
         <TabsContent value="scores">
           <Card>
-            <CardHeader><CardTitle>User Trust Scores</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t("admin.userTrustScores")}</CardTitle></CardHeader>
             <CardContent>
               <div className="space-y-2">
                 {trustScores.slice(0, 20).map(user => (
@@ -175,7 +177,7 @@ const TrustSafetyDashboard = () => {
         {/* Fraud Flags Tab */}
         <TabsContent value="flags">
           <Card>
-            <CardHeader><CardTitle>Fraud Detection Flags</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t("admin.fraudDetectionFlags")}</CardTitle></CardHeader>
             <CardContent>
               <div className="space-y-3">
                 {fraudFlags.map((flag, idx) => (
@@ -218,8 +220,8 @@ const TrustSafetyDashboard = () => {
                     <p className="font-semibold mb-1">{pattern.seller_name} ↔ {pattern.buyer_name}</p>
                     <p className="text-sm text-muted-foreground">{pattern.description}</p>
                     <div className="flex gap-2 mt-2">
-                      <Button size="sm" variant="outline" onClick={() => handleAutoAction(pattern.seller_id, 'require_verification')}>Require Seller Verification</Button>
-                      <Button size="sm" variant="outline" onClick={() => handleAutoAction(pattern.buyer_id, 'require_verification')}>Require Buyer Verification</Button>
+                      <Button size="sm" variant="outline" onClick={() => handleAutoAction(pattern.seller_id, 'require_verification')}>{t("admin.requireSellerVerification")}</Button>
+                      <Button size="sm" variant="outline" onClick={() => handleAutoAction(pattern.buyer_id, 'require_verification')}>{t("admin.requireBuyerVerification")}</Button>
                     </div>
                   </div>
                 ))}

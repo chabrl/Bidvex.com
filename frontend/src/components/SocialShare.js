@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { Button } from './ui/button';
 import { Share2, Facebook, Instagram, Linkedin, MessageCircle, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 
 const SocialShare = ({ title, url, description, className = '' }) => {
+  const { t } = useTranslation();
   const [showMenu, setShowMenu] = useState(false);
 
   const shareUrl = url || window.location.href;
@@ -95,7 +97,7 @@ const SocialShare = ({ title, url, description, className = '' }) => {
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               >
                 <Share2 className="h-5 w-5" />
-                <span>Copy Link</span>
+                <span>{t("common.copyLink")}</span>
               </button>
             </div>
           </div>

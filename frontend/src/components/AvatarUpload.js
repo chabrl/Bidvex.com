@@ -5,8 +5,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Slider } from './ui/slider';
 import { Upload, User } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 
 const AvatarUpload = ({ currentAvatar, onAvatarUpdate }) => {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [image, setImage] = useState(null);
   const [scale, setScale] = useState(1);
@@ -87,7 +89,7 @@ const AvatarUpload = ({ currentAvatar, onAvatarUpdate }) => {
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit Profile Photo</DialogTitle>
+            <DialogTitle>{t("profile.editProfilePhoto")}</DialogTitle>
           </DialogHeader>
           
           <div className="space-y-4">

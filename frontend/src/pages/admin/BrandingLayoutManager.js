@@ -14,6 +14,7 @@ import {
   Plus, Edit2, GripVertical
 } from 'lucide-react';
 import HeroBannerEditor from '../../components/admin/HeroBannerEditor';
+import { useTranslation } from 'react-i18next';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -29,6 +30,7 @@ const GOOGLE_FONTS = [
 ];
 
 const BrandingLayoutManager = () => {
+  const { t } = useTranslation();
   const { token } = useAuth();
   const [activeTab, setActiveTab] = useState('branding');
   const [loading, setLoading] = useState(true);
@@ -269,7 +271,7 @@ const BrandingLayoutManager = () => {
                 <Palette className="h-5 w-5" />
                 Color Palette
               </CardTitle>
-              <CardDescription>Define your brand colors</CardDescription>
+              <CardDescription>{t("admin.defineBrandColors")}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

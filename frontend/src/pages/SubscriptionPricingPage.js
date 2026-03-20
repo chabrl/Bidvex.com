@@ -20,6 +20,7 @@ import {
   Gift, TrendingDown, PartyPopper, AlertCircle
 } from 'lucide-react';
 import { formatCurrency } from '../utils/currencyFormatter';const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+import { useTranslation } from 'react-i18next';
 
 // Plan icons and styling
 const PLAN_STYLES = {
@@ -49,6 +50,7 @@ const PLAN_STYLES = {
 };
 
 const SubscriptionPricingPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -420,7 +422,7 @@ const SubscriptionPricingPage = () => {
                   {plan.plan_id !== 'free' && !stripeReady && (
                     <div className="flex items-center justify-center gap-1 text-xs text-amber-600 dark:text-amber-400">
                       <AlertCircle className="h-3 w-3" />
-                      <span>Payment setup pending</span>
+                      <span>{t("subscription.paymentSetupPending")}</span>
                     </div>
                   )}
                 </CardFooter>
@@ -567,9 +569,9 @@ const SubscriptionPricingPage = () => {
                   Secure Payment
                 </span>
                 <span>•</span>
-                <span>Cancel Anytime</span>
+                <span>{t("subscription.cancelAnytime")}</span>
                 <span>•</span>
-                <span>Instant Access</span>
+                <span>{t("subscription.instantAccess")}</span>
               </div>
             </CardContent>
           </Card>

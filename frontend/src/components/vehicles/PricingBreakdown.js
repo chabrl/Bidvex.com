@@ -9,6 +9,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
+import { useTranslation } from 'react-i18next';
 import {
   DollarSign, Percent, Receipt, Calculator, Info,
   ChevronDown, ChevronUp, Crown, Sparkles, AlertCircle
@@ -18,6 +19,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 // Format currency
 const formatPrice = (amount) => {
+  const { t } = useTranslation();
   return new Intl.NumberFormat('en-CA', {
     style: 'currency',
     currency: 'CAD',
@@ -163,7 +165,7 @@ export const PricingEstimate = ({ vehicleId, bidAmount, province }) => {
 
           {/* Total */}
           <div className="flex justify-between text-base font-bold pt-2 border-t-2 border-slate-300 dark:border-slate-600">
-            <span>Total Payable</span>
+            <span>{t("fees.totalPayable")}</span>
             <span className="text-blue-600 dark:text-blue-400">{formatPrice(breakdown.total_payable)}</span>
           </div>
 
@@ -284,7 +286,7 @@ export const InvoiceView = ({ invoice }) => {
           </div>
           {invoice.deposit_credited > 0 && (
             <div className="flex justify-between text-green-600">
-              <span>Deposit Credit</span>
+              <span>{t("fees.depositCredit")}</span>
               <span>-{formatPrice(invoice.deposit_credited)}</span>
             </div>
           )}

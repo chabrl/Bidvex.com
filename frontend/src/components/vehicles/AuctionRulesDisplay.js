@@ -9,6 +9,7 @@ import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
+import { useTranslation } from 'react-i18next';
 import {
   Clock, TrendingUp, Shield, Zap, Info, AlertTriangle,
   ChevronRight, History, Users, Lock, CheckCircle,
@@ -17,6 +18,7 @@ import {
 
 // Format currency
 const formatCurrency = (amount) => {
+  const { t } = useTranslation();
   return new Intl.NumberFormat('en-CA', {
     style: 'currency',
     currency: 'CAD',
@@ -108,7 +110,7 @@ export const AntiSnipingRulesCard = ({ compact = false }) => {
           <ul className="space-y-2">
             <li className="flex items-start gap-2">
               <CheckCircle className="h-4 w-4 text-blue-500 mt-0.5" />
-              <span>Bids in final <strong>2 minutes</strong> trigger a 2-minute extension</span>
+              <span>{t("auction.bidsInFinal")} <strong>2 minutes</strong> trigger a 2-minute extension</span>
             </li>
             <li className="flex items-start gap-2">
               <CheckCircle className="h-4 w-4 text-blue-500 mt-0.5" />
@@ -362,15 +364,15 @@ export const AuctionRulesSummary = ({ vehicle }) => (
         </div>
         <div className="flex items-center gap-2">
           <Lock className="h-4 w-4 text-green-500" />
-          <span>Binding bids</span>
+          <span>{t("auction.bindingBids")}</span>
         </div>
         <div className="flex items-center gap-2">
           <TrendingUp className="h-4 w-4 text-purple-500" />
-          <span>Tiered increments</span>
+          <span>{t("auction.tieredIncrements")}</span>
         </div>
         <div className="flex items-center gap-2">
           <Eye className="h-4 w-4 text-slate-500" />
-          <span>Transparent history</span>
+          <span>{t("auction.transparentHistory")}</span>
         </div>
       </div>
       

@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Progress } from '../../components/ui/progress';
+import { useTranslation } from 'react-i18next';
 import {
   DollarSign, TrendingUp, Clock, CheckCircle, AlertTriangle,
   ChevronLeft, Percent, Crown, Sparkles, ArrowUpRight,
@@ -20,6 +21,7 @@ import {
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const formatPrice = (amount) => {
+  const { t } = useTranslation();
   return new Intl.NumberFormat('en-CA', {
     style: 'currency',
     currency: 'CAD',
@@ -229,7 +231,7 @@ const SellerFinancialsPage = () => {
             {/* Quick Stats */}
             <Card>
               <CardHeader>
-                <CardTitle>Financial Overview</CardTitle>
+                <CardTitle>{t("seller.financialOverview")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">

@@ -5,12 +5,14 @@ import { toast } from 'sonner';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency } from '../utils/currencyFormatter';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Buy Now button with confirmation modal and quantity selection
  * Implements atomic quantity decrement for partial lot liquidation
  */
 const BuyNowButton = ({ lot, auctionId, onPurchaseComplete }) => {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const [quantity, setQuantity] = useState(1);
@@ -206,7 +208,7 @@ const BuyNowButton = ({ lot, auctionId, onPurchaseComplete }) => {
                 <div className="text-sm text-blue-800">
                   <p className="font-semibold mb-1">Instant Purchase</p>
                   <p>
-                    This is a <strong>Buy Now</strong> purchase. You will immediately secure {quantity} unit(s) at the fixed price of {formatCurrency(buyNowPrice)} per unit. 
+                    This is a <strong>{t("marketplace.buyNowLabel")}</strong> purchase. You will immediately secure {quantity} unit(s) at the fixed price of {formatCurrency(buyNowPrice)} per unit. 
                     {quantity < availableQty && (
                       <span className="block mt-1">
                         The auction will continue for the remaining {availableQty - quantity} unit(s).

@@ -5,10 +5,12 @@ import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
 import { TrendingUp, Download } from 'lucide-react';
 import { formatCurrency } from '../../utils/currencyFormatter';
+import { useTranslation } from 'react-i18next';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const AnalyticsDashboard = () => {
+  const { t } = useTranslation();
   const [revenueData, setRevenueData] = useState([]);
   const [listingData, setListingData] = useState({});
   const [loading, setLoading] = useState(true);
@@ -89,7 +91,7 @@ const AnalyticsDashboard = () => {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>Listing Status Distribution</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{t("admin.listingStatusDistribution")}</CardTitle></CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center p-4 border rounded-lg">

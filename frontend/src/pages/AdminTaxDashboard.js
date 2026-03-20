@@ -173,11 +173,11 @@ const AdminTaxDashboard = () => {
             {period === 'custom' && (
               <>
                 <div className="space-y-2 w-full sm:w-40">
-                  <Label>Start Date</Label>
+                  <Label>{t("admin.startDate")}</Label>
                   <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} data-testid="start-date-input" />
                 </div>
                 <div className="space-y-2 w-full sm:w-40">
-                  <Label>End Date</Label>
+                  <Label>{t("admin.endDate")}</Label>
                   <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} data-testid="end-date-input" />
                 </div>
                 <Button onClick={handleCustomSearch} className="min-h-[48px]" data-testid="apply-filter-btn">
@@ -381,7 +381,7 @@ const AdminTaxDashboard = () => {
           {regional.length > 0 && (
             <Card data-testid="regional-table-card">
               <CardHeader>
-                <CardTitle>Detailed Regional Breakdown</CardTitle>
+                <CardTitle>{t("admin.detailedBreakdown")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">

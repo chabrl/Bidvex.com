@@ -33,10 +33,12 @@ import {
   Search, Clock
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/currencyFormatter';
+import { useTranslation } from 'react-i18next';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const CouponManager = () => {
+  const { t } = useTranslation();
   const [coupons, setCoupons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -239,7 +241,7 @@ const CouponManager = () => {
       {/* Discount Type & Value */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label>Discount Type</Label>
+          <Label>{t("admin.discountType")}</Label>
           <Select 
             value={formData.discount_type} 
             onValueChange={(v) => setFormData(d => ({ ...d, discount_type: v }))}
@@ -317,7 +319,7 @@ const CouponManager = () => {
 
       {/* Applicable Plans */}
       <div className="space-y-2">
-        <Label>Applicable Plans</Label>
+        <Label>{t("admin.applicablePlans")}</Label>
         <div className="flex gap-4">
           {['premium', 'vip'].map(plan => (
             <label key={plan} className="flex items-center gap-2 cursor-pointer">
@@ -469,7 +471,7 @@ const CouponManager = () => {
       {/* Coupons List */}
       <Card>
         <CardHeader>
-          <CardTitle>All Coupons</CardTitle>
+          <CardTitle>{t("admin.allCoupons")}</CardTitle>
           <CardDescription>
             {filteredCoupons.length} coupon{filteredCoupons.length !== 1 ? 's' : ''} found
           </CardDescription>
@@ -559,7 +561,7 @@ const CouponManager = () => {
 
                       {/* Status */}
                       {!coupon.is_active && (
-                        <Badge variant="secondary">Inactive</Badge>
+                        <Badge variant="secondary">{t("common.inactive")}</Badge>
                       )}
                     </div>
 

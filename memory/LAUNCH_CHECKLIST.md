@@ -27,7 +27,7 @@
 | :white_check_mark: | **WebSocket (Live Bidding)** | 4 WS endpoints, real-time bid updates |
 | :white_check_mark: | **PDF Invoices (Cloud)** | Emergent Object Storage, HMAC-signed download URLs |
 | :white_check_mark: | **SEO & Meta Tags** | react-helmet-async, dynamic per-page |
-| :white_check_mark: | **Internationalization (i18n)** | EN/FR fully working. Seller Dashboard: 77 translated keys, zero hardcoded strings. i18n.js resource builder properly merges JSON keys |
+| :white_check_mark: | **Internationalization (i18n)** | EN/FR fully working. 907 keys in sync. i18n.js simplified from 2000→60 lines (JSON-only source of truth). Zero hardcoded strings across all 175 source files. CI gate via `yarn predeploy`. Audit tool: `yarn i18n:audit` |
 | :yellow_circle: | **Cloudflare CDN** | MANUAL SETUP — docs at /app/memory/INFRASTRUCTURE_P2.md |
 | :white_check_mark: | **MongoDB Indexes** | 27 indexes across 14 collections, applied via idempotent script |
 | :white_check_mark: | **Mobile Carousels** | Embla Carousel, 6 homepage sections, dot indicators |

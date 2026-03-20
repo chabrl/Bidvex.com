@@ -6,10 +6,12 @@ import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
 import { DollarSign, CheckCircle, Users } from 'lucide-react';
 import { formatCurrency } from '../../utils/currencyFormatter';
+import { useTranslation } from 'react-i18next';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const AffiliateManager = () => {
+  const { t } = useTranslation();
   const [affiliates, setAffiliates] = useState([]);
   const [payouts, setPayouts] = useState([]);
   const [users, setUsers] = useState([]);
@@ -78,7 +80,7 @@ const AffiliateManager = () => {
       </div>
 
       <Card>
-        <CardHeader><CardTitle>Payout Requests</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{t("admin.payoutRequests")}</CardTitle></CardHeader>
         <CardContent>
           {payouts.length > 0 ? (
             <div className="space-y-2">
@@ -105,7 +107,7 @@ const AffiliateManager = () => {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>Manage Affiliate Status</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{t("admin.manageAffiliateStatus")}</CardTitle></CardHeader>
         <CardContent>
           <div className="space-y-2">
             {users.slice(0, 20).map(user => {

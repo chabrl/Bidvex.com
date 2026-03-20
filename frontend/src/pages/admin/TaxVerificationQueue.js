@@ -7,10 +7,12 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { toast } from 'sonner';
 import { Shield, CheckCircle, XCircle, Eye, RefreshCw, AlertTriangle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const TaxVerificationQueue = () => {
+  const { t } = useTranslation();
   const [pendingUsers, setPendingUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -230,7 +232,7 @@ const TaxVerificationQueue = () => {
                   <ul className="list-disc ml-6 mt-2 space-y-1">
                     <li>Have their status changed to "Verified" 🟢</li>
                     <li>Be able to receive payouts immediately</li>
-                    <li>Receive email confirmation</li>
+                    <li>{t("admin.receiveEmailConfirmation")}</li>
                   </ul>
                 </p>
               ) : (

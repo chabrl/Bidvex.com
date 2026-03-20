@@ -6,10 +6,12 @@ import { Input } from '../../components/ui/input';
 import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
 import { TrendingUp, Trash2, Plus, Star } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const PromotionManager = () => {
+  const { t } = useTranslation();
   const [promotions, setPromotions] = useState([]);
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -91,7 +93,7 @@ const PromotionManager = () => {
 
       {showCreate && (
         <Card className="border-2 border-primary">
-          <CardHeader><CardTitle>Create New Promotion</CardTitle></CardHeader>
+          <CardHeader><CardTitle>{t("admin.createNewPromotion")}</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-2">Select Listing</label>
@@ -105,7 +107,7 @@ const PromotionManager = () => {
             <div>
               <label className="block text-sm font-medium mb-2">Promotion Type</label>
               <select value={newPromotion.promotion_type} onChange={(e) => setNewPromotion({...newPromotion, promotion_type: e.target.value})} className="w-full px-3 py-2 border rounded-md">
-                <option value="featured">Featured</option>
+                <option value="featured">{t("homepage.featured")}</option>
                 <option value="premium">Premium</option>
                 <option value="basic">Basic</option>
               </select>
@@ -148,7 +150,7 @@ const PromotionManager = () => {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>Feature Listings Manually</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{t("admin.featureListingsManually")}</CardTitle></CardHeader>
         <CardContent>
           <div className="space-y-2">
             {listings.slice(0, 10).map(listing => (

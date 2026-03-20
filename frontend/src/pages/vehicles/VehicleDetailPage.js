@@ -76,6 +76,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 // Format helpers
 const formatPrice = (price) => {
+  const { t } = useTranslation();
   return new Intl.NumberFormat('en-CA', {
     style: 'currency',
     currency: 'CAD',
@@ -411,7 +412,7 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
                 {bidding ? (
                   <>Processing...</>
                 ) : !user ? (
-                  <>Login to Bid</>
+                  <>{t("auction.loginToBid")}</>
                 ) : (
                   <>
                     <Gavel className="h-5 w-5 mr-2" />
@@ -433,11 +434,11 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
           <div className="grid grid-cols-2 gap-2 pt-4 border-t">
             <div className="flex items-center gap-2 text-sm text-slate-600">
               <Shield className="h-4 w-4 text-green-500" />
-              <span>Buyer Protection</span>
+              <span>{t("auction.buyerProtection")}</span>
             </div>
             <div className="flex items-center gap-2 text-sm text-slate-600">
               <Lock className="h-4 w-4 text-blue-500" />
-              <span>Secure Payment</span>
+              <span>{t("auction.securePayment")}</span>
             </div>
           </div>
         </CardContent>
@@ -468,10 +469,10 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
             <div className="bg-slate-50 rounded-lg p-4 text-sm space-y-2">
               <p>By bidding, you acknowledge that:</p>
               <ul className="list-disc list-inside space-y-1 text-slate-600">
-                <li>You are responsible for inspecting the vehicle</li>
-                <li>The seller is responsible for title and ownership disclosure</li>
+                <li>{t("vehicles.inspectVehicle")}</li>
+                <li>{t("vehicles.sellerDisclosure")}</li>
                 <li>BidVex does not handle title transfer or delivery</li>
-                <li>All bids are legally binding</li>
+                <li>{t("auction.allBidsLegallyBinding")}</li>
                 <li>Deposits are refundable only to non-winning bidders</li>
               </ul>
             </div>
@@ -626,7 +627,7 @@ const VehicleDetailPage = () => {
               <TabsContent value="details" className="space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Vehicle Specifications</CardTitle>
+                    <CardTitle>{t("vehicles.vehicleSpecifications")}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -685,7 +686,7 @@ const VehicleDetailPage = () => {
                 {/* Description */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Description</CardTitle>
+                    <CardTitle>{t("vehicles.description")}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p className="text-slate-600 dark:text-slate-300 whitespace-pre-wrap">
@@ -708,7 +709,7 @@ const VehicleDetailPage = () => {
                 {/* Documentation */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Documentation</CardTitle>
+                    <CardTitle>{t("vehicles.documentation")}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-3 gap-4">
@@ -739,7 +740,7 @@ const VehicleDetailPage = () => {
               <TabsContent value="condition">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Condition Report</CardTitle>
+                    <CardTitle>{t("vehicles.conditionReport")}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     {/* Running Status */}
@@ -949,16 +950,16 @@ const VehicleDetailPage = () => {
                           </div>
                           <div className="flex items-center gap-2 text-green-600">
                             <CheckCircle className="h-4 w-4" />
-                            <span>Email Confirmed</span>
+                            <span>{t("vehicles.emailConfirmed")}</span>
                           </div>
                           <div className="flex items-center gap-2 text-green-600">
                             <CheckCircle className="h-4 w-4" />
-                            <span>Phone Verified</span>
+                            <span>{t("vehicles.phoneVerified")}</span>
                           </div>
                           {seller.seller_type === 'dealer' && (
                             <div className="flex items-center gap-2 text-green-600">
                               <CheckCircle className="h-4 w-4" />
-                              <span>License Verified</span>
+                              <span>{t("vehicles.licenseVerified")}</span>
                             </div>
                           )}
                         </div>

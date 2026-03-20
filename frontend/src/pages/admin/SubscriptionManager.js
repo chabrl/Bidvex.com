@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from '../../components/ui/select';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 import { 
   Crown, Star, User as UserIcon, Search, TrendingUp, DollarSign, Calendar,
   CreditCard, Settings, History, AlertTriangle, Clock, CheckCircle, XCircle,
@@ -40,6 +41,7 @@ const PLANS = {
 };
 
 const SubscriptionManager = () => {
+  const { t } = useTranslation();
   const { token } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -519,7 +521,7 @@ const SubscriptionManager = () => {
             <div className="space-y-4 py-4">
               {/* Plan Selection */}
               <div className="space-y-2">
-                <Label>Select Plan</Label>
+                <Label>{t("admin.selectPlan")}</Label>
                 <Select value={overrideData.plan} onValueChange={(v) => setOverrideData(p => ({...p, plan: v}))}>
                   <SelectTrigger>
                     <SelectValue />
@@ -542,7 +544,7 @@ const SubscriptionManager = () => {
               {overrideData.plan !== 'free' && (
                 <>
                   <div className="space-y-2">
-                    <Label>Duration Type</Label>
+                    <Label>{t("admin.durationType")}</Label>
                     <div className="flex gap-2">
                       <Button 
                         type="button"
@@ -565,7 +567,7 @@ const SubscriptionManager = () => {
 
                   {overrideData.duration_type === 'days' ? (
                     <div className="space-y-2">
-                      <Label>Number of Days</Label>
+                      <Label>{t("admin.numberOfDays")}</Label>
                       <div className="flex gap-2">
                         {[30, 90, 180, 365].map(d => (
                           <Button
@@ -589,7 +591,7 @@ const SubscriptionManager = () => {
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      <Label>End Date</Label>
+                      <Label>{t("admin.endDate")}</Label>
                       <Input
                         type="date"
                         value={overrideData.end_date}
@@ -637,7 +639,7 @@ const SubscriptionManager = () => {
             
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label>Additional Days</Label>
+                <Label>{t("admin.additionalDays")}</Label>
                 <div className="flex gap-2 flex-wrap">
                   {[7, 14, 30, 60, 90].map(d => (
                     <Button
@@ -830,7 +832,7 @@ const SubscriptionManager = () => {
                 <SelectValue placeholder="Plan" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Plans</SelectItem>
+                <SelectItem value="all">{t("admin.allPlans")}</SelectItem>
                 <SelectItem value="free">Free</SelectItem>
                 <SelectItem value="premium">Premium</SelectItem>
                 <SelectItem value="vip">VIP</SelectItem>
@@ -841,7 +843,7 @@ const SubscriptionManager = () => {
                 <SelectValue placeholder="Source" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Sources</SelectItem>
+                <SelectItem value="all">{t("admin.allSources")}</SelectItem>
                 <SelectItem value="manual">Manual</SelectItem>
                 <SelectItem value="stripe">Stripe</SelectItem>
               </SelectContent>

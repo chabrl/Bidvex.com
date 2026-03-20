@@ -608,7 +608,7 @@ const CreateVehicleListingPage = () => {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="owned">Owned</SelectItem>
-                    <SelectItem value="financed">Financed</SelectItem>
+                    <SelectItem value="financed">{t("vehicleListing.financed")}</SelectItem>
                     <SelectItem value="leased">Leased</SelectItem>
                   </SelectContent>
                 </Select>
@@ -631,8 +631,8 @@ const CreateVehicleListingPage = () => {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="clear">Clear</SelectItem>
-                    <SelectItem value="lien_exists">Lien Exists</SelectItem>
-                    <SelectItem value="pending_release">Pending Release</SelectItem>
+                    <SelectItem value="lien_exists">{t("vehicleListing.lienExists")}</SelectItem>
+                    <SelectItem value="pending_release">{t("vehicleListing.pendingRelease")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -718,7 +718,7 @@ const CreateVehicleListingPage = () => {
             {/* Notes */}
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Mechanical Notes</Label>
+                <Label>{t("vehicleListing.mechanicalNotes")}</Label>
                 <Textarea
                   value={formData.mechanical_notes}
                   onChange={(e) => updateField('mechanical_notes', e.target.value)}
@@ -727,7 +727,7 @@ const CreateVehicleListingPage = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Cosmetic Notes</Label>
+                <Label>{t("vehicleListing.cosmeticNotes")}</Label>
                 <Textarea
                   value={formData.cosmetic_notes}
                   onChange={(e) => updateField('cosmetic_notes', e.target.value)}
@@ -863,9 +863,9 @@ const CreateVehicleListingPage = () => {
                 <Select value={formData.auction_type} onValueChange={(v) => updateField('auction_type', v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="timed">Timed Auction</SelectItem>
-                    <SelectItem value="live">Live Auction</SelectItem>
-                    <SelectItem value="buy_now">Buy Now Only</SelectItem>
+                    <SelectItem value="timed">{t("vehicleListing.timedAuction")}</SelectItem>
+                    <SelectItem value="live">{t("vehicleListing.liveAuction")}</SelectItem>
+                    <SelectItem value="buy_now">{t("vehicleListing.buyNowOnly")}</SelectItem>
                     <SelectItem value="timed_with_buy_now">Timed + Buy Now</SelectItem>
                   </SelectContent>
                 </Select>
@@ -876,7 +876,7 @@ const CreateVehicleListingPage = () => {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="public">Public (Everyone)</SelectItem>
-                    <SelectItem value="dealer_only">Dealers Only</SelectItem>
+                    <SelectItem value="dealer_only">{t("vehicleListing.dealersOnly")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1034,9 +1034,9 @@ const CreateVehicleListingPage = () => {
                     <p className="font-medium mb-2">Seller Acknowledgment</p>
                     <p>By submitting this listing, you confirm that:</p>
                     <ul className="list-disc list-inside mt-2 space-y-1">
-                      <li>All information provided is accurate and complete</li>
-                      <li>You have legal authority to sell this vehicle</li>
-                      <li>You will respond to buyer inquiries promptly</li>
+                      <li>{t("vehicleListing.infoAccurate")}</li>
+                      <li>{t("vehicleListing.legalAuthority")}</li>
+                      <li>{t("vehicleListing.respondPromptly")}</li>
                       <li>You agree to BidVex's seller terms and conditions</li>
                     </ul>
                   </div>

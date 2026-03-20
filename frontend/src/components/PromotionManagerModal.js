@@ -9,6 +9,7 @@ import { Separator } from './ui/separator';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { Loader2, TrendingUp, Target, Calendar, DollarSign, MapPin, Users } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -37,6 +38,7 @@ const PROMOTION_TIERS = [
 ];
 
 const PromotionManagerModal = ({ open, onClose, listingId, listingTitle }) => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [selectedTier, setSelectedTier] = useState(null);
   const [targeting, setTargeting] = useState({
@@ -181,7 +183,7 @@ const PromotionManagerModal = ({ open, onClose, listingId, listingTitle }) => {
                       }
                       className="w-full px-3 py-2 border border-input rounded-md bg-background"
                     >
-                      <option value="">All Ages</option>
+                      <option value="">{t("admin.allAges")}</option>
                       <option value="18-24">18-24</option>
                       <option value="25-34">25-34</option>
                       <option value="35-44">35-44</option>
@@ -191,7 +193,7 @@ const PromotionManagerModal = ({ open, onClose, listingId, listingTitle }) => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="interests">Interests</Label>
+                    <Label htmlFor="interests">{t("admin.interests")}</Label>
                     <Input
                       id="interests"
                       placeholder="e.g., Technology, Fashion"

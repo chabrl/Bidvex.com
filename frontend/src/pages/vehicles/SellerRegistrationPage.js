@@ -20,6 +20,7 @@ import {
   Shield, Star, Loader2, AlertTriangle, Info, Car, ArrowRight
 } from 'lucide-react';
 import SellerDocumentManager from '../../components/vehicles/SellerDocumentManager';
+import { useTranslation } from 'react-i18next';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -54,6 +55,7 @@ const SELLER_TYPES = [
 ];
 
 const SellerRegistrationPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { token, user } = useAuth();
   const [step, setStep] = useState(1);
@@ -166,7 +168,7 @@ const SellerRegistrationPage = () => {
                     : 'text-yellow-600'
                 }`} />
               </div>
-              <CardTitle>Seller Account Status</CardTitle>
+              <CardTitle>{t("seller.accountStatus")}</CardTitle>
               <CardDescription>
                 {typeInfo?.title || 'Vehicle Seller'}
               </CardDescription>
@@ -367,7 +369,7 @@ const SellerRegistrationPage = () => {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Business Phone</Label>
+                        <Label>{t("seller.businessPhone")}</Label>
                         <Input
                           value={formData.business_phone}
                           onChange={(e) => updateField('business_phone', e.target.value)}
@@ -377,7 +379,7 @@ const SellerRegistrationPage = () => {
                     </div>
                     
                     <div className="space-y-2">
-                      <Label>Business Address</Label>
+                      <Label>{t("seller.businessAddress")}</Label>
                       <Input
                         value={formData.business_address}
                         onChange={(e) => updateField('business_address', e.target.value)}
@@ -395,7 +397,7 @@ const SellerRegistrationPage = () => {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>License Province</Label>
+                        <Label>{t("seller.licenseProvince")}</Label>
                         <Input
                           value={formData.license_province}
                           onChange={(e) => updateField('license_province', e.target.value)}
@@ -440,7 +442,7 @@ const SellerRegistrationPage = () => {
                     <div className="text-sm text-blue-700">
                       <p className="font-medium mb-1">What happens next?</p>
                       <ul className="list-disc list-inside space-y-1">
-                        <li>Your application will be reviewed by our team</li>
+                        <li>{t("seller.applicationReview")}</li>
                         <li>We may contact you for additional documentation</li>
                         <li>Approval typically takes 1-2 business days</li>
                         <li>You&apos;ll be notified via email once approved</li>

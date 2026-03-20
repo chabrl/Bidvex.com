@@ -12,6 +12,7 @@ import {
   DollarSign, Clock, ShoppingCart, Shield, Loader2, Info
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/currencyFormatter';
+import { useTranslation } from 'react-i18next';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -28,6 +29,7 @@ const SYSTEM_DEFAULTS = {
 };
 
 const MarketplaceSettings = () => {
+  const { t } = useTranslation();
   const { token } = useAuth();
   const [settings, setSettings] = useState(null);
   const [originalSettings, setOriginalSettings] = useState(null);
@@ -209,7 +211,7 @@ const MarketplaceSettings = () => {
               <Users className="h-5 w-5 text-blue-600" />
               User & Seller Rules
             </CardTitle>
-            <CardDescription>Control who can create auctions</CardDescription>
+            <CardDescription>{t("admin.controlAuctionCreation")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Allow All Users Multi-Lot */}
@@ -253,7 +255,7 @@ const MarketplaceSettings = () => {
               <Package className="h-5 w-5 text-green-600" />
               Auction Limits
             </CardTitle>
-            <CardDescription>Set maximum quantities per user</CardDescription>
+            <CardDescription>{t("admin.setMaxQuantities")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Max Active Auctions */}
@@ -299,7 +301,7 @@ const MarketplaceSettings = () => {
               <DollarSign className="h-5 w-5 text-amber-600" />
               Bidding Rules
             </CardTitle>
-            <CardDescription>Configure bid increments and pricing</CardDescription>
+            <CardDescription>{t("admin.configurePricing")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Minimum Bid Increment */}

@@ -5,10 +5,12 @@ import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
 import { FileText, Download } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const AdminLogs = ({ searchQuery = '' }) => {
+  const { t } = useTranslation();
   const [logs, setLogs] = useState([]);
   const [filter, setFilter] = useState('');
   const [loading, setLoading] = useState(true);
@@ -80,9 +82,9 @@ const AdminLogs = ({ searchQuery = '' }) => {
 
       <div className="flex gap-2">
         <Button variant={!filter ? 'default' : 'outline'} onClick={() => setFilter('')} className={!filter ? 'gradient-button text-white border-0' : ''}>All Actions</Button>
-        <Button variant={filter === 'user_update' ? 'default' : 'outline'} onClick={() => setFilter('user_update')}>User Updates</Button>
-        <Button variant={filter === 'listing_moderate' ? 'default' : 'outline'} onClick={() => setFilter('listing_moderate')}>Moderation</Button>
-        <Button variant={filter === 'promotion_create' ? 'default' : 'outline'} onClick={() => setFilter('promotion_create')}>Promotions</Button>
+        <Button variant={filter === 'user_update' ? 'default' : 'outline'} onClick={() => setFilter('user_update')}>{t("admin.userUpdates")}</Button>
+        <Button variant={filter === 'listing_moderate' ? 'default' : 'outline'} onClick={() => setFilter('listing_moderate')}>{t("admin.moderation")}</Button>
+        <Button variant={filter === 'promotion_create' ? 'default' : 'outline'} onClick={() => setFilter('promotion_create')}>{t("admin.promotions")}</Button>
       </div>
 
       <Card>

@@ -147,7 +147,7 @@ const AuthPage = () => {
             <form onSubmit={handleForceReset} className="space-y-4">
               {/* New Password */}
               <div className="space-y-2">
-                <Label htmlFor="newPassword">New Password</Label>
+                <Label htmlFor="newPassword">{t("auth.newPasswordLabel")}</Label>
                 <div className="relative">
                   <Input
                     id="newPassword"
@@ -173,7 +173,7 @@ const AuthPage = () => {
 
               {/* Confirm Password */}
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Label htmlFor="confirmPassword">{t("auth.confirmPasswordLabel")}</Label>
                 <Input
                   id="confirmPassword"
                   type="password"
@@ -200,7 +200,7 @@ const AuthPage = () => {
                 {resetting ? (
                   <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Updating Password...</>
                 ) : (
-                  <>Set New Password</>
+                  <>{t("auth.setNewPassword")}</>
                 )}
               </Button>
             </form>

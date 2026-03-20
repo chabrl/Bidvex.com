@@ -195,7 +195,7 @@ const CurrencyAppealsManager = () => {
                         {appeal.status === 'pending' && (
                           <>
                             <div className="space-y-2">
-                              <Label htmlFor={`notes-${appeal.id}`}>Admin Notes</Label>
+                              <Label htmlFor={`notes-${appeal.id}`}>{t("admin.adminNotes")}</Label>
                               <Input
                                 id={`notes-${appeal.id}`}
                                 placeholder="Add notes about your decision..."
@@ -249,7 +249,7 @@ const CurrencyAppealsManager = () => {
       {/* Statistics Card */}
       <Card>
         <CardHeader>
-          <CardTitle>Appeal Statistics</CardTitle>
+          <CardTitle>{t("admin.appealStatistics")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-3 gap-4">

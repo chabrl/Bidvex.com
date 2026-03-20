@@ -171,7 +171,7 @@ const CreateListingPage = () => {
                 Please complete your payment to activate listing capabilities.
               </p>
               <p className="text-sm text-amber-600">
-                Check your email for the payment link, or go to your <strong>Account Settings</strong> to initiate payment.
+                Check your email for the payment link, or go to your <strong>{t("profile.accountSettingsLink")}</strong> to initiate payment.
               </p>
               <div className="flex gap-2">
                 <Button onClick={() => navigate('/settings')} className="bg-amber-600 hover:bg-amber-700 text-white" size="sm">

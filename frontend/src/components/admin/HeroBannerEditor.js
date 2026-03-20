@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../ui/select';
+import { useTranslation } from 'react-i18next';
 import {
   Image as ImageIcon, 
   Save, 
@@ -107,6 +108,7 @@ const DEFAULT_BANNER = {
 };
 
 const HeroBannerEditor = () => {
+  const { t } = useTranslation();
   const { token } = useAuth();
   const [banners, setBanners] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -532,7 +534,7 @@ const HeroBannerEditor = () => {
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label>Desktop Image</Label>
+                    <Label>{t("admin.desktopImage")}</Label>
                     <div className="mt-1 space-y-2">
                       <div className="w-full h-24 rounded-lg overflow-hidden bg-gray-100 border-2 border-dashed">
                         {bannerForm.image_desktop ? (
@@ -552,7 +554,7 @@ const HeroBannerEditor = () => {
                     </div>
                   </div>
                   <div>
-                    <Label>Mobile Image</Label>
+                    <Label>{t("admin.mobileImage")}</Label>
                     <div className="mt-1 space-y-2">
                       <div className="w-full h-24 rounded-lg overflow-hidden bg-gray-100 border-2 border-dashed">
                         {bannerForm.image_mobile ? (
@@ -584,7 +586,7 @@ const HeroBannerEditor = () => {
                 {/* Title & Subtitle Colors */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label>Title Color</Label>
+                    <Label>{t("admin.titleColor")}</Label>
                     <div className="flex items-center gap-2 mt-1">
                       <input
                         type="color"
@@ -601,7 +603,7 @@ const HeroBannerEditor = () => {
                     </div>
                   </div>
                   <div>
-                    <Label>Subtitle Color</Label>
+                    <Label>{t("admin.subtitleColor")}</Label>
                     <div className="flex items-center gap-2 mt-1">
                       <input
                         type="color"
@@ -622,7 +624,7 @@ const HeroBannerEditor = () => {
                 {/* Button Colors */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label>Button Background</Label>
+                    <Label>{t("admin.buttonBackground")}</Label>
                     <div className="flex items-center gap-2 mt-1">
                       <input
                         type="color"
@@ -639,7 +641,7 @@ const HeroBannerEditor = () => {
                     </div>
                   </div>
                   <div>
-                    <Label>Button Text Color</Label>
+                    <Label>{t("admin.buttonTextColor")}</Label>
                     <div className="flex items-center gap-2 mt-1">
                       <input
                         type="color"
@@ -660,7 +662,7 @@ const HeroBannerEditor = () => {
                 {/* Overlay Colors */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label>Overlay Color</Label>
+                    <Label>{t("admin.overlayColor")}</Label>
                     <div className="flex items-center gap-2 mt-1">
                       <input
                         type="color"
@@ -678,7 +680,7 @@ const HeroBannerEditor = () => {
                   </div>
                   <div>
                     <Label className="flex items-center justify-between">
-                      <span>Overlay Opacity</span>
+                      <span>{t("admin.overlayOpacity")}</span>
                       <span className="text-muted-foreground">{Math.round(bannerForm.overlay_opacity * 100)}%</span>
                     </Label>
                     <Slider
@@ -699,7 +701,7 @@ const HeroBannerEditor = () => {
                 </h4>
 
                 <div>
-                  <Label>Font Family</Label>
+                  <Label>{t("admin.fontFamily")}</Label>
                   <Select
                     value={bannerForm.font_family}
                     onValueChange={(value) => setBannerForm(prev => ({ ...prev, font_family: value }))}
@@ -719,7 +721,7 @@ const HeroBannerEditor = () => {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label>Title Size</Label>
+                    <Label>{t("admin.titleSize")}</Label>
                     <Select
                       value={bannerForm.title_font_size}
                       onValueChange={(value) => setBannerForm(prev => ({ ...prev, title_font_size: value }))}
@@ -735,7 +737,7 @@ const HeroBannerEditor = () => {
                     </Select>
                   </div>
                   <div>
-                    <Label>Subtitle Size</Label>
+                    <Label>{t("admin.subtitleSize")}</Label>
                     <Select
                       value={bannerForm.subtitle_font_size}
                       onValueChange={(value) => setBannerForm(prev => ({ ...prev, subtitle_font_size: value }))}

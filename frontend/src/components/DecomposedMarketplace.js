@@ -18,6 +18,7 @@ import {
 import { toast } from 'sonner';
 import { formatCurrency } from '../utils/currencyFormatter';
 import { useMarketplaceItems } from '../hooks/useMarketplaceItems';
+import { useTranslation } from 'react-i18next';
  * Decomposed Marketplace - Item-Centric Discovery
  * Features:
  * - Individual items from multi-item lots
@@ -27,6 +28,7 @@ import { useMarketplaceItems } from '../hooks/useMarketplaceItems';
  * - Analytics tracking (impressions, clicks)
  */
 const DecomposedMarketplace = () => {
+  const { t } = useTranslation();
   const [filters, setFilters] = useState({
     search: '',
     category: '',
@@ -142,11 +144,11 @@ const DecomposedMarketplace = () => {
           onChange={(e) => setFilters({...filters, sort: e.target.value})}
           className="border rounded px-4 py-2"
         >
-          <option value="-promoted">Promoted First</option>
-          <option value="ending_soon">Ending Soon</option>
+          <option value="-promoted">{t("marketplace.promotedFirst")}</option>
+          <option value="ending_soon">{t("marketplace.endingSoon")}</option>
           <option value="price">Price: Low to High</option>
           <option value="-price">Price: High to Low</option>
-          <option value="-created_at">Newest First</option>
+          <option value="-created_at">{t("marketplace.newestFirst")}</option>
         </select>
 
         <select
@@ -154,9 +156,9 @@ const DecomposedMarketplace = () => {
           onChange={(e) => setFilters({...filters, condition: e.target.value})}
           className="border rounded px-4 py-2"
         >
-          <option value="">All Conditions</option>
+          <option value="">{t("marketplace.allConditions")}</option>
           <option value="new">New</option>
-          <option value="like_new">Like New</option>
+          <option value="like_new">{t("marketplace.likeNew")}</option>
           <option value="good">Good</option>
           <option value="fair">Fair</option>
           <option value="poor">Poor</option>

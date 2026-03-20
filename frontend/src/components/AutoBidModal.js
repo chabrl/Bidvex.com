@@ -11,10 +11,12 @@ import axios from 'axios';
 import { toast } from 'sonner';
 import { extractErrorMessage } from '../utils/errorHandler';
 import { formatCurrency } from '../utils/currencyFormatter';
+import { useTranslation } from 'react-i18next';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const AutoBidModal = ({ listingId, currentBid, minimumIncrement, onAutoBidSetup }) => {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [maxBid, setMaxBid] = useState('');
@@ -151,7 +153,7 @@ const AutoBidModal = ({ listingId, currentBid, minimumIncrement, onAutoBidSetup 
           {isPremium && (
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label>Current Bid</Label>
+                <Label>{t("bidding.currentBid")}</Label>
                 <div className="text-2xl font-bold text-primary">
                   {formatCurrency(currentBid)}
                 </div>
@@ -161,7 +163,7 @@ const AutoBidModal = ({ listingId, currentBid, minimumIncrement, onAutoBidSetup 
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="max-bid-amount">Maximum Bid Amount</Label>
+                <Label htmlFor="max-bid-amount">{t("bidding.maxBidAmount")}</Label>
                 <Input
                   id="max-bid-amount"
                   type="number"

@@ -158,7 +158,7 @@ const BuyerDashboard = () => {
                             {/* Additional Info */}
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <Badge variant="outline">{listing?.bid_count || 0} bids</Badge>
-                              {isEnded && <Badge variant="destructive">Auction Ended</Badge>}
+                              {isEnded && <Badge variant="destructive">{t("auction.auctionEnded")}</Badge>}
                             </div>
                           </CardContent>
 
@@ -328,7 +328,7 @@ const BuyerDashboard = () => {
                             </div>
                             <div className="flex items-center gap-2">
                               <Badge variant="outline">{listing?.bid_count || 0} bids</Badge>
-                              {isEnded && <Badge variant="destructive">Auction Ended</Badge>}
+                              {isEnded && <Badge variant="destructive">{t("auction.auctionEnded")}</Badge>}
                             </div>
                           </CardContent>
                           <CardFooter className="p-4 pt-0 flex-col sm:flex-row gap-2">
@@ -400,7 +400,7 @@ const BuyerDashboard = () => {
 
         <Card className="glassmorphism">
           <CardHeader>
-            <CardTitle>Purchase History</CardTitle>
+            <CardTitle>{t("dashboard.buyer.purchaseHistory")}</CardTitle>
           </CardHeader>
           <CardContent>
             {dashboard?.bids && dashboard.bids.length > 0 ? (

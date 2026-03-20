@@ -26,6 +26,7 @@ import {
 } from '../components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 import { 
   Mail, Users, Send, Plus, Trash2, Upload, Search, RefreshCw,
   Lock, Crown, AlertTriangle, CheckCircle, Eye, BarChart3,
@@ -35,6 +36,7 @@ import {
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const ClientEmailMarketing = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { token, user } = useAuth();
   const [activeTab, setActiveTab] = useState('contacts');
@@ -372,7 +374,7 @@ const ClientEmailMarketing = () => {
 <body style="font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5;">
   <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
     <div style="background: linear-gradient(135deg, #3B82F6, #8B5CF6); padding: 30px; text-align: center;">
-      <h1 style="color: white; margin: 0; font-size: 24px;">Auction Alert</h1>
+      <h1 style="color: white; margin: 0; font-size: 24px;">{t("admin.auctionAlert")}</h1>
     </div>
     
     <div style="padding: 30px;">
@@ -398,7 +400,7 @@ const ClientEmailMarketing = () => {
         You received this email from ${user?.name || 'a BidVex seller'}.
       </p>
       <p style="margin: 10px 0 0; font-size: 12px;">
-        <a href="{{unsubscribe_url}}" style="color: #999;">Unsubscribe</a>
+        <a href="{{unsubscribe_url}}" style="color: #999;">{t("common.unsubscribe")}</a>
       </p>
     </div>
   </div>
@@ -502,7 +504,7 @@ const ClientEmailMarketing = () => {
           <CardContent className="text-center text-sm text-muted-foreground">
             <ul className="space-y-1">
               <li>10% discount on all emails</li>
-              <li>All premium templates</li>
+              <li>{t("admin.allPremiumTemplates")}</li>
               <li>Open & click analytics</li>
             </ul>
             <Button 
@@ -527,8 +529,8 @@ const ClientEmailMarketing = () => {
           <CardContent className="text-center text-sm text-muted-foreground">
             <ul className="space-y-1">
               <li>20% discount on all emails</li>
-              <li>Priority delivery queue</li>
-              <li>Advanced analytics</li>
+              <li>{t("admin.priorityDelivery")}</li>
+              <li>{t("admin.advancedAnalytics")}</li>
             </ul>
             <Button 
               className="w-full mt-4 bg-purple-600 hover:bg-purple-700"
@@ -952,7 +954,7 @@ const ClientEmailMarketing = () => {
             <TabsContent value="analytics" className="space-y-4">
               <Card>
                 <CardHeader>
-                  <CardTitle>Campaign Performance</CardTitle>
+                  <CardTitle>{t("admin.campaignPerformance")}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -984,7 +986,7 @@ const ClientEmailMarketing = () => {
       <Dialog open={addContactDialogOpen} onOpenChange={setAddContactDialogOpen}>
         <DialogContent className="w-[95vw] max-w-[400px]">
           <DialogHeader>
-            <DialogTitle>Add Contact</DialogTitle>
+            <DialogTitle>{t("admin.addContact")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -1029,7 +1031,7 @@ const ClientEmailMarketing = () => {
       <Dialog open={bulkAddDialogOpen} onOpenChange={setBulkAddDialogOpen}>
         <DialogContent className="w-[95vw] max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Bulk Add Contacts</DialogTitle>
+            <DialogTitle>{t("admin.bulkAddContacts")}</DialogTitle>
             <DialogDescription>
               Enter email addresses separated by commas, semicolons, or new lines
             </DialogDescription>
@@ -1074,7 +1076,7 @@ const ClientEmailMarketing = () => {
           <div className="p-4 sm:p-6 space-y-4">
             {/* Template Selector */}
             <div className="space-y-2">
-              <Label>Start with a Template</Label>
+              <Label>{t("admin.startWithTemplate")}</Label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {Object.entries(templates).map(([key, template]) => (
                   <button

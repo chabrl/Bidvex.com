@@ -25,6 +25,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '../../components/ui/dialog';
+import { useTranslation } from 'react-i18next';
 import {
   Table,
   TableBody,
@@ -70,6 +71,7 @@ const SITE_MODES = [
 ];
 
 const SiteModeManager = () => {
+  const { t } = useTranslation();
   const [currentMode, setCurrentMode] = useState('live');
   const [message, setMessage] = useState('');
   const [expectedBack, setExpectedBack] = useState('');
@@ -317,8 +319,8 @@ const SiteModeManager = () => {
       {/* Mode Selection */}
       <Card>
         <CardHeader>
-          <CardTitle>Select Site Mode</CardTitle>
-          <CardDescription>Choose how visitors will see your website</CardDescription>
+          <CardTitle>{t("admin.selectSiteMode")}</CardTitle>
+          <CardDescription>{t("admin.chooseSiteMode")}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-3 gap-4">
@@ -360,8 +362,8 @@ const SiteModeManager = () => {
       {currentMode !== 'live' && (
         <Card>
           <CardHeader>
-            <CardTitle>Page Settings</CardTitle>
-            <CardDescription>Customize the message shown to visitors</CardDescription>
+            <CardTitle>{t("admin.pageSettings")}</CardTitle>
+            <CardDescription>{t("admin.customizeMessage")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -465,7 +467,7 @@ const SiteModeManager = () => {
                 <Mail className="h-5 w-5" />
                 Launch Subscribers
               </CardTitle>
-              <CardDescription>Email signups from coming soon page</CardDescription>
+              <CardDescription>{t("admin.emailSignups")}</CardDescription>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={handleExportCSV} className="gap-2">
@@ -523,8 +525,8 @@ const SiteModeManager = () => {
       <Dialog open={showSubscribers} onOpenChange={setShowSubscribers}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle>Launch Subscribers</DialogTitle>
-            <DialogDescription>Manage email subscribers from the coming soon page</DialogDescription>
+            <DialogTitle>{t("admin.launchSubscribers")}</DialogTitle>
+            <DialogDescription>{t("admin.manageSubscribers")}</DialogDescription>
           </DialogHeader>
           
           <div className="flex items-center gap-4 py-4">
@@ -559,7 +561,7 @@ const SiteModeManager = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Email</TableHead>
-                    <TableHead>Subscribed</TableHead>
+                    <TableHead>{t("common.subscribed")}</TableHead>
                     <TableHead>Source</TableHead>
                     <TableHead className="w-[100px]">Actions</TableHead>
                   </TableRow>

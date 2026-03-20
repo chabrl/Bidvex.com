@@ -23,6 +23,7 @@ import {
   XCircle, Zap, Loader2, Play, Pause, Sparkles
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -45,6 +46,7 @@ const STATUS_CONFIGS = {
 };
 
 const AIGuardDashboard = () => {
+  const { t } = useTranslation();
   const [flaggedAuctions, setFlaggedAuctions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
@@ -366,11 +368,11 @@ const AIGuardDashboard = () => {
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="pending_review">Pending Review</SelectItem>
-                <SelectItem value="under_investigation">Under Investigation</SelectItem>
+                <SelectItem value="all">{t("admin.allStatuses")}</SelectItem>
+                <SelectItem value="pending_review">{t("admin.pendingReview")}</SelectItem>
+                <SelectItem value="under_investigation">{t("admin.underInvestigation")}</SelectItem>
                 <SelectItem value="cleared">Cleared</SelectItem>
-                <SelectItem value="confirmed_fraud">Confirmed Fraud</SelectItem>
+                <SelectItem value="confirmed_fraud">{t("admin.confirmedFraud")}</SelectItem>
               </SelectContent>
             </Select>
             <Select value={filterType} onValueChange={(v) => { setFilterType(v); }}>
@@ -378,7 +380,7 @@ const AIGuardDashboard = () => {
                 <SelectValue placeholder="Filter by type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="all">{t("admin.allTypes")}</SelectItem>
                 {Object.entries(FLAG_TYPES).map(([key, config]) => (
                   <SelectItem key={key} value={key}>{config.label}</SelectItem>
                 ))}

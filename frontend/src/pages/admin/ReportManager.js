@@ -6,10 +6,12 @@ import { Badge } from '../../components/ui/badge';
 import { Input } from '../../components/ui/input';
 import { toast } from 'sonner';
 import { Flag, Save } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const ReportManager = () => {
+  const { t } = useTranslation();
   const [reports, setReports] = useState([]);
   const [filter, setFilter] = useState({});
   const [editingId, setEditingId] = useState(null);
@@ -58,7 +60,7 @@ const ReportManager = () => {
       <div className="flex gap-2">
         <Button variant={!filter.status ? 'default' : 'outline'} onClick={() => setFilter({})} className={!filter.status ? 'gradient-button text-white border-0' : ''}>All</Button>
         <Button variant={filter.status === 'pending' ? 'default' : 'outline'} onClick={() => setFilter({ status: 'pending' })}>Pending</Button>
-        <Button variant={filter.status === 'resolved' ? 'default' : 'outline'} onClick={() => setFilter({ status: 'resolved' })}>Resolved</Button>
+        <Button variant={filter.status === 'resolved' ? 'default' : 'outline'} onClick={() => setFilter({ status: 'resolved' })}>{t("admin.resolved")}</Button>
       </div>
 
       <Card>
@@ -74,7 +76,7 @@ const ReportManager = () => {
                       <select value={editData.status || report.status} onChange={(e) => setEditData({ ...editData, status: e.target.value })} className="w-full px-3 py-2 border rounded-md">
                         <option value="pending">Pending</option>
                         <option value="in_review">In Review</option>
-                        <option value="resolved">Resolved</option>
+                        <option value="resolved">{t("admin.resolved")}</option>
                       </select>
                       <div className="flex gap-2">
                         <Button size="sm" onClick={() => handleUpdate(report.id)}><Save className="h-4 w-4 mr-1" />Save</Button>

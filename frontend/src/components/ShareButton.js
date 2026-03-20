@@ -9,6 +9,7 @@ import {
   DropdownMenuSeparator
 } from './ui/dropdown-menu';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 
 /**
  * ShareButton Component
@@ -27,6 +28,7 @@ const ShareButton = ({
   variant = 'outline', 
   size = 'sm' 
 }) => {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const shareUrl = url || window.location.href;
 
@@ -96,7 +98,7 @@ const ShareButton = ({
           ) : (
             <>
               <Copy className="h-4 w-4 mr-2" />
-              <span>Copy Link</span>
+              <span>{t("common.copyLink")}</span>
             </>
           )}
         </DropdownMenuItem>
@@ -114,7 +116,7 @@ const ShareButton = ({
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={shareOnFacebook}>
           <Facebook className="h-4 w-4 mr-2 text-blue-600" />
-          <span>Facebook</span>
+          <span>{t("common.facebook")}</span>
         </DropdownMenuItem>
         
         <DropdownMenuItem onClick={shareOnTwitter}>
