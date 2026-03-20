@@ -11,7 +11,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = "https://dashboard-localize.preview.emergentagent.com/api"
+BASE_URL = "https://buy-now-stripe.preview.emergentagent.com/api"
 
 # Test credentials from review request
 TEST_USERS = {

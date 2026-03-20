@@ -11,7 +11,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = "https://dashboard-localize.preview.emergentagent.com/api"
+BASE_URL = "https://buy-now-stripe.preview.emergentagent.com/api"
 SELLER_EMAIL = "seller.invoice.test@bazario.com"
 SELLER_PASSWORD = "SellerInvoice123!"
 SELLER_NAME = "Estate Auction Seller"

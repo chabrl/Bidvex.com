@@ -25,7 +25,7 @@ from typing import Dict, Any, Optional
 from pathlib import Path
 
 # Configuration
-BASE_URL = "https://dashboard-localize.preview.emergentagent.com/api"
+BASE_URL = "https://buy-now-stripe.preview.emergentagent.com/api"
 
 class BilingualInvoiceTester:
     def __init__(self):

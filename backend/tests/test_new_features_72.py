@@ -17,7 +17,7 @@ load_dotenv(Path(__file__).parent.parent / '.env')
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 if not BASE_URL:
-    BASE_URL = "https://dashboard-localize.preview.emergentagent.com"
+    BASE_URL = "https://buy-now-stripe.preview.emergentagent.com"
 
 
 class TestHealthAndBasicAPIs:

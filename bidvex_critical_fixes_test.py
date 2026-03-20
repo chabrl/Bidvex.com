@@ -14,7 +14,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = "https://dashboard-localize.preview.emergentagent.com/api"
+BASE_URL = "https://buy-now-stripe.preview.emergentagent.com/api"
 TEST_USER_EMAIL = "lots.homepage.tester@bazario.com"
 TEST_USER_PASSWORD = "LotsTest123!"
 

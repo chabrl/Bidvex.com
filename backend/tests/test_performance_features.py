@@ -7,7 +7,7 @@ import requests
 import os
 import time
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://dashboard-localize.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://buy-now-stripe.preview.emergentagent.com').rstrip('/')
 
 class TestAPICaching:
     """Test TTL-based API caching for public endpoints"""
