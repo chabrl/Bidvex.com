@@ -213,14 +213,10 @@ const SellerDashboard = () => {
                 <AlertTriangle className="h-6 w-6 text-yellow-600 flex-shrink-0" />
                 <div>
                   <p className="font-semibold text-yellow-900 dark:text-yellow-100 mb-1">
-                    {lang === 'en' 
-                      ? 'Payouts Temporarily On Hold' 
-                      : 'Paiements Temporairement Suspendus'}
+                    {t('dashboard.seller.payoutsOnHold')}
                   </p>
                   <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                    {lang === 'en'
-                      ? 'Your tax information has been submitted and is under review. Payouts will be enabled once verification is complete. You can continue selling in the meantime.'
-                      : 'Vos informations fiscales ont été soumises et sont en cours d\'examen. Les paiements seront activés une fois la vérification terminée. Vous pouvez continuer à vendre entre-temps.'}
+                    {t('dashboard.seller.payoutsOnHoldDesc')}
                   </p>
                 </div>
               </div>
@@ -235,7 +231,7 @@ const SellerDashboard = () => {
               <div className="flex items-center gap-3">
                 <Shield className="h-6 w-6 text-blue-600" />
                 <CardTitle>
-                  {lang === 'en' ? 'Tax Information' : 'Informations Fiscales'}
+                  {t('dashboard.seller.taxInfo')}
                 </CardTitle>
               </div>
               {user?.tax_onboarding_completed && (
@@ -246,9 +242,9 @@ const SellerDashboard = () => {
                     ? 'bg-red-500 text-white'
                     : 'bg-yellow-500 text-white'
                 }>
-                  {user.tax_verification_status === 'verified' && (lang === 'en' ? 'Verified' : 'Vérifié')}
-                  {user.tax_verification_status === 'pending' && (lang === 'en' ? 'Pending Review' : 'En Révision')}
-                  {user.tax_verification_status === 'action_required' && (lang === 'en' ? 'Action Required' : 'Action Requise')}
+                  {user.tax_verification_status === 'verified' && t('dashboard.seller.verified')}
+                  {user.tax_verification_status === 'pending' && t('dashboard.seller.pendingReview')}
+                  {user.tax_verification_status === 'action_required' && t('dashboard.seller.actionRequired')}
                 </Badge>
               )}
             </div>
@@ -259,18 +255,18 @@ const SellerDashboard = () => {
                 <div className="grid md:grid-cols-2 gap-4 text-sm">
                   <div>
                     <p className="text-muted-foreground">
-                      {lang === 'en' ? 'Seller Type' : 'Type de Vendeur'}
+                      {t('dashboard.seller.sellerType')}
                     </p>
                     <p className="font-semibold text-slate-900 dark:text-slate-100">
                       {user.seller_type === 'business' 
-                        ? (lang === 'en' ? 'Registered Business' : 'Entreprise Enregistrée')
-                        : (lang === 'en' ? 'Individual Seller' : 'Vendeur Individuel')}
+                        ? t('dashboard.seller.registeredBusiness')
+                        : t('dashboard.seller.individualSeller')}
                     </p>
                   </div>
                   {user.business_province && (
                     <div>
                       <p className="text-muted-foreground">
-                        {lang === 'en' ? 'Province' : 'Province'}
+                        {t('dashboard.seller.province')}
                       </p>
                       <p className="font-semibold text-slate-900 dark:text-slate-100">{user.business_province}</p>
                     </div>
@@ -278,7 +274,7 @@ const SellerDashboard = () => {
                   {user.legal_business_name && (
                     <div className="md:col-span-2">
                       <p className="text-muted-foreground">
-                        {lang === 'en' ? 'Legal Business Name' : 'Nom Légal de l\'Entreprise'}
+                        {t('dashboard.seller.legalBusinessName')}
                       </p>
                       <p className="font-semibold text-slate-900 dark:text-slate-100">{user.legal_business_name}</p>
                     </div>
@@ -290,22 +286,18 @@ const SellerDashboard = () => {
                   onClick={() => setShowTaxModal(true)}
                   className="w-full"
                 >
-                  {lang === 'en' ? 'Update Tax Information' : 'Mettre à Jour les Informations Fiscales'}
+                  {t('dashboard.seller.updateTaxInfo')}
                 </Button>
                 
                 <p className="text-xs text-muted-foreground text-center">
-                  {lang === 'en'
-                    ? 'Need to update your tax details? Click above to edit your information.'
-                    : 'Besoin de mettre à jour vos détails fiscaux? Cliquez ci-dessus pour modifier vos informations.'}
+                  {t('dashboard.seller.updateTaxDesc')}
                 </p>
               </>
             ) : (
               <>
                 <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
                   <p className="text-sm text-blue-900 dark:text-blue-100 mb-3">
-                    {lang === 'en'
-                      ? '⚠️ Tax information required for CRA compliance. Complete your tax profile to continue selling and receive payouts.'
-                      : '⚠️ Informations fiscales requises pour la conformité ARC. Complétez votre profil fiscal pour continuer à vendre et recevoir des paiements.'}
+                    {t('dashboard.seller.taxRequired')}
                   </p>
                 </div>
                 
@@ -313,7 +305,7 @@ const SellerDashboard = () => {
                   onClick={() => setShowTaxModal(true)}
                   className="w-full gradient-button text-white"
                 >
-                  {lang === 'en' ? 'Complete Tax Profile' : 'Compléter le Profil Fiscal'}
+                  {t('dashboard.seller.completeTaxProfile')}
                 </Button>
               </>
             )}
@@ -325,7 +317,7 @@ const SellerDashboard = () => {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2 text-blue-800 dark:text-blue-300">
               <Shield className="h-5 w-5" />
-              Fee Structure & Payment Rules
+              {t('dashboard.seller.feeStructureTitle')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -337,14 +329,16 @@ const SellerDashboard = () => {
                   <span className="font-semibold text-slate-900 dark:text-white">{t('dashboard.seller.yourCommission')}</span>
                 </div>
                 <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                  {user?.subscription_tier === 'vip' ? '2%' : user?.subscription_tier === 'premium' ? '2.5%' : '4%'}
+                  {user?.subscription_tier === 'vip' ? '2%' : user?.subscription_tier === 'premium' ? '2.5%' : user?.subscription_tier === 'partner_pro' ? '3%' : '4%'}
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                   {user?.subscription_tier === 'vip' 
-                    ? '✨ VIP discount (2% savings)!' 
+                    ? t('dashboard.seller.vipDiscount')
                     : user?.subscription_tier === 'premium'
-                    ? '✨ Premium discount (1.5% savings)!'
-                    : 'Standard rate (Upgrade for savings!)'}
+                    ? t('dashboard.seller.premiumDiscount')
+                    : user?.subscription_tier === 'partner_pro'
+                    ? t('dashboard.seller.partnerProDiscount')
+                    : t('dashboard.seller.standardRate')}
                 </p>
               </div>
 
@@ -356,7 +350,7 @@ const SellerDashboard = () => {
                 </div>
                 <p className="text-2xl font-bold text-red-700 dark:text-red-300">{t('dashboard.seller.fourteenDays')}</p>
                 <p className="text-xs text-red-600 dark:text-red-400 mt-1">
-                  {t('fees.settlement', 'Fees must be settled after auction close')}
+                  {t('fees.settlement')}
                 </p>
               </div>
 
@@ -366,16 +360,16 @@ const SellerDashboard = () => {
                   <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
                   <span className="font-semibold text-amber-800 dark:text-amber-300">{t('dashboard.seller.latePenalty')}</span>
                 </div>
-                <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">2%/month</p>
+                <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">2%/{t('time.month', 'month')}</p>
                 <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                  Interest on overdue balances
+                  {t('dashboard.seller.interestOverdue')}
                 </p>
               </div>
             </div>
             
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-4 text-center">
               <a href="/terms" className="text-blue-600 dark:text-blue-400 hover:underline">
-                View complete Terms & Conditions →
+                {t('dashboard.seller.viewTerms')} →
               </a>
             </p>
           </CardContent>
