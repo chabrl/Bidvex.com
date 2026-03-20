@@ -170,6 +170,11 @@ async def create_listing(
     listing_dict["created_at"] = listing_dict["created_at"].isoformat()
     await db.listings.insert_one(listing_dict)
     listing_dict.pop("_id", None)
+    
+    # Invalidate public caches on new listing
+    from services.api_cache import invalidate_listing_caches
+    invalidate_listing_caches()
+    
     return listing_dict
 
 
@@ -235,6 +240,9 @@ async def update_listing(listing_id: str, updates: Dict[str, Any], current_user:
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
     if update_data:
         await db.listings.update_one({"id": listing_id}, {"$set": update_data})
+        # Invalidate public caches on listing update
+        from services.api_cache import invalidate_listing_caches
+        invalidate_listing_caches()
     updated_listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
     if isinstance(updated_listing.get("created_at"), str):
         updated_listing["created_at"] = datetime.fromisoformat(updated_listing["created_at"])

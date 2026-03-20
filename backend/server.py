@@ -3,6 +3,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import json
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional, Dict, Any
@@ -1289,8 +1290,15 @@ async def get_current_user_optional(request: Request, credentials: Optional[HTTP
 
 @api_router.get("/categories", response_model=List[Category])
 async def get_categories():
+    from services.api_cache import cache, CATEGORIES_NS
+    cache_key = f"{CATEGORIES_NS}all"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
     categories = await db.categories.find({}, {"_id": 0}).to_list(100)
-    return [Category(**cat) for cat in categories]
+    result = [Category(**cat) for cat in categories]
+    cache.set(cache_key, result, ttl=300)
+    return result
 
 @api_router.post("/categories", response_model=Category)
 async def create_category(category: Category, current_user: User = Depends(get_current_user)):
@@ -5002,43 +5010,50 @@ async def get_featured_listings(limit: int = 12):
 
 @api_router.get("/carousel/new-listings")
 async def get_new_listings(limit: int = 12):
-    """Get newest listings (created in last 7 days)"""
+    """Get newest listings (created in last 7 days) — cached 60s"""
+    from services.api_cache import cache, LISTINGS_NS
+    cache_key = f"{LISTINGS_NS}new:{limit}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
     try:
         seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
-        
         listings = await db.listings.find(
-            {
-                "status": "active",
-                "created_at": {"$gte": seven_days_ago.isoformat()}
-            },
+            {"status": "active", "created_at": {"$gte": seven_days_ago.isoformat()}},
             {"_id": 0}
         ).sort("created_at", -1).limit(limit).to_list(limit)
-        
+        cache.set(cache_key, listings, ttl=60)
         return listings
-        
     except Exception as e:
         logger.error(f"Error fetching new listings: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch new listings")
 
 @api_router.get("/carousel/recently-sold")
 async def get_recently_sold(limit: int = 12):
-    """Get recently sold items"""
+    """Get recently sold items — cached 60s"""
+    from services.api_cache import cache, LISTINGS_NS
+    cache_key = f"{LISTINGS_NS}sold:{limit}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
     try:
         listings = await db.listings.find(
-            {
-                "status": "sold"
-            },
-            {"_id": 0}
+            {"status": "sold"}, {"_id": 0}
         ).sort("sold_at", -1).limit(limit).to_list(limit)
-        
+        cache.set(cache_key, listings, ttl=60)
         return listings
-        
     except Exception as e:
         logger.error(f"Error fetching recently sold: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch recently sold")
 
 @api_router.get("/stats/top-sellers")
 async def get_top_sellers(limit: int = 10):
+    """Top sellers — cached 60s"""
+    from services.api_cache import cache, LISTINGS_NS
+    cache_key = f"{LISTINGS_NS}top_sellers:{limit}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
     pipeline = [
         {"$match": {"status": "sold"}},
         {"$group": {"_id": "$seller_id", "total_sales": {"$sum": "$current_price"}, "count": {"$sum": 1}}},
@@ -5056,6 +5071,7 @@ async def get_top_sellers(limit: int = 10):
                 "total_sales": result["total_sales"],
                 "items_sold": result["count"]
             })
+    cache.set(cache_key, sellers, ttl=60)
     return sellers
 
 @api_router.get("/stats/hot-items")
@@ -6214,6 +6230,9 @@ app.add_middleware(
     allow_methods=["*"], allow_headers=["*"],
     expose_headers=["*"],
 )
+
+# GZip compression — compresses all responses > 500 bytes
+app.add_middleware(GZipMiddleware, minimum_size=500, compresslevel=5)
 # ========== WISHLIST ENDPOINTS (Moved to routes/watchlist.py) ==========
 
 # ==================== PREMIUM BIDDING FEATURES ====================
@@ -9165,6 +9184,81 @@ async def create_database_indexes():
             background=True,
             name="idx_sub_invoices_user_id",
         )
-        logger.info("Database indexes created (background)")
+        
+        # ──── HIGH-IMPACT INDEXES (P0 Performance) ────
+        
+        # Listings — marketplace search, filtering, sorting
+        await db.listings.create_index(
+            [("status", ASCENDING), ("created_at", ASCENDING)],
+            background=True, name="idx_listings_status_created",
+        )
+        await db.listings.create_index(
+            [("status", ASCENDING), ("category", ASCENDING)],
+            background=True, name="idx_listings_status_category",
+        )
+        await db.listings.create_index(
+            [("status", ASCENDING), ("auction_end_date", ASCENDING)],
+            background=True, name="idx_listings_status_enddate",
+        )
+        await db.listings.create_index(
+            [("seller_id", ASCENDING), ("status", ASCENDING)],
+            background=True, name="idx_listings_seller_status",
+        )
+        await db.listings.create_index(
+            [("id", ASCENDING)],
+            background=True, unique=True, name="idx_listings_id_unique",
+        )
+        
+        # Users — login, role-based queries
+        await db.users.create_index(
+            [("email", ASCENDING)],
+            background=True, unique=True, name="idx_users_email_unique",
+        )
+        await db.users.create_index(
+            [("role", ASCENDING)],
+            background=True, name="idx_users_role",
+        )
+        await db.users.create_index(
+            [("id", ASCENDING)],
+            background=True, unique=True, name="idx_users_id_unique",
+        )
+        
+        # Transactions — admin dashboard, tax reports
+        await db.transactions.create_index(
+            [("status", ASCENDING), ("created_at", ASCENDING)],
+            background=True, name="idx_transactions_status_created",
+        )
+        await db.transactions.create_index(
+            [("buyer_id", ASCENDING)],
+            background=True, name="idx_transactions_buyer",
+        )
+        await db.transactions.create_index(
+            [("seller_id", ASCENDING)],
+            background=True, name="idx_transactions_seller",
+        )
+        
+        # Notifications — user notification feed
+        await db.notifications.create_index(
+            [("user_id", ASCENDING), ("is_read", ASCENDING), ("created_at", ASCENDING)],
+            background=True, name="idx_notifications_user_read_date",
+        )
+        
+        # Messages — conversation lookups
+        await db.messages.create_index(
+            [("conversation_id", ASCENDING), ("created_at", ASCENDING)],
+            background=True, name="idx_messages_conversation_date",
+        )
+        
+        # Multi-item listings
+        await db.multi_item_listings.create_index(
+            [("status", ASCENDING), ("created_at", ASCENDING)],
+            background=True, name="idx_multi_listings_status_created",
+        )
+        await db.multi_item_listings.create_index(
+            [("id", ASCENDING)],
+            background=True, unique=True, name="idx_multi_listings_id_unique",
+        )
+        
+        logger.info("Database indexes created (background) — full suite")
     except Exception as e:
         logger.warning(f"Index creation note: {e}")

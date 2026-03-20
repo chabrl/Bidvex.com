@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useTranslation, I18nextProvider } from 'react-i18next';
 import i18n from './i18n';
@@ -8,64 +8,83 @@ import { SiteConfigProvider } from './contexts/SiteConfigContext';
 import { CurrencyProvider } from './contexts/CurrencyContext';
 import { SiteModeProvider, useSiteMode } from './contexts/SiteModeContext';
 import { Toaster } from './components/ui/sonner';
+import { HelmetProvider } from 'react-helmet-async';
+
+// Shell components — kept eager (always visible on every page)
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import TrendyAnnouncementBar from './components/TrendyAnnouncementBar';
 import MobileBottomNav from './components/MobileBottomNav';
-import AIAssistant from './components/AIAssistant';
-import MessageNotificationListener from './components/MessageNotificationListener';
 import ScrollToTop from './components/ScrollToTop';
 import CookieConsentBanner from './components/CookieConsentBanner';
-import HomePage from './pages/HomePage';
-import MarketplacePage from './pages/MarketplacePage';
-import ListingDetailPage from './pages/ListingDetailPage';
-import AuthPage from './pages/AuthPage';
-import SellerDashboard from './pages/SellerDashboard';
-import BuyerDashboard from './pages/BuyerDashboard';
-import CreateListingPage from './pages/CreateListingPage';
-import PaymentSuccessPage from './pages/PaymentSuccessPage';
-import ProfileSettingsPage from './pages/ProfileSettingsPage';
-import AffiliateDashboard from './pages/AffiliateDashboard';
-import MessagesPage from './pages/MessagesPage';
-import CreateMultiItemListing from './pages/CreateMultiItemListing';
-import LotsMarketplacePage from './pages/LotsMarketplacePage';
-import MultiItemListingDetailPage from './pages/MultiItemListingDetailPage';
-import ItemsMarketplacePage from './pages/ItemsMarketplacePage';
-import AdminDashboard from './pages/AdminDashboard';
-import AdminTaxDashboard from './pages/AdminTaxDashboard';
-import WatchlistPage from './pages/WatchlistPage';
-import HowItWorksPage from './pages/HowItWorksPage';
-import SellerProfilePage from './pages/SellerProfilePage';
-import NotFoundPage from './pages/NotFoundPage';
-import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
-import TermsOfServicePage from './pages/TermsOfServicePage';
-import ForgotPasswordPage from './pages/ForgotPasswordPage';
-import ResetPasswordPage from './pages/ResetPasswordPage';
-import PhoneVerificationPage from './pages/PhoneVerificationPage';
-import ClientEmailMarketing from './pages/ClientEmailMarketing';
-import EmailMarketingPricing from './pages/EmailMarketingPricing';
-import SubscriptionPricingPage from './pages/SubscriptionPricingPage';
-import MaintenancePage from './pages/MaintenancePage';
-import CheckoutPage from './pages/CheckoutPage';
-import BecomePartnerPage from './pages/BecomePartnerPage';
-import PartnerDashboard from './pages/PartnerDashboard';
-import LegalPage from './pages/LegalPage';
-import InviteAcceptPage from './pages/InviteAcceptPage';
-
-// Vehicle Auction Module (Standalone)
-import VehicleAuctionsPage from './pages/vehicles/VehicleAuctionsPage';
-import VehicleDetailPage from './pages/vehicles/VehicleDetailPage';
-import CreateVehicleListingPage from './pages/vehicles/CreateVehicleListingPage';
-import SellerRegistrationPage from './pages/vehicles/SellerRegistrationPage';
-import MyVehicleListingsPage from './pages/vehicles/MyVehicleListingsPage';
-import VehicleInvoicesPage from './pages/vehicles/VehicleInvoicesPage';
-import SellerFinancialsPage from './pages/vehicles/SellerFinancialsPage';
-import { VehicleAuctionProvider } from './contexts/VehicleAuctionContext';
+import MessageNotificationListener from './components/MessageNotificationListener';
 
 import { registerServiceWorker } from './utils/pushNotifications';
 import './App.css';
 
-// Initialize Service Worker for push notifications
+// ─── Lazy-loaded pages (route-level code splitting) ───────────────
+const HomePage = lazy(() => import('./pages/HomePage'));
+const MarketplacePage = lazy(() => import('./pages/MarketplacePage'));
+const ListingDetailPage = lazy(() => import('./pages/ListingDetailPage'));
+const AuthPage = lazy(() => import('./pages/AuthPage'));
+const SellerDashboard = lazy(() => import('./pages/SellerDashboard'));
+const BuyerDashboard = lazy(() => import('./pages/BuyerDashboard'));
+const CreateListingPage = lazy(() => import('./pages/CreateListingPage'));
+const PaymentSuccessPage = lazy(() => import('./pages/PaymentSuccessPage'));
+const ProfileSettingsPage = lazy(() => import('./pages/ProfileSettingsPage'));
+const AffiliateDashboard = lazy(() => import('./pages/AffiliateDashboard'));
+const MessagesPage = lazy(() => import('./pages/MessagesPage'));
+const CreateMultiItemListing = lazy(() => import('./pages/CreateMultiItemListing'));
+const LotsMarketplacePage = lazy(() => import('./pages/LotsMarketplacePage'));
+const MultiItemListingDetailPage = lazy(() => import('./pages/MultiItemListingDetailPage'));
+const ItemsMarketplacePage = lazy(() => import('./pages/ItemsMarketplacePage'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const AdminTaxDashboard = lazy(() => import('./pages/AdminTaxDashboard'));
+const WatchlistPage = lazy(() => import('./pages/WatchlistPage'));
+const HowItWorksPage = lazy(() => import('./pages/HowItWorksPage'));
+const SellerProfilePage = lazy(() => import('./pages/SellerProfilePage'));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
+const TermsOfServicePage = lazy(() => import('./pages/TermsOfServicePage'));
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
+const PhoneVerificationPage = lazy(() => import('./pages/PhoneVerificationPage'));
+const ClientEmailMarketing = lazy(() => import('./pages/ClientEmailMarketing'));
+const EmailMarketingPricing = lazy(() => import('./pages/EmailMarketingPricing'));
+const SubscriptionPricingPage = lazy(() => import('./pages/SubscriptionPricingPage'));
+const MaintenancePage = lazy(() => import('./pages/MaintenancePage'));
+const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
+const BecomePartnerPage = lazy(() => import('./pages/BecomePartnerPage'));
+const PartnerDashboard = lazy(() => import('./pages/PartnerDashboard'));
+const LegalPage = lazy(() => import('./pages/LegalPage'));
+const InviteAcceptPage = lazy(() => import('./pages/InviteAcceptPage'));
+
+// Vehicle Auction Module
+const VehicleAuctionsPage = lazy(() => import('./pages/vehicles/VehicleAuctionsPage'));
+const VehicleDetailPage = lazy(() => import('./pages/vehicles/VehicleDetailPage'));
+const CreateVehicleListingPage = lazy(() => import('./pages/vehicles/CreateVehicleListingPage'));
+const SellerRegistrationPage = lazy(() => import('./pages/vehicles/SellerRegistrationPage'));
+const MyVehicleListingsPage = lazy(() => import('./pages/vehicles/MyVehicleListingsPage'));
+const VehicleInvoicesPage = lazy(() => import('./pages/vehicles/VehicleInvoicesPage'));
+const SellerFinancialsPage = lazy(() => import('./pages/vehicles/SellerFinancialsPage'));
+
+// Lazy-loaded heavy components
+const AIAssistant = lazy(() => import('./components/AIAssistant'));
+
+// ─── Global Loading Fallback ──────────────────────────────────────
+const PageLoader = () => (
+  <div className="min-h-[60vh] flex items-center justify-center" data-testid="page-loader">
+    <div className="text-center space-y-4">
+      <div className="relative mx-auto w-12 h-12">
+        <div className="absolute inset-0 rounded-full border-4 border-slate-200 dark:border-slate-700" />
+        <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[#1E3A8A] border-r-[#06B6D4] animate-spin" />
+      </div>
+      <p className="text-sm text-muted-foreground font-medium tracking-wide">Loading...</p>
+    </div>
+  </div>
+);
+
+// ─── Service Worker ───────────────────────────────────────────────
 if (typeof window !== 'undefined') {
   registerServiceWorker().then((registration) => {
     if (registration) {
@@ -87,51 +106,26 @@ const ProtectedRoute = ({ children, requireVerification = false }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
   
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
-      </div>
-    );
-  }
+  if (loading) return <PageLoader />;
+  if (!user) return <Navigate to="/auth" state={{ from: location }} replace />;
   
-  if (!user) {
-    return <Navigate to="/auth" state={{ from: location }} replace />;
-  }
-  
-  // Check if route requires phone verification
   const needsVerification = requireVerification || 
     VERIFICATION_REQUIRED_ROUTES.some(route => location.pathname.startsWith(route));
   
-  // Redirect unverified users to phone verification (except admins and already on verify page)
-  if (needsVerification && 
-      !user.phone_verified && 
-      user.role !== 'admin' && 
-      location.pathname !== '/verify-phone') {
+  if (needsVerification && !user.phone_verified && user.role !== 'admin' && location.pathname !== '/verify-phone') {
     return <Navigate to="/verify-phone" state={{ from: location }} replace />;
   }
   
   return children;
 };
 
-// Wrapper for phone verification page - allow access but redirect if already verified
 const PhoneVerificationRoute = ({ children }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
   
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
-      </div>
-    );
-  }
+  if (loading) return <PageLoader />;
+  if (!user) return <Navigate to="/auth" state={{ from: location }} replace />;
   
-  if (!user) {
-    return <Navigate to="/auth" state={{ from: location }} replace />;
-  }
-  
-  // If already verified, redirect to intended destination or dashboard
   if (user.phone_verified) {
     const from = location.state?.from?.pathname || '/seller/dashboard';
     return <Navigate to={from} replace />;
@@ -140,46 +134,33 @@ const PhoneVerificationRoute = ({ children }) => {
   return children;
 };
 
-// Route guard for maintenance/coming soon mode
 const MaintenanceGuard = ({ children }) => {
   const { mode, message, expectedBack, socialLinks, loading, isMaintenanceOrComingSoon } = useSiteMode();
   const { user, loading: authLoading } = useAuth();
   const location = useLocation();
   
-  // Allow preview mode via URL param
   const searchParams = new URLSearchParams(location.search);
   const isPreview = searchParams.get('preview_mode') === 'true';
   
-  // Always allow access to admin route (authentication handled separately by ProtectedRoute)
   const isAdminRoute = location.pathname.startsWith('/admin');
-  if (isAdminRoute) {
-    return children;
-  }
+  if (isAdminRoute) return children;
   
-  // Always allow access to auth page for admin login
   const isAuthRoute = location.pathname === '/auth';
   const isPartnerRoute = location.pathname === '/become-a-partner';
   const isLegalRoute = location.pathname === '/legal';
   const isInviteRoute = location.pathname.startsWith('/invite/');
-  if (isAuthRoute || isPartnerRoute || isLegalRoute || isInviteRoute) {
-    return children;
-  }
+  if (isAuthRoute || isPartnerRoute || isLegalRoute || isInviteRoute) return children;
   
-  // Wait for both site mode and auth to load
-  if (loading || authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
-      </div>
-    );
-  }
+  if (loading || authLoading) return <PageLoader />;
   
-  // Allow admins to access the site normally
   const isAdmin = user?.email?.endsWith('@bidvex.com');
   
-  // If in maintenance/coming soon mode and not admin, show maintenance page
   if (isMaintenanceOrComingSoon && !isAdmin && !isPreview) {
-    return <MaintenancePage mode={mode} message={message} expectedBack={expectedBack} socialLinks={socialLinks} />;
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <MaintenancePage mode={mode} message={message} expectedBack={expectedBack} socialLinks={socialLinks} />
+      </Suspense>
+    );
   }
   
   return children;
@@ -213,16 +194,6 @@ const App = () => {
     }
   }, [user, processGoogleSession]);
 
-  // Performance: Enforce lazy loading on all images globally
-  useEffect(() => {
-    const images = document.querySelectorAll('img:not([loading])');
-    images.forEach(img => {
-      if (!img.getAttribute('loading')) {
-        img.setAttribute('loading', 'lazy');
-      }
-    });
-  }, []);
-
   if (sessionProcessing) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-teal-50 dark:from-gray-900 dark:to-gray-800">
@@ -235,6 +206,7 @@ const App = () => {
   }
 
   return (
+    <HelmetProvider>
     <I18nextProvider i18n={i18n}>
       <BrowserRouter>
         <SiteConfigProvider>
@@ -246,6 +218,7 @@ const App = () => {
         <div className="App min-h-screen bg-gradient-to-br from-blue-50 via-white to-teal-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
           <TrendyAnnouncementBar />
           <Navbar />
+          <Suspense fallback={<PageLoader />}>
           <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/marketplace" element={<MarketplacePage />} />
@@ -312,7 +285,7 @@ const App = () => {
             <ProtectedRoute><CheckoutPage /></ProtectedRoute>
           } />
           
-          {/* Vehicle Auction Module (Standalone) */}
+          {/* Vehicle Auction Module */}
           <Route path="/vehicle-auctions" element={<VehicleAuctionsPage />} />
           <Route path="/vehicle-auctions/:id" element={<VehicleDetailPage />} />
           <Route path="/vehicle-auctions/create" element={
@@ -336,8 +309,11 @@ const App = () => {
           
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
+          </Suspense>
           <Footer />
-          <AIAssistant />
+          <Suspense fallback={null}>
+            <AIAssistant />
+          </Suspense>
           <MessageNotificationListener />
           <Toaster position="top-right" />
           <CookieConsentBanner />
@@ -350,6 +326,7 @@ const App = () => {
       </SiteConfigProvider>
     </BrowserRouter>
     </I18nextProvider>
+    </HelmetProvider>
   );
 };
 

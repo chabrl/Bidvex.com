@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { Badge } from './ui/badge';
@@ -41,9 +41,21 @@ const DecomposedMarketplace = () => {
 
   const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
+  // Debounced filters — prevents API call on every keystroke
+  const [debouncedFilters, setDebouncedFilters] = useState(filters);
+  const debounceRef = useRef(null);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setDebouncedFilters(filters);
+    }, 300);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [filters]);
+
   useEffect(() => {
     fetchItems();
-  }, [filters]);
+  }, [debouncedFilters]);
 
   const fetchItems = async () => {
     setLoading(true);

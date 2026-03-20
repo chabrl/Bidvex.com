@@ -13,6 +13,7 @@ import {
   Zap, Play, ChevronRight, Timer, Package
 } from 'lucide-react';
 import { formatCurrency } from '../utils/currencyFormatter';
+import SEO from '../components/SEO';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -141,6 +142,23 @@ const HomePage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900" data-testid="home-page">
+      <SEO 
+        title="BidVex — Canada's Online Auction Marketplace"
+        description="Bid on electronics, vehicles, art, collectibles & more. Real-time auctions with secure payments. Join thousands of Canadian buyers and sellers."
+        path="/"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          "name": "BidVex",
+          "url": "https://bidvex.com",
+          "description": "Canada's trusted online auction marketplace",
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": "https://bidvex.com/marketplace?search={search_term_string}",
+            "query-input": "required name=search_term_string"
+          }
+        }}
+      />
       {/* ========== EXTRAORDINARY HERO SECTION ========== */}
       <section className="relative min-h-[90vh] flex items-center overflow-hidden">
         {/* Animated Gradient Background */}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
@@ -84,6 +84,21 @@ const FlattenedMarketplace = ({
   
   // Categories
   const [categories, setCategories] = useState([]);
+  
+  // Debounced filters — prevents API call on every keystroke
+  const [debouncedFilters, setDebouncedFilters] = useState(filters);
+  const debounceTimerRef = useRef(null);
+
+  // Debounce filter changes by 300ms
+  useEffect(() => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedFilters(filters);
+    }, 300);
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, [filters]);
 
   useEffect(() => {
     fetchCategories();
@@ -91,7 +106,7 @@ const FlattenedMarketplace = ({
 
   useEffect(() => {
     fetchItems();
-  }, [filters]);
+  }, [debouncedFilters]);
 
   const fetchCategories = async () => {
     try {

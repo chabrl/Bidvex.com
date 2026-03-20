@@ -36,6 +36,13 @@
     @apply font-semibold tracking-tight;
   }
   
+  /* Global image defaults — prevent CLS */
+  img {
+    max-width: 100%;
+    height: auto;
+    content-visibility: auto;
+  }
+  
   /* Typography Scale */
   h1 { @apply text-4xl sm:text-5xl lg:text-6xl; }
   h2 { @apply text-2xl sm:text-3xl lg:text-4xl; }

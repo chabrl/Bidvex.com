@@ -5,10 +5,8 @@
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#009BFF" />
         
-        <!-- CACHE BUSTING - Force fresh assets -->
-        <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-        <meta http-equiv="Pragma" content="no-cache" />
-        <meta http-equiv="Expires" content="0" />
+        <!-- Let browsers cache static assets — CRA hashes filenames for cache-busting -->
+        <meta http-equiv="X-Content-Type-Options" content="nosniff" />
         
         <meta name="description" content="BidVex - Your trusted online auction marketplace for buying and selling unique items" />
         <meta property="og:title" content="BidVex - Online Auction Marketplace" />
@@ -81,7 +79,44 @@
     </head>
     <body>
         <noscript>You need to enable JavaScript to run this app.</noscript>
-        <div id="root"></div>
+        <div id="root">
+          <!-- Inline skeleton — visible instantly while JS loads -->
+          <div id="initial-skeleton" style="
+            min-height:100vh;display:flex;flex-direction:column;
+            background:linear-gradient(135deg,#eff6ff 0%,#fff 50%,#f0fdfa 100%);
+            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+          ">
+            <!-- Navbar skeleton -->
+            <div style="
+              height:56px;background:#fff;border-bottom:1px solid #e2e8f0;
+              display:flex;align-items:center;justify-content:space-between;
+              padding:0 16px;box-shadow:0 1px 3px rgba(0,0,0,.06);
+            ">
+              <div style="width:100px;height:32px;background:#e2e8f0;border-radius:6px;animation:shimmer 1.5s infinite"></div>
+              <div style="display:flex;gap:8px">
+                <div style="width:50px;height:28px;background:#e2e8f0;border-radius:6px;animation:shimmer 1.5s infinite"></div>
+                <div style="width:70px;height:36px;background:linear-gradient(135deg,#1E3A8A,#06B6D4);border-radius:8px"></div>
+              </div>
+            </div>
+            <!-- Hero skeleton -->
+            <div style="
+              flex:1;display:flex;flex-direction:column;
+              align-items:center;justify-content:center;padding:40px 20px;text-align:center;
+            ">
+              <div style="width:280px;max-width:80%;height:40px;background:#e2e8f0;border-radius:8px;margin-bottom:16px;animation:shimmer 1.5s infinite"></div>
+              <div style="width:220px;max-width:60%;height:20px;background:#e2e8f0;border-radius:6px;margin-bottom:32px;animation:shimmer 1.5s infinite"></div>
+              <div style="display:flex;gap:12px">
+                <div style="width:140px;height:44px;background:linear-gradient(135deg,#1E3A8A,#06B6D4);border-radius:999px"></div>
+                <div style="width:120px;height:44px;background:#e2e8f0;border-radius:999px;animation:shimmer 1.5s infinite"></div>
+              </div>
+            </div>
+          </div>
+          <style>
+            @keyframes shimmer {
+              0%{opacity:1}50%{opacity:.5}100%{opacity:1}
+            }
+          </style>
+        </div>
         <!--
       This HTML file is a template.
       If you open it directly in the browser, you will see an empty page.
