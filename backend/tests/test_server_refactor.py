@@ -10,7 +10,7 @@ import os
 import base64
 import json
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://query-caching.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://mobile-first-bidding.preview.emergentagent.com').rstrip('/')
 
 class TestHealthAndCore:
     """Core health and root endpoints"""

@@ -1,65 +1,45 @@
-<analysis>**original_problem_statement**: The user initially requested two features: Smart Localized Currency Formatting and an Admin Tax Dashboard. After their completion, the user reported and the agent fixed a UI visibility bug on the homepage. Following this, the user requested a full responsive design overhaul for the entire application. Most recently, the user has initiated a multi-phase performance engineering overhaul to improve Core Web Vitals and page load speed, with phases P0 and P1 completed, and phase P2 now approved to begin.
+<analysis>**original_problem_statement**: The user initially requested two features: Smart Localized Currency Formatting and an Admin Tax Dashboard. After their completion, the user reported and the agent fixed a UI visibility bug on the homepage. Following this, the user requested a full responsive design overhaul for the entire application. Most recently, the user has initiated a multi-phase performance engineering overhaul (P0, P1, P2) and a massive backend refactoring to break down the monolithic  file.
 
 **User's preferred language**: English
 
 **what currently exists?**
 The application is a full-stack auction marketplace. The agent has successfully completed several major tasks in this session:
-1.  **Feature Implementation**: Smart Localized Currency Formatting and a full-featured Admin Tax Dashboard are complete and tested.
-2.  **Bug Fix**: A text visibility issue on the homepage's Trending Items cards in light mode has been resolved.
-3.  **Responsive Design Overhaul**: A comprehensive responsive fix has been applied across the application, addressing issues on mobile, tablet, and desktop for components like the Navbar, Homepage grids, Hero banner, and floating elements.
-4.  **Performance Engineering (P0 & P1)**:
-    *   **Code Splitting**: All 40+ page components in  have been converted to use  with a  fallback.
-    *   **Backend Compression**: GZip middleware has been added to the FastAPI backend ().
-    *   **API Caching**: An in-memory TTL cache () has been implemented and applied to high-traffic public endpoints like  and .
-    *   **Database Indexing**: Comprehensive indexes have been added to the , , , and  collections to speed up queries.
-    *   **Image Optimization**: A global  attribute has been applied to images via CSS.
-    *   **Critical Rendering Path**:  has been updated with a basic inline skeleton loader to mitigate the blank white screen effect.
-    *   **SEO**: Basic SEO has been implemented using , and  and  have been created.
-    *   **Debouncing**: Search inputs in key marketplace components have been debounced.
+1.  **Performance Engineering (P2)**: Migrated frontend data fetching from / to , implementing client-side caching with  and . Implemented cursor-based pagination on the backend and frontend for efficient data loading in the marketplace.
+2.  **Massive Backend Refactor**: The monolithic  file, which was over 9,200 lines, has been successfully broken down. The agent programmatically extracted 187 endpoints into over a dozen new, logically grouped route modules (e.g., , , , ). The main  file is now a clean 287-line entry point responsible only for app initialization, middleware, and router registration. A new  file was created to house common Pydantic models and helper functions.
+3.  **Cloudflare CDN**: The agent provided the user with the step-by-step documentation for setting up Cloudflare CDN.
 
 **Last working item**:
-    - Last item agent was working: The user has just approved the plan for the **P2 Performance Engineering** tasks. The immediate next action is to provide the user with the step-by-step Cloudflare CDN setup instructions documented in , as requested.
-    - Status: NOT STARTED
-    - Agent Testing Done: Y (For all previously completed work, including P0 and P1 performance tasks)
-    - Which testing method agent to use? both
+    - Last item agent was working: Following the successful backend refactor, the user provided a new multi-step plan. The agent has begun **Step 1: Mobile Swipeable Carousels (P1)**. It started by exploring the codebase to identify existing carousel components and the homepage structure to plan the implementation of touch-native swipe gestures for mobile views.
+    - Status: IN PROGRESS
+    - Agent Testing Done: N
+    - Which testing method agent to use? frontend testing agent
     - User Testing Done: N
 
 **All Pending/In progress Issue list**:
   - There are no pending bugs. All work is feature/task-driven.
 
 **In progress Task List**:
-  - Task 1:  **Execute P2 Performance Engineering & Refactoring (P0)**
-     - **Step 1: Provide Cloudflare CDN Instructions**
-        - Where to resume: Read the file  and present the step-by-step Cloudflare setup instructions to the user via . This is a documentation-only step with no coding.
-        - Status: NOT STARTED
-     - **Step 2: React Query Migration**
-        - Where to resume: Install . Wrap the entire application in  inside  or . Begin migrating data-fetching logic, starting with the highest-traffic endpoint for auction listings ( or ), then categories, and finally user-specific data.
-        - Status: NOT STARTED
-     - **Step 3: Implement Cursor Pagination**
-        - Where to resume: Modify the backend endpoint for listings (e.g., in ) to accept a  parameter (using ) and return a  in the response. Update the corresponding frontend component (e.g., ) to handle infinite scrolling or a Load More button.
-        - Status: NOT STARTED
-     - **Step 4: Refactor **
-        - Where to resume: After all other P2 tasks are complete, create new route files (e.g., , ) and move the relevant routers and logic out of the monolithic .
-        - Status: NOT STARTED
-     - What will be achieved with this?: This will complete the performance overhaul by introducing client-side caching and efficient data loading, and improve backend maintainability.
-     - Should Test frontend/backend/both after fix?: both
-     - Blocked on something: None. The user has instructed the agent to proceed autonomously through all steps.
+  - Task 1:  **Implement Mobile Swipeable Carousels (P1)**
+     - Where to resume: The agent has identified relevant files like  and . The next action is to decide on an implementation strategy (pure CSS/JS or a lightweight library) and begin modifying the components to add swipe functionality for mobile screen sizes, ensuring it doesn't affect the desktop layout.
+     - What will be achieved with this?: Improved user experience on mobile devices by replacing static grids with interactive, swipeable carousels for listing views.
+     - Status:  IN PROGRESS
+     - Should Test frontend/backend/both after fix?: frontend
+     - Blocked on something: No.
 
 **Upcoming and Future Tasks**
 *   **Upcoming Tasks:**
-    *   (P1) Add swipeable card carousels on mobile for a better UX.
+    *   (P1) **STEP 2 — Cloud PDF Invoice Storage (P2)**: Replace the local PDF invoice mock with a cloud storage solution, preferably Cloudflare R2. This involves generating the PDF upon invoice creation, uploading it, and serving it via a signed URL.
+    *   (P1) **STEP 3 — Premium Comparison View (P2)**: Implement a new marketplace view allowing users to compare 2-4 listings side-by-side, with a mobile-friendly responsive layout.
+    *   (P2) **STEP 4 — Partner Pro Subscription Tier (P2)**: Define the feature set for a new Partner Pro subscription tier. **This is blocked until the agent proposes a feature set and gets user approval.** Only then can the billing logic be implemented.
 *   **Future Tasks:**
-    *   (P2) Add a Premium Comparison view in the marketplace.
-    *   (P2) Replace local PDF invoice mock storage with a cloud service like S3.
-    *   (P2) Implement the Partner Pro subscription tier.
     *   (P3) Expand email template test coverage.
 
 **Completed work in this session**
-- **Smart Localized Currency Formatting**: Applied a reusable  utility across more than 25 files, ensuring all prices are displayed according to the user's locale (EN/FR-QC).
-- **Admin Tax Dashboard**: Implemented the backend API () and frontend UI () for the tax dashboard, including hero stats, charts, and CSV export.
-- **UI Bug Fix (Homepage)**: Resolved a CSS specificity issue where Enchères en cours text was nearly invisible in light mode by creating a dedicated, high-specificity CSS class ().
-- **Full Responsive Design Fix**: Refactored  to use a mobile-first hamburger menu, adjusted homepage grids () for all breakpoints, and fixed positioning of floating elements (, ) to prevent overlap on small screens.
-- **Performance Engineering (P0 & P1)**: Executed a wide range of optimizations including code-splitting all pages (), adding Gzip compression (), implementing API caching (), adding DB indexes, and improving frontend rendering patterns.
+- **Massive Backend Refactor**: Reduced  from 8,778 lines to 287 lines by extracting all remaining 187 endpoints into 12+ new route modules (e.g., , , , ). Created  for common models and helpers. This was a complex, programmatic refactor that involved significant debugging of import errors and model definitions.
+- **React Query Migration**: Replaced manual  calls in , , and  with  and  hooks from . Created custom hooks like  and .
+- **Cursor Pagination Implementation**: Modified the backend marketplace endpoint to support cursor-based pagination and updated the frontend to use  with a Load More button.
+- **Cloudflare CDN Instructions**: Provided the user with the contents of  for manual CDN setup.
+- **Full System Testing**: Successfully ran the testing agent twice, confirming the stability of the application after the React Query migration and the massive server refactor. The agent passed with a 100% success rate on all tests.
 
 **Earlier issues found/mentioned but not fixed**
    - None.
@@ -71,93 +51,74 @@ The application is a full-stack auction marketplace. The agent has successfully 
 
 
 **Key Technical Concepts**
-- **Performance Engineering**: Code Splitting (), Gzip Compression, API Caching (in-memory TTL), Database Indexing, Critical CSS, SEO (), Image Optimization ().
-- **Responsive Design**: Extensive use of Tailwind CSS breakpoints (, , , ) to create a fluid layout for navigation, grids, and typography.
-- **CSS Specificity**: Debugged and resolved a complex CSS override issue by increasing selector specificity and using  correctly.
-- **Internationalization (i18n)**: Using  for locale-aware currency formatting.
-- **Data Aggregation**: Using MongoDB aggregation pipelines for the tax dashboard.
+- **Large-Scale Refactoring**: Programmatic extraction of code from a monolithic file into modular components using Python scripts for analysis and generation. This involved complex debugging of dependencies, namespaces, and import resolution.
+- **Client-Side State Management**: Using  (, ) to manage server state, cache data, and handle background refetching, replacing manual / patterns.
+- **Cursor Pagination**: Implementing an efficient pagination strategy where the API returns a cursor (a pointer to the last item) to fetch the next set of results, which is ideal for infinite scrolling.
+- **Backend Architecture**: Decoupling a monolithic FastAPI application into a clean entry point () with multiple independent, pluggable route modules.
 
 **key DB schema**
-  - ****: Indexed on , , , .
-  - ****: Indexed on , .
-  - ****: Indexed on , , , .
-  - ****: Indexed on .
+  - No changes were made to the database schema.
 
 **changes in tech stack**
-  - **Added**:  for SEO meta tag management.
-  - **To be added**:  for client-side state management.
+  - **Added**:  for frontend data fetching and caching.
 
 **All files of reference**
-- **Created**:
-    - : Reusable in-memory TTL cache for API endpoints.
-    - : Standardized component for lazy-loaded images.
-    - : Wrapper for  to manage page titles and meta descriptions.
-    - : Disallows indexing of sensitive paths.
-    - : Provides a basic sitemap for crawlers.
-    - : Documentation for P2 infrastructure tasks.
+- **Created (Backend Refactor)**:
+    - : , , , , , , , , , .
+    - : Central location for shared Pydantic models and helper functions previously in .
+    - , : Extracted WebSocket logic.
+- **Created (React Query)**:
+    - : Wrapper to provide the QueryClient to the app.
+    - : , , .
 - **Heavily Updated**:
-    - : Rewritten to lazy-load all 40+ page components.
-    - : Rewritten for full responsiveness with a new  breakpoint.
-    - : Updated for responsive grids, spacing, typography, and UI bug fixes.
-    - : Modified to include an inline CSS skeleton loader and remove anti-caching headers.
-    - : Added global CSS for responsive utilities, image lazy loading, and the fix for the text visibility bug.
-    - : Added Gzip middleware, API caching decorators, and comprehensive database indexes.
+    - : Rewritten from ~8,778 lines to a 287-line application entry point.
+    - : Migrated all data fetching to React Query hooks.
+    - , : Migrated to use  for cursor-based pagination.
+    - : Modified to support cursor pagination instead of skip/limit.
 
 **Areas that need refactoring**:
-- : This file is over 9000 lines long. The user has explicitly requested this be broken down into smaller route modules as the final step of the P2 task.
+- None. A major refactoring of  was just completed, making the backend architecture significantly more modular and maintainable.
 
 **key api endpoints**
-- **Cached Endpoints**:
-    -  (TTL: 300s)
-    -  (TTL: 60s)
-    -  (TTL: 60s)
-    -  (TTL: 300s)
-- **To be modified for Pagination**:
-    - The main listings endpoint ( or ) will be updated to support cursor-based pagination.
+- : Modified to remove  and  parameters and now accepts a  to support infinite scrolling. Returns , , and .
 
 **Critical Info for New Agent**
-- The user has approved the full P2 performance plan and wants it executed autonomously without asking for confirmation between steps.
-- **Your first action is NOT to code**. You must first read  and present the Cloudflare setup instructions to the user.
-- After providing the instructions, proceed directly to the **React Query Migration**, followed by **Cursor Pagination**, and finally the ** Refactor**.
-- Do not modify existing business logic, especially for Stripe, SendGrid, or user authentication.
-- A final Lighthouse audit is required after all P2 changes are complete.
+- **Follow The Plan**: The user has provided a very specific, multi-step plan. You must follow the exact order: 1. Mobile Carousels, 2. Cloud PDF Storage, 3. Comparison View, 4. Partner Tier.
+- **No Confirmation Needed (for now)**: Do not ask for confirmation after completing steps 1, 2, and 3. Proceed directly to the next step.
+- **Blocker on Step 4**: You MUST stop before implementing the billing logic for the Partner Pro tier. Your task is to first define the features this tier will unlock and present them to the user for approval.
+- The entire backend has been refactored.  is just an entry point. All business logic now resides in the  modules, with common models in .
 
 **documents and test reports created in this job**
-  - /app/memory/PRD.md
-  - /app/memory/INFRASTRUCTURE_P2.md
-  - /app/test_reports/iteration_67.json
-  - /app/test_reports/iteration_68.json
-  - /app/test_reports/iteration_69.json
+  - /app/memory/PRD.md (Updated)
+  - /app/test_reports/iteration_70.json
+  - /app/test_reports/iteration_71.json
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User**: Instructed the agent to proceed with P2 tasks autonomously, starting with providing Cloudflare instructions, then React Query migration, cursor pagination, and server refactoring. (Status: **Pending - First action for next agent**)
-2.  **Agent**: Completed P0+P1 performance tasks and presented the P2 plan. (Status: **Completed**)
-3.  **User**: Provided detailed requirements and approval for the multi-phase performance engineering task (P0, P1, P2). (Status: **Completed**)
-4.  **Agent**: Acknowledged the performance engineering request and gathered initial context. (Status: **Completed**)
-5.  **User**: Initiated a major performance engineering request with a detailed 13-point checklist. (Status: **Completed**)
-6.  **Agent**: Completed the full responsive design fix. (Status: **Completed**)
-7.  **User**: Initiated the full responsive design fix with detailed requirements. (Status: **Completed**)
-8.  **Agent**: Fixed the text visibility bug on the homepage. (Status: **Completed**)
-9.  **User**: Reported the text visibility bug and provided desired enhancements. (Status: **Completed**)
-10. **Agent**: Completed the initial currency formatting and tax dashboard features. (Status: **Completed**)
+1.  **User**: Provided a new 4-step plan: Mobile Carousels -> Cloud PDF Storage -> Premium Comparison -> Partner Pro Tier. Instructed to proceed autonomously until Step 4, which requires approval. (Status: **Pending - First task for next agent**)
+2.  **Agent**: Finished the  refactor and provided the Cloudflare setup guide. (Status: **Completed**)
+3.  **User**: Confirmed the P2 performance tasks and initiated the massive  refactor, demanding the file be reduced to under 300 lines. (Status: **Completed**)
+4.  **Agent**: Finished the P2 performance tasks (React Query, Cursor Pagination) and the initial, smaller  refactor. (Status: **Completed**)
+5.  **User**: Approved the full P2 performance plan, instructing the agent to execute all steps autonomously. (Status: **Completed**)
+6.  **Agent**: Presented the full P2 plan for approval. (Status: **Completed**)
 
 **Project Health Check:**
-- **Broken**: No. The application is stable and significantly more performant and responsive.
-- **Mocked**: Cloud storage for PDF invoices is still mocked locally.
+- **Broken**: No. The application is stable, tested, and significantly more performant and maintainable after the recent refactoring.
+- **Mocked**: Cloud storage for PDF invoices is still mocked locally. This is the explicit target of an upcoming task (Step 2).
 
 **3rd Party Integrations**
 - **Stripe**: Payments
 - **SendGrid**: Transactional Emails
-- **react-helmet-async**: (newly added) SEO meta tags.
+- **react-helmet-async**: SEO meta tags.
+- **@tanstack/react-query**: (newly added) Frontend server state management.
 
 **Testing status**
-  - Testing agent used after significant changes: YES (used three times for features, responsiveness, and performance tasks).
+  - Testing agent used after significant changes: YES (used after React Query migration and again after the full server refactor).
   - Troubleshoot agent used after agent stuck in loop: NO
   - Test files created: None
-  - Known regressions: None. All tests passed with 100% success.
+  - Known regressions: None. The last test run had a 100% pass rate and fixed several minor bugs.
 
 **Credentials to test flow:**
 - **Admin**:  / 
 
 **What agent forgot to execute**
-- Nothing. The agent successfully navigated a series of complex, multi-step tasks including feature work, bug fixing, a major responsive overhaul, and a deep performance engineering refactor, following user instructions precisely.</analysis>
+- Nothing. The agent successfully executed a very large and complex set of user instructions, including a major programmatic refactoring of the backend. It followed the user's explicit do not ask for confirmation directives.</analysis>
