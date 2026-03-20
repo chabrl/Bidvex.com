@@ -231,7 +231,7 @@ async def update_listing(listing_id: str, updates: Dict[str, Any], current_user:
         raise HTTPException(status_code=404, detail="Listing not found")
     if listing["seller_id"] != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
-    allowed_fields = ["title", "description", "category", "condition", "images", "location", "city", "region", "status"]
+    allowed_fields = ["title", "description", "category", "condition", "images", "location", "city", "region", "country", "postal_code", "status"]
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
     if update_data:
         await db.listings.update_one({"id": listing_id}, {"$set": update_data})
