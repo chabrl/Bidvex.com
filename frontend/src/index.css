@@ -1093,6 +1093,19 @@ label span,
 }
 
 /* Live Activity Indicator - BidVex Vibrant Cyan (#06B6D4) */
+
+/* Active Bidding Badge Text - Forces white text on dark badge background */
+.active-bidding-label {
+  color: #ffffff !important;
+  font-size: 0.875rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.025em !important;
+}
+
+.dark .active-bidding-label {
+  color: #ffffff !important;
+}
+
 @keyframes live-dot {
   0%, 100% { 
     opacity: 1; 
@@ -1817,6 +1830,12 @@ h1, h2, h3, h4, h5, h6 {
 [class*="Card"] span,
 [class*="card"] span {
   color: inherit !important;
+}
+
+/* Override for active bidding badge inside cards */
+[class*="Card"] .active-bidding-label,
+[class*="card"] .active-bidding-label {
+  color: #ffffff !important;
 }
 
 /* MUTED FOREGROUND - Force gray */

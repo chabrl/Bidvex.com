@@ -483,12 +483,12 @@ const HotItemsSection = ({ items, navigate }) => {
                 
                 {/* Live Activity Indicator */}
                 <div className="absolute bottom-3 left-3 right-3">
-                  <div className="bg-slate-900/90 backdrop-blur-md rounded-lg px-3 py-2 flex items-center gap-2 border border-cyan-500/30">
+                  <div className="bg-slate-900/95 backdrop-blur-md rounded-lg px-3.5 py-2.5 flex items-center gap-2.5 border border-cyan-400/40">
                     <span 
-                      className="w-2.5 h-2.5 rounded-full animate-pulse shadow-lg bg-cyan-500"
+                      className="w-2.5 h-2.5 rounded-full animate-pulse shadow-lg bg-cyan-400 shrink-0"
                       style={{ boxShadow: '0 0 10px #06B6D4, 0 0 20px rgba(6, 182, 212, 0.5)' }} 
                     />
-                    <span className="text-xs text-white font-medium">{t('homepage.activeBidding')}</span>
+                    <span className="active-bidding-label">{t('homepage.activeBidding')}</span>
                   </div>
                 </div>
               </div>
