@@ -316,7 +316,7 @@
       "totalSalesLabel": "Total Sales",
       "commission": "Commission",
       "yourBank": "Your Bank",
-      "afterCommission": "After {rate} commission",
+      "afterCommission": "After {{rate}} commission",
       "rate": "rate",
       "taxVerified": "Tax Verified",
       "taxPending": "Tax Pending",
@@ -335,7 +335,17 @@
       "payoutsOnHold": "Payouts Temporarily On Hold",
       "payoutsOnHoldDesc": "Your tax information has been submitted and is under review. Payouts will be enabled once verification is complete. You can continue selling in the meantime.",
       "taxRequired": "Tax information required for CRA compliance. Complete your tax profile to continue selling and receive payouts.",
-      "completeTaxProfile": "Complete Tax Profile"
+      "completeTaxProfile": "Complete Tax Profile",
+      "statusActive": "Active",
+      "statusDraft": "Draft",
+      "statusEnded": "Ended",
+      "statusSold": "Sold",
+      "statusPending": "Pending",
+      "statusCancelled": "Cancelled",
+      "tierFree": "Free",
+      "tierPremium": "Premium",
+      "tierPartnerPro": "Partner Pro",
+      "tierVip": "VIP"
     }
   },
   "seller": {
@@ -513,7 +523,8 @@
     "ago": "ago",
     "left": "left",
     "ended": "Ended",
-    "starting": "Starting"
+    "starting": "Starting",
+    "month": "month"
   },
   "footer": {
     "aboutUs": "About Us",

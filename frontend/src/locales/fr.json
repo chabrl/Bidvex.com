@@ -316,7 +316,7 @@
       "totalSalesLabel": "Ventes Totales",
       "commission": "Commission",
       "yourBank": "Votre Banque",
-      "afterCommission": "Après {rate} de commission",
+      "afterCommission": "Après {{rate}} de commission",
       "rate": "taux",
       "taxVerified": "Fiscalité Vérifiée",
       "taxPending": "Fiscalité en Attente",
@@ -335,7 +335,17 @@
       "payoutsOnHold": "Paiements Temporairement Suspendus",
       "payoutsOnHoldDesc": "Vos informations fiscales ont été soumises et sont en cours d'examen. Les paiements seront activés une fois la vérification terminée. Vous pouvez continuer à vendre entre-temps.",
       "taxRequired": "Informations fiscales requises pour la conformité ARC. Complétez votre profil fiscal pour continuer à vendre et recevoir des paiements.",
-      "completeTaxProfile": "Compléter le Profil Fiscal"
+      "completeTaxProfile": "Compléter le Profil Fiscal",
+      "statusActive": "Actif",
+      "statusDraft": "Brouillon",
+      "statusEnded": "Terminé",
+      "statusSold": "Vendu",
+      "statusPending": "En attente",
+      "statusCancelled": "Annulé",
+      "tierFree": "Gratuit",
+      "tierPremium": "Premium",
+      "tierPartnerPro": "Partner Pro",
+      "tierVip": "VIP"
     }
   },
   "seller": {
@@ -513,7 +523,8 @@
     "ago": "il y a",
     "left": "restant",
     "ended": "Terminé",
-    "starting": "Début"
+    "starting": "Début",
+    "month": "mois"
   },
   "footer": {
     "aboutUs": "À propos de nous",

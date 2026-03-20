@@ -16,8 +16,7 @@ import { formatCurrency, formatPercent } from '../utils/currencyFormatter';
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const SellerDashboard = () => {
-  const { t, i18n } = useTranslation();
-  const lang = i18n.language || 'en';
+  const { t } = useTranslation();
   const { user, token } = useAuth();
   const { canCreateMultiLot } = useFeatureFlags();
   const navigate = useNavigate();
@@ -100,9 +99,9 @@ const SellerDashboard = () => {
                     ? 'bg-red-500 text-white'
                     : 'bg-yellow-500 text-white'
                 }>
-                  {user.tax_verification_status === 'verified' && '🟢 Tax Verified'}
-                  {user.tax_verification_status === 'pending' && '🟡 Tax Pending'}
-                  {user.tax_verification_status === 'action_required' && '🔴 Tax Action Required'}
+                  {user.tax_verification_status === 'verified' && t('dashboard.seller.taxVerified')}
+                  {user.tax_verification_status === 'pending' && t('dashboard.seller.taxPending')}
+                  {user.tax_verification_status === 'action_required' && t('dashboard.seller.taxActionRequired')}
                 </Badge>
               )}
             </div>
@@ -415,11 +414,11 @@ const SellerDashboard = () => {
                         <div>
                           <h3 className="font-semibold truncate">{listing.title}</h3>
                           {isMultiItem && (
-                            <p className="text-xs text-muted-foreground">{itemCount} lots</p>
+                            <p className="text-xs text-muted-foreground">{itemCount} {t('dashboard.seller.lots')}</p>
                           )}
                         </div>
                         <Badge variant={listing.status === 'active' ? 'default' : 'secondary'}>
-                          {listing.status}
+                          {t(`dashboard.seller.status${listing.status.charAt(0).toUpperCase() + listing.status.slice(1)}`, listing.status)}
                         </Badge>
                       </div>
                       <div className="flex flex-wrap gap-4 text-sm mb-2">
@@ -429,15 +428,15 @@ const SellerDashboard = () => {
                         </span>
                         <span className="text-blue-600">
                           <TrendingUp className="h-3 w-3 inline mr-1" />
-                          {totalBids} bids
+                          {totalBids} {t('dashboard.seller.bids')}
                         </span>
                         <span className="text-gray-600">
                           <Eye className="h-3 w-3 inline mr-1" />
-                          {listing.views} views
+                          {listing.views} {t('dashboard.seller.views')}
                         </span>
                         <span className="text-red-600">
                           <Heart className="h-3 w-3 inline mr-1 fill-current" />
-                          {listing.wishlist_count || 0} wishlisted
+                          {listing.wishlist_count || 0} {t('dashboard.seller.wishlisted')}
                         </span>
                       </div>
                       <div className="flex gap-2">
@@ -446,7 +445,7 @@ const SellerDashboard = () => {
                           variant="outline"
                           onClick={() => navigate(isMultiItem ? `/lots/${listing.id}` : `/listing/${listing.id}`)}
                         >
-                          View
+                          {t('dashboard.seller.view')}
                         </Button>
                         <Button
                           size="sm"
@@ -465,9 +464,9 @@ const SellerDashboard = () => {
             ) : (
               <div className="text-center py-12">
                 <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground mb-4">No listings yet</p>
+                <p className="text-muted-foreground mb-4">{t('dashboard.seller.noListingsYet')}</p>
                 <Button onClick={() => navigate('/create-listing')} className="gradient-button text-white border-0">
-                  Create Your First Listing
+                  {t('dashboard.seller.createFirstListing')}
                 </Button>
               </div>
             )}
@@ -502,7 +501,7 @@ const SellerDashboard = () => {
                   minLength={20}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  {deletionReason.length}/20 characters minimum
+                  {deletionReason.length}/20 {t('dashboard.seller.charsMinimum')}
                 </p>
               </div>
               <div className="flex gap-2 justify-end">
@@ -567,6 +566,7 @@ const StatCard = ({ icon, title, value, color }) => (
  * - VIP tier: 2% (2% savings)
  */
 const NetPayoutCard = ({ totalSales = 0, subscriptionTier = 'free', taxVerified = false }) => {
+  const { t } = useTranslation();
   // Calculate commission based on subscription tier
   const getCommissionRate = () => {
     switch (subscriptionTier) {
@@ -593,22 +593,22 @@ const NetPayoutCard = ({ totalSales = 0, subscriptionTier = 'free', taxVerified 
           <div className="group relative">
             <Info className="h-4 w-4 text-muted-foreground cursor-help" />
             <div className="absolute right-0 top-6 w-64 bg-gray-900 text-white text-xs p-3 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
-              <p className="font-semibold mb-1">Net Payout Calculation</p>
-              <p>Total Sales: {formatCurrency(totalSales)}</p>
-              <p>Commission ({formatPercent(effectiveRate * 100, 1)}): -{formatCurrency(commissionAmount)}</p>
+              <p className="font-semibold mb-1">{t('dashboard.seller.netPayoutCalc')}</p>
+              <p>{t('dashboard.seller.totalSalesLabel')}: {formatCurrency(totalSales)}</p>
+              <p>{t('dashboard.seller.commission')} ({formatPercent(effectiveRate * 100, 1)}): -{formatCurrency(commissionAmount)}</p>
               <p className="border-t border-gray-700 mt-1 pt-1 font-semibold">
-                Your Bank: {formatCurrency(netPayout)}
+                {t('dashboard.seller.yourBank')}: {formatCurrency(netPayout)}
               </p>
             </div>
           </div>
         </div>
         <p className="text-2xl font-bold mb-1 text-green-600">{formatCurrency(netPayout)}</p>
-        <p className="text-sm text-muted-foreground">Net Payout</p>
+        <p className="text-sm text-muted-foreground">{t('dashboard.seller.netPayout')}</p>
         <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-          <span>After {formatPercent(effectiveRate * 100, 1)} commission</span>
+          <span>{t('dashboard.seller.afterCommission', { rate: formatPercent(effectiveRate * 100, 1) })}</span>
           {subscriptionTier !== 'free' && (
             <Badge className="bg-green-100 text-green-700 text-xs ml-1">
-              {subscriptionTier} rate
+              {t(`dashboard.seller.tier${subscriptionTier.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('')}`, subscriptionTier)} {t('dashboard.seller.rate')}
             </Badge>
           )}
         </div>

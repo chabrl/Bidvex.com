@@ -24,10 +24,12 @@ Full-stack auction marketplace with localized currency, tax compliance, 4-tier s
 - Security: Rate limiting (slowapi), Stripe webhook verification, HMAC signed URLs
 - Email: 5 Partner Pro lifecycle templates (41 pytest tests)
 - Database: Production indexes (27 total across 14 collections), idempotent script at scripts/apply_indexes.py
+- **i18n**: Full EN/FR translation for Seller Dashboard (77+ keys), i18n.js resource builder fixed to merge JSON translation files correctly
 
 ## Launch Status
 - **GO** — See /app/memory/LAUNCH_CHECKLIST.md
 - MongoDB indexes: DONE (27 indexes applied, all verified)
+- i18n Seller Dashboard: DONE (zero hardcoded English strings, visually verified in FR mode)
 - 1 manual item remaining: Cloudflare CDN setup
 
 ## Credentials

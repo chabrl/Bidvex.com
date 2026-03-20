@@ -27,8 +27,9 @@
 | :white_check_mark: | **WebSocket (Live Bidding)** | 4 WS endpoints, real-time bid updates |
 | :white_check_mark: | **PDF Invoices (Cloud)** | Emergent Object Storage, HMAC-signed download URLs |
 | :white_check_mark: | **SEO & Meta Tags** | react-helmet-async, dynamic per-page |
+| :white_check_mark: | **Internationalization (i18n)** | EN/FR fully working. Seller Dashboard: 77 translated keys, zero hardcoded strings. i18n.js resource builder properly merges JSON keys |
 | :yellow_circle: | **Cloudflare CDN** | MANUAL SETUP — docs at /app/memory/INFRASTRUCTURE_P2.md |
-| :yellow_circle: | **MongoDB Indexes** | Recommended: users.id, users.email, listings.seller_id, listings.status, featured_listings.user_id, scheduled_emails.scheduled_for |
+| :white_check_mark: | **MongoDB Indexes** | 27 indexes across 14 collections, applied via idempotent script |
 | :white_check_mark: | **Mobile Carousels** | Embla Carousel, 6 homepage sections, dot indicators |
 | :white_check_mark: | **Comparison View** | /compare page, 2-4 items, desktop table + mobile stacked |
 | :white_check_mark: | **Bulk CSV Import** | /bulk-import, validation, error report, 5MB limit |
