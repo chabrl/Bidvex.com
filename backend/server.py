@@ -4,7 +4,8 @@ All business logic lives in /routes/* modules.
 This file: app creation, middleware, DB setup, router registration, startup events.
 """
 
-from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect, Query
+from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect, Query, Request
+from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -49,6 +50,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ─── Rate Limiting ───
+from rate_limit import limiter
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # ─── WebSocket Managers ───
 from ws_managers import ConnectionManager, MessageConnectionManager
@@ -108,6 +117,16 @@ async def expire_partner_pro_trials():
                 }}
             )
             logger.info(f"Trial expired for user {user['id']}")
+            # Send trial-expired email
+            try:
+                from services.email_service import get_email_service
+                from services.partner_pro_emails import trial_expired
+                svc = get_email_service()
+                if svc and svc.is_configured() and user.get("email"):
+                    tmpl = trial_expired(user.get("name", "there"))
+                    await svc.send_raw_html(user["email"], tmpl["subject"], tmpl["html"])
+            except Exception as em:
+                logger.warning(f"Trial expired email failed for {user.get('email')}: {em}")
     except Exception as e:
         logger.error(f"Error in expire_partner_pro_trials: {e}")
 
@@ -124,19 +143,12 @@ async def send_trial_reminder_emails():
         for item in pending:
             try:
                 from services.email_service import get_email_service
+                from services.partner_pro_emails import trial_reminder
                 svc = get_email_service()
-                if svc:
-                    await svc.send_email(
-                        to_email=item["email"],
-                        subject="Your BidVex Partner Pro trial ends in 3 days",
-                        html_content=(
-                            "<h2>Your Partner Pro trial is ending soon</h2>"
-                            "<p>Hi there! Your 14-day Partner Pro trial expires in 3 days.</p>"
-                            "<p>To keep your branded storefront, bulk import tools, early auction access, "
-                            "and analytics export, subscribe to Partner Pro for just <strong>$240/year</strong>.</p>"
-                            "<p><a href='https://bidvex.com/settings/profile'>Subscribe Now</a></p>"
-                        ),
-                    )
+                if svc and svc.is_configured():
+                    user = await db.users.find_one({"id": item["user_id"]}, {"_id": 0})
+                    tmpl = trial_reminder(user.get("name", "there") if user else "there", 3)
+                    await svc.send_raw_html(item["email"], tmpl["subject"], tmpl["html"])
                 await db.scheduled_emails.update_one(
                     {"id": item["id"]}, {"$set": {"sent": True, "sent_at": now}}
                 )

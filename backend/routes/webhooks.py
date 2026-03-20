@@ -173,11 +173,12 @@ def _verify_stripe_event(payload: bytes, sig_header: str):
     ]
 
     if not secrets:
-        # No secrets configured — parse payload without verification
-        return json.loads(payload)
+        logger.error("No Stripe webhook secrets configured — rejecting webhook")
+        raise HTTPException(status_code=400, detail="Webhook verification not configured")
 
     if not sig_header:
-        return json.loads(payload)
+        logger.warning("Missing stripe-signature header — rejecting webhook")
+        raise HTTPException(status_code=400, detail="Missing stripe-signature header")
 
     last_error = None
     for secret in secrets:

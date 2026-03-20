@@ -10,12 +10,13 @@ Handles auction lifecycle management including:
 - Buy Now purchases
 """
 
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Request
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone, timedelta
 from uuid import uuid4
 from deps import User, get_current_user
 from models import Bid, BidCreate, BuyNowPurchase, BuyNowTransaction, AutoBid
+from rate_limit import limiter as _limiter
 from utils import (
     get_marketplace_settings,
     get_minimum_increment,
@@ -463,7 +464,8 @@ async def extend_auction(auction_id: str, data: Dict[str, Any]):
 # ========== BID PLACEMENT (Single-Item) ==========
 
 @bids_router.post("/bids")
-async def place_bid(bid_data: BidCreate, current_user: User = Depends(get_current_user)):
+@_limiter.limit("30/minute")
+async def place_bid(request: Request, bid_data: BidCreate, current_user: User = Depends(get_current_user)):
     db = get_db()
 
     # ========== HIGH-TRUST GATEKEEPING ==========

@@ -4,7 +4,7 @@ Handles: CSV bulk import, analytics export, branded storefront,
 early auction access, featured listings management.
 """
 
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Query
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Query, Request
 from fastapi.responses import StreamingResponse
 from deps import User, get_current_user
 from typing import Optional
@@ -47,12 +47,16 @@ def _require_partner_pro(user: User):
         )
 
 
+from rate_limit import limiter as _limiter
+
+
 # =====================================================================
 # 14-DAY FREE TRIAL
 # =====================================================================
 
 @partner_pro_router.post("/partner-pro/trial/start")
-async def start_trial(current_user: User = Depends(get_current_user)):
+@_limiter.limit("3/minute")
+async def start_trial(request: Request, current_user: User = Depends(get_current_user)):
     """
     Start a 14-day free trial of Partner Pro.
     No credit card required. One trial per account, non-renewable.
@@ -103,6 +107,17 @@ async def start_trial(current_user: User = Depends(get_current_user)):
 
     logger.info(f"Partner Pro trial started for user {current_user.id}, expires {trial_end.isoformat()}")
 
+    # Send trial confirmation email
+    try:
+        from services.email_service import get_email_service
+        from services.partner_pro_emails import trial_started
+        svc = get_email_service()
+        if svc and svc.is_configured():
+            tmpl = trial_started(user.get("name", "there"), trial_end.strftime("%B %d, %Y"))
+            await svc.send_raw_html(user.get("email"), tmpl["subject"], tmpl["html"])
+    except Exception as em:
+        logger.warning(f"Trial confirmation email failed: {em}")
+
     return {
         "success": True,
         "trial_start": now.isoformat(),
@@ -152,7 +167,9 @@ CSV_ALL_FIELDS = CSV_REQUIRED_FIELDS | CSV_OPTIONAL_FIELDS
 
 
 @partner_pro_router.post("/partner-pro/bulk-import")
+@_limiter.limit("10/minute")
 async def bulk_import_listings(
+    request: Request,
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
 ):

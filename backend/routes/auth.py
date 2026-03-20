@@ -126,9 +126,13 @@ def get_client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
+from rate_limit import limiter as _limiter
+
+
 # ============= AUTH ROUTES =============
 
 @auth_router.post("/register")
+@_limiter.limit("5/minute")
 async def register(user_data: UserCreate, request: Request):
     """
     Register a new user
@@ -240,6 +244,7 @@ async def register(user_data: UserCreate, request: Request):
 
 
 @auth_router.post("/login")
+@_limiter.limit("10/minute")
 async def login(credentials: UserLogin, request: Request):
     """
     Authenticate user with email and password

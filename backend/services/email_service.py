@@ -169,7 +169,27 @@ class EmailService:
                         "message_id": None
                     }
                 await asyncio.sleep(2 ** attempt)
-    
+
+    async def send_raw_html(self, to: str, subject: str, html_content: str) -> Dict[str, Any]:
+        """Send a raw HTML email (no template). Used for system notifications."""
+        if not self.is_configured():
+            logger.warning(f"Email not sent (not configured): {subject} -> {to}")
+            return {"success": False, "error": "Not configured"}
+        try:
+            from sendgrid.helpers.mail import Content
+            message = Mail(
+                from_email=Email(self.from_email, self.from_name),
+                to_emails=To(to),
+                subject=subject,
+                html_content=Content("text/html", html_content),
+            )
+            response = self.client.send(message)
+            logger.info(f"Raw email sent: to={to}, subject={subject}, status={response.status_code}")
+            return {"success": True, "status_code": response.status_code}
+        except Exception as e:
+            logger.error(f"Raw email failed: to={to}, error={e}")
+            return {"success": False, "error": str(e)}
+
     async def send_bulk_email(
         self,
         recipients: List[Dict[str, Any]],
