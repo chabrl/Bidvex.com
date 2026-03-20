@@ -24,7 +24,15 @@ Full-stack auction marketplace with localized currency, tax compliance, 4-tier s
 - Security: Rate limiting (slowapi), Stripe webhook verification, HMAC signed URLs
 - Email: 5 Partner Pro lifecycle templates (41 pytest tests)
 - Database: Production indexes (27 total across 14 collections), idempotent script at scripts/apply_indexes.py
-- **i18n**: Full EN/FR translation for Seller Dashboard (77+ keys), i18n.js resource builder fixed to merge JSON translation files correctly
+- **i18n**: Full EN/FR translation for Seller Dashboard (77+ keys), i18n.js resource builder fixed to merge JSON translation files
+- **i18n Audit Tool**: Node.js script at `scripts/i18n-audit.js` — detects hardcoded strings, missing/unused keys, EN/FR sync issues. Run via `yarn i18n:audit`
+
+## i18n Audit Summary (March 20, 2026)
+- 539 keys in sync between EN/FR
+- 202 hardcoded strings detected across 179 files (full report at scripts/i18n-report.txt)
+- 437 keys used via t() but only defined in i18n.js builder (should migrate to JSON)
+- 225 potentially unused JSON keys (review before cleanup)
+- EN/FR files: perfectly in sync
 
 ## Launch Status
 - **GO** — See /app/memory/LAUNCH_CHECKLIST.md

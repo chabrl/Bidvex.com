@@ -1,0 +1,2646 @@
+======================================================================
+  BIDVEX i18n AUDIT REPORT
+  Generated: 2026-03-20T18:16:22.629Z
+  Files scanned: 179
+  EN keys: 539 | FR keys: 539
+  t() calls found: 597 unique keys
+======================================================================
+
+──────────────────────────────────────────────────────────────────────
+  SECTION 1: EN/FR SYNC CHECK
+──────────────────────────────────────────────────────────────────────
+Keys in sync: 539
+EN and FR files are perfectly in sync.
+
+──────────────────────────────────────────────────────────────────────
+  SECTION 2: MISSING TRANSLATION KEYS
+  (Keys used via t() but absent from JSON files)
+  NOTE: These may exist in i18n.js resource builder.
+  Migrating them to JSON is recommended for maintainability.
+──────────────────────────────────────────────────────────────────────
+
+Keys used in code but MISSING from en.json (437):
+  - bidErrorGuide.title
+      used in components/BidErrorGuide.js:77
+      used in components/BidErrorGuide.js:86
+      used in components/BidErrorGuide.js:130
+  - bidErrorGuide.subtitle
+      used in components/BidErrorGuide.js:89
+      used in components/BidErrorGuide.js:133
+  - bidErrorGuide.helpText
+      used in components/BidErrorGuide.js:114
+      used in components/BidErrorGuide.js:186
+  - cookie.message
+      used in components/CookieConsent.js:37
+      used in components/CookieConsentBanner.js:94
+  - cookie.learnMore
+      used in components/CookieConsent.js:45
+  - cookie.decline
+      used in components/CookieConsent.js:58
+      used in components/CookieConsentBanner.js:192
+  - cookie.accept
+      used in components/CookieConsent.js:67
+      used in components/CookieConsentBanner.js:176
+  - cookie.title
+      used in components/CookieConsentBanner.js:75
+  - cookie.subtitle
+      used in components/CookieConsentBanner.js:78
+  - cookie.managePrefs
+      used in components/CookieConsentBanner.js:103
+  - cookie.essential
+      used in components/CookieConsentBanner.js:115
+  - cookie.alwaysActive
+      used in components/CookieConsentBanner.js:116
+  - cookie.essentialDesc
+      used in components/CookieConsentBanner.js:119
+  - cookie.analytics
+      used in components/CookieConsentBanner.js:128
+  - cookie.analyticsDesc
+      used in components/CookieConsentBanner.js:130
+  - cookie.personalization
+      used in components/CookieConsentBanner.js:142
+  - cookie.personalizationDesc
+      used in components/CookieConsentBanner.js:144
+  - cookie.marketing
+      used in components/CookieConsentBanner.js:156
+  - cookie.marketingDesc
+      used in components/CookieConsentBanner.js:158
+  - cookie.savePrefs
+      used in components/CookieConsentBanner.js:184
+  - marketplace.browseItems
+      used in components/FlattenedMarketplace.js:213
+  - marketplace.itemsFromAuctions
+      used in components/FlattenedMarketplace.js:216
+  - locationSelector.country
+      used in components/LocationSelector.js:130
+  - locationSelector.selectCountry
+      used in components/LocationSelector.js:137
+  - locationSelector.province
+      used in components/LocationSelector.js:150
+  - locationSelector.state
+      used in components/LocationSelector.js:151
+  - locationSelector.selectRegion
+      used in components/LocationSelector.js:164
+  - locationSelector.searchRegion
+      used in components/LocationSelector.js:171
+  - locationSelector.noRegionFound
+      used in components/LocationSelector.js:175
+  - locationSelector.city
+      used in components/LocationSelector.js:209
+  - locationSelector.enterManually
+      used in components/LocationSelector.js:212
+  - locationSelector.enterCityName
+      used in components/LocationSelector.js:229
+  - locationSelector.selectCity
+      used in components/LocationSelector.js:244
+  - locationSelector.searchCity
+      used in components/LocationSelector.js:251
+  - locationSelector.cityNotFound
+      used in components/LocationSelector.js:257
+  - locationSelector.enterManuallyLink
+      used in components/LocationSelector.js:266
+  - locationSelector.postalCode
+      used in components/LocationSelector.js:302
+  - locationSelector.zipCode
+      used in components/LocationSelector.js:303
+  - locationSelector.invalidPostal
+      used in components/LocationSelector.js:322
+  - locationSelector.invalidZip
+      used in components/LocationSelector.js:323
+  - nav.home
+      used in components/Navbar.js:59
+  - nav.marketplace
+      used in components/Navbar.js:60
+  - nav.lotsAuction
+      used in components/Navbar.js:61
+  - nav.sell
+      used in components/Navbar.js:115
+      used in components/Navbar.js:325
+  - nav.sellerDashboard
+      used in components/Navbar.js:225
+  - nav.buyerDashboard
+      used in components/Navbar.js:229
+  - nav.adminPanel
+      used in components/Navbar.js:246
+  - admin.settings
+      used in components/Navbar.js:254
+  - nav.affiliateDashboard
+      used in components/Navbar.js:258
+  - nav.logout
+      used in components/Navbar.js:268
+  - nav.login
+      used in components/Navbar.js:275
+  - verifiedFirm
+      used in components/VerifiedBadge.js:11
+  - affiliate.dashboard
+      used in pages/AffiliateDashboard.js:29
+      used in pages/AffiliateDashboard.js:100
+  - affiliate.loadFailed
+      used in pages/AffiliateDashboard.js:43
+  - affiliate.linkCopied
+      used in pages/AffiliateDashboard.js:52
+  - affiliate.enterValidAmount
+      used in pages/AffiliateDashboard.js:58
+  - affiliate.insufficientBalance
+      used in pages/AffiliateDashboard.js:63
+  - affiliate.withdrawalSubmitted
+      used in pages/AffiliateDashboard.js:72
+  - affiliate.withdrawalFailed
+      used in pages/AffiliateDashboard.js:76
+  - affiliate.description
+      used in pages/AffiliateDashboard.js:101
+  - affiliate.totalClicks
+      used in pages/AffiliateDashboard.js:108
+  - affiliate.conversions
+      used in pages/AffiliateDashboard.js:118
+  - affiliate.conversionRate
+      used in pages/AffiliateDashboard.js:124
+  - affiliate.pendingCommission
+      used in pages/AffiliateDashboard.js:131
+  - affiliate.paidCommission
+      used in pages/AffiliateDashboard.js:141
+  - affiliate.referralLink
+      used in pages/AffiliateDashboard.js:153
+  - affiliate.shareDesc
+      used in pages/AffiliateDashboard.js:154
+  - affiliate.copyLink
+      used in pages/AffiliateDashboard.js:165
+  - affiliate.shareOn
+      used in pages/AffiliateDashboard.js:175
+      used in pages/AffiliateDashboard.js:183
+  - affiliate.referrals
+      used in pages/AffiliateDashboard.js:192
+  - affiliate.referralsDesc
+      used in pages/AffiliateDashboard.js:193
+  - affiliate.referralName
+      used in pages/AffiliateDashboard.js:200
+  - affiliate.signupDate
+      used in pages/AffiliateDashboard.js:201
+  - affiliate.status
+      used in pages/AffiliateDashboard.js:202
+  - affiliate.commission
+      used in pages/AffiliateDashboard.js:203
+  - affiliate.noReferrals
+      used in pages/AffiliateDashboard.js:225
+  - affiliate.requestPayout
+      used in pages/AffiliateDashboard.js:238
+      used in pages/AffiliateDashboard.js:251
+  - affiliate.payoutDesc
+      used in pages/AffiliateDashboard.js:239
+  - affiliate.enterAmount
+      used in pages/AffiliateDashboard.js:245
+  - affiliate.availableBalance
+      used in pages/AffiliateDashboard.js:255
+  - auth.welcomeMessage
+      used in pages/AuthPage.js:54
+  - auth.accountCreatedMessage
+      used in pages/AuthPage.js:59
+  - auth.authFailedMessage
+      used in pages/AuthPage.js:71
+  - auth.welcomeBack
+      used in pages/AuthPage.js:240
+  - auth.signInPrompt
+      used in pages/AuthPage.js:243
+  - auth.createAccountPrompt
+      used in pages/AuthPage.js:243
+  - auth.name
+      used in pages/AuthPage.js:250
+  - auth.phone
+      used in pages/AuthPage.js:303
+  - auth.accountType
+      used in pages/AuthPage.js:316
+  - auth.personal
+      used in pages/AuthPage.js:325
+  - auth.business
+      used in pages/AuthPage.js:326
+  - auth.companyName
+      used in pages/AuthPage.js:333
+  - auth.taxNumber
+      used in pages/AuthPage.js:344
+  - auth.loginBtn
+      used in pages/AuthPage.js:403
+  - auth.registerBtn
+      used in pages/AuthPage.js:403
+  - auth.googleLogin
+      used in pages/AuthPage.js:429
+  - auth.noAccount
+      used in pages/AuthPage.js:439
+      used in pages/ForgotPasswordPage.js:178
+  - auth.hasAccount
+      used in pages/AuthPage.js:439
+  - dashboard.buyer.title
+      used in pages/BuyerDashboard.js:50
+  - dashboard.buyer.trackBidsWins
+      used in pages/BuyerDashboard.js:51
+  - dashboard.buyer.activeBids
+      used in pages/BuyerDashboard.js:57
+  - dashboard.buyer.wonItems
+      used in pages/BuyerDashboard.js:63
+  - dashboard.buyer.myBidsTitle
+      used in pages/BuyerDashboard.js:77
+  - dashboard.buyer.allBids
+      used in pages/BuyerDashboard.js:82
+  - dashboard.buyer.winning
+      used in pages/BuyerDashboard.js:83
+  - dashboard.buyer.outbid
+      used in pages/BuyerDashboard.js:84
+  - watchlist.title
+      used in pages/BuyerDashboard.js:85
+  - dashboard.buyer.yourBid
+      used in pages/BuyerDashboard.js:149
+      used in pages/BuyerDashboard.js:321
+  - createListing.createNewListing
+      used in pages/CreateListingPage.js:196
+  - createListing.auctionTitle
+      used in pages/CreateListingPage.js:201
+      used in pages/CreateMultiItemListing.js:643
+      used in pages/CreateMultiItemListing.js:1241
+  - createListing.auctionTitlePlaceholder
+      used in pages/CreateListingPage.js:209
+      used in pages/CreateMultiItemListing.js:649
+  - createListing.description
+      used in pages/CreateListingPage.js:214
+      used in pages/CreateMultiItemListing.js:654
+  - createListing.descriptionPlaceholder
+      used in pages/CreateListingPage.js:223
+      used in pages/CreateMultiItemListing.js:661
+  - createListing.category
+      used in pages/CreateListingPage.js:229
+      used in pages/CreateMultiItemListing.js:667
+      used in pages/CreateMultiItemListing.js:1242
+  - createListing.selectCategory
+      used in pages/CreateListingPage.js:239
+      used in pages/CreateMultiItemListing.js:676
+  - createListing.condition
+      used in pages/CreateListingPage.js:249
+      used in pages/CreateMultiItemListing.js:1093
+      used in pages/CreateMultiItemListing.js:1267
+  - createListing.conditionNew
+      used in pages/CreateListingPage.js:259
+      used in pages/CreateMultiItemListing.js:1099
+  - createListing.conditionLikeNew
+      used in pages/CreateListingPage.js:260
+      used in pages/CreateMultiItemListing.js:1100
+  - createListing.conditionGood
+      used in pages/CreateListingPage.js:261
+      used in pages/CreateMultiItemListing.js:1101
+  - createListing.conditionFair
+      used in pages/CreateListingPage.js:262
+      used in pages/CreateMultiItemListing.js:1102
+  - createListing.conditionPoor
+      used in pages/CreateListingPage.js:263
+      used in pages/CreateMultiItemListing.js:1103
+  - createListing.startingPrice
+      used in pages/CreateListingPage.js:270
+      used in pages/CreateMultiItemListing.js:1076
+      used in pages/CreateMultiItemListing.js:1138
+      used in pages/CreateMultiItemListing.js:1266
+  - createListing.buyNowPrice
+      used in pages/CreateListingPage.js:287
+      used in pages/CreateMultiItemListing.js:1128
+  - createListing.buyersPremium
+      used in pages/CreateListingPage.js:304
+  - createListing.buyersPremiumPlaceholder
+      used in pages/CreateListingPage.js:311
+  - createListing.buyersPremiumHint
+      used in pages/CreateListingPage.js:317
+  - createListing.auctionEndDate
+      used in pages/CreateListingPage.js:342
+      used in pages/CreateMultiItemListing.js:683
+      used in pages/CreateMultiItemListing.js:1244
+  - createListing.images
+      used in pages/CreateListingPage.js:355
+      used in pages/CreateMultiItemListing.js:1153
+      used in pages/CreateMultiItemListing.js:1268
+  - createListing.uploadImages
+      used in pages/CreateListingPage.js:372
+  - createListing.shipping
+      used in pages/CreateListingPage.js:395
+      used in pages/CreateMultiItemListing.js:1436
+  - createListing.offerShipping
+      used in pages/CreateListingPage.js:406
+      used in pages/CreateMultiItemListing.js:1447
+  - createListing.shippingMethods
+      used in pages/CreateListingPage.js:412
+      used in pages/CreateMultiItemListing.js:1453
+  - createListing.deliveryTime
+      used in pages/CreateListingPage.js:451
+      used in pages/CreateMultiItemListing.js:1492
+  - createListing.deliveryTimePlaceholder
+      used in pages/CreateListingPage.js:453
+      used in pages/CreateMultiItemListing.js:1494
+  - createListing.visitBeforePurchase
+      used in pages/CreateListingPage.js:466
+  - createListing.allowVisit
+      used in pages/CreateListingPage.js:477
+  - createListing.availableDates
+      used in pages/CreateListingPage.js:483
+  - createListing.visitInstructions
+      used in pages/CreateListingPage.js:492
+      used in pages/CreateMultiItemListing.js:1576
+  - createListing.visitInstructionsPlaceholder
+      used in pages/CreateListingPage.js:494
+      used in pages/CreateMultiItemListing.js:1579
+  - createListing.bindingAgreement
+      used in pages/CreateListingPage.js:516
+      used in pages/CreateMultiItemListing.js:2343
+  - createListing.agreementText
+      used in pages/CreateListingPage.js:518
+      used in pages/CreateMultiItemListing.js:2345
+  - createListing.creating
+      used in pages/CreateListingPage.js:531
+      used in pages/CreateMultiItemListing.js:2384
+  - createListing.submitListing
+      used in pages/CreateListingPage.js:533
+      used in pages/CreateMultiItemListing.js:2389
+  - createListing.title
+      used in pages/CreateMultiItemListing.js:153
+      used in pages/CreateMultiItemListing.js:2314
+  - createListing.restrictedToBusinessAccounts
+      used in pages/CreateMultiItemListing.js:162
+  - createListing.maxLotsReached
+      used in pages/CreateMultiItemListing.js:195
+  - createListing.invalidLotCount
+      used in pages/CreateMultiItemListing.js:221
+  - createListing.startingPriceRange
+      used in pages/CreateMultiItemListing.js:397
+  - createListing.descriptionLength
+      used in pages/CreateMultiItemListing.js:401
+  - createListing.quantityPositive
+      used in pages/CreateMultiItemListing.js:405
+  - createListing.buyNowMinPrice
+      used in pages/CreateMultiItemListing.js:415
+  - createListing.fillRequired
+      used in pages/CreateMultiItemListing.js:427
+  - createListing.addOneLot
+      used in pages/CreateMultiItemListing.js:435
+  - createListing.fixValidationErrors
+      used in pages/CreateMultiItemListing.js:448
+  - createListing.listingCreated
+      used in pages/CreateMultiItemListing.js:603
+  - createListing.createFailed
+      used in pages/CreateMultiItemListing.js:608
+  - createListing.stepLabels.basic
+      used in pages/CreateMultiItemListing.js:641
+  - createListing.currency
+      used in pages/CreateMultiItemListing.js:715
+  - currency.locked
+      used in pages/CreateMultiItemListing.js:718
+      used in pages/ProfileSettingsPage.js:312
+  - createListing.incrementSchedule
+      used in pages/CreateMultiItemListing.js:746
+  - createListing.tiered
+      used in pages/CreateMultiItemListing.js:755
+  - createListing.simplified
+      used in pages/CreateMultiItemListing.js:756
+  - createListing.numberOfLots
+      used in pages/CreateMultiItemListing.js:791
+  - createListing.numberOfLotsPlaceholder
+      used in pages/CreateMultiItemListing.js:811
+  - createListing.stepLabels.lots
+      used in pages/CreateMultiItemListing.js:828
+  - createListing.manual
+      used in pages/CreateMultiItemListing.js:854
+  - createListing.csvUpload
+      used in pages/CreateMultiItemListing.js:863
+  - createListing.imagesBulk
+      used in pages/CreateMultiItemListing.js:872
+  - createListing.lotTitle
+      used in pages/CreateMultiItemListing.js:1027
+      used in pages/CreateMultiItemListing.js:1264
+  - createListing.lotTitlePlaceholder
+      used in pages/CreateMultiItemListing.js:1031
+  - createListing.quantity
+      used in pages/CreateMultiItemListing.js:1036
+      used in pages/CreateMultiItemListing.js:1265
+  - createListing.lotDescription
+      used in pages/CreateMultiItemListing.js:1052
+  - createListing.characters
+      used in pages/CreateMultiItemListing.js:1052
+  - createListing.lotDescPlaceholder
+      used in pages/CreateMultiItemListing.js:1057
+  - createListing.buyNowOption
+      used in pages/CreateMultiItemListing.js:1113
+  - createListing.reviewSubmit
+      used in pages/CreateMultiItemListing.js:1198
+  - createListing.totalLots
+      used in pages/CreateMultiItemListing.js:1206
+  - createListing.totalItems
+      used in pages/CreateMultiItemListing.js:1212
+  - createListing.totalValue
+      used in pages/CreateMultiItemListing.js:1218
+  - createListing.totalImages
+      used in pages/CreateMultiItemListing.js:1224
+  - createListing.location
+      used in pages/CreateMultiItemListing.js:1243
+  - createListing.termsConditions
+      used in pages/CreateMultiItemListing.js:1376
+  - createListing.importantInfo
+      used in pages/CreateMultiItemListing.js:1395
+  - createListing.catalogue
+      used in pages/CreateMultiItemListing.js:1414
+  - createListing.ratePlaceholder
+      used in pages/CreateMultiItemListing.js:1477
+  - createListing.sellerObligationsTitle
+      used in pages/CreateMultiItemListing.js:1598
+  - createListing.sellerObligationsDesc
+      used in pages/CreateMultiItemListing.js:1601
+  - createListing.customExchangeRate
+      used in pages/CreateMultiItemListing.js:1610
+  - createListing.exchangeRatePlaceholder
+      used in pages/CreateMultiItemListing.js:1619
+  - createListing.logistics
+      used in pages/CreateMultiItemListing.js:1637
+  - common.selectOption
+      used in pages/CreateMultiItemListing.js:1645
+  - createListing.logisticsYes
+      used in pages/CreateMultiItemListing.js:1646
+  - createListing.logisticsNo
+      used in pages/CreateMultiItemListing.js:1647
+  - createListing.shippingDetailsPlaceholder
+      used in pages/CreateMultiItemListing.js:1652
+  - createListing.removalDeadline
+      used in pages/CreateMultiItemListing.js:1666
+  - createListing.itemsPickupWithin
+      used in pages/CreateMultiItemListing.js:1670
+  - createListing.threeDays
+      used in pages/CreateMultiItemListing.js:1677
+  - createListing.fiveDays
+      used in pages/CreateMultiItemListing.js:1678
+  - createListing.sevenDays
+      used in pages/CreateMultiItemListing.js:1679
+  - createListing.tenDays
+      used in pages/CreateMultiItemListing.js:1680
+  - createListing.fourteenDays
+      used in pages/CreateMultiItemListing.js:1681
+  - createListing.thirtyDays
+      used in pages/CreateMultiItemListing.js:1682
+  - createListing.ofAuctionClose
+      used in pages/CreateMultiItemListing.js:1684
+  - createListing.customDeadlinePlaceholder
+      used in pages/CreateMultiItemListing.js:1688
+  - createListing.facilityCapabilities
+      used in pages/CreateMultiItemListing.js:1702
+  - createListing.facilityAddress
+      used in pages/CreateMultiItemListing.js:1708
+  - createListing.facilityAddressPlaceholder
+      used in pages/CreateMultiItemListing.js:1710
+  - createListing.loadingDock
+      used in pages/CreateMultiItemListing.js:1731
+  - createListing.selectDockType
+      used in pages/CreateMultiItemListing.js:1740
+  - createListing.highDock
+      used in pages/CreateMultiItemListing.js:1741
+  - createListing.standardDock
+      used in pages/CreateMultiItemListing.js:1742
+  - createListing.adjustableDock
+      used in pages/CreateMultiItemListing.js:1743
+  - createListing.overheadCrane
+      used in pages/CreateMultiItemListing.js:1758
+  - createListing.craneCapacity
+      used in pages/CreateMultiItemListing.js:1764
+  - createListing.groundLevel
+      used in pages/CreateMultiItemListing.js:1782
+  - createListing.scaleOnSite
+      used in pages/CreateMultiItemListing.js:1797
+  - createListing.tailgate
+      used in pages/CreateMultiItemListing.js:1812
+  - createListing.forklift
+      used in pages/CreateMultiItemListing.js:1827
+  - createListing.authorizedOnly
+      used in pages/CreateMultiItemListing.js:1843
+  - createListing.safetyRequirementsPlaceholder
+      used in pages/CreateMultiItemListing.js:1848
+  - createListing.additionalNotes
+      used in pages/CreateMultiItemListing.js:1859
+  - createListing.additionalNotesPlaceholder
+      used in pages/CreateMultiItemListing.js:1862
+  - createListing.refundPolicy
+      used in pages/CreateMultiItemListing.js:1872
+      used in pages/CreateMultiItemListing.js:1876
+  - createListing.nonRefundable
+      used in pages/CreateMultiItemListing.js:1896
+  - createListing.allSalesFinal
+      used in pages/CreateMultiItemListing.js:1897
+  - createListing.refundable
+      used in pages/CreateMultiItemListing.js:1917
+  - createListing.termsApply
+      used in pages/CreateMultiItemListing.js:1918
+  - createListing.refundTermsPlaceholder
+      used in pages/CreateMultiItemListing.js:1925
+  - createListing.termsEnglish
+      used in pages/CreateMultiItemListing.js:2051
+  - createListing.termsEnglishPlaceholder
+      used in pages/CreateMultiItemListing.js:2056
+  - createListing.termsToolbarHelp
+      used in pages/CreateMultiItemListing.js:2060
+  - createListing.termsFrench
+      used in pages/CreateMultiItemListing.js:2068
+  - createListing.termsFrenchPlaceholder
+      used in pages/CreateMultiItemListing.js:2073
+  - createListing.termsToolbarHelpFr
+      used in pages/CreateMultiItemListing.js:2077
+  - createListing.subtitle
+      used in pages/CreateMultiItemListing.js:2317
+  - auth.emailRequired
+      used in pages/ForgotPasswordPage.js:24
+  - auth.resetEmailSent
+      used in pages/ForgotPasswordPage.js:35
+  - auth.forgotPasswordDesc
+      used in pages/ForgotPasswordPage.js:65
+  - auth.checkYourEmail
+      used in pages/ForgotPasswordPage.js:75
+  - auth.resetEmailSentDesc
+      used in pages/ForgotPasswordPage.js:78
+  - auth.emailPlaceholder
+      used in pages/ForgotPasswordPage.js:97
+  - common.sending
+      used in pages/ForgotPasswordPage.js:118
+  - auth.sendResetLink
+      used in pages/ForgotPasswordPage.js:123
+  - auth.whatToDoNext
+      used in pages/ForgotPasswordPage.js:132
+  - auth.checkInbox
+      used in pages/ForgotPasswordPage.js:135
+  - auth.checkSpam
+      used in pages/ForgotPasswordPage.js:136
+  - auth.clickResetLink
+      used in pages/ForgotPasswordPage.js:137
+  - auth.linkExpires
+      used in pages/ForgotPasswordPage.js:138
+  - auth.sendAnotherEmail
+      used in pages/ForgotPasswordPage.js:148
+  - auth.backToLogin
+      used in pages/ForgotPasswordPage.js:171
+      used in pages/ResetPasswordPage.js:167
+      used in pages/ResetPasswordPage.js:349
+  - hero.browseAuctions
+      used in pages/HomePage.js:171
+      used in pages/NotFoundPage.js:56
+  - homepage.endingSoonDesc
+      used in pages/HomePage.js:286
+  - homepage.ended
+      used in pages/HomePage.js:318
+  - homepage.live
+      used in pages/HomePage.js:359
+  - homepage.currentBid
+      used in pages/HomePage.js:367
+      used in pages/HomePage.js:464
+  - homepage.bids
+      used in pages/HomePage.js:373
+  - homepage.hotItemsDesc
+      used in pages/HomePage.js:411
+  - homepage.views
+      used in pages/HomePage.js:445
+  - homepage.activeBidding
+      used in pages/HomePage.js:455
+  - homepage.bidNow
+      used in pages/HomePage.js:472
+  - homepage.featured
+      used in pages/HomePage.js:507
+  - homepage.curatedAuctions
+      used in pages/HomePage.js:509
+  - homepage.handPicked
+      used in pages/HomePage.js:510
+  - homepage.justListed
+      used in pages/HomePage.js:558
+  - homepage.freshAuctions
+      used in pages/HomePage.js:559
+  - homepage.new
+      used in pages/HomePage.js:586
+  - homepage.liveBidding
+      used in pages/HomePage.js:606
+  - homepage.liveBiddingDesc
+      used in pages/HomePage.js:606
+  - homepage.securePaymentsDesc
+      used in pages/HomePage.js:607
+  - homepage.buyerProtectionDesc
+      used in pages/HomePage.js:608
+  - homepage.globalCommunityDesc
+      used in pages/HomePage.js:609
+  - homepage.whyChooseBidvex
+      used in pages/HomePage.js:616
+  - homepage.trustedPlatform
+      used in pages/HomePage.js:617
+  - homepage.topPerformers
+      used in pages/HomePage.js:652
+  - homepage.totalSales
+      used in pages/HomePage.js:684
+  - homepage.itemsSold
+      used in pages/HomePage.js:688
+  - homepage.browse
+      used in pages/HomePage.js:707
+  - homepage.browseDesc
+      used in pages/HomePage.js:707
+  - homepage.bidStep
+      used in pages/HomePage.js:708
+  - homepage.bidStepDesc
+      used in pages/HomePage.js:708
+  - homepage.winStep
+      used in pages/HomePage.js:709
+  - homepage.winStepDesc
+      used in pages/HomePage.js:709
+  - homepage.gettingStarted
+      used in pages/HomePage.js:721
+  - homepage.howItWorksTitle
+      used in pages/HomePage.js:722
+  - homepage.startWinning
+      used in pages/HomePage.js:723
+  - homepage.learnMore
+      used in pages/HomePage.js:752
+  - listing.views
+      used in pages/ListingDetailPage.js:340
+  - marketplace.ended
+      used in pages/ListingDetailPage.js:424
+  - listing.verificationRequired
+      used in pages/ListingDetailPage.js:480
+  - listing.yourBid
+      used in pages/ListingDetailPage.js:500
+  - listing.placeBid
+      used in pages/ListingDetailPage.js:534
+  - listing.details
+      used in pages/ListingDetailPage.js:620
+  - listing.condition
+      used in pages/ListingDetailPage.js:628
+  - listing.seller
+      used in pages/ListingDetailPage.js:637
+  - listing.bidHistory
+      used in pages/ListingDetailPage.js:679
+  - marketplace.startingFrom
+      used in pages/LotsMarketplacePage.js:138
+  - lotsMarketplace.title
+      used in pages/LotsMarketplacePage.js:175
+  - lotsMarketplace.subtitle
+      used in pages/LotsMarketplacePage.js:179
+  - lotsMarketplace.noLots
+      used in pages/LotsMarketplacePage.js:236
+  - lotsMarketplace.noLotsDesc
+      used in pages/LotsMarketplacePage.js:239
+  - maintenance.invalidEmail
+      used in pages/MaintenancePage.js:66
+  - maintenance.subscriptionFailed
+      used in pages/MaintenancePage.js:78
+  - maintenance.maintenanceTagline
+      used in pages/MaintenancePage.js:142
+  - maintenance.headlineMaintenance
+      used in pages/MaintenancePage.js:148
+  - maintenance.headlineComingSoon
+      used in pages/MaintenancePage.js:148
+  - maintenance.maintenanceHighlight
+      used in pages/MaintenancePage.js:150
+  - maintenance.headlineHighlight
+      used in pages/MaintenancePage.js:150
+  - maintenance.expectedBackIn
+      used in pages/MaintenancePage.js:162
+  - maintenance.launchingIn
+      used in pages/MaintenancePage.js:162
+  - marketplace.title
+      used in pages/MarketplacePage.js:29
+  - marketplace.subtitle
+      used in pages/MarketplacePage.js:33
+  - marketplace.featuredFirst
+      used in pages/MarketplacePage.js:39
+  - marketplace.privateSaleTax
+      used in pages/MarketplacePage.js:43
+  - marketplace.quickBid
+      used in pages/MarketplacePage.js:47
+  - bid.mustAgreeToTerms
+      used in pages/MultiItemListingDetailPage.js:232
+  - auction.termsAndConditions
+      used in pages/MultiItemListingDetailPage.js:853
+  - common.downloadPDF
+      used in pages/MultiItemListingDetailPage.js:861
+  - auction.englishTerms
+      used in pages/MultiItemListingDetailPage.js:868
+  - common.showLess
+      used in pages/MultiItemListingDetailPage.js:886
+  - common.showMore
+      used in pages/MultiItemListingDetailPage.js:886
+  - auction.frenchTerms
+      used in pages/MultiItemListingDetailPage.js:893
+  - auction.agreeToTerms
+      used in pages/MultiItemListingDetailPage.js:940
+  - auction.mustAgreeBeforeBid
+      used in pages/MultiItemListingDetailPage.js:945
+  - auction.noTermsProvided
+      used in pages/MultiItemListingDetailPage.js:958
+  - auction.mustAgreeToTermsFirst
+      used in pages/MultiItemListingDetailPage.js:1315
+  - bid.placeBid
+      used in pages/MultiItemListingDetailPage.js:1318
+  - auction.agreeToTermsToPlaceBid
+      used in pages/MultiItemListingDetailPage.js:1324
+  - errors.pageNotFound
+      used in pages/NotFoundPage.js:22
+  - errors.oops
+      used in pages/NotFoundPage.js:25
+  - errors.auctionMissing
+      used in pages/NotFoundPage.js:28
+  - errors.goHome
+      used in pages/NotFoundPage.js:40
+  - errors.needHelp
+      used in pages/NotFoundPage.js:63
+  - paymentSuccess.contactSupport
+      used in pages/NotFoundPage.js:63
+  - paymentSuccess.processing
+      used in pages/PaymentSuccessPage.js:77
+  - paymentSuccess.pleaseWait
+      used in pages/PaymentSuccessPage.js:79
+  - paymentSuccess.title
+      used in pages/PaymentSuccessPage.js:87
+  - paymentSuccess.thankYou
+      used in pages/PaymentSuccessPage.js:89
+  - paymentSuccess.step2
+      used in pages/PaymentSuccessPage.js:89
+  - paymentSuccess.amountPaid
+      used in pages/PaymentSuccessPage.js:93
+  - common.status
+      used in pages/PaymentSuccessPage.js:94
+  - paymentSuccess.viewOrder
+      used in pages/PaymentSuccessPage.js:103
+  - paymentSuccess.continueShop
+      used in pages/PaymentSuccessPage.js:110
+  - errors.paymentError
+      used in pages/PaymentSuccessPage.js:119
+  - errors.paymentErrorDesc
+      used in pages/PaymentSuccessPage.js:121
+  - paymentSuccess.backToMarketplace
+      used in pages/PaymentSuccessPage.js:127
+  - errors.verificationTimeout
+      used in pages/PaymentSuccessPage.js:135
+  - errors.timeoutDesc
+      used in pages/PaymentSuccessPage.js:137
+  - paymentSuccess.backToDashboard
+      used in pages/PaymentSuccessPage.js:143
+  - common.error
+      used in pages/ProfileSettingsPage.js:84
+  - payment.confirmDelete
+      used in pages/ProfileSettingsPage.js:106
+  - payment.cardDeleted
+      used in pages/ProfileSettingsPage.js:109
+  - payment.cardDeleteFailed
+      used in pages/ProfileSettingsPage.js:112
+  - common.cad
+      used in pages/ProfileSettingsPage.js:324
+  - common.usd
+      used in pages/ProfileSettingsPage.js:325
+  - currency.complianceMessage
+      used in pages/ProfileSettingsPage.js:330
+  - currency.requestChange
+      used in pages/ProfileSettingsPage.js:338
+  - auth.noResetToken
+      used in pages/ResetPasswordPage.js:35
+  - auth.invalidToken
+      used in pages/ResetPasswordPage.js:51
+  - auth.tokenVerificationFailed
+      used in pages/ResetPasswordPage.js:56
+  - auth.tokenVerificationError
+      used in pages/ResetPasswordPage.js:57
+  - auth.passwordTooShort
+      used in pages/ResetPasswordPage.js:65
+  - auth.passwordsDontMatch
+      used in pages/ResetPasswordPage.js:70
+  - auth.passwordResetSuccess
+      used in pages/ResetPasswordPage.js:94
+  - auth.passwordResetSuccessMessage
+      used in pages/ResetPasswordPage.js:99
+  - auth.passwordResetFailed
+      used in pages/ResetPasswordPage.js:107
+  - auth.verifyingToken
+      used in pages/ResetPasswordPage.js:123
+  - auth.invalidResetLink
+      used in pages/ResetPasswordPage.js:141
+  - auth.possibleReasons
+      used in pages/ResetPasswordPage.js:150
+  - auth.linkExpired
+      used in pages/ResetPasswordPage.js:153
+  - auth.linkAlreadyUsed
+      used in pages/ResetPasswordPage.js:154
+  - auth.linkInvalid
+      used in pages/ResetPasswordPage.js:155
+  - auth.requestNewLink
+      used in pages/ResetPasswordPage.js:161
+  - auth.passwordResetComplete
+      used in pages/ResetPasswordPage.js:185
+  - auth.passwordResetCompleteDesc
+      used in pages/ResetPasswordPage.js:188
+  - auth.redirectingToLogin
+      used in pages/ResetPasswordPage.js:195
+  - auth.goToLogin
+      used in pages/ResetPasswordPage.js:201
+  - auth.resetPasswordDesc
+      used in pages/ResetPasswordPage.js:227
+  - auth.linkExpiresIn
+      used in pages/ResetPasswordPage.js:233
+  - common.minutes
+      used in pages/ResetPasswordPage.js:234
+  - auth.newPassword
+      used in pages/ResetPasswordPage.js:245
+  - auth.enterNewPassword
+      used in pages/ResetPasswordPage.js:252
+  - auth.passwordMinLength
+      used in pages/ResetPasswordPage.js:273
+  - auth.confirmNewPassword
+      used in pages/ResetPasswordPage.js:287
+  - auth.passwordsMustMatch
+      used in pages/ResetPasswordPage.js:311
+  - auth.resettingPassword
+      used in pages/ResetPasswordPage.js:325
+  - auth.resetPasswordBtn
+      used in pages/ResetPasswordPage.js:330
+  - watchlist.viewListing
+      used in pages/WatchlistPage.js:97
+  - watchlist.goToAuction
+      used in pages/WatchlistPage.js:154
+  - watchlist.viewLot
+      used in pages/WatchlistPage.js:198
+  - watchlist.emptyTitle
+      used in pages/WatchlistPage.js:250
+  - watchlist.emptyDescription
+      used in pages/WatchlistPage.js:253
+  - watchlist.browseMarketplace
+      used in pages/WatchlistPage.js:257
+  - watchlist.viewAuctions
+      used in pages/WatchlistPage.js:260
+  - admin.appeals.error
+      used in pages/admin/CurrencyAppealsManager.js:44
+      used in pages/admin/CurrencyAppealsManager.js:65
+  - admin.appeals.approved
+      used in pages/admin/CurrencyAppealsManager.js:58
+  - admin.appeals.rejected
+      used in pages/admin/CurrencyAppealsManager.js:58
+  - admin.appeals.title
+      used in pages/admin/CurrencyAppealsManager.js:106
+  - admin.appeals.description
+      used in pages/admin/CurrencyAppealsManager.js:109
+  - admin.appeals.noAppeals
+      used in pages/admin/CurrencyAppealsManager.js:116
+  - vehicleListing.steps.vin
+      used in pages/vehicles/CreateVehicleListingPage.js:100
+  - vehicleListing.steps.specs
+      used in pages/vehicles/CreateVehicleListingPage.js:101
+  - vehicleListing.steps.condition
+      used in pages/vehicles/CreateVehicleListingPage.js:102
+  - vehicleListing.steps.photos
+      used in pages/vehicles/CreateVehicleListingPage.js:103
+  - vehicleListing.steps.auction
+      used in pages/vehicles/CreateVehicleListingPage.js:104
+  - vehicleListing.steps.review
+      used in pages/vehicles/CreateVehicleListingPage.js:105
+  - vehicleListing.vinNumber
+      used in pages/vehicles/CreateVehicleListingPage.js:403
+  - vehicleListing.vinPlaceholder
+      used in pages/vehicles/CreateVehicleListingPage.js:405
+  - vehicleListing.lookupVin
+      used in pages/vehicles/CreateVehicleListingPage.js:426
+  - vehicleListing.year
+      used in pages/vehicles/CreateVehicleListingPage.js:438
+  - vehicleListing.make
+      used in pages/vehicles/CreateVehicleListingPage.js:449
+  - vehicleListing.makePlaceholder
+      used in pages/vehicles/CreateVehicleListingPage.js:453
+  - vehicleListing.model
+      used in pages/vehicles/CreateVehicleListingPage.js:457
+  - vehicleListing.modelPlaceholder
+      used in pages/vehicles/CreateVehicleListingPage.js:461
+  - vehicleListing.bodyType
+      used in pages/vehicles/CreateVehicleListingPage.js:475
+  - vehicleListing.mileage
+      used in pages/vehicles/CreateVehicleListingPage.js:496
+  - vehicleListing.transmission
+      used in pages/vehicles/CreateVehicleListingPage.js:510
+  - vehicleListing.fuelType
+      used in pages/vehicles/CreateVehicleListingPage.js:524
+  - vehicleListing.driveType
+      used in pages/vehicles/CreateVehicleListingPage.js:537
+  - vehicleListing.engineSize
+      used in pages/vehicles/CreateVehicleListingPage.js:552
+  - vehicleListing.cylinders
+      used in pages/vehicles/CreateVehicleListingPage.js:560
+  - vehicleListing.horsepower
+      used in pages/vehicles/CreateVehicleListingPage.js:570
+  - vehicleListing.exteriorColor
+      used in pages/vehicles/CreateVehicleListingPage.js:585
+  - vehicleListing.interiorColor
+      used in pages/vehicles/CreateVehicleListingPage.js:594
+  - vehicleListing.photosUploaded
+      used in pages/vehicles/CreateVehicleListingPage.js:754
+  - vehicleListing.minPhotos
+      used in pages/vehicles/CreateVehicleListingPage.js:754
+  - vehicleListing.startingPrice
+      used in pages/vehicles/CreateVehicleListingPage.js:911
+  - vehicleListing.reservePrice
+      used in pages/vehicles/CreateVehicleListingPage.js:923
+  - vehicleListing.buyNowPrice
+      used in pages/vehicles/CreateVehicleListingPage.js:934
+  - vehicleListing.bidIncrement
+      used in pages/vehicles/CreateVehicleListingPage.js:945
+  - vehicleListing.requireDeposit
+      used in pages/vehicles/CreateVehicleListingPage.js:964
+  - vehicleListing.depositDescription
+      used in pages/vehicles/CreateVehicleListingPage.js:965
+  - vehicleListing.title
+      used in pages/vehicles/CreateVehicleListingPage.js:1060
+  - vehicleListing.subtitle
+      used in pages/vehicles/CreateVehicleListingPage.js:1063
+  - vehicleListing.previous
+      used in pages/vehicles/CreateVehicleListingPage.js:1131
+  - vehicleListing.next
+      used in pages/vehicles/CreateVehicleListingPage.js:1136
+  - vehicleListing.submitting
+      used in pages/vehicles/CreateVehicleListingPage.js:1147
+  - vehicleListing.submitListing
+      used in pages/vehicles/CreateVehicleListingPage.js:1151
+
+Keys used in code but MISSING from fr.json (437):
+  - bidErrorGuide.title
+      used in components/BidErrorGuide.js:77
+      used in components/BidErrorGuide.js:86
+      used in components/BidErrorGuide.js:130
+  - bidErrorGuide.subtitle
+      used in components/BidErrorGuide.js:89
+      used in components/BidErrorGuide.js:133
+  - bidErrorGuide.helpText
+      used in components/BidErrorGuide.js:114
+      used in components/BidErrorGuide.js:186
+  - cookie.message
+      used in components/CookieConsent.js:37
+      used in components/CookieConsentBanner.js:94
+  - cookie.learnMore
+      used in components/CookieConsent.js:45
+  - cookie.decline
+      used in components/CookieConsent.js:58
+      used in components/CookieConsentBanner.js:192
+  - cookie.accept
+      used in components/CookieConsent.js:67
+      used in components/CookieConsentBanner.js:176
+  - cookie.title
+      used in components/CookieConsentBanner.js:75
+  - cookie.subtitle
+      used in components/CookieConsentBanner.js:78
+  - cookie.managePrefs
+      used in components/CookieConsentBanner.js:103
+  - cookie.essential
+      used in components/CookieConsentBanner.js:115
+  - cookie.alwaysActive
+      used in components/CookieConsentBanner.js:116
+  - cookie.essentialDesc
+      used in components/CookieConsentBanner.js:119
+  - cookie.analytics
+      used in components/CookieConsentBanner.js:128
+  - cookie.analyticsDesc
+      used in components/CookieConsentBanner.js:130
+  - cookie.personalization
+      used in components/CookieConsentBanner.js:142
+  - cookie.personalizationDesc
+      used in components/CookieConsentBanner.js:144
+  - cookie.marketing
+      used in components/CookieConsentBanner.js:156
+  - cookie.marketingDesc
+      used in components/CookieConsentBanner.js:158
+  - cookie.savePrefs
+      used in components/CookieConsentBanner.js:184
+  - marketplace.browseItems
+      used in components/FlattenedMarketplace.js:213
+  - marketplace.itemsFromAuctions
+      used in components/FlattenedMarketplace.js:216
+  - locationSelector.country
+      used in components/LocationSelector.js:130
+  - locationSelector.selectCountry
+      used in components/LocationSelector.js:137
+  - locationSelector.province
+      used in components/LocationSelector.js:150
+  - locationSelector.state
+      used in components/LocationSelector.js:151
+  - locationSelector.selectRegion
+      used in components/LocationSelector.js:164
+  - locationSelector.searchRegion
+      used in components/LocationSelector.js:171
+  - locationSelector.noRegionFound
+      used in components/LocationSelector.js:175
+  - locationSelector.city
+      used in components/LocationSelector.js:209
+  - locationSelector.enterManually
+      used in components/LocationSelector.js:212
+  - locationSelector.enterCityName
+      used in components/LocationSelector.js:229
+  - locationSelector.selectCity
+      used in components/LocationSelector.js:244
+  - locationSelector.searchCity
+      used in components/LocationSelector.js:251
+  - locationSelector.cityNotFound
+      used in components/LocationSelector.js:257
+  - locationSelector.enterManuallyLink
+      used in components/LocationSelector.js:266
+  - locationSelector.postalCode
+      used in components/LocationSelector.js:302
+  - locationSelector.zipCode
+      used in components/LocationSelector.js:303
+  - locationSelector.invalidPostal
+      used in components/LocationSelector.js:322
+  - locationSelector.invalidZip
+      used in components/LocationSelector.js:323
+  - nav.home
+      used in components/Navbar.js:59
+  - nav.marketplace
+      used in components/Navbar.js:60
+  - nav.lotsAuction
+      used in components/Navbar.js:61
+  - nav.sell
+      used in components/Navbar.js:115
+      used in components/Navbar.js:325
+  - nav.sellerDashboard
+      used in components/Navbar.js:225
+  - nav.buyerDashboard
+      used in components/Navbar.js:229
+  - nav.adminPanel
+      used in components/Navbar.js:246
+  - admin.settings
+      used in components/Navbar.js:254
+  - nav.affiliateDashboard
+      used in components/Navbar.js:258
+  - nav.logout
+      used in components/Navbar.js:268
+  - nav.login
+      used in components/Navbar.js:275
+  - verifiedFirm
+      used in components/VerifiedBadge.js:11
+  - affiliate.dashboard
+      used in pages/AffiliateDashboard.js:29
+      used in pages/AffiliateDashboard.js:100
+  - affiliate.loadFailed
+      used in pages/AffiliateDashboard.js:43
+  - affiliate.linkCopied
+      used in pages/AffiliateDashboard.js:52
+  - affiliate.enterValidAmount
+      used in pages/AffiliateDashboard.js:58
+  - affiliate.insufficientBalance
+      used in pages/AffiliateDashboard.js:63
+  - affiliate.withdrawalSubmitted
+      used in pages/AffiliateDashboard.js:72
+  - affiliate.withdrawalFailed
+      used in pages/AffiliateDashboard.js:76
+  - affiliate.description
+      used in pages/AffiliateDashboard.js:101
+  - affiliate.totalClicks
+      used in pages/AffiliateDashboard.js:108
+  - affiliate.conversions
+      used in pages/AffiliateDashboard.js:118
+  - affiliate.conversionRate
+      used in pages/AffiliateDashboard.js:124
+  - affiliate.pendingCommission
+      used in pages/AffiliateDashboard.js:131
+  - affiliate.paidCommission
+      used in pages/AffiliateDashboard.js:141
+  - affiliate.referralLink
+      used in pages/AffiliateDashboard.js:153
+  - affiliate.shareDesc
+      used in pages/AffiliateDashboard.js:154
+  - affiliate.copyLink
+      used in pages/AffiliateDashboard.js:165
+  - affiliate.shareOn
+      used in pages/AffiliateDashboard.js:175
+      used in pages/AffiliateDashboard.js:183
+  - affiliate.referrals
+      used in pages/AffiliateDashboard.js:192
+  - affiliate.referralsDesc
+      used in pages/AffiliateDashboard.js:193
+  - affiliate.referralName
+      used in pages/AffiliateDashboard.js:200
+  - affiliate.signupDate
+      used in pages/AffiliateDashboard.js:201
+  - affiliate.status
+      used in pages/AffiliateDashboard.js:202
+  - affiliate.commission
+      used in pages/AffiliateDashboard.js:203
+  - affiliate.noReferrals
+      used in pages/AffiliateDashboard.js:225
+  - affiliate.requestPayout
+      used in pages/AffiliateDashboard.js:238
+      used in pages/AffiliateDashboard.js:251
+  - affiliate.payoutDesc
+      used in pages/AffiliateDashboard.js:239
+  - affiliate.enterAmount
+      used in pages/AffiliateDashboard.js:245
+  - affiliate.availableBalance
+      used in pages/AffiliateDashboard.js:255
+  - auth.welcomeMessage
+      used in pages/AuthPage.js:54
+  - auth.accountCreatedMessage
+      used in pages/AuthPage.js:59
+  - auth.authFailedMessage
+      used in pages/AuthPage.js:71
+  - auth.welcomeBack
+      used in pages/AuthPage.js:240
+  - auth.signInPrompt
+      used in pages/AuthPage.js:243
+  - auth.createAccountPrompt
+      used in pages/AuthPage.js:243
+  - auth.name
+      used in pages/AuthPage.js:250
+  - auth.phone
+      used in pages/AuthPage.js:303
+  - auth.accountType
+      used in pages/AuthPage.js:316
+  - auth.personal
+      used in pages/AuthPage.js:325
+  - auth.business
+      used in pages/AuthPage.js:326
+  - auth.companyName
+      used in pages/AuthPage.js:333
+  - auth.taxNumber
+      used in pages/AuthPage.js:344
+  - auth.loginBtn
+      used in pages/AuthPage.js:403
+  - auth.registerBtn
+      used in pages/AuthPage.js:403
+  - auth.googleLogin
+      used in pages/AuthPage.js:429
+  - auth.noAccount
+      used in pages/AuthPage.js:439
+      used in pages/ForgotPasswordPage.js:178
+  - auth.hasAccount
+      used in pages/AuthPage.js:439
+  - dashboard.buyer.title
+      used in pages/BuyerDashboard.js:50
+  - dashboard.buyer.trackBidsWins
+      used in pages/BuyerDashboard.js:51
+  - dashboard.buyer.activeBids
+      used in pages/BuyerDashboard.js:57
+  - dashboard.buyer.wonItems
+      used in pages/BuyerDashboard.js:63
+  - dashboard.buyer.myBidsTitle
+      used in pages/BuyerDashboard.js:77
+  - dashboard.buyer.allBids
+      used in pages/BuyerDashboard.js:82
+  - dashboard.buyer.winning
+      used in pages/BuyerDashboard.js:83
+  - dashboard.buyer.outbid
+      used in pages/BuyerDashboard.js:84
+  - watchlist.title
+      used in pages/BuyerDashboard.js:85
+  - dashboard.buyer.yourBid
+      used in pages/BuyerDashboard.js:149
+      used in pages/BuyerDashboard.js:321
+  - createListing.createNewListing
+      used in pages/CreateListingPage.js:196
+  - createListing.auctionTitle
+      used in pages/CreateListingPage.js:201
+      used in pages/CreateMultiItemListing.js:643
+      used in pages/CreateMultiItemListing.js:1241
+  - createListing.auctionTitlePlaceholder
+      used in pages/CreateListingPage.js:209
+      used in pages/CreateMultiItemListing.js:649
+  - createListing.description
+      used in pages/CreateListingPage.js:214
+      used in pages/CreateMultiItemListing.js:654
+  - createListing.descriptionPlaceholder
+      used in pages/CreateListingPage.js:223
+      used in pages/CreateMultiItemListing.js:661
+  - createListing.category
+      used in pages/CreateListingPage.js:229
+      used in pages/CreateMultiItemListing.js:667
+      used in pages/CreateMultiItemListing.js:1242
+  - createListing.selectCategory
+      used in pages/CreateListingPage.js:239
+      used in pages/CreateMultiItemListing.js:676
+  - createListing.condition
+      used in pages/CreateListingPage.js:249
+      used in pages/CreateMultiItemListing.js:1093
+      used in pages/CreateMultiItemListing.js:1267
+  - createListing.conditionNew
+      used in pages/CreateListingPage.js:259
+      used in pages/CreateMultiItemListing.js:1099
+  - createListing.conditionLikeNew
+      used in pages/CreateListingPage.js:260
+      used in pages/CreateMultiItemListing.js:1100
+  - createListing.conditionGood
+      used in pages/CreateListingPage.js:261
+      used in pages/CreateMultiItemListing.js:1101
+  - createListing.conditionFair
+      used in pages/CreateListingPage.js:262
+      used in pages/CreateMultiItemListing.js:1102
+  - createListing.conditionPoor
+      used in pages/CreateListingPage.js:263
+      used in pages/CreateMultiItemListing.js:1103
+  - createListing.startingPrice
+      used in pages/CreateListingPage.js:270
+      used in pages/CreateMultiItemListing.js:1076
+      used in pages/CreateMultiItemListing.js:1138
+      used in pages/CreateMultiItemListing.js:1266
+  - createListing.buyNowPrice
+      used in pages/CreateListingPage.js:287
+      used in pages/CreateMultiItemListing.js:1128
+  - createListing.buyersPremium
+      used in pages/CreateListingPage.js:304
+  - createListing.buyersPremiumPlaceholder
+      used in pages/CreateListingPage.js:311
+  - createListing.buyersPremiumHint
+      used in pages/CreateListingPage.js:317
+  - createListing.auctionEndDate
+      used in pages/CreateListingPage.js:342
+      used in pages/CreateMultiItemListing.js:683
+      used in pages/CreateMultiItemListing.js:1244
+  - createListing.images
+      used in pages/CreateListingPage.js:355
+      used in pages/CreateMultiItemListing.js:1153
+      used in pages/CreateMultiItemListing.js:1268
+  - createListing.uploadImages
+      used in pages/CreateListingPage.js:372
+  - createListing.shipping
+      used in pages/CreateListingPage.js:395
+      used in pages/CreateMultiItemListing.js:1436
+  - createListing.offerShipping
+      used in pages/CreateListingPage.js:406
+      used in pages/CreateMultiItemListing.js:1447
+  - createListing.shippingMethods
+      used in pages/CreateListingPage.js:412
+      used in pages/CreateMultiItemListing.js:1453
+  - createListing.deliveryTime
+      used in pages/CreateListingPage.js:451
+      used in pages/CreateMultiItemListing.js:1492
+  - createListing.deliveryTimePlaceholder
+      used in pages/CreateListingPage.js:453
+      used in pages/CreateMultiItemListing.js:1494
+  - createListing.visitBeforePurchase
+      used in pages/CreateListingPage.js:466
+  - createListing.allowVisit
+      used in pages/CreateListingPage.js:477
+  - createListing.availableDates
+      used in pages/CreateListingPage.js:483
+  - createListing.visitInstructions
+      used in pages/CreateListingPage.js:492
+      used in pages/CreateMultiItemListing.js:1576
+  - createListing.visitInstructionsPlaceholder
+      used in pages/CreateListingPage.js:494
+      used in pages/CreateMultiItemListing.js:1579
+  - createListing.bindingAgreement
+      used in pages/CreateListingPage.js:516
+      used in pages/CreateMultiItemListing.js:2343
+  - createListing.agreementText
+      used in pages/CreateListingPage.js:518
+      used in pages/CreateMultiItemListing.js:2345
+  - createListing.creating
+      used in pages/CreateListingPage.js:531
+      used in pages/CreateMultiItemListing.js:2384
+  - createListing.submitListing
+      used in pages/CreateListingPage.js:533
+      used in pages/CreateMultiItemListing.js:2389
+  - createListing.title
+      used in pages/CreateMultiItemListing.js:153
+      used in pages/CreateMultiItemListing.js:2314
+  - createListing.restrictedToBusinessAccounts
+      used in pages/CreateMultiItemListing.js:162
+  - createListing.maxLotsReached
+      used in pages/CreateMultiItemListing.js:195
+  - createListing.invalidLotCount
+      used in pages/CreateMultiItemListing.js:221
+  - createListing.startingPriceRange
+      used in pages/CreateMultiItemListing.js:397
+  - createListing.descriptionLength
+      used in pages/CreateMultiItemListing.js:401
+  - createListing.quantityPositive
+      used in pages/CreateMultiItemListing.js:405
+  - createListing.buyNowMinPrice
+      used in pages/CreateMultiItemListing.js:415
+  - createListing.fillRequired
+      used in pages/CreateMultiItemListing.js:427
+  - createListing.addOneLot
+      used in pages/CreateMultiItemListing.js:435
+  - createListing.fixValidationErrors
+      used in pages/CreateMultiItemListing.js:448
+  - createListing.listingCreated
+      used in pages/CreateMultiItemListing.js:603
+  - createListing.createFailed
+      used in pages/CreateMultiItemListing.js:608
+  - createListing.stepLabels.basic
+      used in pages/CreateMultiItemListing.js:641
+  - createListing.currency
+      used in pages/CreateMultiItemListing.js:715
+  - currency.locked
+      used in pages/CreateMultiItemListing.js:718
+      used in pages/ProfileSettingsPage.js:312
+  - createListing.incrementSchedule
+      used in pages/CreateMultiItemListing.js:746
+  - createListing.tiered
+      used in pages/CreateMultiItemListing.js:755
+  - createListing.simplified
+      used in pages/CreateMultiItemListing.js:756
+  - createListing.numberOfLots
+      used in pages/CreateMultiItemListing.js:791
+  - createListing.numberOfLotsPlaceholder
+      used in pages/CreateMultiItemListing.js:811
+  - createListing.stepLabels.lots
+      used in pages/CreateMultiItemListing.js:828
+  - createListing.manual
+      used in pages/CreateMultiItemListing.js:854
+  - createListing.csvUpload
+      used in pages/CreateMultiItemListing.js:863
+  - createListing.imagesBulk
+      used in pages/CreateMultiItemListing.js:872
+  - createListing.lotTitle
+      used in pages/CreateMultiItemListing.js:1027
+      used in pages/CreateMultiItemListing.js:1264
+  - createListing.lotTitlePlaceholder
+      used in pages/CreateMultiItemListing.js:1031
+  - createListing.quantity
+      used in pages/CreateMultiItemListing.js:1036
+      used in pages/CreateMultiItemListing.js:1265
+  - createListing.lotDescription
+      used in pages/CreateMultiItemListing.js:1052
+  - createListing.characters
+      used in pages/CreateMultiItemListing.js:1052
+  - createListing.lotDescPlaceholder
+      used in pages/CreateMultiItemListing.js:1057
+  - createListing.buyNowOption
+      used in pages/CreateMultiItemListing.js:1113
+  - createListing.reviewSubmit
+      used in pages/CreateMultiItemListing.js:1198
+  - createListing.totalLots
+      used in pages/CreateMultiItemListing.js:1206
+  - createListing.totalItems
+      used in pages/CreateMultiItemListing.js:1212
+  - createListing.totalValue
+      used in pages/CreateMultiItemListing.js:1218
+  - createListing.totalImages
+      used in pages/CreateMultiItemListing.js:1224
+  - createListing.location
+      used in pages/CreateMultiItemListing.js:1243
+  - createListing.termsConditions
+      used in pages/CreateMultiItemListing.js:1376
+  - createListing.importantInfo
+      used in pages/CreateMultiItemListing.js:1395
+  - createListing.catalogue
+      used in pages/CreateMultiItemListing.js:1414
+  - createListing.ratePlaceholder
+      used in pages/CreateMultiItemListing.js:1477
+  - createListing.sellerObligationsTitle
+      used in pages/CreateMultiItemListing.js:1598
+  - createListing.sellerObligationsDesc
+      used in pages/CreateMultiItemListing.js:1601
+  - createListing.customExchangeRate
+      used in pages/CreateMultiItemListing.js:1610
+  - createListing.exchangeRatePlaceholder
+      used in pages/CreateMultiItemListing.js:1619
+  - createListing.logistics
+      used in pages/CreateMultiItemListing.js:1637
+  - common.selectOption
+      used in pages/CreateMultiItemListing.js:1645
+  - createListing.logisticsYes
+      used in pages/CreateMultiItemListing.js:1646
+  - createListing.logisticsNo
+      used in pages/CreateMultiItemListing.js:1647
+  - createListing.shippingDetailsPlaceholder
+      used in pages/CreateMultiItemListing.js:1652
+  - createListing.removalDeadline
+      used in pages/CreateMultiItemListing.js:1666
+  - createListing.itemsPickupWithin
+      used in pages/CreateMultiItemListing.js:1670
+  - createListing.threeDays
+      used in pages/CreateMultiItemListing.js:1677
+  - createListing.fiveDays
+      used in pages/CreateMultiItemListing.js:1678
+  - createListing.sevenDays
+      used in pages/CreateMultiItemListing.js:1679
+  - createListing.tenDays
+      used in pages/CreateMultiItemListing.js:1680
+  - createListing.fourteenDays
+      used in pages/CreateMultiItemListing.js:1681
+  - createListing.thirtyDays
+      used in pages/CreateMultiItemListing.js:1682
+  - createListing.ofAuctionClose
+      used in pages/CreateMultiItemListing.js:1684
+  - createListing.customDeadlinePlaceholder
+      used in pages/CreateMultiItemListing.js:1688
+  - createListing.facilityCapabilities
+      used in pages/CreateMultiItemListing.js:1702
+  - createListing.facilityAddress
+      used in pages/CreateMultiItemListing.js:1708
+  - createListing.facilityAddressPlaceholder
+      used in pages/CreateMultiItemListing.js:1710
+  - createListing.loadingDock
+      used in pages/CreateMultiItemListing.js:1731
+  - createListing.selectDockType
+      used in pages/CreateMultiItemListing.js:1740
+  - createListing.highDock
+      used in pages/CreateMultiItemListing.js:1741
+  - createListing.standardDock
+      used in pages/CreateMultiItemListing.js:1742
+  - createListing.adjustableDock
+      used in pages/CreateMultiItemListing.js:1743
+  - createListing.overheadCrane
+      used in pages/CreateMultiItemListing.js:1758
+  - createListing.craneCapacity
+      used in pages/CreateMultiItemListing.js:1764
+  - createListing.groundLevel
+      used in pages/CreateMultiItemListing.js:1782
+  - createListing.scaleOnSite
+      used in pages/CreateMultiItemListing.js:1797
+  - createListing.tailgate
+      used in pages/CreateMultiItemListing.js:1812
+  - createListing.forklift
+      used in pages/CreateMultiItemListing.js:1827
+  - createListing.authorizedOnly
+      used in pages/CreateMultiItemListing.js:1843
+  - createListing.safetyRequirementsPlaceholder
+      used in pages/CreateMultiItemListing.js:1848
+  - createListing.additionalNotes
+      used in pages/CreateMultiItemListing.js:1859
+  - createListing.additionalNotesPlaceholder
+      used in pages/CreateMultiItemListing.js:1862
+  - createListing.refundPolicy
+      used in pages/CreateMultiItemListing.js:1872
+      used in pages/CreateMultiItemListing.js:1876
+  - createListing.nonRefundable
+      used in pages/CreateMultiItemListing.js:1896
+  - createListing.allSalesFinal
+      used in pages/CreateMultiItemListing.js:1897
+  - createListing.refundable
+      used in pages/CreateMultiItemListing.js:1917
+  - createListing.termsApply
+      used in pages/CreateMultiItemListing.js:1918
+  - createListing.refundTermsPlaceholder
+      used in pages/CreateMultiItemListing.js:1925
+  - createListing.termsEnglish
+      used in pages/CreateMultiItemListing.js:2051
+  - createListing.termsEnglishPlaceholder
+      used in pages/CreateMultiItemListing.js:2056
+  - createListing.termsToolbarHelp
+      used in pages/CreateMultiItemListing.js:2060
+  - createListing.termsFrench
+      used in pages/CreateMultiItemListing.js:2068
+  - createListing.termsFrenchPlaceholder
+      used in pages/CreateMultiItemListing.js:2073
+  - createListing.termsToolbarHelpFr
+      used in pages/CreateMultiItemListing.js:2077
+  - createListing.subtitle
+      used in pages/CreateMultiItemListing.js:2317
+  - auth.emailRequired
+      used in pages/ForgotPasswordPage.js:24
+  - auth.resetEmailSent
+      used in pages/ForgotPasswordPage.js:35
+  - auth.forgotPasswordDesc
+      used in pages/ForgotPasswordPage.js:65
+  - auth.checkYourEmail
+      used in pages/ForgotPasswordPage.js:75
+  - auth.resetEmailSentDesc
+      used in pages/ForgotPasswordPage.js:78
+  - auth.emailPlaceholder
+      used in pages/ForgotPasswordPage.js:97
+  - common.sending
+      used in pages/ForgotPasswordPage.js:118
+  - auth.sendResetLink
+      used in pages/ForgotPasswordPage.js:123
+  - auth.whatToDoNext
+      used in pages/ForgotPasswordPage.js:132
+  - auth.checkInbox
+      used in pages/ForgotPasswordPage.js:135
+  - auth.checkSpam
+      used in pages/ForgotPasswordPage.js:136
+  - auth.clickResetLink
+      used in pages/ForgotPasswordPage.js:137
+  - auth.linkExpires
+      used in pages/ForgotPasswordPage.js:138
+  - auth.sendAnotherEmail
+      used in pages/ForgotPasswordPage.js:148
+  - auth.backToLogin
+      used in pages/ForgotPasswordPage.js:171
+      used in pages/ResetPasswordPage.js:167
+      used in pages/ResetPasswordPage.js:349
+  - hero.browseAuctions
+      used in pages/HomePage.js:171
+      used in pages/NotFoundPage.js:56
+  - homepage.endingSoonDesc
+      used in pages/HomePage.js:286
+  - homepage.ended
+      used in pages/HomePage.js:318
+  - homepage.live
+      used in pages/HomePage.js:359
+  - homepage.currentBid
+      used in pages/HomePage.js:367
+      used in pages/HomePage.js:464
+  - homepage.bids
+      used in pages/HomePage.js:373
+  - homepage.hotItemsDesc
+      used in pages/HomePage.js:411
+  - homepage.views
+      used in pages/HomePage.js:445
+  - homepage.activeBidding
+      used in pages/HomePage.js:455
+  - homepage.bidNow
+      used in pages/HomePage.js:472
+  - homepage.featured
+      used in pages/HomePage.js:507
+  - homepage.curatedAuctions
+      used in pages/HomePage.js:509
+  - homepage.handPicked
+      used in pages/HomePage.js:510
+  - homepage.justListed
+      used in pages/HomePage.js:558
+  - homepage.freshAuctions
+      used in pages/HomePage.js:559
+  - homepage.new
+      used in pages/HomePage.js:586
+  - homepage.liveBidding
+      used in pages/HomePage.js:606
+  - homepage.liveBiddingDesc
+      used in pages/HomePage.js:606
+  - homepage.securePaymentsDesc
+      used in pages/HomePage.js:607
+  - homepage.buyerProtectionDesc
+      used in pages/HomePage.js:608
+  - homepage.globalCommunityDesc
+      used in pages/HomePage.js:609
+  - homepage.whyChooseBidvex
+      used in pages/HomePage.js:616
+  - homepage.trustedPlatform
+      used in pages/HomePage.js:617
+  - homepage.topPerformers
+      used in pages/HomePage.js:652
+  - homepage.totalSales
+      used in pages/HomePage.js:684
+  - homepage.itemsSold
+      used in pages/HomePage.js:688
+  - homepage.browse
+      used in pages/HomePage.js:707
+  - homepage.browseDesc
+      used in pages/HomePage.js:707
+  - homepage.bidStep
+      used in pages/HomePage.js:708
+  - homepage.bidStepDesc
+      used in pages/HomePage.js:708
+  - homepage.winStep
+      used in pages/HomePage.js:709
+  - homepage.winStepDesc
+      used in pages/HomePage.js:709
+  - homepage.gettingStarted
+      used in pages/HomePage.js:721
+  - homepage.howItWorksTitle
+      used in pages/HomePage.js:722
+  - homepage.startWinning
+      used in pages/HomePage.js:723
+  - homepage.learnMore
+      used in pages/HomePage.js:752
+  - listing.views
+      used in pages/ListingDetailPage.js:340
+  - marketplace.ended
+      used in pages/ListingDetailPage.js:424
+  - listing.verificationRequired
+      used in pages/ListingDetailPage.js:480
+  - listing.yourBid
+      used in pages/ListingDetailPage.js:500
+  - listing.placeBid
+      used in pages/ListingDetailPage.js:534
+  - listing.details
+      used in pages/ListingDetailPage.js:620
+  - listing.condition
+      used in pages/ListingDetailPage.js:628
+  - listing.seller
+      used in pages/ListingDetailPage.js:637
+  - listing.bidHistory
+      used in pages/ListingDetailPage.js:679
+  - marketplace.startingFrom
+      used in pages/LotsMarketplacePage.js:138
+  - lotsMarketplace.title
+      used in pages/LotsMarketplacePage.js:175
+  - lotsMarketplace.subtitle
+      used in pages/LotsMarketplacePage.js:179
+  - lotsMarketplace.noLots
+      used in pages/LotsMarketplacePage.js:236
+  - lotsMarketplace.noLotsDesc
+      used in pages/LotsMarketplacePage.js:239
+  - maintenance.invalidEmail
+      used in pages/MaintenancePage.js:66
+  - maintenance.subscriptionFailed
+      used in pages/MaintenancePage.js:78
+  - maintenance.maintenanceTagline
+      used in pages/MaintenancePage.js:142
+  - maintenance.headlineMaintenance
+      used in pages/MaintenancePage.js:148
+  - maintenance.headlineComingSoon
+      used in pages/MaintenancePage.js:148
+  - maintenance.maintenanceHighlight
+      used in pages/MaintenancePage.js:150
+  - maintenance.headlineHighlight
+      used in pages/MaintenancePage.js:150
+  - maintenance.expectedBackIn
+      used in pages/MaintenancePage.js:162
+  - maintenance.launchingIn
+      used in pages/MaintenancePage.js:162
+  - marketplace.title
+      used in pages/MarketplacePage.js:29
+  - marketplace.subtitle
+      used in pages/MarketplacePage.js:33
+  - marketplace.featuredFirst
+      used in pages/MarketplacePage.js:39
+  - marketplace.privateSaleTax
+      used in pages/MarketplacePage.js:43
+  - marketplace.quickBid
+      used in pages/MarketplacePage.js:47
+  - bid.mustAgreeToTerms
+      used in pages/MultiItemListingDetailPage.js:232
+  - auction.termsAndConditions
+      used in pages/MultiItemListingDetailPage.js:853
+  - common.downloadPDF
+      used in pages/MultiItemListingDetailPage.js:861
+  - auction.englishTerms
+      used in pages/MultiItemListingDetailPage.js:868
+  - common.showLess
+      used in pages/MultiItemListingDetailPage.js:886
+  - common.showMore
+      used in pages/MultiItemListingDetailPage.js:886
+  - auction.frenchTerms
+      used in pages/MultiItemListingDetailPage.js:893
+  - auction.agreeToTerms
+      used in pages/MultiItemListingDetailPage.js:940
+  - auction.mustAgreeBeforeBid
+      used in pages/MultiItemListingDetailPage.js:945
+  - auction.noTermsProvided
+      used in pages/MultiItemListingDetailPage.js:958
+  - auction.mustAgreeToTermsFirst
+      used in pages/MultiItemListingDetailPage.js:1315
+  - bid.placeBid
+      used in pages/MultiItemListingDetailPage.js:1318
+  - auction.agreeToTermsToPlaceBid
+      used in pages/MultiItemListingDetailPage.js:1324
+  - errors.pageNotFound
+      used in pages/NotFoundPage.js:22
+  - errors.oops
+      used in pages/NotFoundPage.js:25
+  - errors.auctionMissing
+      used in pages/NotFoundPage.js:28
+  - errors.goHome
+      used in pages/NotFoundPage.js:40
+  - errors.needHelp
+      used in pages/NotFoundPage.js:63
+  - paymentSuccess.contactSupport
+      used in pages/NotFoundPage.js:63
+  - paymentSuccess.processing
+      used in pages/PaymentSuccessPage.js:77
+  - paymentSuccess.pleaseWait
+      used in pages/PaymentSuccessPage.js:79
+  - paymentSuccess.title
+      used in pages/PaymentSuccessPage.js:87
+  - paymentSuccess.thankYou
+      used in pages/PaymentSuccessPage.js:89
+  - paymentSuccess.step2
+      used in pages/PaymentSuccessPage.js:89
+  - paymentSuccess.amountPaid
+      used in pages/PaymentSuccessPage.js:93
+  - common.status
+      used in pages/PaymentSuccessPage.js:94
+  - paymentSuccess.viewOrder
+      used in pages/PaymentSuccessPage.js:103
+  - paymentSuccess.continueShop
+      used in pages/PaymentSuccessPage.js:110
+  - errors.paymentError
+      used in pages/PaymentSuccessPage.js:119
+  - errors.paymentErrorDesc
+      used in pages/PaymentSuccessPage.js:121
+  - paymentSuccess.backToMarketplace
+      used in pages/PaymentSuccessPage.js:127
+  - errors.verificationTimeout
+      used in pages/PaymentSuccessPage.js:135
+  - errors.timeoutDesc
+      used in pages/PaymentSuccessPage.js:137
+  - paymentSuccess.backToDashboard
+      used in pages/PaymentSuccessPage.js:143
+  - common.error
+      used in pages/ProfileSettingsPage.js:84
+  - payment.confirmDelete
+      used in pages/ProfileSettingsPage.js:106
+  - payment.cardDeleted
+      used in pages/ProfileSettingsPage.js:109
+  - payment.cardDeleteFailed
+      used in pages/ProfileSettingsPage.js:112
+  - common.cad
+      used in pages/ProfileSettingsPage.js:324
+  - common.usd
+      used in pages/ProfileSettingsPage.js:325
+  - currency.complianceMessage
+      used in pages/ProfileSettingsPage.js:330
+  - currency.requestChange
+      used in pages/ProfileSettingsPage.js:338
+  - auth.noResetToken
+      used in pages/ResetPasswordPage.js:35
+  - auth.invalidToken
+      used in pages/ResetPasswordPage.js:51
+  - auth.tokenVerificationFailed
+      used in pages/ResetPasswordPage.js:56
+  - auth.tokenVerificationError
+      used in pages/ResetPasswordPage.js:57
+  - auth.passwordTooShort
+      used in pages/ResetPasswordPage.js:65
+  - auth.passwordsDontMatch
+      used in pages/ResetPasswordPage.js:70
+  - auth.passwordResetSuccess
+      used in pages/ResetPasswordPage.js:94
+  - auth.passwordResetSuccessMessage
+      used in pages/ResetPasswordPage.js:99
+  - auth.passwordResetFailed
+      used in pages/ResetPasswordPage.js:107
+  - auth.verifyingToken
+      used in pages/ResetPasswordPage.js:123
+  - auth.invalidResetLink
+      used in pages/ResetPasswordPage.js:141
+  - auth.possibleReasons
+      used in pages/ResetPasswordPage.js:150
+  - auth.linkExpired
+      used in pages/ResetPasswordPage.js:153
+  - auth.linkAlreadyUsed
+      used in pages/ResetPasswordPage.js:154
+  - auth.linkInvalid
+      used in pages/ResetPasswordPage.js:155
+  - auth.requestNewLink
+      used in pages/ResetPasswordPage.js:161
+  - auth.passwordResetComplete
+      used in pages/ResetPasswordPage.js:185
+  - auth.passwordResetCompleteDesc
+      used in pages/ResetPasswordPage.js:188
+  - auth.redirectingToLogin
+      used in pages/ResetPasswordPage.js:195
+  - auth.goToLogin
+      used in pages/ResetPasswordPage.js:201
+  - auth.resetPasswordDesc
+      used in pages/ResetPasswordPage.js:227
+  - auth.linkExpiresIn
+      used in pages/ResetPasswordPage.js:233
+  - common.minutes
+      used in pages/ResetPasswordPage.js:234
+  - auth.newPassword
+      used in pages/ResetPasswordPage.js:245
+  - auth.enterNewPassword
+      used in pages/ResetPasswordPage.js:252
+  - auth.passwordMinLength
+      used in pages/ResetPasswordPage.js:273
+  - auth.confirmNewPassword
+      used in pages/ResetPasswordPage.js:287
+  - auth.passwordsMustMatch
+      used in pages/ResetPasswordPage.js:311
+  - auth.resettingPassword
+      used in pages/ResetPasswordPage.js:325
+  - auth.resetPasswordBtn
+      used in pages/ResetPasswordPage.js:330
+  - watchlist.viewListing
+      used in pages/WatchlistPage.js:97
+  - watchlist.goToAuction
+      used in pages/WatchlistPage.js:154
+  - watchlist.viewLot
+      used in pages/WatchlistPage.js:198
+  - watchlist.emptyTitle
+      used in pages/WatchlistPage.js:250
+  - watchlist.emptyDescription
+      used in pages/WatchlistPage.js:253
+  - watchlist.browseMarketplace
+      used in pages/WatchlistPage.js:257
+  - watchlist.viewAuctions
+      used in pages/WatchlistPage.js:260
+  - admin.appeals.error
+      used in pages/admin/CurrencyAppealsManager.js:44
+      used in pages/admin/CurrencyAppealsManager.js:65
+  - admin.appeals.approved
+      used in pages/admin/CurrencyAppealsManager.js:58
+  - admin.appeals.rejected
+      used in pages/admin/CurrencyAppealsManager.js:58
+  - admin.appeals.title
+      used in pages/admin/CurrencyAppealsManager.js:106
+  - admin.appeals.description
+      used in pages/admin/CurrencyAppealsManager.js:109
+  - admin.appeals.noAppeals
+      used in pages/admin/CurrencyAppealsManager.js:116
+  - vehicleListing.steps.vin
+      used in pages/vehicles/CreateVehicleListingPage.js:100
+  - vehicleListing.steps.specs
+      used in pages/vehicles/CreateVehicleListingPage.js:101
+  - vehicleListing.steps.condition
+      used in pages/vehicles/CreateVehicleListingPage.js:102
+  - vehicleListing.steps.photos
+      used in pages/vehicles/CreateVehicleListingPage.js:103
+  - vehicleListing.steps.auction
+      used in pages/vehicles/CreateVehicleListingPage.js:104
+  - vehicleListing.steps.review
+      used in pages/vehicles/CreateVehicleListingPage.js:105
+  - vehicleListing.vinNumber
+      used in pages/vehicles/CreateVehicleListingPage.js:403
+  - vehicleListing.vinPlaceholder
+      used in pages/vehicles/CreateVehicleListingPage.js:405
+  - vehicleListing.lookupVin
+      used in pages/vehicles/CreateVehicleListingPage.js:426
+  - vehicleListing.year
+      used in pages/vehicles/CreateVehicleListingPage.js:438
+  - vehicleListing.make
+      used in pages/vehicles/CreateVehicleListingPage.js:449
+  - vehicleListing.makePlaceholder
+      used in pages/vehicles/CreateVehicleListingPage.js:453
+  - vehicleListing.model
+      used in pages/vehicles/CreateVehicleListingPage.js:457
+  - vehicleListing.modelPlaceholder
+      used in pages/vehicles/CreateVehicleListingPage.js:461
+  - vehicleListing.bodyType
+      used in pages/vehicles/CreateVehicleListingPage.js:475
+  - vehicleListing.mileage
+      used in pages/vehicles/CreateVehicleListingPage.js:496
+  - vehicleListing.transmission
+      used in pages/vehicles/CreateVehicleListingPage.js:510
+  - vehicleListing.fuelType
+      used in pages/vehicles/CreateVehicleListingPage.js:524
+  - vehicleListing.driveType
+      used in pages/vehicles/CreateVehicleListingPage.js:537
+  - vehicleListing.engineSize
+      used in pages/vehicles/CreateVehicleListingPage.js:552
+  - vehicleListing.cylinders
+      used in pages/vehicles/CreateVehicleListingPage.js:560
+  - vehicleListing.horsepower
+      used in pages/vehicles/CreateVehicleListingPage.js:570
+  - vehicleListing.exteriorColor
+      used in pages/vehicles/CreateVehicleListingPage.js:585
+  - vehicleListing.interiorColor
+      used in pages/vehicles/CreateVehicleListingPage.js:594
+  - vehicleListing.photosUploaded
+      used in pages/vehicles/CreateVehicleListingPage.js:754
+  - vehicleListing.minPhotos
+      used in pages/vehicles/CreateVehicleListingPage.js:754
+  - vehicleListing.startingPrice
+      used in pages/vehicles/CreateVehicleListingPage.js:911
+  - vehicleListing.reservePrice
+      used in pages/vehicles/CreateVehicleListingPage.js:923
+  - vehicleListing.buyNowPrice
+      used in pages/vehicles/CreateVehicleListingPage.js:934
+  - vehicleListing.bidIncrement
+      used in pages/vehicles/CreateVehicleListingPage.js:945
+  - vehicleListing.requireDeposit
+      used in pages/vehicles/CreateVehicleListingPage.js:964
+  - vehicleListing.depositDescription
+      used in pages/vehicles/CreateVehicleListingPage.js:965
+  - vehicleListing.title
+      used in pages/vehicles/CreateVehicleListingPage.js:1060
+  - vehicleListing.subtitle
+      used in pages/vehicles/CreateVehicleListingPage.js:1063
+  - vehicleListing.previous
+      used in pages/vehicles/CreateVehicleListingPage.js:1131
+  - vehicleListing.next
+      used in pages/vehicles/CreateVehicleListingPage.js:1136
+  - vehicleListing.submitting
+      used in pages/vehicles/CreateVehicleListingPage.js:1147
+  - vehicleListing.submitListing
+      used in pages/vehicles/CreateVehicleListingPage.js:1151
+
+──────────────────────────────────────────────────────────────────────
+  SECTION 3: POTENTIALLY UNUSED KEYS
+──────────────────────────────────────────────────────────────────────
+Found 225 keys not directly referenced via t() or i18n.js:
+
+  - auction.bidCount [EN, FR]
+  - auction.bidCount_plural [EN, FR]
+  - auction.bidIncrement [EN, FR]
+  - auction.bidPlaced [EN, FR]
+  - auction.buyNow [EN, FR]
+  - auction.buyersPremium [EN, FR]
+  - auction.cancelBid [EN, FR]
+  - auction.confirmBid [EN, FR]
+  - auction.endsIn [EN, FR]
+  - auction.enterBid [EN, FR]
+  - auction.featured [EN, FR]
+  - auction.hot [EN, FR]
+  - auction.justListed [EN, FR]
+  - auction.lotDetails [EN, FR]
+  - auction.minimumBid [EN, FR]
+  - auction.noBids [EN, FR]
+  - auction.noReserve [EN, FR]
+  - auction.pickup [EN, FR]
+  - auction.reserveMet [EN, FR]
+  - auction.reserveNotMet [EN, FR]
+  - auction.similarItems [EN, FR]
+  - auction.specifications [EN, FR]
+  - auction.taxesAndFees [EN, FR]
+  - auction.totalPayable [EN, FR]
+  - auction.unsold [EN, FR]
+  - auction.watchItem [EN, FR]
+  - auction.watching [EN, FR]
+  - auth.agreeToPrivacy [EN, FR]
+  - auth.emailVerified [EN, FR]
+  - auth.lastName [EN, FR]
+  - auth.orContinueWith [EN, FR]
+  - auth.registerTitle [EN, FR]
+  - auth.resendVerification [EN, FR]
+  - auth.signOut [EN, FR]
+  - auth.verifyEmail [EN, FR]
+  - bidding.antiSniping [EN, FR]
+  - bidding.antiSnipingDescription [EN, FR]
+  - bidding.auctionExtended [EN, FR]
+  - bidding.bidRetraction [EN, FR]
+  - bidding.bindingBid [EN, FR]
+  - bidding.depositAmount [EN, FR]
+  - bidding.depositRefundable [EN, FR]
+  - bidding.depositRequired [EN, FR]
+  - bidding.newEndTime [EN, FR]
+  - common.and [EN, FR]
+  - common.appName [EN, FR]
+  - common.currencySymbol [EN, FR]
+  - common.none [EN, FR]
+  - common.optional [EN, FR]
+  - common.tagline [EN, FR]
+  - confirmation.bidIsBinding [EN, FR]
+  - confirmation.confirmBid [EN, FR]
+  - confirmation.confirmCancel [EN, FR]
+  - confirmation.confirmDelete [EN, FR]
+  - confirmation.confirmLogout [EN, FR]
+  - dashboard.accountBalance [EN, FR]
+  - dashboard.addFunds [EN, FR]
+  - dashboard.changePassword [EN, FR]
+  - dashboard.completedTransactions [EN, FR]
+  - dashboard.deleteAccount [EN, FR]
+  - dashboard.emailPreferences [EN, FR]
+  - dashboard.invoices [EN, FR]
+  - dashboard.notificationPreferences [EN, FR]
+  - dashboard.payouts [EN, FR]
+  - dashboard.pendingPayment [EN, FR]
+  - dashboard.securitySettings [EN, FR]
+  - dashboard.seller.statusActive [EN, FR]
+  - dashboard.seller.statusCancelled [EN, FR]
+  - dashboard.seller.statusDraft [EN, FR]
+  - dashboard.seller.statusEnded [EN, FR]
+  - dashboard.seller.statusPending [EN, FR]
+  - dashboard.seller.statusSold [EN, FR]
+  - dashboard.seller.tierFree [EN, FR]
+  - dashboard.seller.tierPartnerPro [EN, FR]
+  - dashboard.seller.tierPremium [EN, FR]
+  - dashboard.seller.tierVip [EN, FR]
+  - dashboard.totalEarned [EN, FR]
+  - dashboard.twoFactorAuth [EN, FR]
+  - dashboard.withdrawFunds [EN, FR]
+  - errors.auctionNotStarted [EN, FR]
+  - errors.bidBelowMinimum [EN, FR]
+  - errors.fileTooLarge [EN, FR]
+  - errors.forbidden [EN, FR]
+  - errors.genericError [EN, FR]
+  - errors.insufficientFunds [EN, FR]
+  - errors.invalidFormat [EN, FR]
+  - errors.invalidLogin [EN, FR]
+  - errors.itemNotFound [EN, FR]
+  - errors.sessionExpired [EN, FR]
+  - errors.uploadFailed [EN, FR]
+  - fees.feeStructure [EN, FR]
+  - fees.latePaymentPenalty [EN, FR]
+  - fees.paymentTerms [EN, FR]
+  - fees.sellerPremiumRate [EN, FR]
+  - fees.sellerStandardRate [EN, FR]
+  - fees.sellerVipRate [EN, FR]
+  - footer.accessibility [EN, FR]
+  - footer.blog [EN, FR]
+  - footer.careers [EN, FR]
+  - footer.enterEmail [EN, FR]
+  - footer.helpCenter [EN, FR]
+  - footer.newsletter [EN, FR]
+  - footer.press [EN, FR]
+  - footer.sitemap [EN, FR]
+  - footer.subscribe [EN, FR]
+  - footer.subscribeNewsletter [EN, FR]
+  - homepage.featuredAuctions [EN, FR]
+  - homepage.heroSubtitle [EN, FR]
+  - homepage.heroTitle [EN, FR]
+  - homepage.joinCommunity [EN, FR]
+  - homepage.newListings [EN, FR]
+  - homepage.seeMore [EN, FR]
+  - homepage.welcome [EN, FR]
+  - legal.asIs [EN, FR]
+  - legal.asIsDescription [EN, FR]
+  - legal.auctionRules [EN, FR]
+  - legal.bindingContract [EN, FR]
+  - legal.buyerAssumesRisk [EN, FR]
+  - legal.cookiePolicy [EN, FR]
+  - legal.copyright [EN, FR]
+  - legal.disclaimer [EN, FR]
+  - legal.inspectionRecommended [EN, FR]
+  - legal.noReturns [EN, FR]
+  - legal.noWarranty [EN, FR]
+  - legal.platformRole [EN, FR]
+  - legal.refundPolicy [EN, FR]
+  - legal.shippingPolicy [EN, FR]
+  - maintenance.comingSoon [EN, FR]
+  - maintenance.subscribing [EN, FR]
+  - maintenance.underMaintenance [EN, FR]
+  - marketplace.activeAuctions [EN, FR]
+  - marketplace.allCategories [EN, FR]
+  - marketplace.applyFilters [EN, FR]
+  - marketplace.endsIn [EN, FR]
+  - marketplace.filterResults [EN, FR]
+  - marketplace.lotDetails [EN, FR]
+  - marketplace.newListings [EN, FR]
+  - marketplace.priceRange [EN, FR]
+  - marketplace.reserveMet [EN, FR]
+  - marketplace.sortBy [EN, FR]
+  - navigation.help [EN, FR]
+  - seller.auctionDuration [EN, FR]
+  - seller.buyNowPrice [EN, FR]
+  - seller.editListing [EN, FR]
+  - seller.endDate [EN, FR]
+  - seller.estimatedPayout [EN, FR]
+  - seller.itemDescription [EN, FR]
+  - seller.itemTitle [EN, FR]
+  - seller.listingDetails [EN, FR]
+  - seller.listingFee [EN, FR]
+  - seller.pickupOnly [EN, FR]
+  - seller.previewListing [EN, FR]
+  - seller.publishListing [EN, FR]
+  - seller.reservePrice [EN, FR]
+  - seller.saveDraft [EN, FR]
+  - seller.setLocation [EN, FR]
+  - seller.shippingOptions [EN, FR]
+  - seller.startDate [EN, FR]
+  - seller.startingPrice [EN, FR]
+  - seller.uploadDocuments [EN, FR]
+  - seller.uploadPhotos [EN, FR]
+  - settings.accountInfo [EN, FR]
+  - settings.auctionReminders [EN, FR]
+  - settings.bankAccount [EN, FR]
+  - settings.bidAlerts [EN, FR]
+  - settings.changePassword [EN, FR]
+  - settings.connectedAccounts [EN, FR]
+  - settings.darkMode [EN, FR]
+  - settings.emailNotifications [EN, FR]
+  - settings.identityVerification [EN, FR]
+  - settings.notificationPrefs [EN, FR]
+  - settings.payoutSettings [EN, FR]
+  - settings.pending [EN, FR]
+  - settings.privacySettings [EN, FR]
+  - settings.promotionalEmails [EN, FR]
+  - settings.pushNotifications [EN, FR]
+  - settings.securitySettings [EN, FR]
+  - settings.smsNotifications [EN, FR]
+  - settings.taxInformation [EN, FR]
+  - settings.timezone [EN, FR]
+  - settings.twoFactorAuth [EN, FR]
+  - settings.unverified [EN, FR]
+  - settings.uploadId [EN, FR]
+  - settings.verificationStatus [EN, FR]
+  - settings.verified [EN, FR]
+  - settings.verifyIdentity [EN, FR]
+  - success.accountUpdated [EN, FR]
+  - success.bidPlaced [EN, FR]
+  - success.emailSent [EN, FR]
+  - success.listingCreated [EN, FR]
+  - success.listingUpdated [EN, FR]
+  - success.passwordChanged [EN, FR]
+  - success.removedFromWatchlist [EN, FR]
+  - success.savedToWatchlist [EN, FR]
+  - time.ago [EN, FR]
+  - time.left [EN, FR]
+  - vehicles.automatic [EN, FR]
+  - vehicles.cleanTitle [EN, FR]
+  - vehicles.conditionReport [EN, FR]
+  - vehicles.diesel [EN, FR]
+  - vehicles.drivetrain [EN, FR]
+  - vehicles.electric [EN, FR]
+  - vehicles.engineSize [EN, FR]
+  - vehicles.exteriorColor [EN, FR]
+  - vehicles.floodTitle [EN, FR]
+  - vehicles.fuelType [EN, FR]
+  - vehicles.gasoline [EN, FR]
+  - vehicles.hybrid [EN, FR]
+  - vehicles.inspectionAvailable [EN, FR]
+  - vehicles.interiorColor [EN, FR]
+  - vehicles.lemonTitle [EN, FR]
+  - vehicles.makeModel [EN, FR]
+  - vehicles.manual [EN, FR]
+  - vehicles.mileage [EN, FR]
+  - vehicles.nonRunning [EN, FR]
+  - vehicles.rebuiltTitle [EN, FR]
+  - vehicles.running [EN, FR]
+  - vehicles.salvageTitle [EN, FR]
+  - vehicles.sellerRegistration [EN, FR]
+  - vehicles.titleStatus [EN, FR]
+  - vehicles.transmission [EN, FR]
+  - vehicles.verifiedSeller [EN, FR]
+  - vehicles.vin [EN, FR]
+  - vehicles.vinDecoded [EN, FR]
+  - vehicles.year [EN, FR]
+
+Note: Some keys may be referenced dynamically (template literals, computed keys).
+Review before deleting.
+
+──────────────────────────────────────────────────────────────────────
+  SECTION 4: POTENTIAL HARDCODED STRINGS
+──────────────────────────────────────────────────────────────────────
+Found 202 potential hardcoded strings:
+
+  components/AdminBannerManager.js:
+    Line 320: "Banner Title"
+      <Label htmlFor="title">Banner Title</Label>
+    Line 342: "Banner Image"
+      <Label>Banner Image</Label>
+
+  components/AutoBidModal.js:
+    Line 154: "Current Bid"
+      <Label>Current Bid</Label>
+    Line 164: "Maximum Bid Amount"
+      <Label htmlFor="max-bid-amount">Maximum Bid Amount</Label>
+
+  components/AvatarUpload.js:
+    Line 90: "Edit Profile Photo"
+      <DialogTitle>Edit Profile Photo</DialogTitle>
+
+  components/BuyNowButton.js:
+    Line 209: "Buy Now"
+      This is a <strong>Buy Now</strong> purchase. You will immediately secure {quantity} unit(s) at the fixed price of {forma
+
+  components/DecomposedMarketplace.js:
+    Line 145: "Promoted First"
+      <option value="-promoted">Promoted First</option>
+    Line 146: "Ending Soon"
+      <option value="ending_soon">Ending Soon</option>
+    Line 149: "Newest First"
+      <option value="-created_at">Newest First</option>
+    Line 157: "All Conditions"
+      <option value="">All Conditions</option>
+    Line 159: "Like New"
+      <option value="like_new">Like New</option>
+
+  components/FlattenedMarketplace.js:
+    Line 262: "All Categories"
+      <option value="">All Categories</option>
+    Line 275: "All Conditions"
+      <option value="">All Conditions</option>
+    Line 277: "Like New"
+      <option value="like_new">Like New</option>
+    Line 278: "Excellent"
+      <option value="excellent">Excellent</option>
+    Line 288: "Featured First"
+      <option value="-promoted">Featured First</option>
+    Line 289: "Ending Soon"
+      <option value="ending_soon">Ending Soon</option>
+    Line 292: "Newest First"
+      <option value="-created_at">Newest First</option>
+
+  components/LocationSearchMap.js:
+    Line 77: "Error loading maps"
+      if (loadError) return <div>Error loading maps</div>;
+
+  components/LocationSelector.js:
+    Line 141: "United States"
+      <SelectItem value="US">United States</SelectItem>
+
+  components/PromotionManagerModal.js:
+    Line 184: "All Ages"
+      <option value="">All Ages</option>
+    Line 194: "Interests"
+      <Label htmlFor="interests">Interests</Label>
+
+  components/RealtimeBiddingPanel.js:
+    Line 220: "This lot contains"
+      <strong>Multi-Item Lot:</strong> This lot contains <strong>{quantity} items</strong>.
+
+  components/ShareButton.js:
+    Line 99: "Copy Link"
+      <span>Copy Link</span>
+    Line 117: "Facebook"
+      <span>Facebook</span>
+
+  components/SocialShare.js:
+    Line 98: "Copy Link"
+      <span>Copy Link</span>
+
+  components/TrendySubscriptionCards.js:
+    Line 336: "Subtotal"
+      <span>Subtotal</span>
+    Line 348: "Processing fee"
+      <span>Processing fee</span>
+
+  components/admin/HeroBannerEditor.js:
+    Line 535: "Desktop Image"
+      <Label>Desktop Image</Label>
+    Line 555: "Mobile Image"
+      <Label>Mobile Image</Label>
+    Line 587: "Title Color"
+      <Label>Title Color</Label>
+    Line 604: "Subtitle Color"
+      <Label>Subtitle Color</Label>
+    Line 625: "Button Background"
+      <Label>Button Background</Label>
+    Line 642: "Button Text Color"
+      <Label>Button Text Color</Label>
+    Line 663: "Overlay Color"
+      <Label>Overlay Color</Label>
+    Line 681: "Overlay Opacity"
+      <span>Overlay Opacity</span>
+    Line 702: "Font Family"
+      <Label>Font Family</Label>
+    Line 722: "Title Size"
+      <Label>Title Size</Label>
+    Line 738: "Subtitle Size"
+      <Label>Subtitle Size</Label>
+
+  components/legal/PrivacyEN.jsx:
+    Line 54: "This policy is designed to comply with the"
+      <strong>Compliance:</strong> This policy is designed to comply with the <strong>Act respecting the protection of persona
+    Line 282: "Your browsing and search history"
+      <li>Your browsing and search history</li>
+    Line 283: "Past bidding and purchase patterns"
+      <li>Past bidding and purchase patterns</li>
+
+  components/legal/PrivacyFR.jsx:
+    Line 282: "Votre historique de navigation et de recherche"
+      <li>Votre historique de navigation et de recherche</li>
+
+  components/legal/TermsEN.jsx:
+    Line 124: "You must be at least"
+      <p>You must be at least <strong>eighteen (18) years of age</strong> and possess the legal capacity to enter into binding
+    Line 484: "These Terms and your use of the Platform are governed by and construed in accordance with the laws of the"
+      <p>These Terms and your use of the Platform are governed by and construed in accordance with the laws of the <strong>Pro
+    Line 484: "Province of Quebec"
+      <p>These Terms and your use of the Platform are governed by and construed in accordance with the laws of the <strong>Pro
+
+  components/legal/TermsFR.jsx:
+    Line 123: "Vous devez avoir au moins"
+      <p>Vous devez avoir au moins <strong>dix-huit (18) ans</strong> et posséder la capacité juridique de conclure des contra
+
+  components/vehicles/AuctionRulesDisplay.js:
+    Line 111: "Bids in final"
+      <span>Bids in final <strong>2 minutes</strong> trigger a 2-minute extension</span>
+    Line 365: "Binding bids"
+      <span>Binding bids</span>
+    Line 369: "Tiered increments"
+      <span>Tiered increments</span>
+    Line 373: "Transparent history"
+      <span>Transparent history</span>
+
+  components/vehicles/LegalDisclaimers.js:
+    Line 171: "All bids are legally binding contracts"
+      <span>All bids are legally binding contracts</span>
+    Line 361: "Your deposit of"
+      <span>Your deposit of <strong>${amount}</strong> has been confirmed. You may now place bids.</span>
+
+  components/vehicles/PricingBreakdown.js:
+    Line 166: "Total Payable"
+      <span>Total Payable</span>
+    Line 287: "Deposit Credit"
+      <span>Deposit Credit</span>
+
+  components/vehicles/PricingCalculator.js:
+    Line 243: "Enter a bid amount to see pricing breakdown"
+      <span>Enter a bid amount to see pricing breakdown</span>
+    Line 329: "Transaction processing and platform service fee"
+      <p>Transaction processing and platform service fee</p>
+
+  components/vehicles/SellerDocumentManager.js:
+    Line 388: "Required Documents"
+      <CardTitle>Required Documents</CardTitle>
+
+  pages/AdminTaxDashboard.js:
+    Line 176: "Start Date"
+      <Label>Start Date</Label>
+    Line 180: "End Date"
+      <Label>End Date</Label>
+    Line 384: "Detailed Regional Breakdown"
+      <CardTitle>Detailed Regional Breakdown</CardTitle>
+
+  pages/AuthPage.js:
+    Line 150: "New Password"
+      <Label htmlFor="newPassword">New Password</Label>
+    Line 176: "Confirm Password"
+      <Label htmlFor="confirmPassword">Confirm Password</Label>
+    Line 203: "Set New Password"
+      <>Set New Password</>
+
+  pages/BuyerDashboard.js:
+    Line 161: "Auction Ended"
+      {isEnded && <Badge variant="destructive">Auction Ended</Badge>}
+    Line 331: "Auction Ended"
+      {isEnded && <Badge variant="destructive">Auction Ended</Badge>}
+    Line 403: "Purchase History"
+      <CardTitle>Purchase History</CardTitle>
+
+  pages/ClientEmailMarketing.js:
+    Line 375: "Auction Alert"
+      <h1 style="color: white; margin: 0; font-size: 24px;">Auction Alert</h1>
+    Line 401: "Unsubscribe"
+      <a href="{{unsubscribe_url}}" style="color: #999;">Unsubscribe</a>
+    Line 505: "All premium templates"
+      <li>All premium templates</li>
+    Line 530: "Priority delivery queue"
+      <li>Priority delivery queue</li>
+    Line 531: "Advanced analytics"
+      <li>Advanced analytics</li>
+    Line 955: "Campaign Performance"
+      <CardTitle>Campaign Performance</CardTitle>
+    Line 987: "Add Contact"
+      <DialogTitle>Add Contact</DialogTitle>
+    Line 1032: "Bulk Add Contacts"
+      <DialogTitle>Bulk Add Contacts</DialogTitle>
+    Line 1077: "Start with a Template"
+      <Label>Start with a Template</Label>
+
+  pages/CreateListingPage.js:
+    Line 174: "Account Settings"
+      Check your email for the payment link, or go to your <strong>Account Settings</strong> to initiate payment.
+
+  pages/InviteAcceptPage.js:
+    Line 127: "Full Name"
+      <Label htmlFor="name">Full Name</Label>
+    Line 131: "Password"
+      <Label htmlFor="password">Password</Label>
+    Line 145: "Confirm Password"
+      <Label htmlFor="confirmPassword">Confirm Password</Label>
+
+  pages/LegalPage.js:
+    Line 66: "You must be at least"
+      <p>You must be at least <strong>eighteen (18) years of age</strong> and possess the legal capacity to enter into binding
+    Line 137: "Full payment for all winning bids is due within"
+      <p>Full payment for all winning bids is due within <strong>fourteen (14) days</strong> of the auction close.</p>
+    Line 138: "Payments not received by the due date may incur a late payment penalty of"
+      <p><strong>Late Payments:</strong> Payments not received by the due date may incur a late payment penalty of <strong>2% 
+    Line 141: "All payments are handled via"
+      <p>All payments are handled via <strong>Stripe</strong>, a secure third-party payment processor. BidVex does not store, 
+    Line 210: "These Terms and your use of the Platform are governed by and construed in accordance with the laws of the"
+      <p>These Terms and your use of the Platform are governed by and construed in accordance with the laws of the <strong>Pro
+    Line 210: "Province of Quebec"
+      <p>These Terms and your use of the Platform are governed by and construed in accordance with the laws of the <strong>Pro
+    Line 238: "This policy is designed to comply with the"
+      <p><strong>Compliance:</strong> This policy is designed to comply with the <strong>Act respecting the protection of pers
+    Line 302: "Encryption in transit"
+      <li><strong>TLS/SSL:</strong> Encryption in transit</li>
+    Line 303: "Encryption at rest"
+      <li><strong>AES-256:</strong> Encryption at rest</li>
+    Line 304: "Payment compliance"
+      <li><strong>PCI-DSS:</strong> Payment compliance</li>
+
+  pages/ProfileSettingsPage.js:
+    Line 366: "Manage your payment methods for bidding"
+      <CardDescription>Manage your payment methods for bidding</CardDescription>
+
+  pages/SubscriptionPricingPage.js:
+    Line 423: "Payment setup pending"
+      <span>Payment setup pending</span>
+    Line 570: "Cancel Anytime"
+      <span>Cancel Anytime</span>
+    Line 572: "Instant Access"
+      <span>Instant Access</span>
+
+  pages/admin/AIGuardDashboard.js:
+    Line 369: "All Statuses"
+      <SelectItem value="all">All Statuses</SelectItem>
+    Line 370: "Pending Review"
+      <SelectItem value="pending_review">Pending Review</SelectItem>
+    Line 371: "Under Investigation"
+      <SelectItem value="under_investigation">Under Investigation</SelectItem>
+    Line 373: "Confirmed Fraud"
+      <SelectItem value="confirmed_fraud">Confirmed Fraud</SelectItem>
+    Line 381: "All Types"
+      <SelectItem value="all">All Types</SelectItem>
+
+  pages/admin/AdminLogs.js:
+    Line 83: "User Updates"
+      <Button variant={filter === 'user_update' ? 'default' : 'outline'} onClick={() => setFilter('user_update')}>User Updates
+    Line 84: "Moderation"
+      <Button variant={filter === 'listing_moderate' ? 'default' : 'outline'} onClick={() => setFilter('listing_moderate')}>Mo
+    Line 85: "Promotions"
+      <Button variant={filter === 'promotion_create' ? 'default' : 'outline'} onClick={() => setFilter('promotion_create')}>Pr
+
+  pages/admin/AffiliateManager.js:
+    Line 81: "Payout Requests"
+      <CardHeader><CardTitle>Payout Requests</CardTitle></CardHeader>
+    Line 108: "Manage Affiliate Status"
+      <CardHeader><CardTitle>Manage Affiliate Status</CardTitle></CardHeader>
+
+  pages/admin/AnalyticsDashboard.js:
+    Line 92: "Listing Status Distribution"
+      <CardHeader><CardTitle>Listing Status Distribution</CardTitle></CardHeader>
+
+  pages/admin/AnnouncementManager.js:
+    Line 85: "Create Announcement"
+      <CardHeader><CardTitle>Create Announcement</CardTitle></CardHeader>
+    Line 99: "All Users"
+      <option value="all">All Users</option>
+    Line 100: "Buyers Only"
+      <option value="buyers">Buyers Only</option>
+    Line 101: "Sellers Only"
+      <option value="sellers">Sellers Only</option>
+    Line 102: "Business Accounts"
+      <option value="business">Business Accounts</option>
+
+  pages/admin/AuctionControl.js:
+    Line 217: "Set limits to maintain marketplace quality"
+      <CardDescription>Set limits to maintain marketplace quality</CardDescription>
+    Line 306: "Configure auction bidding behavior"
+      <CardDescription>Configure auction bidding behavior</CardDescription>
+
+  pages/admin/BrandingLayoutManager.js:
+    Line 272: "Define your brand colors"
+      <CardDescription>Define your brand colors</CardDescription>
+
+  pages/admin/CouponManager.js:
+    Line 242: "Discount Type"
+      <Label>Discount Type</Label>
+    Line 320: "Applicable Plans"
+      <Label>Applicable Plans</Label>
+    Line 472: "All Coupons"
+      <CardTitle>All Coupons</CardTitle>
+    Line 562: "Inactive"
+      <Badge variant="secondary">Inactive</Badge>
+
+  pages/admin/CurrencyAppealsManager.js:
+    Line 198: "Admin Notes"
+      <Label htmlFor={`notes-${appeal.id}`}>Admin Notes</Label>
+    Line 252: "Appeal Statistics"
+      <CardTitle>Appeal Statistics</CardTitle>
+
+  pages/admin/EmailMarketingManager.js:
+    Line 403: "Unsubscribe"
+      <a href="{{unsubscribe_url}}" style="color: #999;">Unsubscribe</a>
+    Line 773: "Send Test Email"
+      <DialogTitle>Send Test Email</DialogTitle>
+    Line 774: "Preview the campaign in your inbox"
+      <DialogDescription>Preview the campaign in your inbox</DialogDescription>
+    Line 778: "Email Address"
+      <Label>Email Address</Label>
+    Line 801: "Schedule Campaign"
+      <DialogTitle>Schedule Campaign</DialogTitle>
+    Line 802: "Choose when to send this campaign"
+      <DialogDescription>Choose when to send this campaign</DialogDescription>
+    Line 838: "This will cancel the scheduled campaign"
+      <DialogDescription>This will cancel the scheduled campaign</DialogDescription>
+    Line 852: "Keep Scheduled"
+      <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>Keep Scheduled</Button>
+    Line 971: "All Status"
+      <SelectItem value="all">All Status</SelectItem>
+    Line 973: "Scheduled"
+      <SelectItem value="scheduled">Scheduled</SelectItem>
+    Line 975: "Cancelled"
+      <SelectItem value="cancelled">Cancelled</SelectItem>
+    Line 1057: "From Name"
+      <Label>From Name</Label>
+    Line 1142: "Any Activity"
+      <SelectItem value="all">Any Activity</SelectItem>
+    Line 1405: "Send Test Email"
+      <DialogTitle>Send Test Email</DialogTitle>
+    Line 1406: "Preview the campaign in your inbox"
+      <DialogDescription>Preview the campaign in your inbox</DialogDescription>
+    Line 1410: "Email Address"
+      <Label>Email Address</Label>
+
+  pages/admin/MarketplaceSettings.js:
+    Line 212: "Control who can create auctions"
+      <CardDescription>Control who can create auctions</CardDescription>
+    Line 256: "Set maximum quantities per user"
+      <CardDescription>Set maximum quantities per user</CardDescription>
+    Line 302: "Configure bid increments and pricing"
+      <CardDescription>Configure bid increments and pricing</CardDescription>
+
+  pages/admin/PricingManager.js:
+    Line 204: "Inactive"
+      <Badge variant="secondary">Inactive</Badge>
+    Line 485: "Plan Active"
+      <Label>Plan Active</Label>
+
+  pages/admin/PromotionManager.js:
+    Line 94: "Create New Promotion"
+      <CardHeader><CardTitle>Create New Promotion</CardTitle></CardHeader>
+    Line 108: "Featured"
+      <option value="featured">Featured</option>
+    Line 151: "Feature Listings Manually"
+      <CardHeader><CardTitle>Feature Listings Manually</CardTitle></CardHeader>
+
+  pages/admin/ReportManager.js:
+    Line 61: "Resolved"
+      <Button variant={filter.status === 'resolved' ? 'default' : 'outline'} onClick={() => setFilter({ status: 'resolved' })}
+    Line 77: "Resolved"
+      <option value="resolved">Resolved</option>
+
+  pages/admin/SiteModeManager.js:
+    Line 320: "Select Site Mode"
+      <CardTitle>Select Site Mode</CardTitle>
+    Line 321: "Choose how visitors will see your website"
+      <CardDescription>Choose how visitors will see your website</CardDescription>
+    Line 363: "Page Settings"
+      <CardTitle>Page Settings</CardTitle>
+    Line 364: "Customize the message shown to visitors"
+      <CardDescription>Customize the message shown to visitors</CardDescription>
+    Line 468: "Email signups from coming soon page"
+      <CardDescription>Email signups from coming soon page</CardDescription>
+    Line 526: "Launch Subscribers"
+      <DialogTitle>Launch Subscribers</DialogTitle>
+    Line 527: "Manage email subscribers from the coming soon page"
+      <DialogDescription>Manage email subscribers from the coming soon page</DialogDescription>
+    Line 562: "Subscribed"
+      <TableHead>Subscribed</TableHead>
+
+  pages/admin/SubscriptionManager.js:
+    Line 522: "Select Plan"
+      <Label>Select Plan</Label>
+    Line 545: "Duration Type"
+      <Label>Duration Type</Label>
+    Line 568: "Number of Days"
+      <Label>Number of Days</Label>
+    Line 592: "End Date"
+      <Label>End Date</Label>
+    Line 640: "Additional Days"
+      <Label>Additional Days</Label>
+    Line 833: "All Plans"
+      <SelectItem value="all">All Plans</SelectItem>
+    Line 844: "All Sources"
+      <SelectItem value="all">All Sources</SelectItem>
+
+  pages/admin/TaxVerificationQueue.js:
+    Line 233: "Receive email confirmation"
+      <li>Receive email confirmation</li>
+
+  pages/admin/TrustSafetyDashboard.js:
+    Line 147: "User Trust Scores"
+      <CardHeader><CardTitle>User Trust Scores</CardTitle></CardHeader>
+    Line 178: "Fraud Detection Flags"
+      <CardHeader><CardTitle>Fraud Detection Flags</CardTitle></CardHeader>
+    Line 221: "Require Seller Verification"
+      <Button size="sm" variant="outline" onClick={() => handleAutoAction(pattern.seller_id, 'require_verification')}>Require 
+    Line 222: "Require Buyer Verification"
+      <Button size="sm" variant="outline" onClick={() => handleAutoAction(pattern.buyer_id, 'require_verification')}>Require B
+
+  pages/admin/VehicleAdminManager.js:
+    Line 682: "Enable Vehicle Auctions"
+      <CardTitle>Enable Vehicle Auctions</CardTitle>
+    Line 738: "Enable Vehicle Listing"
+      <CardTitle>Enable Vehicle Listing</CardTitle>
+    Line 843: "Recent Actions"
+      <CardTitle>Recent Actions</CardTitle>
+    Line 844: "Audit trail for vehicle module operations"
+      <CardDescription>Audit trail for vehicle module operations</CardDescription>
+    Line 895: "Free Tier"
+      <Badge variant="outline">Free Tier</Badge>
+    Line 963: "Free Tier"
+      <Badge variant="outline">Free Tier</Badge>
+
+  pages/vehicles/CreateVehicleListingPage.js:
+    Line 611: "Financed"
+      <SelectItem value="financed">Financed</SelectItem>
+    Line 634: "Lien Exists"
+      <SelectItem value="lien_exists">Lien Exists</SelectItem>
+    Line 635: "Pending Release"
+      <SelectItem value="pending_release">Pending Release</SelectItem>
+    Line 721: "Mechanical Notes"
+      <Label>Mechanical Notes</Label>
+    Line 730: "Cosmetic Notes"
+      <Label>Cosmetic Notes</Label>
+    Line 866: "Timed Auction"
+      <SelectItem value="timed">Timed Auction</SelectItem>
+    Line 867: "Live Auction"
+      <SelectItem value="live">Live Auction</SelectItem>
+    Line 868: "Buy Now Only"
+      <SelectItem value="buy_now">Buy Now Only</SelectItem>
+    Line 879: "Dealers Only"
+      <SelectItem value="dealer_only">Dealers Only</SelectItem>
+    Line 1037: "All information provided is accurate and complete"
+      <li>All information provided is accurate and complete</li>
+    Line 1038: "You have legal authority to sell this vehicle"
+      <li>You have legal authority to sell this vehicle</li>
+    Line 1039: "You will respond to buyer inquiries promptly"
+      <li>You will respond to buyer inquiries promptly</li>
+
+  pages/vehicles/SellerFinancialsPage.js:
+    Line 232: "Financial Overview"
+      <CardTitle>Financial Overview</CardTitle>
+
+  pages/vehicles/SellerRegistrationPage.js:
+    Line 169: "Seller Account Status"
+      <CardTitle>Seller Account Status</CardTitle>
+    Line 370: "Business Phone"
+      <Label>Business Phone</Label>
+    Line 380: "Business Address"
+      <Label>Business Address</Label>
+    Line 398: "License Province"
+      <Label>License Province</Label>
+    Line 443: "Your application will be reviewed by our team"
+      <li>Your application will be reviewed by our team</li>
+
+  pages/vehicles/VehicleDetailPage.js:
+    Line 414: "Login to Bid"
+      <>Login to Bid</>
+    Line 436: "Buyer Protection"
+      <span>Buyer Protection</span>
+    Line 440: "Secure Payment"
+      <span>Secure Payment</span>
+    Line 471: "You are responsible for inspecting the vehicle"
+      <li>You are responsible for inspecting the vehicle</li>
+    Line 472: "The seller is responsible for title and ownership disclosure"
+      <li>The seller is responsible for title and ownership disclosure</li>
+    Line 474: "All bids are legally binding"
+      <li>All bids are legally binding</li>
+    Line 629: "Vehicle Specifications"
+      <CardTitle>Vehicle Specifications</CardTitle>
+    Line 688: "Description"
+      <CardTitle>Description</CardTitle>
+    Line 711: "Documentation"
+      <CardTitle>Documentation</CardTitle>
+    Line 742: "Condition Report"
+      <CardTitle>Condition Report</CardTitle>
+    Line 952: "Email Confirmed"
+      <span>Email Confirmed</span>
+    Line 956: "Phone Verified"
+      <span>Phone Verified</span>
+    Line 961: "License Verified"
+      <span>License Verified</span>
+
+Note: Some may be false positives (component names, enum values, user content).
+Review each one manually.
+
+======================================================================
+  END OF REPORT
+======================================================================
