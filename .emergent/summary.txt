@@ -1,67 +1,65 @@
-<analysis>**original_problem_statement**: The user wants to implement two new features after a major three-phase refactor:
-
-1.  **Smart Localized Currency Formatting**: Implement a platform-wide utility to format currency based on the user's language ( vs. ).
-    *   **FR-QC**:  (space for thousands, comma for decimal, symbol at end).
-    *   **EN**:  (comma for thousands, period for decimal, symbol at start).
-    *   This should be applied to all marketplace pages, sell flows, checkout, and dashboards.
-    *   Stripe API calls must continue to use integers (cents).
-
-2.  **Admin Tax Dashboard**: Build a new admin-only dashboard to track and export tax liabilities (GST/QST/HST).
-    *   **Backend**: A new secure API endpoint to aggregate tax data from completed transactions, including totals and regional breakdowns.
-    *   **Frontend**: A new page () with:
-        *   Hero cards for total GST, QST, etc.
-        *   A chart for regional tax breakdown.
-        *   Date filtering capabilities.
-        *   A CSV export feature for accountants.
-        *   A Net Cash vs. Tax Reserve comparison.
+<analysis>**original_problem_statement**: The user initially requested two features: Smart Localized Currency Formatting and an Admin Tax Dashboard. After their completion, the user reported and the agent fixed a UI visibility bug on the homepage. Following this, the user requested a full responsive design overhaul for the entire application. Most recently, the user has initiated a multi-phase performance engineering overhaul to improve Core Web Vitals and page load speed, with phases P0 and P1 completed, and phase P2 now approved to begin.
 
 **User's preferred language**: English
 
 **what currently exists?**
-The agent has completed a three-phase refactor of the Sell flows (Unified Location, Mobile Responsiveness, and EN/FR Translation).
-
-For the new tasks, the agent has:
-1.  Created a reusable currency formatting utility at  and applied it to several high-traffic pages like , , , and .
-2.  Built the backend foundation for the Tax Dashboard, including a new route () with a functional API endpoint () that aggregates data.
-3.  Created the frontend shell for the Tax Dashboard at  and linked it from the main admin panel.
+The application is a full-stack auction marketplace. The agent has successfully completed several major tasks in this session:
+1.  **Feature Implementation**: Smart Localized Currency Formatting and a full-featured Admin Tax Dashboard are complete and tested.
+2.  **Bug Fix**: A text visibility issue on the homepage's Trending Items cards in light mode has been resolved.
+3.  **Responsive Design Overhaul**: A comprehensive responsive fix has been applied across the application, addressing issues on mobile, tablet, and desktop for components like the Navbar, Homepage grids, Hero banner, and floating elements.
+4.  **Performance Engineering (P0 & P1)**:
+    *   **Code Splitting**: All 40+ page components in  have been converted to use  with a  fallback.
+    *   **Backend Compression**: GZip middleware has been added to the FastAPI backend ().
+    *   **API Caching**: An in-memory TTL cache () has been implemented and applied to high-traffic public endpoints like  and .
+    *   **Database Indexing**: Comprehensive indexes have been added to the , , , and  collections to speed up queries.
+    *   **Image Optimization**: A global  attribute has been applied to images via CSS.
+    *   **Critical Rendering Path**:  has been updated with a basic inline skeleton loader to mitigate the blank white screen effect.
+    *   **SEO**: Basic SEO has been implemented using , and  and  have been created.
+    *   **Debouncing**: Search inputs in key marketplace components have been debounced.
 
 **Last working item**:
-    - Last item agent was working: The agent just finished setting up the foundational pieces for the **Admin Tax Dashboard**. It created and tested the backend API endpoint and created the skeleton frontend component, adding the necessary routing and navigation links. A smoke-test screenshot confirmed the empty dashboard page renders correctly.
-    - Status: IN PROGRESS
-    - Agent Testing Done: Y (API tested with , frontend page rendered via screenshot)
+    - Last item agent was working: The user has just approved the plan for the **P2 Performance Engineering** tasks. The immediate next action is to provide the user with the step-by-step Cloudflare CDN setup instructions documented in , as requested.
+    - Status: NOT STARTED
+    - Agent Testing Done: Y (For all previously completed work, including P0 and P1 performance tasks)
     - Which testing method agent to use? both
     - User Testing Done: N
 
 **All Pending/In progress Issue list**:
-  - There are no pending issues or bugs. The current work is focused on feature implementation.
+  - There are no pending bugs. All work is feature/task-driven.
 
 **In progress Task List**:
-  - Task 1:  **Implement Smart Localized Currency Formatting (P0)**
-     - Where to resume: The utility is built and applied to major pages. The next step is to perform a final sweep across the codebase for any remaining hardcoded price formats (e.g.,  or ) in less common pages like , , and vehicle-related pages to ensure 100% coverage.
-     - What will be achieved with this?: All prices displayed throughout the application will respect the user's language and regional formatting conventions (EN vs. FR-QC).
-     - Status:  IN PROGRESS
-     - Should Test frontend/backend/both after fix?: frontend
-     - Blocked on something: None
-  - Task 2: **Build Admin Tax Dashboard UI (P0)**
-     - Where to resume: The backend API and frontend shell exist. The next step is to build out the UI in . This involves fetching data from the new  endpoint and rendering the UI elements as requested: stat cards, a regional breakdown chart (using the available  library), date filters, and the CSV export button.
-     - What will be achieved with this?: A fully functional dashboard for administrators to monitor and manage tax liabilities.
-     - Status:  IN PROGRESS
+  - Task 1:  **Execute P2 Performance Engineering & Refactoring (P0)**
+     - **Step 1: Provide Cloudflare CDN Instructions**
+        - Where to resume: Read the file  and present the step-by-step Cloudflare setup instructions to the user via . This is a documentation-only step with no coding.
+        - Status: NOT STARTED
+     - **Step 2: React Query Migration**
+        - Where to resume: Install . Wrap the entire application in  inside  or . Begin migrating data-fetching logic, starting with the highest-traffic endpoint for auction listings ( or ), then categories, and finally user-specific data.
+        - Status: NOT STARTED
+     - **Step 3: Implement Cursor Pagination**
+        - Where to resume: Modify the backend endpoint for listings (e.g., in ) to accept a  parameter (using ) and return a  in the response. Update the corresponding frontend component (e.g., ) to handle infinite scrolling or a Load More button.
+        - Status: NOT STARTED
+     - **Step 4: Refactor **
+        - Where to resume: After all other P2 tasks are complete, create new route files (e.g., , ) and move the relevant routers and logic out of the monolithic .
+        - Status: NOT STARTED
+     - What will be achieved with this?: This will complete the performance overhaul by introducing client-side caching and efficient data loading, and improve backend maintainability.
      - Should Test frontend/backend/both after fix?: both
-     - Blocked on something: None
+     - Blocked on something: None. The user has instructed the agent to proceed autonomously through all steps.
 
 **Upcoming and Future Tasks**
+*   **Upcoming Tasks:**
+    *   (P1) Add swipeable card carousels on mobile for a better UX.
 *   **Future Tasks:**
-    *   Add a Premium Comparison view in the marketplace.
-    *   Replace local PDF invoice mock storage with a cloud service (e.g., S3).
-    *   Implement the Partner Pro subscription tier.
-    *   Expand email template test coverage.
-    *   Auto-detect user's province for faster location selection.
-    *   Allow sellers to save location profiles.
+    *   (P2) Add a Premium Comparison view in the marketplace.
+    *   (P2) Replace local PDF invoice mock storage with a cloud service like S3.
+    *   (P2) Implement the Partner Pro subscription tier.
+    *   (P3) Expand email template test coverage.
 
 **Completed work in this session**
-- **Phase A: Unified Location Architecture**: Implemented a reusable  component with a  data source, integrated it into all three Sell forms, and ran a database migration to normalize existing location data.
-- **Phase B: Mobile-First UX & Geo Pre-filling**: Refactored the Sell forms to be fully mobile-responsive, improving touch targets and input types. Implemented a  hook to pre-suggest the user's location.
-- **Phase C: Full EN/FR-QC Multilingual Refactor**: Audited and fixed all hardcoded strings and broken i18n keys in the Sell flows by adding ~200 new translation keys to  for a complete bilingual experience.
+- **Smart Localized Currency Formatting**: Applied a reusable  utility across more than 25 files, ensuring all prices are displayed according to the user's locale (EN/FR-QC).
+- **Admin Tax Dashboard**: Implemented the backend API () and frontend UI () for the tax dashboard, including hero stats, charts, and CSV export.
+- **UI Bug Fix (Homepage)**: Resolved a CSS specificity issue where Enchères en cours text was nearly invisible in light mode by creating a dedicated, high-specificity CSS class ().
+- **Full Responsive Design Fix**: Refactored  to use a mobile-first hamburger menu, adjusted homepage grids () for all breakpoints, and fixed positioning of floating elements (, ) to prevent overlap on small screens.
+- **Performance Engineering (P0 & P1)**: Executed a wide range of optimizations including code-splitting all pages (), adding Gzip compression (), implementing API caching (), adding DB indexes, and improving frontend rendering patterns.
 
 **Earlier issues found/mentioned but not fixed**
    - None.
@@ -73,76 +71,93 @@ For the new tasks, the agent has:
 
 
 **Key Technical Concepts**
-- **Internationalization (i18n)**: Using  for locale-aware number and currency formatting.
-- **Data Aggregation**: Using a MongoDB aggregation pipeline on the backend to dynamically calculate tax totals from the  collection.
-- **Admin Tooling**: Building a secure, data-driven admin interface with features like date filtering and data export (CSV).
-- **Component-Based Development**: Creating new, and modifying existing, React components to add functionality.
+- **Performance Engineering**: Code Splitting (), Gzip Compression, API Caching (in-memory TTL), Database Indexing, Critical CSS, SEO (), Image Optimization ().
+- **Responsive Design**: Extensive use of Tailwind CSS breakpoints (, , , ) to create a fluid layout for navigation, grids, and typography.
+- **CSS Specificity**: Debugged and resolved a complex CSS override issue by increasing selector specificity and using  correctly.
+- **Internationalization (i18n)**: Using  for locale-aware currency formatting.
+- **Data Aggregation**: Using MongoDB aggregation pipelines for the tax dashboard.
 
 **key DB schema**
-  - : While not explicitly viewed, the  logic implies this collection exists and contains fields like , , and  which are used to calculate tax liabilities. No schema changes were made, as the tax is calculated on-the-fly.
+  - ****: Indexed on , , , .
+  - ****: Indexed on , .
+  - ****: Indexed on , , , .
+  - ****: Indexed on .
 
 **changes in tech stack**
-  - None.
+  - **Added**:  for SEO meta tag management.
+  - **To be added**:  for client-side state management.
 
 **All files of reference**
 - **Created**:
-    - : Provides a centralized, i18n-aware function for displaying prices.
-    - : Defines the  endpoint for fetching tax data.
-    - : The React component for the new tax dashboard UI.
-- **Updated**:
-    - : To mount the new  router.
-    - : To add the route for the new tax dashboard page.
-    - : To add a navigation link to the tax dashboard.
-    - Numerous frontend pages (, , , , etc.) to use the new .
+    - : Reusable in-memory TTL cache for API endpoints.
+    - : Standardized component for lazy-loaded images.
+    - : Wrapper for  to manage page titles and meta descriptions.
+    - : Disallows indexing of sensitive paths.
+    - : Provides a basic sitemap for crawlers.
+    - : Documentation for P2 infrastructure tasks.
+- **Heavily Updated**:
+    - : Rewritten to lazy-load all 40+ page components.
+    - : Rewritten for full responsiveness with a new  breakpoint.
+    - : Updated for responsive grids, spacing, typography, and UI bug fixes.
+    - : Modified to include an inline CSS skeleton loader and remove anti-caching headers.
+    - : Added global CSS for responsive utilities, image lazy loading, and the fix for the text visibility bug.
+    - : Added Gzip middleware, API caching decorators, and comprehensive database indexes.
 
 **Areas that need refactoring**:
-- None. The agent successfully refactored  to use the new shared currency formatter, removing a redundant local implementation.
+- : This file is over 9000 lines long. The user has explicitly requested this be broken down into smaller route modules as the final step of the P2 task.
 
 **key api endpoints**
-- : (NEW) Secure endpoint for admins to fetch aggregated tax data. Accepts , , and  query parameters.
-- : (NEW) Secure endpoint for admins to download a CSV of tax data.
+- **Cached Endpoints**:
+    -  (TTL: 300s)
+    -  (TTL: 60s)
+    -  (TTL: 60s)
+    -  (TTL: 300s)
+- **To be modified for Pagination**:
+    - The main listings endpoint ( or ) will be updated to support cursor-based pagination.
 
 **Critical Info for New Agent**
-- The user has approved a two-part task: complete the currency formatting, then finish the Admin Tax Dashboard.
-- **Currency Formatting**: The task is ~80% done. Your first action should be to find and replace any remaining hardcoded price displays () to ensure full platform coverage.
-- **Tax Dashboard**: The backend API is ready and the frontend component exists but is empty. Your main task is to build the UI in  by fetching data from the API and rendering the required charts and stats. The  library is available for building the charts.
-- The database currently has no transactions, so the API will return zero values. The UI should handle this gracefully.
+- The user has approved the full P2 performance plan and wants it executed autonomously without asking for confirmation between steps.
+- **Your first action is NOT to code**. You must first read  and present the Cloudflare setup instructions to the user.
+- After providing the instructions, proceed directly to the **React Query Migration**, followed by **Cursor Pagination**, and finally the ** Refactor**.
+- Do not modify existing business logic, especially for Stripe, SendGrid, or user authentication.
+- A final Lighthouse audit is required after all P2 changes are complete.
 
 **documents and test reports created in this job**
--  (updated for all completed phases)
-- 
-- 
-- 
+  - /app/memory/PRD.md
+  - /app/memory/INFRASTRUCTURE_P2.md
+  - /app/test_reports/iteration_67.json
+  - /app/test_reports/iteration_68.json
+  - /app/test_reports/iteration_69.json
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User**: Approved starting the Currency Formatting and Tax Dashboard tasks sequentially. (Status: **In Progress**)
-2.  **Agent**: Proposed a plan to implement the Admin Tax Dashboard. (Status: **Plan Approved**)
-3.  **User**: Provided detailed requirements for the Admin Tax Dashboard. (Status: **In Progress**)
-4.  **Agent**: Proposed a plan to implement Smart Localized Currency Formatting. (Status: **Plan Approved**)
-5.  **User**: Provided detailed requirements for the Currency Formatting task. (Status: **In Progress**)
-6.  **Agent**: Finished Phase C (i18n Refactor) and suggested currency formatting as an enhancement. (Status: **Completed**)
-7.  **User**: Provided detailed requirements for Phase C (i18n Refactor). (Status: **Completed**)
-8.  **Agent**: Finished Phase B (Mobile UX) and suggested saved location profiles as an enhancement. (Status: **Completed**)
-9.  **User**: Provided detailed requirements for Phase B (Mobile UX). (Status: **Completed**)
-10. **Agent**: Proposed a plan to implement Phase B. (Status: **Plan Approved**)
+1.  **User**: Instructed the agent to proceed with P2 tasks autonomously, starting with providing Cloudflare instructions, then React Query migration, cursor pagination, and server refactoring. (Status: **Pending - First action for next agent**)
+2.  **Agent**: Completed P0+P1 performance tasks and presented the P2 plan. (Status: **Completed**)
+3.  **User**: Provided detailed requirements and approval for the multi-phase performance engineering task (P0, P1, P2). (Status: **Completed**)
+4.  **Agent**: Acknowledged the performance engineering request and gathered initial context. (Status: **Completed**)
+5.  **User**: Initiated a major performance engineering request with a detailed 13-point checklist. (Status: **Completed**)
+6.  **Agent**: Completed the full responsive design fix. (Status: **Completed**)
+7.  **User**: Initiated the full responsive design fix with detailed requirements. (Status: **Completed**)
+8.  **Agent**: Fixed the text visibility bug on the homepage. (Status: **Completed**)
+9.  **User**: Reported the text visibility bug and provided desired enhancements. (Status: **Completed**)
+10. **Agent**: Completed the initial currency formatting and tax dashboard features. (Status: **Completed**)
 
 **Project Health Check:**
-- **Broken**: No. The application is stable.
+- **Broken**: No. The application is stable and significantly more performant and responsive.
 - **Mocked**: Cloud storage for PDF invoices is still mocked locally.
 
 **3rd Party Integrations**
-- **Stripe**: Used for payments.
-- **SendGrid**: Used for transactional emails.
-- No new integrations were added.
+- **Stripe**: Payments
+- **SendGrid**: Transactional Emails
+- **react-helmet-async**: (newly added) SEO meta tags.
 
 **Testing status**
-  - Testing agent used after significant changes: YES (for Phases A, B, and C).
+  - Testing agent used after significant changes: YES (used three times for features, responsiveness, and performance tasks).
   - Troubleshoot agent used after agent stuck in loop: NO
-  - Test files created: None.
-  - Known regressions: None.
+  - Test files created: None
+  - Known regressions: None. All tests passed with 100% success.
 
 **Credentials to test flow:**
 - **Admin**:  / 
 
 **What agent forgot to execute**
-- The agent has followed the user's instructions and is on track. It has not forgotten any requested items.</analysis>
+- Nothing. The agent successfully navigated a series of complex, multi-step tasks including feature work, bug fixing, a major responsive overhaul, and a deep performance engineering refactor, following user instructions precisely.</analysis>

@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 if not BASE_URL:
-    BASE_URL = "https://tax-liability-portal.preview.emergentagent.com"
+    BASE_URL = "https://query-caching.preview.emergentagent.com"
 
 # Test credentials
 ADMIN_EMAIL = "charbeladmin@bidvex.com"

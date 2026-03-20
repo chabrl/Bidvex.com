@@ -15,7 +15,7 @@ import os
 import re
 
 # Get base URL from environment
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://tax-liability-portal.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://query-caching.preview.emergentagent.com').rstrip('/')
 
 # Test credentials
 ADMIN_EMAIL = "charbeladmin@bidvex.com"

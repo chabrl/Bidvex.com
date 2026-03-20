@@ -13,7 +13,7 @@ import requests
 import os
 import json
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://tax-liability-portal.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://query-caching.preview.emergentagent.com').rstrip('/')
 
 # Test credentials
 ADMIN_EMAIL = "charbel@admin.bazario.com"
