@@ -1,78 +1,76 @@
-# BidVex Auction Marketplace — Product Requirements Document
+# BidVex Auction Marketplace — PRD
 
-## Original Problem Statement
-Full-stack auction marketplace (BidVex) with smart localized currency formatting, admin tax dashboard, responsive design, and multi-phase performance engineering including full server.py refactoring.
+## Product Overview
+Full-stack auction marketplace with localized currency, tax compliance, subscriptions, real-time bidding, and seller tools.
 
-## Core Architecture
-- **Frontend**: React 18 + Tailwind CSS + Shadcn/UI + React Query
-- **Backend**: FastAPI + MongoDB (Motor async driver)
-- **Payments**: Stripe
-- **Email**: SendGrid
-- **SEO**: react-helmet-async
-- **State Management**: @tanstack/react-query (client-side caching)
+## Tech Stack
+- **Frontend**: React 19, Tailwind CSS, Shadcn/UI, @tanstack/react-query, embla-carousel-react
+- **Backend**: FastAPI (modular routes), MongoDB, Stripe, SendGrid
+- **Architecture**: Modular backend (~15 route modules), shared.py for common models, server.py as clean entry point (~300 lines)
 
-## What's Been Implemented
+## Core Features (Completed)
+- User auth (JWT), admin panel, real-time WebSocket bidding
+- Smart localized currency formatting, tax compliance engine
+- Admin tax dashboard, email marketing system
+- Responsive design overhaul, SEO with react-helmet-async
+- React Query migration (client-side caching, cursor pagination)
+- Massive backend refactor (server.py: 9200→300 lines, 12+ route modules)
 
-### Features
-- Smart Localized Currency Formatting (EN/FR-QC via `Intl.NumberFormat`)
-- Admin Tax Dashboard (aggregation pipeline + CSV export)
-- Full Responsive Design Overhaul (mobile-first, hamburger nav, responsive grids)
+## Recently Completed (Session — Mar 20, 2026)
 
-### Performance Engineering — P0 (Complete)
-- Code splitting: All 40+ pages via `React.lazy()` with Suspense fallback
-- Backend Gzip compression middleware
-- Critical CSS skeleton loader in `index.html`
+### Step 1: Mobile Swipeable Carousels (P1)
+- Created `SwipeableCardRow` component using Embla Carousel
+- Mobile (<sm): horizontal swipe carousel with dot indicators
+- Desktop (sm+): standard CSS grid, unchanged
+- Applied to 6 homepage sections: Live Auctions, Hot Items, Featured, New Listings, Top Sellers, Features
 
-### Performance Engineering — P1 (Complete)
-- In-memory TTL cache (`services/api_cache.py`) on public endpoints
-- Comprehensive MongoDB indexes on all major collections
-- SEO: react-helmet-async, robots.txt, sitemap.xml
-- Image lazy loading via CSS
-- Debounced search inputs
+### Step 2: Cloud PDF Invoice Storage (P2)
+- Migrated `/app/backend/services/cloud_storage.py` from local `/data/invoices/` to Emergent Object Storage
+- Init on startup, HMAC-signed download URLs for secure access
+- Updated commission invoice endpoints to use cloud storage
 
-### Performance Engineering — P2 (Complete — Feb 2026)
-- **React Query Migration**: `@tanstack/react-query` with custom hooks (`useCategories`, `useMarketplaceItems`, `useHomePageData`)
-- **Cursor Pagination**: `/api/marketplace/items` accepts `cursor` param, returns `next_cursor` + `has_more`
-- **server.py Refactor**: 9,265 lines → **287 lines** (clean entry point only)
-  - 12 new route modules: subscriptions, invoices, partners, admin_config, admin_ops, trust_safety, email_marketing_ext, legal, site_mode, misc, carousel, site_config
-  - Shared code in `shared.py` (models, constants, helpers), `ws_managers.py`, `ws_handlers.py`
-- **Cloudflare CDN**: Instructions in `INFRASTRUCTURE_P2.md` — requires manual DNS setup
+### Step 3: Premium Comparison View (P2)
+- New `/compare` page: side-by-side table (desktop), stacked cards (mobile)
+- Search overlay to add 2-4 listings for comparison
+- Marketplace integration: compare toggle on item cards + floating compare bar
 
-## Backend Architecture (Post-Refactor)
-```
-/app/backend/
-├── server.py              (287 lines - entry point only)
-├── shared.py              (492 lines - models, constants, helpers)
-├── deps.py                (121 lines - DB/auth dependency injection)
-├── ws_managers.py          (216 lines - WebSocket connection managers)
-├── ws_handlers.py          (220 lines - WebSocket endpoint registration)
-├── routes/                 (22,683 lines across 36 modules)
-│   ├── admin.py, admin_config.py, admin_ops.py
-│   ├── analytics.py, auth.py, auctions.py
-│   ├── carousel.py, dashboard.py, email_marketing_ext.py
-│   ├── fees.py, invoices.py, legal.py, listings.py
-│   ├── marketplace.py, marketing.py, messages.py, misc.py
-│   ├── notifications.py, partners.py, payments.py, profiles.py
-│   ├── site_config.py, site_mode.py, sms_verification.py
-│   ├── subscriptions.py, tax.py, tax_dashboard.py, tax_reports.py
-│   ├── team.py, trust_safety.py, users.py, vehicles.py
-│   ├── watchlist.py, webhooks.py, ai_chat.py
-│   └── __init__.py
-└── services/              (email, tax, caching, marketing, etc.)
-```
+### Step 4: Partner Pro Subscription Tier (P2)
+- **Pricing**: $240/yr (50% launch discount from $480/yr)
+- **Annual-only** renewal (matching existing tier structure)
+- **Tier ladder**: Free ($0) → Premium ($180) → Partner Pro ($240) → VIP ($300)
+- **Features built**:
+  - Branded storefront page (`/store/:userId`)
+  - CSV bulk listing import (`/bulk-import`)
+  - Early auction access (2h head start endpoint)
+  - Analytics export (CSV/JSON)
+  - 10 featured listings/month with tracking
+  - Priority chat + email support flag
+  - 25% buyer/seller discount
+- **Billing**: NOT yet implemented. Awaiting user confirmation that annual-only at $240/yr is final before Stripe integration.
 
-## Prioritized Backlog
+## Subscription Tiers
+| Tier | Price/yr | Original | Buyer Discount | Seller Discount |
+|------|----------|----------|----------------|-----------------|
+| Free | $0 | — | 0% | 0% |
+| Premium | $180 | $360 | 30% | 37.5% |
+| Partner Pro | $240 | $480 | 25% | 25% |
+| VIP | $300 | $600 | 40% | 50% |
 
-### P1 — Upcoming
-- Swipeable card carousels on mobile
+## Key API Endpoints
+- `GET /api/subscription-plans` — public, returns 4 tiers
+- `GET /api/partner-pro/bulk-import/template` — CSV template download
+- `POST /api/partner-pro/bulk-import` — upload CSV (Partner Pro+ only)
+- `GET /api/partner-pro/analytics/export` — CSV/JSON export (Partner Pro+)
+- `GET/POST /api/partner-pro/featured-listings` — manage featured listings
+- `GET /api/partner-pro/early-access` — early-window listings
+- `GET /api/storefronts/{user_id}` — public storefront
+- `PUT /api/partner-pro/storefront` — update storefront (Partner Pro+)
+- `GET /api/marketplace/items` — cursor-based pagination
+- `GET /api/listings/{id}` — listing detail
 
-### P2 — Future
-- Premium Comparison view in marketplace
-- Replace local PDF invoice mock with cloud storage (S3)
-- Partner Pro subscription tier
-
-### P3 — Later
-- Expand email template test coverage
-
-## Test Credentials
+## Credentials
 - Admin: `charbeladmin@bidvex.com` / `Admin123!`
+
+## Pending / Backlog
+- **P1**: Stripe billing for Partner Pro ($240/yr annual-only) — blocked on user confirmation
+- **P3**: Expand email template test coverage
