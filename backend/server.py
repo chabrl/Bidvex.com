@@ -167,6 +167,7 @@ try:
         ("routes.legal", "legal_router", None, False),
         ("routes.site_mode", "site_mode_router", None, False),
         ("routes.misc", "misc_router", None, False),
+        ("routes.partner_pro", "partner_pro_router", "set_partner_pro_db", False),
     ]
 
     for module_path, router_name, db_setter_name, app_level in SELF_CONTAINED_ROUTERS:

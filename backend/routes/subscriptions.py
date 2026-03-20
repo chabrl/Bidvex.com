@@ -29,7 +29,33 @@ import json as _json
 
 logger = logging.getLogger(__name__)
 
-from services.subscription_pricing import get_pricing_service
+from services.subscription_pricing import get_pricing_service, CouponCode
+
+try:
+    from services.tax_engine import calculate_gst_qst
+except ImportError:
+    def calculate_gst_qst(subtotal, currency="CAD"):
+        gst = round(subtotal * 0.05, 2)
+        qst = round(subtotal * 0.09975, 2)
+        return {"gst_amount": gst, "qst_amount": qst, "total_with_tax": round(subtotal + gst + qst, 2)}
+
+
+def _calculate_stripe_fee(amount):
+    return round(amount * STRIPE_PERCENTAGE_FEE + STRIPE_FIXED_FEE, 2) if amount > 0 else 0
+
+
+async def _generate_subscription_invoice(db, user, plan_id, amount, subscription_id, fee):
+    invoice = {
+        "id": str(uuid.uuid4()),
+        "user_id": user.id,
+        "plan_id": plan_id,
+        "amount": amount,
+        "fee": fee,
+        "subscription_id": str(subscription_id) if subscription_id else None,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "status": "paid",
+    }
+    await db.subscription_invoices.insert_one(invoice)
 
 try:
     from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest

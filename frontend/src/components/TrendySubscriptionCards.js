@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Crown, Star, Zap, Shield, TrendingUp, Percent, Megaphone, Headphones, Check, Sparkles, RefreshCw } from 'lucide-react';
+import { Crown, Star, Zap, Shield, TrendingUp, Percent, Megaphone, Headphones, Check, Sparkles, RefreshCw, Store, FileSpreadsheet, BarChart3 } from 'lucide-react';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
 
@@ -33,7 +33,7 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
         setPlans(response.data.plans || []);
         // Fetch price breakdowns for paid plans
         const bdMap = {};
-        for (const planId of ['premium', 'vip']) {
+        for (const planId of ['premium', 'partner_pro', 'vip']) {
           try {
             const bd = await axios.get(`${API}/subscriptions/price-breakdown?plan_id=${planId}`);
             bdMap[planId] = bd.data;
@@ -107,9 +107,6 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
       iconColor: 'text-purple-600 dark:text-purple-400',
       cardClass: 'bg-gradient-to-br from-purple-50/80 via-white/80 to-blue-50/80 dark:from-purple-900/30 dark:via-slate-800/80 dark:to-blue-900/30 border-purple-300 dark:border-purple-700',
       hoverClass: 'hover:shadow-2xl hover:shadow-purple-300/50 dark:hover:shadow-purple-900/50 hover:scale-[1.02] hover:border-purple-400',
-      badge: 'BEST VALUE',
-      badgeClass: 'bg-gradient-to-r from-amber-400 to-orange-500 text-black animate-pulse',
-      featured: true,
       features: [
         { icon: Percent, text: '2.5% Seller / 3.5% Buyer', included: true, highlight: 'Save 1.5%' },
         { icon: Shield, text: 'Auto-Bid Bot Access', included: true },
@@ -119,6 +116,31 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
       ],
       cta: 'Upgrade to Premium',
       ctaClass: 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700',
+    },
+    {
+      id: 'partner_pro',
+      name: 'Partner Pro',
+      period: '/year',
+      description: 'Power tools for high-volume sellers',
+      icon: Store,
+      iconBg: 'bg-cyan-100 dark:bg-cyan-900/50',
+      iconColor: 'text-cyan-600 dark:text-cyan-400',
+      cardClass: 'bg-gradient-to-br from-cyan-50/80 via-white/80 to-teal-50/80 dark:from-cyan-900/30 dark:via-slate-800/80 dark:to-teal-900/30 border-cyan-300 dark:border-cyan-700',
+      hoverClass: 'hover:shadow-2xl hover:shadow-cyan-300/50 dark:hover:shadow-cyan-900/50 hover:scale-[1.02] hover:border-cyan-400',
+      badge: 'PRO TOOLS',
+      badgeClass: 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white',
+      featured: true,
+      features: [
+        { icon: Percent, text: '25% Buyer & Seller Discount', included: true, highlight: 'Pro Rate' },
+        { icon: Store, text: 'Branded Storefront Page', included: true },
+        { icon: FileSpreadsheet, text: 'CSV Bulk Listing Import', included: true },
+        { icon: Sparkles, text: '2h Early Auction Access', included: true },
+        { icon: Megaphone, text: '10 Featured Listings/Month', included: true },
+        { icon: BarChart3, text: 'Analytics Export (CSV/JSON)', included: true },
+        { icon: Headphones, text: 'Priority Chat + Email Support', included: true },
+      ],
+      cta: 'Go Partner Pro',
+      ctaClass: 'bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-700 hover:to-teal-700',
     },
     {
       id: 'vip',
@@ -186,7 +208,7 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
 
   return (
     <div className="w-full py-8" data-testid="trendy-subscription-cards">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 lg:gap-8">
         {tiers.map((tier) => {
           const isCurrentTier = currentTier === tier.id;
           const Icon = tier.icon;

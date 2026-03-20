@@ -163,11 +163,42 @@ DEFAULT_PLANS = {
             "VIP badge with animation",
             "Auto-promotion on listings",
             "Early access to new features",
-            "Exclusive VIP events"
+            "Exclusive VIP events",
+            "Compare up to 6 listings"
         ],
         "buyer_premium_discount": 40.0,  # 40% discount on 5% = 3%
         "seller_commission_discount": 50.0,  # 50% discount on 4% = 2%
         "monthly_listing_limit": -1,  # Unlimited
+        "is_active": True
+    },
+    "partner_pro": {
+        "plan_id": "partner_pro",
+        "name": "Partner Pro",
+        "price_monthly": 0.0,
+        "price_yearly": 240.00,
+        "original_price_monthly": 0.0,
+        "original_price_yearly": 480.00,
+        "features": [
+            "All Premium benefits",
+            "25% buyer premium discount",
+            "25% seller commission discount",
+            "10 featured listings per month",
+            "Branded storefront page",
+            "CSV bulk listing import",
+            "Early auction access (2h head start)",
+            "Priority chat + email support",
+            "Full analytics dashboard + export",
+            "Compare up to 4 listings"
+        ],
+        "buyer_premium_discount": 25.0,
+        "seller_commission_discount": 25.0,
+        "monthly_listing_limit": -1,
+        "featured_listings_per_month": 10,
+        "early_access_hours": 2,
+        "has_storefront": True,
+        "has_bulk_import": True,
+        "has_analytics_export": True,
+        "support_level": "priority_chat_email",
         "is_active": True
     }
 }
