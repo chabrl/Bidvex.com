@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
+import { formatCurrency } from '../utils/currencyFormatter';
 
 /**
  * Real-time bidding panel with quantity-based price calculations
@@ -90,7 +91,7 @@ const RealtimeBiddingPanel = ({ listing, onBidPlaced }) => {
     }
 
     if (amount < parseFloat(minBidAmount)) {
-      toast.error(`Minimum bid is $${minBidAmount}`);
+      toast.error(`Minimum bid is ${formatCurrency(minBidAmount)}`);
       return;
     }
 
@@ -175,7 +176,7 @@ const RealtimeBiddingPanel = ({ listing, onBidPlaced }) => {
           <div>
             <p className="text-sm text-muted-foreground">Current Bid</p>
             <p className="text-3xl font-bold text-primary">
-              ${(currentPrice || listing.starting_price || 0).toFixed(2)}
+              {formatCurrency(currentPrice || listing.starting_price || 0)}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
               {bidCount || 0} {bidCount === 1 ? 'bid' : 'bids'} placed
@@ -240,7 +241,7 @@ const RealtimeBiddingPanel = ({ listing, onBidPlaced }) => {
                   min={minBidAmount}
                   value={bidAmount}
                   onChange={(e) => setBidAmount(e.target.value)}
-                  placeholder={`Min: $${minBidAmount}`}
+                  placeholder={`Min: ${formatCurrency(minBidAmount)}`}
                   className="pl-10"
                   disabled={loading}
                 />
@@ -268,7 +269,7 @@ const RealtimeBiddingPanel = ({ listing, onBidPlaced }) => {
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Bid per unit:</span>
-                  <span className="font-medium">${parseFloat(bidAmount).toFixed(2)}</span>
+                  <span className="font-medium">{formatCurrency(parseFloat(bidAmount))}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Quantity:</span>
@@ -278,7 +279,7 @@ const RealtimeBiddingPanel = ({ listing, onBidPlaced }) => {
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-gray-700">Total Commitment:</span>
                     <span className="text-2xl font-bold text-primary">
-                      ${totalValue.toFixed(2)}
+                      {formatCurrency(totalValue)}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1 text-center">
@@ -290,7 +291,7 @@ const RealtimeBiddingPanel = ({ listing, onBidPlaced }) => {
           )}
 
           <p className="text-xs text-muted-foreground text-center">
-            Minimum bid: ${minBidAmount} • Next increment: ${listing.minimum_bid_increment || 1}
+            Minimum bid: {formatCurrency(minBidAmount)} • Next increment: {formatCurrency(listing.minimum_bid_increment || 1)}
           </p>
         </div>
       ) : (
@@ -327,13 +328,13 @@ const RealtimeBiddingPanel = ({ listing, onBidPlaced }) => {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Your bid per unit:</span>
-                <span className="font-semibold">${parseFloat(bidAmount).toFixed(2)}</span>
+                <span className="font-semibold">{formatCurrency(parseFloat(bidAmount))}</span>
               </div>
               <div className="border-t pt-2 mt-2">
                 <div className="flex justify-between">
                   <span className="font-semibold text-gray-900">Total Amount:</span>
                   <span className="text-2xl font-bold text-primary">
-                    ${totalValue.toFixed(2)}
+                    {formatCurrency(totalValue)}
                   </span>
                 </div>
               </div>
@@ -342,7 +343,7 @@ const RealtimeBiddingPanel = ({ listing, onBidPlaced }) => {
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
               <p className="text-sm text-blue-800">
                 <strong>Note:</strong> By placing this bid, you agree to purchase all {quantity} items at your bid price if you win. 
-                Your total payment obligation will be <strong>${totalValue.toFixed(2)}</strong>.
+                Your total payment obligation will be <strong>{formatCurrency(totalValue)}</strong>.
               </p>
             </div>
 

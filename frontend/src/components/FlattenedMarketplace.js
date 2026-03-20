@@ -31,6 +31,7 @@ import {
   Receipt
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatCurrency } from '../utils/currencyFormatter';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -418,7 +419,7 @@ const FlattenedMarketplace = ({
                 <div className="flex-1">
                   <h4 className="font-semibold line-clamp-1">{selectedItem.title}</h4>
                   <p className="text-sm text-muted-foreground">
-                    Current: ${selectedItem.current_price?.toFixed(2)}
+                    Current: {formatCurrency(selectedItem.current_price)}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {selectedItem.bid_count || 0} bids
@@ -447,11 +448,11 @@ const FlattenedMarketplace = ({
                   min={(selectedItem.current_price || 0) + 1}
                   value={bidAmount}
                   onChange={(e) => setBidAmount(e.target.value)}
-                  placeholder={`Min: $${((selectedItem.current_price || 0) + 10).toFixed(2)}`}
+                  placeholder={`Min: ${formatCurrency((selectedItem.current_price || 0) + 10)}`}
                   className="text-lg font-semibold"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Minimum bid: ${((selectedItem.current_price || 0) + 10).toFixed(2)}
+                  Minimum bid: {formatCurrency((selectedItem.current_price || 0) + 10)}
                 </p>
               </div>
             </div>
@@ -667,7 +668,7 @@ const ItemCard = ({ item, onQuickBid, trackClick }) => {
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">Current Bid</span>
             <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
-              ${(item.current_price || item.starting_price || 0).toFixed(2)}
+              {formatCurrency(item.current_price || item.starting_price || 0)}
             </span>
           </div>
 
@@ -675,7 +676,7 @@ const ItemCard = ({ item, onQuickBid, trackClick }) => {
             <div className="flex items-center justify-between text-sm">
               <span className="text-slate-600 dark:text-slate-400">Buy Now</span>
               <span className="font-semibold text-green-600 dark:text-green-400">
-                ${item.buy_now_price.toFixed(2)}
+                {formatCurrency(item.buy_now_price)}
               </span>
             </div>
           )}

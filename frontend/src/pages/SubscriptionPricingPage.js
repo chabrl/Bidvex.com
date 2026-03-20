@@ -19,8 +19,7 @@ import {
   Ticket, RefreshCw, Percent, DollarSign, Sparkles, Shield,
   Gift, TrendingDown, PartyPopper, AlertCircle
 } from 'lucide-react';
-
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+import { formatCurrency } from '../utils/currencyFormatter';const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 // Plan icons and styling
 const PLAN_STYLES = {
@@ -205,15 +204,6 @@ const SubscriptionPricingPage = () => {
       return !!plan.stripe_price_id_yearly;
     }
     return !!plan.stripe_price_id_monthly;
-  };
-
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-CA', {
-      style: 'currency',
-      currency: 'CAD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2
-    }).format(amount || 0);
   };
 
   if (loading) {
@@ -500,7 +490,7 @@ const SubscriptionPricingPage = () => {
                     <p className="text-sm text-green-600 dark:text-green-500 mt-1">
                       {couponValidation.discount_type === 'percentage' 
                         ? `${couponValidation.discount_value}% off your subscription` 
-                        : `$${couponValidation.discount_value} off your subscription`}
+                        : `${formatCurrency(couponValidation.discount_value)} off your subscription`}
                     </p>
                     
                     {/* Big Savings Highlight */}

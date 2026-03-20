@@ -32,6 +32,7 @@ import {
   Calendar, Users, DollarSign, Percent, Tag, AlertCircle,
   Search, Clock
 } from 'lucide-react';
+import { formatCurrency } from '../../utils/currencyFormatter';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -523,8 +524,8 @@ const CouponManager = () => {
                         <p className="text-sm text-muted-foreground">
                           {coupon.discount_type === 'percentage' 
                             ? `${coupon.value}% off` 
-                            : `$${coupon.value.toFixed(2)} off`}
-                          {coupon.min_purchase_amount > 0 && ` (min $${coupon.min_purchase_amount})`}
+                            : `${formatCurrency(coupon.value)} off`}
+                          {coupon.min_purchase_amount > 0 && ` (min ${formatCurrency(coupon.min_purchase_amount)})`}
                         </p>
                       </div>
                     </div>

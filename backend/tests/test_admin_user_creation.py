@@ -17,7 +17,7 @@ import os
 import uuid
 from datetime import datetime
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://sell-location-unify.preview.emergentagent.com')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://tax-liability-portal.preview.emergentagent.com')
 
 # Admin credentials
 ADMIN_EMAIL = "charbeladmin@bidvex.com"

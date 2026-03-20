@@ -27,6 +27,7 @@ import {
   ChevronDown, ChevronUp, ExternalLink, Calendar, MapPin,
   DollarSign, Settings2, Percent, Timer, Scale, Award
 } from 'lucide-react';
+import { formatCurrency } from '../../utils/currencyFormatter';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -39,14 +40,6 @@ const formatDate = (date) => {
     hour: '2-digit',
     minute: '2-digit',
   });
-};
-
-const formatPrice = (price) => {
-  return new Intl.NumberFormat('en-CA', {
-    style: 'currency',
-    currency: 'CAD',
-    minimumFractionDigits: 0,
-  }).format(price);
 };
 
 // Seller Card Component
@@ -176,7 +169,7 @@ const SellerCard = ({ seller, onApprove, onReject, onViewDetails }) => {
                 <p className="text-xs text-slate-500">Sold</p>
               </div>
               <div>
-                <p className="text-xl font-bold">{formatPrice(seller.total_revenue || 0)}</p>
+                <p className="text-xl font-bold">{formatCurrency(seller.total_revenue || 0)}</p>
                 <p className="text-xs text-slate-500">Revenue</p>
               </div>
               <div>
@@ -264,9 +257,9 @@ const VehicleListingCard = ({ vehicle, onApprove, onReject, onView }) => {
                   <MapPin className="h-4 w-4 text-slate-400" />
                   {vehicle.location_city}, {vehicle.location_province}
                 </span>
-                <span>Starting: {formatPrice(vehicle.starting_price)}</span>
+                <span>Starting: {formatCurrency(vehicle.starting_price)}</span>
                 {vehicle.reserve_price && (
-                  <span className="text-slate-500">Reserve: {formatPrice(vehicle.reserve_price)}</span>
+                  <span className="text-slate-500">Reserve: {formatCurrency(vehicle.reserve_price)}</span>
                 )}
               </div>
             </div>

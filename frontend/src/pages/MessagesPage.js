@@ -16,6 +16,7 @@ import {
   Volume2, VolumeX, ChevronLeft, MoreVertical, Info, Maximize2
 } from 'lucide-react';
 import { useRealtimeMessaging } from '../hooks/useRealtimeMessaging';
+import { formatCurrency } from '../utils/currencyFormatter';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -89,7 +90,7 @@ const ProductMiniCard = ({ info, navigate }) => {
       <div className="flex-1 min-w-0">
         <p className="font-bold text-slate-900 dark:text-white truncate text-lg">{info.title}</p>
         <div className="flex items-center gap-3 mt-1">
-          <span className="text-xl font-bold text-[#06B6D4]">${info.price?.toFixed(2)}</span>
+          <span className="text-xl font-bold text-[#06B6D4]">{formatCurrency(info.price)}</span>
           <Badge className={`${isLive ? 'bg-green-500' : 'bg-slate-500'} text-white border-0 text-xs`}>
             {isLive ? '🔴 LIVE' : 'ENDED'}
           </Badge>
@@ -121,7 +122,7 @@ const SystemMessageCard = ({ message }) => {
             {data.final_price && (
               <div className="text-center py-3 bg-slate-100 dark:bg-slate-800 rounded-lg">
                 <p className="text-sm text-slate-500 dark:text-slate-400">Final Price</p>
-                <p className="text-3xl font-bold text-[#06B6D4]">${data.final_price?.toFixed(2)}</p>
+                <p className="text-3xl font-bold text-[#06B6D4]">{formatCurrency(data.final_price)}</p>
               </div>
             )}
             
@@ -183,7 +184,7 @@ const ItemDetailsCard = ({ data }) => (
     <div className="flex justify-between items-center pt-3 border-t border-slate-200 dark:border-slate-700">
       <div>
         <p className="text-xs text-slate-500">Final Price</p>
-        <p className="text-lg font-bold text-[#06B6D4]">${data.final_price?.toFixed(2)}</p>
+        <p className="text-lg font-bold text-[#06B6D4]">{formatCurrency(data.final_price)}</p>
       </div>
       <Badge className={`${data.payment_status === 'paid' ? 'bg-green-500' : 'bg-yellow-500'} text-white border-0`}>
         {data.payment_status === 'paid' ? '✓ Paid' : 'Pending'}

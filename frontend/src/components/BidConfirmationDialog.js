@@ -6,6 +6,7 @@ import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
 import { DollarSign, CheckCircle2, Info, Sparkles, ShieldCheck, Receipt } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatCurrency } from '../utils/currencyFormatter';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -138,7 +139,7 @@ const BidConfirmationDialog = ({
                   <span className="text-sm font-medium">Hammer Price</span>
                   <Badge variant="outline" className="text-xs">Your Bid</Badge>
                 </div>
-                <span className="font-semibold">${costBreakdown.hammer_price?.toFixed(2)}</span>
+                <span className="font-semibold">{formatCurrency(costBreakdown.hammer_price)}</span>
               </div>
 
               {/* Buyer Premium */}
@@ -149,14 +150,14 @@ const BidConfirmationDialog = ({
                   </span>
                   <Info className="h-3 w-3 text-muted-foreground cursor-help" title="Standard platform fee" />
                 </div>
-                <span>${costBreakdown.buyer_premium?.toFixed(2)}</span>
+                <span>{formatCurrency(costBreakdown.buyer_premium)}</span>
               </div>
 
               {/* Platform Fee (Vehicles only) */}
               {isVehicle && costBreakdown.platform_fee > 0 && (
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-muted-foreground">Platform Fee (2.5%)</span>
-                  <span>${costBreakdown.platform_fee?.toFixed(2)}</span>
+                  <span>{formatCurrency(costBreakdown.platform_fee)}</span>
                 </div>
               )}
 
@@ -168,7 +169,7 @@ const BidConfirmationDialog = ({
                   {/* Vehicle: Tax only on BidVex fees */}
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-muted-foreground">Tax on BidVex Fees (GST/QST)</span>
-                    <span>${costBreakdown.bidvex_fees_tax_total?.toFixed(2)}</span>
+                    <span>{formatCurrency(costBreakdown.bidvex_fees_tax_total)}</span>
                   </div>
                 </>
               ) : (
@@ -179,21 +180,21 @@ const BidConfirmationDialog = ({
                     {isPrivateSale ? (
                       <div className="flex items-center gap-2">
                         <span className="line-through text-gray-400">
-                          ${(costBreakdown.tax_savings || 0).toFixed(2)}
+                          {formatCurrency(costBreakdown.tax_savings || 0)}
                         </span>
                         <Badge className="bg-green-100 text-green-700 text-xs">
                           $0.00
                         </Badge>
                       </div>
                     ) : (
-                      <span>${(costBreakdown.buyer_pays_hammer_tax || 0).toFixed(2)}</span>
+                      <span>{formatCurrency(costBreakdown.buyer_pays_hammer_tax || 0)}</span>
                     )}
                   </div>
 
                   {/* Tax on Fees */}
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-muted-foreground">Tax on Fees</span>
-                    <span>${(costBreakdown.buyer_pays_fees_tax || 0).toFixed(2)}</span>
+                    <span>{formatCurrency(costBreakdown.buyer_pays_fees_tax || 0)}</span>
                   </div>
                 </>
               )}
@@ -207,7 +208,7 @@ const BidConfirmationDialog = ({
                       <span className="text-sm font-medium text-green-700">Your Savings</span>
                     </div>
                     <span className="font-bold text-green-700">
-                      -${(costBreakdown.tax_savings || 0).toFixed(2)}
+                      -{formatCurrency(costBreakdown.tax_savings || 0)}
                     </span>
                   </div>
                 </div>
@@ -223,7 +224,7 @@ const BidConfirmationDialog = ({
                     <div className="text-sm">
                       <p className="font-medium text-blue-700">Vehicle Payment</p>
                       <p className="text-blue-600 mt-1">
-                        Only BidVex fees and taxes are paid online. Hammer price (${bidAmount?.toFixed(2)}) paid directly to seller via Bank Draft.
+                        Only BidVex fees and taxes are paid online. Hammer price ({formatCurrency(bidAmount)}) paid directly to seller via Bank Draft.
                       </p>
                     </div>
                   </div>
@@ -242,7 +243,7 @@ const BidConfirmationDialog = ({
                     </p>
                   </div>
                   <span className="text-2xl font-bold text-[#1E3A8A]" data-testid="bid-total-amount">
-                    ${(isVehicle ? costBreakdown.stripe_charge_total : costBreakdown.buyer_total)?.toFixed(2)}
+                    {formatCurrency(isVehicle ? costBreakdown.stripe_charge_total : costBreakdown.buyer_total)}
                   </span>
                 </div>
               </div>
@@ -253,7 +254,7 @@ const BidConfirmationDialog = ({
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-slate-600">Balance due to seller (Bank Draft)</span>
                     <span className="font-bold text-slate-800">
-                      ${costBreakdown.seller_balance_due?.toFixed(2)}
+                      {formatCurrency(costBreakdown.seller_balance_due)}
                     </span>
                   </div>
                 </div>
@@ -280,7 +281,7 @@ const BidConfirmationDialog = ({
             ) : (
               <>
                 <CheckCircle2 className="h-4 w-4 mr-2" />
-                Confirm Bid ${bidAmount?.toFixed(2)}
+                Confirm Bid {formatCurrency(bidAmount)}
               </>
             )}
           </Button>

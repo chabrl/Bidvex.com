@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
+import { formatCurrency } from '../utils/currencyFormatter';
 
 /**
  * Real-time bidding hook with WebSocket connection
@@ -166,7 +167,7 @@ export const useRealtimeBidding = (listingId) => {
               // User-facing notifications only
               if (data.bid_status === 'OUTBID' && user) {
                 toast.warning('You\'ve been outbid!', {
-                  description: `New bid: $${data.current_price}`,
+                  description: `New bid: ${formatCurrency(data.current_price)}`,
                   duration: 5000
                 });
               } else if (data.bid_status === 'LEADING' && user) {

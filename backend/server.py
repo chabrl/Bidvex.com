@@ -6878,6 +6878,14 @@ try:
         logger.info("Tax Reports (CRA) router loaded")
     except Exception as e:
         logger.warning(f"Could not load tax reports router: {e}")
+
+    try:
+        from routes.tax_dashboard import tax_dashboard_router, set_tax_dashboard_db
+        set_tax_dashboard_db(db)
+        api_router.include_router(tax_dashboard_router)
+        logger.info("Tax Dashboard router loaded")
+    except Exception as e:
+        logger.warning(f"Could not load tax dashboard router: {e}")
     
 except ImportError as e:
     logger.warning(f"⚠️ Could not load modular routers: {e}")

@@ -13,6 +13,7 @@ import {
   Gift, Percent, Star, ChevronRight, Shield, Rocket,
   Clock, Target, ArrowDown, Play, DollarSign, Layers
 } from 'lucide-react';
+import { formatCurrency } from '../utils/currencyFormatter';
 
 const EmailMarketingPricing = () => {
   const navigate = useNavigate();
@@ -444,7 +445,7 @@ const EmailMarketingPricing = () => {
                           <p className="font-medium">{tier.emails.toLocaleString()} emails</p>
                           <p className="text-xs text-slate-500">@ ${tier.price.toFixed(3)}/email</p>
                         </div>
-                        <p className="font-semibold">${tier.cost.toFixed(2)}</p>
+                        <p className="font-semibold">{formatCurrency(tier.cost)}</p>
                       </div>
                     ))}
                   </div>
@@ -452,7 +453,7 @@ const EmailMarketingPricing = () => {
                   <div className="pt-2">
                     <div className="flex justify-between items-center">
                       <p className="text-slate-500">Subtotal</p>
-                      <p className="font-semibold">${calculateCost.baseCost.toFixed(2)}</p>
+                      <p className="font-semibold">{formatCurrency(calculateCost.baseCost)}</p>
                     </div>
                     
                     {calculateCost.discountPercent > 0 && (
@@ -461,7 +462,7 @@ const EmailMarketingPricing = () => {
                           <Percent className="h-4 w-4" />
                           {selectedPlan} discount ({calculateCost.discountPercent}%)
                         </p>
-                        <p className="font-semibold">-${calculateCost.discount.toFixed(2)}</p>
+                        <p className="font-semibold">-{formatCurrency(calculateCost.discount)}</p>
                       </div>
                     )}
                   </div>
@@ -472,7 +473,7 @@ const EmailMarketingPricing = () => {
                   <div className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 rounded-2xl p-6 text-center">
                     <p className="text-sm text-slate-500 mb-2">Your Campaign Cost</p>
                     <p className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                      ${calculateCost.finalCost.toFixed(2)}
+                      {formatCurrency(calculateCost.finalCost)}
                     </p>
                     <p className="text-sm text-slate-500 mt-2">
                       Effective rate: ${calculateCost.effectiveRate.toFixed(4)}/email

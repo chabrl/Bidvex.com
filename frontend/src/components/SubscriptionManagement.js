@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Crown, Star, Calendar, AlertTriangle, RefreshCw, XCircle, ArrowUpCircle, FileText, Download, RotateCcw } from 'lucide-react';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
+import { formatCurrency } from '../utils/currencyFormatter';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -215,7 +216,7 @@ const SubscriptionManagement = () => {
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-sm font-semibold text-slate-900 dark:text-white">${inv.total?.toFixed(2)} CAD</span>
+                  <span className="text-sm font-semibold text-slate-900 dark:text-white">{formatCurrency(inv.total)} CAD</span>
                   <Button
                     size="sm" variant="ghost"
                     className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/10"

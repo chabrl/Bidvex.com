@@ -11,6 +11,7 @@ import {
   Settings, Save, RotateCcw, AlertTriangle, Check, Users, Package, 
   DollarSign, Clock, ShoppingCart, Shield, Loader2, Info
 } from 'lucide-react';
+import { formatCurrency } from '../../utils/currencyFormatter';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -305,7 +306,7 @@ const MarketplaceSettings = () => {
             <div className="p-3 bg-gray-50 rounded-lg">
               <div className="flex items-center justify-between mb-2">
                 <p className="font-medium">Minimum Bid Increment</p>
-                <Badge variant="outline">${settings.minimum_bid_increment?.toFixed(2)}</Badge>
+                <Badge variant="outline">{formatCurrency(settings.minimum_bid_increment)}</Badge>
               </div>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
@@ -443,7 +444,7 @@ const MarketplaceSettings = () => {
             </div>
             <div className="text-center p-3 bg-white/10 backdrop-blur rounded-lg border border-white/10">
               <p className="text-xs text-slate-300 uppercase tracking-wider font-medium">Min Bid Increment</p>
-              <p className="font-bold text-lg text-white mt-1">${settings.minimum_bid_increment?.toFixed(2)}</p>
+              <p className="font-bold text-lg text-white mt-1">{formatCurrency(settings.minimum_bid_increment)}</p>
             </div>
             <div className="text-center p-3 bg-white/10 backdrop-blur rounded-lg border border-white/10">
               <p className="text-xs text-slate-300 uppercase tracking-wider font-medium">Anti-Sniping</p>

@@ -42,11 +42,12 @@ import PartnerManager from './admin/PartnerManager';
 import FinanceDashboard from './admin/FinanceDashboard';
 import EmailSettings from './admin/EmailSettings';
 import TeamManager from '../components/admin/TeamManager';
+import AdminTaxDashboard from './AdminTaxDashboard';
 import { 
   Users, Package, Gavel, Shield, TrendingUp, Bell, Settings, FileText, 
   MessageSquare, DollarSign, Search, Image, CreditCard, Megaphone, 
   Activity, AlertTriangle, ChevronRight, Power, Zap, Eye, History,
-  ToggleLeft, ToggleRight, Clock, Mail, Sliders, Car, Send, Bot, Ticket, BarChart3, Globe, Building2
+  ToggleLeft, ToggleRight, Clock, Mail, Sliders, Car, Send, Bot, Ticket, BarChart3, Globe, Building2, BarChart2
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -71,6 +72,7 @@ const SECONDARY_TABS = {
     { id: 'all-auctions', label: 'Manage All Auctions', icon: '🏛️', lucideIcon: Package },
     { id: 'deletion-requests', label: 'Deletion Requests', icon: '🗑️', lucideIcon: AlertTriangle },
     { id: 'tax-verification', label: 'Tax Verification', icon: '🛡️', lucideIcon: Shield },
+    { id: 'tax-dashboard', label: 'Tax Dashboard', icon: '📊', lucideIcon: BarChart2 },
     { id: 'auctions', label: 'Auction Control', icon: '🔨', lucideIcon: Gavel },
     { id: 'categories', label: 'Categories', icon: '📂', lucideIcon: Settings },
     { id: 'partner-applications', label: 'Partner Applications', icon: '🏢', lucideIcon: Building2 },
@@ -298,6 +300,7 @@ const AdminDashboard = () => {
           case 'all-auctions': return <ManageAllAuctions />;
           case 'deletion-requests': return <DeletionRequestsManager />;
           case 'tax-verification': return <TaxVerificationQueue />;
+          case 'tax-dashboard': return <AdminTaxDashboard />;
           case 'auctions': return <AuctionControl />;
           case 'categories': return <CategoryManager />;
           case 'partner-applications': return <PartnerManager />;

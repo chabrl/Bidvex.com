@@ -10,6 +10,7 @@ import { Heart, Clock, Package, MapPin, Tag, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import WatchlistButton from '../components/WatchlistButton';
 import Countdown from 'react-countdown';
+import { formatCurrency } from '../utils/currencyFormatter';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -86,7 +87,7 @@ const WatchlistPage = () => {
                 )} />
               )}
             </div>
-            <span className="text-lg font-bold text-primary">${listing.current_price?.toFixed(2)}</span>
+            <span className="text-lg font-bold text-primary">{formatCurrency(listing.current_price)}</span>
           </div>
           <Button 
             onClick={() => navigate(`/listing/${listing.id}`)} 
@@ -187,7 +188,7 @@ const WatchlistPage = () => {
           </div>
           <div className="flex items-center justify-between pt-2 border-t">
             <span className="text-sm text-muted-foreground">Current:</span>
-            <span className="text-lg font-bold text-primary">${lot.current_price?.toFixed(2)}</span>
+            <span className="text-lg font-bold text-primary">{formatCurrency(lot.current_price)}</span>
           </div>
           <Button 
             onClick={() => navigate(`/lots/${auctionId}#lot-${lot.lot_number}`)} 

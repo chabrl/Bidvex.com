@@ -12,6 +12,7 @@ import {
   Search, Trophy, CreditCard, Sparkles, Clock, CheckCircle2,
   Zap, Play, ChevronRight, Timer, Package
 } from 'lucide-react';
+import { formatCurrency } from '../utils/currencyFormatter';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -404,7 +405,7 @@ const LiveAuctionCard = ({ item, index, isVisible, navigate }) => {
           <div>
             <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('homepage.currentBid')}</p>
             <p className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
-              ${item.current_price?.toFixed(2)}
+              {formatCurrency(item.current_price)}
             </p>
           </div>
           <div className="text-right">
@@ -497,7 +498,7 @@ const HotItemsSection = ({ items, navigate }) => {
                 <div className="flex justify-between items-end">
                   <div>
                     <p className="text-xs uppercase tracking-wider font-medium text-slate-500 dark:text-cyan-200/80">{t('homepage.currentBid')}</p>
-                    <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-300">${item.current_price?.toFixed(2)}</p>
+                    <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-300">{formatCurrency(item.current_price)}</p>
                   </div>
                   <Button 
                     size="sm" 
@@ -564,7 +565,7 @@ const FeaturedSection = ({ items, navigate }) => {
               </div>
               <CardContent className="p-4">
                 <h3 className="font-medium text-sm mb-2 line-clamp-1 text-slate-900 dark:text-slate-50">{item.title}</h3>
-                <p className="text-lg font-bold text-blue-600 dark:text-cyan-400">${item.current_price?.toFixed(2)}</p>
+                <p className="text-lg font-bold text-blue-600 dark:text-cyan-400">{formatCurrency(item.current_price)}</p>
               </CardContent>
             </Card>
           ))}
@@ -614,7 +615,7 @@ const NewListingsSection = ({ items, navigate }) => {
               </div>
               <CardContent className="p-3">
                 <h3 className="font-medium text-xs mb-1 line-clamp-1 text-slate-900 dark:text-slate-50">{item.title}</h3>
-                <p className="text-sm font-bold text-blue-600 dark:text-cyan-400">${item.current_price?.toFixed(2)}</p>
+                <p className="text-sm font-bold text-blue-600 dark:text-cyan-400">{formatCurrency(item.current_price)}</p>
               </CardContent>
             </Card>
           ))}

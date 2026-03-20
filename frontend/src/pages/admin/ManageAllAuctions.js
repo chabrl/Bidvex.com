@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
 import { Package, Search, Edit2, Trash2, Pause, Archive, XCircle, Eye, AlertTriangle } from 'lucide-react';
+import { formatCurrency } from '../../utils/currencyFormatter';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -243,9 +244,9 @@ const ManageAllAuctions = () => {
                     <p className="text-sm text-muted-foreground mb-2">{listing.category} • {listing.city}, {listing.region}</p>
                     <div className="flex gap-4 text-sm">
                       <span className="text-green-600 font-semibold">
-                        ${listing.type === 'multi'
-                          ? listing.lots?.reduce((sum, lot) => sum + (lot.starting_price || 0), 0).toFixed(2)
-                          : listing.current_price?.toFixed(2)}
+                        {formatCurrency(listing.type === 'multi'
+                          ? listing.lots?.reduce((sum, lot) => sum + (lot.starting_price || 0), 0)
+                          : listing.current_price)}
                       </span>
                       <span className="text-muted-foreground">
                         {listing.type === 'multi'

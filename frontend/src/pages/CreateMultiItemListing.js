@@ -22,6 +22,7 @@ import { useDropzone } from 'react-dropzone';
 import RichTextEditor from '../components/RichTextEditor';
 import LocationSelector from '../components/LocationSelector';
 import useGeoLocation from '../hooks/useGeoLocation';
+import { formatCurrency } from '../utils/currencyFormatter';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -411,7 +412,7 @@ const CreateMultiItemListing = () => {
       const minBuyNowPrice = startingPrice * 1.2; // 20% higher
       
       if (buyNowPrice < minBuyNowPrice) {
-        errors.buy_now_price = t('createListing.buyNowMinPrice', `Buy Now price must be at least $${minBuyNowPrice.toFixed(2)} (20% above starting price)`, { price: minBuyNowPrice.toFixed(2) });
+        errors.buy_now_price = t('createListing.buyNowMinPrice', `Buy Now price must be at least ${formatCurrency(minBuyNowPrice)} (20% above starting price)`, { price: minBuyNowPrice.toFixed(2) });
       }
     }
 
@@ -1134,7 +1135,7 @@ const CreateMultiItemListing = () => {
                           min={lot.starting_price ? (parseFloat(lot.starting_price) * 1.2).toFixed(2) : '1'}
                           value={lot.buy_now_price || ''} 
                           onChange={(e) => handleLotChange(actualIndex, 'buy_now_price', e.target.value)} 
-                          placeholder={lot.starting_price ? `Min: $${(parseFloat(lot.starting_price) * 1.2).toFixed(2)}` : 'Enter starting price first'}
+                          placeholder={lot.starting_price ? `Min: ${formatCurrency(parseFloat(lot.starting_price) * 1.2)}` : t('createListing.startingPrice', 'Enter starting price first')}
                           className="flex-1 min-h-[48px]"
                         />
                       </div>
@@ -1212,7 +1213,7 @@ const CreateMultiItemListing = () => {
             </div>
             <div>
               <p className="text-2xl font-bold text-blue-600">
-                ${lots.reduce((sum, lot) => sum + parseFloat(lot.starting_price || 0), 0).toFixed(2)}
+                {formatCurrency(lots.reduce((sum, lot) => sum + parseFloat(lot.starting_price || 0), 0))}
               </p>
               <p className="text-sm text-muted-foreground">{t('createListing.totalValue')}</p>
             </div>
@@ -1273,7 +1274,7 @@ const CreateMultiItemListing = () => {
                     <td className="p-2">{lot.lot_number}</td>
                     <td className="p-2 font-medium">{lot.title}</td>
                     <td className="p-2">{lot.quantity}</td>
-                    <td className="p-2">${parseFloat(lot.starting_price).toFixed(2)}</td>
+                    <td className="p-2">{formatCurrency(parseFloat(lot.starting_price))}</td>
                     <td className="p-2 capitalize">{lot.condition.replace('_', ' ')}</td>
                     <td className="p-2">{lot.images?.length || 0}</td>
                   </tr>

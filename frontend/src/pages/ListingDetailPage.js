@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { extractErrorMessage } from '../utils/errorHandler';
-// BidErrorGuide removed - error messages now shown via toast notifications
+import { formatCurrency, formatPercent } from '../utils/currencyFormatter';
 import axios from 'axios';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -386,7 +386,7 @@ const ListingDetailPage = () => {
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">{t('marketplace.currentBid')}</p>
                     <p className="text-4xl font-bold gradient-text" data-testid="current-price">
-                      ${(realtimePrice ?? listing.current_price).toFixed(2)}
+                      {formatCurrency(realtimePrice ?? listing.current_price)}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
                       {realtimeBidCount ?? listing.bid_count ?? 0} {(realtimeBidCount ?? listing.bid_count ?? 0) === 1 ? 'bid' : 'bids'} placed
@@ -504,7 +504,7 @@ const ListingDetailPage = () => {
                         min={(realtimePrice ?? listing.current_price) + 0.01}
                         value={bidAmount}
                         onChange={(e) => setBidAmount(e.target.value)}
-                        placeholder={`Min: $${((realtimePrice ?? listing.current_price) + 1).toFixed(2)}`}
+                        placeholder={`Min: ${formatCurrency((realtimePrice ?? listing.current_price) + 1)}`}
                         required
                         disabled={!canBid}
                         data-testid="bid-amount-input"
@@ -586,7 +586,7 @@ const ListingDetailPage = () => {
                         onClick={handleBuyNow}
                         data-testid="buy-now-btn"
                       >
-                        {t('marketplace.buyNow')}: ${listing.buy_now_price.toFixed(2)}
+                        {t('marketplace.buyNow')}: {formatCurrency(listing.buy_now_price)}
                       </Button>
                     </>
                   )}
@@ -610,7 +610,7 @@ const ListingDetailPage = () => {
               <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/20" data-testid="buyers-premium-banner">
                 <DollarSign className="h-4 w-4 text-amber-600" />
                 <AlertDescription className="text-amber-800 dark:text-amber-300 text-sm font-medium">
-                  A {(listing.custom_buyer_premium_rate * 100).toFixed(1)}% buyer's premium applies to this lot
+                  A {formatPercent(listing.custom_buyer_premium_rate * 100, 1)} buyer's premium applies to this lot
                 </AlertDescription>
               </Alert>
             )}
@@ -716,7 +716,7 @@ const ListingDetailPage = () => {
                         </div>
                         
                         {/* Bid Amount */}
-                        <span className="font-bold text-lg gradient-text">${bid.amount.toFixed(2)}</span>
+                        <span className="font-bold text-lg gradient-text">{formatCurrency(bid.amount)}</span>
                       </div>
                     ))}
                   </div>

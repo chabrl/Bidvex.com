@@ -11,6 +11,7 @@ import { Badge } from '../components/ui/badge';
 import { Plus, DollarSign, Package, FileText, ShoppingBag, Heart, Eye, TrendingUp, BarChart3, Wallet, Info, AlertTriangle, Clock, Shield, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import SellerAnalyticsDashboard from '../components/SellerAnalyticsDashboard';
+import { formatCurrency, formatPercent } from '../utils/currencyFormatter';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -193,7 +194,7 @@ const SellerDashboard = () => {
           <StatCard
             icon={<DollarSign className="h-6 w-6" />}
             title={t('dashboard.seller.totalSales')}
-            value={`$${dashboard?.total_sales?.toFixed(2) || '0.00'}`}
+            value={formatCurrency(dashboard?.total_sales || 0)}
             color="purple"
           />
           {/* Net Payout Card - Shows what seller will receive after commission */}
@@ -430,7 +431,7 @@ const SellerDashboard = () => {
                       <div className="flex flex-wrap gap-4 text-sm mb-2">
                         <span className="text-green-600 font-semibold">
                           <DollarSign className="h-3 w-3 inline mr-1" />
-                          ${displayPrice.toFixed(2)}
+                          {formatCurrency(displayPrice)}
                         </span>
                         <span className="text-blue-600">
                           <TrendingUp className="h-3 w-3 inline mr-1" />
@@ -599,18 +600,18 @@ const NetPayoutCard = ({ totalSales = 0, subscriptionTier = 'free', taxVerified 
             <Info className="h-4 w-4 text-muted-foreground cursor-help" />
             <div className="absolute right-0 top-6 w-64 bg-gray-900 text-white text-xs p-3 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
               <p className="font-semibold mb-1">Net Payout Calculation</p>
-              <p>Total Sales: ${totalSales.toFixed(2)}</p>
-              <p>Commission ({(effectiveRate * 100).toFixed(1)}%): -${commissionAmount.toFixed(2)}</p>
+              <p>Total Sales: {formatCurrency(totalSales)}</p>
+              <p>Commission ({formatPercent(effectiveRate * 100, 1)}): -{formatCurrency(commissionAmount)}</p>
               <p className="border-t border-gray-700 mt-1 pt-1 font-semibold">
-                Your Bank: ${netPayout.toFixed(2)}
+                Your Bank: {formatCurrency(netPayout)}
               </p>
             </div>
           </div>
         </div>
-        <p className="text-2xl font-bold mb-1 text-green-600">${netPayout.toFixed(2)}</p>
+        <p className="text-2xl font-bold mb-1 text-green-600">{formatCurrency(netPayout)}</p>
         <p className="text-sm text-muted-foreground">Net Payout</p>
         <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-          <span>After {(effectiveRate * 100).toFixed(1)}% commission</span>
+          <span>After {formatPercent(effectiveRate * 100, 1)} commission</span>
           {subscriptionTier !== 'free' && (
             <Badge className="bg-green-100 text-green-700 text-xs ml-1">
               {subscriptionTier} rate

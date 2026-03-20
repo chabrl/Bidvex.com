@@ -7,6 +7,7 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';
+import { formatCurrency } from '../utils/currencyFormatter';
 import { 
   Package, Clock, MapPin, User, Calendar, 
   ArrowLeft, Gavel, AlertCircle, TrendingUp,
@@ -236,7 +237,7 @@ const MultiItemListingDetailPage = () => {
     const lot = listing.lots.find(l => l.lot_number === lotNumber);
 
     if (!bidAmount || bidAmount <= lot.current_price) {
-      toast.error(`Bid must be higher than current price of $${lot.current_price.toFixed(2)}`);
+      toast.error(`Bid must be higher than current price of ${formatCurrency(lot.current_price)}`);
       return;
     }
 
@@ -246,7 +247,7 @@ const MultiItemListingDetailPage = () => {
       const minimumBid = lot.current_price + minIncrement;
       
       if (bidAmount < minimumBid) {
-        toast.error(`Minimum bid is $${minimumBid.toFixed(2)} (increment: $${minIncrement.toFixed(2)})`);
+        toast.error(`Minimum bid is ${formatCurrency(minimumBid)} (increment: ${formatCurrency(minIncrement)})`);
         return;
       }
     }
@@ -294,7 +295,7 @@ const MultiItemListingDetailPage = () => {
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
       
-      toast.success(`🎉 Congratulations! You purchased "${lot.title}" for $${lot.buy_now_price.toFixed(2)}!`);
+      toast.success(`Congratulations! You purchased "${lot.title}" for ${formatCurrency(lot.buy_now_price)}!`);
       
       // Refresh listing to update lot status
       fetchListing();
@@ -991,11 +992,11 @@ const MultiItemListingDetailPage = () => {
                     <p className="text-sm" style={{ color: '#6b7280' }}>Total Lots</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-2xl font-bold" style={{ color: '#2563eb' }}>${totalStartingValue.toFixed(2)}</p>
+                    <p className="text-2xl font-bold" style={{ color: '#2563eb' }}>{formatCurrency(totalStartingValue)}</p>
                     <p className="text-sm" style={{ color: '#6b7280' }}>Total Starting Value</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-2xl font-bold" style={{ color: '#16a34a' }}>${totalCurrentValue.toFixed(2)}</p>
+                    <p className="text-2xl font-bold" style={{ color: '#16a34a' }}>{formatCurrency(totalCurrentValue)}</p>
                     <p className="text-sm" style={{ color: '#6b7280' }}>Current Total Value</p>
                   </div>
                 </div>
@@ -1123,11 +1124,11 @@ const MultiItemListingDetailPage = () => {
                         <div className="grid grid-cols-2 gap-4 mb-4">
                           <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                             <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Opening Bid</p>
-                            <p className="text-xl font-bold text-slate-900 dark:text-slate-100">${lot.starting_price.toFixed(2)}</p>
+                            <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{formatCurrency(lot.starting_price)}</p>
                           </div>
                           <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
                             <p className="text-xs text-green-700 dark:text-green-400 uppercase tracking-wide mb-1">Current Bid</p>
-                            <p className="text-xl font-bold text-green-600 dark:text-green-400">${lot.current_price.toFixed(2)}</p>
+                            <p className="text-xl font-bold text-green-600 dark:text-green-400">{formatCurrency(lot.current_price)}</p>
                           </div>
                         </div>
 
@@ -1167,7 +1168,7 @@ const MultiItemListingDetailPage = () => {
                             <div className="flex items-center justify-between py-2 bg-blue-100 dark:bg-blue-900/30 -mx-4 px-4 rounded">
                               <span className="text-sm font-semibold text-blue-900 dark:text-blue-100">Est. Total Out-of-Pocket:</span>
                               <span className="text-lg font-bold text-blue-700 dark:text-blue-300">
-                                ${(lot.current_price * 1.05).toFixed(2)}
+                                {formatCurrency(lot.current_price * 1.05)}
                               </span>
                             </div>
                             
@@ -1218,7 +1219,7 @@ const MultiItemListingDetailPage = () => {
                                 <div>
                                   <p className="text-sm font-medium text-[#06B6D4]">⚡ Buy Now Available</p>
                                   <p className="text-2xl font-bold text-[#1E3A8A] dark:text-white">
-                                    ${lot.buy_now_price.toFixed(2)}
+                                    {formatCurrency(lot.buy_now_price)}
                                   </p>
                                   {lot.available_quantity && lot.available_quantity < lot.quantity && (
                                     <p className="text-xs text-amber-600">
@@ -1290,7 +1291,7 @@ const MultiItemListingDetailPage = () => {
                             <div className="flex items-center gap-2 text-xs text-muted-foreground bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-md">
                               <Info className="h-3 w-3" />
                               <span>
-                                Minimum increment: ${getMinimumIncrement(lot.current_price).toFixed(2)} 
+                                Minimum increment: {formatCurrency(getMinimumIncrement(lot.current_price))} 
                                 {incrementInfo && ` (${incrementInfo.increment_option === 'tiered' ? 'Tiered' : 'Simplified'} schedule)`}
                               </span>
                             </div>
@@ -1301,7 +1302,7 @@ const MultiItemListingDetailPage = () => {
                                 type="number"
                                 step="0.01"
                                 min={lot.current_price + getMinimumIncrement(lot.current_price)}
-                                placeholder={`Min: $${(lot.current_price + getMinimumIncrement(lot.current_price)).toFixed(2)}`}
+                                placeholder={`Min: ${formatCurrency(lot.current_price + getMinimumIncrement(lot.current_price))}`}
                                 value={bidAmounts[lot.lot_number] || ''}
                                 onChange={(e) => handleBidChange(lot.lot_number, e.target.value)}
                                 className="flex-1 px-4 py-2 border border-input rounded-md bg-background"
@@ -1408,7 +1409,7 @@ const MultiItemListingDetailPage = () => {
                       <p className="text-xs truncate mb-1">{lot.title}</p>
                       <div className="flex items-center justify-between text-xs mb-1">
                         <span>Qty: {lot.quantity}</span>
-                        <span className="font-semibold">${lot.current_price.toFixed(2)}</span>
+                        <span className="font-semibold">{formatCurrency(lot.current_price)}</span>
                       </div>
                       {lot.lot_end_time && !auctionEnded && (
                         <div className="flex items-center gap-1 text-xs">
@@ -1486,7 +1487,7 @@ const MultiItemListingDetailPage = () => {
                     <div className="flex items-center justify-between text-xs">
                       <span>Qty: {lot.quantity}</span>
                       <span className={`font-bold ${lotIsHighStakes && activeLotId !== lot.lot_number ? 'text-amber-600' : ''}`}>
-                        ${lot.current_price.toFixed(2)}
+                        {formatCurrency(lot.current_price)}
                       </span>
                     </div>
                     {lot.lot_end_time && !auctionEnded && (

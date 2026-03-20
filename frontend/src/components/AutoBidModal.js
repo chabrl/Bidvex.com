@@ -10,6 +10,7 @@ import { Switch } from './ui/switch';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { extractErrorMessage } from '../utils/errorHandler';
+import { formatCurrency } from '../utils/currencyFormatter';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -57,7 +58,7 @@ const AutoBidModal = ({ listingId, currentBid, minimumIncrement, onAutoBidSetup 
 
     const amount = parseFloat(maxBid);
     if (isNaN(amount) || amount <= currentBid) {
-      toast.error(`Max bid must be higher than current bid of $${currentBid.toFixed(2)}`);
+      toast.error(`Max bid must be higher than current bid of ${formatCurrency(currentBid)}`);
       return;
     }
 
@@ -70,8 +71,8 @@ const AutoBidModal = ({ listingId, currentBid, minimumIncrement, onAutoBidSetup 
         }
       });
 
-      toast.success('🤖 Auto-Bid Bot activated!', {
-        description: `Will bid up to $${amount.toFixed(2)} using ${minimumIncrement > 0 ? 'seller\'s increment schedule' : 'standard increments'}`
+      toast.success('Auto-Bid Bot activated!', {
+        description: `Will bid up to ${formatCurrency(amount)} using ${minimumIncrement > 0 ? 'seller\'s increment schedule' : 'standard increments'}`
       });
 
       setAutoBidActive(true);
@@ -152,10 +153,10 @@ const AutoBidModal = ({ listingId, currentBid, minimumIncrement, onAutoBidSetup 
               <div className="space-y-2">
                 <Label>Current Bid</Label>
                 <div className="text-2xl font-bold text-primary">
-                  ${currentBid.toFixed(2)}
+                  {formatCurrency(currentBid)}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Bot will follow seller's increment: ${minimumIncrement.toFixed(2)}
+                  Bot will follow seller's increment: {formatCurrency(minimumIncrement)}
                 </p>
               </div>
 
@@ -168,7 +169,7 @@ const AutoBidModal = ({ listingId, currentBid, minimumIncrement, onAutoBidSetup 
                   min={currentBid + minimumIncrement}
                   value={maxBid}
                   onChange={(e) => setMaxBid(e.target.value)}
-                  placeholder={`Enter max bid (min: $${(currentBid + minimumIncrement).toFixed(2)})`}
+                  placeholder={`Enter max bid (min: ${formatCurrency(currentBid + minimumIncrement)})`}
                   className="text-lg"
                   disabled={!isPremium}
                 />
@@ -190,7 +191,7 @@ const AutoBidModal = ({ listingId, currentBid, minimumIncrement, onAutoBidSetup 
                     ✅ Auto-Bid Currently Active
                   </p>
                   <p className="text-xs text-green-700 mt-1">
-                    Max Bid: ${existingAutoBid.max_bid.toFixed(2)}
+                    Max Bid: {formatCurrency(existingAutoBid.max_bid)}
                   </p>
                 </div>
               )}

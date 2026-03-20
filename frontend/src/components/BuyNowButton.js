@@ -4,6 +4,7 @@ import { ShoppingCart, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
+import { formatCurrency } from '../utils/currencyFormatter';
 
 /**
  * Buy Now button with confirmation modal and quantity selection
@@ -52,7 +53,7 @@ const BuyNowButton = ({ lot, auctionId, onPurchaseComplete }) => {
 
       if (response.data.success) {
         toast.success(
-          `Purchase successful! ${quantity} unit(s) for $${totalAmount.toFixed(2)}`,
+          `Purchase successful! ${quantity} unit(s) for ${formatCurrency(totalAmount)}`,
           {
             description: 'Payment pending. Check your dashboard for details.',
             duration: 7000
@@ -101,7 +102,7 @@ const BuyNowButton = ({ lot, auctionId, onPurchaseComplete }) => {
         disabled={availableQty <= 0}
       >
         <ShoppingCart className="h-4 w-4 mr-2" />
-        Buy Now - ${buyNowPrice.toFixed(2)}
+        Buy Now - {formatCurrency(buyNowPrice)}
       </Button>
 
       {/* Confirmation Modal */}
@@ -146,7 +147,7 @@ const BuyNowButton = ({ lot, auctionId, onPurchaseComplete }) => {
 
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Buy Now Price:</span>
-                <span className="font-semibold">${buyNowPrice.toFixed(2)} per unit</span>
+                <span className="font-semibold">{formatCurrency(buyNowPrice)} per unit</span>
               </div>
 
               {/* Quantity Selector */}
@@ -192,7 +193,7 @@ const BuyNowButton = ({ lot, auctionId, onPurchaseComplete }) => {
                 <div className="flex justify-between items-center">
                   <span className="font-semibold text-gray-900">Total Amount:</span>
                   <span className="text-2xl font-bold text-green-600">
-                    ${totalAmount.toFixed(2)}
+                    {formatCurrency(totalAmount)}
                   </span>
                 </div>
               </div>
@@ -205,7 +206,7 @@ const BuyNowButton = ({ lot, auctionId, onPurchaseComplete }) => {
                 <div className="text-sm text-blue-800">
                   <p className="font-semibold mb-1">Instant Purchase</p>
                   <p>
-                    This is a <strong>Buy Now</strong> purchase. You will immediately secure {quantity} unit(s) at the fixed price of ${buyNowPrice.toFixed(2)} per unit. 
+                    This is a <strong>Buy Now</strong> purchase. You will immediately secure {quantity} unit(s) at the fixed price of {formatCurrency(buyNowPrice)} per unit. 
                     {quantity < availableQty && (
                       <span className="block mt-1">
                         The auction will continue for the remaining {availableQty - quantity} unit(s).

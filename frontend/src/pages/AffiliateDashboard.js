@@ -7,6 +7,7 @@ import { Input } from '../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { toast } from 'sonner';
 import { DollarSign, Users, TrendingUp, Copy, ExternalLink, Download } from 'lucide-react';
+import { formatCurrency } from '../utils/currencyFormatter';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -131,7 +132,7 @@ const AffiliateDashboard = () => {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${(stats?.pending_earnings || 0).toFixed(2)}</div>
+              <div className="text-2xl font-bold">{formatCurrency(stats?.pending_earnings || 0)}</div>
             </CardContent>
           </Card>
 
@@ -141,7 +142,7 @@ const AffiliateDashboard = () => {
               <DollarSign className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">${(stats?.paid_earnings || 0).toFixed(2)}</div>
+              <div className="text-2xl font-bold text-green-600">{formatCurrency(stats?.paid_earnings || 0)}</div>
             </CardContent>
           </Card>
         </div>
@@ -215,7 +216,7 @@ const AffiliateDashboard = () => {
                             {ref.status}
                           </span>
                         </td>
-                        <td className="py-2">${(ref.commission || 0).toFixed(2)}</td>
+                        <td className="py-2">{formatCurrency(ref.commission || 0)}</td>
                       </tr>
                     ))
                   ) : (
@@ -251,7 +252,7 @@ const AffiliateDashboard = () => {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              {t('affiliate.availableBalance', 'Available balance')}: ${(stats?.pending_earnings || 0).toFixed(2)}
+              {t('affiliate.availableBalance', 'Available balance')}: {formatCurrency(stats?.pending_earnings || 0)}
             </p>
           </CardContent>
         </Card>

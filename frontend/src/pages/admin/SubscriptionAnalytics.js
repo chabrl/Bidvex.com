@@ -15,6 +15,7 @@ import {
   CreditCard, Gift, BarChart3, PieChart, Calendar, Percent,
   Sparkles, Zap, ChevronRight
 } from 'lucide-react';
+import { formatCurrency } from '../../utils/currencyFormatter';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -42,15 +43,6 @@ const SubscriptionAnalytics = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-CA', {
-      style: 'currency',
-      currency: 'CAD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2
-    }).format(amount || 0);
   };
 
   if (loading) {
@@ -373,7 +365,7 @@ const SubscriptionAnalytics = () => {
                         <p className="text-xs text-muted-foreground">
                           {coupon.discount_type === 'percentage' 
                             ? `${coupon.value}% off` 
-                            : `$${coupon.value} off`}
+                            : `${formatCurrency(coupon.value)} off`}
                         </p>
                       </div>
                     </div>

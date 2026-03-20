@@ -16,8 +16,7 @@ import {
   User
 } from 'lucide-react';
 import { toast } from 'sonner';
-
-/**
+import { formatCurrency } from '../utils/currencyFormatter';
  * Decomposed Marketplace - Item-Centric Discovery
  * Features:
  * - Individual items from multi-item lots
@@ -273,7 +272,7 @@ const DecomposedMarketplace = () => {
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Current Bid:</span>
                     <span className="text-lg font-bold text-primary">
-                      ${(item.current_price || 0).toFixed(2)}
+                      {formatCurrency(item.current_price || 0)}
                     </span>
                   </div>
 
@@ -281,7 +280,7 @@ const DecomposedMarketplace = () => {
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Buy Now:</span>
                       <span className="font-semibold text-green-600">
-                        ${item.buy_now_price.toFixed(2)}
+                        {formatCurrency(item.buy_now_price)}
                       </span>
                     </div>
                   )}

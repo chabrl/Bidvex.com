@@ -11,6 +11,7 @@ import {
   MessageCircle, ArrowLeft, Building, User
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatCurrency } from '../utils/currencyFormatter';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -288,7 +289,7 @@ const SellerProfilePage = () => {
                     <CardContent className="p-4">
                       <h3 className="font-semibold line-clamp-2 mb-2">{listing.title}</h3>
                       <p className="text-lg font-bold text-primary">
-                        ${listing.current_price.toFixed(2)}
+                        {formatCurrency(listing.current_price)}
                       </p>
                     </CardContent>
                   </Card>

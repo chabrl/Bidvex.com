@@ -12,7 +12,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional, List
 
 # Configuration
-BASE_URL = "https://sell-location-unify.preview.emergentagent.com/api"
+BASE_URL = "https://tax-liability-portal.preview.emergentagent.com/api"
 TEST_BUSINESS_EMAIL = "business.tester@bidvex.com"
 TEST_PERSONAL_EMAIL = "personal.tester@bidvex.com"
 TEST_PASSWORD = "MultiLotTest123!"

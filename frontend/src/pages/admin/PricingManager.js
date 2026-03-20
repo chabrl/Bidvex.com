@@ -26,6 +26,7 @@ import {
   Crown, Star, User as UserIcon, DollarSign, Save, History,
   RefreshCw, Settings, Edit3, TrendingUp, Check, AlertCircle
 } from 'lucide-react';
+import { formatCurrency } from '../../utils/currencyFormatter';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -140,13 +141,6 @@ const PricingManager = () => {
       hour: '2-digit',
       minute: '2-digit'
     });
-  };
-
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-CA', {
-      style: 'currency',
-      currency: 'CAD'
-    }).format(amount || 0);
   };
 
   if (loading) {

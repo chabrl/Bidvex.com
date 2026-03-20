@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
 import { TrendingUp, Download } from 'lucide-react';
+import { formatCurrency } from '../../utils/currencyFormatter';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -63,7 +64,7 @@ const AnalyticsDashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card><CardContent className="p-6"><div><p className="text-2xl font-bold gradient-text">${totalRevenue.toFixed(2)}</p><p className="text-sm text-muted-foreground">Total Revenue (30d)</p></div></CardContent></Card>
+        <Card><CardContent className="p-6"><div><p className="text-2xl font-bold gradient-text">{formatCurrency(totalRevenue)}</p><p className="text-sm text-muted-foreground">Total Revenue (30d)</p></div></CardContent></Card>
         <Card><CardContent className="p-6"><div><p className="text-2xl font-bold text-green-600">{listingData.active || 0}</p><p className="text-sm text-muted-foreground">Active Listings</p></div></CardContent></Card>
         <Card><CardContent className="p-6"><div><p className="text-2xl font-bold text-blue-600">{listingData.sold || 0}</p><p className="text-sm text-muted-foreground">Sold Listings</p></div></CardContent></Card>
         <Card><CardContent className="p-6"><div><p className="text-2xl font-bold text-yellow-600">{listingData.pending || 0}</p><p className="text-sm text-muted-foreground">Pending Review</p></div></CardContent></Card>
@@ -77,7 +78,7 @@ const AnalyticsDashboard = () => {
               {revenueData.slice().reverse().slice(0, 10).map(data => (
                 <div key={data.date} className="flex justify-between items-center p-3 border rounded-lg">
                   <span className="text-sm font-medium">{new Date(data.date).toLocaleDateString()}</span>
-                  <span className="text-lg font-bold gradient-text">${data.revenue.toFixed(2)}</span>
+                  <span className="text-lg font-bold gradient-text">{formatCurrency(data.revenue)}</span>
                 </div>
               ))}
             </div>

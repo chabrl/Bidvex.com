@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
+import { formatCurrency } from '../utils/currencyFormatter';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -112,14 +113,6 @@ const CheckoutPage = () => {
       setError(err.response?.data?.detail || 'Failed to initiate payment');
       setProcessing(false);
     }
-  };
-  
-  const formatCurrency = (amount) => {
-    if (!amount && amount !== 0) return '$0.00';
-    return new Intl.NumberFormat('en-CA', {
-      style: 'currency',
-      currency: 'CAD'
-    }).format(amount);
   };
   
   const isVehicle = checkoutType === 'vehicle';

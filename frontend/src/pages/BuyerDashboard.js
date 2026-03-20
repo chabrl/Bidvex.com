@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { DollarSign, Gavel, Trophy, Heart, TrendingUp, TrendingDown, Eye, AlertTriangle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import Countdown from 'react-countdown';
+import { formatCurrency } from '../utils/currencyFormatter';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -146,11 +147,11 @@ const BuyerDashboard = () => {
                             <div className={`grid grid-cols-2 gap-4 p-4 rounded-lg ${isWinning ? 'bg-green-50 dark:bg-green-950/30' : 'bg-red-50 dark:bg-red-950/30'}`}>
                               <div>
                                 <p className="text-xs text-muted-foreground uppercase mb-1 font-semibold">{t('dashboard.buyer.yourBid')}</p>
-                                <p className="text-2xl font-bold">${bid.amount.toFixed(2)}</p>
+                                <p className="text-2xl font-bold">{formatCurrency(bid.amount)}</p>
                               </div>
                               <div>
                                 <p className="text-xs text-muted-foreground uppercase mb-1 font-semibold">Current Price</p>
-                                <p className={`text-2xl font-bold ${isWinning ? 'text-green-600' : 'text-red-600'}`}>${listing?.current_price.toFixed(2)}</p>
+                                <p className={`text-2xl font-bold ${isWinning ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(listing?.current_price)}</p>
                               </div>
                             </div>
 
@@ -242,7 +243,7 @@ const BuyerDashboard = () => {
                             <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-950 rounded-lg">
                               <div>
                                 <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">Your Winning Bid</p>
-                                <p className="text-3xl font-bold text-green-600">${bid.amount.toFixed(2)}</p>
+                                <p className="text-3xl font-bold text-green-600">{formatCurrency(bid.amount)}</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
@@ -318,11 +319,11 @@ const BuyerDashboard = () => {
                             <div className="grid grid-cols-2 gap-4">
                               <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
                                 <p className="text-xs text-muted-foreground uppercase mb-1 font-semibold">{t('dashboard.buyer.yourBid')}</p>
-                                <p className="text-xl font-bold">${bid.amount.toFixed(2)}</p>
+                                <p className="text-xl font-bold">{formatCurrency(bid.amount)}</p>
                               </div>
                               <div className="p-3 bg-red-50 dark:bg-red-950 rounded-lg">
                                 <p className="text-xs text-muted-foreground uppercase mb-1 font-semibold">Current Bid</p>
-                                <p className="text-xl font-bold text-red-600">${listing?.current_price.toFixed(2)}</p>
+                                <p className="text-xl font-bold text-red-600">{formatCurrency(listing?.current_price)}</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
@@ -429,8 +430,8 @@ const BuyerDashboard = () => {
                           </Badge>
                         </div>
                         <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-2">
-                          <span>Your Bid: ${bid.amount.toFixed(2)}</span>
-                          <span>Current: ${listing.current_price.toFixed(2)}</span>
+                          <span>Your Bid: {formatCurrency(bid.amount)}</span>
+                          <span>Current: {formatCurrency(listing.current_price)}</span>
                           {bid.amount >= listing.current_price && listing.status === 'active' && (
                             <Badge variant="default" className="text-xs">Winning</Badge>
                           )}

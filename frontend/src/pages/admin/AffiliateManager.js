@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
 import { DollarSign, CheckCircle, Users } from 'lucide-react';
+import { formatCurrency } from '../../utils/currencyFormatter';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -72,7 +73,7 @@ const AffiliateManager = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card><CardContent className="p-6"><div className="flex items-center gap-4"><Users className="h-8 w-8 text-blue-600" /><div><p className="text-2xl font-bold">{affiliates.length}</p><p className="text-sm text-muted-foreground">Active Affiliates</p></div></div></CardContent></Card>
-        <Card><CardContent className="p-6"><div className="flex items-center gap-4"><DollarSign className="h-8 w-8 text-green-600" /><div><p className="text-2xl font-bold">${totalCommissions.toFixed(2)}</p><p className="text-sm text-muted-foreground">Total Commissions</p></div></div></CardContent></Card>
+        <Card><CardContent className="p-6"><div className="flex items-center gap-4"><DollarSign className="h-8 w-8 text-green-600" /><div><p className="text-2xl font-bold">{formatCurrency(totalCommissions)}</p><p className="text-sm text-muted-foreground">Total Commissions</p></div></div></CardContent></Card>
         <Card><CardContent className="p-6"><div className="flex items-center gap-4"><CheckCircle className="h-8 w-8 text-yellow-600" /><div><p className="text-2xl font-bold">{payouts.filter(p => p.status === 'pending').length}</p><p className="text-sm text-muted-foreground">Pending Payouts</p></div></div></CardContent></Card>
       </div>
 

@@ -6,6 +6,7 @@ import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { formatCurrency } from '../utils/currencyFormatter';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -89,7 +90,7 @@ const PaymentSuccessPage = () => {
               </p>
               {paymentInfo && (
                 <div className="bg-accent/20 rounded-lg p-4 text-sm space-y-1">
-                  <p><span className="font-medium">{t('paymentSuccess.amountPaid')}:</span> ${(paymentInfo.amount_total / 100).toFixed(2)}</p>
+                  <p><span className="font-medium">{t('paymentSuccess.amountPaid')}:</span> {formatCurrency(paymentInfo.amount_total / 100)}</p>
                   <p><span className="font-medium">{t('common.status', 'Status')}:</span> {paymentInfo.payment_status}</p>
                 </div>
               )}

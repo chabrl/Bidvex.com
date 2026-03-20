@@ -8,6 +8,7 @@ import { Badge } from './ui/badge';
 import WatchlistButton from './WatchlistButton';
 import Countdown from 'react-countdown';
 import { Clock } from 'lucide-react';
+import { formatCurrency } from '../utils/currencyFormatter';
 
 const AuctionCarousel = ({ title, items, type = 'auction' }) => {
   const navigate = useNavigate();
@@ -197,7 +198,7 @@ const AuctionCard = ({ item, onClick }) => {
         <div className="space-y-1">
           <p className="text-xs text-muted-foreground uppercase">Current Bid</p>
           <p className="text-2xl font-bold gradient-text">
-            ${item.current_price?.toFixed(2) || item.starting_price?.toFixed(2)}
+            {formatCurrency(item.current_price || item.starting_price)}
           </p>
         </div>
 
@@ -225,7 +226,7 @@ const SellerCard = ({ item }) => {
         </div>
         <div className="space-y-1">
           <p className="text-xs text-muted-foreground uppercase">Total Sales</p>
-          <p className="text-xl font-bold gradient-text">${item.total_sales?.toFixed(2)}</p>
+          <p className="text-xl font-bold gradient-text">{formatCurrency(item.total_sales)}</p>
         </div>
       </CardContent>
     </Card>
