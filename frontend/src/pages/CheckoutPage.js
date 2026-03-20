@@ -92,8 +92,14 @@ const CheckoutPage = () => {
           category: winnerRes.data.category,
         });
         return;
-      } catch {
-        // Not a winner — fall through to existing general checkout preview
+      } catch (winnerErr) {
+        // If it's a specific auth/payment error, show it directly
+        const winnerStatus = winnerErr.response?.status;
+        if (winnerStatus === 403 || winnerStatus === 400) {
+          setError(winnerErr.response?.data?.detail || 'Access denied');
+          return;
+        }
+        // 404 = not a winner listing, fall through to general checkout
       }
 
       // Existing general checkout preview flow
