@@ -1,0 +1,1007 @@
+"""
+BidVex - Invoice Generation & Delivery
+Auto-extracted from server.py during P2 refactoring.
+"""
+
+from fastapi import APIRouter, HTTPException, Depends, Request, Query, UploadFile, File, Form, WebSocket, WebSocketDisconnect
+from deps import get_db, get_current_user, get_current_user_optional, User
+from shared import (
+    DEFAULT_EMAIL_TEMPLATES, EMAIL_TEMPLATE_CATEGORIES,
+    DEFAULT_MARKETPLACE_SETTINGS, AFFILIATE_COMMISSION_RATE,
+    generate_affiliate_code, get_email_templates, get_email_template_id,
+    get_marketplace_settings, get_epoch_timestamp, get_server_timestamp,
+    calculate_buyer_fees, calculate_seller_fees, calculate_stripe_fee_recovery,
+    calculate_partner_checkout, calculate_standard_checkout,
+    FeeCalculation, UserCreate, Category, Invoice, PaddleNumber,
+    PaymentTransaction, SessionCreate, get_minimum_increment,
+    STANDARD_BUYER_PREMIUM_RATE, STANDARD_SELLER_COMMISSION_RATE,
+    PARTNER_PLATFORM_FEE_RATE, PARTNER_ANNUAL_ACCESS_FEE,
+    STRIPE_PERCENTAGE_FEE, STRIPE_FIXED_FEE,
+)
+from typing import Optional, Dict, Any, List
+from datetime import datetime, timezone, timedelta
+from pydantic import BaseModel, Field
+from pathlib import Path
+import logging
+import uuid
+import os as _os
+import json as _json
+
+logger = logging.getLogger(__name__)
+
+from services.email_service import get_email_service
+from services.tax_engine import calculate_gst_qst
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image as RLImage
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from starlette.responses import FileResponse
+import hmac
+import hashlib
+import io
+
+invoices_router = APIRouter(tags=["Invoices"])
+
+
+@invoices_router.get("/invoices")
+async def list_invoices(current_user: User = Depends(get_current_user)):
+    """List all invoices for the current user, each with a fresh signed download URL."""
+    db = get_db()
+    from services.cloud_storage import generate_signed_url
+    invoices = await db.subscription_invoices.find(
+        {"user_id": current_user.id},
+        {"_id": 0, "pdf_data": 0}
+    ).sort("created_at", -1).to_list(50)
+
+    for inv in invoices:
+        inv["download_url"] = generate_signed_url(inv["id"])
+
+    return {"invoices": invoices}
+
+
+
+
+@invoices_router.get("/invoices/{invoice_id}/download")
+async def download_invoice(invoice_id: str, current_user: User = Depends(get_current_user)):
+    """Download a PDF invoice — generates, stores in cloud, and returns."""
+    db = get_db()
+    from fastapi.responses import Response
+    from services.cloud_storage import store_invoice_pdf, retrieve_invoice_pdf
+
+    invoice = await db.subscription_invoices.find_one(
+        {"id": invoice_id, "user_id": current_user.id},
+        {"_id": 0}
+    )
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    # Try serving from cloud storage first
+    storage_path = invoice.get("storage_path")
+    if storage_path:
+        pdf_data = await retrieve_invoice_pdf(storage_path)
+        if pdf_data:
+            filename = f"{invoice.get('invoice_number', 'invoice')}.pdf"
+            return Response(
+                content=pdf_data,
+                media_type="application/pdf",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+            )
+
+    # Fallback: render dynamically, then store for next time
+    if not invoice.get("user_name"):
+        user = await db.users.find_one({"id": current_user.id})
+        invoice["user_name"] = user.get("name", user.get("username", "Customer")) if user else "Customer"
+
+    pdf_data = _render_subscription_invoice_pdf(invoice)
+
+    # Persist to cloud storage
+    path = await store_invoice_pdf(invoice_id, pdf_data, subfolder="subscription")
+    await db.subscription_invoices.update_one(
+        {"id": invoice_id},
+        {"$set": {"storage_path": path}}
+    )
+
+    filename = f"{invoice.get('invoice_number', 'invoice')}.pdf"
+    return Response(
+        content=pdf_data,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
+
+
+@invoices_router.get("/invoices/download/{invoice_id}")
+async def download_invoice_signed(invoice_id: str, expires: int = 0, sig: str = ""):
+    """
+    Public signed-URL download endpoint. No auth required — the HMAC signature IS the auth.
+    """
+    db = get_db()
+    from fastapi.responses import Response
+    from services.cloud_storage import verify_signature, retrieve_invoice_pdf
+
+    if not verify_signature(invoice_id, expires, sig):
+        raise HTTPException(status_code=403, detail="Link expired or invalid signature")
+
+    # Look up in both invoice collections
+    invoice = await db.subscription_invoices.find_one({"id": invoice_id}, {"_id": 0})
+    if not invoice:
+        invoice = await db.invoices.find_one({"id": invoice_id}, {"_id": 0})
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    storage_path = invoice.get("storage_path")
+    if storage_path:
+        pdf_data = await retrieve_invoice_pdf(storage_path)
+        if pdf_data:
+            filename = f"{invoice.get('invoice_number', 'invoice')}.pdf"
+            return Response(
+                content=pdf_data,
+                media_type="application/pdf",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+            )
+
+    # Generate on demand if no stored file (subscription invoices)
+    if invoice.get("type") == "subscription":
+        if not invoice.get("user_name"):
+            user = await db.users.find_one({"id": invoice.get("user_id")})
+            invoice["user_name"] = user.get("name", "Customer") if user else "Customer"
+        from services.cloud_storage import store_invoice_pdf
+        pdf_data = _render_subscription_invoice_pdf(invoice)
+        path = await store_invoice_pdf(invoice_id, pdf_data, subfolder="subscription")
+        await db.subscription_invoices.update_one({"id": invoice_id}, {"$set": {"storage_path": path}})
+        filename = f"{invoice.get('invoice_number', 'invoice')}.pdf"
+        return Response(
+            content=pdf_data,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        )
+
+    raise HTTPException(status_code=404, detail="Invoice PDF not available")
+
+
+
+
+@invoices_router.post("/invoices/lots-won/{auction_id}/{user_id}")
+async def generate_lots_won_invoice(
+    auction_id: str,
+    user_id: str,
+    lang: str = "en",
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Generate Buyer Lots Won Summary PDF
+    Requires admin privileges or matching user_id
+    
+    Query Parameters:
+        lang: Language code ('en' or 'fr') - uses buyer's preference if not specified
+    """
+    # Check permissions (admin or own invoice)
+    if current_user.account_type != "admin" and current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    # Fetch auction
+    auction = await db.multi_item_listings.find_one({"id": auction_id})
+    if not auction:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    
+    # Fetch buyer
+    buyer = await db.users.find_one({"id": user_id})
+    if not buyer:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Use buyer's preferred language if lang not specified
+    if lang == "en" and buyer.get("preferred_language"):
+        lang = buyer.get("preferred_language", "en")
+    
+    # Get or create paddle number
+    paddle_record = await db.paddle_numbers.find_one({
+        "auction_id": auction_id,
+        "user_id": user_id
+    })
+    
+    if not paddle_record:
+        paddle_num = await generate_paddle_number(auction_id)
+        paddle_record = {
+            "id": str(uuid.uuid4()),
+            "auction_id": auction_id,
+            "user_id": user_id,
+            "paddle_number": paddle_num,
+            "assigned_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.paddle_numbers.insert_one(paddle_record)
+    
+    # Find lots won by this buyer
+    # For MVP, we'll use lots from the auction that have bids from this user
+    # In production, you'd track winning bids
+    
+    # For demo purposes, let's use first 3 lots as "won"
+    lots_won = []
+    for lot in auction['lots'][:3]:  # Demo: first 3 lots
+        lots_won.append({
+            "lot_number": lot['lot_number'],
+            "title": lot['title'],
+            "description": lot['description'],
+            "quantity": lot['quantity'],
+            "hammer_price": lot['current_price']  # Use current_price as hammer price
+        })
+    
+    if not lots_won:
+        raise HTTPException(status_code=400, detail="No lots won by this buyer")
+    
+    # Calculate fees using the Unified Fee Engine
+    buyer_subscription = buyer.get('subscription_tier', 'free')
+    hammer_total = sum(lot['hammer_price'] for lot in lots_won)
+    buyer_fees = calculate_buyer_fees(hammer_total, buyer_subscription)
+    
+    # Generate invoice number
+    invoice_number = await generate_invoice_number(auction_id)
+    
+    # Prepare data for template with subscription-aware fees
+    template_data = {
+        "invoice_number": invoice_number,
+        "buyer": {
+            "name": buyer['name'],
+            "company_name": buyer.get('company_name'),
+            "billing_address": buyer.get('billing_address', buyer.get('address')),
+            "phone": buyer['phone'],
+            "email": buyer['email'],
+            "subscription_tier": buyer_subscription,
+            "is_premium": buyer_subscription in ['premium', 'vip']
+        },
+        "paddle_number": paddle_record['paddle_number'],
+        "auction": {
+            "title": auction['title'],
+            "city": auction['city'],
+            "region": auction['region'],
+            "location": auction.get('location'),
+            "auction_end_date": datetime.fromisoformat(auction['auction_end_date']) if isinstance(auction['auction_end_date'], str) else auction['auction_end_date']
+        },
+        "lots": lots_won,
+        # Fee Engine values
+        "premium_percentage": buyer_fees.fee_percentage,  # Subscription-adjusted
+        "premium_amount": buyer_fees.fee_amount,
+        "standard_premium_rate": 5.0,
+        "discount_applied": buyer_fees.discount_applied,
+        "is_premium_member": buyer_fees.is_premium_member,
+        "tax_rate_gst": auction.get('tax_rate_gst', 5.0),
+        "tax_rate_qst": auction.get('tax_rate_qst', 9.975),
+        "payment_deadline": "Within 14 days of auction close",
+        "currency": auction.get('currency', 'CAD')  # Include auction currency
+    }
+    
+    # Generate HTML
+    # Generate bilingual HTML
+    try:
+        from invoice_templates_bilingual import lots_won_template as lots_won_bilingual
+        html_content = lots_won_bilingual(template_data, lang=lang)
+    except ImportError:
+        # Fallback to original template if bilingual not available
+        html_content = lots_won_template(template_data)
+    
+    # Generate PDF to temp path, then persist to cloud storage
+    import tempfile
+    from services.cloud_storage import store_invoice_pdf, generate_signed_url
+
+    invoice_id = str(uuid.uuid4())
+
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    generate_pdf_from_html(html_content, tmp_path)
+    pdf_bytes = tmp_path.read_bytes()
+    tmp_path.unlink(missing_ok=True)
+
+    storage_path = await store_invoice_pdf(invoice_id, pdf_bytes, subfolder="lots_won")
+    download_url = generate_signed_url(invoice_id)
+
+    # Save invoice record to database
+    invoice_record = {
+        "id": invoice_id,
+        "invoice_number": invoice_number,
+        "invoice_type": "lots_won",
+        "user_id": user_id,
+        "auction_id": auction_id,
+        "storage_path": storage_path,
+        "download_url": download_url,
+        "generated_date": datetime.now(timezone.utc).isoformat(),
+        "status": "generated"
+    }
+    await db.invoices.insert_one(invoice_record)
+    
+    return {
+        "success": True,
+        "invoice_number": invoice_number,
+        "download_url": download_url,
+        "paddle_number": paddle_record['paddle_number'],
+        "message": "Invoice generated successfully"
+    }
+
+
+
+@invoices_router.post("/invoices/payment-letter/{auction_id}/{user_id}")
+async def generate_payment_letter(
+    auction_id: str,
+    user_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Generate Payment Letter PDF for buyer
+    Requires admin privileges or matching user_id
+    """
+    # Check permissions
+    if current_user.account_type != "admin" and current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    # Fetch auction
+    auction = await db.multi_item_listings.find_one({"id": auction_id})
+    if not auction:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    
+    # Fetch buyer
+    buyer = await db.users.find_one({"id": user_id})
+    if not buyer:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Get paddle number
+    paddle_record = await db.paddle_numbers.find_one({
+        "auction_id": auction_id,
+        "user_id": user_id
+    })
+    
+    if not paddle_record:
+        # Create if doesn't exist
+        paddle_num = await generate_paddle_number(auction_id)
+        paddle_record = {
+            "id": str(uuid.uuid4()),
+            "auction_id": auction_id,
+            "user_id": user_id,
+            "paddle_number": paddle_num,
+            "assigned_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.paddle_numbers.insert_one(paddle_record)
+    
+    # Find lots won (demo: first 3 lots)
+    lots_won = []
+    for lot in auction['lots'][:3]:
+        lots_won.append({
+            "lot_number": lot['lot_number'],
+            "title": lot['title'],
+            "hammer_price": lot['current_price']
+        })
+    
+    if not lots_won:
+        raise HTTPException(status_code=400, detail="No lots won by this buyer")
+    
+    # Calculate totals (same as Lots Won Summary)
+    hammer_total = sum(lot['hammer_price'] for lot in lots_won)
+    premium_percentage = auction.get('premium_percentage', 5.0)
+    premium_amount = hammer_total * (premium_percentage / 100)
+    subtotal = hammer_total + premium_amount
+    
+    tax_rate_gst = auction.get('tax_rate_gst', 5.0)
+    tax_rate_qst = auction.get('tax_rate_qst', 9.975)
+    
+    gst_on_hammer = hammer_total * (tax_rate_gst / 100)
+    qst_on_hammer = hammer_total * (tax_rate_qst / 100)
+    gst_on_premium = premium_amount * (tax_rate_gst / 100)
+    qst_on_premium = premium_amount * (tax_rate_qst / 100)
+    
+    total_tax = gst_on_hammer + qst_on_hammer + gst_on_premium + qst_on_premium
+    grand_total = subtotal + total_tax
+    
+    # Generate invoice number (reuse from lots won or create new)
+    existing_invoice = await db.invoices.find_one({
+        "auction_id": auction_id,
+        "user_id": user_id,
+        "invoice_type": "lots_won"
+    })
+    
+    if existing_invoice:
+        invoice_number = existing_invoice['invoice_number']
+    else:
+        invoice_number = await generate_invoice_number(auction_id)
+    
+    # Prepare data for template
+    template_data = {
+        "invoice_number": invoice_number,
+        "buyer": {
+            "name": buyer['name'],
+            "company_name": buyer.get('company_name'),
+            "billing_address": buyer.get('billing_address', buyer.get('address')),
+            "phone": buyer['phone'],
+            "email": buyer['email']
+        },
+        "paddle_number": paddle_record['paddle_number'],
+        "auction": {
+            "title": auction['title'],
+            "city": auction['city'],
+            "region": auction['region'],
+            "auction_end_date": datetime.fromisoformat(auction['auction_end_date']) if isinstance(auction['auction_end_date'], str) else auction['auction_end_date']
+        },
+        "lots_count": len(lots_won),
+        "hammer_total": hammer_total,
+        "premium_amount": premium_amount,
+        "premium_percentage": premium_percentage,
+        "total_tax": total_tax,
+        "grand_total": grand_total,
+        "payment_deadline": auction.get('payment_deadline', 'Within 14 days of auction close') if isinstance(auction.get('payment_deadline'), str) else "Within 14 days of auction close"
+    }
+    
+    # Generate HTML using bilingual template
+    # Use buyer's preferred language if available
+    lang = buyer.get('preferred_language', 'en')
+    currency = auction.get('currency', 'CAD')
+    template_data['currency'] = currency
+    template_data['lots_count'] = len(lots_won)
+    
+    from invoice_templates_complete import payment_letter_template
+    html_content = payment_letter_template(template_data, lang=lang)
+    
+    # Generate PDF and persist to cloud storage
+    import tempfile
+    from services.cloud_storage import store_invoice_pdf, generate_signed_url
+
+    invoice_id = str(uuid.uuid4())
+
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    generate_pdf_from_html(html_content, tmp_path)
+    pdf_bytes = tmp_path.read_bytes()
+    tmp_path.unlink(missing_ok=True)
+
+    storage_path = await store_invoice_pdf(invoice_id, pdf_bytes, subfolder="payment_letter")
+    download_url = generate_signed_url(invoice_id)
+
+    # Save invoice record
+    invoice_record = {
+        "id": invoice_id,
+        "invoice_number": invoice_number,
+        "invoice_type": "payment_letter",
+        "user_id": user_id,
+        "auction_id": auction_id,
+        "storage_path": storage_path,
+        "download_url": download_url,
+        "generated_date": datetime.now(timezone.utc).isoformat(),
+        "status": "generated"
+    }
+    await db.invoices.insert_one(invoice_record)
+    
+    return {
+        "success": True,
+        "invoice_number": invoice_number,
+        "download_url": download_url,
+        "paddle_number": paddle_record['paddle_number'],
+        "amount_due": grand_total,
+        "message": "Payment letter generated successfully"
+    }
+
+
+
+@invoices_router.get("/invoices/{user_id}")
+async def get_user_invoices(
+    user_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Get all invoices for a user, each with a fresh signed download URL."""
+    from services.cloud_storage import generate_signed_url
+
+    if current_user.account_type != "admin" and current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    invoices = await db.invoices.find({"user_id": user_id}, {"_id": 0}).to_list(100)
+    
+    for invoice in invoices:
+        if isinstance(invoice.get('generated_date'), str):
+            invoice['generated_date'] = datetime.fromisoformat(invoice['generated_date'])
+        invoice["download_url"] = generate_signed_url(invoice["id"])
+    
+    return invoices
+
+
+
+@invoices_router.post("/invoices/seller-statement/{auction_id}/{seller_id}")
+async def generate_seller_statement(
+    auction_id: str,
+    seller_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Generate Seller Statement PDF"""
+    if current_user.account_type != "admin" and current_user.id != seller_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    auction = await db.multi_item_listings.find_one({"id": auction_id})
+    if not auction:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    
+    seller = await db.users.find_one({"id": seller_id})
+    if not seller:
+        raise HTTPException(status_code=404, detail="Seller not found")
+    
+    # Prepare lots with buyer info (demo: mark first 3 as sold)
+    lots_data = []
+    for i, lot in enumerate(auction['lots']):
+        lot_info = {
+            "lot_number": lot['lot_number'],
+            "title": lot['title'],
+            "description": lot['description'],
+            "status": "sold" if i < 3 else "unsold"
+        }
+        
+        if i < 3:  # Sold lots
+            lot_info["hammer_price"] = lot['current_price']
+            lot_info["buyer_name"] = "Test Buyer"
+            lot_info["paddle_number"] = 5051 + i
+        
+        lots_data.append(lot_info)
+    
+    # Use seller's preferred language if available
+    lang = seller.get('preferred_language', 'en')
+    currency = auction.get('currency', 'CAD')
+    
+    from invoice_templates_complete import seller_statement_template
+    template_data = {
+        "seller": {
+            "name": seller['name'],
+            "company_name": seller.get('company_name'),
+            "address": seller.get('address'),
+            "email": seller['email'],
+            "phone": seller['phone']
+        },
+        "auction": {
+            "title": auction['title'],
+            "city": auction['city'],
+            "region": auction['region'],
+            "auction_end_date": datetime.fromisoformat(auction['auction_end_date']) if isinstance(auction['auction_end_date'], str) else auction['auction_end_date']
+        },
+        "lots": lots_data,
+        "commission_rate": auction.get('commission_rate', 0.0),
+        "currency": currency,
+        "statement_number": f"STMT-{auction_id[:8]}"
+    }
+    
+    html_content = seller_statement_template(template_data, lang=lang)
+    
+    # Generate PDF and persist to cloud storage
+    import tempfile
+    from services.cloud_storage import store_invoice_pdf, generate_signed_url
+
+    invoice_id = str(uuid.uuid4())
+
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    generate_pdf_from_html(html_content, tmp_path)
+    pdf_bytes = tmp_path.read_bytes()
+    tmp_path.unlink(missing_ok=True)
+
+    storage_path = await store_invoice_pdf(invoice_id, pdf_bytes, subfolder="seller_statement")
+    download_url = generate_signed_url(invoice_id)
+
+    invoice_record = {
+        "id": invoice_id,
+        "invoice_number": f"STMT-{auction_id[:8]}",
+        "invoice_type": "seller_statement",
+        "user_id": seller_id,
+        "auction_id": auction_id,
+        "storage_path": storage_path,
+        "download_url": download_url,
+        "generated_date": datetime.now(timezone.utc).isoformat(),
+        "status": "generated"
+    }
+    await db.invoices.insert_one(invoice_record)
+    
+    return {
+        "success": True,
+        "download_url": download_url,
+        "message": "Seller statement generated successfully"
+    }
+
+
+
+@invoices_router.post("/invoices/seller-receipt/{auction_id}/{seller_id}")
+async def generate_seller_receipt(
+    auction_id: str,
+    seller_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Generate Seller Receipt PDF"""
+    if current_user.account_type != "admin" and current_user.id != seller_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    auction = await db.multi_item_listings.find_one({"id": auction_id})
+    if not auction:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    
+    seller = await db.users.find_one({"id": seller_id})
+    if not seller:
+        raise HTTPException(status_code=404, detail="Seller not found")
+    
+    # Calculate totals (demo: first 3 lots sold)
+    total_hammer = sum(lot['current_price'] for lot in auction['lots'][:3])
+    
+    # Use seller's preferred language if available
+    lang = seller.get('preferred_language', 'en')
+    currency = auction.get('currency', 'CAD')
+    
+    from invoice_templates_complete import seller_receipt_template
+    template_data = {
+        "receipt_number": f"RCPT-{auction_id[:8]}-{int(datetime.now().timestamp())}",
+        "seller": {
+            "name": seller['name'],
+            "company_name": seller.get('company_name'),
+            "address": seller.get('address'),
+            "email": seller['email']
+        },
+        "auction": {
+            "title": auction['title'],
+            "auction_end_date": datetime.fromisoformat(auction['auction_end_date']) if isinstance(auction['auction_end_date'], str) else auction['auction_end_date']
+        },
+        "total_lots": len(auction['lots']),
+        "lots_sold": 3,
+        "total_hammer": total_hammer,
+        "commission_rate": auction.get('commission_rate', 0.0),
+        "tax_rate_gst": auction.get('tax_rate_gst', 0.0),
+        "tax_rate_qst": auction.get('tax_rate_qst', 0.0),
+        "payment_method": "Bank Transfer",
+        "payment_date": "Within 5-7 business days",
+        "currency": currency
+    }
+    
+    html_content = seller_receipt_template(template_data, lang=lang)
+    
+    # Generate PDF and persist to cloud storage
+    import tempfile
+    from services.cloud_storage import store_invoice_pdf, generate_signed_url
+
+    invoice_id = str(uuid.uuid4())
+
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    generate_pdf_from_html(html_content, tmp_path)
+    pdf_bytes = tmp_path.read_bytes()
+    tmp_path.unlink(missing_ok=True)
+
+    storage_path = await store_invoice_pdf(invoice_id, pdf_bytes, subfolder="seller_receipt")
+    download_url = generate_signed_url(invoice_id)
+
+    invoice_record = {
+        "id": invoice_id,
+        "invoice_number": template_data['receipt_number'],
+        "invoice_type": "seller_receipt",
+        "user_id": seller_id,
+        "auction_id": auction_id,
+        "storage_path": storage_path,
+        "download_url": download_url,
+        "generated_date": datetime.now(timezone.utc).isoformat(),
+        "status": "generated"
+    }
+    await db.invoices.insert_one(invoice_record)
+    
+    return {
+        "success": True,
+        "download_url": download_url,
+        "receipt_number": template_data['receipt_number'],
+        "message": "Seller receipt generated successfully"
+    }
+
+
+
+@invoices_router.post("/invoices/commission-invoice/{auction_id}/{seller_id}")
+async def generate_commission_invoice(
+    auction_id: str,
+    seller_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Generate Commission Invoice PDF (BidVex to Seller)"""
+    if current_user.account_type != "admin" and current_user.id != seller_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    auction = await db.multi_item_listings.find_one({"id": auction_id})
+    if not auction:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    
+    seller = await db.users.find_one({"id": seller_id})
+    if not seller:
+        raise HTTPException(status_code=404, detail="Seller not found")
+    
+    # Calculate totals
+    total_hammer = sum(lot['current_price'] for lot in auction['lots'][:3])
+    commission_rate = auction.get('commission_rate', 0.0)
+    commission_amount = total_hammer * (commission_rate / 100)
+    
+    # Calculate net payout
+    tax_rate_gst = auction.get('tax_rate_gst', 5.0)
+    tax_rate_qst = auction.get('tax_rate_qst', 9.975)
+    gst = commission_amount * (tax_rate_gst / 100)
+    qst = commission_amount * (tax_rate_qst / 100)
+    net_payout = total_hammer - commission_amount - gst - qst
+    
+    invoice_number = f"BV-COMM-{datetime.now().year}-{auction_id[:8]}-0001"
+    
+    # Use seller's preferred language if available
+    lang = seller.get('preferred_language', 'en')
+    currency = auction.get('currency', 'CAD')
+    
+    from invoice_templates_complete import commission_invoice_template
+    template_data = {
+        "invoice_number": invoice_number,
+        "seller": {
+            "name": seller['name'],
+            "company_name": seller.get('company_name'),
+            "address": seller.get('address'),
+            "email": seller['email'],
+            "phone": seller['phone']
+        },
+        "auction": {
+            "title": auction['title'],
+            "auction_end_date": datetime.fromisoformat(auction['auction_end_date']) if isinstance(auction['auction_end_date'], str) else auction['auction_end_date']
+        },
+        "total_hammer": total_hammer,
+        "lots_sold": 3,
+        "commission_rate": commission_rate,
+        "commission_amount": commission_amount,
+        "tax_rate_gst": tax_rate_gst,
+        "tax_rate_qst": tax_rate_qst,
+        "net_payout": net_payout,
+        "due_date": "Upon Receipt",
+        "currency": currency
+    }
+    
+    html_content = commission_invoice_template(template_data, lang=lang)
+    
+    invoice_dir = Path(f"/app/invoices/{seller_id}")
+    invoice_dir.mkdir(parents=True, exist_ok=True)
+    
+    pdf_filename = f"CommissionInvoice_{auction_id}.pdf"
+    pdf_path = invoice_dir / pdf_filename
+    
+    generate_pdf_from_html(html_content, pdf_path)
+    
+    invoice_record = {
+        "id": str(uuid.uuid4()),
+        "invoice_number": invoice_number,
+        "invoice_type": "commission_invoice",
+        "user_id": seller_id,
+        "auction_id": auction_id,
+        "pdf_path": str(pdf_path),
+        "generated_date": datetime.now(timezone.utc).isoformat(),
+        "status": "generated"
+    }
+    await db.invoices.insert_one(invoice_record)
+    
+    return {
+        "success": True,
+        "invoice_number": invoice_number,
+        "pdf_path": str(pdf_path),
+        "message": "Commission invoice generated successfully"
+    }
+
+
+
+
+@invoices_router.post("/auctions/{auction_id}/complete")
+async def complete_auction_and_send_documents(
+    auction_id: str,
+    lang: str = "en",
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Complete auction and automatically generate + send all documents
+    
+    Triggers when auction status changes to 'ended':
+    - Generates all buyer and seller documents
+    - Sends emails with PDF attachments (mock mode)
+    - Updates invoice records with email tracking
+    
+    Query Parameters:
+        lang: Language code for documents ('en' or 'fr')
+    
+    Requires admin privileges
+    """
+    if current_user.account_type != "admin":
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+    
+    # Fetch auction
+    auction = await db.multi_item_listings.find_one({"id": auction_id})
+    if not auction:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    
+    seller_id = auction['seller_id']
+    seller = await db.users.find_one({"id": seller_id})
+    if not seller:
+        raise HTTPException(status_code=404, detail="Seller not found")
+    
+    # Initialize mock email service
+    email_service = MockEmailService(db=db)
+    
+    results = {
+        "auction_id": auction_id,
+        "auction_title": auction['title'],
+        "documents_generated": [],
+        "emails_sent": [],
+        "errors": []
+    }
+    
+    # ===== SELLER DOCUMENTS =====
+    try:
+        # Calculate seller totals
+        total_hammer = sum(lot['current_price'] for lot in auction['lots'][:3])  # Demo: first 3 sold
+        lots_sold = 3
+        commission_rate = auction.get('commission_rate', 0.0)
+        commission_amount = total_hammer * (commission_rate / 100)
+        net_payout = total_hammer - commission_amount
+        
+        seller_pdf_paths = {}
+        
+        # 1. Generate Seller Statement
+        try:
+            statement_response = await generate_seller_statement(auction_id, seller_id, current_user)
+            seller_pdf_paths['statement'] = statement_response['pdf_path']
+            results['documents_generated'].append('seller_statement')
+        except Exception as e:
+            results['errors'].append(f"Seller Statement: {str(e)}")
+        
+        # 2. Generate Seller Receipt
+        try:
+            receipt_response = await generate_seller_receipt(auction_id, seller_id, current_user)
+            seller_pdf_paths['receipt'] = receipt_response['pdf_path']
+            results['documents_generated'].append('seller_receipt')
+        except Exception as e:
+            results['errors'].append(f"Seller Receipt: {str(e)}")
+        
+        # 3. Generate Commission Invoice
+        try:
+            commission_response = await generate_commission_invoice(auction_id, seller_id, current_user)
+            seller_pdf_paths['commission'] = commission_response['pdf_path']
+            results['documents_generated'].append('commission_invoice')
+        except Exception as e:
+            results['errors'].append(f"Commission Invoice: {str(e)}")
+        
+        # Send seller email (mock)
+        if seller_pdf_paths:
+            email_sent = await email_service.send_seller_documents_email(
+                recipient_email=seller['email'],
+                recipient_name=seller['name'],
+                auction_title=auction['title'],
+                total_hammer=total_hammer,
+                lots_sold=lots_sold,
+                net_payout=net_payout,
+                pdf_paths=seller_pdf_paths,
+                lang=lang
+            )
+            
+            if email_sent:
+                results['emails_sent'].append({
+                    "type": "seller_documents",
+                    "recipient": seller['email'],
+                    "documents": list(seller_pdf_paths.keys())
+                })
+                
+                # Update invoice records with email tracking
+                await db.invoices.update_many(
+                    {
+                        "auction_id": auction_id,
+                        "user_id": seller_id,
+                        "invoice_type": {"$in": ["seller_statement", "seller_receipt", "commission_invoice"]}
+                    },
+                    {
+                        "$set": {
+                            "email_sent": True,
+                            "sent_timestamp": datetime.now(timezone.utc).isoformat(),
+                            "recipient_email": seller['email']
+                        }
+                    }
+                )
+    
+    except Exception as e:
+        results['errors'].append(f"Seller documents error: {str(e)}")
+    
+    # ===== BUYER DOCUMENTS =====
+    # Find all buyers (paddle numbers assigned to this auction)
+    paddle_records = await db.paddle_numbers.find({"auction_id": auction_id}).to_list(100)
+    
+    for paddle_record in paddle_records:
+        buyer_id = paddle_record['user_id']
+        paddle_number = paddle_record['paddle_number']
+        
+        try:
+            buyer = await db.users.find_one({"id": buyer_id})
+            if not buyer:
+                continue
+            
+            buyer_pdf_paths = {}
+            
+            # 1. Generate Lots Won Summary
+            try:
+                lots_won_response = await generate_lots_won_invoice(auction_id, buyer_id, lang, current_user)
+                buyer_pdf_paths['lots_won'] = lots_won_response['pdf_path']
+                results['documents_generated'].append(f'lots_won_{buyer_id[:8]}')
+                total_due = lots_won_response.get('total_due', 0)
+                invoice_number = lots_won_response.get('invoice_number', 'N/A')
+            except Exception as e:
+                results['errors'].append(f"Lots Won (Buyer {buyer_id[:8]}): {str(e)}")
+                continue
+            
+            # 2. Generate Payment Letter
+            try:
+                payment_letter_response = await generate_payment_letter(auction_id, buyer_id, current_user)
+                buyer_pdf_paths['payment_letter'] = payment_letter_response['pdf_path']
+                results['documents_generated'].append(f'payment_letter_{buyer_id[:8]}')
+            except Exception as e:
+                results['errors'].append(f"Payment Letter (Buyer {buyer_id[:8]}): {str(e)}")
+            
+            # Send buyer email (mock)
+            if buyer_pdf_paths:
+                email_sent = await email_service.send_buyer_invoice_email(
+                    recipient_email=buyer['email'],
+                    recipient_name=buyer['name'],
+                    auction_title=auction['title'],
+                    invoice_number=invoice_number,
+                    total_due=total_due,
+                    paddle_number=paddle_number,
+                    pdf_paths=buyer_pdf_paths,
+                    lang=lang
+                )
+                
+                if email_sent:
+                    results['emails_sent'].append({
+                        "type": "buyer_invoice",
+                        "recipient": buyer['email'],
+                        "paddle_number": paddle_number,
+                        "documents": list(buyer_pdf_paths.keys())
+                    })
+                    
+                    # Update invoice records with email tracking
+                    await db.invoices.update_many(
+                        {
+                            "auction_id": auction_id,
+                            "user_id": buyer_id,
+                            "invoice_type": {"$in": ["lots_won", "payment_letter"]}
+                        },
+                        {
+                            "$set": {
+                                "email_sent": True,
+                                "sent_timestamp": datetime.now(timezone.utc).isoformat(),
+                                "recipient_email": buyer['email']
+                            }
+                        }
+                    )
+        
+        except Exception as e:
+            results['errors'].append(f"Buyer documents error (buyer {buyer_id[:8]}): {str(e)}")
+    
+    # Update auction status to 'ended'
+    await db.multi_item_listings.update_one(
+        {"id": auction_id},
+        {"$set": {"status": "ended"}}
+    )
+    
+    results['success'] = len(results['errors']) == 0
+    results['summary'] = {
+        "total_documents": len(results['documents_generated']),
+        "total_emails": len(results['emails_sent']),
+        "total_errors": len(results['errors'])
+    }
+    
+    return results
+
+
+
+@invoices_router.get("/email-logs")
+async def get_email_logs(
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get all email logs (mock emails sent)
+    Requires admin privileges
+    """
+    if current_user.account_type != "admin":
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+    
+    email_logs = await db.email_logs.find({}, {"_id": 0}).to_list(100)
+    return {
+        "total": len(email_logs),
+        "emails": email_logs
+    }
+
+
