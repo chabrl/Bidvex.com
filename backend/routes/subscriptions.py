@@ -29,6 +29,8 @@ import json as _json
 
 logger = logging.getLogger(__name__)
 
+from services.subscription_pricing import get_pricing_service
+
 try:
     from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
 except ImportError:
@@ -44,7 +46,7 @@ async def get_subscription_plans(current_user: User = Depends(get_current_user))
     if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    pricing_service = get_pricing_service(db)
+    pricing_service = get_pricing_service(get_db())
     plans = await pricing_service.get_all_plans()
     return {"success": True, "plans": plans}
 
@@ -53,7 +55,7 @@ async def get_subscription_plans(current_user: User = Depends(get_current_user))
 @subscriptions_router.get("/subscription-plans")
 async def get_public_subscription_plans():
     """Get public subscription plans (no auth required)"""
-    pricing_service = get_pricing_service(db)
+    pricing_service = get_pricing_service(get_db())
     plans = await pricing_service.get_all_plans()
     # Remove sensitive fields for public view (keep original_price for promotional display)
     public_plans = []
@@ -88,7 +90,7 @@ async def update_subscription_plan(
     if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    pricing_service = get_pricing_service(db)
+    pricing_service = get_pricing_service(get_db())
     reason = data.pop("reason", None)
     
     try:
@@ -114,7 +116,7 @@ async def get_pricing_changelog(
     if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    pricing_service = get_pricing_service(db)
+    pricing_service = get_pricing_service(get_db())
     logs = await pricing_service.get_pricing_changelog(plan_id=plan_id, limit=limit)
     return {"success": True, "changelog": logs}
 
@@ -129,7 +131,7 @@ async def create_coupon(
     if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    pricing_service = get_pricing_service(db)
+    pricing_service = get_pricing_service(get_db())
     
     try:
         coupon_data = CouponCode(**data)
@@ -149,7 +151,7 @@ async def get_coupons(
     if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    pricing_service = get_pricing_service(db)
+    pricing_service = get_pricing_service(get_db())
     coupons = await pricing_service.get_all_coupons(include_inactive=include_inactive)
     return {"success": True, "coupons": coupons}
 
@@ -164,7 +166,7 @@ async def get_coupon(
     if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    pricing_service = get_pricing_service(db)
+    pricing_service = get_pricing_service(get_db())
     coupon = await pricing_service.get_coupon(coupon_id)
     if not coupon:
         raise HTTPException(status_code=404, detail="Coupon not found")
@@ -182,7 +184,7 @@ async def update_coupon(
     if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    pricing_service = get_pricing_service(db)
+    pricing_service = get_pricing_service(get_db())
     
     try:
         updated_coupon = await pricing_service.update_coupon(
@@ -205,7 +207,7 @@ async def delete_coupon(
     if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    pricing_service = get_pricing_service(db)
+    pricing_service = get_pricing_service(get_db())
     success = await pricing_service.delete_coupon(coupon_id)
     if not success:
         raise HTTPException(status_code=404, detail="Coupon not found")
@@ -226,7 +228,7 @@ async def validate_coupon_code(data: Dict[str, Any]):
     if not code:
         raise HTTPException(status_code=400, detail="Coupon code is required")
     
-    pricing_service = get_pricing_service(db)
+    pricing_service = get_pricing_service(get_db())
     result = await pricing_service.validate_coupon(
         code=code,
         plan_id=plan_id,
@@ -241,7 +243,7 @@ async def validate_coupon_code(data: Dict[str, Any]):
 @subscriptions_router.get("/subscriptions/price-breakdown")
 async def get_price_breakdown(plan_id: str):
     """Get full price breakdown including taxes and processing fee for a plan."""
-    pricing_service = get_pricing_service(db)
+    pricing_service = get_pricing_service(get_db())
     plan = await pricing_service.get_plan(plan_id)
     if not plan:
         raise HTTPException(status_code=404, detail="Plan not found")
@@ -279,7 +281,7 @@ async def create_subscription(
     if plan_id not in ("premium", "vip"):
         raise HTTPException(status_code=400, detail="Invalid plan. Choose 'premium' or 'vip'.")
 
-    user = await db.users.find_one({"id": current_user.id})
+    user = await get_db().users.find_one({"id": current_user.id})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -292,7 +294,7 @@ async def create_subscription(
         raise HTTPException(status_code=400, detail="No payment method on file. Please add a card first.")
 
     # Look up the Stripe Price ID from the DB
-    pricing_service = get_pricing_service(db)
+    pricing_service = get_pricing_service(get_db())
     plan = await pricing_service.get_plan(plan_id)
     if not plan:
         raise HTTPException(status_code=400, detail="Plan not found")
@@ -334,7 +336,7 @@ async def create_subscription(
                     start_dt = datetime.fromtimestamp(start_ts, tz=timezone.utc) if start_ts else datetime.now(timezone.utc)
                     end_dt = start_dt.replace(year=start_dt.year + 1)
                     
-                    await db.users.update_one(
+                    await get_db().users.update_one(
                         {"id": current_user.id},
                         {"$set": {
                             "subscription_tier": plan_id,
@@ -354,7 +356,7 @@ async def create_subscription(
                     price_amount = plan.get("price_yearly", 0)
                     fee = _calculate_stripe_fee(calculate_gst_qst(price_amount)["total_with_tax"]) if price_amount > 0 else 0
                     try:
-                        await _generate_subscription_invoice(db, user, plan_id, price_amount, updated_sub.id, fee)
+                        await _generate_subscription_invoice(get_db(), user, plan_id, price_amount, updated_sub.id, fee)
                     except Exception as inv_err:
                         logger.error(f"Invoice generation failed for upgrade: {inv_err}")
 
@@ -404,7 +406,7 @@ async def create_subscription(
             end_date = datetime.now(timezone.utc).replace(year=datetime.now(timezone.utc).year + 1).isoformat()
 
         # Update user record in MongoDB
-        await db.users.update_one(
+        await get_db().users.update_one(
             {"id": current_user.id},
             {"$set": {
                 "subscription_tier": plan_id,
@@ -423,7 +425,7 @@ async def create_subscription(
         price_amount = plan.get("price_yearly", 0)
         fee = _calculate_stripe_fee(calculate_gst_qst(price_amount)["total_with_tax"]) if price_amount > 0 else 0
         try:
-            await _generate_subscription_invoice(db, user, plan_id, price_amount, subscription.id, fee)
+            await _generate_subscription_invoice(get_db(), user, plan_id, price_amount, subscription.id, fee)
         except Exception as inv_err:
             logger.error(f"Invoice generation failed: {inv_err}")
 
@@ -449,7 +451,7 @@ async def cancel_subscription(current_user: User = Depends(get_current_user)):
     Cancel subscription at period end. No refund — user keeps access until billing cycle ends.
     """
     db = get_db()
-    user = await db.users.find_one({"id": current_user.id})
+    user = await get_db().users.find_one({"id": current_user.id})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -470,7 +472,7 @@ async def cancel_subscription(current_user: User = Depends(get_current_user)):
             start_dt = datetime.fromtimestamp(start_ts, tz=timezone.utc)
             end_dt = start_dt.replace(year=start_dt.year + 1)
 
-        await db.users.update_one(
+        await get_db().users.update_one(
             {"id": current_user.id},
             {"$set": {
                 "subscription_status": "active",
@@ -499,7 +501,7 @@ async def cancel_subscription(current_user: User = Depends(get_current_user)):
 async def reactivate_subscription(current_user: User = Depends(get_current_user)):
     """Reactivate a subscription that was set to cancel at period end."""
     db = get_db()
-    user = await db.users.find_one({"id": current_user.id})
+    user = await get_db().users.find_one({"id": current_user.id})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -509,7 +511,7 @@ async def reactivate_subscription(current_user: User = Depends(get_current_user)
 
     try:
         updated_sub = stripe.Subscription.modify(sub_id, cancel_at_period_end=False)
-        await db.users.update_one(
+        await get_db().users.update_one(
             {"id": current_user.id},
             {"$set": {
                 "cancel_at_period_end": False,
@@ -532,7 +534,7 @@ async def get_subscription_status(current_user: User = Depends(get_current_user)
     Get detailed subscription status for the management panel.
     """
     db = get_db()
-    user = await db.users.find_one({"id": current_user.id})
+    user = await get_db().users.find_one({"id": current_user.id})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -578,7 +580,7 @@ async def create_subscription_checkout(
     coupon_code = data.get("coupon_code")
     origin_url = data.get("origin_url", str(request.base_url).rstrip("/"))
     
-    pricing_service = get_pricing_service(db)
+    pricing_service = get_pricing_service(get_db())
     
     # Get plan details
     plan = await pricing_service.get_plan(plan_id)
@@ -679,7 +681,7 @@ async def create_subscription_checkout(
             "payment_status": "initiated",
             "created_at": datetime.now(timezone.utc).isoformat()
         }
-        await db.payment_transactions.insert_one(transaction)
+        await get_db().payment_transactions.insert_one(transaction)
         
         # Increment coupon usage if applied
         if coupon_code:
@@ -716,7 +718,7 @@ async def get_subscription_analytics(current_user: User = Depends(get_current_us
         start_of_last_month = (start_of_month - timedelta(days=1)).replace(day=1)
         
         # Get all users with subscriptions
-        users = await db.users.find({}, {"_id": 0, "subscription_tier": 1, "subscription_start_date": 1, "subscription_end_date": 1, "subscription_source": 1}).to_list(10000)
+        users = await get_db().users.find({}, {"_id": 0, "subscription_tier": 1, "subscription_start_date": 1, "subscription_end_date": 1, "subscription_source": 1}).to_list(10000)
         
         # Calculate subscriber counts by plan
         plan_counts = {"free": 0, "premium": 0, "vip": 0}
@@ -740,7 +742,7 @@ async def get_subscription_analytics(current_user: User = Depends(get_current_us
                     stripe_count += 1
         
         # Get payment transactions for revenue
-        transactions = await db.payment_transactions.find({
+        transactions = await get_db().payment_transactions.find({
             "status": "completed",
             "type": {"$in": ["subscription_checkout", "subscription"]}
         }, {"_id": 0}).to_list(1000)
@@ -787,7 +789,7 @@ async def get_subscription_analytics(current_user: User = Depends(get_current_us
                     pass
         
         # Get coupon statistics
-        coupons = await db.coupon_codes.find({}, {"_id": 0}).to_list(100)
+        coupons = await get_db().coupon_codes.find({}, {"_id": 0}).to_list(100)
         total_coupons = len(coupons)
         active_coupons = sum(1 for c in coupons if c.get("is_active", True))
         total_coupon_uses = sum(c.get("usage_count", 0) for c in coupons)
@@ -811,7 +813,7 @@ async def get_subscription_analytics(current_user: User = Depends(get_current_us
             total_discount_given += discount
         
         # Get pricing changelog for recent changes
-        recent_changes = await db.pricing_changelog.find({}, {"_id": 0}).sort("changed_at", -1).limit(10).to_list(10)
+        recent_changes = await get_db().pricing_changelog.find({}, {"_id": 0}).sort("changed_at", -1).limit(10).to_list(10)
         
         # Calculate MRR (Monthly Recurring Revenue) estimate
         mrr_estimate = (plan_counts.get("premium", 0) * 30 + plan_counts.get("vip", 0) * 60)  # Using current prices
