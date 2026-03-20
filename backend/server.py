@@ -14,7 +14,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from pathlib import Path
 from dotenv import load_dotenv
 from typing import Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import os
 import logging
 import uuid
@@ -163,6 +163,138 @@ scheduler.add_job(expire_partner_pro_trials, trigger=IntervalTrigger(hours=1),
                   id='expire_partner_pro_trials', replace_existing=True)
 scheduler.add_job(send_trial_reminder_emails, trigger=IntervalTrigger(hours=1),
                   id='send_trial_reminder_emails', replace_existing=True)
+
+
+async def send_auction_payment_reminders():
+    """Send payment reminders for auctions where deadline is in ~4 days (day 10 of 14)."""
+    try:
+        now = datetime.now(timezone.utc)
+        # Find listings with payment due in 3-5 days that haven't had a reminder sent
+        reminder_window_start = (now + timedelta(days=3)).isoformat()
+        reminder_window_end = (now + timedelta(days=5)).isoformat()
+
+        pending_listings = await db.listings.find({
+            "payment_status": "pending_payment",
+            "payment_deadline": {"$gte": reminder_window_start, "$lte": reminder_window_end},
+            "reminder_sent": {"$ne": True},
+        }, {"_id": 0}).to_list(100)
+
+        for listing in pending_listings:
+            try:
+                winner_id = listing.get("winner_id")
+                if not winner_id:
+                    continue
+                winner = await db.users.find_one({"id": winner_id}, {"_id": 0, "email": 1, "name": 1})
+                if not winner or not winner.get("email"):
+                    continue
+
+                deadline_dt = datetime.fromisoformat(listing["payment_deadline"])
+                days_remaining = max(0, (deadline_dt - now).days)
+
+                from services.email_notifications import send_payment_reminder_email
+                await send_payment_reminder_email(
+                    winner_email=winner["email"],
+                    winner_name=winner.get("name", "Winner"),
+                    item_title=listing.get("title", "Item"),
+                    final_price=listing.get("final_price", 0),
+                    listing_id=listing["id"],
+                    days_remaining=days_remaining,
+                    payment_deadline=listing["payment_deadline"],
+                )
+
+                await db.listings.update_one(
+                    {"id": listing["id"]},
+                    {"$set": {"reminder_sent": True}},
+                )
+                logger.info(f"Payment reminder sent for listing {listing['id']} to {winner['email']}")
+            except Exception as e:
+                logger.error(f"Failed to send payment reminder for listing {listing.get('id')}: {e}")
+    except Exception as e:
+        logger.error(f"Error in send_auction_payment_reminders: {e}")
+
+
+async def process_overdue_auction_payments():
+    """Mark overdue payments (day 14+) and apply 2%/month penalty."""
+    try:
+        now = datetime.now(timezone.utc)
+        now_str = now.isoformat()
+
+        overdue_listings = await db.listings.find({
+            "payment_status": "pending_payment",
+            "payment_deadline": {"$lte": now_str},
+            "overdue_notified": {"$ne": True},
+        }, {"_id": 0}).to_list(100)
+
+        for listing in overdue_listings:
+            try:
+                listing_id = listing["id"]
+                winner_id = listing.get("winner_id")
+                hammer_price = listing.get("final_price", 0)
+
+                if not winner_id:
+                    continue
+
+                # Calculate penalty (2% per month, minimum 1 month)
+                deadline_dt = datetime.fromisoformat(listing["payment_deadline"])
+                days_late = max(0, (now - deadline_dt).days)
+                months_late = max(1, (days_late + 29) // 30)
+                penalty_rate = 0.02 * months_late
+                penalty_amount = round(hammer_price * penalty_rate, 2)
+                total_with_penalty = hammer_price + penalty_amount
+
+                # Update listing
+                await db.listings.update_one(
+                    {"id": listing_id},
+                    {"$set": {
+                        "payment_status": "overdue",
+                        "overdue_notified": True,
+                        "late_penalty_rate": penalty_rate,
+                        "late_penalty_amount": penalty_amount,
+                        "overdue_at": now_str,
+                    }},
+                )
+
+                # Create overdue notification
+                await db.notifications.insert_one({
+                    "id": str(uuid.uuid4()),
+                    "user_id": winner_id,
+                    "type": "payment_overdue",
+                    "title": "Payment Overdue",
+                    "message": f"Your payment for {listing.get('title')} is overdue. A late penalty of ${penalty_amount:.2f} has been applied.",
+                    "listing_id": listing_id,
+                    "data": {
+                        "checkout_url": f"/checkout/{listing_id}",
+                        "penalty_amount": penalty_amount,
+                    },
+                    "read": False,
+                    "created_at": now_str,
+                })
+
+                # Send overdue email
+                winner = await db.users.find_one({"id": winner_id}, {"_id": 0, "email": 1, "name": 1})
+                if winner and winner.get("email"):
+                    from services.email_notifications import send_payment_overdue_email
+                    await send_payment_overdue_email(
+                        winner_email=winner["email"],
+                        winner_name=winner.get("name", "Winner"),
+                        item_title=listing.get("title", "Item"),
+                        final_price=hammer_price,
+                        listing_id=listing_id,
+                        penalty_amount=penalty_amount,
+                        total_with_penalty=total_with_penalty,
+                    )
+
+                logger.info(f"Overdue processed for listing {listing_id}: penalty=${penalty_amount:.2f}")
+            except Exception as e:
+                logger.error(f"Failed to process overdue for listing {listing.get('id')}: {e}")
+    except Exception as e:
+        logger.error(f"Error in process_overdue_auction_payments: {e}")
+
+
+scheduler.add_job(send_auction_payment_reminders, trigger=IntervalTrigger(hours=6),
+                  id='send_auction_payment_reminders', replace_existing=True)
+scheduler.add_job(process_overdue_auction_payments, trigger=IntervalTrigger(hours=6),
+                  id='process_overdue_auction_payments', replace_existing=True)
 
 # ─── Health Endpoints ───
 @api_router.get("/")

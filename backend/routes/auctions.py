@@ -119,14 +119,21 @@ async def process_ended_auctions():
                     winner_id = highest_bid["bidder_id"]
                     final_price = highest_bid["amount"]
                     
-                    # Update listing status
+                    # Payment deadline: 14 days from auction close
+                    payment_deadline = (now + timedelta(days=14)).isoformat()
+                    
+                    # Update listing status with payment tracking
                     await db.listings.update_one(
                         {"id": listing_id},
                         {"$set": {
                             "status": "ended",
                             "winner_id": winner_id,
                             "final_price": final_price,
-                            "ended_at": now_str
+                            "ended_at": now_str,
+                            "payment_status": "pending_payment",
+                            "payment_deadline": payment_deadline,
+                            "reminder_sent": False,
+                            "overdue_notified": False,
                         }}
                     )
                     
@@ -148,7 +155,7 @@ async def process_ended_auctions():
                         notification_manager = get_notification_manager()
                         await notification_manager.send_to_user(winner_id, {
                             "type": "AUCTION_WON",
-                            "title": "🎉 Congratulations! You Won!",
+                            "title": "Congratulations! You Won!",
                             "message": f"You won the auction for {listing.get('title')} at ${final_price:.2f}",
                             "listing_id": listing_id,
                             "conversation_id": conversation_id,
@@ -158,7 +165,7 @@ async def process_ended_auctions():
                         # Also notify seller
                         await notification_manager.send_to_user(seller_id, {
                             "type": "AUCTION_SOLD",
-                            "title": "💰 Item Sold!",
+                            "title": "Item Sold!",
                             "message": f"Your item {listing.get('title')} sold for ${final_price:.2f}",
                             "listing_id": listing_id,
                             "winner_id": winner_id,
@@ -167,15 +174,19 @@ async def process_ended_auctions():
                     except Exception as e:
                         logger.warning(f"Could not send push notification: {e}")
                     
-                    # Create notification records in database
+                    # Create notification records with checkout CTA
                     await db.notifications.insert_many([
                         {
                             "id": str(uuid4()),
                             "user_id": winner_id,
                             "type": "auction_won",
-                            "title": "🎉 Congratulations! You Won!",
-                            "message": f"You won the auction for {listing.get('title')} at ${final_price:.2f}",
+                            "title": "Congratulations! You Won!",
+                            "message": f"You won the auction for {listing.get('title')} at ${final_price:.2f}. Complete payment within 14 days.",
                             "listing_id": listing_id,
+                            "data": {
+                                "checkout_url": f"/checkout/{listing_id}",
+                                "payment_deadline": payment_deadline,
+                            },
                             "read": False,
                             "created_at": now_str
                         },
@@ -183,13 +194,30 @@ async def process_ended_auctions():
                             "id": str(uuid4()),
                             "user_id": seller_id,
                             "type": "auction_sold",
-                            "title": "💰 Item Sold!",
+                            "title": "Item Sold!",
                             "message": f"Your item {listing.get('title')} sold for ${final_price:.2f}",
                             "listing_id": listing_id,
                             "read": False,
                             "created_at": now_str
                         }
                     ])
+                    
+                    # Send "You Won!" email via SendGrid
+                    try:
+                        winner_user = await db.users.find_one({"id": winner_id}, {"_id": 0, "email": 1, "name": 1})
+                        if winner_user and winner_user.get("email"):
+                            from services.email_notifications import send_auction_won_email
+                            await send_auction_won_email(
+                                winner_email=winner_user["email"],
+                                winner_name=winner_user.get("name", "Winner"),
+                                item_title=listing.get("title", "Item"),
+                                final_price=final_price,
+                                listing_id=listing_id,
+                                payment_deadline=payment_deadline,
+                            )
+                            logger.info(f"Sent 'You Won' email to {winner_user['email']} for listing {listing_id}")
+                    except Exception as email_err:
+                        logger.warning(f"Failed to send winner email for listing {listing_id}: {email_err}")
                     
                     processed_count += 1
                     

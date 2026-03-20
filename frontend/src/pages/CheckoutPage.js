@@ -18,8 +18,8 @@ import {
   ArrowLeft,
   FileText,
   Info,
-  Building2,
-  User
+  User,
+  Clock,
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -28,7 +28,7 @@ const CheckoutPage = () => {
   const { listingId } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { t, i18n } = useTranslation();
+  const { i18n } = useTranslation();
   
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
@@ -39,23 +39,26 @@ const CheckoutPage = () => {
   const [sellerIsTaxRegistered, setSellerIsTaxRegistered] = useState(false);
   const [isPartnerListing, setIsPartnerListing] = useState(false);
   const [partnerCompany, setPartnerCompany] = useState(null);
-  const [feeModelLabel, setFeeModelLabel] = useState(null);
+
+  // Auction winner flow state
+  const [isWinnerFlow, setIsWinnerFlow] = useState(false);
+  const [winnerPreview, setWinnerPreview] = useState(null);
+  const [latePenalty, setLatePenalty] = useState(0);
+  const [isOverdue, setIsOverdue] = useState(false);
+  const [paymentDeadline, setPaymentDeadline] = useState(null);
   
-  // Check for success/cancelled status from Stripe redirect
   const status = searchParams.get('status');
-  const sessionId = searchParams.get('session_id');
+  const isFrench = i18n.language === 'fr';
   
   useEffect(() => {
     if (status === 'success') {
-      // Payment successful - show confirmation
       setLoading(false);
       return;
     }
-    
-    fetchCheckoutPreview();
-  }, [listingId]);
+    loadCheckout();
+  }, [listingId]); // eslint-disable-line
   
-  const fetchCheckoutPreview = async () => {
+  const loadCheckout = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -66,22 +69,48 @@ const CheckoutPage = () => {
         return;
       }
       
-      // Get listing details
+      const headers = { Authorization: `Bearer ${token}` };
+
+      // Try auction winner preview first
+      try {
+        const winnerRes = await axios.get(
+          `${API}/payments/auction-winner-preview/${listingId}`,
+          { headers }
+        );
+        // Success = this is an auction winner checkout
+        setIsWinnerFlow(true);
+        setWinnerPreview(winnerRes.data);
+        setBreakdown(winnerRes.data.breakdown);
+        setCheckoutType(winnerRes.data.checkout_type);
+        setSellerIsTaxRegistered(winnerRes.data.seller_is_business);
+        setLatePenalty(winnerRes.data.late_penalty || 0);
+        setIsOverdue(winnerRes.data.is_overdue || false);
+        setPaymentDeadline(winnerRes.data.payment_deadline);
+        setListing({
+          title: winnerRes.data.title,
+          images: winnerRes.data.images,
+          category: winnerRes.data.category,
+        });
+        return;
+      } catch {
+        // Not a winner — fall through to existing general checkout preview
+      }
+
+      // Existing general checkout preview flow
       const listingRes = await axios.get(`${API}/listings/${listingId}`);
       setListing(listingRes.data);
       
-      // Get checkout preview
-      const previewRes = await axios.get(`${API}/payments/checkout/preview/${listingId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const previewRes = await axios.get(
+        `${API}/payments/checkout/preview/${listingId}`,
+        { headers }
+      );
       
       setBreakdown(previewRes.data.breakdown);
       setCheckoutType(previewRes.data.checkout_type);
       setSellerIsTaxRegistered(previewRes.data.seller_is_tax_registered);
       setIsPartnerListing(previewRes.data.is_partner_listing || false);
       setPartnerCompany(previewRes.data.partner_company || null);
-      setFeeModelLabel(previewRes.data.fee_model_label || null);
-      
+
     } catch (err) {
       console.error('Failed to load checkout:', err);
       setError(err.response?.data?.detail || 'Failed to load checkout details');
@@ -97,17 +126,26 @@ const CheckoutPage = () => {
       
       const token = localStorage.getItem('token');
       const returnUrl = `${window.location.origin}/checkout/${listingId}`;
+
+      let response;
+
+      if (isWinnerFlow) {
+        // Auction winner checkout endpoint
+        response = await axios.post(
+          `${API}/payments/auction-winner-checkout/${listingId}`,
+          { return_url: returnUrl },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      } else {
+        // Existing general checkout endpoint
+        response = await axios.post(
+          `${API}/payments/checkout/auction`,
+          { listing_id: listingId, return_url: returnUrl },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      }
       
-      const response = await axios.post(`${API}/payments/checkout/auction`, {
-        listing_id: listingId,
-        return_url: returnUrl
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      // Redirect to Stripe Checkout
       window.location.href = response.data.checkout_url;
-      
     } catch (err) {
       console.error('Failed to create checkout session:', err);
       setError(err.response?.data?.detail || 'Failed to initiate payment');
@@ -116,14 +154,18 @@ const CheckoutPage = () => {
   };
   
   const isVehicle = checkoutType === 'vehicle';
-  const isFrench = i18n.language === 'fr';
+
+  // Derive buyer total (accounts for late penalty in winner flow)
+  const buyerTotal = isWinnerFlow
+    ? (winnerPreview?.buyer_total || 0)
+    : breakdown?.buyer_total;
   
   // Success state
   if (status === 'success') {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 py-12">
         <div className="container max-w-2xl mx-auto px-4">
-          <Card className="border-green-200 dark:border-green-800">
+          <Card className="border-green-200 dark:border-green-800" data-testid="checkout-success">
             <CardContent className="p-8 text-center">
               <div className="w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mx-auto mb-4">
                 <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
@@ -133,24 +175,9 @@ const CheckoutPage = () => {
               </h1>
               <p className="text-slate-600 dark:text-slate-400 mb-6">
                 {isFrench 
-                  ? 'Votre paiement a été traité avec succès. Vous recevrez un email de confirmation sous peu.'
+                  ? 'Votre paiement a été traité avec succès.'
                   : 'Your payment has been processed successfully. You will receive a confirmation email shortly.'}
               </p>
-              
-              {isVehicle && (
-                <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800 mb-6 text-left">
-                  <Info className="h-4 w-4 text-blue-600" />
-                  <AlertDescription className="text-blue-700 dark:text-blue-300">
-                    <strong>{isFrench ? 'Prochaines étapes:' : 'Next Steps:'}</strong>
-                    <p className="mt-1">
-                      {isFrench 
-                        ? 'Veuillez envoyer le prix au marteau au vendeur par traite bancaire dans les 14 jours.'
-                        : 'Please send the hammer price to the seller via Bank Draft within 14 days.'}
-                    </p>
-                  </AlertDescription>
-                </Alert>
-              )}
-              
               <div className="flex gap-4 justify-center">
                 <Button onClick={() => navigate('/profile/purchases')} variant="outline">
                   <FileText className="mr-2 h-4 w-4" />
@@ -167,7 +194,6 @@ const CheckoutPage = () => {
     );
   }
   
-  // Loading state
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -176,12 +202,11 @@ const CheckoutPage = () => {
     );
   }
   
-  // Error state
   if (error && !breakdown) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 py-12">
         <div className="container max-w-2xl mx-auto px-4">
-          <Card className="border-red-200 dark:border-red-800">
+          <Card className="border-red-200 dark:border-red-800" data-testid="checkout-error">
             <CardContent className="p-8 text-center">
               <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
               <h2 className="text-xl font-bold text-red-700 dark:text-red-400 mb-2">
@@ -189,8 +214,7 @@ const CheckoutPage = () => {
               </h2>
               <p className="text-slate-600 dark:text-slate-400 mb-4">{error}</p>
               <Button onClick={() => navigate(-1)} variant="outline">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                {isFrench ? 'Retour' : 'Go Back'}
+                <ArrowLeft className="mr-2 h-4 w-4" /> {isFrench ? 'Retour' : 'Go Back'}
               </Button>
             </CardContent>
           </Card>
@@ -205,12 +229,13 @@ const CheckoutPage = () => {
         {/* Header */}
         <div className="mb-6">
           <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            {isFrench ? 'Retour' : 'Back'}
+            <ArrowLeft className="mr-2 h-4 w-4" /> {isFrench ? 'Retour' : 'Back'}
           </Button>
           <h1 className="text-3xl font-bold flex items-center gap-3">
             <ShoppingCart className="h-8 w-8 text-primary" />
-            {isFrench ? 'Finaliser l\'achat' : 'Complete Purchase'}
+            {isWinnerFlow
+              ? (isFrench ? 'Paiement - Enchère gagnée' : 'Auction Winner Payment')
+              : (isFrench ? "Finaliser l'achat" : 'Complete Purchase')}
           </h1>
           <p className="text-slate-600 dark:text-slate-400 mt-1">
             {isFrench ? 'Vérifiez les détails avant de payer' : 'Review details before payment'}
@@ -220,7 +245,7 @@ const CheckoutPage = () => {
         <div className="grid md:grid-cols-3 gap-6">
           {/* Main checkout card */}
           <div className="md:col-span-2">
-            <Card>
+            <Card data-testid="checkout-breakdown-card">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <CreditCard className="h-5 w-5" />
@@ -240,22 +265,48 @@ const CheckoutPage = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Overdue Warning */}
+                {isOverdue && (
+                  <Alert className="bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800" data-testid="overdue-alert">
+                    <AlertTriangle className="h-4 w-4 text-red-600" />
+                    <AlertDescription className="text-red-700 dark:text-red-300">
+                      <strong>{isFrench ? 'Paiement en retard!' : 'Payment Overdue!'}</strong>
+                      <p className="mt-1">
+                        {isFrench
+                          ? `Une pénalité de retard de ${formatCurrency(latePenalty)} a été appliquée.`
+                          : `A late penalty of ${formatCurrency(latePenalty)} has been applied.`}
+                      </p>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Payment Deadline */}
+                {paymentDeadline && !isOverdue && (
+                  <Alert className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800" data-testid="deadline-alert">
+                    <Clock className="h-4 w-4 text-amber-600" />
+                    <AlertDescription className="text-amber-700 dark:text-amber-300">
+                      {isFrench ? 'Date limite de paiement: ' : 'Payment deadline: '}
+                      <strong>{new Date(paymentDeadline).toLocaleDateString()}</strong>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
                 {/* Item Section */}
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
                   <h3 className="font-semibold text-sm text-slate-500 dark:text-slate-400 mb-3">
                     {isFrench ? 'ARTICLE' : 'ITEM SALE'}
                   </h3>
-                  
                   <div className="flex justify-between items-center">
                     <span>{isFrench ? 'Prix au marteau (Enchère gagnante)' : 'Hammer Price (Winning Bid)'}</span>
-                    <span className="font-bold text-lg">{formatCurrency(breakdown?.hammer_price)}</span>
+                    <span className="font-bold text-lg" data-testid="hammer-price">
+                      {formatCurrency(isWinnerFlow ? winnerPreview?.hammer_price : breakdown?.hammer_price)}
+                    </span>
                   </div>
                   
-                  {/* Tax on item */}
                   {!isVehicle && (
                     <div className="mt-2 flex justify-between items-center text-sm">
                       <span className="text-slate-600 dark:text-slate-400">
-                        {isFrench ? 'Taxes sur l\'article (TPS/TVQ)' : 'Tax on Item (GST/QST)'}
+                        {isFrench ? "Taxes sur l'article (TPS/TVQ)" : 'Tax on Item (GST/QST)'}
                       </span>
                       {sellerIsTaxRegistered ? (
                         <span>{formatCurrency(breakdown?.hammer_tax_total)}</span>
@@ -277,7 +328,6 @@ const CheckoutPage = () => {
                   <h3 className="font-semibold text-sm text-blue-600 dark:text-blue-400 mb-3">
                     {isFrench ? 'FRAIS DE SERVICE BIDVEX' : 'BIDVEX SERVICE FEES'}
                   </h3>
-                  
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span>
@@ -307,7 +357,6 @@ const CheckoutPage = () => {
                       <span>{isFrench ? 'TPS sur les frais' : 'GST on Fees'} (5%)</span>
                       <span>{formatCurrency(breakdown?.gst_on_fees)}</span>
                     </div>
-                    
                     <div className="flex justify-between">
                       <span>{isFrench ? 'TVQ sur les frais' : 'QST on Fees'} (9.975%)</span>
                       <span>{formatCurrency(breakdown?.qst_on_fees)}</span>
@@ -327,12 +376,24 @@ const CheckoutPage = () => {
                     </div>
                     <span className="font-medium">{formatCurrency(breakdown?.processing_fee)}</span>
                   </div>
-                  <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
-                    {isFrench 
-                      ? 'Frais de traitement par carte de crédit — transparent et sans majoration'
-                      : 'Credit card processing cost — transparent, no markup'}
-                  </p>
                 </div>
+
+                {/* Late Penalty Section */}
+                {latePenalty > 0 && (
+                  <div className="bg-red-50 dark:bg-red-950/30 rounded-lg p-4" data-testid="late-penalty-section">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 text-red-600" />
+                        <span className="font-medium text-red-700 dark:text-red-400">
+                          {isFrench ? 'Pénalité de retard (2%/mois)' : 'Late Penalty (2%/month)'}
+                        </span>
+                      </div>
+                      <span className="font-bold text-red-600" data-testid="late-penalty-amount">
+                        +{formatCurrency(latePenalty)}
+                      </span>
+                    </div>
+                  </div>
+                )}
                 
                 <Separator />
                 
@@ -343,8 +404,8 @@ const CheckoutPage = () => {
                       ? (isFrench ? 'Total à payer maintenant' : 'Total Due Now')
                       : (isFrench ? 'Total à payer' : 'Total Due')}
                   </span>
-                  <span className="text-2xl font-bold text-primary">
-                    {formatCurrency(breakdown?.buyer_total)}
+                  <span className="text-2xl font-bold text-primary" data-testid="checkout-total">
+                    {formatCurrency(buyerTotal)}
                   </span>
                 </div>
                 
@@ -363,7 +424,6 @@ const CheckoutPage = () => {
                   </Alert>
                 )}
                 
-                {/* Error */}
                 {error && (
                   <Alert variant="destructive">
                     <AlertTriangle className="h-4 w-4" />
@@ -387,7 +447,7 @@ const CheckoutPage = () => {
                   ) : (
                     <>
                       <CreditCard className="mr-2 h-5 w-5" />
-                      {isFrench ? 'Payer' : 'Pay'} {formatCurrency(breakdown?.buyer_total)}
+                      {isFrench ? 'Payer' : 'Pay'} {formatCurrency(buyerTotal)}
                     </>
                   )}
                 </Button>
@@ -406,7 +466,7 @@ const CheckoutPage = () => {
           
           {/* Order Summary Sidebar */}
           <div>
-            <Card className="sticky top-4">
+            <Card className="sticky top-4" data-testid="order-summary">
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg">
                   {isFrench ? 'Résumé' : 'Order Summary'}
@@ -423,7 +483,7 @@ const CheckoutPage = () => {
                       />
                     )}
                     <h3 className="font-semibold line-clamp-2">{listing.title}</h3>
-                    <Badge variant="outline">{listing.category}</Badge>
+                    {listing.category && <Badge variant="outline">{listing.category}</Badge>}
                   </>
                 )}
                 
@@ -434,7 +494,9 @@ const CheckoutPage = () => {
                     <span className="text-slate-600 dark:text-slate-400">
                       {isFrench ? 'Prix au marteau' : 'Hammer Price'}
                     </span>
-                    <span>{formatCurrency(breakdown?.hammer_price)}</span>
+                    <span>
+                      {formatCurrency(isWinnerFlow ? winnerPreview?.hammer_price : breakdown?.hammer_price)}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-600 dark:text-slate-400">
@@ -455,16 +517,21 @@ const CheckoutPage = () => {
                     </span>
                     <span>{formatCurrency(breakdown?.processing_fee)}</span>
                   </div>
+                  {latePenalty > 0 && (
+                    <div className="flex justify-between text-red-600">
+                      <span>{isFrench ? 'Pénalité' : 'Late Penalty'}</span>
+                      <span>+{formatCurrency(latePenalty)}</span>
+                    </div>
+                  )}
                 </div>
                 
                 <Separator />
                 
                 <div className="flex justify-between font-bold">
-                  <span>{isFrench ? 'Total' : 'Total'}</span>
-                  <span className="text-primary">{formatCurrency(breakdown?.buyer_total)}</span>
+                  <span>Total</span>
+                  <span className="text-primary">{formatCurrency(buyerTotal)}</span>
                 </div>
                 
-                {/* Tax Registration Info */}
                 <div className="text-xs text-slate-500 pt-2 border-t">
                   <p className="font-medium mb-1">BidVex Inc.</p>
                   <p>TPS/GST: 123456789RT0001</p>

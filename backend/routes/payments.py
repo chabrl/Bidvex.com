@@ -1288,8 +1288,6 @@ async def preview_checkout_breakdown(
             include_processing_fee=True
         )
         
-        bp_label = f"Buyer's Premium ({custom_bp_rate*100:.1f}%)" if custom_bp_rate > 0 else "Buyer's Premium"
-        
         return {
             "checkout_type": "partner",
             "breakdown": breakdown.to_dict(),
@@ -1656,4 +1654,541 @@ async def get_seller_transactions(
         "total_count": total_count,
         "limit": limit,
         "offset": offset
+    }
+
+
+
+# ========== BUY NOW CHECKOUT FLOW ==========
+
+class BuyNowPreviewRequest(BaseModel):
+    auction_id: str
+    lot_number: int
+    quantity: int = 1
+
+
+class BuyNowCheckoutRequest(BaseModel):
+    auction_id: str
+    lot_number: int
+    quantity: int = 1
+    return_url: str
+
+
+@payments_router.post("/buy-now-preview")
+async def buy_now_preview(
+    data: BuyNowPreviewRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Server-side price breakdown for Buy Now purchase.
+    No side effects — for display only before user confirms.
+    """
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    current_user = await _get_current_user(credentials)
+    db = get_db()
+
+    auction = await db.multi_item_listings.find_one({"id": data.auction_id}, {"_id": 0})
+    if not auction:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    if auction.get("status") != "active":
+        raise HTTPException(status_code=400, detail="Auction is not active")
+
+    target_lot = None
+    for lot in auction.get("lots", []):
+        if lot["lot_number"] == data.lot_number:
+            target_lot = lot
+            break
+
+    if not target_lot:
+        raise HTTPException(status_code=404, detail="Lot not found")
+    if not target_lot.get("buy_now_enabled"):
+        raise HTTPException(status_code=400, detail="Buy Now not available for this lot")
+
+    buy_now_price = target_lot.get("buy_now_price")
+    if not buy_now_price:
+        raise HTTPException(status_code=400, detail="Buy Now price not set")
+
+    available_qty = target_lot.get("available_quantity", target_lot.get("quantity", 1))
+    if data.quantity > available_qty:
+        raise HTTPException(status_code=400, detail=f"Only {available_qty} units available")
+
+    item_total = buy_now_price * data.quantity
+
+    user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
+    buyer_tier = user_doc.get("subscription_tier", "free") if user_doc else "free"
+
+    seller = await db.users.find_one({"id": auction["seller_id"]}, {"_id": 0})
+    seller_is_business = seller.get("is_tax_registered", False) if seller else False
+    seller_tier = seller.get("subscription_tier", "basic") if seller else "basic"
+
+    breakdown = calculate_general_checkout(
+        hammer_price=item_total,
+        buyer_tier=buyer_tier,
+        seller_tier=seller_tier,
+        seller_is_tax_registered=seller_is_business,
+        include_processing_fee=True
+    )
+
+    return {
+        "lot_title": target_lot.get("title", "Item"),
+        "price_per_unit": buy_now_price,
+        "quantity": data.quantity,
+        "item_total": item_total,
+        "buyer_premium_rate": float(breakdown.buyer_premium_rate),
+        "buyer_premium": float(breakdown.buyer_premium),
+        "gst": float(breakdown.gst_on_fees + breakdown.gst_on_hammer),
+        "qst": float(breakdown.qst_on_fees + breakdown.qst_on_hammer),
+        "total_tax": float(breakdown.total_tax),
+        "processing_fee": float(breakdown.processing_fee),
+        "buyer_total": float(breakdown.buyer_total),
+        "seller_is_business": seller_is_business,
+        "available_quantity": available_qty,
+    }
+
+
+@payments_router.post("/buy-now-checkout")
+async def buy_now_checkout(
+    data: BuyNowCheckoutRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Process Buy Now purchase: validate, decrement inventory, create Stripe session.
+    All prices recalculated server-side from MongoDB.
+    """
+    import stripe as stripe_mod
+
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    current_user = await _get_current_user(credentials)
+    db = get_db()
+
+    # Check if buy-now is enabled
+    settings_doc = await db.marketplace_settings.find_one({}, {"_id": 0})
+    if settings_doc and not settings_doc.get("enable_buy_now", True):
+        raise HTTPException(status_code=403, detail="Buy Now is currently disabled")
+
+    # Fetch auction from DB (server-side truth)
+    auction = await db.multi_item_listings.find_one({"id": data.auction_id}, {"_id": 0})
+    if not auction:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    if auction["status"] != "active":
+        raise HTTPException(status_code=400, detail="Auction is not active")
+
+    if auction.get("seller_id") == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot buy your own listing")
+
+    # Find lot
+    lot_index = None
+    target_lot = None
+    for idx, lot in enumerate(auction.get("lots", [])):
+        if lot["lot_number"] == data.lot_number:
+            lot_index = idx
+            target_lot = lot
+            break
+
+    if target_lot is None:
+        raise HTTPException(status_code=404, detail="Lot not found")
+    if not target_lot.get("buy_now_enabled", False):
+        raise HTTPException(status_code=400, detail="Buy Now not available for this lot")
+
+    # Server-side price (NEVER trust frontend)
+    buy_now_price = target_lot["buy_now_price"]
+    if not buy_now_price:
+        raise HTTPException(status_code=400, detail="Buy Now price not set")
+
+    available_qty = target_lot.get("available_quantity", target_lot.get("quantity", 1))
+    if available_qty <= 0:
+        raise HTTPException(status_code=400, detail="Sold out")
+    if data.quantity > available_qty:
+        raise HTTPException(status_code=400, detail=f"Only {available_qty} units available")
+
+    item_total = buy_now_price * data.quantity
+
+    # Calculate fees server-side
+    user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
+    buyer_tier = user_doc.get("subscription_tier", "free") if user_doc else "free"
+
+    seller = await db.users.find_one({"id": auction["seller_id"]}, {"_id": 0})
+    seller_is_business = seller.get("is_tax_registered", False) if seller else False
+    seller_tier = seller.get("subscription_tier", "basic") if seller else "basic"
+
+    breakdown = calculate_general_checkout(
+        hammer_price=item_total,
+        buyer_tier=buyer_tier,
+        seller_tier=seller_tier,
+        seller_is_tax_registered=seller_is_business,
+        include_processing_fee=True
+    )
+
+    # Decrement inventory
+    new_available_qty = available_qty - data.quantity
+    new_sold_qty = target_lot.get("sold_quantity", 0) + data.quantity
+    if new_available_qty == 0:
+        new_lot_status = "sold_out"
+    elif new_sold_qty > 0:
+        new_lot_status = "partially_sold"
+    else:
+        new_lot_status = target_lot.get("lot_status", "active")
+
+    inv_result = await db.multi_item_listings.update_one(
+        {"id": data.auction_id},
+        {"$set": {
+            f"lots.{lot_index}.available_quantity": new_available_qty,
+            f"lots.{lot_index}.sold_quantity": new_sold_qty,
+            f"lots.{lot_index}.lot_status": new_lot_status,
+        }}
+    )
+    if inv_result.modified_count == 0:
+        raise HTTPException(status_code=500, detail="Failed to update inventory")
+
+    # Create transaction record
+    transaction_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc)
+    transaction = {
+        "id": transaction_id,
+        "auction_id": data.auction_id,
+        "lot_number": data.lot_number,
+        "buyer_id": current_user.id,
+        "quantity_purchased": data.quantity,
+        "price_per_unit": buy_now_price,
+        "total_amount": item_total,
+        "buyer_total": float(breakdown.buyer_total),
+        "payment_status": "pending",
+        "transaction_date": now.isoformat(),
+    }
+    await db.buy_now_transactions.insert_one(transaction)
+
+    # Create Stripe checkout session
+    customer_id = user_doc.get("stripe_customer_id") if user_doc else None
+    if not customer_id:
+        customer = stripe_mod.Customer.create(
+            email=current_user.email,
+            name=getattr(current_user, "name", current_user.email),
+            metadata={"user_id": current_user.id},
+        )
+        customer_id = customer.id
+        await db.users.update_one(
+            {"id": current_user.id},
+            {"$set": {"stripe_customer_id": customer_id}},
+        )
+
+    lot_title = target_lot.get("title", "Item")
+    bp_pct = float(breakdown.buyer_premium_rate) * 100
+    description = (
+        f"{lot_title} x{data.quantity} | "
+        f"Buyer Premium ({bp_pct:.1f}%): ${float(breakdown.buyer_premium):,.2f} | "
+        f"Tax: ${float(breakdown.total_tax):,.2f}"
+    )
+
+    seller_connect_id = seller.get("stripe_connect_account_id") if seller else None
+
+    session_params = {
+        "customer": customer_id,
+        "payment_method_types": ["card"],
+        "mode": "payment",
+        "line_items": [{
+            "price_data": {
+                "currency": "cad",
+                "unit_amount": breakdown.buyer_total_cents,
+                "product_data": {
+                    "name": f"Buy Now - {lot_title}",
+                    "description": description,
+                },
+            },
+            "quantity": 1,
+        }],
+        "success_url": f"{data.return_url}?status=success&session_id={{CHECKOUT_SESSION_ID}}&txn={transaction_id}",
+        "cancel_url": f"{data.return_url}?status=cancelled",
+        "metadata": {
+            "type": "buy_now",
+            "transaction_id": transaction_id,
+            "auction_id": data.auction_id,
+            "lot_number": str(data.lot_number),
+            "buyer_id": current_user.id,
+        },
+    }
+
+    if seller_connect_id:
+        session_params["payment_intent_data"] = {
+            "application_fee_amount": breakdown.stripe_application_fee_cents,
+            "transfer_data": {"destination": seller_connect_id},
+        }
+
+    session = stripe_mod.checkout.Session.create(**session_params)
+
+    # Link session to transaction
+    await db.buy_now_transactions.update_one(
+        {"id": transaction_id},
+        {"$set": {"stripe_session_id": session.id}},
+    )
+
+    return {
+        "success": True,
+        "checkout_url": session.url,
+        "session_id": session.id,
+        "transaction_id": transaction_id,
+        "breakdown": breakdown.to_dict(),
+    }
+
+
+# ========== AUCTION WINNER CHECKOUT FLOW ==========
+
+@payments_router.get("/auction-winner-preview/{listing_id}")
+async def auction_winner_preview(
+    listing_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Preview checkout breakdown for auction winner.
+    Includes late penalty calculation if past deadline.
+    """
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    current_user = await _get_current_user(credentials)
+    db = get_db()
+
+    listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    # Verify caller is the winner
+    if listing.get("winner_id") != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the auction winner can view this checkout")
+
+    if listing.get("payment_status") == "paid":
+        raise HTTPException(status_code=400, detail="This auction has already been paid")
+
+    hammer_price = listing.get("final_price", listing.get("current_price", 0))
+
+    user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
+    buyer_tier = user_doc.get("subscription_tier", "free") if user_doc else "free"
+
+    seller = await db.users.find_one({"id": listing["seller_id"]}, {"_id": 0})
+    seller_is_business = seller.get("is_tax_registered", False) if seller else False
+    seller_tier = seller.get("subscription_tier", "basic") if seller else "basic"
+
+    category = listing.get("category", "").lower()
+    is_vehicle = any(kw in category for kw in ["vehicle", "car", "auto", "truck", "motorcycle"])
+
+    if is_vehicle:
+        breakdown = calculate_vehicle_checkout(
+            hammer_price=hammer_price,
+            buyer_tier=buyer_tier
+        )
+    else:
+        breakdown = calculate_general_checkout(
+            hammer_price=hammer_price,
+            buyer_tier=buyer_tier,
+            seller_tier=seller_tier,
+            seller_is_tax_registered=seller_is_business,
+            include_processing_fee=True
+        )
+
+    # Late penalty calculation
+    late_penalty = 0.0
+    payment_deadline = listing.get("payment_deadline")
+    if payment_deadline:
+        deadline_dt = datetime.fromisoformat(payment_deadline)
+        now = datetime.now(timezone.utc)
+        if now > deadline_dt:
+            days_late = (now - deadline_dt).days
+            months_late = max(1, (days_late + 29) // 30)
+            penalty_rate = 0.02 * months_late  # 2% per month
+            late_penalty = round(hammer_price * penalty_rate, 2)
+
+    total_with_penalty = float(breakdown.buyer_total) + late_penalty
+
+    return {
+        "listing_id": listing_id,
+        "title": listing.get("title", ""),
+        "hammer_price": hammer_price,
+        "checkout_type": "vehicle" if is_vehicle else "general",
+        "buyer_premium_rate": float(breakdown.buyer_premium_rate),
+        "buyer_premium": float(breakdown.buyer_premium),
+        "platform_fee": float(breakdown.platform_fee),
+        "gst_on_fees": float(breakdown.gst_on_fees),
+        "qst_on_fees": float(breakdown.qst_on_fees),
+        "gst_on_hammer": float(breakdown.gst_on_hammer),
+        "qst_on_hammer": float(breakdown.qst_on_hammer),
+        "total_tax": float(breakdown.total_tax),
+        "processing_fee": float(breakdown.processing_fee),
+        "buyer_total_before_penalty": float(breakdown.buyer_total),
+        "late_penalty": late_penalty,
+        "buyer_total": total_with_penalty,
+        "payment_deadline": payment_deadline,
+        "is_overdue": late_penalty > 0,
+        "seller_is_business": seller_is_business,
+        "breakdown": breakdown.to_dict(),
+        "images": listing.get("images", []),
+        "category": listing.get("category", ""),
+    }
+
+
+@payments_router.post("/auction-winner-checkout/{listing_id}")
+async def auction_winner_checkout(
+    listing_id: str,
+    data: Dict[str, str],
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Create Stripe checkout session for auction winner.
+    Uses idempotency key to prevent double charges.
+    All prices recalculated server-side from MongoDB.
+    """
+    import stripe as stripe_mod
+
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    current_user = await _get_current_user(credentials)
+    db = get_db()
+
+    # Server-side validation
+    listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    if listing.get("winner_id") != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the auction winner can checkout")
+
+    if listing.get("status") not in ("ended", "won", "pending_payment"):
+        raise HTTPException(status_code=400, detail="Listing is not in a valid state for checkout")
+
+    if listing.get("payment_status") == "paid":
+        raise HTTPException(status_code=400, detail="Already paid")
+
+    # Server-side price calculation
+    hammer_price = listing.get("final_price", listing.get("current_price", 0))
+
+    user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
+    buyer_tier = user_doc.get("subscription_tier", "free") if user_doc else "free"
+
+    seller = await db.users.find_one({"id": listing["seller_id"]}, {"_id": 0})
+    seller_is_business = seller.get("is_tax_registered", False) if seller else False
+    seller_tier = seller.get("subscription_tier", "basic") if seller else "basic"
+
+    category = listing.get("category", "").lower()
+    is_vehicle = any(kw in category for kw in ["vehicle", "car", "auto", "truck", "motorcycle"])
+
+    if is_vehicle:
+        breakdown = calculate_vehicle_checkout(hammer_price=hammer_price, buyer_tier=buyer_tier)
+    else:
+        breakdown = calculate_general_checkout(
+            hammer_price=hammer_price,
+            buyer_tier=buyer_tier,
+            seller_tier=seller_tier,
+            seller_is_tax_registered=seller_is_business,
+            include_processing_fee=True
+        )
+
+    # Late penalty
+    late_penalty = 0.0
+    payment_deadline = listing.get("payment_deadline")
+    if payment_deadline:
+        deadline_dt = datetime.fromisoformat(payment_deadline)
+        now = datetime.now(timezone.utc)
+        if now > deadline_dt:
+            days_late = (now - deadline_dt).days
+            months_late = max(1, (days_late + 29) // 30)
+            penalty_rate = 0.02 * months_late
+            late_penalty = round(hammer_price * penalty_rate, 2)
+
+    total_cents = breakdown.buyer_total_cents + int(round(late_penalty * 100))
+
+    # Stripe customer
+    customer_id = user_doc.get("stripe_customer_id") if user_doc else None
+    if not customer_id:
+        customer = stripe_mod.Customer.create(
+            email=current_user.email,
+            name=getattr(current_user, "name", current_user.email),
+            metadata={"user_id": current_user.id},
+        )
+        customer_id = customer.id
+        await db.users.update_one(
+            {"id": current_user.id},
+            {"$set": {"stripe_customer_id": customer_id}},
+        )
+
+    # Idempotency key: auction_{listingId}_{winnerId}
+    idempotency_key = f"auction_{listing_id}_{current_user.id}"
+
+    return_url = data.get("return_url", f"https://bidvex.com/checkout/{listing_id}")
+
+    desc_parts = [f"Winning Bid: ${hammer_price:,.2f}"]
+    if late_penalty > 0:
+        desc_parts.append(f"Late Penalty: ${late_penalty:,.2f}")
+    description = " | ".join(desc_parts)
+
+    session_params = {
+        "customer": customer_id,
+        "payment_method_types": ["card"],
+        "mode": "payment",
+        "line_items": [{
+            "price_data": {
+                "currency": "cad",
+                "unit_amount": total_cents,
+                "product_data": {
+                    "name": f"Auction Win - {listing.get('title', 'Item')}",
+                    "description": description,
+                },
+            },
+            "quantity": 1,
+        }],
+        "success_url": f"{return_url}?status=success&session_id={{CHECKOUT_SESSION_ID}}",
+        "cancel_url": f"{return_url}?status=cancelled",
+        "metadata": {
+            "type": "auction_winner",
+            "listing_id": listing_id,
+            "buyer_id": current_user.id,
+            "hammer_price": str(hammer_price),
+            "late_penalty": str(late_penalty),
+        },
+    }
+
+    seller_connect_id = seller.get("stripe_connect_account_id") if seller else None
+    if seller_connect_id and not is_vehicle:
+        app_fee_cents = breakdown.stripe_application_fee_cents + int(round(late_penalty * 100))
+        session_params["payment_intent_data"] = {
+            "application_fee_amount": app_fee_cents,
+            "transfer_data": {"destination": seller_connect_id},
+        }
+
+    session = stripe_mod.checkout.Session.create(
+        **session_params,
+        idempotency_key=idempotency_key
+    )
+
+    # Store pending payment
+    await db.pending_payments.update_one(
+        {"listing_id": listing_id, "buyer_id": current_user.id, "type": "auction_winner"},
+        {"$set": {
+            "id": str(uuid.uuid4()),
+            "session_id": session.id,
+            "listing_id": listing_id,
+            "buyer_id": current_user.id,
+            "type": "auction_winner",
+            "breakdown": breakdown.to_dict(),
+            "late_penalty": late_penalty,
+            "total_cents": total_cents,
+            "status": "pending",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }},
+        upsert=True
+    )
+
+    # Update listing payment status
+    await db.listings.update_one(
+        {"id": listing_id},
+        {"$set": {"payment_status": "checkout_initiated"}},
+    )
+
+    return {
+        "checkout_url": session.url,
+        "session_id": session.id,
+        "total_cents": total_cents,
+        "late_penalty": late_penalty,
+        "breakdown": breakdown.to_dict(),
     }

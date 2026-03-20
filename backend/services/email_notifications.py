@@ -929,3 +929,199 @@ async def send_subscription_upgraded_email(
         html_content=_base_template(content, "Subscription Updated")
     )
 
+
+
+# ========== AUCTION WINNER EMAILS ==========
+
+async def send_auction_won_email(
+    winner_email: str,
+    winner_name: str,
+    item_title: str,
+    final_price: float,
+    listing_id: str,
+    payment_deadline: str,
+) -> Dict[str, Any]:
+    """Send 'You Won!' email to auction winner with checkout CTA"""
+    checkout_url = f"{FRONTEND_URL}/checkout/{listing_id}"
+    price_display = _format_currency(final_price)
+    deadline_display = _format_date(payment_deadline) if payment_deadline else "14 days"
+
+    content = f"""
+    <h2 style="margin: 0 0 20px 0; color: #10b981;">Congratulations! You Won!</h2>
+
+    <p style="color: #475569; line-height: 1.6;">
+        Hi {winner_name},
+    </p>
+
+    <p style="color: #475569; line-height: 1.6;">
+        You've won the auction for <strong>{item_title}</strong>!
+    </p>
+
+    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+            <td style="background-color: #ecfdf5; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                        <td style="color: #065f46; font-size: 14px; padding: 4px 0;">Item:</td>
+                        <td style="color: #065f46; font-size: 14px; font-weight: bold; text-align: right;">{item_title}</td>
+                    </tr>
+                    <tr>
+                        <td style="color: #065f46; font-size: 14px; padding: 4px 0;">Winning Bid:</td>
+                        <td style="color: #065f46; font-size: 24px; font-weight: bold; text-align: right;">{price_display}</td>
+                    </tr>
+                    <tr>
+                        <td style="color: #065f46; font-size: 14px; padding: 4px 0;">Payment Due By:</td>
+                        <td style="color: #dc2626; font-size: 14px; font-weight: bold; text-align: right;">{deadline_display}</td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+
+    <p style="color: #475569; line-height: 1.6; margin-top: 20px;">
+        Please complete your payment within <strong>14 days</strong>. After this period, a late penalty of 2% per month will be applied.
+    </p>
+
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
+        <tr>
+            <td align="center" style="background-color: #10b981; padding: 14px 30px; border-radius: 8px;">
+                <a href="{checkout_url}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">Complete Payment</a>
+            </td>
+        </tr>
+    </table>
+
+    <p style="color: #94a3b8; font-size: 12px; text-align: center;">
+        If the button doesn't work, copy this link: {checkout_url}
+    </p>
+    """
+
+    return await send_email(
+        to_email=winner_email,
+        subject=f"You Won! Complete Payment for {item_title}",
+        html_content=_base_template(content, "Auction Won")
+    )
+
+
+async def send_payment_reminder_email(
+    winner_email: str,
+    winner_name: str,
+    item_title: str,
+    final_price: float,
+    listing_id: str,
+    days_remaining: int,
+    payment_deadline: str,
+) -> Dict[str, Any]:
+    """Send payment reminder email (day 10)"""
+    checkout_url = f"{FRONTEND_URL}/checkout/{listing_id}"
+    price_display = _format_currency(final_price)
+    deadline_display = _format_date(payment_deadline) if payment_deadline else "soon"
+
+    content = f"""
+    <h2 style="margin: 0 0 20px 0; color: #f59e0b;">Payment Reminder</h2>
+
+    <p style="color: #475569; line-height: 1.6;">
+        Hi {winner_name},
+    </p>
+
+    <p style="color: #475569; line-height: 1.6;">
+        This is a reminder that your payment for <strong>{item_title}</strong> is due in <strong>{days_remaining} days</strong>.
+    </p>
+
+    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+            <td style="background-color: #fffbeb; border: 1px solid #fbbf24; border-radius: 8px; padding: 20px;">
+                <p style="margin: 0 0 8px 0; color: #92400e; font-weight: bold;">Payment Details</p>
+                <p style="margin: 0; color: #92400e;">Amount: <strong>{price_display}</strong> (+ applicable fees &amp; taxes)</p>
+                <p style="margin: 8px 0 0 0; color: #dc2626; font-weight: bold;">Deadline: {deadline_display}</p>
+            </td>
+        </tr>
+    </table>
+
+    <p style="color: #475569; line-height: 1.6; margin-top: 20px;">
+        After the deadline, a <strong>2% monthly late penalty</strong> will be applied to your balance.
+    </p>
+
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
+        <tr>
+            <td align="center" style="background-color: #f59e0b; padding: 14px 30px; border-radius: 8px;">
+                <a href="{checkout_url}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">Pay Now</a>
+            </td>
+        </tr>
+    </table>
+    """
+
+    return await send_email(
+        to_email=winner_email,
+        subject=f"Payment Reminder: {item_title} - {days_remaining} Days Left",
+        html_content=_base_template(content, "Payment Reminder")
+    )
+
+
+async def send_payment_overdue_email(
+    winner_email: str,
+    winner_name: str,
+    item_title: str,
+    final_price: float,
+    listing_id: str,
+    penalty_amount: float,
+    total_with_penalty: float,
+) -> Dict[str, Any]:
+    """Send payment overdue notice with penalty (day 14+)"""
+    checkout_url = f"{FRONTEND_URL}/checkout/{listing_id}"
+    price_display = _format_currency(final_price)
+    penalty_display = _format_currency(penalty_amount)
+    total_display = _format_currency(total_with_penalty)
+
+    content = f"""
+    <h2 style="margin: 0 0 20px 0; color: #dc2626;">Payment Overdue</h2>
+
+    <p style="color: #475569; line-height: 1.6;">
+        Hi {winner_name},
+    </p>
+
+    <p style="color: #475569; line-height: 1.6;">
+        Your payment for <strong>{item_title}</strong> is now <strong>overdue</strong>. A late penalty has been applied.
+    </p>
+
+    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+            <td style="background-color: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 20px;">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                        <td style="color: #991b1b; font-size: 14px; padding: 4px 0;">Original Amount:</td>
+                        <td style="color: #991b1b; font-size: 14px; text-align: right;">{price_display}</td>
+                    </tr>
+                    <tr>
+                        <td style="color: #dc2626; font-size: 14px; padding: 4px 0;">Late Penalty (2%/month):</td>
+                        <td style="color: #dc2626; font-size: 14px; font-weight: bold; text-align: right;">+{penalty_display}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" style="border-top: 1px solid #fca5a5; padding-top: 8px; margin-top: 8px;"></td>
+                    </tr>
+                    <tr>
+                        <td style="color: #991b1b; font-size: 16px; font-weight: bold; padding: 4px 0;">New Total Due:</td>
+                        <td style="color: #dc2626; font-size: 20px; font-weight: bold; text-align: right;">{total_display}</td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+
+    <p style="color: #475569; line-height: 1.6; margin-top: 20px;">
+        Please complete your payment immediately to avoid further penalties. The late penalty increases by 2% for each additional month.
+    </p>
+
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
+        <tr>
+            <td align="center" style="background-color: #dc2626; padding: 14px 30px; border-radius: 8px;">
+                <a href="{checkout_url}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">Pay Now</a>
+            </td>
+        </tr>
+    </table>
+    """
+
+    return await send_email(
+        to_email=winner_email,
+        subject=f"OVERDUE: Payment Required for {item_title}",
+        html_content=_base_template(content, "Payment Overdue")
+    )
