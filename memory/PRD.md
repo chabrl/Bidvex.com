@@ -104,6 +104,7 @@ Charts: recharts
 - iteration_66 — Phase C i18n Multilingual (100%)
 - iteration_67 — Currency Formatting + Tax Dashboard (100%)
 - iteration_68 — Full Responsive Design Fix (100%)
+- iteration_69 — Performance Engineering P0+P1 (100%)
 
 ### Full Responsive Design Overhaul (Completed Mar 20, 2026)
 - **Navbar**: Rewrote to use `lg` breakpoint (1024px) for desktop nav, preventing tablet overflow. Hamburger menu below lg. Mobile: hides theme toggle & messages (accessible in user dropdown). Consistent `max-w-7xl mx-auto px-3 sm:px-4 lg:px-8`.
@@ -114,6 +115,31 @@ Charts: recharts
 - **Global CSS**: Added `overflow-x: hidden` on html element.
 - **Active Bidding Label**: Fixed visibility with dedicated `.active-bidding-label` CSS class overriding card span `!important` rule.
 - Tests: iteration_68 (100% - all 4 breakpoints verified, no horizontal overflow)
+
+### Performance Engineering Overhaul (Completed Mar 20, 2026)
+**P0 — Implemented:**
+- **Code Splitting**: All 40+ page imports converted to `React.lazy()` + `Suspense` with branded `PageLoader` fallback. Heavy components (AIAssistant) also lazy-loaded. Eliminates monolithic initial bundle.
+- **GZip Compression**: `GZipMiddleware` added to FastAPI (minimum_size=500, compresslevel=5). Compresses all API JSON responses > 500 bytes. K8s ingress also provides transport-level compression.
+- **API Response Caching**: TTL-based in-memory cache (`/app/backend/services/api_cache.py`):
+  - `/api/categories` → TTL 300s
+  - `/api/carousel/new-listings` → TTL 60s
+  - `/api/carousel/recently-sold` → TTL 60s
+  - `/api/stats/top-sellers` → TTL 60s
+  - Auto-invalidation on listing create/update via `invalidate_listing_caches()`
+- **MongoDB Indexes**: 15+ new compound indexes on listings, users, transactions, notifications, messages, multi_item_listings. Critical indexes: `(status, created_at)`, `(status, category)`, `(status, auction_end_date)`, `(email, unique)`, `(user_id, is_read, created_at)`.
+- **Image Optimization**: Global `content-visibility: auto` on all images. `OptimizedImage` component with native lazy loading, WebP hints, fade-in.
+
+**P1 — Implemented:**
+- **Critical CSS Skeleton**: Inline HTML/CSS in `index.html` renders instantly — navbar skeleton + hero skeleton + shimmer animation. Eliminates blank white screen.
+- **Debounced Search**: 300ms debounce on search inputs in `FlattenedMarketplace` and `DecomposedMarketplace`. Prevents API call spam.
+- **SEO**: `react-helmet-async` with `SEO.js` component, `HelmetProvider` in App. HomePage has JSON-LD WebSite schema. `robots.txt` and `sitemap.xml` in public folder.
+- **Cache-Control**: Removed anti-caching meta tags from index.html. CRA hash-based filenames handle cache busting.
+
+**P2 — Documented (Infrastructure):**
+- Cloudflare CDN setup guide → `/app/memory/INFRASTRUCTURE_P2.md`
+- React Query migration plan (2-3 day effort) → `/app/memory/INFRASTRUCTURE_P2.md`
+- Cursor pagination spec for `/api/listings` → `/app/memory/INFRASTRUCTURE_P2.md`
+- Tests: iteration_69 (100% - all features verified, no regressions)
 
 ## Upcoming Tasks
 
