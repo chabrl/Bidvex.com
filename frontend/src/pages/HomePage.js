@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSiteConfig } from '../contexts/SiteConfigContext';
-import axios from 'axios';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -14,8 +13,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency } from '../utils/currencyFormatter';
 import SEO from '../components/SEO';
-
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+import { useTopSellers, useHotItems, useEndingSoon, useFeatured, useNewListings, useRecentlySold } from '../hooks/useHomePageData';
 
 // Custom hook for scroll-triggered animations with fallback visibility
 const useScrollReveal = (threshold = 0.1) => {
@@ -66,79 +64,20 @@ const HomePage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { isSectionVisible } = useSiteConfig();
-  const [topSellers, setTopSellers] = useState([]);
-  const [hotItems, setHotItems] = useState([]);
-  const [endingSoon, setEndingSoon] = useState([]);
-  const [featured, setFeatured] = useState([]);
-  const [newListings, setNewListings] = useState([]);
-  const [recentlySold, setRecentlySold] = useState([]);
   const [heroLoaded, setHeroLoaded] = useState(false);
+
+  // React Query hooks replace manual useState + useEffect fetching
+  const { data: topSellers = [] } = useTopSellers(8);
+  const { data: hotItems = [] } = useHotItems(6);
+  const { data: endingSoon = [] } = useEndingSoon(12);
+  const { data: featured = [] } = useFeatured(12);
+  const { data: newListings = [] } = useNewListings(12);
+  const { data: recentlySold = [] } = useRecentlySold(12);
 
   useEffect(() => {
     // Trigger hero animation after mount
     setTimeout(() => setHeroLoaded(true), 100);
-    
-    fetchTopSellers();
-    fetchHotItems();
-    fetchEndingSoon();
-    fetchFeatured();
-    fetchNewListings();
-    fetchRecentlySold();
   }, []);
-
-  const fetchTopSellers = async () => {
-    try {
-      const response = await axios.get(`${API}/stats/top-sellers?limit=8`);
-      setTopSellers(response.data);
-    } catch (error) {
-      console.error('Failed to fetch top sellers:', error);
-    }
-  };
-
-  const fetchHotItems = async () => {
-    try {
-      const response = await axios.get(`${API}/stats/hot-items?limit=6`);
-      setHotItems(response.data);
-    } catch (error) {
-      console.error('Failed to fetch hot items:', error);
-    }
-  };
-
-  const fetchEndingSoon = async () => {
-    try {
-      const response = await axios.get(`${API}/carousel/ending-soon?limit=12`);
-      setEndingSoon(response.data);
-    } catch (error) {
-      console.error('Failed to fetch ending soon:', error);
-    }
-  };
-
-  const fetchFeatured = async () => {
-    try {
-      const response = await axios.get(`${API}/carousel/featured?limit=12`);
-      setFeatured(response.data);
-    } catch (error) {
-      console.error('Failed to fetch featured:', error);
-    }
-  };
-
-  const fetchNewListings = async () => {
-    try {
-      const response = await axios.get(`${API}/carousel/new-listings?limit=12`);
-      setNewListings(response.data);
-    } catch (error) {
-      console.error('Failed to fetch new listings:', error);
-    }
-  };
-
-  const fetchRecentlySold = async () => {
-    try {
-      const response = await axios.get(`${API}/carousel/recently-sold?limit=12`);
-      setRecentlySold(response.data);
-    } catch (error) {
-      console.error('Failed to fetch recently sold:', error);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900" data-testid="home-page">

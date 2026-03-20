@@ -15,6 +15,8 @@ from datetime import datetime, timezone, timedelta
 import asyncio
 import time
 import logging
+import base64
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +67,7 @@ async def get_marketplace_items(
     sort: str = "-promoted",
     limit: int = 50,
     skip: int = 0,
+    cursor: Optional[str] = None,
     track_impression: bool = False
 ):
     """
@@ -274,14 +277,32 @@ async def get_marketplace_items(
         )
     
     total_items = len(items)
-    paginated_items = items[skip:skip + limit]
+    
+    # Cursor-based pagination: decode cursor to get offset, or use skip
+    offset = skip
+    if cursor:
+        try:
+            decoded = json.loads(base64.b64decode(cursor))
+            offset = decoded.get("offset", 0)
+        except Exception:
+            offset = skip
+    
+    paginated_items = items[offset:offset + limit]
+    has_more = (offset + limit) < total_items
+    
+    # Build next_cursor
+    next_cursor = None
+    if has_more:
+        cursor_data = {"offset": offset + limit}
+        next_cursor = base64.b64encode(json.dumps(cursor_data).encode()).decode()
     
     return {
         "items": paginated_items,
         "total": total_items,
         "limit": limit,
-        "skip": skip,
-        "has_more": (skip + limit) < total_items
+        "skip": offset,
+        "has_more": has_more,
+        "next_cursor": next_cursor
     }
 
 

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '../utils/currencyFormatter';
+import { useMarketplaceItems } from '../hooks/useMarketplaceItems';
  * Decomposed Marketplace - Item-Centric Discovery
  * Features:
  * - Individual items from multi-item lots
@@ -26,8 +27,6 @@ import { formatCurrency } from '../utils/currencyFormatter';
  * - Analytics tracking (impressions, clicks)
  */
 const DecomposedMarketplace = () => {
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
     search: '',
     category: '',
@@ -36,8 +35,6 @@ const DecomposedMarketplace = () => {
     condition: '',
     sort: '-promoted'
   });
-  const [total, setTotal] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
 
   const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
@@ -53,37 +50,18 @@ const DecomposedMarketplace = () => {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [filters]);
 
-  useEffect(() => {
-    fetchItems();
-  }, [debouncedFilters]);
+  // React Query: infinite marketplace items with cursor pagination
+  const {
+    data: marketplaceData,
+    isLoading: loading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useMarketplaceItems(debouncedFilters, 50);
 
-  const fetchItems = async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      
-      if (filters.search) params.append('search', filters.search);
-      if (filters.category) params.append('category', filters.category);
-      if (filters.min_price) params.append('min_price', filters.min_price);
-      if (filters.max_price) params.append('max_price', filters.max_price);
-      if (filters.condition) params.append('condition', filters.condition);
-      params.append('sort', filters.sort);
-      params.append('limit', '50');
-      params.append('skip', '0');
-      params.append('track_impression', 'true');  // Track impressions for analytics
-
-      const response = await axios.get(`${API_URL}/api/marketplace/items?${params.toString()}`);
-      
-      setItems(response.data.items);
-      setTotal(response.data.total);
-      setHasMore(response.data.has_more);
-    } catch (error) {
-      console.error('Error fetching marketplace items:', error);
-      toast.error('Failed to load marketplace items');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const items = (marketplaceData?.pages ?? []).flatMap((page) => page.items ?? []);
+  const total = marketplaceData?.pages?.[0]?.total ?? 0;
+  const hasMore = hasNextPage;
 
   const trackClick = async (itemId) => {
     try {

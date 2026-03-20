@@ -32,6 +32,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '../utils/currencyFormatter';
+import { useCategories } from '../hooks/useCategories';
+import { useMarketplaceItems } from '../hooks/useMarketplaceItems';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -58,12 +60,6 @@ const FlattenedMarketplace = ({
   const { user, token } = useAuth();
   const navigate = useNavigate();
   
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [total, setTotal] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
-  const [skip, setSkip] = useState(0);
-  
   // Filters
   const [filters, setFilters] = useState({
     search: '',
@@ -82,8 +78,8 @@ const FlattenedMarketplace = ({
   const [bidConfirmOpen, setBidConfirmOpen] = useState(false);
   const [placingBid, setPlacingBid] = useState(false);
   
-  // Categories
-  const [categories, setCategories] = useState([]);
+  // React Query: categories
+  const { data: categories = [] } = useCategories();
   
   // Debounced filters — prevents API call on every keystroke
   const [debouncedFilters, setDebouncedFilters] = useState(filters);
@@ -100,64 +96,23 @@ const FlattenedMarketplace = ({
     };
   }, [filters]);
 
-  useEffect(() => {
-    fetchCategories();
-  }, []);
+  // React Query: infinite marketplace items with cursor pagination
+  const {
+    data: marketplaceData,
+    isLoading: loading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    refetch: refetchItems,
+  } = useMarketplaceItems(debouncedFilters, limit);
 
-  useEffect(() => {
-    fetchItems();
-  }, [debouncedFilters]);
-
-  const fetchCategories = async () => {
-    try {
-      const response = await axios.get(`${API}/categories`);
-      setCategories(response.data);
-    } catch (error) {
-      console.error('Failed to fetch categories:', error);
-    }
-  };
-
-  const fetchItems = async (loadMore = false) => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      
-      if (filters.search) params.append('search', filters.search);
-      if (filters.category) params.append('category', filters.category);
-      if (filters.min_price) params.append('min_price', filters.min_price);
-      if (filters.max_price) params.append('max_price', filters.max_price);
-      if (filters.condition) params.append('condition', filters.condition);
-      params.append('sort', filters.sort);
-      params.append('limit', limit.toString());
-      params.append('skip', loadMore ? skip.toString() : '0');
-      params.append('track_impression', 'true');
-
-      const response = await axios.get(`${API}/marketplace/items?${params.toString()}`);
-      
-      let fetchedItems = response.data.items || [];
-      
-      // Apply Private Sales Only filter client-side
-      if (filters.private_sales_only) {
-        fetchedItems = fetchedItems.filter(item => !item.seller_is_business);
-      }
-      
-      if (loadMore) {
-        setItems(prev => [...prev, ...fetchedItems]);
-        setSkip(prev => prev + limit);
-      } else {
-        setItems(fetchedItems);
-        setSkip(limit);
-      }
-      
-      setTotal(response.data.total || fetchedItems.length);
-      setHasMore(response.data.has_more || false);
-    } catch (error) {
-      console.error('Error fetching marketplace items:', error);
-      toast.error('Failed to load marketplace items');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Flatten pages into a single items array
+  const allItems = (marketplaceData?.pages ?? []).flatMap((page) => page.items ?? []);
+  const items = filters.private_sales_only
+    ? allItems.filter((item) => !item.seller_is_business)
+    : allItems;
+  const total = marketplaceData?.pages?.[0]?.total ?? 0;
+  const hasMore = hasNextPage;
 
   const trackClick = async (itemId) => {
     try {
@@ -169,7 +124,6 @@ const FlattenedMarketplace = ({
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
-    setSkip(0);
   };
 
   const openQuickBid = (item, e) => {
@@ -214,14 +168,14 @@ const FlattenedMarketplace = ({
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
-      toast.success('🎉 Bid placed successfully!');
+      toast.success('Bid placed successfully!');
       setBidConfirmOpen(false);
       setQuickBidOpen(false);
       setSelectedItem(null);
       setBidAmount('');
       
-      // Refresh items
-      fetchItems();
+      // Refresh items via React Query
+      refetchItems();
     } catch (error) {
       const detail = error.response?.data?.detail;
       let message = 'Failed to place bid';
@@ -398,11 +352,12 @@ const FlattenedMarketplace = ({
       {hasMore && !loading && (
         <div className="text-center mt-8">
           <Button 
-            onClick={() => fetchItems(true)} 
+            onClick={() => fetchNextPage()} 
             variant="outline"
             className="px-8"
+            disabled={isFetchingNextPage}
           >
-            Load More Items
+            {isFetchingNextPage ? 'Loading...' : 'Load More Items'}
           </Button>
         </div>
       )}
