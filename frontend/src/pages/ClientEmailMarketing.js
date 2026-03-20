@@ -670,7 +670,7 @@ const ClientEmailMarketing = () => {
           <div>
             <p className="font-medium text-amber-700 dark:text-amber-300">Low Quota</p>
             <p className="text-sm text-amber-600 dark:text-amber-400">
-              You have {access.quota.monthly_remaining} emails remaining this month.
+              You have {access?.quota?.monthly_remaining} emails remaining this month.
             </p>
           </div>
         </div>
