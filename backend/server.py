@@ -227,6 +227,14 @@ async def start_scheduler():
     scheduler.start()
     logger.info("APScheduler started")
 
+@app.on_event("startup")
+async def init_cloud_storage():
+    try:
+        from services.cloud_storage import _init_storage
+        _init_storage()
+    except Exception as e:
+        logger.error(f"Cloud storage init failed (non-fatal): {e}")
+
 @app.on_event("shutdown")
 async def shutdown_scheduler():
     scheduler.shutdown()

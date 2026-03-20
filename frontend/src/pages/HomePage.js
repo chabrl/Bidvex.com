@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency } from '../utils/currencyFormatter';
 import SEO from '../components/SEO';
+import SwipeableCardRow from '../components/SwipeableCardRow';
 import { useTopSellers, useHotItems, useEndingSoon, useFeatured, useNewListings, useRecentlySold } from '../hooks/useHomePageData';
 
 // Custom hook for scroll-triggered animations with fallback visibility
@@ -290,11 +291,14 @@ const LiveAuctionsSection = ({ items, navigate }) => {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          {items.slice(0, 4).map((item, index) => (
+        <SwipeableCardRow
+          items={items.slice(0, 4)}
+          gridCols="sm:grid-cols-2 lg:grid-cols-4"
+          mobileWidth="w-[80vw]"
+          renderCard={(item, index) => (
             <LiveAuctionCard key={item.id} item={item} index={index} isVisible={isVisible} navigate={navigate} />
-          ))}
-        </div>
+          )}
+        />
       </div>
     </section>
   );
@@ -416,12 +420,15 @@ const HotItemsSection = ({ items, navigate }) => {
           </Button>
         </div>
 
-        {/* Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {items.map((item, index) => (
+        {/* Cards Grid / Mobile Carousel */}
+        <SwipeableCardRow
+          items={items}
+          gridCols="sm:grid-cols-2 lg:grid-cols-3"
+          mobileWidth="w-[85vw]"
+          renderCard={(item, index) => (
             <Card 
               key={item.id}
-              className={`hover-glow-cyan cursor-pointer overflow-hidden border shadow-lg hover:shadow-xl transition-all duration-700 bg-white dark:bg-white/5 dark:backdrop-blur-md border-slate-200 dark:border-white/20 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+              className={`hover-glow-cyan cursor-pointer overflow-hidden border shadow-lg hover:shadow-xl transition-all duration-700 bg-white dark:bg-white/5 dark:backdrop-blur-md border-slate-200 dark:border-white/20 h-full ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
               style={{ transitionDelay: `${index * 150}ms` }}
               onClick={() => navigate(`/listing/${item.id}`)}
               data-testid="hot-item-card"
@@ -467,8 +474,8 @@ const HotItemsSection = ({ items, navigate }) => {
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
+          )}
+        />
 
         {/* Mobile View All Button */}
         <div className="flex sm:hidden justify-center mt-8">
@@ -503,11 +510,15 @@ const FeaturedSection = ({ items, navigate }) => {
           <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">{t('homepage.handPicked')}</p>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-          {items.slice(0, 8).map((item, index) => (
+        <SwipeableCardRow
+          items={items.slice(0, 8)}
+          gridCols="sm:grid-cols-3 lg:grid-cols-4"
+          gap="gap-3 sm:gap-4 lg:gap-6"
+          mobileWidth="w-[45vw]"
+          renderCard={(item, index) => (
             <Card 
               key={item.id}
-              className={`card-hover-pop cursor-pointer overflow-hidden border-0 shadow-md dark:bg-slate-800/50 dark:backdrop-blur-sm transition-all duration-700 ${isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
+              className={`card-hover-pop cursor-pointer overflow-hidden border-0 shadow-md dark:bg-slate-800/50 dark:backdrop-blur-sm transition-all duration-700 h-full ${isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
               style={{ transitionDelay: `${index * 50}ms` }}
               onClick={() => navigate(`/listing/${item.id}`)}
             >
@@ -525,8 +536,8 @@ const FeaturedSection = ({ items, navigate }) => {
                 <p className="text-base sm:text-lg font-bold text-blue-600 dark:text-cyan-400">{formatCurrency(item.current_price)}</p>
               </CardContent>
             </Card>
-          ))}
-        </div>
+          )}
+        />
       </div>
     </section>
   );
@@ -552,11 +563,15 @@ const NewListingsSection = ({ items, navigate }) => {
           </Button>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-          {items.slice(0, 6).map((item, index) => (
+        <SwipeableCardRow
+          items={items.slice(0, 6)}
+          gridCols="sm:grid-cols-3 lg:grid-cols-6"
+          gap="gap-3 sm:gap-4"
+          mobileWidth="w-[42vw]"
+          renderCard={(item, index) => (
             <Card 
               key={item.id}
-              className={`card-hover-pop cursor-pointer overflow-hidden border-0 shadow-md dark:bg-slate-800/50 dark:backdrop-blur-sm transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+              className={`card-hover-pop cursor-pointer overflow-hidden border-0 shadow-md dark:bg-slate-800/50 dark:backdrop-blur-sm transition-all duration-700 h-full ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
               style={{ transitionDelay: `${index * 80}ms` }}
               onClick={() => navigate(`/listing/${item.id}`)}
             >
@@ -575,8 +590,8 @@ const NewListingsSection = ({ items, navigate }) => {
                 <p className="text-sm font-bold text-blue-600 dark:text-cyan-400">{formatCurrency(item.current_price)}</p>
               </CardContent>
             </Card>
-          ))}
-        </div>
+          )}
+        />
       </div>
     </section>
   );
@@ -602,11 +617,14 @@ const FeaturesSection = ({ navigate }) => {
           <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300">{t('homepage.trustedPlatform')}</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          {features.map((feature, index) => (
+        <SwipeableCardRow
+          items={features}
+          gridCols="sm:grid-cols-2 lg:grid-cols-4"
+          mobileWidth="w-[75vw]"
+          renderCard={(feature, index) => (
             <div 
               key={index}
-              className={`group p-5 sm:p-8 rounded-2xl bg-gradient-to-br from-slate-50 to-white dark:from-slate-800 dark:to-slate-700 border border-slate-100 dark:border-slate-600 hover:border-cyan-200 dark:hover:border-cyan-500/50 hover:shadow-xl hover:shadow-cyan-500/10 dark:hover:shadow-cyan-500/20 transition-all duration-500 flex flex-col items-center text-center ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+              className={`group p-5 sm:p-8 rounded-2xl bg-gradient-to-br from-slate-50 to-white dark:from-slate-800 dark:to-slate-700 border border-slate-100 dark:border-slate-600 hover:border-cyan-200 dark:hover:border-cyan-500/50 hover:shadow-xl hover:shadow-cyan-500/10 dark:hover:shadow-cyan-500/20 transition-all duration-500 flex flex-col items-center text-center h-full ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
               style={{ transitionDelay: `${index * 100}ms` }}
             >
               <div className="w-14 h-14 mb-5 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/30 group-hover:scale-110 transition-transform">
@@ -615,8 +633,8 @@ const FeaturesSection = ({ navigate }) => {
               <h3 className="text-lg sm:text-xl font-semibold text-slate-900 dark:text-slate-50 mb-2">{feature.title}</h3>
               <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed">{feature.desc}</p>
             </div>
-          ))}
-        </div>
+          )}
+        />
       </div>
     </section>
   );
@@ -635,11 +653,14 @@ const TopSellersSection = ({ sellers }) => {
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 dark:text-slate-50">{t('homepage.topSellers')}</h2>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {sellers.slice(0, 3).map((seller, idx) => (
+        <SwipeableCardRow
+          items={sellers.slice(0, 3)}
+          gridCols="sm:grid-cols-2 lg:grid-cols-3"
+          mobileWidth="w-[80vw]"
+          renderCard={(seller, idx) => (
             <Card 
               key={seller.user?.id || idx} 
-              className={`card-hover-pop overflow-hidden border-0 shadow-lg dark:bg-slate-800/50 dark:backdrop-blur-sm transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+              className={`card-hover-pop overflow-hidden border-0 shadow-lg dark:bg-slate-800/50 dark:backdrop-blur-sm transition-all duration-700 h-full ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
               style={{ transitionDelay: `${idx * 150}ms` }}
             >
               <CardContent className="p-5 sm:p-8 text-center">
@@ -670,8 +691,8 @@ const TopSellersSection = ({ sellers }) => {
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
+          )}
+        />
       </div>
     </section>
   );

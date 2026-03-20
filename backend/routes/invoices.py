@@ -749,21 +749,29 @@ async def generate_commission_invoice(
     
     html_content = commission_invoice_template(template_data, lang=lang)
     
-    invoice_dir = Path(f"/app/invoices/{seller_id}")
-    invoice_dir.mkdir(parents=True, exist_ok=True)
-    
-    pdf_filename = f"CommissionInvoice_{auction_id}.pdf"
-    pdf_path = invoice_dir / pdf_filename
-    
-    generate_pdf_from_html(html_content, pdf_path)
-    
+    # Generate PDF and persist to cloud storage
+    import tempfile
+    from services.cloud_storage import store_invoice_pdf, generate_signed_url
+
+    invoice_id = str(uuid.uuid4())
+
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    generate_pdf_from_html(html_content, tmp_path)
+    pdf_bytes = tmp_path.read_bytes()
+    tmp_path.unlink(missing_ok=True)
+
+    storage_path = await store_invoice_pdf(invoice_id, pdf_bytes, subfolder="commission_invoice")
+    download_url = generate_signed_url(invoice_id)
+
     invoice_record = {
-        "id": str(uuid.uuid4()),
+        "id": invoice_id,
         "invoice_number": invoice_number,
         "invoice_type": "commission_invoice",
         "user_id": seller_id,
         "auction_id": auction_id,
-        "pdf_path": str(pdf_path),
+        "storage_path": storage_path,
+        "download_url": download_url,
         "generated_date": datetime.now(timezone.utc).isoformat(),
         "status": "generated"
     }
@@ -772,7 +780,7 @@ async def generate_commission_invoice(
     return {
         "success": True,
         "invoice_number": invoice_number,
-        "pdf_path": str(pdf_path),
+        "download_url": download_url,
         "message": "Commission invoice generated successfully"
     }
 
@@ -836,7 +844,7 @@ async def complete_auction_and_send_documents(
         # 1. Generate Seller Statement
         try:
             statement_response = await generate_seller_statement(auction_id, seller_id, current_user)
-            seller_pdf_paths['statement'] = statement_response['pdf_path']
+            seller_pdf_paths['statement'] = statement_response.get('download_url', '')
             results['documents_generated'].append('seller_statement')
         except Exception as e:
             results['errors'].append(f"Seller Statement: {str(e)}")
@@ -844,7 +852,7 @@ async def complete_auction_and_send_documents(
         # 2. Generate Seller Receipt
         try:
             receipt_response = await generate_seller_receipt(auction_id, seller_id, current_user)
-            seller_pdf_paths['receipt'] = receipt_response['pdf_path']
+            seller_pdf_paths['receipt'] = receipt_response.get('download_url', '')
             results['documents_generated'].append('seller_receipt')
         except Exception as e:
             results['errors'].append(f"Seller Receipt: {str(e)}")
@@ -852,7 +860,7 @@ async def complete_auction_and_send_documents(
         # 3. Generate Commission Invoice
         try:
             commission_response = await generate_commission_invoice(auction_id, seller_id, current_user)
-            seller_pdf_paths['commission'] = commission_response['pdf_path']
+            seller_pdf_paths['commission'] = commission_response.get('download_url', '')
             results['documents_generated'].append('commission_invoice')
         except Exception as e:
             results['errors'].append(f"Commission Invoice: {str(e)}")
@@ -914,7 +922,7 @@ async def complete_auction_and_send_documents(
             # 1. Generate Lots Won Summary
             try:
                 lots_won_response = await generate_lots_won_invoice(auction_id, buyer_id, lang, current_user)
-                buyer_pdf_paths['lots_won'] = lots_won_response['pdf_path']
+                buyer_pdf_paths['lots_won'] = lots_won_response.get('download_url', '')
                 results['documents_generated'].append(f'lots_won_{buyer_id[:8]}')
                 total_due = lots_won_response.get('total_due', 0)
                 invoice_number = lots_won_response.get('invoice_number', 'N/A')
@@ -925,7 +933,7 @@ async def complete_auction_and_send_documents(
             # 2. Generate Payment Letter
             try:
                 payment_letter_response = await generate_payment_letter(auction_id, buyer_id, current_user)
-                buyer_pdf_paths['payment_letter'] = payment_letter_response['pdf_path']
+                buyer_pdf_paths['payment_letter'] = payment_letter_response.get('download_url', '')
                 results['documents_generated'].append(f'payment_letter_{buyer_id[:8]}')
             except Exception as e:
                 results['errors'].append(f"Payment Letter (Buyer {buyer_id[:8]}): {str(e)}")

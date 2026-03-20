@@ -58,6 +58,7 @@ const BecomePartnerPage = lazy(() => import('./pages/BecomePartnerPage'));
 const PartnerDashboard = lazy(() => import('./pages/PartnerDashboard'));
 const LegalPage = lazy(() => import('./pages/LegalPage'));
 const InviteAcceptPage = lazy(() => import('./pages/InviteAcceptPage'));
+const CompareListingsPage = lazy(() => import('./pages/CompareListingsPage'));
 
 // Vehicle Auction Module
 const VehicleAuctionsPage = lazy(() => import('./pages/vehicles/VehicleAuctionsPage'));
@@ -226,6 +227,7 @@ const App = () => {
           <Route path="/lots" element={<LotsMarketplacePage />} />
           <Route path="/lots/:id" element={<MultiItemListingDetailPage />} />
           <Route path="/listing/:id" element={<ListingDetailPage />} />
+          <Route path="/compare" element={<CompareListingsPage />} />
           <Route path="/auth" element={<AuthPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />

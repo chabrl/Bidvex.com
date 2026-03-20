@@ -28,7 +28,9 @@ import {
   DollarSign,
   Timer,
   ExternalLink,
-  Receipt
+  Receipt,
+  Scale,
+  X
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '../utils/currencyFormatter';
@@ -77,6 +79,14 @@ const FlattenedMarketplace = ({
   const [bidAmount, setBidAmount] = useState('');
   const [bidConfirmOpen, setBidConfirmOpen] = useState(false);
   const [placingBid, setPlacingBid] = useState(false);
+
+  // Compare mode state
+  const [compareIds, setCompareIds] = useState([]);
+  const toggleCompare = (id) => {
+    setCompareIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : prev.length < 4 ? [...prev, id] : prev
+    );
+  };
   
   // React Query: categories
   const { data: categories = [] } = useCategories();
@@ -343,6 +353,8 @@ const FlattenedMarketplace = ({
               item={item} 
               onQuickBid={openQuickBid}
               trackClick={trackClick}
+              isComparing={compareIds.includes(item.id)}
+              onToggleCompare={toggleCompare}
             />
           ))}
         </div>
@@ -456,6 +468,25 @@ const FlattenedMarketplace = ({
           loading={placingBid}
         />
       )}
+
+      {/* Floating Compare Bar */}
+      {compareIds.length > 0 && (
+        <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900 dark:bg-slate-800 text-white rounded-full shadow-2xl px-5 py-3 flex items-center gap-3 border border-cyan-500/30" data-testid="compare-floating-bar">
+          <Scale className="h-4 w-4 text-cyan-400 shrink-0" />
+          <span className="text-sm font-medium whitespace-nowrap">{compareIds.length} selected</span>
+          <Button
+            size="sm"
+            onClick={() => navigate(`/compare?ids=${compareIds.join(',')}`)}
+            className="bg-cyan-500 hover:bg-cyan-600 text-white rounded-full h-8 px-4 text-xs font-bold"
+            data-testid="compare-go-btn"
+          >
+            Compare
+          </Button>
+          <button onClick={() => setCompareIds([])} className="text-slate-400 hover:text-white" data-testid="compare-clear-btn">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 };
@@ -463,7 +494,7 @@ const FlattenedMarketplace = ({
 /**
  * ItemCard - Individual item card component
  */
-const ItemCard = ({ item, onQuickBid, trackClick }) => {
+const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare }) => {
   const [timeLeft, setTimeLeft] = useState('');
   const [isUrgent, setIsUrgent] = useState(false);
 
@@ -576,6 +607,20 @@ const ItemCard = ({ item, onQuickBid, trackClick }) => {
               {getPromotionBadge()}
             </div>
           )}
+
+          {/* Compare checkbox */}
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleCompare(item.id); }}
+            className={`absolute ${getPromotionBadge() ? 'top-10' : 'top-3'} right-3 z-20 w-7 h-7 rounded-full flex items-center justify-center transition-all shadow-md ${
+              isComparing
+                ? 'bg-cyan-500 text-white scale-110'
+                : 'bg-white/80 dark:bg-slate-800/80 text-slate-500 opacity-0 group-hover:opacity-100'
+            }`}
+            data-testid={`compare-toggle-${item.id}`}
+            title="Add to compare"
+          >
+            <Scale className="h-3.5 w-3.5" />
+          </button>
 
           {/* Bottom - Timer */}
           <div className="absolute bottom-3 left-3 right-3 flex justify-between items-center">
