@@ -488,7 +488,7 @@ const HotItemsSection = ({ items, navigate }) => {
                       className="w-2.5 h-2.5 rounded-full animate-pulse shadow-lg bg-cyan-500"
                       style={{ boxShadow: '0 0 10px #06B6D4, 0 0 20px rgba(6, 182, 212, 0.5)' }} 
                     />
-                    <span className="text-xs text-cyan-100 font-medium">{t('homepage.activeBidding')}</span>
+                    <span className="text-xs text-white font-medium">{t('homepage.activeBidding')}</span>
                   </div>
                 </div>
               </div>
