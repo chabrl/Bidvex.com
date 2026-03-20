@@ -303,9 +303,9 @@ async def create_subscription(
     Create a Stripe subscription using the user's saved default payment method.
     No redirect — charges the card on file directly.
     """
-    plan_id = data.get("plan_id")  # "premium" or "vip"
-    if plan_id not in ("premium", "vip"):
-        raise HTTPException(status_code=400, detail="Invalid plan. Choose 'premium' or 'vip'.")
+    plan_id = data.get("plan_id")  # "premium", "partner_pro", or "vip"
+    if plan_id not in ("premium", "partner_pro", "vip"):
+        raise HTTPException(status_code=400, detail="Invalid plan. Choose 'premium', 'partner_pro', or 'vip'.")
 
     user = await get_db().users.find_one({"id": current_user.id})
     if not user:

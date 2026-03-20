@@ -22,6 +22,7 @@ class SubscriptionTier(str, Enum):
     FREE = "free"
     BASIC = "basic"  # Alias for free
     PREMIUM = "premium"
+    PARTNER_PRO = "partner_pro"
     VIP = "vip"
 
 
@@ -30,6 +31,7 @@ STRIPE_PRICE_IDS = {
     "free": "price_1T5V79Bd6Wtvh7hsnp69zu1F",
     "basic": "price_1T5V79Bd6Wtvh7hsnp69zu1F",  # Same as free
     "premium": "price_1T5V5xBd6Wtvh7hscWcNnk34",
+    "partner_pro": "",  # Created dynamically on startup
     "vip": "price_1T5V2bBd6Wtvh7hsqLLmAZSH",
 }
 
@@ -45,6 +47,7 @@ SUBSCRIPTION_PRICES = {
     "free": {"amount": 0, "currency": "CAD", "interval": "year", "display": "Free"},
     "basic": {"amount": 0, "currency": "CAD", "interval": "year", "display": "Free"},
     "premium": {"amount": 18000, "currency": "CAD", "interval": "year", "display": "$180.00 CAD/year + taxes"},
+    "partner_pro": {"amount": 24000, "currency": "CAD", "interval": "year", "display": "$240.00 CAD/year + taxes"},
     "vip": {"amount": 30000, "currency": "CAD", "interval": "year", "display": "$300.00 CAD/year + taxes"},
 }
 
@@ -53,6 +56,7 @@ BUYER_PREMIUM_RATES = {
     "free": 0.05,      # 5.0%
     "basic": 0.05,     # 5.0%
     "premium": 0.035,  # 3.5%
+    "partner_pro": 0.0375,  # 3.75% (25% discount on 5%)
     "vip": 0.03,       # 3.0%
 }
 
@@ -60,6 +64,7 @@ SELLER_COMMISSION_RATES = {
     "free": 0.04,      # 4.0%
     "basic": 0.04,     # 4.0%
     "premium": 0.025,  # 2.5%
+    "partner_pro": 0.03,  # 3.0% (25% discount on 4%)
     "vip": 0.02,       # 2.0%
 }
 
@@ -99,6 +104,22 @@ TIER_BENEFITS = {
         ],
         "savings_example": "Save $15 per $1,000 vs Basic"
     },
+    "partner_pro": {
+        "name": "Partner Pro",
+        "buyer_premium": "3.75%",
+        "seller_commission": "3.0%",
+        "price": "$240 CAD/year + taxes",
+        "features": [
+            "25% buyer & seller fee discount",
+            "Branded storefront page",
+            "CSV bulk listing import",
+            "2h early auction access",
+            "10 featured listings/month",
+            "Full analytics with export",
+            "Priority chat + email support"
+        ],
+        "savings_example": "Save $12.50 per $1,000 vs Basic"
+    },
     "vip": {
         "name": "VIP Elite",
         "buyer_premium": "3.0%",
@@ -116,6 +137,46 @@ TIER_BENEFITS = {
         "savings_example": "Save $20 per $1,000 vs Basic"
     }
 }
+
+
+def _ensure_partner_pro_stripe_price():
+    """Create Stripe product/price for Partner Pro if not yet created."""
+    import stripe as _stripe
+    if not _stripe.api_key:
+        return
+    if STRIPE_PRICE_IDS.get("partner_pro"):
+        return
+    try:
+        # Search for existing product
+        products = _stripe.Product.search(query="metadata['tier']:'partner_pro'", limit=1)
+        if products.data:
+            product = products.data[0]
+        else:
+            product = _stripe.Product.create(
+                name="BidVex Partner Pro",
+                description="Partner Pro annual subscription",
+                metadata={"tier": "partner_pro"},
+            )
+        # Search for existing price
+        prices = _stripe.Price.list(product=product.id, active=True, limit=5)
+        price_obj = None
+        for p in prices.data:
+            if p.unit_amount == 24000 and p.currency == "cad" and p.recurring and p.recurring.interval == "year":
+                price_obj = p
+                break
+        if not price_obj:
+            price_obj = _stripe.Price.create(
+                product=product.id,
+                unit_amount=24000,
+                currency="cad",
+                recurring={"interval": "year"},
+                metadata={"tier": "partner_pro"},
+            )
+        STRIPE_PRICE_IDS["partner_pro"] = price_obj.id
+        PRICE_ID_TO_TIER[price_obj.id] = "partner_pro"
+        logger.info(f"Partner Pro Stripe price: {price_obj.id}")
+    except Exception as e:
+        logger.warning(f"Could not create Partner Pro Stripe price: {e}")
 
 
 def get_tier_from_price_id(price_id: str) -> str:
@@ -149,6 +210,7 @@ def get_tier_benefits(tier: str) -> Dict[str, Any]:
 
 def get_all_tiers() -> Dict[str, Any]:
     """Get all subscription tiers with their details"""
+    _ensure_partner_pro_stripe_price()
     return {
         "tiers": [
             {
@@ -166,6 +228,14 @@ def get_all_tiers() -> Dict[str, Any]:
                 "price_display": "$180 CAD/year + taxes",
                 "stripe_price_id": STRIPE_PRICE_IDS["premium"],
                 **TIER_BENEFITS["premium"]
+            },
+            {
+                "id": "partner_pro",
+                "name": "Partner Pro",
+                "price": 24000,
+                "price_display": "$240 CAD/year + taxes",
+                "stripe_price_id": STRIPE_PRICE_IDS.get("partner_pro", ""),
+                **TIER_BENEFITS["partner_pro"]
             },
             {
                 "id": "vip",

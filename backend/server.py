@@ -14,7 +14,9 @@ from pathlib import Path
 from dotenv import load_dotenv
 from typing import Optional
 from datetime import datetime, timezone
-import os, logging, uuid
+import os
+import logging
+import uuid
 
 # ─── Environment ───
 ROOT_DIR = Path(__file__).parent
@@ -85,6 +87,70 @@ scheduler.add_job(transition_upcoming_auctions, trigger=IntervalTrigger(minutes=
                   id='transition_upcoming_auctions', replace_existing=True)
 scheduler.add_job(run_process_ended_auctions, trigger=IntervalTrigger(minutes=1),
                   id='process_ended_auctions', replace_existing=True)
+
+
+async def expire_partner_pro_trials():
+    """Revert expired Partner Pro trials to free tier."""
+    try:
+        now = datetime.now(timezone.utc).isoformat()
+        expired = await db.users.find({
+            "subscription_status": "trialing",
+            "subscription_source": "trial",
+            "partner_pro_trial_end": {"$lte": now},
+        }).to_list(100)
+        for user in expired:
+            await db.users.update_one(
+                {"id": user["id"]},
+                {"$set": {
+                    "subscription_tier": "free",
+                    "subscription_status": "expired",
+                    "updated_at": now,
+                }}
+            )
+            logger.info(f"Trial expired for user {user['id']}")
+    except Exception as e:
+        logger.error(f"Error in expire_partner_pro_trials: {e}")
+
+
+async def send_trial_reminder_emails():
+    """Send reminder emails for trials expiring in 3 days via SendGrid."""
+    try:
+        now = datetime.now(timezone.utc).isoformat()
+        pending = await db.scheduled_emails.find({
+            "type": "trial_expiry_reminder",
+            "sent": False,
+            "scheduled_for": {"$lte": now},
+        }).to_list(50)
+        for item in pending:
+            try:
+                from services.email_service import get_email_service
+                svc = get_email_service()
+                if svc:
+                    await svc.send_email(
+                        to_email=item["email"],
+                        subject="Your BidVex Partner Pro trial ends in 3 days",
+                        html_content=(
+                            "<h2>Your Partner Pro trial is ending soon</h2>"
+                            "<p>Hi there! Your 14-day Partner Pro trial expires in 3 days.</p>"
+                            "<p>To keep your branded storefront, bulk import tools, early auction access, "
+                            "and analytics export, subscribe to Partner Pro for just <strong>$240/year</strong>.</p>"
+                            "<p><a href='https://bidvex.com/settings/profile'>Subscribe Now</a></p>"
+                        ),
+                    )
+                await db.scheduled_emails.update_one(
+                    {"id": item["id"]}, {"$set": {"sent": True, "sent_at": now}}
+                )
+                logger.info(f"Trial reminder sent to {item['email']}")
+            except Exception as em:
+                logger.error(f"Failed to send trial reminder to {item.get('email')}: {em}")
+    except Exception as e:
+        logger.error(f"Error in send_trial_reminder_emails: {e}")
+
+
+scheduler.add_job(expire_partner_pro_trials, trigger=IntervalTrigger(hours=1),
+                  id='expire_partner_pro_trials', replace_existing=True)
+scheduler.add_job(send_trial_reminder_emails, trigger=IntervalTrigger(hours=1),
+                  id='send_trial_reminder_emails', replace_existing=True)
 
 # ─── Health Endpoints ───
 @api_router.get("/")

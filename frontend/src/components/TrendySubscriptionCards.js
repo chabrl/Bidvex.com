@@ -167,6 +167,35 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
   ];
 
   const [upgrading, setUpgrading] = useState(null);
+  const [trialStatus, setTrialStatus] = useState(null);
+  const [startingTrial, setStartingTrial] = useState(false);
+
+  // Fetch trial status on mount
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      axios.get(`${API}/partner-pro/trial/status`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => setTrialStatus(r.data))
+        .catch(() => {});
+    }
+  }, []);
+
+  const handleStartTrial = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) { toast.error('Please log in first'); return; }
+    setStartingTrial(true);
+    try {
+      const { data } = await axios.post(`${API}/partner-pro/trial/start`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      if (data.success) {
+        toast.success(data.message);
+        window.location.reload();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Could not start trial');
+    } finally {
+      setStartingTrial(false);
+    }
+  };
 
   const handleUpgrade = async (tierId) => {
     if (tierId === 'free') return;
@@ -340,12 +369,16 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
                       <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${
                         tier.darkTheme 
                           ? 'bg-amber-500/20' 
-                          : tier.id === 'premium' ? 'bg-purple-100 dark:bg-purple-900/50' : 'bg-slate-100 dark:bg-slate-800'
+                          : tier.id === 'premium' ? 'bg-purple-100 dark:bg-purple-900/50' 
+                          : tier.id === 'partner_pro' ? 'bg-cyan-100 dark:bg-cyan-900/50'
+                          : 'bg-slate-100 dark:bg-slate-800'
                       }`}>
                         <FeatureIcon className={`h-3.5 w-3.5 ${
                           tier.darkTheme 
                             ? 'text-amber-400' 
-                            : tier.id === 'premium' ? 'text-purple-600 dark:text-purple-400' : 'text-green-600 dark:text-green-400'
+                            : tier.id === 'premium' ? 'text-purple-600 dark:text-purple-400' 
+                            : tier.id === 'partner_pro' ? 'text-cyan-600 dark:text-cyan-400'
+                            : 'text-green-600 dark:text-green-400'
                         }`} />
                       </div>
                       <div className="flex-1">
@@ -390,6 +423,27 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
                   <p className={`text-[11px] leading-relaxed text-center ${tier.darkTheme ? 'text-slate-500' : 'text-slate-400 dark:text-slate-500'}`}>
                     By purchasing, you agree that all payments are final and non-refundable. If you cancel, access continues until the end of your billing cycle.
                   </p>
+                </div>
+              )}
+
+              {/* Free Trial CTA — Partner Pro only */}
+              {tier.id === 'partner_pro' && !isCurrentTier && trialStatus?.eligible_for_trial && (
+                <div className="mt-3 text-center">
+                  <button
+                    onClick={handleStartTrial}
+                    disabled={startingTrial}
+                    className="text-sm font-semibold text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 underline underline-offset-2 transition-colors"
+                    data-testid="start-trial-btn"
+                  >
+                    {startingTrial ? 'Starting...' : 'Try free for 14 days — no credit card needed'}
+                  </button>
+                </div>
+              )}
+              {tier.id === 'partner_pro' && trialStatus?.is_trialing && (
+                <div className="mt-3 text-center">
+                  <span className="text-xs font-medium px-3 py-1 rounded-full bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300" data-testid="trial-active-badge">
+                    Trial active — {trialStatus.days_remaining} days left
+                  </span>
                 </div>
               )}
             </div>

@@ -34,6 +34,8 @@ def get_db():
 
 
 PARTNER_PRO_TIERS = {"partner_pro", "vip"}
+TRIAL_DURATION_DAYS = 14
+TRIAL_REMINDER_DAY = 10  # Send reminder 3 days before expiry
 
 
 def _require_partner_pro(user: User):
@@ -43,6 +45,98 @@ def _require_partner_pro(user: User):
             status_code=403,
             detail="Partner Pro or VIP subscription required",
         )
+
+
+# =====================================================================
+# 14-DAY FREE TRIAL
+# =====================================================================
+
+@partner_pro_router.post("/partner-pro/trial/start")
+async def start_trial(current_user: User = Depends(get_current_user)):
+    """
+    Start a 14-day free trial of Partner Pro.
+    No credit card required. One trial per account, non-renewable.
+    """
+    db = get_db()
+    user = await db.users.find_one({"id": current_user.id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Check if user already used trial
+    if user.get("partner_pro_trial_used"):
+        raise HTTPException(status_code=400, detail="Trial already used. Each account gets one free trial.")
+
+    # Check if already on partner_pro or vip
+    current_tier = user.get("subscription_tier", "free")
+    if current_tier in PARTNER_PRO_TIERS:
+        raise HTTPException(status_code=400, detail="You already have Partner Pro or higher.")
+
+    now = datetime.now(timezone.utc)
+    trial_end = now + timedelta(days=TRIAL_DURATION_DAYS)
+
+    await db.users.update_one(
+        {"id": current_user.id},
+        {"$set": {
+            "subscription_tier": "partner_pro",
+            "subscription_status": "trialing",
+            "subscription_source": "trial",
+            "partner_pro_trial_used": True,
+            "partner_pro_trial_start": now.isoformat(),
+            "partner_pro_trial_end": trial_end.isoformat(),
+            "subscription_start_date": now.isoformat(),
+            "subscription_end_date": trial_end.isoformat(),
+            "updated_at": now.isoformat(),
+        }}
+    )
+
+    # Schedule reminder (stored for the scheduler to pick up)
+    reminder_date = now + timedelta(days=TRIAL_REMINDER_DAY)
+    await db.scheduled_emails.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": current_user.id,
+        "email": user.get("email"),
+        "type": "trial_expiry_reminder",
+        "scheduled_for": reminder_date.isoformat(),
+        "sent": False,
+        "created_at": now.isoformat(),
+    })
+
+    logger.info(f"Partner Pro trial started for user {current_user.id}, expires {trial_end.isoformat()}")
+
+    return {
+        "success": True,
+        "trial_start": now.isoformat(),
+        "trial_end": trial_end.isoformat(),
+        "days_remaining": TRIAL_DURATION_DAYS,
+        "message": f"Your {TRIAL_DURATION_DAYS}-day Partner Pro trial has started! All features are now unlocked.",
+    }
+
+
+@partner_pro_router.get("/partner-pro/trial/status")
+async def get_trial_status(current_user: User = Depends(get_current_user)):
+    """Get the current user's trial status."""
+    db = get_db()
+    user = await db.users.find_one({"id": current_user.id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    trial_used = user.get("partner_pro_trial_used", False)
+    trial_end = user.get("partner_pro_trial_end")
+    is_trialing = user.get("subscription_status") == "trialing" and user.get("subscription_source") == "trial"
+
+    days_remaining = 0
+    if trial_end and is_trialing:
+        end_dt = datetime.fromisoformat(trial_end)
+        remaining = end_dt - datetime.now(timezone.utc)
+        days_remaining = max(0, remaining.days)
+
+    return {
+        "trial_used": trial_used,
+        "is_trialing": is_trialing,
+        "trial_end": trial_end,
+        "days_remaining": days_remaining,
+        "eligible_for_trial": not trial_used and user.get("subscription_tier", "free") not in PARTNER_PRO_TIERS,
+    }
 
 
 # =====================================================================
@@ -232,8 +326,8 @@ async def export_analytics(
             "summary": {
                 "total_listings": len(listings),
                 "total_bids": len(bids),
-                "active_listings": sum(1 for l in listings if l.get("status") == "active"),
-                "total_views": sum(l.get("views", 0) for l in listings),
+                "active_listings": sum(1 for item in listings if item.get("status") == "active"),
+                "total_views": sum(item.get("views", 0) for item in listings),
             },
         }
         return StreamingResponse(
