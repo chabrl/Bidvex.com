@@ -11,7 +11,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-tax_router = APIRouter(prefix="/api/tax", tags=["Tax Reporting"])
+tax_router = APIRouter(prefix="/tax", tags=["Tax Reporting"])
 security = HTTPBearer(auto_error=False)
 
 # Database will be injected from main app
