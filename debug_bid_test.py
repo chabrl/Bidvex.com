@@ -7,7 +7,7 @@ import asyncio
 import aiohttp
 import json
 
-BASE_URL = "https://tax-precision.preview.emergentagent.com/api"
+BASE_URL = "https://sell-location-unify.preview.emergentagent.com/api"
 TEST_USER_EMAIL = "lots.homepage.tester@bazario.com"
 TEST_USER_PASSWORD = "LotsTest123!"
 

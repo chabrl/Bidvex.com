@@ -11,7 +11,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = "https://tax-precision.preview.emergentagent.com/api"
+BASE_URL = "https://sell-location-unify.preview.emergentagent.com/api"
 
 class EdgeCasesTester:
     def __init__(self):

@@ -35,7 +35,7 @@ Password: Admin123!
 ## Testing
 
 You can now log in to BidVex using the new admin credentials:
-- Live URL: https://tax-precision.preview.emergentagent.com
+- Live URL: https://sell-location-unify.preview.emergentagent.com
 - Navigate to login page
 - Use the new credentials above
 

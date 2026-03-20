@@ -10,7 +10,7 @@ import json
 from datetime import datetime, timezone, timedelta
 
 # Configuration
-BASE_URL = "https://tax-precision.preview.emergentagent.com/api"
+BASE_URL = "https://sell-location-unify.preview.emergentagent.com/api"
 ADMIN_EMAIL = "admin@bazario.com"
 ADMIN_PASSWORD = "Admin123!"
 
