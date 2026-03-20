@@ -17,35 +17,37 @@ Email: SendGrid (54 verified dynamic templates, bilingual EN/FR)
 Jobs: APScheduler | i18n: react-i18next | PDF: ReportLab
 ```
 
-## Backend Route Architecture (Post Phase 9)
+## Backend Route Architecture (Post Phase 10)
 ```
 /app/backend/
-├── server.py              (~9,630 lines — admin settings, messaging, affiliates, misc)
+├── server.py              (~9,162 lines — admin settings, affiliates, WebSocket handlers, misc)
 ├── models/
-│   └── auction_models.py  # Listing, ListingCreate (with buyers_premium_rate), Bid, AutoBid models
+│   ├── auction_models.py  # Listing, ListingCreate (with buyers_premium_rate), Bid, AutoBid
+│   └── message_models.py  # MessageCreate, Message (canonical models for messaging)
 ├── routes/
 │   ├── auth.py            # Authentication (login, register, password reset, sessions)
 │   ├── admin.py           # Partner/user admin + verified firm toggle + email-preview
 │   ├── auctions.py        # Auction lifecycle + bids + anti-sniping + buy-now + auto-bid
 │   ├── listings.py        # Single + multi-item CRUD, terms, deletion requests
 │   ├── marketplace.py     # Marketplace browsing/search/filter
-│   ├── payments.py        # Unified checkout, payment-methods CRUD, subscriptions, fees + tax calc w/ listing premium
+│   ├── messages.py        # Internal chat, inbox, conversations, attachments, admin (NEW)
+│   ├── payments.py        # Unified checkout, payment-methods CRUD, subscriptions, fees + tax calc
 │   ├── webhooks.py        # Stripe + SendGrid webhooks, trust verification handlers
 │   ├── dashboard.py       # Seller + buyer dashboards
 │   ├── profiles.py        # User profiles, ratings, trust score, tax, GDPR, Stripe Connect
 │   ├── tax.py             # Tax calculation API (GST/QST via services/tax_engine.py)
-│   ├── tax_reports.py     # CRA compliance and tax report generation (admin only)
+│   ├── tax_reports.py     # CRA tax reports, GST/QST filing (NOW MOUNTED)
 │   ├── ai_chat.py | fees.py | notifications.py | watchlist.py
 │   └── team.py | vehicles.py
 ├── config/
-│   └── email_templates.py # Verified SendGrid template IDs (bilingual EN/FR dicts) + premium fields
+│   └── email_templates.py # Verified SendGrid template IDs + premium fields
 ├── deps.py                # User model, shared auth
 └── services/
     ├── tax_engine.py            # Authoritative tax engine (Decimal, ROUND_HALF_UP) + listing premium override
     ├── vehicle_pricing.py       # Vehicle pricing (imports GST_RATE from tax_engine)
     ├── vehicle_invoice.py       # Invoice generation (passes listing premium to email)
     ├── email_service.py         # SendGrid Dynamic Template sender
-    ├── email_notifications.py   # Outlook-safe table-based HTML email templates + premium breakdown
+    ├── email_notifications.py   # Outlook-safe table-based HTML + premium breakdown
     ├── cloud_storage.py         # Local file-based cloud storage mock
     └── subscription_service.py
 ```
@@ -57,11 +59,10 @@ Jobs: APScheduler | i18n: react-i18next | PDF: ReportLab
 - PDF Invoices (bilingual, tax compliant) | Stripe Fee-on-Top Model
 - Partner Account System | Admin Command Center | Marketplace Sidebar Filter
 - AI Chatbot (Claude Sonnet 4.5) | Subscription Pricing ($180/$300/year)
-- Pay-to-Activate ($100 CAD/year) | Stripe Customer Portal | Partner Dashboard
 
 ### Refactoring Phases 1-5: ~2,930 lines extracted
 - Auth -> routes/auth.py | Admin -> routes/admin.py
-- Listings CRUD -> routes/listings.py | Auctions/Bidding -> routes/auctions.py
+- Listings -> routes/listings.py | Auctions -> routes/auctions.py
 - Marketplace -> routes/marketplace.py
 
 ### P3: Trust & Compliance
@@ -69,54 +70,64 @@ Jobs: APScheduler | i18n: react-i18next | PDF: ReportLab
 - Outlook Email Fix (table-based) | SendGrid Template Audit (54 verified IDs)
 
 ### Phase 6: Payment/Dashboard Extraction (506 lines)
-- Payments dedup | Dashboard extraction | Webhook consolidation | Admin email preview
-
 ### Phase 7: Profile Modularization (926 lines)
-- 20 endpoints extracted to routes/profiles.py
 
 ### Phase 8: Tax Logic Modularization (Completed Mar 19, 2026)
-- Created `routes/tax.py` with 4 endpoints (calculate, rates, structure, invoice-lines)
-- Eliminated all inline float-based tax calcs from server.py
-- Removed duplicate GST_RATE from vehicle_pricing.py
-- 24/24 tests passed (iteration_61.json)
+- Created routes/tax.py | Eliminated inline float tax calcs | 24/24 tests
 
 ### Phase 9: Listing-Level Buyer's Premium (Completed Mar 19, 2026)
-- **Schema**: Added `buyers_premium_rate` (Optional[float]) to `ListingCreate` model in `models/auction_models.py`
-- **Backend**: `routes/listings.py` stores provided rate or falls back to org default (partners) / None (non-partners)
-- **Tax Engine**: `services/tax_engine.py` `calculate_vehicle_payment` and `calculate_general_payment` accept `buyer_premium_rate_override` parameter
-- **Payments API**: `routes/payments.py` `TaxCalculationRequest` accepts `buyers_premium_rate`, passes through to tax engine
-- **Frontend Create Listing**: Added "Buyer's Premium (%)" input field with percent → rate conversion (15 → 0.15) before API call
-- **UI Transparency**: Listing detail page shows amber banner "A X% buyer's premium applies to this lot"
-- **Bidding Modal**: `BidConfirmationDialog` now shows "Total Estimated Price (Bid + Premium + Taxes)" and passes listing premium to API
-- **Price Breakdown**: `PriceBreakdown` component accepts and passes listing premium to API
-- **Email Sync**: `config/email_templates.py` auction_won and invoice templates include `buyers_premium_percent` and `buyers_premium_amount`; `email_notifications.py` `send_auction_won_email` shows premium breakdown
-- 13/13 backend + 100% frontend tests passed (iteration_62.json)
+- Schema + backend + frontend + email sync for per-listing premium | 13/13 tests
+
+### Phase 10: Messaging Extraction + CRA Mount (Completed Mar 19, 2026)
+- **Extracted 12 REST endpoints** to `routes/messages.py` (~470 lines removed from server.py):
+  - `POST /api/messages` — Send message
+  - `GET /api/conversations` — List conversations
+  - `GET /api/messages/unread-count` — Unread count
+  - `GET /api/messages/{conversation_id}` — Get messages
+  - `POST /api/messages/attachment` — Upload attachment
+  - `POST /api/messages/share-item-details` — Rich item cards
+  - `GET /api/conversations/{id}/online-status` — Online status
+  - `GET /api/uploads/messages/{filename}` — Serve attachments
+  - Admin: flagged messages, delete, suspend messaging
+- **Helper function** `create_auction_won_conversation` — used by auctions.py
+- **Fixed latent bug**: `messaging_manager.send_message()` → `message_manager.send_to_conversation()` (was referencing undefined variable)
+- **Mounted `routes/tax_reports.py`** — CRA tax reports now accessible at `/api/tax/reports`, `/api/tax/summary/{year}`, etc.
+- **Fixed tax_reports prefix**: `/api/tax` → `/tax` (nested under api_router)
+- **WebSocket handlers** stayed in server.py (tightly coupled to ConnectionManager singletons)
+- All 16/16 backend + frontend tests passed (iteration_63.json)
+
+## server.py Size History
+- Start: ~11,055 lines
+- After Phase 6: 10,549 lines (-506)
+- After Phase 7: 9,623 lines (-926)
+- **After Phase 10: 9,162 lines (-470)**
+- **Total extracted: ~1,893 lines**
 
 ## Key API Endpoints
 - `POST /api/auth/login|register|forgot-password` -> routes/auth.py
-- `POST /api/listings` (now accepts buyers_premium_rate) -> routes/listings.py
-- `GET /api/listings/{id}` (returns custom_buyer_premium_rate) -> routes/listings.py
+- `POST /api/listings` (accepts buyers_premium_rate) -> routes/listings.py
+- `POST /api/messages` -> routes/messages.py (NEW)
+- `GET /api/conversations` -> routes/messages.py (NEW)
+- `GET /api/messages/unread-count` -> routes/messages.py (NEW)
 - `POST /api/payments/tax/calculate` (accepts buyers_premium_rate) -> routes/payments.py
-- `GET /api/payments/tax/vehicle?price=X&buyers_premium_rate=Y` -> routes/payments.py
+- `GET /api/tax/reports` -> routes/tax_reports.py (NOW MOUNTED)
+- `GET /api/tax/summary/{year}` -> routes/tax_reports.py (NOW MOUNTED)
 - `POST /api/tax-calc/calculate` -> routes/tax.py
-- `GET /api/tax-calc/rates` -> routes/tax.py
 
 ## Test Credentials
 - **Admin:** `charbeladmin@bidvex.com` / `Admin123!`
 
 ## Test Reports
-- iteration_57.json — P3 Trust & Compliance (100%, 12/12)
-- iteration_58.json — Template audit + Outlook fix (100%, 14/14)
 - iteration_59.json — Phase 6 Modularization (100%, 21/21)
 - iteration_60.json — Phase 7 Profile Modularization (100%, 23/23)
 - iteration_61.json — Phase 8 Tax Modularization (100%, 24/24)
 - iteration_62.json — Phase 9 Listing-Level Premium (100%, 13/13 + frontend)
+- iteration_63.json — Phase 10 Messaging + CRA Mount (100%, 16/16 + frontend)
 
 ## Upcoming Tasks
 
 ### P1 - High Priority
-- [ ] Continue refactoring server.py: Extract messaging, affiliates, remaining modules
-- [ ] Mount existing `routes/tax_reports.py` (CRA reporting — currently unmounted)
+- [ ] Continue refactoring server.py: Extract affiliates, categories, remaining admin modules
 
 ### P2 - Medium Priority
 - [ ] Partner Pro subscription tier
