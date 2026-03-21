@@ -1,15 +1,15 @@
 ======================================================================
   BIDVEX i18n AUDIT REPORT
-  Generated: 2026-03-21T13:30:16.616Z
+  Generated: 2026-03-21T14:03:18.460Z
   Files scanned: 177
-  EN keys: 922 | FR keys: 922
-  t() calls found: 773 unique keys
+  EN keys: 977 | FR keys: 977
+  t() calls found: 820 unique keys
 ======================================================================
 
 ──────────────────────────────────────────────────────────────────────
   SECTION 1: EN/FR SYNC CHECK
 ──────────────────────────────────────────────────────────────────────
-Keys in sync: 922
+Keys in sync: 977
 EN and FR files are perfectly in sync.
 
 ──────────────────────────────────────────────────────────────────────
@@ -23,7 +23,7 @@ All t() keys have corresponding entries in both JSON files.
 ──────────────────────────────────────────────────────────────────────
   SECTION 3: POTENTIALLY UNUSED KEYS
 ──────────────────────────────────────────────────────────────────────
-Found 149 keys not directly referenced via t() or i18n.js:
+Found 157 keys not directly referenced via t() or i18n.js:
 
   - admin.appeals.approve [EN, FR]
   - admin.appeals.reject [EN, FR]
@@ -153,6 +153,14 @@ Found 149 keys not directly referenced via t() or i18n.js:
   - navigation.sell [EN, FR]
   - navigation.settings [EN, FR]
   - navigation.vehicles [EN, FR]
+  - partnerPage.benefit1Desc [EN, FR]
+  - partnerPage.benefit1Title [EN, FR]
+  - partnerPage.benefit2Desc [EN, FR]
+  - partnerPage.benefit2Title [EN, FR]
+  - partnerPage.benefit3Desc [EN, FR]
+  - partnerPage.benefit3Title [EN, FR]
+  - partnerPage.benefit4Desc [EN, FR]
+  - partnerPage.benefit4Title [EN, FR]
   - seller.createListing [EN, FR]
   - seller.totalSales [EN, FR]
   - sellerReputation.basedOnReviews [EN, FR]

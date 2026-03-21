@@ -175,9 +175,9 @@ DEFAULT_PLANS = {
         "plan_id": "partner_pro",
         "name": "Partner Pro",
         "price_monthly": 0.0,
-        "price_yearly": 240.00,
+        "price_yearly": 100.00,
         "original_price_monthly": 0.0,
-        "original_price_yearly": 480.00,
+        "original_price_yearly": 200.00,
         "features": [
             "All Premium benefits",
             "25% buyer premium discount",

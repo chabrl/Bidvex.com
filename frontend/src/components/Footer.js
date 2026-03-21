@@ -114,7 +114,7 @@ const Footer = () => {
             className="text-sm px-4 py-2 rounded-md bg-gray-800 hover:bg-gray-700 transition-colors"
             aria-label="Toggle language"
           >
-            {i18n.language === 'en' ? '🇫🇷 Français' : '🇺🇸 English'}
+            {i18n.language === 'fr' ? '🇨🇦 Français' : '🇨🇦 English'}
           </button>
         </div>
       </div>

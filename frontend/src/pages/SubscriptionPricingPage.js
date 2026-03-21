@@ -39,6 +39,14 @@ const PLAN_STYLES = {
     launchBadge: true,
     launchBadgeColor: 'from-blue-500 to-cyan-500'
   },
+  partner_pro: {
+    icon: Shield,
+    gradient: 'from-blue-500 to-emerald-600',
+    border: 'border-blue-300 dark:border-blue-700',
+    badge: null,
+    launchBadge: true,
+    launchBadgeColor: 'from-blue-500 to-emerald-500'
+  },
   vip: { 
     icon: Crown, 
     gradient: 'from-amber-500 to-orange-600',
@@ -74,7 +82,7 @@ const SubscriptionPricingPage = () => {
       const response = await axios.get(`${API}/subscription-plans`);
       if (response.data.success) {
         // Sort plans: free, premium, vip
-        const sortOrder = ['free', 'premium', 'vip'];
+        const sortOrder = ['free', 'premium', 'partner_pro', 'vip'];
         const sorted = (response.data.plans || []).sort(
           (a, b) => sortOrder.indexOf(a.plan_id) - sortOrder.indexOf(b.plan_id)
         );
