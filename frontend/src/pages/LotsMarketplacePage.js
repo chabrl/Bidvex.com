@@ -196,7 +196,7 @@ const LotsMarketplacePage = () => {
             </div>
             <div className="flex flex-wrap gap-2">
               <Badge className="bg-white/10 backdrop-blur border-cyan-400/30 px-4 py-2" style={{ color: '#FFFFFF' }}>
-                <Sparkles className="h-4 w-4 mr-2 text-yellow-400" /> Featured First
+                <Sparkles className="h-4 w-4 mr-2 text-yellow-400" /> {t('lotsMarketplace.featuredFirst')}
               </Badge>
             </div>
           </div>

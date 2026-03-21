@@ -1,15 +1,15 @@
 ======================================================================
   BIDVEX i18n AUDIT REPORT
-  Generated: 2026-03-21T14:32:52.375Z
+  Generated: 2026-03-21T14:38:23.006Z
   Files scanned: 177
-  EN keys: 1139 | FR keys: 1139
-  t() calls found: 948 unique keys
+  EN keys: 1159 | FR keys: 1159
+  t() calls found: 964 unique keys
 ======================================================================
 
 ──────────────────────────────────────────────────────────────────────
   SECTION 1: EN/FR SYNC CHECK
 ──────────────────────────────────────────────────────────────────────
-Keys in sync: 1139
+Keys in sync: 1159
 EN and FR files are perfectly in sync.
 
 ──────────────────────────────────────────────────────────────────────
@@ -23,7 +23,7 @@ All t() keys have corresponding entries in both JSON files.
 ──────────────────────────────────────────────────────────────────────
   SECTION 3: POTENTIALLY UNUSED KEYS
 ──────────────────────────────────────────────────────────────────────
-Found 191 keys not directly referenced via t() or i18n.js:
+Found 195 keys not directly referenced via t() or i18n.js:
 
   - admin.appeals.approve [EN, FR]
   - admin.appeals.reject [EN, FR]
@@ -169,6 +169,10 @@ Found 191 keys not directly referenced via t() or i18n.js:
   - partnerPage.benefit3Title [EN, FR]
   - partnerPage.benefit4Desc [EN, FR]
   - partnerPage.benefit4Title [EN, FR]
+  - pricingPage.monthlyBilling [EN, FR]
+  - pricingPage.planBilling [EN, FR]
+  - pricingPage.popularPlan [EN, FR]
+  - pricingPage.yearlyBilling [EN, FR]
   - seller.createListing [EN, FR]
   - seller.totalSales [EN, FR]
   - sellerReputation.basedOnReviews [EN, FR]

@@ -996,7 +996,31 @@
     "title": "Lots Marketplace",
     "subtitle": "Browse multi-item auction lots",
     "noLots": "No lots available",
-    "noLotsDesc": "Check back later for new lot auctions"
+    "noLotsDesc": "Check back later for new lot auctions",
+    "featuredFirst": "Featured First"
+  },
+  "itemsMarketplace": {
+    "title": "Browse Individual Items",
+    "subtitle": "Discover unique items from estate sales and multi-lot auctions. Each item has its own countdown timer and bidding.",
+    "featuredFirst": "Featured First",
+    "privateSaleTax": "Private Sale = Tax Savings!",
+    "quickBid": "Quick Bid"
+  },
+  "pricingPage": {
+    "launchBanner": "Launch Special: Use code <strong>LAUNCH50</strong> for <strong>50% OFF!</strong>",
+    "title": "Membership Plans",
+    "subtitle": "Choose Your Plan",
+    "monthly": "Monthly",
+    "yearly": "Yearly",
+    "savePercent": "Save up to {{percent}}%",
+    "perMonth": "/month",
+    "perYear": "/year",
+    "currentPlan": "Current Plan",
+    "choosePlan": "Choose Plan",
+    "popularPlan": "Most Popular",
+    "yearlyBilling": "Yearly Billing",
+    "monthlyBilling": "Monthly Billing",
+    "planBilling": "{{plan}} — {{billing}} Billing"
   },
   "sellerReputation": {
     "newSeller": "New Seller",

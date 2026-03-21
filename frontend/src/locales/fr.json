@@ -996,7 +996,31 @@
     "title": "Marché des lots",
     "subtitle": "Parcourez les enchères multi-articles",
     "noLots": "Aucun lot disponible",
-    "noLotsDesc": "Revenez plus tard pour de nouvelles enchères de lots"
+    "noLotsDesc": "Revenez plus tard pour de nouvelles enchères de lots",
+    "featuredFirst": "En vedette d'abord"
+  },
+  "itemsMarketplace": {
+    "title": "Parcourir les articles individuels",
+    "subtitle": "Découvrez des articles uniques provenant de ventes successorales et d'enchères multi-lots. Chaque article a son propre compte à rebours et ses enchères.",
+    "featuredFirst": "En vedette d'abord",
+    "privateSaleTax": "Vente privée = Économies de taxe !",
+    "quickBid": "Enchère rapide"
+  },
+  "pricingPage": {
+    "launchBanner": "Offre de lancement : Utilisez le code <strong>LAUNCH50</strong> pour <strong>50% DE RABAIS !</strong>",
+    "title": "Plans d'adhésion",
+    "subtitle": "Choisissez votre plan",
+    "monthly": "Mensuel",
+    "yearly": "Annuel",
+    "savePercent": "Économisez jusqu'à {{percent}}%",
+    "perMonth": "/mois",
+    "perYear": "/an",
+    "currentPlan": "Plan actuel",
+    "choosePlan": "Choisir ce plan",
+    "popularPlan": "Le plus populaire",
+    "yearlyBilling": "Facturation annuelle",
+    "monthlyBilling": "Facturation mensuelle",
+    "planBilling": "{{plan}} — Facturation {{billing}}"
   },
   "sellerReputation": {
     "newSeller": "Nouveau vendeur",

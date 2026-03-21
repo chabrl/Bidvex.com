@@ -236,18 +236,16 @@ const SubscriptionPricingPage = () => {
           {/* Launch Offer Banner */}
           <div className="inline-flex items-center gap-2 mb-6 px-4 py-2 bg-gradient-to-r from-amber-500/10 to-orange-500/10 dark:from-amber-500/20 dark:to-orange-500/20 border border-amber-500/30 rounded-full">
             <Gift className="h-4 w-4 text-amber-500" />
-            <span className="text-sm font-medium text-amber-700 dark:text-amber-400">
-              Launch Special: Use code <strong className="text-amber-600 dark:text-amber-300">LAUNCH50</strong> for 50% OFF!
-            </span>
+            <span className="text-sm font-medium text-amber-700 dark:text-amber-400" dangerouslySetInnerHTML={{ __html: t('pricingPage.launchBanner') }} />
             <PartyPopper className="h-4 w-4 text-amber-500" />
           </div>
 
           <Badge className="mb-4 bg-primary/10 text-primary border-primary/20">
             <Sparkles className="h-3 w-3 mr-1" />
-            Membership Plans
+            {t('pricingPage.title')}
           </Badge>
           <h1 className="text-4xl sm:text-5xl font-bold text-slate-900 dark:text-white mb-4">
-            Choose Your Plan
+            {t('pricingPage.subtitle')}
           </h1>
           <p className="text-lg text-slate-600 dark:text-slate-300 max-w-2xl mx-auto mb-8">
             Unlock premium features, lower fees, and exclusive benefits with our membership plans
@@ -256,7 +254,7 @@ const SubscriptionPricingPage = () => {
           {/* Billing Toggle */}
           <div className="flex items-center justify-center gap-4">
             <span className={`text-sm font-medium ${!isYearly ? 'text-primary' : 'text-slate-500'}`}>
-              Monthly
+              {t('pricingPage.monthly')}
             </span>
             <Switch
               checked={isYearly}
@@ -265,11 +263,11 @@ const SubscriptionPricingPage = () => {
               data-testid="billing-toggle"
             />
             <span className={`text-sm font-medium ${isYearly ? 'text-primary' : 'text-slate-500'}`}>
-              Yearly
+              {t('pricingPage.yearly')}
             </span>
             {isYearly && plans.length > 0 && (
               <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                Save up to {Math.max(...plans.filter(p => p.price_monthly > 0).map(p => getYearlySavingsPercent(p)), 0)}%
+                {t('pricingPage.savePercent', { percent: Math.max(...plans.filter(p => p.price_monthly > 0).map(p => getYearlySavingsPercent(p)), 0) })}
               </Badge>
             )}
           </div>
@@ -336,7 +334,7 @@ const SubscriptionPricingPage = () => {
                         {formatCurrency(price)}
                       </span>
                       <span className="text-slate-500">
-                        /{isYearly ? 'year' : 'month'}
+                        /{isYearly ? t('pricingPage.perYear') : t('pricingPage.perMonth')}
                       </span>
                     </div>
                     
@@ -412,10 +410,10 @@ const SubscriptionPricingPage = () => {
                         Processing...
                       </>
                     ) : plan.plan_id === 'free' ? (
-                      'Current Plan'
+                      t('pricingPage.currentPlan')
                     ) : (
                       <>
-                        Buy {plan.name}
+                        {t('pricingPage.choosePlan')}
                         <ArrowRight className="h-4 w-4" />
                       </>
                     )}

@@ -214,7 +214,7 @@ const FlattenedMarketplace = ({
   };
 
   return (
-    <div className={variant === 'homepage' ? '' : variant === 'full' ? '' : 'container mx-auto px-4 py-8'}>
+    <div className={`overflow-x-hidden ${variant === 'homepage' ? '' : variant === 'full' ? '' : 'container mx-auto px-4 py-8'}`}>
       {/* Header */}
       {showHeader && (
         <div className="mb-6">

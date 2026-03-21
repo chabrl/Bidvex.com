@@ -49,6 +49,12 @@ BidVex is a full-stack auction marketplace with React frontend, FastAPI backend,
 - **FIX 3 — Pricing**: Partner Pro annual fee updated from $240 to $100 CAD/year (DB + code defaults). Subscription pricing page shows $100 with $200 original price. Price breakdown API confirms subtotal=$100. Partner Pro added to SubscriptionPricingPage PLAN_STYLES and sort order.
 - **Testing**: 29/29 tests pass (Iteration 81 — 12 backend + 17 frontend)
 
+### Pre-Launch Platform Audit (March 21, 2026)
+- **i18n Coverage**: Extended to MobileBottomNav, TrendyAnnouncementBar, ReviewPage, StorefrontPage, PartnerDashboard, BulkImportPage, ItemsMarketplacePage, LotsMarketplacePage, SubscriptionPricingPage, MyVehicleListingsPage, VehicleInvoicesPage. Total: 1159 keys in sync EN/FR, 0 missing, 0 hardcoded.
+- **Backend Fix**: Fixed NameError in email_marketing_ext.py — replaced bare `db` references with `get_db()` calls.
+- **Mobile Layout**: Fixed horizontal overflow on /items page at 390px by adding `overflow-x-hidden`.
+- **Testing**: 22/22 tests pass (Iteration 82)
+
 ## Key API Endpoints (Reviews)
 - POST /api/reviews/create — Create review (auth + paid txn required)
 - PUT /api/reviews/{id} — Edit within 48h

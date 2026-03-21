@@ -4,6 +4,7 @@ Auto-extracted from server.py during P2 refactoring.
 """
 
 from fastapi import APIRouter, HTTPException, Depends, Request, Query, UploadFile, File, Form, WebSocket, WebSocketDisconnect
+import os
 from deps import get_db, get_current_user, get_current_user_optional, User
 from shared import (
     DEFAULT_EMAIL_TEMPLATES, EMAIL_TEMPLATE_CATEGORIES,
@@ -60,7 +61,7 @@ async def preview_audience(
     if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    marketing = get_marketing_service(db)
+    marketing = get_marketing_service(get_db())
     count = await marketing.get_audience_count(filters)
     preview = await marketing.get_audience_preview(filters, limit=10)
     
@@ -89,7 +90,7 @@ async def preview_advanced_audience(
     if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    marketing = get_marketing_service(db)
+    marketing = get_marketing_service(get_db())
     
     result = await marketing.get_advanced_audience_preview(
         filters=data.audience_filters,
@@ -118,7 +119,7 @@ async def parse_email_list(
         raise HTTPException(status_code=403, detail="Admin access required")
     
     email_text = data.get("emails", "")
-    marketing = get_marketing_service(db)
+    marketing = get_marketing_service(get_db())
     
     valid_emails = marketing.parse_email_list(email_text)
     
@@ -164,7 +165,7 @@ async def parse_csv_emails(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to read file: {str(e)}")
     
-    marketing = get_marketing_service(db)
+    marketing = get_marketing_service(get_db())
     result = marketing.parse_csv_emails(csv_content)
     
     if "error" in result:
@@ -193,7 +194,7 @@ async def check_suppressed_emails(
     if not emails:
         return {"suppressed": [], "valid": []}
     
-    marketing = get_marketing_service(db)
+    marketing = get_marketing_service(get_db())
     suppressed_set = await marketing.get_suppressed_emails()
     
     suppressed = []
@@ -225,7 +226,7 @@ async def create_campaign(
     if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    marketing = get_marketing_service(db)
+    marketing = get_marketing_service(get_db())
     
     try:
         campaign = await marketing.create_campaign(
@@ -262,7 +263,7 @@ async def list_campaigns(
     if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    marketing = get_marketing_service(db)
+    marketing = get_marketing_service(get_db())
     campaigns = await marketing.list_campaigns(status=status, limit=limit, skip=skip)
     
     return {
@@ -282,7 +283,7 @@ async def get_campaign(
     if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    marketing = get_marketing_service(db)
+    marketing = get_marketing_service(get_db())
     campaign = await marketing.get_campaign(campaign_id)
     
     if not campaign:
@@ -303,7 +304,7 @@ async def update_campaign(
     if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    marketing = get_marketing_service(db)
+    marketing = get_marketing_service(get_db())
     
     try:
         # Build update dict from non-None values
@@ -339,7 +340,7 @@ async def send_test_email(
     if not test_email:
         raise HTTPException(status_code=400, detail="Test email address required")
     
-    marketing = get_marketing_service(db)
+    marketing = get_marketing_service(get_db())
     
     try:
         result = await marketing.send_test_email(
@@ -372,7 +373,7 @@ async def schedule_campaign(
     if not scheduled_at:
         raise HTTPException(status_code=400, detail="Scheduled time required")
     
-    marketing = get_marketing_service(db)
+    marketing = get_marketing_service(get_db())
     
     try:
         campaign = await marketing.schedule_campaign(
@@ -400,7 +401,7 @@ async def send_campaign_now(
     if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    marketing = get_marketing_service(db)
+    marketing = get_marketing_service(get_db())
     
     try:
         result = await marketing.send_campaign_now(
@@ -432,7 +433,7 @@ async def cancel_campaign(
     if not reason:
         raise HTTPException(status_code=400, detail="Cancellation reason required")
     
-    marketing = get_marketing_service(db)
+    marketing = get_marketing_service(get_db())
     
     try:
         campaign = await marketing.cancel_campaign(
@@ -460,7 +461,7 @@ async def get_campaign_stats(
     if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    marketing = get_marketing_service(db)
+    marketing = get_marketing_service(get_db())
     
     try:
         stats = await marketing.get_campaign_stats(campaign_id)
@@ -485,7 +486,7 @@ async def get_campaign_events(
     if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    marketing = get_marketing_service(db)
+    marketing = get_marketing_service(get_db())
     events = await marketing.get_email_events(
         campaign_id=campaign_id,
         event_type=event_type,
@@ -511,7 +512,7 @@ async def get_marketing_audit_logs(
     if campaign_id:
         query["campaign_id"] = campaign_id
     
-    logs = await db.marketing_audit_logs.find(
+    logs = await get_db().marketing_audit_logs.find(
         query, {"_id": 0}
     ).sort("timestamp", -1).limit(limit).to_list(limit)
     
@@ -526,7 +527,7 @@ async def get_marketing_config(current_user: User = Depends(get_current_user)):
     if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    marketing = get_marketing_service(db)
+    marketing = get_marketing_service(get_db())
     
     marketing_key = os.environ.get("SENDGRID_MARKETING_API_KEY")
     transactional_key = os.environ.get("SENDGRID_API_KEY")
@@ -547,7 +548,7 @@ async def get_marketing_config(current_user: User = Depends(get_current_user)):
 @email_marketing_ext_router.get("/user/marketing/access")
 async def check_marketing_access(current_user: User = Depends(get_current_user)):
     """Check user's access to email marketing feature"""
-    user_marketing = get_user_marketing_service(db)
+    user_marketing = get_user_marketing_service(get_db())
     tier = current_user.subscription_tier or "free"
     
     can_send = user_marketing.can_access_feature(tier)
@@ -576,7 +577,7 @@ async def get_user_contacts(
     current_user: User = Depends(get_current_user)
 ):
     """Get user's contacts - all tiers can view their contacts"""
-    user_marketing = get_user_marketing_service(db)
+    user_marketing = get_user_marketing_service(get_db())
     
     result = await user_marketing.get_contacts(
         user_id=current_user.id,
@@ -593,7 +594,7 @@ async def get_user_contacts(
 @email_marketing_ext_router.get("/user/marketing/contacts/stats")
 async def get_user_contact_stats(current_user: User = Depends(get_current_user)):
     """Get contact statistics - all tiers can view stats"""
-    user_marketing = get_user_marketing_service(db)
+    user_marketing = get_user_marketing_service(get_db())
     tier = current_user.subscription_tier or "free"
     
     stats = await user_marketing.get_contact_stats(current_user.id)
@@ -613,7 +614,7 @@ async def add_user_contact(
     current_user: User = Depends(get_current_user)
 ):
     """Add a single contact - all tiers can add contacts up to their limit"""
-    user_marketing = get_user_marketing_service(db)
+    user_marketing = get_user_marketing_service(get_db())
     tier = current_user.subscription_tier or "free"
     
     try:
@@ -638,7 +639,7 @@ async def add_user_contacts_bulk(
     current_user: User = Depends(get_current_user)
 ):
     """Add multiple contacts at once - all tiers can add up to their limit"""
-    user_marketing = get_user_marketing_service(db)
+    user_marketing = get_user_marketing_service(get_db())
     tier = current_user.subscription_tier or "free"
     
     result = await user_marketing.add_contacts_bulk(
@@ -658,7 +659,7 @@ async def parse_user_emails(
     current_user: User = Depends(get_current_user)
 ):
     """Parse and validate email list"""
-    user_marketing = get_user_marketing_service(db)
+    user_marketing = get_user_marketing_service(get_db())
     tier = current_user.subscription_tier or "free"
     
     if not user_marketing.can_access_feature(tier):
@@ -679,7 +680,7 @@ async def upload_user_contacts_csv(
     current_user: User = Depends(get_current_user)
 ):
     """Upload CSV file with contacts"""
-    user_marketing = get_user_marketing_service(db)
+    user_marketing = get_user_marketing_service(get_db())
     tier = current_user.subscription_tier or "free"
     
     if not user_marketing.can_access_feature(tier):
@@ -708,7 +709,7 @@ async def get_user_contact(
     current_user: User = Depends(get_current_user)
 ):
     """Get single contact"""
-    user_marketing = get_user_marketing_service(db)
+    user_marketing = get_user_marketing_service(get_db())
     contact = await user_marketing.get_contact(current_user.id, contact_id)
     
     if not contact:
@@ -726,7 +727,7 @@ async def update_user_contact(
     current_user: User = Depends(get_current_user)
 ):
     """Update a contact"""
-    user_marketing = get_user_marketing_service(db)
+    user_marketing = get_user_marketing_service(get_db())
     tier = current_user.subscription_tier or "free"
     
     if not user_marketing.can_access_feature(tier):
@@ -754,7 +755,7 @@ async def delete_user_contact(
     current_user: User = Depends(get_current_user)
 ):
     """Delete a contact"""
-    user_marketing = get_user_marketing_service(db)
+    user_marketing = get_user_marketing_service(get_db())
     tier = current_user.subscription_tier or "free"
     
     if not user_marketing.can_access_feature(tier):
@@ -779,7 +780,7 @@ async def delete_user_contacts_bulk(
     current_user: User = Depends(get_current_user)
 ):
     """Delete multiple contacts"""
-    user_marketing = get_user_marketing_service(db)
+    user_marketing = get_user_marketing_service(get_db())
     tier = current_user.subscription_tier or "free"
     
     if not user_marketing.can_access_feature(tier):
@@ -805,7 +806,7 @@ async def get_user_campaigns(
     current_user: User = Depends(get_current_user)
 ):
     """Get user's campaigns"""
-    user_marketing = get_user_marketing_service(db)
+    user_marketing = get_user_marketing_service(get_db())
     tier = current_user.subscription_tier or "free"
     
     if not user_marketing.can_access_feature(tier):
@@ -831,7 +832,7 @@ async def create_user_campaign(
     current_user: User = Depends(get_current_user)
 ):
     """Create a new campaign"""
-    user_marketing = get_user_marketing_service(db)
+    user_marketing = get_user_marketing_service(get_db())
     tier = current_user.subscription_tier or "free"
     
     if not user_marketing.can_access_feature(tier):
@@ -861,7 +862,7 @@ async def get_user_campaign(
     current_user: User = Depends(get_current_user)
 ):
     """Get single campaign"""
-    user_marketing = get_user_marketing_service(db)
+    user_marketing = get_user_marketing_service(get_db())
     campaign = await user_marketing.get_campaign(current_user.id, campaign_id)
     
     if not campaign:
@@ -879,7 +880,7 @@ async def update_user_campaign(
     current_user: User = Depends(get_current_user)
 ):
     """Update a draft campaign"""
-    user_marketing = get_user_marketing_service(db)
+    user_marketing = get_user_marketing_service(get_db())
     tier = current_user.subscription_tier or "free"
     
     if not user_marketing.can_access_feature(tier):
@@ -907,7 +908,7 @@ async def confirm_user_campaign_consent(
     current_user: User = Depends(get_current_user)
 ):
     """Confirm consent before sending"""
-    user_marketing = get_user_marketing_service(db)
+    user_marketing = get_user_marketing_service(get_db())
     
     campaign = await user_marketing.confirm_consent(current_user.id, campaign_id)
     return campaign
@@ -922,7 +923,7 @@ async def send_user_campaign(
     current_user: User = Depends(get_current_user)
 ):
     """Send a campaign"""
-    user_marketing = get_user_marketing_service(db)
+    user_marketing = get_user_marketing_service(get_db())
     tier = current_user.subscription_tier or "free"
     
     if not user_marketing.can_access_feature(tier):
@@ -954,7 +955,7 @@ async def get_user_campaign_stats(
     current_user: User = Depends(get_current_user)
 ):
     """Get campaign stats"""
-    user_marketing = get_user_marketing_service(db)
+    user_marketing = get_user_marketing_service(get_db())
     
     try:
         stats = await user_marketing.get_campaign_stats(current_user.id, campaign_id)
@@ -971,7 +972,7 @@ async def get_auction_email_template(
     current_user: User = Depends(get_current_user)
 ):
     """Get email template for an auction"""
-    user_marketing = get_user_marketing_service(db)
+    user_marketing = get_user_marketing_service(get_db())
     tier = current_user.subscription_tier or "free"
     
     if not user_marketing.can_access_feature(tier):
@@ -981,10 +982,10 @@ async def get_auction_email_template(
         )
     
     # Get auction details
-    auction = await db.listings.find_one({"id": auction_id}, {"_id": 0})
+    auction = await get_db().listings.find_one({"id": auction_id}, {"_id": 0})
     if not auction:
         # Try vehicles
-        auction = await db.vehicle_auctions.find_one({"id": auction_id}, {"_id": 0})
+        auction = await get_db().vehicle_auctions.find_one({"id": auction_id}, {"_id": 0})
     
     if not auction:
         raise HTTPException(status_code=404, detail="Auction not found")
@@ -1007,7 +1008,7 @@ async def unsubscribe_user_contact(
     contact: str
 ):
     """Handle unsubscribe from user marketing email"""
-    user_marketing = get_user_marketing_service(db)
+    user_marketing = get_user_marketing_service(get_db())
     
     success = await user_marketing.handle_unsubscribe(user, contact)
     
@@ -1022,7 +1023,7 @@ async def unsubscribe_user_contact(
 @email_marketing_ext_router.get("/user/marketing/templates")
 async def get_email_templates(current_user: User = Depends(get_current_user)):
     """Get pre-built email templates"""
-    user_marketing = get_user_marketing_service(db)
+    user_marketing = get_user_marketing_service(get_db())
     templates = user_marketing.get_email_templates()
     return {"templates": templates}
 

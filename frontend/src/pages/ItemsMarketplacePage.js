@@ -35,27 +35,26 @@ const ItemsMarketplacePage = () => {
                   <Package className="h-8 w-8 text-cyan-300" />
                 </div>
                 <h1 className="text-3xl md:text-4xl font-bold drop-shadow-lg" style={{ color: '#FFFFFF' }}>
-                  Browse Individual Items
+                  {t('itemsMarketplace.title')}
                 </h1>
               </div>
               <p className="max-w-2xl text-lg drop-shadow-md" style={{ color: '#BFDBFE' }}>
-                Discover unique items from estate sales and multi-lot auctions. 
-                Each item has its own countdown timer and bidding.
+                {t('itemsMarketplace.subtitle')}
               </p>
             </div>
             
             <div className="flex flex-wrap gap-2">
               <Badge className="bg-white/10 backdrop-blur border-cyan-400/30 px-4 py-2" style={{ color: '#FFFFFF' }}>
                 <Sparkles className="h-4 w-4 mr-2 text-yellow-400" />
-                Featured First
+                {t('itemsMarketplace.featuredFirst')}
               </Badge>
               <Badge className="bg-green-500/20 backdrop-blur border-green-400/30 px-4 py-2" style={{ color: '#86EFAC' }}>
                 <User className="h-4 w-4 mr-2" />
-                Private Sale = Tax Savings!
+                {t('itemsMarketplace.privateSaleTax')}
               </Badge>
               <Badge className="bg-cyan-500/20 backdrop-blur border-cyan-400/30 px-4 py-2" style={{ color: '#67E8F9' }}>
                 <Zap className="h-4 w-4 mr-2" />
-                Quick Bid
+                {t('itemsMarketplace.quickBid')}
               </Badge>
             </div>
           </div>
