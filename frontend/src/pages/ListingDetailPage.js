@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { extractErrorMessage } from '../utils/errorHandler';
@@ -14,7 +14,7 @@ import { Alert, AlertDescription } from '../components/ui/alert';
 import { toast } from 'sonner';
 import Countdown from 'react-countdown';
 import confetti from 'canvas-confetti';
-import { Clock, MapPin, Eye, User, DollarSign, MessageCircle, TrendingUp, Wifi, WifiOff, AlertCircle, CheckCircle2, Shield } from 'lucide-react';
+import { Clock, MapPin, Eye, User, DollarSign, MessageCircle, TrendingUp, Wifi, WifiOff, AlertCircle, CheckCircle2, Shield, Star } from 'lucide-react';
 import PromotionManagerModal from '../components/PromotionManagerModal';
 import WatchlistButton from '../components/WatchlistButton';
 import SocialShare from '../components/SocialShare';
@@ -27,6 +27,7 @@ import PriceBreakdown from '../components/PriceBreakdown';
 import PrivateSaleBadge, { BusinessSellerBadge } from '../components/PrivateSaleBadge';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { useTrustStatus, BidBlocker } from '../components/TrustVerification';
+import { SellerReputationCard, SellerReviewsList } from '../components/SellerReputation';
 import Lightbox from 'yet-another-react-lightbox';
 import 'yet-another-react-lightbox/styles.css';
 import { useRealtimeBidding } from '../hooks/useRealtimeBidding';
@@ -653,13 +654,28 @@ const ListingDetailPage = () => {
                         variant="outline"
                         onClick={() => setRateSellerModalOpen(true)}
                       >
-                        ⭐ Rate Seller
+                        <Star className="h-3.5 w-3.5 mr-1" /> Rate Seller
                       </Button>
                     )}
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
                   <AuctioneerInfo sellerId={listing.seller_id} variant="full" />
+
+                  {/* Seller Reputation Breakdown */}
+                  <SellerReputationCard sellerId={listing.seller_id} />
+
+                  {/* Recent Reviews */}
+                  <SellerReviewsList sellerId={listing.seller_id} />
+
+                  {/* View all reviews link */}
+                  <Link
+                    to={`/store/${listing.seller_id}`}
+                    className="block text-center text-sm font-medium text-cyan-600 dark:text-cyan-400 hover:underline pt-1"
+                    data-testid="view-all-reviews-link"
+                  >
+                    View all reviews &rarr;
+                  </Link>
                 </CardContent>
               </Card>
             )}

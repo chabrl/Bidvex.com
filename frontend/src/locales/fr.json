@@ -997,5 +997,22 @@
     "subtitle": "Parcourez les enchères multi-articles",
     "noLots": "Aucun lot disponible",
     "noLotsDesc": "Revenez plus tard pour de nouvelles enchères de lots"
+  },
+  "sellerReputation": {
+    "newSeller": "Nouveau vendeur",
+    "topRated": "Mieux noté",
+    "trustedSeller": "Vendeur de confiance",
+    "buyerReviews": "Avis des acheteurs",
+    "basedOnReviews": "Basé sur {{count}} avis",
+    "noReviewsYet": "Aucun avis pour le moment",
+    "moreReviewsNeeded": "{{count}} avis supplémentaire(s) nécessaire(s) pour afficher la note",
+    "viewAllReviews": "Voir tous les avis",
+    "rateSeller": "Évaluer le vendeur",
+    "sellerInformation": "Informations sur le vendeur",
+    "itemAccuracy": "Exactitude de l'article",
+    "communication": "Communication",
+    "shippingSpeed": "Rapidité d'expédition",
+    "previous": "Précédent",
+    "next": "Suivant"
   }
 }

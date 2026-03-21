@@ -997,5 +997,22 @@
     "subtitle": "Browse multi-item auction lots",
     "noLots": "No lots available",
     "noLotsDesc": "Check back later for new lot auctions"
+  },
+  "sellerReputation": {
+    "newSeller": "New Seller",
+    "topRated": "Top Rated",
+    "trustedSeller": "Trusted Seller",
+    "buyerReviews": "Buyer Reviews",
+    "basedOnReviews": "Based on {{count}} reviews",
+    "noReviewsYet": "No reviews yet",
+    "moreReviewsNeeded": "{{count}} more review(s) needed to display rating",
+    "viewAllReviews": "View all reviews",
+    "rateSeller": "Rate Seller",
+    "sellerInformation": "Seller Information",
+    "itemAccuracy": "Item Accuracy",
+    "communication": "Communication",
+    "shippingSpeed": "Shipping Speed",
+    "previous": "Previous",
+    "next": "Next"
   }
 }

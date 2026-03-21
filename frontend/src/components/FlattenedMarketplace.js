@@ -36,6 +36,7 @@ import { toast } from 'sonner';
 import { formatCurrency } from '../utils/currencyFormatter';
 import { useCategories } from '../hooks/useCategories';
 import { useMarketplaceItems } from '../hooks/useMarketplaceItems';
+import { SellerRatingInline } from './SellerReputation';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -123,6 +124,16 @@ const FlattenedMarketplace = ({
     : allItems;
   const total = marketplaceData?.pages?.[0]?.total ?? 0;
   const hasMore = hasNextPage;
+
+  // Batch-fetch seller reputations for all visible items
+  const [sellerReps, setSellerReps] = useState({});
+  useEffect(() => {
+    const sellerIds = [...new Set(allItems.map(i => i.seller_id).filter(Boolean))];
+    if (sellerIds.length === 0) return;
+    axios.post(`${API}/reviews/reputation/batch`, { seller_ids: sellerIds })
+      .then(res => setSellerReps(res.data.reputations || {}))
+      .catch(() => {});
+  }, [allItems.length]); // re-fetch when items change
 
   const trackClick = async (itemId) => {
     try {
@@ -351,6 +362,7 @@ const FlattenedMarketplace = ({
               trackClick={trackClick}
               isComparing={compareIds.includes(item.id)}
               onToggleCompare={toggleCompare}
+              sellerRep={sellerReps[item.seller_id]}
             />
           ))}
         </div>
@@ -490,7 +502,7 @@ const FlattenedMarketplace = ({
 /**
  * ItemCard - Individual item card component
  */
-const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare }) => {
+const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, sellerRep }) => {
   const [timeLeft, setTimeLeft] = useState('');
   const [isUrgent, setIsUrgent] = useState(false);
 
@@ -653,6 +665,9 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare }
             {item.title}
           </h3>
         </Link>
+
+        {/* Seller Rating */}
+        <SellerRatingInline sellerId={item.seller_id} reputation={sellerRep} />
 
         {/* Location */}
         {item.city && (

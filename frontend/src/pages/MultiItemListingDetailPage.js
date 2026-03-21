@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
@@ -33,6 +33,7 @@ import PrivateSaleBadge, { BusinessSellerBadge } from '../components/PrivateSale
 import PublicBidHistory from '../components/PublicBidHistory';
 import { HighStakesIndicator, HighStakesTimer, getHighStakesCardStyles, isHighStakes } from '../components/HighStakesBidCard';
 import { TrustScoreDisplay, TrustBadge } from '../components/SellerTrustScore';
+import { SellerReputationCard, SellerReviewsList } from '../components/SellerReputation';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../components/ui/sheet';
 import { extractErrorMessage } from '../utils/errorHandler';
 import { useCurrency } from '../contexts/CurrencyContext';
@@ -461,6 +462,25 @@ const MultiItemListingDetailPage = () => {
                         <div className="mt-4">
                           <TrustScoreDisplay sellerId={listing.seller_id} variant="compact" showBadge={true} />
                         </div>
+
+                        {/* Seller Reputation Breakdown */}
+                        <div className="mt-4">
+                          <SellerReputationCard sellerId={listing.seller_id} />
+                        </div>
+
+                        {/* Recent Reviews */}
+                        <div className="mt-4">
+                          <SellerReviewsList sellerId={listing.seller_id} />
+                        </div>
+
+                        {/* View all reviews link */}
+                        <Link
+                          to={`/store/${listing.seller_id}`}
+                          className="block text-center text-sm font-medium text-cyan-600 dark:text-cyan-400 hover:underline mt-3"
+                          data-testid="view-all-reviews-link"
+                        >
+                          View all reviews &rarr;
+                        </Link>
                       </div>
                     )}
 

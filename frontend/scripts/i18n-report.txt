@@ -1,15 +1,15 @@
 ======================================================================
   BIDVEX i18n AUDIT REPORT
-  Generated: 2026-03-20T18:30:08.681Z
-  Files scanned: 175
-  EN keys: 907 | FR keys: 907
-  t() calls found: 774 unique keys
+  Generated: 2026-03-21T13:30:16.616Z
+  Files scanned: 177
+  EN keys: 922 | FR keys: 922
+  t() calls found: 773 unique keys
 ======================================================================
 
 ──────────────────────────────────────────────────────────────────────
   SECTION 1: EN/FR SYNC CHECK
 ──────────────────────────────────────────────────────────────────────
-Keys in sync: 907
+Keys in sync: 922
 EN and FR files are perfectly in sync.
 
 ──────────────────────────────────────────────────────────────────────
@@ -23,7 +23,7 @@ All t() keys have corresponding entries in both JSON files.
 ──────────────────────────────────────────────────────────────────────
   SECTION 3: POTENTIALLY UNUSED KEYS
 ──────────────────────────────────────────────────────────────────────
-Found 133 keys not directly referenced via t() or i18n.js:
+Found 149 keys not directly referenced via t() or i18n.js:
 
   - admin.appeals.approve [EN, FR]
   - admin.appeals.reject [EN, FR]
@@ -135,6 +135,7 @@ Found 133 keys not directly referenced via t() or i18n.js:
   - footer.terms_of_service [EN, FR]
   - listing.description [EN, FR]
   - listing.location [EN, FR]
+  - marketplace.buyNowLabel [EN, FR]
   - marketplace.ending [EN, FR]
   - marketplace.newest [EN, FR]
   - navigation.about [EN, FR]
@@ -154,6 +155,21 @@ Found 133 keys not directly referenced via t() or i18n.js:
   - navigation.vehicles [EN, FR]
   - seller.createListing [EN, FR]
   - seller.totalSales [EN, FR]
+  - sellerReputation.basedOnReviews [EN, FR]
+  - sellerReputation.buyerReviews [EN, FR]
+  - sellerReputation.communication [EN, FR]
+  - sellerReputation.itemAccuracy [EN, FR]
+  - sellerReputation.moreReviewsNeeded [EN, FR]
+  - sellerReputation.newSeller [EN, FR]
+  - sellerReputation.next [EN, FR]
+  - sellerReputation.noReviewsYet [EN, FR]
+  - sellerReputation.previous [EN, FR]
+  - sellerReputation.rateSeller [EN, FR]
+  - sellerReputation.sellerInformation [EN, FR]
+  - sellerReputation.shippingSpeed [EN, FR]
+  - sellerReputation.topRated [EN, FR]
+  - sellerReputation.trustedSeller [EN, FR]
+  - sellerReputation.viewAllReviews [EN, FR]
   - vehicleListing.engine [EN, FR]
   - vehicleListing.exterior [EN, FR]
   - vehicleListing.interior [EN, FR]
@@ -165,7 +181,14 @@ Review before deleting.
 ──────────────────────────────────────────────────────────────────────
   SECTION 4: POTENTIAL HARDCODED STRINGS
 ──────────────────────────────────────────────────────────────────────
-No hardcoded strings detected.
+Found 1 potential hardcoded strings:
+
+  pages/ReviewPage.js:
+    Line 206: "Your review helps other buyers and sellers on BidVex"
+      <CardDescription>Your review helps other buyers and sellers on BidVex</CardDescription>
+
+Note: Some may be false positives (component names, enum values, user content).
+Review each one manually.
 
 ======================================================================
   END OF REPORT

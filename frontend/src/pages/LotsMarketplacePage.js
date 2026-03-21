@@ -14,6 +14,7 @@ import WishlistHeartButton from '../components/WishlistHeartButton';
 import MarketplaceSidebar from '../components/MarketplaceSidebar';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { formatCurrency } from '../utils/currencyFormatter';
+import { SellerRatingInline } from '../components/SellerReputation';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -66,6 +67,16 @@ const LotsMarketplacePage = () => {
     const totalLots = listings.reduce((sum, l) => sum + (l.total_lots || 0), 0);
     const privateSales = listings.filter(l => !l.seller_is_tax_registered).length;
     return { totalLots, privateSalesCount: privateSales };
+  }, [listings]);
+
+  // Batch-fetch seller reputations
+  const [sellerReps, setSellerReps] = useState({});
+  useEffect(() => {
+    const sellerIds = [...new Set(listings.map(l => l.seller_id).filter(Boolean))];
+    if (sellerIds.length === 0) return;
+    axios.post(`${API}/reviews/reputation/batch`, { seller_ids: sellerIds })
+      .then(res => setSellerReps(res.data.reputations || {}))
+      .catch(() => {});
   }, [listings]);
 
   const renderListingCard = (listing) => {
@@ -127,6 +138,10 @@ const LotsMarketplacePage = () => {
           <div className="flex items-center gap-1 text-sm mb-3" style={{ color: '#6b7280' }}>
             <MapPin className="h-4 w-4" style={{ color: '#6b7280' }} />
             <span style={{ color: '#6b7280' }}>{listing.city}, {listing.region}</span>
+          </div>
+          {/* Seller Rating */}
+          <div className="mb-2">
+            <SellerRatingInline sellerId={listing.seller_id} reputation={sellerReps[listing.seller_id]} />
           </div>
           {isPrivateSale && (
             <div className="rounded-lg px-3 py-2 text-xs mb-3" style={{ backgroundColor: '#dcfce7', border: '1px solid #86efac' }}>

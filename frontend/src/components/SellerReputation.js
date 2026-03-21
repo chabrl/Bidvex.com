@@ -24,20 +24,32 @@ const badgeConfig = {
 
 /**
  * Compact reputation display for listing cards.
- * Shows: star icon + average rating + review count
+ * Shows: star icon + average rating + review count (3+ reviews)
+ * Shows: "New Seller" label (< 3 reviews)
+ * Accepts optional pre-fetched `reputation` prop to avoid N+1 requests.
  */
-export const SellerRatingInline = ({ sellerId }) => {
-  const [rep, setRep] = useState(null);
+export const SellerRatingInline = ({ sellerId, reputation }) => {
+  const [rep, setRep] = useState(reputation || null);
 
   useEffect(() => {
+    if (reputation) { setRep(reputation); return; }
     if (!sellerId) return;
     axios
       .get(`${API}/reviews/reputation/${sellerId}`)
       .then((res) => setRep(res.data))
       .catch(() => {});
-  }, [sellerId]);
+  }, [sellerId, reputation]);
 
-  if (!rep || rep.total_reviews < 3) return null;
+  if (!rep) return null;
+
+  if (rep.total_reviews < 3) {
+    return (
+      <div className="flex items-center gap-1 text-xs" data-testid="seller-rating-inline-new">
+        <Award className="h-3.5 w-3.5 text-slate-400" />
+        <span className="text-slate-500 font-medium">New Seller</span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center gap-1 text-xs" data-testid="seller-rating-inline">
