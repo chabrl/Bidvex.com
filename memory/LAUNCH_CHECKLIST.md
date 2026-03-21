@@ -1,5 +1,5 @@
 # BidVex Launch Checklist
-**Date**: March 21, 2026 | **Final Audit**: Iteration 79 (38/38 review tests + 51/51 regression, 100% pass rate)
+**Date**: March 21, 2026 | **Final Audit**: Iteration 80 (10/10 backend + 5/5 frontend seller reputation tests, 100% pass rate)
 
 ---
 
@@ -28,14 +28,16 @@
 | :white_check_mark: | **Review Request Emails** | Scheduled 24h after payment confirmation via SendGrid. Hourly scheduler job |
 | :white_check_mark: | **Review Notifications** | In-app + email to seller on new review received |
 | :white_check_mark: | **Reputation on Storefront** | SellerReputationCard + SellerReviewsList on /store/:userId |
+| :white_check_mark: | **Reputation on Listing Cards** | SellerRatingInline on Items (/items) and Lots (/lots) marketplace grids. Batch API for N+1 avoidance. Shows star rating (3+ reviews) or "New Seller" label (<3 reviews). (Iteration 80: 15/15 tests) |
+| :white_check_mark: | **Reputation on Detail Pages** | SellerReputationCard + SellerReviewsList + "View all reviews" link on /listing/:id and /lots/:id. (Iteration 80: verified) |
 | :white_check_mark: | **Review Page** | /review/:transactionId — star selector, category ratings, comment, submit |
 | :white_check_mark: | **Partner Pro Trial Flow** | 14-day, no CC, auto-revert, scheduler hourly |
 | :white_check_mark: | **Email Templates (all)** | Trial, subscription, invoice, auction won, payment reminder, overdue, review request |
 | :white_check_mark: | **WebSocket (Live Bidding)** | 4 WS endpoints, real-time updates |
 | :white_check_mark: | **PDF Invoices (Cloud)** | Emergent Object Storage, HMAC-signed URLs |
 | :white_check_mark: | **SEO & Meta Tags** | react-helmet-async, dynamic per-page |
-| :white_check_mark: | **Internationalization** | EN/FR, 907 keys in sync, CI gate, temp scripts cleaned |
-| :white_check_mark: | **Mobile Responsive** | All pages tested at 390px/768px/1280px |
+| :white_check_mark: | **Internationalization** | EN/FR, 922 keys in sync, CI gate, temp scripts cleaned |
+| :white_check_mark: | **Mobile Responsive** | All pages tested at 390px/768px/1280px (Iteration 80: verified) |
 | :yellow_circle: | **Cloudflare CDN** | MANUAL — docs at /app/memory/INFRASTRUCTURE_P2.md |
 | :white_check_mark: | **MongoDB Indexes** | 27 indexes, idempotent script |
 
@@ -48,7 +50,8 @@
 | 77 | Mobile UI (4 fixes) | All | PASS |
 | 78 | Webhooks + Subscriptions + Tax | 51/51 | PASS |
 | 79 | Review System (full) | 38/38 | PASS |
-| **Total** | **All systems** | **106+** | **100%** |
+| 80 | Seller Reputation on Cards + Detail Pages | 15/15 | PASS |
+| **Total** | **All systems** | **121+** | **100%** |
 
 ---
 

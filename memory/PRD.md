@@ -36,6 +36,13 @@ BidVex is a full-stack auction marketplace with React frontend, FastAPI backend,
 - **Frontend**: /review/:transactionId page, SellerReputationCard + SellerReviewsList on storefront.
 - **Testing**: 38/38 tests pass (Iteration 79)
 
+### Seller Rating on Listing Cards + Detail Pages (March 21, 2026)
+- **SellerRatingInline on Marketplace Cards**: Shows star rating + review count for 3+ reviews, "New Seller" label for <3 reviews. Applied to both Items (/items) and Lots (/lots) marketplace grids.
+- **Batch Reputation API**: POST /api/reviews/reputation/batch used to avoid N+1 individual API calls.
+- **Full Breakdown on Detail Pages**: SellerReputationCard (score + star bars + category averages) + SellerReviewsList (paginated reviews) + "View all reviews" link on /listing/:id and /lots/:id.
+- **i18n**: 922 keys in sync EN/FR. `sellerReputation.*` keys added to both locales.
+- **Testing**: 15/15 tests pass (Iteration 80)
+
 ## Key API Endpoints (Reviews)
 - POST /api/reviews/create — Create review (auth + paid txn required)
 - PUT /api/reviews/{id} — Edit within 48h
@@ -52,4 +59,4 @@ BidVex is a full-stack auction marketplace with React frontend, FastAPI backend,
 ## Backlog
 - (P2) Cloudflare CDN setup per /app/memory/INFRASTRUCTURE_P2.md
 - (P2) Post-launch monitoring and alerting
-- (P3) Add SellerRatingInline to listing cards in marketplace grid
+- (Post-Launch) Configure production secrets (Stripe, SendGrid, webhooks)
