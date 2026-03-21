@@ -610,6 +610,92 @@ async def _handle_checkout_completed(db, session):
             
             # Generate invoice for fees
             await _generate_vehicle_fees_invoice(db, auction, buyer_id, breakdown, invoice_id)
+
+    elif payment_type == "buy_now":
+        # Buy Now purchase — mark transaction paid
+        transaction_id = metadata.get("transaction_id")
+        auction_id = metadata.get("auction_id")
+        buyer_id = metadata.get("buyer_id")
+
+        if transaction_id:
+            await db.buy_now_transactions.update_one(
+                {"id": transaction_id},
+                {"$set": {
+                    "payment_status": "paid",
+                    "paid_at": datetime.now(timezone.utc).isoformat(),
+                    "stripe_session_id": session_id,
+                }}
+            )
+            logger.info(f"Buy Now transaction {transaction_id} marked as paid")
+
+        # Generate invoice for buy-now
+        if auction_id and buyer_id:
+            auction = await db.multi_item_listings.find_one({"id": auction_id}, {"_id": 0})
+            if auction:
+                buy_now_invoice_id = invoice_id or f"bn_{transaction_id[:8]}"
+                await db.invoices.insert_one({
+                    "id": buy_now_invoice_id,
+                    "transaction_id": transaction_id,
+                    "auction_id": auction_id,
+                    "buyer_id": buyer_id,
+                    "seller_id": auction.get("seller_id"),
+                    "breakdown": breakdown,
+                    "type": "buy_now",
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                })
+
+                # Send confirmation email
+                try:
+                    buyer = await db.users.find_one({"id": buyer_id}, {"_id": 0})
+                    if buyer and buyer.get("email"):
+                        from services.email_notifications import send_email
+                        lot_number = metadata.get("lot_number", "")
+                        lot_title = f"Lot #{lot_number}" if lot_number else "Item"
+                        await send_email(
+                            to_email=buyer["email"],
+                            subject=f"Payment Confirmed - {auction.get('title', 'Buy Now Purchase')}",
+                            html_content=f"<p>Hi {buyer.get('name', 'Buyer')},</p>"
+                                         f"<p>Your Buy Now payment for <strong>{lot_title}</strong> "
+                                         f"from <strong>{auction.get('title', 'Auction')}</strong> has been confirmed.</p>"
+                                         f"<p>Transaction ID: {transaction_id}</p>"
+                                         f"<p>Thank you for your purchase!</p>",
+                        )
+                except Exception as e:
+                    logger.warning(f"Failed to send buy-now confirmation email: {e}")
+
+    elif payment_type == "auction_winner":
+        # Auction winner payment — mark listing fully paid
+        listing_id = metadata.get("listing_id")
+        buyer_id = metadata.get("buyer_id")
+        late_penalty = float(metadata.get("late_penalty", "0"))
+
+        if listing_id:
+            listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
+            if listing:
+                await db.listings.update_one(
+                    {"id": listing_id},
+                    {"$set": {
+                        "status": "sold",
+                        "payment_status": "paid",
+                        "paid_at": datetime.now(timezone.utc).isoformat(),
+                        "stripe_session_id": session_id,
+                        "late_penalty_charged": late_penalty,
+                    }}
+                )
+                logger.info(f"Auction winner payment completed for listing {listing_id}")
+
+                # Generate and store invoice
+                winner_invoice_id = invoice_id or f"aw_{listing_id[:8]}"
+                await _generate_and_store_invoice(db, listing, buyer_id, breakdown, winner_invoice_id)
+
+                # Send confirmation emails
+                await _send_purchase_confirmation_emails(db, listing, buyer_id, breakdown, winner_invoice_id)
+
+                # Update pending payment
+                await db.pending_payments.update_one(
+                    {"listing_id": listing_id, "buyer_id": buyer_id, "type": "auction_winner"},
+                    {"$set": {"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat()}}
+                )
     
     logger.info(f"Checkout completed processing finished: {session_id}")
 
