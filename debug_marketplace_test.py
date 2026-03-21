@@ -8,7 +8,7 @@ import aiohttp
 import json
 import traceback
 
-BASE_URL = "https://buy-now-stripe.preview.emergentagent.com/api"
+BASE_URL = "https://auction-marketplace-15.preview.emergentagent.com/api"
 ADMIN_EMAIL = "admin@bazario.com"
 ADMIN_PASSWORD = "Admin123!"
 
