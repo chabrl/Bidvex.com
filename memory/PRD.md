@@ -8,36 +8,40 @@ BidVex is a full-stack auction marketplace with React frontend, FastAPI backend,
 - **Backend**: FastAPI, MongoDB, Stripe, SendGrid, APScheduler
 - **Infrastructure**: Kubernetes, Emergent Object Storage
 
-## Core Features
-1. Multi-tier subscriptions (Free, Basic, Pro, Partner Pro) with Stripe billing
-2. Real-time bidding via WebSockets
-3. Multi-item lot auctions with Buy Now functionality
-4. Vehicle auctions (hybrid payment)
-5. Internationalization (EN/FR) with CI audit pipeline
-6. Seller verification and tax registration
-7. Partner auction system for professional auctioneers
-
 ## Test Credentials
 - Admin: `charbeladmin@bidvex.com` / `Admin123!`
 
 ## Completed Work
 
+### Core Platform (Sessions 1-N)
+- Full subscription system with Stripe billing (Free/Premium/Partner Pro/VIP)
+- Real-time bidding with WebSockets
+- Multi-item lot auctions, vehicle auctions
+- User verification and trust system, messaging, PDF invoices, notifications
+
 ### i18n Overhaul (March 2026)
-- Migrated to JSON-based system, fixed 202 strings across 55 files, removed 481 unused keys, CI audit
+- JSON-based EN/FR, CI audit gate, 202 strings fixed, 481 unused keys removed
 
 ### E-Commerce Checkout (March 20, 2026)
-- BUG 1 FIXED: Buy Now Stripe price (server-side calculation + buyer premium + taxes)
-- BUG 2 FIXED: Auction winner flow (email, checkout, idempotency, 14-day deadline, day 10 reminder, day 14 overdue + 2%/month)
+- Buy Now: server-side pricing with buyer premium + taxes, Stripe checkout, webhook → paid
+- Auction Winner: email, checkout page, idempotency key, 14-day deadline, late penalty
+- Webhook handlers for buy_now and auction_winner payment types
+- Price security: all amounts from MongoDB, never trust frontend
 
 ### Mobile UI Fixes (March 21, 2026)
-- **FIX 1 — Marketplace/Lots Filter Layout**: Removed floating sidebar on mobile. Single inline Filters button + sticky horizontal filter bar. Items full-width on mobile (1 col). No duplicate buttons on Lots page. Applied to: MarketplacePage.js, LotsMarketplacePage.js, FlattenedMarketplace.js, DecomposedMarketplace.js.
-- **FIX 2 — Messages Page Mobile**: Full-screen conversation list on mobile. Tap conversation → full-screen chat. No split panel on mobile. Tablet shows 40/60 split. Applied to: MessagesPage.js.
-- **FIX 3 — Lot Detail Bid Layout**: Bid input + Place Bid button stack vertically on mobile (full width, min 48px height). No horizontal overflow at 390px. Applied to: MultiItemListingDetailPage.js.
-- **FIX 4 — Seller Dashboard Deletion**: Added missing Authorization header. Added loading spinner on Submit. Added error display. Applied to: SellerDashboard.js.
-- All 4 fixes: 100% test pass rate at 390px/768px/1280px viewports.
+- Marketplace/Lots: sticky horizontal filter bar, no floating sidebar on mobile, no duplicates
+- Messages: full-screen conversation list on mobile, split panel on tablet/desktop
+- Lot Detail: bid input stacks vertically on mobile, min 48px height
+- Seller Dashboard: deletion request auth header fix, loading spinner
 
-## Backlog / Future Tasks
+### Full Regression (March 21, 2026) — 51/51 PASS
+- Webhook security (signature validation)
+- Buy Now + Auction Winner full payment flows
+- Subscription billing lifecycle
+- Tax calculations (GST/QST)
+- Temp i18n migration scripts cleaned up
+- LAUNCH_CHECKLIST.md updated with all verified systems
+
+## Backlog
 - (P2) Cloudflare CDN setup per /app/memory/INFRASTRUCTURE_P2.md
 - (P2) Post-launch monitoring and alerting
-- (P3) Cleanup: Delete temp i18n migration scripts from /app/frontend/scripts/
-- (P3) Full regression test of existing general checkout flows
