@@ -1820,6 +1820,12 @@ h1, h2, h3, h4, h5, h6 {
   color: #ffffff !important;
 }
 
+/* VIP Elite pricing card - force white text on dark background */
+[data-testid="plan-card-vip"] h3,
+[data-testid="plan-card-vip"] .text-white {
+  color: #ffffff !important;
+}
+
 /* BADGE OUTLINE - Force visible border and text */
 [class*="Badge"][class*="outline"],
 .badge-outline {

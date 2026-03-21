@@ -1,15 +1,15 @@
 ======================================================================
   BIDVEX i18n AUDIT REPORT
-  Generated: 2026-03-21T14:38:23.006Z
+  Generated: 2026-03-21T18:53:15.108Z
   Files scanned: 177
-  EN keys: 1159 | FR keys: 1159
-  t() calls found: 964 unique keys
+  EN keys: 1195 | FR keys: 1195
+  t() calls found: 987 unique keys
 ======================================================================
 
 ──────────────────────────────────────────────────────────────────────
   SECTION 1: EN/FR SYNC CHECK
 ──────────────────────────────────────────────────────────────────────
-Keys in sync: 1159
+Keys in sync: 1195
 EN and FR files are perfectly in sync.
 
 ──────────────────────────────────────────────────────────────────────
@@ -23,7 +23,7 @@ All t() keys have corresponding entries in both JSON files.
 ──────────────────────────────────────────────────────────────────────
   SECTION 3: POTENTIALLY UNUSED KEYS
 ──────────────────────────────────────────────────────────────────────
-Found 195 keys not directly referenced via t() or i18n.js:
+Found 208 keys not directly referenced via t() or i18n.js:
 
   - admin.appeals.approve [EN, FR]
   - admin.appeals.reject [EN, FR]
@@ -170,8 +170,18 @@ Found 195 keys not directly referenced via t() or i18n.js:
   - partnerPage.benefit4Desc [EN, FR]
   - partnerPage.benefit4Title [EN, FR]
   - pricingPage.monthlyBilling [EN, FR]
+  - pricingPage.perMonth [EN, FR]
   - pricingPage.planBilling [EN, FR]
+  - pricingPage.planNames.free [EN, FR]
+  - pricingPage.planNames.partner_pro [EN, FR]
+  - pricingPage.planNames.premium [EN, FR]
+  - pricingPage.planNames.vip [EN, FR]
+  - pricingPage.planTaglines.free [EN, FR]
+  - pricingPage.planTaglines.partner_pro [EN, FR]
+  - pricingPage.planTaglines.premium [EN, FR]
+  - pricingPage.planTaglines.vip [EN, FR]
   - pricingPage.popularPlan [EN, FR]
+  - pricingPage.title [EN, FR]
   - pricingPage.yearlyBilling [EN, FR]
   - seller.createListing [EN, FR]
   - seller.totalSales [EN, FR]
@@ -190,6 +200,9 @@ Found 195 keys not directly referenced via t() or i18n.js:
   - sellerReputation.topRated [EN, FR]
   - sellerReputation.trustedSeller [EN, FR]
   - sellerReputation.viewAllReviews [EN, FR]
+  - subscription.cancelAnytime [EN, FR]
+  - subscription.instantAccess [EN, FR]
+  - subscription.paymentSetupPending [EN, FR]
   - vehicleInvoices.allInvoices [EN, FR]
   - vehicleInvoices.amount [EN, FR]
   - vehicleInvoices.asbuyer [EN, FR]

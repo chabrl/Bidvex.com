@@ -8,7 +8,7 @@ import requests
 import os
 import time
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://auction-marketplace-15.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://subscription-grid-ui.preview.emergentagent.com').rstrip('/')
 
 
 class TestAIChatBasicFunctionality:
