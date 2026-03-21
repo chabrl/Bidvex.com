@@ -43,6 +43,12 @@ BidVex is a full-stack auction marketplace with React frontend, FastAPI backend,
 - **i18n**: 922 keys in sync EN/FR. `sellerReputation.*` keys added to both locales.
 - **Testing**: 15/15 tests pass (Iteration 80)
 
+### Partner Program Page Fixes (March 21, 2026)
+- **FIX 1 — Translation**: Rewrote BecomePartnerPage with full i18n (55 `partnerPage.*` keys). All strings display in French when FR mode active, English when EN mode. 977 keys in sync EN/FR.
+- **FIX 2 — Layout**: Feature cards 2x2 desktop / 1-col mobile with equal height. Math section side-by-side desktop / stacked mobile. Form max-640px centered desktop, full-width mobile. Submit button full-width mobile / centered desktop. Footer language indicator now shows Canadian flag with current language name (CA Français / CA English).
+- **FIX 3 — Pricing**: Partner Pro annual fee updated from $240 to $100 CAD/year (DB + code defaults). Subscription pricing page shows $100 with $200 original price. Price breakdown API confirms subtotal=$100. Partner Pro added to SubscriptionPricingPage PLAN_STYLES and sort order.
+- **Testing**: 29/29 tests pass (Iteration 81 — 12 backend + 17 frontend)
+
 ## Key API Endpoints (Reviews)
 - POST /api/reviews/create — Create review (auth + paid txn required)
 - PUT /api/reviews/{id} — Edit within 48h

@@ -36,7 +36,7 @@
 | :white_check_mark: | **WebSocket (Live Bidding)** | 4 WS endpoints, real-time updates |
 | :white_check_mark: | **PDF Invoices (Cloud)** | Emergent Object Storage, HMAC-signed URLs |
 | :white_check_mark: | **SEO & Meta Tags** | react-helmet-async, dynamic per-page |
-| :white_check_mark: | **Internationalization** | EN/FR, 922 keys in sync, CI gate, temp scripts cleaned |
+| :white_check_mark: | **Internationalization** | EN/FR, 977 keys in sync, CI gate, temp scripts cleaned |
 | :white_check_mark: | **Mobile Responsive** | All pages tested at 390px/768px/1280px (Iteration 80: verified) |
 | :yellow_circle: | **Cloudflare CDN** | MANUAL — docs at /app/memory/INFRASTRUCTURE_P2.md |
 | :white_check_mark: | **MongoDB Indexes** | 27 indexes, idempotent script |
@@ -51,7 +51,8 @@
 | 78 | Webhooks + Subscriptions + Tax | 51/51 | PASS |
 | 79 | Review System (full) | 38/38 | PASS |
 | 80 | Seller Reputation on Cards + Detail Pages | 15/15 | PASS |
-| **Total** | **All systems** | **121+** | **100%** |
+| 81 | Partner Program: i18n + Layout + Pricing ($100) | 29/29 | PASS |
+| **Total** | **All systems** | **150+** | **100%** |
 
 ---
 
