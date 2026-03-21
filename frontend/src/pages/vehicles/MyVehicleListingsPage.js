@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -143,6 +144,7 @@ const VehicleListingCard = ({ listing, onView, onEdit }) => {
 
 const MyVehicleListingsPage = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { token, user } = useAuth();
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -215,10 +217,10 @@ const MyVehicleListingsPage = () => {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-                My Vehicle Listings
+                {t('vehicleListings.title')}
               </h1>
               <p className="text-slate-500 mt-1">
-                Manage your vehicle auction listings
+                {t('vehicleListings.subtitle')}
               </p>
             </div>
             
@@ -227,7 +229,7 @@ const MyVehicleListingsPage = () => {
               className="gap-2"
               disabled={sellerProfile?.verification_status !== 'approved'}
             >
-              <Plus className="h-4 w-4" /> List a Vehicle
+              <Plus className="h-4 w-4" /> {t('vehicleListings.createVehicle')}
             </Button>
           </div>
           

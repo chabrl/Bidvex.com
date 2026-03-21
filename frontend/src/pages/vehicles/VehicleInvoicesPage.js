@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import axios from 'axios';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -209,6 +210,7 @@ const InvoiceDetail = ({ invoiceId, onBack }) => {
 const VehicleInvoicesPage = () => {
   const navigate = useNavigate();
   const { invoiceId } = useParams();
+  const { t } = useTranslation();
   const { user, token } = useAuth();
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -284,10 +286,10 @@ const VehicleInvoicesPage = () => {
           
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
             <Receipt className="h-8 w-8 text-blue-600" />
-            My Vehicle Invoices
+            {t('vehicleInvoices.title')}
           </h1>
           <p className="text-slate-500 mt-1">
-            View and manage your vehicle auction invoices and settlements
+            {t('vehicleInvoices.subtitle')}
           </p>
         </div>
       </div>

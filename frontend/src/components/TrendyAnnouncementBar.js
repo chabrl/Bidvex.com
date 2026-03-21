@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 import { X, ChevronLeft, ChevronRight, Bell, Sparkles, AlertTriangle, CheckCircle, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const TrendyAnnouncementBar = () => {
+  const { t } = useTranslation();
   const [announcements, setAnnouncements] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
   const [dismissedIds, setDismissedIds] = useState([]);
   const [isPaused, setIsPaused] = useState(false);
+  const dismissAllLabel = t('announcements.dismissAll');
 
   // Calculate visible announcements
   const visibleAnnouncements = announcements.filter(
@@ -207,7 +210,7 @@ const TrendyAnnouncementBar = () => {
                         onClick={handleDismissAll}
                         className="hidden md:block px-3 py-1.5 text-xs font-semibold bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full transition-colors text-white"
                       >
-                        Dismiss All
+                        {dismissAllLabel}
                       </button>
                     )}
                     <button

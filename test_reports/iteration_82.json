@@ -1,0 +1,133 @@
+{
+  "summary": "Platform-wide audit for FR mode translations, mobile layout at 390px, and core functionality. Found multiple translation issues on Items Marketplace, Lots Marketplace, and Pricing pages. Backend APIs working correctly. Mobile layout has no overflow issues on most pages except Items Marketplace.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/user/marketing/*", "issue": "500 Internal Server Error - NameError: name 'db' is not defined in email_marketing_ext.py line 596"}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "translation_issues": [
+      {
+        "page": "/items (ItemsMarketplacePage.js)",
+        "issue": "CRITICAL - Multiple hardcoded English strings not using i18n",
+        "strings": [
+          "Browse Individual Items (line 38)",
+          "Discover unique items from estate sales and multi-lot auctions... (lines 41-43)",
+          "Featured First (line 50)",
+          "Private Sale = Tax Savings! (line 54)",
+          "Quick Bid (line 58)"
+        ],
+        "priority": "HIGH"
+      },
+      {
+        "page": "/lots (LotsMarketplacePage.js)",
+        "issue": "Hardcoded 'Featured First' badge not translated",
+        "strings": ["Featured First (line 199)"],
+        "priority": "MEDIUM"
+      },
+      {
+        "page": "/pricing (SubscriptionPricingPage.js)",
+        "issue": "CRITICAL - Entire pricing page has hardcoded English strings",
+        "strings": [
+          "Launch Special: Use code LAUNCH50 for 50% OFF! (line 240)",
+          "Membership Plans (line 247)",
+          "Choose Your Plan (line 250)",
+          "Monthly (line 259)",
+          "Yearly (line 268)",
+          "Save up to X% (line 272)",
+          "Current Plan (line 415)",
+          "/year, /month (line 339)",
+          "Plan - Yearly/Monthly Billing (line 451)"
+        ],
+        "priority": "HIGH"
+      },
+      {
+        "page": "/terms",
+        "issue": "Route returns 404 - Page does not exist",
+        "priority": "HIGH"
+      },
+      {
+        "page": "/privacy",
+        "issue": "Page stuck on loading spinner",
+        "priority": "HIGH"
+      }
+    ]
+  },
+  "test_results": {
+    "backend_tests": {
+      "GET /api/health": "PASS - returns {status: healthy}",
+      "GET /api/subscription-plans": "PASS - returns partner_pro at price_yearly=100",
+      "GET /api/site-mode": "PASS - returns mode=live",
+      "POST /api/auth/login": "PASS - returns token for charbeladmin@bidvex.com"
+    },
+    "frontend_tests": {
+      "homepage_fr_mode": "PASS - Shows French text (Découvrez. Misez. Gagnez.)",
+      "homepage_mobile_390px": "PASS - No horizontal overflow",
+      "mobile_bottom_nav_fr": "PASS - Shows Accueil, Rechercher, Lots, Profil",
+      "footer_language_indicator": "PASS - Shows 🇨🇦 Français",
+      "items_marketplace_fr": "FAIL - Title and badges in English",
+      "items_marketplace_mobile": "FAIL - Horizontal overflow detected",
+      "lots_marketplace_fr": "PARTIAL - Title in French, 'Featured First' badge in English",
+      "lots_marketplace_mobile": "PASS - No horizontal overflow",
+      "partner_program_fr": "PASS - Shows PROGRAMME PARTENAIRE",
+      "partner_program_mobile": "PASS - No horizontal overflow",
+      "pricing_page_fr": "FAIL - Entire page in English",
+      "pricing_page_mobile": "PASS - No horizontal overflow",
+      "auth_page_fr": "PASS - Shows Bon retour, Courriel, Mot de passe",
+      "auth_page_mobile": "PASS - No horizontal overflow",
+      "terms_page": "FAIL - Returns 404",
+      "privacy_page": "FAIL - Stuck on loading",
+      "login_flow": "PASS - Login works, redirects to marketplace",
+      "seller_dashboard": "FAIL - Returns 404 (requires auth or route missing)",
+      "messages_page": "REQUIRES AUTH - Redirects to login"
+    },
+    "i18n_audit": {
+      "keys_in_sync": 1139,
+      "missing_keys": 0,
+      "hardcoded_strings_detected": "0 (but audit script misses inline JSX strings)",
+      "potentially_unused_keys": 191
+    }
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_82.json"
+  ],
+  "action_items": [
+    "HIGH: Add i18n translations to ItemsMarketplacePage.js - all hardcoded strings need t() wrapper",
+    "HIGH: Add i18n translations to SubscriptionPricingPage.js - entire page needs translation",
+    "MEDIUM: Add i18n translation for 'Featured First' badge in LotsMarketplacePage.js",
+    "HIGH: Fix /terms route - currently returns 404",
+    "HIGH: Fix /privacy route - currently stuck on loading",
+    "MEDIUM: Fix horizontal overflow on /items page at 390px mobile viewport",
+    "LOW: Fix backend NameError in email_marketing_ext.py line 596"
+  ],
+  "critical_code_review_comments": [
+    "ItemsMarketplacePage.js has hardcoded English strings despite importing useTranslation - t() function not used",
+    "SubscriptionPricingPage.js imports useTranslation but doesn't use t() for any visible text",
+    "LotsMarketplacePage.js mostly uses t() but misses 'Featured First' badge",
+    "Legal pages (/terms, /privacy) routes appear broken or missing"
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (4/4 passed)",
+    "frontend": "60% (9/15 passed, 6 failed)"
+  },
+  "test_credentials": "Admin: charbeladmin@bidvex.com / Admin123!",
+  "seed_data_creation": "None",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Platform-wide i18n audit completed. Main issues: ItemsMarketplacePage.js, SubscriptionPricingPage.js have hardcoded English strings. Legal pages (/terms, /privacy) are broken. Mobile layout mostly good except /items page has overflow. Login flow works. Use localStorage key 'bidvex_language' to switch languages (not 'i18nextLng').",
+  "pages_tested": {
+    "homepage": {"fr_mode": "PASS", "mobile_390px": "PASS"},
+    "items_marketplace": {"fr_mode": "FAIL", "mobile_390px": "FAIL (overflow)"},
+    "lots_marketplace": {"fr_mode": "PARTIAL", "mobile_390px": "PASS"},
+    "partner_program": {"fr_mode": "PASS", "mobile_390px": "PASS"},
+    "pricing": {"fr_mode": "FAIL", "mobile_390px": "PASS"},
+    "auth": {"fr_mode": "PASS", "mobile_390px": "PASS"},
+    "terms": {"fr_mode": "N/A - 404", "mobile_390px": "N/A"},
+    "privacy": {"fr_mode": "N/A - loading", "mobile_390px": "N/A"}
+  }
+}

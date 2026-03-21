@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -16,6 +17,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const StorefrontPage = () => {
   const { userId } = useParams();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -38,8 +40,8 @@ const StorefrontPage = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 px-4">
         <Store className="h-16 w-16 text-slate-300 mb-4" />
-        <h2 className="text-xl font-semibold text-slate-700 dark:text-slate-200 mb-2">Storefront not found</h2>
-        <Button onClick={() => navigate(-1)} variant="outline">Go Back</Button>
+        <h2 className="text-xl font-semibold text-slate-700 dark:text-slate-200 mb-2">{t('storefront.notFound')}</h2>
+        <Button onClick={() => navigate(-1)} variant="outline">{t('storefront.goBack')}</Button>
       </div>
     );
   }
@@ -51,7 +53,6 @@ const StorefrontPage = () => {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900" data-testid="storefront-page">
       <SEO title={`${seller.name}'s Store — BidVex`} description={storefront?.tagline || `Browse ${seller.name}'s listings on BidVex`} path={`/store/${userId}`} />
 
-      {/* Banner */}
       <div className="relative h-48 sm:h-64" style={{ background: storefront?.banner_url ? `url(${storefront.banner_url}) center/cover` : `linear-gradient(135deg, ${accentColor}33, ${accentColor}11)` }}>
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-slate-900/60" />
         <div className="absolute top-4 left-4">
@@ -61,7 +62,6 @@ const StorefrontPage = () => {
         </div>
       </div>
 
-      {/* Seller info */}
       <div className="max-w-6xl mx-auto px-4 -mt-16 relative z-10">
         <div className="flex items-end gap-4 mb-6">
           <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl border-4 border-white dark:border-slate-800 shadow-xl overflow-hidden bg-slate-200">
@@ -78,7 +78,7 @@ const StorefrontPage = () => {
               <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">{seller.name}</h1>
               {has_storefront && (
                 <Badge className="text-xs font-semibold" style={{ background: accentColor, color: 'white' }}>
-                  <Star className="h-3 w-3 mr-1" /> Pro Seller
+                  <Star className="h-3 w-3 mr-1" /> {t('storefront.proSeller')}
                 </Badge>
               )}
             </div>
@@ -96,7 +96,6 @@ const StorefrontPage = () => {
           </Card>
         )}
 
-        {/* Reputation & Reviews */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="md:col-span-1">
             <SellerReputationCard sellerId={userId} />
@@ -106,17 +105,16 @@ const StorefrontPage = () => {
           </div>
         </div>
 
-        {/* Listings */}
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
-            Active Listings ({listings.length})
+            {t('storefront.activeListings', { count: listings.length })}
           </h2>
         </div>
 
         {listings.length === 0 ? (
           <div className="text-center py-16">
             <Package className="h-12 w-12 mx-auto text-slate-300 mb-3" />
-            <p className="text-slate-500">No active listings</p>
+            <p className="text-slate-500">{t('storefront.noActiveListings')}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-12">
@@ -135,7 +133,7 @@ const StorefrontPage = () => {
                   )}
                   {item.is_featured && (
                     <Badge className="absolute top-2 left-2 bg-amber-500 text-white border-0 text-xs">
-                      <Star className="h-3 w-3 mr-1" /> Featured
+                      <Star className="h-3 w-3 mr-1" /> {t('storefront.featured')}
                     </Badge>
                   )}
                 </div>

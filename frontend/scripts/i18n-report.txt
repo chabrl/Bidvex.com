@@ -1,15 +1,15 @@
 ======================================================================
   BIDVEX i18n AUDIT REPORT
-  Generated: 2026-03-21T14:03:18.460Z
+  Generated: 2026-03-21T14:32:52.375Z
   Files scanned: 177
-  EN keys: 977 | FR keys: 977
-  t() calls found: 820 unique keys
+  EN keys: 1139 | FR keys: 1139
+  t() calls found: 948 unique keys
 ======================================================================
 
 ──────────────────────────────────────────────────────────────────────
   SECTION 1: EN/FR SYNC CHECK
 ──────────────────────────────────────────────────────────────────────
-Keys in sync: 977
+Keys in sync: 1139
 EN and FR files are perfectly in sync.
 
 ──────────────────────────────────────────────────────────────────────
@@ -23,7 +23,7 @@ All t() keys have corresponding entries in both JSON files.
 ──────────────────────────────────────────────────────────────────────
   SECTION 3: POTENTIALLY UNUSED KEYS
 ──────────────────────────────────────────────────────────────────────
-Found 157 keys not directly referenced via t() or i18n.js:
+Found 191 keys not directly referenced via t() or i18n.js:
 
   - admin.appeals.approve [EN, FR]
   - admin.appeals.reject [EN, FR]
@@ -138,6 +138,12 @@ Found 157 keys not directly referenced via t() or i18n.js:
   - marketplace.buyNowLabel [EN, FR]
   - marketplace.ending [EN, FR]
   - marketplace.newest [EN, FR]
+  - mobileNav.home [EN, FR]
+  - mobileNav.lots [EN, FR]
+  - mobileNav.profile [EN, FR]
+  - mobileNav.search [EN, FR]
+  - mobileNav.sell [EN, FR]
+  - mobileNav.watchlist [EN, FR]
   - navigation.about [EN, FR]
   - navigation.browseAuctions [EN, FR]
   - navigation.contact [EN, FR]
@@ -153,6 +159,8 @@ Found 157 keys not directly referenced via t() or i18n.js:
   - navigation.sell [EN, FR]
   - navigation.settings [EN, FR]
   - navigation.vehicles [EN, FR]
+  - partnerDashboard.bids [EN, FR]
+  - partnerDashboard.lots [EN, FR]
   - partnerPage.benefit1Desc [EN, FR]
   - partnerPage.benefit1Title [EN, FR]
   - partnerPage.benefit2Desc [EN, FR]
@@ -178,9 +186,35 @@ Found 157 keys not directly referenced via t() or i18n.js:
   - sellerReputation.topRated [EN, FR]
   - sellerReputation.trustedSeller [EN, FR]
   - sellerReputation.viewAllReviews [EN, FR]
+  - vehicleInvoices.allInvoices [EN, FR]
+  - vehicleInvoices.amount [EN, FR]
+  - vehicleInvoices.asbuyer [EN, FR]
+  - vehicleInvoices.asseller [EN, FR]
+  - vehicleInvoices.buyer [EN, FR]
+  - vehicleInvoices.download [EN, FR]
+  - vehicleInvoices.invoiceDate [EN, FR]
+  - vehicleInvoices.noInvoices [EN, FR]
+  - vehicleInvoices.noInvoicesDesc [EN, FR]
+  - vehicleInvoices.overdue [EN, FR]
+  - vehicleInvoices.paid [EN, FR]
+  - vehicleInvoices.pending [EN, FR]
+  - vehicleInvoices.seller [EN, FR]
+  - vehicleInvoices.status [EN, FR]
+  - vehicleInvoices.viewDetails [EN, FR]
   - vehicleListing.engine [EN, FR]
   - vehicleListing.exterior [EN, FR]
   - vehicleListing.interior [EN, FR]
+  - vehicleListings.activeTab [EN, FR]
+  - vehicleListings.allVehicles [EN, FR]
+  - vehicleListings.bids [EN, FR]
+  - vehicleListings.createFirst [EN, FR]
+  - vehicleListings.delete [EN, FR]
+  - vehicleListings.draftTab [EN, FR]
+  - vehicleListings.edit [EN, FR]
+  - vehicleListings.noVehicles [EN, FR]
+  - vehicleListings.soldTab [EN, FR]
+  - vehicleListings.viewListing [EN, FR]
+  - vehicleListings.views [EN, FR]
   - watchlist.empty [EN, FR]
 
 Note: Some keys may be referenced dynamically (template literals, computed keys).
@@ -189,14 +223,7 @@ Review before deleting.
 ──────────────────────────────────────────────────────────────────────
   SECTION 4: POTENTIAL HARDCODED STRINGS
 ──────────────────────────────────────────────────────────────────────
-Found 1 potential hardcoded strings:
-
-  pages/ReviewPage.js:
-    Line 206: "Your review helps other buyers and sellers on BidVex"
-      <CardDescription>Your review helps other buyers and sellers on BidVex</CardDescription>
-
-Note: Some may be false positives (component names, enum values, user content).
-Review each one manually.
+No hardcoded strings detected.
 
 ======================================================================
   END OF REPORT

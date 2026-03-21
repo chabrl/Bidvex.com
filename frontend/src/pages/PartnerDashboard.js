@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -19,6 +20,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 export default function PartnerDashboard() {
   const { user, token, refreshUser } = useAuth();
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -61,7 +63,7 @@ export default function PartnerDashboard() {
       // Auto-dismiss celebration after 8 seconds
       setTimeout(() => setShowCelebration(false), 8000);
     } else if (status === 'cancelled') {
-      toast.info('Payment was cancelled. You can complete it anytime from this dashboard.');
+      toast.info(t('partnerDashboard.paymentCancelled'));
       setSearchParams({}, { replace: true });
     }
   }, [searchParams, refreshUser, setSearchParams]);
@@ -76,7 +78,7 @@ export default function PartnerDashboard() {
         window.location.href = res.data.url;
       }
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to open billing portal.');
+      toast.error(err.response?.data?.detail || t('partnerDashboard.billingFailed'));
     } finally {
       setBillingLoading(false);
     }
@@ -92,7 +94,7 @@ export default function PartnerDashboard() {
         window.location.href = res.data.checkout_url;
       }
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to create payment session.');
+      toast.error(err.response?.data?.detail || t('partnerDashboard.checkoutFailed'));
     } finally {
       setCheckoutLoading(false);
     }
@@ -120,7 +122,7 @@ export default function PartnerDashboard() {
       });
       const invoices = res.data.invoices || [];
       if (invoices.length === 0) {
-        toast.info('No invoices available yet.');
+        toast.info(t('partnerDashboard.noInvoices'));
         return;
       }
       const latest = invoices[0];
@@ -131,7 +133,7 @@ export default function PartnerDashboard() {
         window.open(`${API}/invoices/${latest.id}/download`, '_blank');
       }
     } catch (err) {
-      toast.error('Failed to fetch invoices.');
+      toast.error(t('partnerDashboard.invoiceFailed'));
     } finally {
       setInvoiceLoading(false);
     }
@@ -139,7 +141,8 @@ export default function PartnerDashboard() {
 
   const formatDate = (iso) => {
     if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' });
+    const locale = i18n.language === 'fr' ? 'fr-CA' : 'en-CA';
+    return new Date(iso).toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
   return (
@@ -151,9 +154,9 @@ export default function PartnerDashboard() {
             <div className="flex items-center gap-2.5">
               <AlertTriangle className="h-5 w-5 flex-shrink-0" />
               <div>
-                <p className="font-semibold text-sm">Annual Partner Fee Required</p>
+                <p className="font-semibold text-sm">{t('partnerDashboard.feeRequired')}</p>
                 <p className="text-xs text-amber-100">
-                  Your partner fee of $100 CAD/year + taxes has not been paid. Listing capabilities are locked.
+                  {t('partnerDashboard.feeRequiredDesc')}
                 </p>
               </div>
             </div>
@@ -165,9 +168,9 @@ export default function PartnerDashboard() {
               data-testid="softlock-pay-now-btn"
             >
               {checkoutLoading ? (
-                <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Processing...</>
+                <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> {t('partnerDashboard.processing')}</>
               ) : (
-                <><CreditCard className="h-4 w-4 mr-1.5" /> Pay Now — $100 CAD/year</>
+                <><CreditCard className="h-4 w-4 mr-1.5" /> {t('partnerDashboard.payNow')}</>
               )}
             </Button>
           </div>
@@ -186,9 +189,9 @@ export default function PartnerDashboard() {
                 <PartyPopper className="h-6 w-6 text-emerald-600" />
               </div>
               <div className="flex-1">
-                <h2 className="text-xl font-bold text-emerald-900">Account Activated!</h2>
+                <h2 className="text-xl font-bold text-emerald-900">{t('partnerDashboard.accountActivated')}</h2>
                 <p className="text-sm text-emerald-700 mt-1">
-                  Your annual partner fee has been processed successfully. All partner features are now unlocked — you can create listings, manage auctions, and access your full dashboard.
+                  {t('partnerDashboard.accountActivatedDesc')}
                 </p>
                 <div className="flex items-center gap-3 mt-4">
                   <Button 
@@ -197,7 +200,7 @@ export default function PartnerDashboard() {
                     size="sm"
                     data-testid="celebration-create-listing-btn"
                   >
-                    <Plus className="h-4 w-4 mr-1.5" /> Create Your First Listing
+                    <Plus className="h-4 w-4 mr-1.5" /> {t('partnerDashboard.createFirstListing')}
                   </Button>
                   <Button 
                     onClick={() => setShowCelebration(false)}
@@ -205,7 +208,7 @@ export default function PartnerDashboard() {
                     size="sm"
                     className="text-emerald-600"
                   >
-                    Dismiss
+                    {t('partnerDashboard.dismiss')}
                   </Button>
                 </div>
               </div>
@@ -217,23 +220,23 @@ export default function PartnerDashboard() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Partner Dashboard</h1>
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{t('partnerDashboard.title')}</h1>
               {isActive ? (
                 <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200" data-testid="status-badge-active">
-                  <CheckCircle className="h-3 w-3 mr-1" /> Active
+                  <CheckCircle className="h-3 w-3 mr-1" /> {t('partnerDashboard.active')}
                 </Badge>
               ) : !isFeePaid ? (
                 <Badge className="bg-amber-100 text-amber-700 border-amber-200" data-testid="status-badge-locked">
-                  <XCircle className="h-3 w-3 mr-1" /> Payment Required
+                  <XCircle className="h-3 w-3 mr-1" /> {t('partnerDashboard.paymentRequired')}
                 </Badge>
               ) : (
                 <Badge className="bg-blue-100 text-blue-700 border-blue-200" data-testid="status-badge-pending">
-                  <Clock className="h-3 w-3 mr-1" /> Processing
+                  <Clock className="h-3 w-3 mr-1" /> {t('partnerDashboard.processing')}
                 </Badge>
               )}
             </div>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-              {partner.company_name || 'Partner Account'} — Verified {formatDate(partner.verified_at)}
+              {partner.company_name || t('partnerDashboard.title')} — {t('partnerDashboard.verified')} {formatDate(partner.verified_at)}
             </p>
           </div>
           {isFeePaid && (
@@ -242,7 +245,7 @@ export default function PartnerDashboard() {
               className="bg-blue-600 hover:bg-blue-700"
               data-testid="create-listing-btn"
             >
-              <Plus className="h-4 w-4 mr-1.5" /> Create Listing
+              <Plus className="h-4 w-4 mr-1.5" /> {t('partnerDashboard.createListing')}
             </Button>
           )}
         </div>
@@ -258,13 +261,13 @@ export default function PartnerDashboard() {
                   <div>
                     <CardTitle className="text-lg font-semibold flex items-center gap-2">
                       <CreditCard className="h-5 w-5 text-blue-600" />
-                      Subscription & Billing
+                      {t('partnerDashboard.subscriptionBilling')}
                     </CardTitle>
-                    <CardDescription className="mt-1">Manage your annual partner fee and download tax receipts</CardDescription>
+                    <CardDescription className="mt-1">{t('partnerDashboard.subscriptionBillingDesc')}</CardDescription>
                   </div>
                   {isFeePaid && (
                     <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">
-                      <CheckCircle className="h-3 w-3 mr-1" /> Fee Paid
+                      <CheckCircle className="h-3 w-3 mr-1" /> {t('partnerDashboard.feePaid')}
                     </Badge>
                   )}
                 </div>
@@ -275,30 +278,30 @@ export default function PartnerDashboard() {
                 {subscription ? (
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Status</p>
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{t('partnerDashboard.status')}</p>
                       <p className="text-sm font-semibold flex items-center gap-1.5">
                         {subscription.status === 'active' ? (
-                          <><CheckCircle className="h-4 w-4 text-emerald-500" /> Active</>
+                          <><CheckCircle className="h-4 w-4 text-emerald-500" /> {t('partnerDashboard.active')}</>
                         ) : subscription.status === 'past_due' ? (
-                          <><AlertTriangle className="h-4 w-4 text-amber-500" /> Past Due</>
+                          <><AlertTriangle className="h-4 w-4 text-amber-500" /> {t('partnerDashboard.pastDue')}</>
                         ) : (
                           <><XCircle className="h-4 w-4 text-red-500" /> {subscription.status}</>
                         )}
                       </p>
                     </div>
                     <div className="space-y-1">
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Plan</p>
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{t('partnerDashboard.plan')}</p>
                       <p className="text-sm font-semibold">${subscription.plan_amount} {subscription.plan_currency.toUpperCase()}/{subscription.plan_interval}</p>
                     </div>
                     <div className="space-y-1">
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Current Period</p>
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{t('partnerDashboard.currentPeriod')}</p>
                       <p className="text-sm">{formatDate(subscription.current_period_start)}</p>
                     </div>
                     <div className="space-y-1">
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Next Billing</p>
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{t('partnerDashboard.nextBilling')}</p>
                       <p className="text-sm font-semibold">
                         {subscription.cancel_at_period_end ? (
-                          <span className="text-amber-600">Cancels on {formatDate(subscription.current_period_end)}</span>
+                          <span className="text-amber-600">{t('partnerDashboard.cancelsOn', { date: formatDate(subscription.current_period_end) })}</span>
                         ) : (
                           formatDate(subscription.current_period_end)
                         )}
@@ -307,11 +310,11 @@ export default function PartnerDashboard() {
                   </div>
                 ) : isFeePaid ? (
                   <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-4 text-center">
-                    <p className="text-sm text-slate-500">Subscription details unavailable. Use the billing portal to view details.</p>
+                    <p className="text-sm text-slate-500">{t('partnerDashboard.subDetailsUnavail')}</p>
                   </div>
                 ) : (
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                    <p className="text-sm text-amber-700 font-medium">No active subscription. Complete your $100 CAD/year payment to activate.</p>
+                    <p className="text-sm text-amber-700 font-medium">{t('partnerDashboard.noActiveSub')}</p>
                   </div>
                 )}
 
@@ -327,9 +330,9 @@ export default function PartnerDashboard() {
                         data-testid="manage-billing-btn"
                       >
                         {billingLoading ? (
-                          <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Opening...</>
+                          <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> {t('partnerDashboard.opening')}</>
                         ) : (
-                          <><FileText className="h-4 w-4 mr-1.5" /> View Invoices & Tax Receipts</>
+                          <><FileText className="h-4 w-4 mr-1.5" /> {t('partnerDashboard.viewInvoicesTax')}</>
                         )}
                       </Button>
                       <Button
@@ -339,9 +342,9 @@ export default function PartnerDashboard() {
                         data-testid="download-invoice-btn"
                       >
                         {invoiceLoading ? (
-                          <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Loading...</>
+                          <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> {t('partnerDashboard.loading')}</>
                         ) : (
-                          <><DollarSign className="h-4 w-4 mr-1.5" /> Download Latest Invoice</>
+                          <><DollarSign className="h-4 w-4 mr-1.5" /> {t('partnerDashboard.downloadLatestInvoice')}</>
                         )}
                       </Button>
                       <Button
@@ -350,7 +353,7 @@ export default function PartnerDashboard() {
                         disabled={billingLoading}
                         data-testid="update-payment-btn"
                       >
-                        <CreditCard className="h-4 w-4 mr-1.5" /> Update Payment Method
+                        <CreditCard className="h-4 w-4 mr-1.5" /> {t('partnerDashboard.updatePaymentMethod')}
                       </Button>
                     </>
                   ) : (
@@ -361,16 +364,16 @@ export default function PartnerDashboard() {
                       data-testid="pay-annual-fee-btn"
                     >
                       {checkoutLoading ? (
-                        <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Processing...</>
+                        <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> {t('partnerDashboard.processing')}</>
                       ) : (
-                        <><CreditCard className="h-4 w-4 mr-1.5" /> Pay $100 CAD/year + taxes</>
+                        <><CreditCard className="h-4 w-4 mr-1.5" /> {t('partnerDashboard.payAnnualFee')}</>
                       )}
                     </Button>
                   )}
                 </div>
 
                 <p className="text-xs text-slate-400">
-                  Your GST/QST tax receipts are available through the Stripe billing portal, or download your latest invoice directly using the button above.
+                  {t('partnerDashboard.taxReceiptNote')}
                 </p>
               </CardContent>
             </Card>
@@ -380,7 +383,7 @@ export default function PartnerDashboard() {
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg font-semibold flex items-center gap-2">
                   <Clock className="h-5 w-5 text-slate-500" />
-                  Recent Activity
+                  {t('partnerDashboard.recentActivity')}
                 </CardTitle>
               </CardHeader>
               <Separator />
@@ -388,10 +391,10 @@ export default function PartnerDashboard() {
                 {(dashboard.recent_listings.length === 0 && dashboard.recent_multi_auctions.length === 0) ? (
                   <div className="text-center py-8">
                     <Package className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-                    <p className="text-sm text-slate-500">No listings yet.</p>
+                    <p className="text-sm text-slate-500">{t('partnerDashboard.noListingsYet')}</p>
                     {isFeePaid && (
                       <Button onClick={() => navigate('/create-listing')} variant="link" className="mt-2 text-blue-600">
-                        Create your first listing <ArrowRight className="h-3 w-3 ml-1" />
+                        {t('partnerDashboard.createFirstLink')} <ArrowRight className="h-3 w-3 ml-1" />
                       </Button>
                     )}
                   </div>
@@ -439,7 +442,7 @@ export default function PartnerDashboard() {
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg font-semibold flex items-center gap-2">
                   <BarChart3 className="h-5 w-5 text-blue-600" />
-                  Listing Stats
+                  {t('partnerDashboard.listingStats')}
                 </CardTitle>
               </CardHeader>
               <Separator />
@@ -447,19 +450,19 @@ export default function PartnerDashboard() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-3 text-center">
                     <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">{stats.active_listings}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Active Listings</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{t('partnerDashboard.activeListings')}</p>
                   </div>
                   <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-3 text-center">
                     <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{stats.total_listings}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Total Listings</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{t('partnerDashboard.totalListings')}</p>
                   </div>
                   <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-3 text-center">
                     <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{stats.total_bids_received}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Bids Received</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{t('partnerDashboard.bidsReceived')}</p>
                   </div>
                   <div className="bg-purple-50 dark:bg-purple-950/30 rounded-lg p-3 text-center">
                     <p className="text-2xl font-bold text-purple-700 dark:text-purple-400">{stats.active_multi}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Multi-Lot Auctions</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{t('partnerDashboard.multiLotAuctions')}</p>
                   </div>
                 </div>
               </CardContent>
@@ -470,47 +473,47 @@ export default function PartnerDashboard() {
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg font-semibold flex items-center gap-2">
                   <Shield className="h-5 w-5 text-slate-500" />
-                  Account Details
+                  {t('partnerDashboard.accountDetails')}
                 </CardTitle>
               </CardHeader>
               <Separator />
               <CardContent className="pt-5">
                 <dl className="space-y-3 text-sm">
                   <div className="flex justify-between">
-                    <dt className="text-slate-500">Company</dt>
+                    <dt className="text-slate-500">{t('partnerDashboard.company')}</dt>
                     <dd className="font-medium text-right">{partner.company_name || '—'}</dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-slate-500">Platform Fee</dt>
+                    <dt className="text-slate-500">{t('partnerDashboard.platformFee')}</dt>
                     <dd className="font-medium">
                       <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-xs">3%</Badge>
                     </dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-slate-500">Buyer Premium</dt>
+                    <dt className="text-slate-500">{t('partnerDashboard.buyerPremium')}</dt>
                     <dd className="font-medium">
                       {partner.custom_premium_rate
                         ? `${(partner.custom_premium_rate * 100).toFixed(1)}%`
-                        : 'Not set'}
+                        : t('partnerDashboard.notSet')}
                     </dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-slate-500">Stripe Connect</dt>
+                    <dt className="text-slate-500">{t('partnerDashboard.stripeConnect')}</dt>
                     <dd className="font-medium">
                       {partner.stripe_connect_status === 'complete' ? (
-                        <span className="text-emerald-600 flex items-center gap-1"><CheckCircle className="h-3 w-3" /> Connected</span>
+                        <span className="text-emerald-600 flex items-center gap-1"><CheckCircle className="h-3 w-3" /> {t('partnerDashboard.connected')}</span>
                       ) : (
-                        <span className="text-amber-600 flex items-center gap-1"><Clock className="h-3 w-3" /> Pending</span>
+                        <span className="text-amber-600 flex items-center gap-1"><Clock className="h-3 w-3" /> {t('partnerDashboard.pending')}</span>
                       )}
                     </dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-slate-500">Annual Fee</dt>
+                    <dt className="text-slate-500">{t('partnerDashboard.annualFee')}</dt>
                     <dd className="font-medium">
                       {isFeePaid ? (
-                        <span className="text-emerald-600 flex items-center gap-1"><CheckCircle className="h-3 w-3" /> Paid</span>
+                        <span className="text-emerald-600 flex items-center gap-1"><CheckCircle className="h-3 w-3" /> {t('partnerDashboard.paid')}</span>
                       ) : (
-                        <span className="text-amber-600 flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Unpaid</span>
+                        <span className="text-amber-600 flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> {t('partnerDashboard.unpaid')}</span>
                       )}
                     </dd>
                   </div>
@@ -527,7 +530,7 @@ export default function PartnerDashboard() {
                   onClick={() => navigate('/seller/dashboard')}
                   data-testid="link-seller-dashboard"
                 >
-                  <TrendingUp className="h-4 w-4 mr-2 text-slate-500" /> Seller Dashboard
+                  <TrendingUp className="h-4 w-4 mr-2 text-slate-500" /> {t('partnerDashboard.sellerDashboard')}
                 </Button>
                 <Button
                   variant="ghost"
@@ -535,7 +538,7 @@ export default function PartnerDashboard() {
                   onClick={() => navigate('/settings')}
                   data-testid="link-settings"
                 >
-                  <Settings className="h-4 w-4 mr-2 text-slate-500" /> Account Settings
+                  <Settings className="h-4 w-4 mr-2 text-slate-500" /> {t('partnerDashboard.accountSettings')}
                 </Button>
                 <Button
                   variant="ghost"
@@ -544,7 +547,7 @@ export default function PartnerDashboard() {
                   disabled={!isFeePaid}
                   data-testid="link-create-multi"
                 >
-                  <Gavel className="h-4 w-4 mr-2 text-slate-500" /> Create Multi-Lot Auction
+                  <Gavel className="h-4 w-4 mr-2 text-slate-500" /> {t('partnerDashboard.createMultiLot')}
                 </Button>
               </CardContent>
             </Card>

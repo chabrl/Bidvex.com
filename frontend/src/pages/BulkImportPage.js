@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -16,6 +17,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const BulkImportPage = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { token } = useAuth();
   const fileRef = useRef(null);
 
@@ -38,7 +40,7 @@ const BulkImportPage = () => {
       a.click();
       window.URL.revokeObjectURL(url);
     } catch {
-      toast.error('Failed to download template');
+      toast.error(t('bulkImport.failedDownload'));
     }
   };
 
@@ -53,10 +55,10 @@ const BulkImportPage = () => {
         headers: { ...headers, 'Content-Type': 'multipart/form-data' },
       });
       setResult(data);
-      if (data.imported > 0) toast.success(`${data.imported} listings imported`);
-      if (data.errors > 0) toast.warning(`${data.errors} rows had errors`);
+      if (data.imported > 0) toast.success(t('bulkImport.listingsImported', { count: data.imported }));
+      if (data.errors > 0) toast.warning(t('bulkImport.rowsHadErrors', { count: data.errors }));
     } catch (err) {
-      const msg = err.response?.data?.detail || 'Import failed';
+      const msg = err.response?.data?.detail || t('bulkImport.importFailed');
       toast.error(msg);
     } finally {
       setUploading(false);
@@ -67,7 +69,7 @@ const BulkImportPage = () => {
     e.preventDefault();
     const f = e.dataTransfer?.files?.[0];
     if (f && f.name.endsWith('.csv')) setFile(f);
-    else toast.error('Only CSV files are accepted');
+    else toast.error(t('bulkImport.csvOnly'));
   };
 
   return (
@@ -85,8 +87,8 @@ const BulkImportPage = () => {
               <FileSpreadsheet className="h-7 w-7 text-cyan-300" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">Bulk Listing Import</h1>
-              <p className="text-blue-200/80 text-sm">Upload a CSV to create multiple listings at once</p>
+              <h1 className="text-2xl font-bold text-white">{t('bulkImport.title')}</h1>
+              <p className="text-blue-200/80 text-sm">{t('bulkImport.subtitle')}</p>
             </div>
           </div>
         </div>
@@ -98,15 +100,15 @@ const BulkImportPage = () => {
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Badge className="bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300 text-xs">1</Badge>
-              Download Template
+              {t('bulkImport.downloadTemplate')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
-              Start with our template. Required columns: <code className="text-xs bg-slate-100 dark:bg-slate-700 px-1 rounded">title</code>, <code className="text-xs bg-slate-100 dark:bg-slate-700 px-1 rounded">starting_price</code>, <code className="text-xs bg-slate-100 dark:bg-slate-700 px-1 rounded">category</code>.
+              {t('bulkImport.templateDesc')} <code className="text-xs bg-slate-100 dark:bg-slate-700 px-1 rounded">title</code>, <code className="text-xs bg-slate-100 dark:bg-slate-700 px-1 rounded">starting_price</code>, <code className="text-xs bg-slate-100 dark:bg-slate-700 px-1 rounded">category</code>.
             </p>
             <Button variant="outline" onClick={downloadTemplate} className="border-cyan-500 text-cyan-600 hover:bg-cyan-50 dark:hover:bg-cyan-900/20" data-testid="download-template-btn">
-              <Download className="h-4 w-4 mr-2" /> Download CSV Template
+              <Download className="h-4 w-4 mr-2" /> {t('bulkImport.downloadBtn')}
             </Button>
           </CardContent>
         </Card>
@@ -116,7 +118,7 @@ const BulkImportPage = () => {
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Badge className="bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300 text-xs">2</Badge>
-              Upload CSV
+              {t('bulkImport.uploadCsv')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -151,8 +153,8 @@ const BulkImportPage = () => {
               ) : (
                 <>
                   <Upload className="h-10 w-10 mx-auto text-slate-400 mb-3" />
-                  <p className="font-medium text-slate-700 dark:text-slate-300">Drop CSV here or click to browse</p>
-                  <p className="text-xs text-slate-500 mt-1">Max 5 MB</p>
+                  <p className="font-medium text-slate-700 dark:text-slate-300">{t('bulkImport.dropHere')}</p>
+                  <p className="text-xs text-slate-500 mt-1">{t('bulkImport.maxSize')}</p>
                 </>
               )}
             </div>
@@ -165,7 +167,7 @@ const BulkImportPage = () => {
                 data-testid="upload-csv-btn"
               >
                 {uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
-                {uploading ? 'Importing...' : 'Import Listings'}
+                {uploading ? t('bulkImport.importing') : t('bulkImport.importListings')}
               </Button>
             </div>
           </CardContent>
@@ -177,28 +179,28 @@ const BulkImportPage = () => {
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 {result.imported > 0 ? <CheckCircle2 className="h-5 w-5 text-green-500" /> : <AlertTriangle className="h-5 w-5 text-amber-500" />}
-                Import Results
+                {t('bulkImport.importResults')}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 text-center">
                   <p className="text-2xl font-bold text-green-600 dark:text-green-400">{result.imported}</p>
-                  <p className="text-xs text-green-700 dark:text-green-300">Imported</p>
+                  <p className="text-xs text-green-700 dark:text-green-300">{t('bulkImport.imported')}</p>
                 </div>
                 <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 text-center">
                   <p className="text-2xl font-bold text-red-600 dark:text-red-400">{result.errors}</p>
-                  <p className="text-xs text-red-700 dark:text-red-300">Errors</p>
+                  <p className="text-xs text-red-700 dark:text-red-300">{t('bulkImport.errors')}</p>
                 </div>
               </div>
 
               {result.error_details?.length > 0 && (
                 <div className="mt-3">
-                  <p className="text-xs font-medium text-slate-500 mb-2">Error details:</p>
+                  <p className="text-xs font-medium text-slate-500 mb-2">{t('bulkImport.errorDetails')}</p>
                   <div className="max-h-40 overflow-y-auto space-y-1">
                     {result.error_details.map((e, i) => (
                       <div key={i} className="flex gap-2 text-xs">
-                        <Badge variant="outline" className="text-red-600 shrink-0">Row {e.row}</Badge>
+                        <Badge variant="outline" className="text-red-600 shrink-0">{t('bulkImport.row', { num: e.row })}</Badge>
                         <span className="text-slate-600 dark:text-slate-400">{e.error}</span>
                       </div>
                     ))}
