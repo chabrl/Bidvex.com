@@ -9,6 +9,7 @@ import {
   ArrowLeft, Store, Package, Clock, Eye, Gavel, MapPin, Star, ExternalLink
 } from 'lucide-react';
 import SEO from '../components/SEO';
+import { SellerReputationCard, SellerReviewsList } from '../components/SellerReputation';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -94,6 +95,16 @@ const StorefrontPage = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* Reputation & Reviews */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="md:col-span-1">
+            <SellerReputationCard sellerId={userId} />
+          </div>
+          <div className="md:col-span-2">
+            <SellerReviewsList sellerId={userId} />
+          </div>
+        </div>
 
         {/* Listings */}
         <div className="mb-4 flex items-center justify-between">

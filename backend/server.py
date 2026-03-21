@@ -296,6 +296,44 @@ scheduler.add_job(send_auction_payment_reminders, trigger=IntervalTrigger(hours=
 scheduler.add_job(process_overdue_auction_payments, trigger=IntervalTrigger(hours=6),
                   id='process_overdue_auction_payments', replace_existing=True)
 
+
+async def send_review_request_emails():
+    """Send 'How was your purchase?' emails 24h after payment confirmation."""
+    try:
+        now = datetime.now(timezone.utc)
+        now_str = now.isoformat()
+
+        pending_requests = await db.review_requests.find({
+            "send_at": {"$lte": now_str},
+            "sent": False,
+        }, {"_id": 0}).to_list(50)
+
+        for req in pending_requests:
+            try:
+                buyer = await db.users.find_one({"id": req["buyer_id"]}, {"_id": 0})
+                if buyer and buyer.get("email"):
+                    from services.email_notifications import send_review_request_email
+                    await send_review_request_email(
+                        buyer_email=buyer["email"],
+                        buyer_name=buyer.get("name", "Buyer"),
+                        item_title=req.get("item_title", "Item"),
+                        transaction_id=req["transaction_id"],
+                        seller_name=req.get("seller_name", "Seller"),
+                    )
+                await db.review_requests.update_one(
+                    {"transaction_id": req["transaction_id"]},
+                    {"$set": {"sent": True, "sent_at": now_str}},
+                )
+                logger.info(f"Review request email sent for txn {req['transaction_id']}")
+            except Exception as e:
+                logger.error(f"Failed to send review request: {e}")
+    except Exception as e:
+        logger.error(f"Error in send_review_request_emails: {e}")
+
+
+scheduler.add_job(send_review_request_emails, trigger=IntervalTrigger(hours=1),
+                  id='send_review_request_emails', replace_existing=True)
+
 # ─── Health Endpoints ───
 @api_router.get("/")
 async def root():
@@ -378,6 +416,7 @@ try:
         ("routes.site_mode", "site_mode_router", None, False),
         ("routes.misc", "misc_router", None, False),
         ("routes.partner_pro", "partner_pro_router", "set_partner_pro_db", False),
+        ("routes.reviews", "reviews_router", "set_reviews_db", False),
     ]
 
     for module_path, router_name, db_setter_name, app_level in SELF_CONTAINED_ROUTERS:

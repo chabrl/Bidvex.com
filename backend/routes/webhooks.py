@@ -663,6 +663,25 @@ async def _handle_checkout_completed(db, session):
                 except Exception as e:
                     logger.warning(f"Failed to send buy-now confirmation email: {e}")
 
+        # Schedule review request email (24h later)
+        try:
+            auction_obj = await db.multi_item_listings.find_one({"id": auction_id}, {"_id": 0})
+            seller_doc = await db.users.find_one({"id": auction_obj["seller_id"]}, {"_id": 0}) if auction_obj else None
+            await db.review_requests.update_one(
+                {"transaction_id": transaction_id},
+                {"$set": {
+                    "transaction_id": transaction_id,
+                    "buyer_id": buyer_id,
+                    "item_title": auction_obj.get("title", "Item") if auction_obj else "Item",
+                    "seller_name": seller_doc.get("name", "Seller") if seller_doc else "Seller",
+                    "send_at": (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat(),
+                    "sent": False,
+                }},
+                upsert=True,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to schedule review request: {e}")
+
     elif payment_type == "auction_winner":
         # Auction winner payment — mark listing fully paid
         listing_id = metadata.get("listing_id")
@@ -696,6 +715,24 @@ async def _handle_checkout_completed(db, session):
                     {"listing_id": listing_id, "buyer_id": buyer_id, "type": "auction_winner"},
                     {"$set": {"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat()}}
                 )
+
+                # Schedule review request email (24h later)
+                try:
+                    seller_doc = await db.users.find_one({"id": listing["seller_id"]}, {"_id": 0})
+                    await db.review_requests.update_one(
+                        {"transaction_id": listing_id},
+                        {"$set": {
+                            "transaction_id": listing_id,
+                            "buyer_id": buyer_id,
+                            "item_title": listing.get("title", "Item"),
+                            "seller_name": seller_doc.get("name", "Seller") if seller_doc else "Seller",
+                            "send_at": (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat(),
+                            "sent": False,
+                        }},
+                        upsert=True,
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to schedule review request: {e}")
     
     logger.info(f"Checkout completed processing finished: {session_id}")
 

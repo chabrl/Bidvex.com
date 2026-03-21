@@ -1125,3 +1125,59 @@ async def send_payment_overdue_email(
         subject=f"OVERDUE: Payment Required for {item_title}",
         html_content=_base_template(content, "Payment Overdue")
     )
+
+
+# ========== REVIEW REQUEST EMAIL ==========
+
+async def send_review_request_email(
+    buyer_email: str,
+    buyer_name: str,
+    item_title: str,
+    transaction_id: str,
+    seller_name: str,
+) -> Dict[str, Any]:
+    """Send 'How was your purchase?' email 24h after payment confirmation."""
+    review_url = f"{FRONTEND_URL}/review/{transaction_id}"
+
+    content = f"""
+    <h2 style="margin: 0 0 20px 0; color: #1e3a8a;">How was your purchase?</h2>
+
+    <p style="color: #475569; line-height: 1.6;">
+        Hi {buyer_name},
+    </p>
+
+    <p style="color: #475569; line-height: 1.6;">
+        You recently purchased <strong>{item_title}</strong> from <strong>{seller_name}</strong>.
+        We'd love to hear about your experience!
+    </p>
+
+    <p style="color: #475569; line-height: 1.6;">
+        Your review helps other buyers make informed decisions and helps sellers improve.
+    </p>
+
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
+        <tr>
+            <td style="padding: 4px;">
+                <span style="font-size: 36px; color: #f59e0b;">&#9733;&#9733;&#9733;&#9733;&#9733;</span>
+            </td>
+        </tr>
+    </table>
+
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 20px auto;">
+        <tr>
+            <td align="center" style="background-color: #1e3a8a; padding: 14px 30px; border-radius: 8px;">
+                <a href="{review_url}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">Leave a Review</a>
+            </td>
+        </tr>
+    </table>
+
+    <p style="color: #94a3b8; font-size: 12px; text-align: center;">
+        If the button doesn't work, copy this link: {review_url}
+    </p>
+    """
+
+    return await send_email(
+        to_email=buyer_email,
+        subject=f"How was your purchase of {item_title}?",
+        html_content=_base_template(content, "Leave a Review")
+    )
