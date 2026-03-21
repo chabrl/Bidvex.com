@@ -68,7 +68,20 @@ BidVex is a full-stack auction marketplace with React frontend, FastAPI backend,
 - POST /api/reviews/{id}/unflag — Admin restore
 - GET /api/reviews/moderation/pending — Admin flagged list
 
+### Subscription Pricing Page Redesign (March 21, 2026)
+- **Layout**: Rewrote SubscriptionPricingPage.js with 2x2 responsive grid (md:grid-cols-2). Card order: [Starter, Premium] top, [Partner Pro, VIP Elite] bottom. Single column on mobile.
+- **Card Design**: Tier-specific top accent borders (slate/purple-indigo/teal-cyan/amber-gold), rounded-2xl corners, shadow-md with hover:shadow-lg, p-6 sm:p-8 padding.
+- **VIP Elite Card**: Dark charcoal background (#1a1a2e), ALL text white (#FFFFFF) or gold (#FFD700). Fixed global CSS !important override on h3 headings by adding targeted selector in index.css.
+- **CTA Buttons**: Tier-specific gradient buttons, greyed-out "Current Plan" for active tier, "CURRENT PLAN" uppercase badge.
+- **Account Settings Section**: Shows current plan, billing renewal date, and payment method for logged-in users with link to /settings.
+- **Personalized Savings Section**: Shows monthly savings for each paid plan when using yearly billing.
+- **i18n**: 30+ new pricingPage keys added (planNames, planTaglines, off, free, yr, mo, saveAmount, processing, goVip, terms, accountSettings, etc.). 1195 keys in sync EN/FR, 0 missing.
+- **Display Names**: Free→Starter, VIP→VIP Elite (via i18n planNames keys).
+- **Responsive**: Verified at 390px (single col), 768px (2x2), 1280px (2x2). No horizontal overflow at any breakpoint.
+- **Testing**: 100% frontend pass (Iteration 83)
+
 ## Backlog
 - (P2) Cloudflare CDN setup per /app/memory/INFRASTRUCTURE_P2.md
 - (P2) Post-launch monitoring and alerting
 - (Post-Launch) Configure production secrets (Stripe, SendGrid, webhooks)
+- (Low Priority) Add i18n to internal EmailMarketingPricing page
