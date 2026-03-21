@@ -8,7 +8,7 @@ import axios from 'axios';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
-import { Plus, DollarSign, Package, FileText, ShoppingBag, Heart, Eye, TrendingUp, BarChart3, Wallet, Info, AlertTriangle, Clock, Shield, Mail } from 'lucide-react';
+import { Plus, DollarSign, Package, FileText, ShoppingBag, Heart, Eye, TrendingUp, BarChart3, Wallet, Info, AlertTriangle, Clock, Shield, Mail, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import SellerAnalyticsDashboard from '../components/SellerAnalyticsDashboard';
 import { formatCurrency, formatPercent } from '../utils/currencyFormatter';
@@ -25,6 +25,7 @@ const SellerDashboard = () => {
   const [activeTab, setActiveTab] = useState('listings');
   const [deletionRequestModal, setDeletionRequestModal] = useState({ open: false, listing: null, isMultiItem: false });
   const [deletionReason, setDeletionReason] = useState('');
+  const [deletionSubmitting, setDeletionSubmitting] = useState(false);
   const [showTaxModal, setShowTaxModal] = useState(false);
 
   useEffect(() => {
@@ -58,12 +59,15 @@ const SellerDashboard = () => {
       return;
     }
     
+    setDeletionSubmitting(true);
     try {
       const { listing, isMultiItem } = deletionRequestModal;
       const endpoint = isMultiItem ? 'multi-item-listings' : 'listings';
       
       await axios.post(`${API}/${endpoint}/${listing.id}/request-deletion`, {
         reason: deletionReason
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
       });
       
       toast.success(t('dashboard.seller.deletionRequestSubmitted', 'Deletion request submitted. Admin will review shortly.'));
@@ -71,7 +75,10 @@ const SellerDashboard = () => {
       setDeletionReason('');
       fetchDashboard();
     } catch (error) {
-      toast.error(t('dashboard.seller.deletionRequestFailed', 'Failed to submit deletion request'));
+      console.error('Deletion request failed:', error);
+      toast.error(error.response?.data?.detail || t('dashboard.seller.deletionRequestFailed', 'Failed to submit deletion request'));
+    } finally {
+      setDeletionSubmitting(false);
     }
   };
 
@@ -517,9 +524,14 @@ const SellerDashboard = () => {
                 <Button
                   variant="destructive"
                   onClick={handleSubmitDeletionRequest}
-                  disabled={deletionReason.trim().length < 20}
+                  disabled={deletionReason.trim().length < 20 || deletionSubmitting}
+                  data-testid="submit-deletion-btn"
                 >
-                  {t('dashboard.seller.submitRequest', 'Submit Request')}
+                  {deletionSubmitting ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Submitting...</>
+                  ) : (
+                    t('dashboard.seller.submitRequest', 'Submit Request')
+                  )}
                 </Button>
               </div>
             </CardContent>

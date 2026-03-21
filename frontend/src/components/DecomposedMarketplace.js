@@ -129,44 +129,46 @@ const DecomposedMarketplace = () => {
         </p>
       </div>
 
-      {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <input
-          type="text"
-          placeholder="Search items..."
-          value={filters.search}
-          onChange={(e) => setFilters({...filters, search: e.target.value})}
-          className="border rounded px-4 py-2"
-        />
-        
-        <select
-          value={filters.sort}
-          onChange={(e) => setFilters({...filters, sort: e.target.value})}
-          className="border rounded px-4 py-2"
-        >
-          <option value="-promoted">{t("marketplace.promotedFirst")}</option>
-          <option value="ending_soon">{t("marketplace.endingSoon")}</option>
-          <option value="price">Price: Low to High</option>
-          <option value="-price">Price: High to Low</option>
-          <option value="-created_at">{t("marketplace.newestFirst")}</option>
-        </select>
+      {/* Filters — sticky horizontal bar */}
+      <div className="sticky top-0 z-10 bg-white/95 dark:bg-slate-900/95 backdrop-blur -mx-4 px-4 py-3 mb-4 border-b border-slate-200 dark:border-slate-700">
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide items-center" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <input
+            type="text"
+            placeholder="Search items..."
+            value={filters.search}
+            onChange={(e) => setFilters({...filters, search: e.target.value})}
+            className="border rounded px-3 py-1.5 text-xs h-9 flex-shrink-0 w-44 sm:w-56 bg-background"
+          />
+          
+          <select
+            value={filters.sort}
+            onChange={(e) => setFilters({...filters, sort: e.target.value})}
+            className="border rounded px-3 py-1.5 text-xs h-9 flex-shrink-0 bg-background"
+          >
+            <option value="-promoted">{t("marketplace.promotedFirst")}</option>
+            <option value="ending_soon">{t("marketplace.endingSoon")}</option>
+            <option value="price">Price: Low → High</option>
+            <option value="-price">Price: High → Low</option>
+            <option value="-created_at">{t("marketplace.newestFirst")}</option>
+          </select>
 
-        <select
-          value={filters.condition}
-          onChange={(e) => setFilters({...filters, condition: e.target.value})}
-          className="border rounded px-4 py-2"
-        >
-          <option value="">{t("marketplace.allConditions")}</option>
-          <option value="new">New</option>
-          <option value="like_new">{t("marketplace.likeNew")}</option>
-          <option value="good">Good</option>
-          <option value="fair">Fair</option>
-          <option value="poor">Poor</option>
-        </select>
+          <select
+            value={filters.condition}
+            onChange={(e) => setFilters({...filters, condition: e.target.value})}
+            className="border rounded px-3 py-1.5 text-xs h-9 flex-shrink-0 bg-background"
+          >
+            <option value="">{t("marketplace.allConditions")}</option>
+            <option value="new">New</option>
+            <option value="like_new">{t("marketplace.likeNew")}</option>
+            <option value="good">Good</option>
+            <option value="fair">Fair</option>
+            <option value="poor">Poor</option>
+          </select>
 
-        <Button onClick={fetchItems} variant="outline">
-          Apply Filters
-        </Button>
+          <Button onClick={fetchItems} variant="outline" size="sm" className="flex-shrink-0 h-9 text-xs">
+            Apply
+          </Button>
+        </div>
       </div>
 
       {/* Results Count */}
@@ -189,7 +191,7 @@ const DecomposedMarketplace = () => {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {items.map((item) => (
             <Card 
               key={item.id} 

@@ -1297,7 +1297,7 @@ const MultiItemListingDetailPage = () => {
                             </div>
 
                             {/* Standard Bid Input */}
-                            <div className="flex gap-2">
+                            <div className="flex flex-col sm:flex-row gap-2">
                               <input
                                 type="number"
                                 step="0.01"
@@ -1305,14 +1305,16 @@ const MultiItemListingDetailPage = () => {
                                 placeholder={`Min: ${formatCurrency(lot.current_price + getMinimumIncrement(lot.current_price))}`}
                                 value={bidAmounts[lot.lot_number] || ''}
                                 onChange={(e) => handleBidChange(lot.lot_number, e.target.value)}
-                                className="flex-1 px-4 py-2 border border-input rounded-md bg-background"
+                                className="flex-1 px-4 py-3 border border-input rounded-md bg-background min-h-[48px] text-base"
                                 disabled={(listing.auction_terms_en || listing.auction_terms_fr) && !agreedToTerms}
+                                data-testid="bid-amount-input"
                               />
                               <Button 
                                 onClick={() => handlePlaceBid(lot.lot_number, 'normal')}
-                                className="gradient-button text-white border-0"
+                                className="gradient-button text-white border-0 min-h-[48px] w-full sm:w-auto whitespace-nowrap"
                                 disabled={(listing.auction_terms_en || listing.auction_terms_fr) && !agreedToTerms}
                                 title={!agreedToTerms && (listing.auction_terms_en || listing.auction_terms_fr) ? t('auction.mustAgreeToTermsFirst', 'Please agree to terms & conditions first') : ''}
+                                data-testid="place-bid-btn"
                               >
                                 <Gavel className="mr-2 h-4 w-4" />
                                 {t('bid.placeBid', 'Place Bid')}
@@ -1332,7 +1334,7 @@ const MultiItemListingDetailPage = () => {
 
                             {/* Premium Bidding Options */}
                             {user && (
-                              <div className="flex flex-wrap gap-2">
+                              <div className="flex flex-wrap gap-2 items-center">
                                 <AutoBidModal
                                   listingId={lot.id}
                                   currentBid={lot.current_price}
@@ -1342,9 +1344,7 @@ const MultiItemListingDetailPage = () => {
                                   }}
                                 />
                                 {user.subscription_tier && (
-                                  <div className="flex items-center">
-                                    <SubscriptionBadge tier={user.subscription_tier} size="small" />
-                                  </div>
+                                  <SubscriptionBadge tier={user.subscription_tier} size="small" />
                                 )}
                               </div>
                             )}

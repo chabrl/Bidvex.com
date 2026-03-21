@@ -697,18 +697,18 @@ const MessagesPage = () => {
       )}
       
       {/* ========== CONVERSATIONS LIST (Left Pane) ========== */}
-      <div className={`${showMobileConversations ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-96 border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900`}>
+      <div className={`${selectedConversation && !showMobileConversations ? 'hidden' : 'flex'} md:flex flex-col w-full md:w-96 md:max-w-[40%] border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900`}>
         {/* Header */}
-        <div className="p-5 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-[#1E3A8A] to-[#06B6D4]">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <MessageSquare className="h-6 w-6 text-white" />
-              <h2 className="text-xl font-bold text-white">Messages</h2>
+        <div className="p-4 md:p-5 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-[#1E3A8A] to-[#06B6D4]">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-white" />
+              <h2 className="text-lg font-bold text-white">Messages</h2>
             </div>
             <div className="flex items-center gap-2">
               <button 
                 onClick={() => setSoundEnabled(!soundEnabled)}
-                className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+                className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
                 title={soundEnabled ? 'Mute sounds' : 'Enable sounds'}
               >
                 {soundEnabled ? (
@@ -739,7 +739,10 @@ const MessagesPage = () => {
                 key={convo.id}
                 convo={convo}
                 isSelected={selectedConversation?.id === convo.id}
-                onClick={() => setSelectedConversation(convo)}
+                onClick={() => {
+                  setSelectedConversation(convo);
+                  setShowMobileConversations(false);
+                }}
                 otherUserOnline={selectedConversation?.id === convo.id && otherUserOnline}
               />
             ))
@@ -754,7 +757,7 @@ const MessagesPage = () => {
       </div>
 
       {/* ========== CHAT AREA (Right Pane) ========== */}
-      <div className={`${!showMobileConversations || !selectedConversation ? 'flex' : 'hidden'} md:flex flex-col flex-1`}>
+      <div className={`${showMobileConversations ? 'hidden' : 'flex'} md:flex flex-col flex-1 min-w-0`}>
         {selectedConversation ? (
           <>
             {/* Chat Header */}
