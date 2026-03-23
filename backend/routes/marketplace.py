@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 marketplace_router = APIRouter(tags=["Marketplace"])
 
 _db = None
+_db_read = None
 
 
 def set_marketplace_db(db_instance):
@@ -31,10 +32,19 @@ def set_marketplace_db(db_instance):
     _db = db_instance
 
 
+def set_marketplace_read_db(db_instance):
+    global _db_read
+    _db_read = db_instance
+
+
 def get_db():
     if _db is None:
         raise RuntimeError("Marketplace database not initialized")
     return _db
+
+
+def get_read_db():
+    return _db_read if _db_read is not None else _db
 
 
 # ========== STALE-WHILE-REVALIDATE CACHE (5-min TTL) ==========
@@ -44,6 +54,14 @@ _filter_counts_cache = {
     "refreshing": False,    # guard to prevent concurrent refresh tasks
 }
 _CACHE_TTL = 300  # 5 minutes
+
+# ========== MARKETPLACE ITEMS CACHE (30s TTL) ==========
+_items_cache = {
+    "data": None,           # full sorted list of all active items
+    "fresh_until": 0,
+    "refreshing": False,
+}
+_ITEMS_CACHE_TTL = 30  # 30 seconds
 
 
 class LocationSearchParams(BaseModel):
@@ -55,103 +73,76 @@ class LocationSearchParams(BaseModel):
     max_price: Optional[float] = None
 
 
-# ========== MARKETPLACE ITEMS ==========
+# ── Projection: only fields the frontend actually uses ──
+_LISTING_PROJECTION = {
+    "_id": 0, "id": 1, "title": 1, "description": 1, "category": 1,
+    "condition": 1, "images": 1, "starting_price": 1, "current_price": 1,
+    "buy_now_price": 1, "bid_count": 1, "highest_bidder_id": 1,
+    "auction_end_date": 1, "status": 1, "seller_id": 1,
+    "is_promoted": 1, "promotion_tier": 1, "is_featured": 1,
+    "is_partner_listing": 1, "city": 1, "region": 1, "country": 1,
+    "created_at": 1,
+}
+_MULTI_PROJECTION = {
+    "_id": 0, "id": 1, "title": 1, "description": 1, "category": 1,
+    "lots": 1, "auction_end_date": 1, "auction_start_date": 1,
+    "status": 1, "seller_id": 1, "is_promoted": 1, "promotion_tier": 1,
+    "is_featured": 1, "is_partner_listing": 1, "region": 1, "country": 1,
+    "created_at": 1,
+}
 
-@marketplace_router.get("/marketplace/items")
-async def get_marketplace_items(
-    search: Optional[str] = None,
-    category: Optional[str] = None,
-    min_price: Optional[float] = None,
-    max_price: Optional[float] = None,
-    condition: Optional[str] = None,
-    sort: str = "-promoted",
-    limit: int = 50,
-    skip: int = 0,
-    cursor: Optional[str] = None,
-    track_impression: bool = False
-):
-    """
-    Decomposed marketplace view: Returns individual items from multi-item lots.
-    Features:
-    - Item-centric discovery (not lot-centric)
-    - Promoted items appear first
-    - Each item has individual Buy Now price, bid, and staggered end time
-    - Tracks impressions for promoted items
-    """
-    db = get_db()
-    
-    # Query active multi-item auctions
-    query = {"status": "active"}
-    if category:
-        query["category"] = category
-    if search:
-        query["$or"] = [
-            {"title": {"$regex": search, "$options": "i"}},
-            {"description": {"$regex": search, "$options": "i"}}
-        ]
-    
-    auctions = await db.multi_item_listings.find(query, {"_id": 0}).to_list(None)
-    
-    # Fetch single listings
-    single_query = {"status": "active"}
-    if category:
-        single_query["category"] = category
-    if search:
-        single_query["$or"] = [
-            {"title": {"$regex": search, "$options": "i"}},
-            {"description": {"$regex": search, "$options": "i"}}
-        ]
-    
-    single_listings = await db.listings.find(single_query, {"_id": 0}).to_list(None)
-    
-    # Cache seller tax status
-    seller_tax_cache = {}
-    
+
+async def _build_marketplace_items():
+    """Build the full sorted marketplace items list (called from cache refresh)."""
+    db = get_read_db()
+    now = datetime.now(timezone.utc)
+
+    # Fetch with projection and limit — cap at 500 each
+    auctions = await db.multi_item_listings.find(
+        {"status": "active"}, _MULTI_PROJECTION
+    ).sort("created_at", -1).limit(500).to_list(500)
+
+    single_listings = await db.listings.find(
+        {"status": "active"}, _LISTING_PROJECTION
+    ).sort("created_at", -1).limit(500).to_list(500)
+
+    # Batch-fetch seller tax status
+    all_seller_ids = list(set(
+        [a.get("seller_id") for a in auctions if a.get("seller_id")] +
+        [sl.get("seller_id") for sl in single_listings if sl.get("seller_id")]
+    ))
+    sellers = {}
+    if all_seller_ids:
+        seller_docs = await db.users.find(
+            {"id": {"$in": all_seller_ids}},
+            {"_id": 0, "id": 1, "is_tax_registered": 1}
+        ).to_list(len(all_seller_ids))
+        sellers = {s["id"]: s.get("is_tax_registered", False) for s in seller_docs}
+
     items = []
-    
+
     for auction in auctions:
-        seller_id = auction.get("seller_id")
-        if seller_id not in seller_tax_cache:
-            seller = await db.users.find_one({"id": seller_id}, {"_id": 0, "is_tax_registered": 1})
-            seller_tax_cache[seller_id] = seller.get("is_tax_registered", False) if seller else False
-        
-        seller_is_business = seller_tax_cache[seller_id]
-        
-        if auction.get("is_promoted") and track_impression:
-            await db.multi_item_listings.update_one(
-                {"id": auction["id"]},
-                {"$inc": {"total_impressions": 1}}
-            )
-        
+        seller_is_business = sellers.get(auction.get("seller_id"), False)
+        base_end_time = auction.get("auction_end_date")
+        if isinstance(base_end_time, str):
+            base_end_time = datetime.fromisoformat(base_end_time)
+
         for lot in auction.get("lots", []):
             if lot.get("lot_status") == "sold_out":
                 continue
-            
             current_price = lot.get("current_price", lot.get("starting_price", 0))
-            if min_price is not None and current_price < min_price:
-                continue
-            if max_price is not None and current_price > max_price:
-                continue
-            if condition and lot.get("condition") != condition:
-                continue
-            
-            base_end_time = auction.get("auction_end_date")
-            if isinstance(base_end_time, str):
-                base_end_time = datetime.fromisoformat(base_end_time)
-            
             lot_end_time = lot.get("lot_end_time")
             if not lot_end_time and base_end_time:
-                stagger_seconds = lot["lot_number"] * 60
-                lot_end_time = base_end_time + timedelta(seconds=stagger_seconds)
+                lot_end_time = base_end_time + timedelta(seconds=lot["lot_number"] * 60)
             elif isinstance(lot_end_time, str):
                 lot_end_time = datetime.fromisoformat(lot_end_time)
-            
-            item = {
+
+            items.append({
                 "id": f"{auction['id']}_lot{lot['lot_number']}",
                 "auction_id": auction["id"],
                 "lot_number": lot["lot_number"],
                 "title": lot["title"],
-                "description": lot["description"],
+                "description": lot.get("description", ""),
                 "category": auction.get("category"),
                 "condition": lot.get("condition"),
                 "images": lot.get("images", []),
@@ -178,28 +169,12 @@ async def get_marketplace_items(
                 "is_partner_listing": auction.get("is_partner_listing", False),
                 "region": auction.get("region"),
                 "country": auction.get("country"),
-                "created_at": auction.get("created_at")
-            }
-            items.append(item)
-    
-    # Add single listings
+                "created_at": auction.get("created_at"),
+            })
+
     for listing in single_listings:
         current_price = listing.get("current_price", listing.get("starting_price", 0))
-        if min_price is not None and current_price < min_price:
-            continue
-        if max_price is not None and current_price > max_price:
-            continue
-        if condition and listing.get("condition") != condition:
-            continue
-        
-        seller_id = listing.get("seller_id")
-        if seller_id not in seller_tax_cache:
-            seller = await db.users.find_one({"id": seller_id}, {"_id": 0, "is_tax_registered": 1})
-            seller_tax_cache[seller_id] = seller.get("is_tax_registered", False) if seller else False
-        
-        seller_is_business = seller_tax_cache[seller_id]
-        
-        item = {
+        items.append({
             "id": listing["id"],
             "auction_id": None,
             "lot_number": None,
@@ -227,58 +202,127 @@ async def get_marketplace_items(
             "parent_auction_title": None,
             "total_lots_in_auction": 0,
             "seller_id": listing.get("seller_id"),
-            "seller_is_business": seller_is_business,
+            "seller_is_business": sellers.get(listing.get("seller_id"), False),
             "is_partner_listing": listing.get("is_partner_listing", False),
             "city": listing.get("city"),
             "region": listing.get("region"),
             "country": listing.get("country"),
-            "created_at": listing.get("created_at")
-        }
-        items.append(item)
-    
-    # Sorting
-    now = datetime.now(timezone.utc)
-    
-    if sort == "-promoted":
-        promotion_weight = {"premium": 3, "standard": 2, "basic": 1, None: 0}
-        
-        def get_urgency_score(item):
-            if item.get("auction_end_date"):
-                end_time = datetime.fromisoformat(item["auction_end_date"].replace("Z", "+00:00")) if isinstance(item["auction_end_date"], str) else item["auction_end_date"]
+            "created_at": listing.get("created_at"),
+        })
+
+    # Default sort: featured > promoted > recent
+    promotion_weight = {"premium": 3, "standard": 2, "basic": 1, None: 0}
+
+    def urgency_score(item):
+        if item.get("auction_end_date"):
+            try:
+                end_str = item["auction_end_date"]
+                end_time = datetime.fromisoformat(end_str.replace("Z", "+00:00")) if isinstance(end_str, str) else end_str
                 if end_time.tzinfo is None:
                     end_time = end_time.replace(tzinfo=timezone.utc)
-                time_remaining = (end_time - now).total_seconds()
-                if 0 < time_remaining <= 3600:
-                    return 1000 - time_remaining
-            return 0
-        
-        items.sort(
-            key=lambda x: (
-                -1 if x.get("is_featured") else 0,
-                -get_urgency_score(x),
-                -promotion_weight.get(x.get("promotion_tier"), 0),
-                -(x.get("created_at").timestamp() if isinstance(x.get("created_at"), datetime) else 0)
-            )
-        )
-    elif sort == "price":
-        items.sort(key=lambda x: x.get("current_price", 0))
+                remaining = (end_time - now).total_seconds()
+                if 0 < remaining <= 3600:
+                    return 1000 - remaining
+            except Exception:
+                pass
+        return 0
+
+    items.sort(key=lambda x: (
+        -1 if x.get("is_featured") else 0,
+        -urgency_score(x),
+        -promotion_weight.get(x.get("promotion_tier"), 0),
+        -(x.get("created_at").timestamp() if isinstance(x.get("created_at"), datetime) else 0),
+    ))
+
+    return items
+
+
+async def _refresh_items_cache():
+    """Background task: rebuild and cache the marketplace items."""
+    global _items_cache
+    try:
+        items = await _build_marketplace_items()
+        _items_cache["data"] = items
+        _items_cache["fresh_until"] = time.time() + _ITEMS_CACHE_TTL
+        logger.info(f"[cache] Marketplace items refreshed: {len(items)} items")
+    except Exception as e:
+        logger.error(f"[cache] Marketplace items refresh failed: {e}")
+    finally:
+        _items_cache["refreshing"] = False
+
+
+async def _warm_marketplace_cache():
+    """Called from server startup to pre-warm the cache."""
+    _items_cache["refreshing"] = True
+    await _refresh_items_cache()
+
+
+# ========== MARKETPLACE ITEMS ==========
+
+@marketplace_router.get("/marketplace/items")
+async def get_marketplace_items(
+    search: Optional[str] = None,
+    category: Optional[str] = None,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
+    condition: Optional[str] = None,
+    sort: str = "-promoted",
+    limit: int = 20,
+    skip: int = 0,
+    cursor: Optional[str] = None,
+    track_impression: bool = False
+):
+    """
+    Marketplace view: cached, paginated, with stale-while-revalidate.
+    Cold cache returns empty list with loading=True flag.
+    """
+    now_t = time.time()
+    cache = _items_cache
+
+    # If cache is cold (first request ever), kick off background build
+    # and return empty immediately so frontend isn't blocked
+    if cache["data"] is None:
+        if not cache["refreshing"]:
+            cache["refreshing"] = True
+            asyncio.ensure_future(_refresh_items_cache())
+        return {"items": [], "total": 0, "limit": limit, "skip": 0,
+                "has_more": False, "next_cursor": None, "cache_warming": True}
+
+    # If stale, refresh in background but serve stale data
+    if cache["fresh_until"] < now_t and not cache["refreshing"]:
+        cache["refreshing"] = True
+        asyncio.ensure_future(_refresh_items_cache())
+
+    # Filter the cached items
+    items = cache["data"]
+
+    if search:
+        s_lower = search.lower()
+        items = [i for i in items if s_lower in (i.get("title") or "").lower()
+                 or s_lower in (i.get("description") or "").lower()]
+    if category:
+        items = [i for i in items if i.get("category") == category]
+    if min_price is not None:
+        items = [i for i in items if (i.get("current_price") or 0) >= min_price]
+    if max_price is not None:
+        items = [i for i in items if (i.get("current_price") or 0) <= max_price]
+    if condition:
+        items = [i for i in items if i.get("condition") == condition]
+
+    # Re-sort if not default
+    if sort == "price":
+        items = sorted(items, key=lambda x: x.get("current_price", 0))
     elif sort == "-price":
-        items.sort(key=lambda x: -x.get("current_price", 0))
+        items = sorted(items, key=lambda x: -x.get("current_price", 0))
     elif sort == "ending_soon":
-        items.sort(
-            key=lambda x: (
-                0 if x.get("is_featured") else 1,
-                datetime.fromisoformat(x["auction_end_date"].replace("Z", "+00:00")) if x.get("auction_end_date") else datetime.max
-            )
-        )
-    else:
-        items.sort(
-            key=lambda x: -(x.get("created_at").timestamp() if isinstance(x.get("created_at"), datetime) else 0)
-        )
-    
+        items = sorted(items, key=lambda x: (
+            0 if x.get("is_featured") else 1,
+            x.get("auction_end_date") or "9999"
+        ))
+
     total_items = len(items)
-    
-    # Cursor-based pagination: decode cursor to get offset, or use skip
+
+    # Cursor-based or offset pagination
     offset = skip
     if cursor:
         try:
@@ -286,23 +330,21 @@ async def get_marketplace_items(
             offset = decoded.get("offset", 0)
         except Exception:
             offset = skip
-    
+
     paginated_items = items[offset:offset + limit]
     has_more = (offset + limit) < total_items
-    
-    # Build next_cursor
+
     next_cursor = None
     if has_more:
-        cursor_data = {"offset": offset + limit}
-        next_cursor = base64.b64encode(json.dumps(cursor_data).encode()).decode()
-    
+        next_cursor = base64.b64encode(json.dumps({"offset": offset + limit}).encode()).decode()
+
     return {
         "items": paginated_items,
         "total": total_items,
         "limit": limit,
         "skip": offset,
         "has_more": has_more,
-        "next_cursor": next_cursor
+        "next_cursor": next_cursor,
     }
 
 

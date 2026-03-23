@@ -15,6 +15,7 @@ import MarketplaceSidebar from '../components/MarketplaceSidebar';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { formatCurrency } from '../utils/currencyFormatter';
 import { SellerRatingInline } from '../components/SellerReputation';
+import { LoadingTimeout } from '../components/LoadingTimeout';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -40,7 +41,7 @@ const LotsMarketplacePage = () => {
         if (sidebarFilters.cities?.length) params.append('city', sidebarFilters.cities[0]);
         if (sidebarFilters.auctioneers?.length) params.append('seller_id', sidebarFilters.auctioneers.join(','));
 
-        const response = await axios.get(`${API}/multi-item-listings?${params.toString()}`);
+        const response = await axios.get(`${API}/multi-item-listings?${params.toString()}`, { timeout: 15000 });
         let data = response.data || [];
 
         // Sort: Featured items first
@@ -93,7 +94,7 @@ const LotsMarketplacePage = () => {
         <Link to={`/lots/${listing.id}`} className="block relative">
           <div className="aspect-[4/3] overflow-hidden bg-slate-100 dark:bg-slate-800">
             {imageUrl ? (
-              <img src={imageUrl} alt={listing.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+              <img src={imageUrl} alt={listing.title} width={400} height={300} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <Package className="h-16 w-16" style={{ color: '#94a3b8' }} />
@@ -245,9 +246,7 @@ const LotsMarketplacePage = () => {
 
             {/* Listings Grid */}
             {loading ? (
-              <div className="flex items-center justify-center py-20">
-                <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
-              </div>
+              <LoadingTimeout rows={6} variant="cards" />
             ) : listings.length === 0 ? (
               <Card className="p-12 text-center" data-testid="no-results">
                 <Package className="h-16 w-16 mx-auto mb-4" style={{ color: '#9ca3af' }} />

@@ -18,6 +18,8 @@ from datetime import datetime, timezone, timedelta
 import os
 import logging
 import uuid
+import time as _time
+import httpx
 
 # ─── Environment ───
 ROOT_DIR = Path(__file__).parent
@@ -27,9 +29,21 @@ mongo_url = os.environ.get('MONGO_URL')
 db_name = os.environ.get('DB_NAME', 'bazario_db')
 stripe_api_key = os.environ.get('STRIPE_API_KEY', '')
 
-# ─── Database ───
-client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=5000)
+# ─── Database (connection pooling) ───
+from pymongo import ReadPreference
+client = AsyncIOMotorClient(
+    mongo_url,
+    serverSelectionTimeoutMS=10000,
+    maxPoolSize=10,
+    minPoolSize=2,
+    connectTimeoutMS=10000,
+    socketTimeoutMS=20000,
+    retryReads=True,
+    retryWrites=True,
+)
 db = client[db_name]
+# Use secondary-preferred reads so queries don't wait for a failing primary
+db_read = client.get_database(db_name, read_preference=ReadPreference.SECONDARY_PREFERRED)
 
 import stripe
 if stripe_api_key:
@@ -50,6 +64,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ─── Response Time Logging Middleware ───
+@app.middleware("http")
+async def response_time_middleware(request: Request, call_next):
+    start = _time.monotonic()
+    response = await call_next(request)
+    elapsed = round((_time.monotonic() - start) * 1000)
+    path = request.url.path
+    if not path.startswith("/health") and elapsed > 500:
+        logger.warning(f"SLOW {request.method} {path} — {elapsed}ms")
+    response.headers["X-Response-Time"] = f"{elapsed}ms"
+    # Static assets get long cache, API responses don't
+    if path.startswith("/static/") or path.endswith((".js", ".css", ".png", ".jpg", ".webp", ".woff2")):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return response
 
 # ─── Rate Limiting ───
 from rate_limit import limiter
@@ -334,6 +363,21 @@ async def send_review_request_emails():
 scheduler.add_job(send_review_request_emails, trigger=IntervalTrigger(hours=1),
                   id='send_review_request_emails', replace_existing=True)
 
+# ─── Keep-Alive Self-Ping (prevents backend sleep) ───
+async def keepalive_ping():
+    """Ping own endpoints every 4 min to prevent cold starts."""
+    endpoints = ["/api/health", "/api/marketplace/items?limit=1", "/api/multi-item-listings?limit=1"]
+    async with httpx.AsyncClient(base_url="http://127.0.0.1:8001", timeout=10) as c:
+        for ep in endpoints:
+            try:
+                r = await c.get(ep)
+                logger.debug(f"[keepalive] GET {ep} → {r.status_code} ({r.elapsed.total_seconds():.2f}s)")
+            except Exception as e:
+                logger.debug(f"[keepalive] GET {ep} → error: {e}")
+
+scheduler.add_job(keepalive_ping, trigger=IntervalTrigger(minutes=4),
+                  id='keepalive_ping', replace_existing=True)
+
 # ─── Health Endpoints ───
 @api_router.get("/")
 async def root():
@@ -368,6 +412,16 @@ try:
                    set_marketing_db, set_admin_db, set_webhooks_db, set_payments_db,
                    set_marketplace_db, set_listings_db, set_auth_db, set_dashboard_db, set_profiles_db]:
         setter(db)
+
+    # Inject fast-read DB (secondary-preferred) for read-heavy modules
+    from routes.listings import set_listings_read_db
+    from routes.marketplace import set_marketplace_read_db
+    from routes.dashboard import set_dashboard_read_db
+    for setter in [set_listings_read_db, set_marketplace_read_db, set_dashboard_read_db]:
+        try:
+            setter(db_read)
+        except Exception:
+            pass
 
     # Inject auth
     for setter in [set_users_auth, set_marketing_auth, set_admin_auth,
@@ -476,6 +530,44 @@ async def root_health():
 async def start_scheduler():
     scheduler.start()
     logger.info("APScheduler started")
+
+@app.on_event("startup")
+async def prewarm_caches():
+    """Pre-warm frequently-accessed data so first user never waits."""
+    import asyncio
+    async def _warm():
+        try:
+            # 1. Subscription plans
+            from services.subscription_pricing import get_pricing_service
+            ps = get_pricing_service(db)
+            await ps.get_all_plans()
+            logger.info("[prewarm] Subscription plans cached")
+        except Exception as e:
+            logger.warning(f"[prewarm] subscription plans: {e}")
+        try:
+            # 2. Categories
+            cats = await db.categories.find({}, {"_id": 0}).to_list(100)
+            logger.info(f"[prewarm] {len(cats)} categories loaded")
+        except Exception as e:
+            logger.warning(f"[prewarm] categories: {e}")
+        try:
+            # 3. Active listing count
+            count = await db.listings.count_documents({"status": "active"})
+            logger.info(f"[prewarm] {count} active listings counted")
+        except Exception as e:
+            logger.warning(f"[prewarm] listing count: {e}")
+        try:
+            # 4. Marketplace items (warm the cache via HTTP self-call)
+            # Wait for server to be ready
+            await asyncio.sleep(3)
+            async with httpx.AsyncClient(base_url="http://127.0.0.1:8001", timeout=45) as c:
+                r = await c.get("/api/marketplace/items?limit=1")
+                logger.info(f"[prewarm] Marketplace items → {r.status_code} ({r.elapsed.total_seconds():.2f}s)")
+                r2 = await c.get("/api/multi-item-listings?limit=1")
+                logger.info(f"[prewarm] Multi-item listings → {r2.status_code} ({r2.elapsed.total_seconds():.2f}s)")
+        except Exception as e:
+            logger.warning(f"[prewarm] marketplace: {e}")
+    asyncio.ensure_future(_warm())
 
 @app.on_event("startup")
 async def init_cloud_storage():

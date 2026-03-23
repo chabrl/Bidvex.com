@@ -1313,5 +1313,11 @@
     "paid": "Payé",
     "pending": "En attente",
     "overdue": "En retard"
+  },
+  "loading": {
+    "troubleConnecting": "Problème de connexion.",
+    "pleaseRefresh": "Veuillez actualiser la page.",
+    "refresh": "Actualiser",
+    "takingLonger": "Plus long que d'habitude... chargement en cours"
   }
 }

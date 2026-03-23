@@ -403,6 +403,8 @@ const FlattenedMarketplace = ({
                   <img 
                     src={selectedItem.images[0]} 
                     alt={selectedItem.title}
+                    width={80}
+                    height={80}
                     className="w-20 h-20 object-cover rounded-lg"
                   />
                 )}
@@ -579,6 +581,9 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
             <img
               src={item.images[0]}
               alt={item.title}
+              width={400}
+              height={208}
+              loading="lazy"
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             />
           ) : (

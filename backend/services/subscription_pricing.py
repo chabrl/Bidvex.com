@@ -215,11 +215,17 @@ class SubscriptionPricingService:
         self.plans_collection = db.subscription_plans
         self.coupons_collection = db.coupon_codes
         self.changelog_collection = db.pricing_changelog
+        self._plans_cache = None      # in-memory cache
+        self._plans_cache_ts = 0      # epoch when cached
+        self._plans_cache_ttl = 3600  # 1 hour
+        self._initialized = False
     
     # ========== PRICING MANAGEMENT ==========
     
     async def initialize_plans(self):
         """Initialize default plans if not present in database, migrate existing plans with new fields"""
+        if self._initialized:
+            return
         for plan_id, plan_data in DEFAULT_PLANS.items():
             existing = await self.plans_collection.find_one({"plan_id": plan_id})
             if not existing:
@@ -240,17 +246,24 @@ class SubscriptionPricingService:
                         {"$set": updates}
                     )
                     logger.info(f"Migrated plan {plan_id} with original price fields")
+        self._initialized = True
     
     async def get_all_plans(self) -> List[Dict[str, Any]]:
-        """Get all subscription plans"""
+        """Get all subscription plans — cached in memory for 1 hour."""
+        import time as _t
+        now = _t.time()
+        if self._plans_cache and now < self._plans_cache_ts + self._plans_cache_ttl:
+            return self._plans_cache
+
         await self.initialize_plans()
         plans = await self.plans_collection.find({}, {"_id": 0}).to_list(10)
-        # Ensure all plans have original price fields
         for plan in plans:
             if "original_price_monthly" not in plan:
                 plan["original_price_monthly"] = 0.0
             if "original_price_yearly" not in plan:
                 plan["original_price_yearly"] = 0.0
+        self._plans_cache = plans
+        self._plans_cache_ts = now
         return plans
     
     async def get_plan(self, plan_id: str) -> Optional[Dict[str, Any]]:

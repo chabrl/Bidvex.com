@@ -76,17 +76,44 @@ const SellerFinancialsPage = lazy(() => import('./pages/vehicles/SellerFinancial
 const AIAssistant = lazy(() => import('./components/AIAssistant'));
 
 // ─── Global Loading Fallback ──────────────────────────────────────
-const PageLoader = () => (
-  <div className="min-h-[60vh] flex items-center justify-center" data-testid="page-loader">
-    <div className="text-center space-y-4">
-      <div className="relative mx-auto w-12 h-12">
-        <div className="absolute inset-0 rounded-full border-4 border-slate-200 dark:border-slate-700" />
-        <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[#1E3A8A] border-r-[#06B6D4] animate-spin" />
+const PageLoader = () => {
+  const [elapsed, setElapsed] = React.useState(0);
+  React.useEffect(() => {
+    const t = setInterval(() => setElapsed(e => e + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  if (elapsed >= 15) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center" data-testid="page-loader-timeout">
+        <div className="text-center space-y-4 max-w-sm">
+          <div className="mx-auto w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
+            <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 5.636a9 9 0 11-12.728 0M12 9v4"/></svg>
+          </div>
+          <p className="text-sm font-semibold text-slate-700">Having trouble connecting.</p>
+          <p className="text-xs text-slate-500">Please refresh the page.</p>
+          <button onClick={() => window.location.reload()} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90">
+            Refresh
+          </button>
+        </div>
       </div>
-      <p className="text-sm text-muted-foreground font-medium tracking-wide">Loading...</p>
+    );
+  }
+
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center" data-testid="page-loader">
+      <div className="text-center space-y-4">
+        <div className="relative mx-auto w-12 h-12">
+          <div className="absolute inset-0 rounded-full border-4 border-slate-200 dark:border-slate-700" />
+          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[#1E3A8A] border-r-[#06B6D4] animate-spin" />
+        </div>
+        <p className="text-sm text-muted-foreground font-medium tracking-wide">
+          {elapsed >= 8 ? 'Taking longer than usual... still loading' : 'Loading...'}
+        </p>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ─── Service Worker ───────────────────────────────────────────────
 if (typeof window !== 'undefined') {

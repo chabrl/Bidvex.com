@@ -28,6 +28,7 @@ listings_router = APIRouter(tags=["Listings"])
 
 # Database instance — injected from server.py at startup
 _db = None
+_db_read = None
 
 
 def set_listings_db(db_instance):
@@ -35,10 +36,24 @@ def set_listings_db(db_instance):
     _db = db_instance
 
 
+def set_listings_read_db(db_instance):
+    global _db_read
+    _db_read = db_instance
+
+
 def get_db():
     if _db is None:
         raise RuntimeError("Listings DB not initialised")
     return _db
+
+
+def get_read_db():
+    return _db_read if _db_read is not None else _db
+
+
+# ── Multi-item listings cache (30s TTL) ──
+import time as _time
+_multi_cache = {"data": None, "ts": 0, "ttl": 30}
 
 
 # ========== SINGLE-ITEM LISTINGS ==========
@@ -452,9 +467,16 @@ async def get_multi_item_listings(
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
 ):
-    db = get_db()
-    query = {}
+    db = get_read_db()
+    has_filters = any([category, region, city, currency, search, seller_id, min_price, max_price])
 
+    # Use cache for default (unfiltered) requests
+    now = _time.time()
+    if not has_filters and status is None and _multi_cache["data"] is not None and now < _multi_cache["ts"] + _multi_cache["ttl"]:
+        cached = _multi_cache["data"]
+        return cached[skip:skip + limit]
+
+    query = {}
     if status:
         query["status"] = status
     else:
@@ -482,7 +504,10 @@ async def get_multi_item_listings(
             {"description": {"$regex": search, "$options": "i"}}
         ]
 
-    listings = await db.multi_item_listings.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    fetch_limit = min(limit, 50) if has_filters else 100
+    logger.info(f"[multi-item] Fetching with query={query}, limit={fetch_limit}")
+    listings = await db.multi_item_listings.find(query, {"_id": 0}).sort("created_at", -1).skip(skip if has_filters else 0).limit(fetch_limit).to_list(fetch_limit)
+    logger.info(f"[multi-item] Got {len(listings)} docs from DB")
 
     for listing in listings:
         if isinstance(listing.get("created_at"), str):
@@ -495,7 +520,16 @@ async def get_multi_item_listings(
             if isinstance(lot.get("lot_end_time"), str):
                 lot["lot_end_time"] = datetime.fromisoformat(lot["lot_end_time"])
 
-    return [MultiItemListing(**listing) for listing in listings]
+    logger.info(f"[multi-item] Processed, returning {len(listings)} listings")
+
+    # Cache unfiltered results (store raw dicts)
+    if not has_filters and status is None:
+        _multi_cache["data"] = listings
+        _multi_cache["ts"] = now
+
+    if has_filters:
+        return listings
+    return listings[skip:skip + limit]
 
 
 @listings_router.get("/multi-item-listings/{listing_id}")

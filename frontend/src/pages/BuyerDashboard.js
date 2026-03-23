@@ -10,6 +10,7 @@ import { DollarSign, Gavel, Trophy, Heart, TrendingUp, TrendingDown, Eye, AlertT
 import { toast } from 'sonner';
 import Countdown from 'react-countdown';
 import { formatCurrency } from '../utils/currencyFormatter';
+import { LoadingTimeout } from '../components/LoadingTimeout';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -25,7 +26,7 @@ const BuyerDashboard = () => {
 
   const fetchDashboard = async () => {
     try {
-      const response = await axios.get(`${API}/dashboard/buyer`);
+      const response = await axios.get(`${API}/dashboard/buyer`, { timeout: 15000 });
       setDashboard(response.data);
     } catch (error) {
       console.error('Failed to fetch dashboard:', error);
@@ -37,8 +38,10 @@ const BuyerDashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
+      <div className="min-h-screen py-8 px-4">
+        <div className="max-w-7xl mx-auto">
+          <LoadingTimeout rows={6} variant="cards" />
+        </div>
       </div>
     );
   }

@@ -16,7 +16,19 @@ const fetchMarketplaceItems = async ({ pageParam, filters, limit }) => {
   params.append('track_impression', 'true');
   if (pageParam) params.append('cursor', pageParam);
 
-  const { data } = await axios.get(`${API}/marketplace/items?${params.toString()}`);
+  const { data } = await axios.get(`${API}/marketplace/items?${params.toString()}`, {
+    timeout: 15000,
+  });
+
+  // If cache is still warming, retry after 2 seconds
+  if (data.cache_warming) {
+    await new Promise(r => setTimeout(r, 2000));
+    const { data: retryData } = await axios.get(`${API}/marketplace/items?${params.toString()}`, {
+      timeout: 15000,
+    });
+    return retryData;
+  }
+
   return data;
 };
 
