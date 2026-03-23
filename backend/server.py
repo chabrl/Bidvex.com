@@ -412,7 +412,7 @@ scheduler.add_job(keepalive_ping, trigger=IntervalTrigger(minutes=4),
 async def root():
     return {"message": "Bazario API v1.0"}
 
-@api_router.get("/health")
+@api_router.api_route("/health", methods=["GET", "HEAD"])
 async def health():
     return {"status": "healthy"}
 
@@ -551,7 +551,7 @@ register_ws_handlers(app, db, manager, message_manager)
 # ─── Mount API Router ───
 app.include_router(api_router)
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def root_health():
     return {"status": "healthy"}
 
