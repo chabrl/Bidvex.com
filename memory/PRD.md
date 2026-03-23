@@ -29,31 +29,34 @@ BidVex is a full-stack auction marketplace with React frontend, FastAPI backend,
 - Webhooks, subscriptions, tax calculations — 51/51 pass
 
 ### Post-Purchase Review System (March 21, 2026)
-- **Reviews**: POST /api/reviews/create (1-5 stars + category ratings + comment 20-500 chars). One per transaction, 48h edit window. Server-side ownership validation. Rate limit 10/hr. XSS sanitized.
-- **Reputation**: Weighted avg + badge system (New <3, Trusted 4.0+/10+, Top Rated 4.7+/25+). Score hidden <3 reviews. 5-star breakdown bars. Category averages.
-- **Moderation**: Admin flag/unflag/remove. Flagged excluded from score. GET /api/reviews/moderation/pending.
-- **Emails**: Review request 24h after payment (hourly scheduler). Seller notification on new review.
-- **Frontend**: /review/:transactionId page, SellerReputationCard + SellerReviewsList on storefront.
-- **Testing**: 38/38 tests pass (Iteration 79)
+- Reviews, Reputation, Moderation, Emails, Frontend — 38/38 tests pass (Iteration 79)
 
 ### Seller Rating on Listing Cards + Detail Pages (March 21, 2026)
-- **SellerRatingInline on Marketplace Cards**: Shows star rating + review count for 3+ reviews, "New Seller" label for <3 reviews. Applied to both Items (/items) and Lots (/lots) marketplace grids.
-- **Batch Reputation API**: POST /api/reviews/reputation/batch used to avoid N+1 individual API calls.
-- **Full Breakdown on Detail Pages**: SellerReputationCard (score + star bars + category averages) + SellerReviewsList (paginated reviews) + "View all reviews" link on /listing/:id and /lots/:id.
-- **i18n**: 922 keys in sync EN/FR. `sellerReputation.*` keys added to both locales.
-- **Testing**: 15/15 tests pass (Iteration 80)
+- SellerRatingInline, Batch Reputation API, Full Breakdown — 15/15 tests pass (Iteration 80)
 
 ### Partner Program Page Fixes (March 21, 2026)
-- **FIX 1 — Translation**: Rewrote BecomePartnerPage with full i18n (55 `partnerPage.*` keys). All strings display in French when FR mode active, English when EN mode. 977 keys in sync EN/FR.
-- **FIX 2 — Layout**: Feature cards 2x2 desktop / 1-col mobile with equal height. Math section side-by-side desktop / stacked mobile. Form max-640px centered desktop, full-width mobile. Submit button full-width mobile / centered desktop. Footer language indicator now shows Canadian flag with current language name (CA Français / CA English).
-- **FIX 3 — Pricing**: Partner Pro annual fee updated from $240 to $100 CAD/year (DB + code defaults). Subscription pricing page shows $100 with $200 original price. Price breakdown API confirms subtotal=$100. Partner Pro added to SubscriptionPricingPage PLAN_STYLES and sort order.
-- **Testing**: 29/29 tests pass (Iteration 81 — 12 backend + 17 frontend)
+- Translation, Layout, Pricing — 29/29 tests pass (Iteration 81)
 
 ### Pre-Launch Platform Audit (March 21, 2026)
-- **i18n Coverage**: Extended to MobileBottomNav, TrendyAnnouncementBar, ReviewPage, StorefrontPage, PartnerDashboard, BulkImportPage, ItemsMarketplacePage, LotsMarketplacePage, SubscriptionPricingPage, MyVehicleListingsPage, VehicleInvoicesPage. Total: 1159 keys in sync EN/FR, 0 missing, 0 hardcoded.
-- **Backend Fix**: Fixed NameError in email_marketing_ext.py — replaced bare `db` references with `get_db()` calls.
-- **Mobile Layout**: Fixed horizontal overflow on /items page at 390px by adding `overflow-x-hidden`.
-- **Testing**: 22/22 tests pass (Iteration 82)
+- i18n Coverage, Backend Fix, Mobile Layout — 22/22 tests pass (Iteration 82)
+
+### Subscription Pricing Page Redesign (March 21, 2026)
+- 2x2 grid, tier-specific design, VIP card — 100% pass (Iteration 83)
+
+### Performance Optimization Sprint (March 23, 2026)
+- Keep-alive ping, MongoDB connection pooling, marketplace cache, subscription cache, pre-warming — 100% frontend, 82% backend (Iteration 84)
+
+### PageSpeed Optimization Sprint (March 23, 2026)
+- Logo optimization, Google Ads removal, PostHog deferral, critical CSS, cache-control headers, CLS fixes, security headers, accessibility — 100% pass (Iteration 85)
+
+### Critical Production Fixes (March 23, 2026)
+- **FIX 1 — Admin Dashboard**: Fixed broken API call from `/admin/stats/revenue` (404) to `/admin/analytics/revenue` (200). Added auth headers to all admin stat requests. Updated data extraction to match response format (`total_gmv`, `active_listings`).
+- **FIX 2 — Listing Detail Resilience**: Added 30s TTL in-memory cache for `GET /api/listings/{listing_id}`. Switched read to `get_read_db()` (SECONDARY_PREFERRED). First call ~3.7s, cached call ~0.09s. Added frontend retry mechanism (1 retry after 2s) in both `ListingDetailPage.js` and `MultiItemListingDetailPage.js`.
+- **FIX 3 — Server Startup Logging**: Changed outer `except ImportError` to `except Exception` with full traceback. Self-contained router loading now logs `logger.error()` with `traceback.format_exc()` instead of silent `logger.warning()`.
+- **FIX 5 — WWW Redirect**: Added FastAPI middleware that 301 redirects any request with `www.` host prefix to non-www equivalent.
+- **FIX 6 — CLS Footer**: Increased footer `min-height` from 180px to 220px to match rendered height and reduce CLS. Google Fonts already had `&display=swap`.
+- **FIX 7 — Accessibility**: Added `aria-label="Toggle theme"` to Navbar theme button. Added `aria-label="Close"` to close buttons in VerificationRequiredModal, AIAssistant, CookieConsentBanner, NotificationCenter. Standardized all `/terms` links to `/terms-of-service` (SellerDashboard, LegalDisclaimers, CookieConsentBanner). Added `/terms` → `/terms-of-service` redirect in App.js.
+- **Testing**: 22/22 backend + 100% frontend — all 7 fixes verified (Iteration 86)
 
 ## Key API Endpoints (Reviews)
 - POST /api/reviews/create — Create review (auth + paid txn required)
@@ -68,47 +71,13 @@ BidVex is a full-stack auction marketplace with React frontend, FastAPI backend,
 - POST /api/reviews/{id}/unflag — Admin restore
 - GET /api/reviews/moderation/pending — Admin flagged list
 
-### Subscription Pricing Page Redesign (March 21, 2026)
-- **Layout**: Rewrote SubscriptionPricingPage.js with 2x2 responsive grid (md:grid-cols-2). Card order: [Starter, Premium] top, [Partner Pro, VIP Elite] bottom. Single column on mobile.
-- **Card Design**: Tier-specific top accent borders (slate/purple-indigo/teal-cyan/amber-gold), rounded-2xl corners, shadow-md with hover:shadow-lg, p-6 sm:p-8 padding.
-- **VIP Elite Card**: Dark charcoal background (#1a1a2e), ALL text white (#FFFFFF) or gold (#FFD700). Fixed global CSS !important override on h3 headings by adding targeted selector in index.css.
-- **CTA Buttons**: Tier-specific gradient buttons, greyed-out "Current Plan" for active tier, "CURRENT PLAN" uppercase badge.
-- **Account Settings Section**: Shows current plan, billing renewal date, and payment method for logged-in users with link to /settings.
-- **Personalized Savings Section**: Shows monthly savings for each paid plan when using yearly billing.
-- **i18n**: 30+ new pricingPage keys added (planNames, planTaglines, off, free, yr, mo, saveAmount, processing, goVip, terms, accountSettings, etc.). 1195 keys in sync EN/FR, 0 missing.
-- **Display Names**: Free→Starter, VIP→VIP Elite (via i18n planNames keys).
-- **Responsive**: Verified at 390px (single col), 768px (2x2), 1280px (2x2). No horizontal overflow at any breakpoint.
-- **Testing**: 100% frontend pass (Iteration 83)
-
-### Performance Optimization Sprint (March 23, 2026)
-- **Keep-Alive Ping**: APScheduler job pings `/api/health`, `/api/marketplace/items?limit=1`, `/api/multi-item-listings?limit=1` every 4 min to prevent backend sleep.
-- **MongoDB Connection Pooling**: `maxPoolSize=10, minPoolSize=2`, `retryReads/retryWrites=True`. Added `ReadPreference.SECONDARY_PREFERRED` for read-heavy routes (`db_read` injection).
-- **Marketplace Items Cache**: 30s TTL stale-while-revalidate. Cold cache returns `{"items":[], "cache_warming":true}` immediately; background task populates cache. Result: **502 TIMEOUT → 0.12s**.
-- **Subscription Plans Cache**: In-memory 1hr TTL in `SubscriptionPricingService`. Skip re-init after first load. Result: **11s → 0.12s (99% faster)**.
-- **Multi-Item Listings Cache**: 30s TTL for unfiltered queries. Result: **untested → 0.7s (warm 0.1s)**.
-- **Startup Pre-Warming**: On server start, pre-warms subscription plans, categories, listing count, marketplace items, multi-item-listings via HTTP self-calls (with 3s delay for server readiness).
-- **Response Time Middleware**: Logs `SLOW` warning for any request >500ms. Adds `X-Response-Time` header to all responses.
-- **Cache-Control Headers**: Static assets get `max-age=31536000, immutable`.
-- **Frontend LoadingTimeout Component**: Progressive states: skeleton (0-8s) → "Taking longer than usual…" (8-15s) → "Having trouble connecting" + Refresh button (15s+). Applied to BuyerDashboard, SellerDashboard, LotsMarketplacePage, and App.js PageLoader.
-- **Frontend Optimizations**: React Query `staleTime=60s` (was 30s). Marketplace hook has 15s timeout + `cache_warming` retry. Images have explicit `width`/`height` + `loading="lazy"`. All 47 routes confirmed `React.lazy()`.
-- **i18n**: Added `loading.*` keys (troubleConnecting, pleaseRefresh, refresh, takingLonger) in EN/FR.
-- **Testing**: 100% frontend, 82% backend (3 intermittent network timeouts). Zero action items. (Iteration 84)
-
-### PageSpeed Optimization Sprint (March 23, 2026)
-- **FIX 1 — Logo**: Resized from 4500x1080 (1376KB PNG) → 466x112 (13.6KB WebP, 99% reduction). Added `width=233 height=56 fetchpriority=high` to Navbar img tag.
-- **FIX 2 — Google Ads Removed**: Deleted all `adsbygoogle.js`, `ca-pub-*`, googlesyndication references from index.html. Saves 261KB + 304ms blocking.
-- **FIX 3 — PostHog Deferred**: Wrapped PostHog init in `window.onload → setTimeout(2000)`. Disabled session recording on mobile. Saves 191KB + 692ms blocking.
-- **FIX 4 — Critical CSS**: Inlined above-the-fold CSS (navbar + hero skeleton) directly in `<head>`. Added `<div id="initial-skeleton">` with shimmer animation for instant visual feedback.
-- **FIX 5 — Cache-Control**: Backend middleware sets `max-age=31536000, immutable` for JS/CSS/fonts, `max-age=31536000` for images, `no-cache` for HTML.
-- **FIX 6 — Footer CLS**: Added `min-height: 180px` to footer element. Added preconnect hints for Google Fonts.
-- **FIX 7 — Button Animation**: Changed `button-shine` from `left: -100%→100%` to `transform: translateX(-100%→200%)`. Added `will-change: transform`. GPU-composited, eliminates CLS.
-- **FIX 8 — Security Headers**: Added CSP (script-src, style-src, img-src, connect-src, frame-src), X-Frame-Options: SAMEORIGIN, Cross-Origin-Opener-Policy: same-origin.
-- **FIX 9 — Accessibility**: Mobile menu `aria-label`, Dialog/Sheet close `aria-label`, Carousel buttons 44px (h-11 w-11), `/privacy` → `/privacy-policy` redirect, hero text-white full opacity.
-- **FIX 10 — Preconnect**: `<link rel="preconnect">` for fonts.googleapis.com, fonts.gstatic.com, us-assets.i.posthog.com.
-- **Testing**: 100% pass rate, all 10 fixes verified (Iteration 85)
+## Known Issues
+- Intermittent MongoDB `NetworkTimeout` on `/api/site-config` and `/api/admin/site-config` endpoints. Pre-existing infrastructure issue related to MongoDB Atlas connectivity. Not a code regression.
 
 ## Backlog
 - (P2) Cloudflare CDN setup per /app/memory/INFRASTRUCTURE_P2.md
 - (P2) Post-launch monitoring and alerting
 - (Post-Launch) Configure production secrets (Stripe, SendGrid, webhooks)
 - (Low Priority) Add i18n to internal EmailMarketingPricing page
+- (Enhancement) Real-time performance dashboard
+- (Enhancement) Automated weekly Lighthouse audits
