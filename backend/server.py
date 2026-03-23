@@ -65,6 +65,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ─── WWW → non-WWW Redirect Middleware ───
+from starlette.responses import RedirectResponse
+@app.middleware("http")
+async def www_redirect(request: Request, call_next):
+    host = request.headers.get("host", "")
+    if host.startswith("www."):
+        non_www_host = host[4:]
+        url = str(request.url).replace(f"://{host}", f"://{non_www_host}", 1)
+        return RedirectResponse(url=url, status_code=301)
+    return await call_next(request)
+
 # ─── Response Time Logging Middleware ───
 @app.middleware("http")
 async def response_time_middleware(request: Request, call_next):
@@ -506,12 +517,13 @@ try:
             else:
                 api_router.include_router(router_obj)
         except Exception as e:
-            logger.warning(f"Could not load {module_path}: {e}")
+            import traceback
+            logger.error(f"FAILED to load {module_path}: {e}\n{traceback.format_exc()}")
 
     logger.info("All routers registered")
 
-except ImportError as e:
-    logger.warning(f"Could not load modular routers: {e}")
+except Exception as e:
+    logger.error(f"CRITICAL: Could not load modular routers: {e}")
     import traceback
     traceback.print_exc()
 

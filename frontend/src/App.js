@@ -304,6 +304,7 @@ const App = () => {
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
           <Route path="/privacy" element={<Navigate to="/privacy-policy" replace />} />
           <Route path="/terms-of-service" element={<TermsOfServicePage />} />
+          <Route path="/terms" element={<Navigate to="/terms-of-service" replace />} />
           <Route path="/legal" element={<LegalPage />} />
           <Route path="/invite/:token" element={<InviteAcceptPage />} />
           <Route path="/become-a-partner" element={<BecomePartnerPage />} />

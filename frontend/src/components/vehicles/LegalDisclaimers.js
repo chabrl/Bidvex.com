@@ -399,7 +399,7 @@ export const LegalFooter = () => (
     <BindingBidNotice compact />
     <p className="text-xs text-slate-400 text-center">
       By using BidVex, you agree to our{' '}
-      <a href="/terms" className="underline hover:text-slate-600">Terms of Service</a>
+      <a href="/terms-of-service" className="underline hover:text-slate-600">Terms of Service</a>
       {' '}and{' '}
       <a href="/privacy-policy" className="underline hover:text-slate-600">Privacy Policy</a>
     </p>

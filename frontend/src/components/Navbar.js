@@ -141,6 +141,7 @@ const Navbar = () => {
                 size="icon" 
                 onClick={toggleTheme} 
                 data-testid="theme-toggle-btn"
+                aria-label="Toggle theme"
                 className="hidden sm:inline-flex transition-transform hover:scale-110 hover:bg-slate-100 dark:hover:bg-slate-800 navbar-icon-btn h-9 w-9"
               >
                 {theme === 'light' ? (

@@ -377,7 +377,7 @@ const SellerDashboard = () => {
             </div>
             
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-4 text-center">
-              <a href="/terms" className="text-blue-600 dark:text-blue-400 hover:underline">
+              <a href="/terms-of-service" className="text-blue-600 dark:text-blue-400 hover:underline">
                 {t('dashboard.seller.viewTerms')} →
               </a>
             </p>

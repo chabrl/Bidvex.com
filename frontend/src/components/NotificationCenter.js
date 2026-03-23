@@ -302,6 +302,7 @@ const NotificationCenter = () => {
                   size="icon"
                   onClick={() => setIsOpen(false)}
                   className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/10"
+                  aria-label="Close"
                 >
                   <X className="h-4 w-4" />
                 </Button>

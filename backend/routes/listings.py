@@ -55,6 +55,10 @@ def get_read_db():
 import time as _time
 _multi_cache = {"data": None, "ts": 0, "ttl": 30}
 
+# ── Single listing cache (30s TTL) ──
+_listing_cache = {}
+_LISTING_CACHE_TTL = 30
+
 
 # ========== SINGLE-ITEM LISTINGS ==========
 
@@ -231,16 +235,24 @@ async def get_listings(
 
 @listings_router.get("/listings/{listing_id}", response_model=Listing)
 async def get_listing(listing_id: str):
-    db = get_db()
+    now = _time.time()
+    cached = _listing_cache.get(listing_id)
+    if cached and (now - cached["ts"]) < _LISTING_CACHE_TTL:
+        return cached["data"]
+
+    db = get_read_db()
     listing_doc = await db.listings.find_one({"id": listing_id}, {"_id": 0})
     if not listing_doc:
         raise HTTPException(status_code=404, detail="Listing not found")
-    await db.listings.update_one({"id": listing_id}, {"$inc": {"views": 1}})
+    # Increment views on the primary DB (write operation)
+    await get_db().listings.update_one({"id": listing_id}, {"$inc": {"views": 1}})
     if isinstance(listing_doc.get("created_at"), str):
         listing_doc["created_at"] = datetime.fromisoformat(listing_doc["created_at"])
     if isinstance(listing_doc.get("auction_end_date"), str):
         listing_doc["auction_end_date"] = datetime.fromisoformat(listing_doc["auction_end_date"])
-    return Listing(**listing_doc)
+    result = Listing(**listing_doc)
+    _listing_cache[listing_id] = {"data": result, "ts": now}
+    return result
 
 
 @listings_router.put("/listings/{listing_id}", response_model=Listing)

@@ -87,7 +87,7 @@ const ListingDetailPage = () => {
     }
   };
 
-  const fetchListing = async () => {
+  const fetchListing = async (retryCount = 0) => {
     try {
       const response = await axios.get(`${API}/listings/${id}`);
       setListing(response.data);
@@ -95,6 +95,11 @@ const ListingDetailPage = () => {
       const sellerResponse = await axios.get(`${API}/users/${response.data.seller_id}`);
       setSeller(sellerResponse.data);
     } catch (error) {
+      if (retryCount < 1) {
+        console.warn(`Listing fetch failed, retrying in 2s (attempt ${retryCount + 1})...`);
+        await new Promise(r => setTimeout(r, 2000));
+        return fetchListing(retryCount + 1);
+      }
       console.error('Failed to fetch listing:', error);
       toast.error('Listing not found');
       navigate('/marketplace');

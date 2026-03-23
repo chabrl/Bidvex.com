@@ -134,7 +134,7 @@ const AIAssistant = () => {
                 <h3 className="font-bold text-lg text-white">BidVex Master Concierge</h3>
                 <p className="text-xs text-white/90">Your Luxury Auction Specialist</p>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="text-white hover:bg-white/20 rounded-full">
+              <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="text-white hover:bg-white/20 rounded-full" aria-label="Close">
                 <X className="h-5 w-5" />
               </Button>
             </div>

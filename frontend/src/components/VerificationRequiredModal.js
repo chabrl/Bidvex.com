@@ -79,6 +79,7 @@ const VerificationRequiredModal = ({ isOpen, onClose, action = 'bid' }) => {
           <button
             onClick={onClose}
             className="absolute top-4 right-4 p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+            aria-label="Close"
           >
             <X className="h-4 w-4" />
           </button>

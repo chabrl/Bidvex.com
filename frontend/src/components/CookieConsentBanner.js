@@ -82,6 +82,7 @@ const CookieConsentBanner = () => {
               <button 
                 onClick={handleRejectAll}
                 className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                aria-label="Close"
               >
                 <X className="h-5 w-5 text-slate-500" />
               </button>
@@ -200,7 +201,7 @@ const CookieConsentBanner = () => {
                 Privacy Policy
               </a>
               {' '}and{' '}
-              <a href="/terms" className="text-blue-600 dark:text-blue-400 hover:underline">
+              <a href="/terms-of-service" className="text-blue-600 dark:text-blue-400 hover:underline">
                 Terms of Service
               </a>
             </p>

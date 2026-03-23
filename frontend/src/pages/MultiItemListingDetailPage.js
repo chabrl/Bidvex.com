@@ -162,7 +162,7 @@ const MultiItemListingDetailPage = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [listing]);
 
-  const fetchListing = async () => {
+  const fetchListing = async (retryCount = 0) => {
     try {
       setLoading(true);
       const response = await axios.get(`${API}/multi-item-listings/${id}`);
@@ -182,6 +182,11 @@ const MultiItemListingDetailPage = () => {
         }
       }
     } catch (error) {
+      if (retryCount < 1) {
+        console.warn(`Listing fetch failed, retrying in 2s (attempt ${retryCount + 1})...`);
+        await new Promise(r => setTimeout(r, 2000));
+        return fetchListing(retryCount + 1);
+      }
       console.error('Failed to fetch listing:', error);
       toast.error('Failed to load listing');
       navigate('/lots');

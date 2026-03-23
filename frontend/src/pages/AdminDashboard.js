@@ -195,16 +195,16 @@ const AdminDashboard = () => {
   const fetchDashboardStats = async () => {
     try {
       const [usersRes, listingsRes, revenueRes] = await Promise.all([
-        axios.get(`${API}/admin/users?limit=1`),
-        axios.get(`${API}/listings?limit=1`),
-        axios.get(`${API}/admin/stats/revenue`)
+        axios.get(`${API}/admin/users?limit=1`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`${API}/admin/analytics`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`${API}/admin/analytics/revenue`, { headers: { Authorization: `Bearer ${token}` } })
       ]);
 
       setStats({
         totalUsers: usersRes.data.total || 0,
-        totalListings: listingsRes.data.total || 0,
-        activeAuctions: listingsRes.data.active || 0,
-        revenue: revenueRes.data.total_revenue || 0
+        totalListings: listingsRes.data.active_listings || 0,
+        activeAuctions: listingsRes.data.active_listings || 0,
+        revenue: revenueRes.data.total_gmv || 0
       });
     } catch (error) {
       console.error('Failed to fetch dashboard stats:', error);
