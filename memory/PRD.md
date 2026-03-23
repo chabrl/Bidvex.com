@@ -80,6 +80,20 @@ BidVex is a full-stack auction marketplace with React frontend, FastAPI backend,
 - **Responsive**: Verified at 390px (single col), 768px (2x2), 1280px (2x2). No horizontal overflow at any breakpoint.
 - **Testing**: 100% frontend pass (Iteration 83)
 
+### Performance Optimization Sprint (March 23, 2026)
+- **Keep-Alive Ping**: APScheduler job pings `/api/health`, `/api/marketplace/items?limit=1`, `/api/multi-item-listings?limit=1` every 4 min to prevent backend sleep.
+- **MongoDB Connection Pooling**: `maxPoolSize=10, minPoolSize=2`, `retryReads/retryWrites=True`. Added `ReadPreference.SECONDARY_PREFERRED` for read-heavy routes (`db_read` injection).
+- **Marketplace Items Cache**: 30s TTL stale-while-revalidate. Cold cache returns `{"items":[], "cache_warming":true}` immediately; background task populates cache. Result: **502 TIMEOUT → 0.12s**.
+- **Subscription Plans Cache**: In-memory 1hr TTL in `SubscriptionPricingService`. Skip re-init after first load. Result: **11s → 0.12s (99% faster)**.
+- **Multi-Item Listings Cache**: 30s TTL for unfiltered queries. Result: **untested → 0.7s (warm 0.1s)**.
+- **Startup Pre-Warming**: On server start, pre-warms subscription plans, categories, listing count, marketplace items, multi-item-listings via HTTP self-calls (with 3s delay for server readiness).
+- **Response Time Middleware**: Logs `SLOW` warning for any request >500ms. Adds `X-Response-Time` header to all responses.
+- **Cache-Control Headers**: Static assets get `max-age=31536000, immutable`.
+- **Frontend LoadingTimeout Component**: Progressive states: skeleton (0-8s) → "Taking longer than usual…" (8-15s) → "Having trouble connecting" + Refresh button (15s+). Applied to BuyerDashboard, SellerDashboard, LotsMarketplacePage, and App.js PageLoader.
+- **Frontend Optimizations**: React Query `staleTime=60s` (was 30s). Marketplace hook has 15s timeout + `cache_warming` retry. Images have explicit `width`/`height` + `loading="lazy"`. All 47 routes confirmed `React.lazy()`.
+- **i18n**: Added `loading.*` keys (troubleConnecting, pleaseRefresh, refresh, takingLonger) in EN/FR.
+- **Testing**: 100% frontend, 82% backend (3 intermittent network timeouts). Zero action items. (Iteration 84)
+
 ## Backlog
 - (P2) Cloudflare CDN setup per /app/memory/INFRASTRUCTURE_P2.md
 - (P2) Post-launch monitoring and alerting
