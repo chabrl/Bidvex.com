@@ -94,6 +94,19 @@ BidVex is a full-stack auction marketplace with React frontend, FastAPI backend,
 - **i18n**: Added `loading.*` keys (troubleConnecting, pleaseRefresh, refresh, takingLonger) in EN/FR.
 - **Testing**: 100% frontend, 82% backend (3 intermittent network timeouts). Zero action items. (Iteration 84)
 
+### PageSpeed Optimization Sprint (March 23, 2026)
+- **FIX 1 — Logo**: Resized from 4500x1080 (1376KB PNG) → 466x112 (13.6KB WebP, 99% reduction). Added `width=233 height=56 fetchpriority=high` to Navbar img tag.
+- **FIX 2 — Google Ads Removed**: Deleted all `adsbygoogle.js`, `ca-pub-*`, googlesyndication references from index.html. Saves 261KB + 304ms blocking.
+- **FIX 3 — PostHog Deferred**: Wrapped PostHog init in `window.onload → setTimeout(2000)`. Disabled session recording on mobile. Saves 191KB + 692ms blocking.
+- **FIX 4 — Critical CSS**: Inlined above-the-fold CSS (navbar + hero skeleton) directly in `<head>`. Added `<div id="initial-skeleton">` with shimmer animation for instant visual feedback.
+- **FIX 5 — Cache-Control**: Backend middleware sets `max-age=31536000, immutable` for JS/CSS/fonts, `max-age=31536000` for images, `no-cache` for HTML.
+- **FIX 6 — Footer CLS**: Added `min-height: 180px` to footer element. Added preconnect hints for Google Fonts.
+- **FIX 7 — Button Animation**: Changed `button-shine` from `left: -100%→100%` to `transform: translateX(-100%→200%)`. Added `will-change: transform`. GPU-composited, eliminates CLS.
+- **FIX 8 — Security Headers**: Added CSP (script-src, style-src, img-src, connect-src, frame-src), X-Frame-Options: SAMEORIGIN, Cross-Origin-Opener-Policy: same-origin.
+- **FIX 9 — Accessibility**: Mobile menu `aria-label`, Dialog/Sheet close `aria-label`, Carousel buttons 44px (h-11 w-11), `/privacy` → `/privacy-policy` redirect, hero text-white full opacity.
+- **FIX 10 — Preconnect**: `<link rel="preconnect">` for fonts.googleapis.com, fonts.gstatic.com, us-assets.i.posthog.com.
+- **Testing**: 100% pass rate, all 10 fixes verified (Iteration 85)
+
 ## Backlog
 - (P2) Cloudflare CDN setup per /app/memory/INFRASTRUCTURE_P2.md
 - (P2) Post-launch monitoring and alerting
