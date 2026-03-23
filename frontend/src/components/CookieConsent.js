@@ -38,7 +38,7 @@ const CookieConsent = () => {
             'We use cookies and similar technologies to improve your experience, analyze traffic, and personalize content. By continuing to use this site you consent to our use of cookies in accordance with our Privacy Policy and Quebec\'s Law 25.'
           )}{' '}
           <a
-            href="/privacy"
+            href="/privacy-policy"
             className="underline underline-offset-2 hover:text-white transition-colors"
             style={{ color: '#38bdf8' }}
           >

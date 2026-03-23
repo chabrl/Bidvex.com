@@ -81,9 +81,12 @@ const Navbar = () => {
               data-testid="nav-logo"
             >
               <img 
-                src="/bidvex-logo.png" 
+                src="/bidvex-logo.webp" 
                 alt="BidVex" 
+                width={233}
+                height={56}
                 className="h-8 sm:h-9 w-auto transform group-hover:scale-105 transition-transform duration-200"
+                fetchpriority="high"
               />
             </Link>
 
@@ -284,6 +287,7 @@ const Navbar = () => {
                 className="lg:hidden navbar-icon-btn hover:bg-slate-100 dark:hover:bg-slate-800 h-9 w-9"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 data-testid="mobile-menu-toggle"
+                aria-label="Toggle mobile menu"
               >
                 {mobileMenuOpen ? (
                   <X className="h-5 w-5 navbar-icon text-slate-900 dark:text-slate-100" />

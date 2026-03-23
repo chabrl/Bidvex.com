@@ -196,7 +196,7 @@ const CookieConsentBanner = () => {
             {/* Privacy Link */}
             <p className="text-xs text-center text-slate-500 dark:text-slate-400 mt-4">
               Learn more in our{' '}
-              <a href="/privacy" className="text-blue-600 dark:text-blue-400 hover:underline">
+              <a href="/privacy-policy" className="text-blue-600 dark:text-blue-400 hover:underline">
                 Privacy Policy
               </a>
               {' '}and{' '}

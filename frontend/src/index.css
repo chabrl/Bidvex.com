@@ -1324,8 +1324,8 @@ label span,
 
 /* Button Shine Effect */
 @keyframes button-shine {
-  from { left: -100%; }
-  to { left: 100%; }
+  from { transform: translateX(-200%); }
+  to { transform: translateX(200%); }
 }
 
 .btn-shine {
@@ -1337,11 +1337,12 @@ label span,
   content: '';
   position: absolute;
   top: 0;
-  left: -100%;
+  left: 0;
   width: 50%;
   height: 100%;
   background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
   animation: button-shine 3s ease-in-out infinite;
+  will-change: transform;
 }
 
 /* ===== Animations ===== */

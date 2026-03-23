@@ -401,7 +401,7 @@ export const LegalFooter = () => (
       By using BidVex, you agree to our{' '}
       <a href="/terms" className="underline hover:text-slate-600">Terms of Service</a>
       {' '}and{' '}
-      <a href="/privacy" className="underline hover:text-slate-600">Privacy Policy</a>
+      <a href="/privacy-policy" className="underline hover:text-slate-600">Privacy Policy</a>
     </p>
   </div>
 );

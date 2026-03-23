@@ -75,9 +75,27 @@ async def response_time_middleware(request: Request, call_next):
     if not path.startswith("/health") and elapsed > 500:
         logger.warning(f"SLOW {request.method} {path} — {elapsed}ms")
     response.headers["X-Response-Time"] = f"{elapsed}ms"
-    # Static assets get long cache, API responses don't
-    if path.startswith("/static/") or path.endswith((".js", ".css", ".png", ".jpg", ".webp", ".woff2")):
+    # FIX 5: Cache-Control — static assets get 1yr, HTML must revalidate
+    if path.startswith("/static/") or any(path.endswith(ext) for ext in (".js", ".css", ".woff2", ".woff")):
         response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    elif any(path.endswith(ext) for ext in (".png", ".jpg", ".jpeg", ".webp", ".svg", ".ico", ".gif")):
+        response.headers["Cache-Control"] = "public, max-age=31536000"
+    elif path.endswith(".html") or path == "/":
+        response.headers["Cache-Control"] = "no-cache"
+    # FIX 8: Security headers
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://assets.emergent.sh https://unpkg.com https://d2adkz2s9zrlge.cloudfront.net https://cdn.tailwindcss.com https://us-assets.i.posthog.com https://js.stripe.com; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "img-src 'self' data: blob: https: http:; "
+        "connect-src 'self' https: wss:; "
+        "frame-src 'self' https://js.stripe.com; "
+        "object-src 'none'; "
+        "base-uri 'self'"
+    )
     return response
 
 # ─── Rate Limiting ───

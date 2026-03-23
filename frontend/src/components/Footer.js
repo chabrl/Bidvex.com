@@ -86,7 +86,7 @@ const Footer = () => {
   };
 
   return (
-    <footer className="bg-gray-900 text-gray-300 py-8 mt-20">
+    <footer className="bg-gray-900 text-gray-300 py-8 mt-20" style={{ minHeight: '180px' }}>
       <div className="max-w-7xl mx-auto px-4">
         {/* Essential Links - Dynamic */}
         <div className="flex flex-wrap justify-center items-center gap-6 mb-6">

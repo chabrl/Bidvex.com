@@ -5,8 +5,13 @@
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#009BFF" />
         
-        <!-- Let browsers cache static assets — CRA hashes filenames for cache-busting -->
+        <!-- Security headers via meta -->
         <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+        
+        <!-- Preconnect hints (FIX 10) -->
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="preconnect" href="https://us-assets.i.posthog.com" />
         
         <meta name="description" content="BidVex - Your trusted online auction marketplace for buying and selling unique items" />
         <meta property="og:title" content="BidVex - Online Auction Marketplace" />
@@ -28,25 +33,22 @@
         <link rel="manifest" href="%PUBLIC_URL%/manifest.json?v=2.1" />
         <meta name="msapplication-TileColor" content="#009BFF" />
         <meta name="msapplication-TileImage" content="%PUBLIC_URL%/bidvex-icon.png" />
-        <!--
-      manifest.json?v=2.1 provides metadata used when your web app is installed on a
-      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
-    -->
-        <!--
-      Notice the use of %PUBLIC_URL% in the tags above.
-      It will be replaced with the URL of the `public` folder during the build.
-      Only files inside the `public` folder can be referenced from the HTML.
 
-      Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
-      work correctly both with client-side routing and a non-root public URL.
-      Learn how to configure a non-root public URL by running `npm run build`.
-    -->
         <title>BidVex | Online Auction Marketplace</title>
         
-        <!-- Google AdSense -->
-        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5626625571065443"
-             crossorigin="anonymous"></script>
+        <!-- Critical above-the-fold CSS (FIX 4) -->
+        <style>
+          *,*::before,*::after{box-sizing:border-box;margin:0}
+          body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,sans-serif;-webkit-font-smoothing:antialiased}
+          #initial-skeleton{min-height:100vh;display:flex;flex-direction:column;background:linear-gradient(135deg,#eff6ff 0%,#fff 50%,#f0fdfa 100%)}
+          .sk-nav{height:56px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;padding:0 16px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+          .sk-pill{background:#e2e8f0;border-radius:6px;animation:shimmer 1.5s infinite}
+          .sk-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;text-align:center}
+          @keyframes shimmer{0%{opacity:1}50%{opacity:.5}100%{opacity:1}}
+        </style>
         
+        <!-- FIX 2: Google AdSense REMOVED — BidVex does not serve ads -->
+
         <script src="https://assets.emergent.sh/scripts/emergent-main.js"></script>
         <!--
         These two scripts have been added for the testing, please do not edit or remove them
@@ -81,118 +83,80 @@
         <noscript>You need to enable JavaScript to run this app.</noscript>
         <div id="root">
           <!-- Inline skeleton — visible instantly while JS loads -->
-          <div id="initial-skeleton" style="
-            min-height:100vh;display:flex;flex-direction:column;
-            background:linear-gradient(135deg,#eff6ff 0%,#fff 50%,#f0fdfa 100%);
-            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-          ">
+          <div id="initial-skeleton">
             <!-- Navbar skeleton -->
-            <div style="
-              height:56px;background:#fff;border-bottom:1px solid #e2e8f0;
-              display:flex;align-items:center;justify-content:space-between;
-              padding:0 16px;box-shadow:0 1px 3px rgba(0,0,0,.06);
-            ">
-              <div style="width:100px;height:32px;background:#e2e8f0;border-radius:6px;animation:shimmer 1.5s infinite"></div>
+            <div class="sk-nav">
+              <div style="width:100px;height:32px" class="sk-pill"></div>
               <div style="display:flex;gap:8px">
-                <div style="width:50px;height:28px;background:#e2e8f0;border-radius:6px;animation:shimmer 1.5s infinite"></div>
+                <div style="width:50px;height:28px" class="sk-pill"></div>
                 <div style="width:70px;height:36px;background:linear-gradient(135deg,#1E3A8A,#06B6D4);border-radius:8px"></div>
               </div>
             </div>
             <!-- Hero skeleton -->
-            <div style="
-              flex:1;display:flex;flex-direction:column;
-              align-items:center;justify-content:center;padding:40px 20px;text-align:center;
-            ">
-              <div style="width:280px;max-width:80%;height:40px;background:#e2e8f0;border-radius:8px;margin-bottom:16px;animation:shimmer 1.5s infinite"></div>
-              <div style="width:220px;max-width:60%;height:20px;background:#e2e8f0;border-radius:6px;margin-bottom:32px;animation:shimmer 1.5s infinite"></div>
+            <div class="sk-hero">
+              <div style="width:280px;max-width:80%;height:40px;margin-bottom:16px" class="sk-pill" style="border-radius:8px"></div>
+              <div style="width:220px;max-width:60%;height:20px;margin-bottom:32px" class="sk-pill"></div>
               <div style="display:flex;gap:12px">
                 <div style="width:140px;height:44px;background:linear-gradient(135deg,#1E3A8A,#06B6D4);border-radius:999px"></div>
-                <div style="width:120px;height:44px;background:#e2e8f0;border-radius:999px;animation:shimmer 1.5s infinite"></div>
+                <div style="width:120px;height:44px;border-radius:999px" class="sk-pill"></div>
               </div>
             </div>
           </div>
-          <style>
-            @keyframes shimmer {
-              0%{opacity:1}50%{opacity:.5}100%{opacity:1}
-            }
-          </style>
         </div>
-        <!--
-      This HTML file is a template.
-      If you open it directly in the browser, you will see an empty page.
 
-      You can add webfonts, meta tags, or analytics to this file.
-      The build step will place the bundled scripts into the <body> tag.
-
-      To begin the development, run `npm start` or `yarn start`.
-      To create a production bundle, use `npm run build` or `yarn build`.
-    -->
+        <!-- FIX 3: PostHog deferred — loads 2s after page is interactive -->
         <script>
-            !(function (t, e) {
+          window.addEventListener('load', function() {
+            setTimeout(function() {
+              !(function (t, e) {
                 var o, n, p, r;
                 e.__SV ||
-                    ((window.posthog = e),
-                    (e._i = []),
-                    (e.init = function (i, s, a) {
-                        function g(t, e) {
-                            var o = e.split(".");
-                            2 == o.length && ((t = t[o[0]]), (e = o[1])),
-                                (t[e] = function () {
-                                    t.push(
-                                        [e].concat(
-                                            Array.prototype.slice.call(
-                                                arguments,
-                                                0,
-                                            ),
-                                        ),
-                                    );
-                                });
-                        }
-                        ((p = t.createElement("script")).type =
-                            "text/javascript"),
-                            (p.crossOrigin = "anonymous"),
-                            (p.async = !0),
-                            (p.src =
-                                s.api_host.replace(
-                                    ".i.posthog.com",
-                                    "-assets.i.posthog.com",
-                                ) + "/static/array.js"),
-                            (r =
-                                t.getElementsByTagName(
-                                    "script",
-                                )[0]).parentNode.insertBefore(p, r);
-                        var u = e;
-                        for (
-                            void 0 !== a ? (u = e[a] = []) : (a = "posthog"),
-                                u.people = u.people || [],
-                                u.toString = function (t) {
-                                    var e = "posthog";
-                                    return (
-                                        "posthog" !== a && (e += "." + a),
-                                        t || (e += " (stub)"),
-                                        e
-                                    );
-                                },
-                                u.people.toString = function () {
-                                    return u.toString(1) + ".people (stub)";
-                                },
-                                o =
-                                    "init me ws ys ps bs capture je Di ks register register_once register_for_session unregister unregister_for_session Ps getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey canRenderSurveyAsync identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar get_property getSessionProperty Es $s createPersonProfile Is opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing Ss debug xs getPageViewId captureTraceFeedback captureTraceMetric".split(
-                                        " ",
-                                    ),
-                                n = 0;
-                            n < o.length;
-                            n++
-                        )
-                            g(u, o[n]);
-                        e._i.push([i, s, a]);
-                    }),
-                    (e.__SV = 1));
-            })(document, window.posthog || []);
-            posthog.init("phc_yJW1VjHGGwmCbbrtczfqqNxgBDbhlhOWcdzcIJEOTFE", {
+                  ((window.posthog = e),
+                  (e._i = []),
+                  (e.init = function (i, s, a) {
+                    function g(t, e) {
+                      var o = e.split(".");
+                      2 == o.length && ((t = t[o[0]]), (e = o[1])),
+                        (t[e] = function () {
+                          t.push([e].concat(Array.prototype.slice.call(arguments, 0)));
+                        });
+                    }
+                    ((p = t.createElement("script")).type = "text/javascript"),
+                      (p.crossOrigin = "anonymous"),
+                      (p.async = !0),
+                      (p.defer = !0),
+                      (p.src =
+                        s.api_host.replace(".i.posthog.com", "-assets.i.posthog.com") +
+                        "/static/array.js"),
+                      (r = t.getElementsByTagName("script")[0]).parentNode.insertBefore(p, r);
+                    var u = e;
+                    for (
+                      void 0 !== a ? (u = e[a] = []) : (a = "posthog"),
+                        u.people = u.people || [],
+                        u.toString = function (t) {
+                          var e = "posthog";
+                          return "posthog" !== a && (e += "." + a), t || (e += " (stub)"), e;
+                        },
+                        u.people.toString = function () {
+                          return u.toString(1) + ".people (stub)";
+                        },
+                        o = "init me ws ys ps bs capture je Di ks register register_once register_for_session unregister unregister_for_session Ps getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey canRenderSurveyAsync identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar get_property getSessionProperty Es $s createPersonProfile Is opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing Ss debug xs getPageViewId captureTraceFeedback captureTraceMetric".split(" "),
+                        n = 0;
+                      n < o.length;
+                      n++
+                    )
+                      g(u, o[n]);
+                    e._i.push([i, s, a]);
+                  }),
+                  (e.__SV = 1));
+              })(document, window.posthog || []);
+              posthog.init("phc_yJW1VjHGGwmCbbrtczfqqNxgBDbhlhOWcdzcIJEOTFE", {
                 api_host: "https://us.i.posthog.com",
-                person_profiles: "identified_only", // or 'always' to create profiles for anonymous users as well
-            });
+                person_profiles: "identified_only",
+                disable_session_recording: /Mobi|Android/i.test(navigator.userAgent),
+              });
+            }, 2000);
+          });
         </script>
     </body>
 </html>

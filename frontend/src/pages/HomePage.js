@@ -157,7 +157,7 @@ const HomePage = () => {
               </div>
               
               {/* Animated Description */}
-              <p className={`text-lg md:text-xl text-blue-100/90 max-w-lg leading-relaxed transition-all duration-1000 delay-400 ${heroLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+              <p className={`text-lg md:text-xl text-white max-w-lg leading-relaxed transition-all duration-1000 delay-400 ${heroLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
                 {t('homepage.heroDescription')}
               </p>
               
@@ -720,7 +720,7 @@ const HowItWorksSection = ({ navigate }) => {
         <div className={`mb-8 sm:mb-12 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
           <Badge className="bg-white/20 backdrop-blur border-white/30 dark:border-cyan-400/30 mb-4 text-white font-semibold shadow-lg">{t('homepage.gettingStarted')}</Badge>
           <h2 className="text-2xl sm:text-3xl lg:text-5xl font-bold mb-3 sm:mb-4 text-white drop-shadow-lg">{t('homepage.howItWorksTitle')}</h2>
-          <p className="max-w-2xl mx-auto text-base sm:text-lg text-white/90 drop-shadow-md">{t('homepage.startWinning')}</p>
+          <p className="max-w-2xl mx-auto text-base sm:text-lg text-white drop-shadow-md">{t('homepage.startWinning')}</p>
         </div>
 
         <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8 mb-8 sm:mb-12">
@@ -738,7 +738,7 @@ const HowItWorksSection = ({ navigate }) => {
                   {step.icon}
                 </div>
                 <h3 className="text-xl font-bold mb-3 text-white drop-shadow-md">{step.title}</h3>
-                <p className="text-white/95 leading-relaxed">{step.desc}</p>
+                <p className="text-white leading-relaxed">{step.desc}</p>
               </div>
             </div>
           ))}

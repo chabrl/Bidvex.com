@@ -302,6 +302,7 @@ const App = () => {
             <ProtectedRoute><AdminTaxDashboard /></ProtectedRoute>
           } />
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+          <Route path="/privacy" element={<Navigate to="/privacy-policy" replace />} />
           <Route path="/terms-of-service" element={<TermsOfServicePage />} />
           <Route path="/legal" element={<LegalPage />} />
           <Route path="/invite/:token" element={<InviteAcceptPage />} />
