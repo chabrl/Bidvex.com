@@ -30,7 +30,7 @@ distro==1.9.0
 dnspython==2.8.0
 durationpy==0.10
 ecdsa==0.19.1
-email-validator==2.3.0
+email-validator>=2.0.0
 fastapi==0.110.1
 fastuuid==0.14.0
 filelock==3.20.0
@@ -78,7 +78,7 @@ langchain==1.2.0
 langchain-classic==1.0.1
 langchain-community==0.4.1
 langchain-core==1.2.6
-langchain-openai==1.1.6
+langchain-openai>=1.1.0
 langchain-text-splitters==1.1.0
 langgraph==1.0.5
 langgraph-checkpoint==3.0.1
@@ -102,7 +102,7 @@ mypy_extensions==1.1.0
 numpy==2.3.3
 oauthlib==3.3.1
 onnxruntime==1.23.2
-openai==1.99.9
+openai>=1.30.0
 opentelemetry-api==1.39.1
 opentelemetry-exporter-otlp-proto-common==1.39.1
 opentelemetry-exporter-otlp-proto-grpc==1.39.1
