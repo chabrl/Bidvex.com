@@ -21,7 +21,13 @@ const MessageNotificationListener = () => {
   useEffect(() => {
     if (!user?.id) return;
 
+    // Prevent duplicate connections
+    if (wsRef.current?.readyState === WebSocket.OPEN || wsRef.current?.readyState === WebSocket.CONNECTING) return;
+
     const connect = () => {
+      // Guard against multiple simultaneous connections
+      if (wsRef.current?.readyState === WebSocket.OPEN || wsRef.current?.readyState === WebSocket.CONNECTING) return;
+
       try {
         // Use the global user notification channel
         const ws = new WebSocket(`${WS_URL}/api/ws/messages/${user.id}`);
@@ -70,8 +76,8 @@ const MessageNotificationListener = () => {
         };
 
         ws.onclose = () => {
-          console.log('[NotificationListener] Disconnected, reconnecting in 5s...');
-          reconnectTimeoutRef.current = setTimeout(connect, 5000);
+          console.log('[NotificationListener] Disconnected, reconnecting in 10s...');
+          reconnectTimeoutRef.current = setTimeout(connect, 10000);
         };
 
         ws.onerror = (error) => {
@@ -81,7 +87,7 @@ const MessageNotificationListener = () => {
         wsRef.current = ws;
       } catch (error) {
         console.error('[NotificationListener] Connection error:', error);
-        reconnectTimeoutRef.current = setTimeout(connect, 5000);
+        reconnectTimeoutRef.current = setTimeout(connect, 10000);
       }
     };
 

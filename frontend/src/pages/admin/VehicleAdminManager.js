@@ -33,7 +33,6 @@ import { useTranslation } from 'react-i18next';
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const formatDate = (date) => {
-  const { t } = useTranslation();
   if (!date) return 'N/A';
   return new Date(date).toLocaleDateString('en-CA', {
     year: 'numeric',
@@ -359,6 +358,7 @@ const VehicleListingCard = ({ vehicle, onApprove, onReject, onView }) => {
 // Main Component
 const VehicleAdminManager = () => {
   const { token } = useAuth();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('system-settings');
   const [loading, setLoading] = useState(true);
   const [pendingSellers, setPendingSellers] = useState([]);
