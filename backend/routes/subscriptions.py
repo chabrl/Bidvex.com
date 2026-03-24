@@ -57,10 +57,6 @@ async def _generate_subscription_invoice(db, user, plan_id, amount, subscription
     }
     await db.subscription_invoices.insert_one(invoice)
 
-try:
-    from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
-except ImportError:
-    pass
 import stripe
 
 subscriptions_router = APIRouter(tags=["Subscriptions"])

@@ -1,6 +1,6 @@
 """
 BidVex Master Concierge AI Assistant v2
-RAG-based luxury auction specialist using emergentintegrations
+RAG-based luxury auction specialist using OpenAI SDK
 """
 
 import os
@@ -8,7 +8,7 @@ import json
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from openai import AsyncOpenAI
 from services.ai_knowledge_base_v2 import get_knowledge_base
 
 logger = logging.getLogger(__name__)
@@ -116,6 +116,7 @@ Remember: You are not just an assistant - you are the Master Concierge, the face
         """Initialize the AI Assistant"""
         self.api_key = api_key
         self.db = db
+        self.openai_client = AsyncOpenAI(api_key=api_key)
         
         # Initialize knowledge base with local embeddings
         try:
@@ -167,17 +168,17 @@ Remember: You are not just an assistant - you are the Master Concierge, the face
 
 Please answer the user's question using the context provided above. If the context doesn't contain relevant information, use your general knowledge about auction platforms."""
             
-            # Initialize LlmChat with session for this user
-            session_id = f"bidvex_chat_{user_id or 'anonymous'}"
-            chat_client = LlmChat(
-                api_key=self.api_key,
-                session_id=session_id,
-                system_message=self.SYSTEM_INSTRUCTIONS
-            ).with_model("anthropic", "claude-sonnet-4-5-20250929")
-            
-            # Send message and get response
-            user_msg = UserMessage(text=enhanced_message)
-            response_text = await chat_client.send_message(user_msg)
+            # Call OpenAI GPT-4o (standard, available on PyPI)
+            response = await self.openai_client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": self.SYSTEM_INSTRUCTIONS},
+                    {"role": "user", "content": enhanced_message}
+                ],
+                temperature=0.7,
+                max_tokens=1024,
+            )
+            response_text = response.choices[0].message.content
             
             # Check if user needs verification (basic detection)
             needs_verification = False

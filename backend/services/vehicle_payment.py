@@ -9,13 +9,7 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone
 from decimal import Decimal
 import uuid
-
-from emergentintegrations.payments.stripe.checkout import (
-    StripeCheckout, 
-    CheckoutSessionResponse, 
-    CheckoutStatusResponse, 
-    CheckoutSessionRequest
-)
+import stripe
 
 logger = logging.getLogger(__name__)
 
@@ -31,16 +25,7 @@ class PaymentService:
     
     def __init__(self, api_key: str = None):
         self.api_key = api_key or os.environ.get("STRIPE_API_KEY")
-        self._checkout = None
-        
-    def _get_checkout(self, webhook_url: str) -> StripeCheckout:
-        """Get or create checkout instance"""
-        if not self._checkout:
-            self._checkout = StripeCheckout(
-                api_key=self.api_key,
-                webhook_url=webhook_url
-            )
-        return self._checkout
+        stripe.api_key = self.api_key
     
     async def create_invoice_checkout(
         self,
@@ -79,16 +64,23 @@ class PaymentService:
         
         # Create checkout instance
         webhook_url = f"{base_url}api/webhook/stripe"
-        checkout = self._get_checkout(webhook_url)
         
         # Build URLs from frontend origin
         success_url = f"{origin_url}/vehicle-auctions/invoices/{invoice_id}?session_id={{CHECKOUT_SESSION_ID}}&status=success"
         cancel_url = f"{origin_url}/vehicle-auctions/invoices/{invoice_id}?status=cancelled"
         
-        # Create checkout request
-        request = CheckoutSessionRequest(
-            amount=float(amount_due),
-            currency="cad",
+        # Create Stripe checkout session directly
+        session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            mode="payment",
+            line_items=[{
+                "price_data": {
+                    "currency": "cad",
+                    "unit_amount": int(float(amount_due) * 100),
+                    "product_data": {"name": f"Invoice {invoice.get('invoice_number', invoice_id)}"},
+                },
+                "quantity": 1,
+            }],
             success_url=success_url,
             cancel_url=cancel_url,
             metadata={
@@ -97,32 +89,33 @@ class PaymentService:
                 "invoice_number": invoice.get("invoice_number", ""),
                 "user_id": user_id,
                 "vehicle_id": invoice.get("vehicle_id", "")
-            }
+            },
         )
-        
-        # Create checkout session
-        session: CheckoutSessionResponse = await checkout.create_checkout_session(request)
         
         # Record transaction in database
         transaction_id = str(uuid.uuid4())
         await db.payment_transactions.insert_one({
             "id": transaction_id,
-            "session_id": session.session_id,
+            "session_id": session.id,
             "payment_type": PaymentType.INVOICE,
             "invoice_id": invoice_id,
             "user_id": user_id,
             "amount": amount_due,
             "currency": "CAD",
             "payment_status": "initiated",
-            "metadata": request.metadata,
+            "metadata": {
+                "payment_type": PaymentType.INVOICE,
+                "invoice_id": invoice_id,
+                "user_id": user_id,
+            },
             "created_at": datetime.now(timezone.utc)
         })
         
-        logger.info(f"Created checkout session {session.session_id} for invoice {invoice_id}")
+        logger.info(f"Created checkout session {session.id} for invoice {invoice_id}")
         
         return {
             "checkout_url": session.url,
-            "session_id": session.session_id,
+            "session_id": session.id,
             "amount": amount_due,
             "currency": "CAD",
             "invoice_number": invoice.get("invoice_number")
@@ -162,29 +155,33 @@ class PaymentService:
         if existing_deposit:
             raise ValueError("Deposit already paid or pending")
         
-        # Create checkout instance
+        # Create checkout session
         webhook_url = f"{base_url}api/webhook/stripe"
-        checkout = self._get_checkout(webhook_url)
         
         # Build URLs from frontend origin
         success_url = f"{origin_url}/vehicle-auctions/{vehicle_id}?session_id={{CHECKOUT_SESSION_ID}}&deposit=success"
         cancel_url = f"{origin_url}/vehicle-auctions/{vehicle_id}?deposit=cancelled"
         
-        # Create checkout request
-        request = CheckoutSessionRequest(
-            amount=float(amount),
-            currency="cad",
+        # Create Stripe checkout session directly
+        session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            mode="payment",
+            line_items=[{
+                "price_data": {
+                    "currency": "cad",
+                    "unit_amount": int(float(amount) * 100),
+                    "product_data": {"name": f"Bid Deposit - Vehicle {vehicle_id[:8]}"},
+                },
+                "quantity": 1,
+            }],
             success_url=success_url,
             cancel_url=cancel_url,
             metadata={
                 "payment_type": PaymentType.DEPOSIT,
                 "vehicle_id": vehicle_id,
                 "user_id": user_id
-            }
+            },
         )
-        
-        # Create checkout session
-        session: CheckoutSessionResponse = await checkout.create_checkout_session(request)
         
         # Create pending deposit record
         deposit_id = str(uuid.uuid4())
@@ -194,14 +191,14 @@ class PaymentService:
             "bidder_id": user_id,
             "amount": amount,
             "status": "pending",
-            "session_id": session.session_id,
+            "session_id": session.id,
             "created_at": datetime.now(timezone.utc)
         })
         
         # Record transaction
         await db.payment_transactions.insert_one({
             "id": str(uuid.uuid4()),
-            "session_id": session.session_id,
+            "session_id": session.id,
             "payment_type": PaymentType.DEPOSIT,
             "vehicle_id": vehicle_id,
             "deposit_id": deposit_id,
@@ -209,15 +206,19 @@ class PaymentService:
             "amount": amount,
             "currency": "CAD",
             "payment_status": "initiated",
-            "metadata": request.metadata,
+            "metadata": {
+                "payment_type": PaymentType.DEPOSIT,
+                "vehicle_id": vehicle_id,
+                "user_id": user_id
+            },
             "created_at": datetime.now(timezone.utc)
         })
         
-        logger.info(f"Created deposit checkout {session.session_id} for vehicle {vehicle_id}")
+        logger.info(f"Created deposit checkout {session.id} for vehicle {vehicle_id}")
         
         return {
             "checkout_url": session.url,
-            "session_id": session.session_id,
+            "session_id": session.id,
             "amount": amount,
             "currency": "CAD",
             "deposit_id": deposit_id
@@ -243,11 +244,9 @@ class PaymentService:
                 "payment_type": transaction.get("payment_type")
             }
         
-        # Get status from Stripe
-        webhook_url = f"{base_url}api/webhook/stripe"
-        checkout = self._get_checkout(webhook_url)
-        
-        status: CheckoutStatusResponse = await checkout.get_checkout_status(session_id)
+        # Get status from Stripe directly
+        stripe_session = stripe.checkout.Session.retrieve(session_id)
+        payment_status = "paid" if stripe_session.payment_status == "paid" else stripe_session.payment_status
         
         now = datetime.now(timezone.utc)
         
@@ -256,15 +255,15 @@ class PaymentService:
             {"session_id": session_id},
             {
                 "$set": {
-                    "payment_status": status.payment_status,
-                    "stripe_status": status.status,
+                    "payment_status": payment_status,
+                    "stripe_status": stripe_session.status,
                     "updated_at": now
                 }
             }
         )
         
         # If payment successful, update related records
-        if status.payment_status == "paid":
+        if payment_status == "paid":
             payment_type = transaction.get("payment_type")
             
             if payment_type == PaymentType.INVOICE:
@@ -332,12 +331,12 @@ class PaymentService:
                 logger.info(f"Deposit {deposit_id} marked as paid for vehicle {vehicle_id}")
         
         return {
-            "status": status.status,
-            "payment_status": status.payment_status,
-            "amount": status.amount_total / 100 if status.amount_total else transaction.get("amount"),
-            "currency": status.currency.upper() if status.currency else "CAD",
+            "status": stripe_session.status,
+            "payment_status": payment_status,
+            "amount": stripe_session.amount_total / 100 if stripe_session.amount_total else transaction.get("amount"),
+            "currency": stripe_session.currency.upper() if stripe_session.currency else "CAD",
             "payment_type": transaction.get("payment_type"),
-            "metadata": status.metadata
+            "metadata": dict(stripe_session.metadata) if stripe_session.metadata else {}
         }
     
     async def process_deposit_refund(

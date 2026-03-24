@@ -543,16 +543,9 @@ class FraudDetectionService:
             return flag.get("reason", "No summary available")
         
         try:
-            from emergentintegrations.llm.chat import LlmChat, UserMessage
+            from openai import AsyncOpenAI
             
-            chat = LlmChat(
-                api_key=self.llm_key,
-                session_id=f"fraud-analysis-{flag.get('id', 'unknown')}",
-                system_message="""You are an expert fraud analyst for a vehicle auction platform. 
-                Analyze the provided fraud flag data and generate a concise, professional summary 
-                explaining the suspicious pattern, potential risks, and recommended actions.
-                Keep the summary under 150 words. Be specific and actionable."""
-            ).with_model("openai", "gpt-4o")
+            client = AsyncOpenAI(api_key=self.llm_key)
             
             prompt = f"""Analyze this fraud flag and provide a summary:
 
@@ -567,10 +560,17 @@ Additional Data:
 
 Provide a brief fraud analysis summary with risk assessment and recommended action."""
 
-            user_message = UserMessage(text=prompt)
-            response = await chat.send_message(user_message)
+            response = await client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": "You are an expert fraud analyst for a vehicle auction platform. Analyze the provided fraud flag data and generate a concise, professional summary explaining the suspicious pattern, potential risks, and recommended actions. Keep the summary under 150 words. Be specific and actionable."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,
+                max_tokens=256,
+            )
             
-            return response
+            return response.choices[0].message.content
             
         except Exception as e:
             logger.error(f"Error generating fraud summary: {e}")

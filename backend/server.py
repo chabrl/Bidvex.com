@@ -602,8 +602,8 @@ async def prewarm_caches():
 @app.on_event("startup")
 async def init_cloud_storage():
     try:
-        from services.cloud_storage import _init_storage
-        _init_storage()
+        from services.cloud_storage import _get_s3
+        _get_s3()
     except Exception as e:
         logger.error(f"Cloud storage init failed (non-fatal): {e}")
 

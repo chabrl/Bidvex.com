@@ -29,10 +29,6 @@ import json as _json
 
 logger = logging.getLogger(__name__)
 
-try:
-    from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
-except ImportError:
-    pass
 import stripe
 from starlette.responses import FileResponse
 

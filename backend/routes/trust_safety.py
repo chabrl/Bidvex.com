@@ -399,9 +399,9 @@ async def analyze_content_ai(data: Dict[str, Any], current_user: User = Depends(
     content_type = data.get("type", "text")  # "text" or "image"
     
     try:
-        from emergentintegrations.openai import OpenAIChatIntegration
+        from openai import AsyncOpenAI
         
-        openai_client = OpenAIChatIntegration(api_key=EMERGENT_LLM_KEY)
+        client = AsyncOpenAI(api_key=EMERGENT_LLM_KEY)
         
         prompt = f"""Analyze this content for scams, fraud, or policy violations.
         
@@ -415,13 +415,14 @@ Provide a risk assessment with:
 
 Respond in JSON format."""
 
-        response = openai_client.chat_completion(
-            model="gpt-4",
+        response = await client.chat.completions.create(
+            model="gpt-4o",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.3
+            temperature=0.3,
+            max_tokens=512,
         )
         
-        analysis = response.get("choices", [{}])[0].get("message", {}).get("content", "{}")
+        analysis = response.choices[0].message.content
         
         return {
             "analysis": analysis,
@@ -447,9 +448,9 @@ async def scan_listing_ai(listing_id: str, current_user: User = Depends(get_curr
         raise HTTPException(status_code=404, detail="Listing not found")
     
     try:
-        from emergentintegrations.openai import OpenAIChatIntegration
+        from openai import AsyncOpenAI
         
-        openai_client = OpenAIChatIntegration(api_key=EMERGENT_LLM_KEY)
+        client = AsyncOpenAI(api_key=EMERGENT_LLM_KEY)
         
         content_to_analyze = f"Title: {listing.get('title')}\nDescription: {listing.get('description')}\nPrice: ${listing.get('starting_price')}"
         
@@ -466,13 +467,14 @@ Check for:
 
 Provide risk assessment in JSON format with risk_level, issues, and recommendations."""
 
-        response = openai_client.chat_completion(
-            model="gpt-4",
+        response = await client.chat.completions.create(
+            model="gpt-4o",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.3
+            temperature=0.3,
+            max_tokens=512,
         )
         
-        analysis = response.get("choices", [{}])[0].get("message", {}).get("content", "{}")
+        analysis = response.choices[0].message.content
         
         # Store analysis result
         await db.listing_scans.insert_one({
