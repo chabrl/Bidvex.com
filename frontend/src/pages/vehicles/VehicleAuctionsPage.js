@@ -32,7 +32,7 @@ import {
 import VehicleFilterModern from '../../components/VehicleFilterModern';
 import { TrustIndicators } from '../../components/vehicles/TrustBadges';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 // Vehicle body type icons
 const bodyTypeIcons = {

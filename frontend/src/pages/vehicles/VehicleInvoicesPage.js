@@ -20,7 +20,7 @@ import {
   TrendingUp, Calendar, FileText
 } from 'lucide-react';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const formatPrice = (amount) => {
   return new Intl.NumberFormat('en-CA', {

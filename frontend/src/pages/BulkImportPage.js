@@ -14,7 +14,7 @@ import {
 import { toast } from 'sonner';
 import SEO from '../components/SEO';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const BulkImportPage = () => {
   const navigate = useNavigate();

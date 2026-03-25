@@ -10,7 +10,7 @@ import {
   Filter, Search, X, Loader2
 } from 'lucide-react';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const MarketplaceSidebar = ({ onFiltersChange, className = '' }) => {
   const [filterData, setFilterData] = useState(null);

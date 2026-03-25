@@ -13,7 +13,7 @@ import WatchlistButton from '../components/WatchlistButton';
 import Countdown from 'react-countdown';
 import { formatCurrency } from '../utils/currencyFormatter';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const WatchlistPage = () => {
   const { t } = useTranslation();

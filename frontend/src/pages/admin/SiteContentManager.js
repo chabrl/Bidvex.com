@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { FileText, Globe, Save, RefreshCw, Mail, MessageCircle, ExternalLink } from 'lucide-react';
 import RichTextEditor from '../../components/RichTextEditor';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const SiteContentManager = () => {
   const [pages, setPages] = useState(null);

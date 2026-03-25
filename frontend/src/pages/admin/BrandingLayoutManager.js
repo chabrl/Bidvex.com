@@ -17,7 +17,7 @@ import {
 import HeroBannerEditor from '../../components/admin/HeroBannerEditor';
 import { useTranslation } from 'react-i18next';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 // Available Google Fonts
 const GOOGLE_FONTS = [

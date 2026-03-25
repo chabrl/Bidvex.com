@@ -73,7 +73,7 @@ import {
   LiveStatusIndicator
 } from '../../components/vehicles/AuctionRulesDisplay';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 // Format helpers
 const formatPrice = (price) => {

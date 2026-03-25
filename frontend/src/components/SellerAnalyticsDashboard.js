@@ -12,7 +12,7 @@ import {
   ArrowUpRight, ArrowDownRight, Loader2
 } from 'lucide-react';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 // Simple line chart component using CSS
 const SimpleLineChart = ({ data, color, label }) => {

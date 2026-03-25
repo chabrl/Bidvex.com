@@ -10,7 +10,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem('token'));
 
-  const API = `${API_BASE}/api`;
+  const API = API_BASE;
 
   useEffect(() => {
     if (token) {

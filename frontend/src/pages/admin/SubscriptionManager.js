@@ -32,7 +32,7 @@ import {
   Plus, Minus, RefreshCw, Shield, ArrowLeft, Eye, Edit3
 } from 'lucide-react';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 // Plan configurations (prices will be fetched from API)
 const PLANS = {

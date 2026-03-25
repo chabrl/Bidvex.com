@@ -16,7 +16,7 @@ const ForgotPasswordPage = () => {
   const [loading, setLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
 
-  const API = `${API_BASE}/api`;
+  const API = API_BASE;
 
   const handleSubmit = async (e) => {
     e.preventDefault();

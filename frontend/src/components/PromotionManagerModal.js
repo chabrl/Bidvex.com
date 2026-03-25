@@ -12,7 +12,7 @@ import axios from 'axios';
 import { Loader2, TrendingUp, Target, Calendar, DollarSign, MapPin, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const PROMOTION_TIERS = [
   {

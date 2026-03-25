@@ -15,7 +15,7 @@ import SellerAnalyticsDashboard from '../components/SellerAnalyticsDashboard';
 import { formatCurrency, formatPercent } from '../utils/currencyFormatter';
 import { LoadingTimeout } from '../components/LoadingTimeout';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const SellerDashboard = () => {
   const { t } = useTranslation();

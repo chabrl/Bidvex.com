@@ -8,7 +8,7 @@ import { TrendingUp, Download } from 'lucide-react';
 import { formatCurrency } from '../../utils/currencyFormatter';
 import { useTranslation } from 'react-i18next';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const AnalyticsDashboard = () => {
   const { t } = useTranslation();

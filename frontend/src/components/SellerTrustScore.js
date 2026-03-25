@@ -5,7 +5,7 @@ import { Badge } from './ui/badge';
 import { Card, CardContent } from './ui/card';
 import axios from 'axios';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 /**
  * SellerTrustScore - Displays seller trust rating and badges

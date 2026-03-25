@@ -16,7 +16,7 @@ import {
 import { toast } from 'sonner';
 import SEO from '../components/SEO';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 const MAX_COMPARE = 4;
 
 const CompareListingsPage = () => {

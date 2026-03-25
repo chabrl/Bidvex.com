@@ -8,7 +8,7 @@ import React, { createContext, useContext, useState, useCallback } from 'react';
 import axios from 'axios';
 import { useAuth } from './AuthContext';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const VehicleAuctionContext = createContext(null);
 

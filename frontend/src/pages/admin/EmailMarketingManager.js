@@ -35,7 +35,7 @@ import {
   UserPlus, UserMinus, Download, ListFilter, Target
 } from 'lucide-react';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 // Status colors
 const STATUS_COLORS = {

@@ -27,7 +27,7 @@ const ResetPasswordPage = () => {
   const [expiresInMinutes, setExpiresInMinutes] = useState(0);
   const [resetSuccess, setResetSuccess] = useState(false);
 
-  const API = `${API_BASE}/api`;
+  const API = API_BASE;
 
   useEffect(() => {
     if (!token) {

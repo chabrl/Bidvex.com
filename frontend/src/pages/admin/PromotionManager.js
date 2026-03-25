@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { TrendingUp, Trash2, Plus, Star } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const PromotionManager = () => {
   const { t } = useTranslation();

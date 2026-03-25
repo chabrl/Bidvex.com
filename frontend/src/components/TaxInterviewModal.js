@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { Building2, User, Shield, AlertTriangle, CheckCircle, X, ArrowLeft } from 'lucide-react';
 import { TAX_DECLARATIONS, TAX_FIELD_REQUIREMENTS } from '../utils/taxCompliance';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const TaxInterviewModal = ({ user, onComplete, onCancel }) => {
   const { t, i18n } = useTranslation();

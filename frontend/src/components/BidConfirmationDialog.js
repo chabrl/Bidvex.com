@@ -9,7 +9,7 @@ import { DollarSign, CheckCircle2, Info, Sparkles, ShieldCheck, Receipt } from '
 import { toast } from 'sonner';
 import { formatCurrency } from '../utils/currencyFormatter';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 /**
  * BidConfirmationDialog - Shows transparent cost breakdown before placing a bid

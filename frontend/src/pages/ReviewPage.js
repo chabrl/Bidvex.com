@@ -11,7 +11,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Star, ArrowLeft, Loader2, CheckCircle2, Package, User, MessageSquare, Truck, Send } from 'lucide-react';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const StarSelector = ({ value, onChange, label, size = 'lg' }) => {
   const [hover, setHover] = useState(0);

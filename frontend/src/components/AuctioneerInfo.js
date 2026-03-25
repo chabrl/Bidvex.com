@@ -5,7 +5,7 @@ import { User, MapPin, Award, TrendingUp, Star } from 'lucide-react';
 import { Badge } from './ui/badge';
 import axios from 'axios';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 /**
  * AuctioneerInfo Component

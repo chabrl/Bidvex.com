@@ -11,7 +11,7 @@ import { Package, Layers, ArrowRight, Lock, AlertTriangle, CreditCard, Loader2 }
 import { toast } from 'sonner';
 import axios from 'axios';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 /**
  * SellOptionsModal Component

@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const RateSellerModal = ({ 
   isOpen, 

@@ -25,7 +25,7 @@ import LocationSelector from '../components/LocationSelector';
 import useGeoLocation from '../hooks/useGeoLocation';
 import { formatCurrency } from '../utils/currencyFormatter';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const CreateMultiItemListing = () => {
   const { t, i18n } = useTranslation();

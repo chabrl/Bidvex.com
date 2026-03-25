@@ -7,7 +7,7 @@ import { Separator } from './ui/separator';
 import { Info, Calculator, AlertTriangle, Loader2 } from 'lucide-react';
 import axios from 'axios';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 /**
  * PriceBreakdown Component

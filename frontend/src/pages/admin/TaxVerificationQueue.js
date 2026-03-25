@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { Shield, CheckCircle, XCircle, Eye, RefreshCw, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const TaxVerificationQueue = () => {
   const { t } = useTranslation();

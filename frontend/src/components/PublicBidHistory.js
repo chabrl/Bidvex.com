@@ -7,7 +7,7 @@ import { Button } from './ui/button';
 import { useCurrency } from '../contexts/CurrencyContext';
 import axios from 'axios';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 /**
  * PublicBidHistory - Transparent bid history display with masked bidder identities

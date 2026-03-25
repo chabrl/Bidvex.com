@@ -17,7 +17,7 @@ import {
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const BIDVEX_LOGO = 'https://customer-assets.emergentagent.com/job_aa51ced5-053b-417a-a5ea-c63c2febfff9/artifacts/xkt9mtpw_logo%20app.png';
 

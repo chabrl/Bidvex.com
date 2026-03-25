@@ -7,7 +7,7 @@ import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
 import { MessageCircle, Trash2, Ban } from 'lucide-react';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const MessagingOversight = () => {
   const [messages, setMessages] = useState([]);

@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { Loader2, Lock, Eye, EyeOff, AlertTriangle, CheckCircle, Square, CheckSquare } from 'lucide-react';
 import axios from 'axios';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const AuthPage = () => {
   const { t } = useTranslation();

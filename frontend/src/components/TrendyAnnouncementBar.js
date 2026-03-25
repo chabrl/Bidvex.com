@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { X, ChevronLeft, ChevronRight, Bell, Sparkles, AlertTriangle, CheckCircle, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const TrendyAnnouncementBar = () => {
   const { t } = useTranslation();

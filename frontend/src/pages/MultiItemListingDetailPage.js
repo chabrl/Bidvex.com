@@ -39,7 +39,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../c
 import { extractErrorMessage } from '../utils/errorHandler';
 import { useCurrency } from '../contexts/CurrencyContext';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const MultiItemListingDetailPage = () => {
   const { id } = useParams();

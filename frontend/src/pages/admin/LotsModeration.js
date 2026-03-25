@@ -7,7 +7,7 @@ import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
 import { Package, CheckCircle, XCircle } from 'lucide-react';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const LotsModeration = () => {
   const [lots, setLots] = useState([]);

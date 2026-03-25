@@ -26,7 +26,7 @@ import {
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 // Flag type configurations
 const FLAG_TYPES = {

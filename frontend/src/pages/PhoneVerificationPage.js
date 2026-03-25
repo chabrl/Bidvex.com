@@ -13,7 +13,7 @@ import {
   RefreshCw, Sparkles, Lock, AlertCircle
 } from 'lucide-react';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 // ========== OTP INPUT COMPONENT ==========
 const OTPInput = ({ length = 6, value, onChange, disabled }) => {

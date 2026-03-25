@@ -19,7 +19,7 @@ import {
   Calendar, Building2, CreditCard, FileText, Info
 } from 'lucide-react';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const formatPrice = (amount) => {
   const { t } = useTranslation();

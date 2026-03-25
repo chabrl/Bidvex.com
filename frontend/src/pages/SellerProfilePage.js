@@ -14,7 +14,7 @@ import {
 import { toast } from 'sonner';
 import { formatCurrency } from '../utils/currencyFormatter';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const SellerProfilePage = () => {
   const { t } = useTranslation();

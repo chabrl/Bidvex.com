@@ -33,7 +33,7 @@ import Lightbox from 'yet-another-react-lightbox';
 import 'yet-another-react-lightbox/styles.css';
 import { useRealtimeBidding } from '../hooks/useRealtimeBidding';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const ListingDetailPage = () => {
   const { id } = useParams();

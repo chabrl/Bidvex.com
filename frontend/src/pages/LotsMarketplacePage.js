@@ -18,7 +18,7 @@ import { formatCurrency } from '../utils/currencyFormatter';
 import { SellerRatingInline } from '../components/SellerReputation';
 import { LoadingTimeout } from '../components/LoadingTimeout';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const LotsMarketplacePage = () => {
   const { t } = useTranslation();

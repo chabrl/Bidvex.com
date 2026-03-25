@@ -19,7 +19,7 @@ import {
   Shield
 } from 'lucide-react';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const CurrencyAppealsManager = () => {
   const { t } = useTranslation();

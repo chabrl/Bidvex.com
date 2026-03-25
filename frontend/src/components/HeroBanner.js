@@ -8,7 +8,7 @@ import { Search, ArrowRight, Clock } from 'lucide-react';
 import axios from 'axios';
 import Countdown from 'react-countdown';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const HeroBanner = () => {
   const navigate = useNavigate();

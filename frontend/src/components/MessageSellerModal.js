@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import axios from 'axios';
 import { Send, Loader2 } from 'lucide-react';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const MessageSellerModal = ({ isOpen, onClose, sellerId, listingId, listingTitle }) => {
   const [subject, setSubject] = useState(`Inquiry about: ${listingTitle || 'Auction'}`);

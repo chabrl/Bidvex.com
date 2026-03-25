@@ -15,7 +15,7 @@ import {
 import { formatCurrency } from '../../utils/currencyFormatter';
 import { useTranslation } from 'react-i18next';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 // System defaults (must match backend)
 const SYSTEM_DEFAULTS = {

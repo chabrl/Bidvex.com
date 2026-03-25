@@ -11,7 +11,7 @@ import { Loader2, CheckCircle, Eye, EyeOff, UserPlus, Shield, AlertTriangle } fr
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const InviteAcceptPage = () => {
   const { t } = useTranslation();

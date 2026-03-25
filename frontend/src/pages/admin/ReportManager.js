@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { Flag, Save } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const ReportManager = () => {
   const { t } = useTranslation();

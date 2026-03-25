@@ -29,7 +29,7 @@ export const useRealtimeMessaging = (conversationId) => {
   const maxReconnectAttempts = 10;
 
   const API_URL = API_BASE || 'http://localhost:8001';
-  const WS_URL = API_URL.replace('https', 'wss').replace('http', 'ws');
+  const WS_BASE = API_URL.replace('/api', '').replace('https', 'wss').replace('http', 'ws');
 
   // Connect to WebSocket
   const connect = useCallback(() => {
@@ -39,7 +39,7 @@ export const useRealtimeMessaging = (conversationId) => {
     setConnectionHealth('connecting');
 
     try {
-      const wsUrl = `${WS_URL}/api/ws/messaging/${conversationId}?user_id=${user.id}`;
+      const wsUrl = `${WS_BASE}/api/ws/messaging/${conversationId}?user_id=${user.id}`;
       console.log('[Messaging] Connecting to WebSocket:', wsUrl);
       
       const ws = new WebSocket(wsUrl);
@@ -196,7 +196,7 @@ export const useRealtimeMessaging = (conversationId) => {
       setIsConnected(false);
       setConnectionHealth('disconnected');
     }
-  }, [conversationId, user?.id, WS_URL]);
+  }, [conversationId, user?.id, WS_BASE]);
   
   // Store connect function in ref
   useEffect(() => {

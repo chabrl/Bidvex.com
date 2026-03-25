@@ -2,7 +2,7 @@ import API_BASE from '../config';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const fetchCategories = async () => {
   const { data } = await axios.get(`${API}/categories`);

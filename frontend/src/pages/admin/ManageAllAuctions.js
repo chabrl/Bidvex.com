@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { Package, Search, Edit2, Trash2, Pause, Archive, XCircle, Eye, AlertTriangle } from 'lucide-react';
 import { formatCurrency } from '../../utils/currencyFormatter';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const ManageAllAuctions = () => {
   const navigate = useNavigate();

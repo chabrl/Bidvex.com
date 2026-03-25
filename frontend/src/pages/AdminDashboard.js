@@ -51,7 +51,7 @@ import {
   ToggleLeft, ToggleRight, Clock, Mail, Sliders, Car, Send, Bot, Ticket, BarChart3, Globe, Building2, BarChart2
 } from 'lucide-react';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 // ========== PRIMARY NAVIGATION CATEGORIES ==========
 const PRIMARY_TABS = [

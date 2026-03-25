@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/currencyFormatter';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const SubscriptionAnalytics = () => {
   const [analytics, setAnalytics] = useState(null);

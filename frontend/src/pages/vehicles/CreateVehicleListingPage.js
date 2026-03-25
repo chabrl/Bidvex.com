@@ -35,7 +35,7 @@ import {
 import LocationSelector from '../../components/LocationSelector';
 import useGeoLocation from '../../hooks/useGeoLocation';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const BODY_TYPES = [
   { value: 'sedan', label: 'Sedan' },

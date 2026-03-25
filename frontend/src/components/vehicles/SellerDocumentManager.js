@@ -18,7 +18,7 @@ import {
   Image, File, Trash2, Eye, RefreshCw, Shield, Info
 } from 'lucide-react';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 // Document type labels
 const DOCUMENT_LABELS = {

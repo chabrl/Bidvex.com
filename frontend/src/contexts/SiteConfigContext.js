@@ -2,7 +2,7 @@ import API_BASE from '../config';
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 /**
  * SiteConfigContext

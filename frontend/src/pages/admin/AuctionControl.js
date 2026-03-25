@@ -16,7 +16,7 @@ import {
   ToggleLeft, Hash, Layers
 } from 'lucide-react';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const AuctionControl = () => {
   const { t } = useTranslation();

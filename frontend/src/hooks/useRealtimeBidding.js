@@ -33,7 +33,7 @@ export const useRealtimeBidding = (listingId) => {
   const maxReconnectAttempts = 10;
 
   const API_URL = API_BASE || 'http://localhost:8001';
-  const WS_URL = API_URL.replace('https', 'wss').replace('http', 'ws');
+  const WS_BASE = API_URL.replace('/api', '').replace('https', 'wss').replace('http', 'ws');
 
   // Fallback polling when WebSocket is disconnected
   const startFallbackPolling = useCallback(() => {
@@ -42,7 +42,7 @@ export const useRealtimeBidding = (listingId) => {
     
     pollingIntervalRef.current = setInterval(async () => {
       try {
-        const response = await fetch(`${API_URL}/api/listings/${listingId}`);
+        const response = await fetch(`${API_URL}/listings/${listingId}`);
         if (response.ok) {
           const listing = await response.json();
           setCurrentPrice(listing.current_price);
@@ -77,8 +77,8 @@ export const useRealtimeBidding = (listingId) => {
 
     try {
       const wsUrl = user 
-        ? `${WS_URL}/api/ws/listings/${listingId}?user_id=${user.id}`
-        : `${WS_URL}/api/ws/listings/${listingId}`;
+        ? `${WS_BASE}/api/ws/listings/${listingId}?user_id=${user.id}`
+        : `${WS_BASE}/api/ws/listings/${listingId}`;
       
       console.log('[Bidding] Connecting:', wsUrl.split('?')[0]);
       const ws = new WebSocket(wsUrl);
@@ -248,7 +248,7 @@ export const useRealtimeBidding = (listingId) => {
       setConnectionHealth('disconnected');
       startFallbackPolling();
     }
-  }, [listingId, user, WS_URL, startFallbackPolling, stopFallbackPolling]);
+  }, [listingId, user, WS_BASE, startFallbackPolling, stopFallbackPolling]);
   
   useEffect(() => { connectRef.current = connect; }, [connect]);
 

@@ -8,7 +8,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 const getWebSocketUrl = () => {
   const backendUrl = API_BASE || '';
-  return backendUrl.replace('https://', 'wss://').replace('http://', 'ws://');
+  return backendUrl.replace('/api', '').replace('https://', 'wss://').replace('http://', 'ws://');
 };
 
 export const useVehicleBidding = (vehicleId, enabled = true) => {

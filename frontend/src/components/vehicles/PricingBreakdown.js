@@ -16,7 +16,7 @@ import {
   ChevronDown, ChevronUp, Crown, Sparkles, AlertCircle
 } from 'lucide-react';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 // Format currency
 const formatPrice = (amount) => {

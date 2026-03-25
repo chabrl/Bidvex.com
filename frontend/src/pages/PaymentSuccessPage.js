@@ -9,7 +9,7 @@ import { CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { formatCurrency } from '../utils/currencyFormatter';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const PaymentSuccessPage = () => {
   const { t } = useTranslation();

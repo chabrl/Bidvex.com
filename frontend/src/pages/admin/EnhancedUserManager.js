@@ -30,7 +30,7 @@ import {
   Phone, AlertTriangle, X
 } from 'lucide-react';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const EnhancedUserManager = () => {
   const { token } = useAuth();

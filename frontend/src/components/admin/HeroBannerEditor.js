@@ -42,7 +42,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 // Available font families
 const FONT_FAMILIES = [

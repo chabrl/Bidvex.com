@@ -17,7 +17,7 @@ const MessageNotificationListener = () => {
   const reconnectTimeoutRef = useRef(null);
 
   const API_URL = API_BASE || 'http://localhost:8001';
-  const WS_URL = API_URL.replace('https', 'wss').replace('http', 'ws');
+  const WS_BASE = API_URL.replace('/api', '').replace('https', 'wss').replace('http', 'ws');
 
   useEffect(() => {
     if (!user?.id) return;
@@ -31,7 +31,7 @@ const MessageNotificationListener = () => {
 
       try {
         // Use the global user notification channel
-        const ws = new WebSocket(`${WS_URL}/api/ws/messages/${user.id}`);
+        const ws = new WebSocket(`${WS_BASE}/api/ws/messages/${user.id}`);
         
         ws.onopen = () => {
           console.log('[NotificationListener] Connected');
@@ -102,7 +102,7 @@ const MessageNotificationListener = () => {
         wsRef.current.close();
       }
     };
-  }, [user?.id, WS_URL, navigate, location.pathname]);
+  }, [user?.id, WS_BASE, navigate, location.pathname]);
 
   return null; // This component doesn't render anything
 };

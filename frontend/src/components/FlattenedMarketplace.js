@@ -39,7 +39,7 @@ import { useCategories } from '../hooks/useCategories';
 import { useMarketplaceItems } from '../hooks/useMarketplaceItems';
 import { SellerRatingInline } from './SellerReputation';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 /**
  * FlattenedMarketplace - Item-Centric Discovery View

@@ -6,7 +6,7 @@ import { Slider } from './ui/slider';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 /**
  * PersonalizedSavingsCalculator - Shows ROI based on user's actual transaction history

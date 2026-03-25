@@ -13,7 +13,7 @@ import Countdown from 'react-countdown';
 import { formatCurrency } from '../utils/currencyFormatter';
 import { LoadingTimeout } from '../components/LoadingTimeout';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const BuyerDashboard = () => {
   const { t } = useTranslation();

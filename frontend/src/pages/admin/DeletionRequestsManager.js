@@ -8,7 +8,7 @@ import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
 import { AlertTriangle, CheckCircle, XCircle, Eye, Trash2 } from 'lucide-react';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const DeletionRequestsManager = () => {
   const navigate = useNavigate();

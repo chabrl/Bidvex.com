@@ -24,7 +24,7 @@ import {
   Calendar
 } from 'lucide-react';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const SellerEarningsDashboard = () => {
   const { t, i18n } = useTranslation();

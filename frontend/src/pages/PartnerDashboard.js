@@ -16,7 +16,7 @@ import {
 import { toast } from 'sonner';
 import axios from 'axios';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 export default function PartnerDashboard() {
   const { user, token, refreshUser } = useAuth();

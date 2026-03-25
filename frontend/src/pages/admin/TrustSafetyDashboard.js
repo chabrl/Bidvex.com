@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { Shield, AlertTriangle, TrendingUp, Users, MessageSquare, Eye, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const TrustSafetyDashboard = () => {
   const { t } = useTranslation();

@@ -14,7 +14,7 @@ import { extractErrorMessage } from '../utils/errorHandler';
 import { formatCurrency } from '../utils/currencyFormatter';
 import { useTranslation } from 'react-i18next';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const AutoBidModal = ({ listingId, currentBid, minimumIncrement, onAutoBidSetup }) => {
   const { t } = useTranslation();

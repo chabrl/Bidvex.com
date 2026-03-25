@@ -26,7 +26,7 @@ import {
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 // Notification type icons and colors
 const NOTIFICATION_TYPES = {

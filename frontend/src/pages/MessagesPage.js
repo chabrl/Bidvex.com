@@ -25,7 +25,7 @@ import {
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 // ========== NOTIFICATION SOUND ==========
 const playMessageSound = () => {

@@ -22,7 +22,7 @@ const LocationSearchMap = ({ onLocationSearch }) => {
   const [apiKey, setApiKey] = useState('');
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/config/google-maps-key`)
+    fetch(`${API_BASE}/config/google-maps-key`)
       .then(res => res.json())
       .then(data => setApiKey(data.api_key))
       .catch(err => console.error('Failed to fetch API key:', err));

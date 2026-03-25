@@ -6,7 +6,7 @@ import { Button } from './ui/button';
 import { toast } from 'sonner';
 import { formatCurrency } from '../utils/currencyFormatter';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const TIER_CONFIG = {
   free: { label: 'Starter', icon: Star, color: 'text-slate-500', bg: 'bg-slate-100 dark:bg-slate-800' },

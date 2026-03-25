@@ -13,7 +13,7 @@ import {
 import SEO from '../components/SEO';
 import { SellerReputationCard, SellerReviewsList } from '../components/SellerReputation';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const StorefrontPage = () => {
   const { userId } = useParams();

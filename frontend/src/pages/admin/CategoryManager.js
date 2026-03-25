@@ -7,7 +7,7 @@ import { Input } from '../../components/ui/input';
 import { toast } from 'sonner';
 import { FolderOpen, Plus, Edit2, Trash2 } from 'lucide-react';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const CategoryManager = () => {
   const [categories, setCategories] = useState([]);

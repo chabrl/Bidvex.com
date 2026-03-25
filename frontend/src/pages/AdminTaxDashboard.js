@@ -14,7 +14,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { formatCurrency } from '../utils/currencyFormatter';
 import { toast } from 'sonner';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const PERIOD_OPTIONS = [
   { value: 'current', label: 'Current Quarter' },

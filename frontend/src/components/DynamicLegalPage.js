@@ -17,7 +17,7 @@ import {
   Menu, X
 } from 'lucide-react';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 // Section icons mapping
 const SECTION_ICONS = {

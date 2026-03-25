@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import { toast } from 'sonner';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const WishlistHeartButton = ({ auctionId, lotId = null, initialWishlisted = false, size = "default", showCount = false, wishlistCount = 0 }) => {
   const { user } = useAuth();

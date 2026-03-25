@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const HowItWorksPage = () => {
   const { t, i18n } = useTranslation();

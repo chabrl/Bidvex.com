@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const ROLE_INFO = {
   admin: { color: 'bg-red-100 text-red-700 border-red-200', label: 'Admin', desc: 'Full access' },

@@ -23,7 +23,7 @@ import {
 import SellerDocumentManager from '../../components/vehicles/SellerDocumentManager';
 import { useTranslation } from 'react-i18next';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const SELLER_TYPES = [
   {

@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { X, Info, AlertTriangle, CheckCircle } from 'lucide-react';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const AnnouncementBanner = () => {
   const [announcements, setAnnouncements] = useState([]);

@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { DollarSign, Users, TrendingUp, Copy, ExternalLink, Download } from 'lucide-react';
 import { formatCurrency } from '../utils/currencyFormatter';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const AffiliateDashboard = () => {
   const { t, i18n, ready } = useTranslation();

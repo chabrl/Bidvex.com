@@ -36,7 +36,7 @@ import {
   TableRow,
 } from '../../components/ui/table';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const SITE_MODES = [
   {

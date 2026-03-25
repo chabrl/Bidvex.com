@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { FileText, Download } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const AdminLogs = ({ searchQuery = '' }) => {
   const { t } = useTranslation();

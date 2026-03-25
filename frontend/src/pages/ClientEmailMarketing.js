@@ -34,7 +34,7 @@ import {
   UserPlus, FileText, ArrowRight, Zap, XCircle, Edit3, DollarSign
 } from 'lucide-react';
 
-const API = `${API_BASE}/api`;
+const API = API_BASE;
 
 const ClientEmailMarketing = () => {
   const { t } = useTranslation();
