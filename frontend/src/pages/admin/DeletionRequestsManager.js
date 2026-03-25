@@ -1,3 +1,4 @@
+import API_BASE from '../../config';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -7,7 +8,7 @@ import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
 import { AlertTriangle, CheckCircle, XCircle, Eye, Trash2 } from 'lucide-react';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const DeletionRequestsManager = () => {
   const navigate = useNavigate();

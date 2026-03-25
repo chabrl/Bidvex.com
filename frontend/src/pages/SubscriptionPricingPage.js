@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 /**
  * SubscriptionPricingPage – 2x2 premium pricing grid
  */
@@ -16,7 +17,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency } from '../utils/currencyFormatter';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 /* ────── tier visual config ────── */
 const TIERS = {

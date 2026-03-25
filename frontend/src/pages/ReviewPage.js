@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -10,7 +11,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Star, ArrowLeft, Loader2, CheckCircle2, Package, User, MessageSquare, Truck, Send } from 'lucide-react';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const StarSelector = ({ value, onChange, label, size = 'lg' }) => {
   const [hover, setHover] = useState(0);

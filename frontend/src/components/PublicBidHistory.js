@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect, useRef } from 'react';
 import { History, TrendingUp, Clock, User, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -6,7 +7,7 @@ import { Button } from './ui/button';
 import { useCurrency } from '../contexts/CurrencyContext';
 import axios from 'axios';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 /**
  * PublicBidHistory - Transparent bid history display with masked bidder identities

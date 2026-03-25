@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Crown, Star, Calendar, AlertTriangle, RefreshCw, XCircle, ArrowUpCircle, FileText, Download, RotateCcw } from 'lucide-react';
@@ -5,7 +6,7 @@ import { Button } from './ui/button';
 import { toast } from 'sonner';
 import { formatCurrency } from '../utils/currencyFormatter';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const TIER_CONFIG = {
   free: { label: 'Starter', icon: Star, color: 'text-slate-500', bg: 'bg-slate-100 dark:bg-slate-800' },

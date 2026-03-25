@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Crown, Star, Zap, Shield, TrendingUp, Percent, Megaphone, Headphones, Check, Sparkles, RefreshCw, Store, FileSpreadsheet, BarChart3 } from 'lucide-react';
@@ -5,7 +6,7 @@ import { Button } from './ui/button';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 /**
  * TrendySubscriptionCards - Premium glassmorphism subscription UI

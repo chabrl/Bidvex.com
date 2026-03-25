@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -50,7 +51,7 @@ import {
   ToggleLeft, ToggleRight, Clock, Mail, Sliders, Car, Send, Bot, Ticket, BarChart3, Globe, Building2, BarChart2
 } from 'lucide-react';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 // ========== PRIMARY NAVIGATION CATEGORIES ==========
 const PRIMARY_TABS = [

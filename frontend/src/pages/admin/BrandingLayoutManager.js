@@ -1,3 +1,4 @@
+import API_BASE from '../../config';
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../contexts/AuthContext';
@@ -16,7 +17,7 @@ import {
 import HeroBannerEditor from '../../components/admin/HeroBannerEditor';
 import { useTranslation } from 'react-i18next';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 // Available Google Fonts
 const GOOGLE_FONTS = [

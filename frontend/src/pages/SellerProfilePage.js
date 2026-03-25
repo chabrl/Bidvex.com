@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -13,7 +14,7 @@ import {
 import { toast } from 'sonner';
 import { formatCurrency } from '../utils/currencyFormatter';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const SellerProfilePage = () => {
   const { t } = useTranslation();

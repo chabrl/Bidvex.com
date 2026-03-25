@@ -1,3 +1,4 @@
+import API_BASE from '../../config';
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../contexts/AuthContext';
@@ -31,7 +32,7 @@ import {
   Plus, Minus, RefreshCw, Shield, ArrowLeft, Eye, Edit3
 } from 'lucide-react';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 // Plan configurations (prices will be fetched from API)
 const PLANS = {

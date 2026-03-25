@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
@@ -9,7 +10,7 @@ import { toast } from 'sonner';
 import { DollarSign, Users, TrendingUp, Copy, ExternalLink, Download } from 'lucide-react';
 import { formatCurrency } from '../utils/currencyFormatter';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const AffiliateDashboard = () => {
   const { t, i18n, ready } = useTranslation();

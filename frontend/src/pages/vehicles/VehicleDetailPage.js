@@ -1,3 +1,4 @@
+import API_BASE from '../../config';
 /**
  * Vehicle Detail Page
  * Shows full vehicle details with live bidding panel
@@ -72,7 +73,7 @@ import {
   LiveStatusIndicator
 } from '../../components/vehicles/AuctionRulesDisplay';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 // Format helpers
 const formatPrice = (price) => {

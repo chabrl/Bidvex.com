@@ -1,3 +1,4 @@
+import API_BASE from '../../config';
 /**
  * My Vehicle Listings Page
  * Dashboard for sellers to manage their vehicle listings
@@ -24,7 +25,7 @@ import {
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const formatPrice = (price) => {
   return new Intl.NumberFormat('en-CA', {

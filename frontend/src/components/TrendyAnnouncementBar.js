@@ -1,10 +1,11 @@
+import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
 import { X, ChevronLeft, ChevronRight, Bell, Sparkles, AlertTriangle, CheckCircle, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const TrendyAnnouncementBar = () => {
   const { t } = useTranslation();

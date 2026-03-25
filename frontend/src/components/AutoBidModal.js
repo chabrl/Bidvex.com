@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { Bot, Settings, Zap } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -13,7 +14,7 @@ import { extractErrorMessage } from '../utils/errorHandler';
 import { formatCurrency } from '../utils/currencyFormatter';
 import { useTranslation } from 'react-i18next';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const AutoBidModal = ({ listingId, currentBid, minimumIncrement, onAutoBidSetup }) => {
   const { t } = useTranslation();

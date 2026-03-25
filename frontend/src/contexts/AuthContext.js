@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 import i18n from '../i18n';
@@ -9,7 +10,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem('token'));
 
-  const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+  const API = `${API_BASE}/api`;
 
   useEffect(() => {
     if (token) {

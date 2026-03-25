@@ -1,3 +1,4 @@
+import API_BASE from '../../config';
 /**
  * BidVex Hero Banner Editor
  * Fully customizable banner management with live preview
@@ -41,7 +42,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 // Available font families
 const FONT_FAMILIES = [

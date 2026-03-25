@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -38,7 +39,7 @@ import { useCategories } from '../hooks/useCategories';
 import { useMarketplaceItems } from '../hooks/useMarketplaceItems';
 import { SellerRatingInline } from './SellerReputation';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 /**
  * FlattenedMarketplace - Item-Centric Discovery View

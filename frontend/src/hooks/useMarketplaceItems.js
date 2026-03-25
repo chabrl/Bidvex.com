@@ -1,7 +1,8 @@
+import API_BASE from '../config';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import axios from 'axios';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const fetchMarketplaceItems = async ({ pageParam, filters, limit }) => {
   const params = new URLSearchParams();

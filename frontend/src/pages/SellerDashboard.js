@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -14,7 +15,7 @@ import SellerAnalyticsDashboard from '../components/SellerAnalyticsDashboard';
 import { formatCurrency, formatPercent } from '../utils/currencyFormatter';
 import { LoadingTimeout } from '../components/LoadingTimeout';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const SellerDashboard = () => {
   const { t } = useTranslation();

@@ -1,3 +1,4 @@
+import API_BASE from '../../config';
 /**
  * PricingManager - Admin panel for managing subscription plan pricing
  * Features: Edit prices, view changelog, Stripe sync
@@ -29,7 +30,7 @@ import {
 import { formatCurrency } from '../../utils/currencyFormatter';
 import { useTranslation } from 'react-i18next';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 // Plan icons and colors
 const PLAN_CONFIG = {

@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState } from 'react';
 import { Button } from './ui/button';
 import { ShoppingCart, AlertCircle, CheckCircle2, Loader2, CreditCard } from 'lucide-react';
@@ -8,7 +9,7 @@ import { formatCurrency } from '../utils/currencyFormatter';
 import { useTranslation } from 'react-i18next';
 import { Separator } from './ui/separator';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+const API_URL = API_BASE;
 
 const BuyNowButton = ({ lot, auctionId, onPurchaseComplete }) => {
   const { t } = useTranslation();

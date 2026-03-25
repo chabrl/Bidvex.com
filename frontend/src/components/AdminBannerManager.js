@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 /**
  * BidVex Admin Banner Management Component
  * Allows admins to manage homepage promotional banners
@@ -17,7 +18,7 @@ import {
   Eye, EyeOff, Upload, Save, Loader2, RefreshCw
 } from 'lucide-react';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const AdminBannerManager = () => {
   const { t } = useTranslation();

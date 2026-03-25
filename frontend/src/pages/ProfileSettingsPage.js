@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -20,7 +21,7 @@ import SubscriptionManagement from '../components/SubscriptionManagement';
 import PersonalizedSavingsCalculator from '../components/PersonalizedSavingsCalculator';
 import { useTranslation } from 'react-i18next';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
 const ProfileSettingsPage = () => {

@@ -1,3 +1,4 @@
+import API_BASE from '../../config';
 /**
  * Vehicle Auctions Marketplace Page
  * Main browse page for vehicle auctions - Automotive-inspired design
@@ -31,7 +32,7 @@ import {
 import VehicleFilterModern from '../../components/VehicleFilterModern';
 import { TrustIndicators } from '../../components/vehicles/TrustBadges';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 // Vehicle body type icons
 const bodyTypeIcons = {

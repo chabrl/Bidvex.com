@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
@@ -13,7 +14,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { formatCurrency } from '../utils/currencyFormatter';
 import { toast } from 'sonner';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const PERIOD_OPTIONS = [
   { value: 'current', label: 'Current Quarter' },

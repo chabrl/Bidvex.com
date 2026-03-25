@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -12,7 +13,7 @@ import {
 import SEO from '../components/SEO';
 import { SellerReputationCard, SellerReviewsList } from '../components/SellerReputation';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const StorefrontPage = () => {
   const { userId } = useParams();

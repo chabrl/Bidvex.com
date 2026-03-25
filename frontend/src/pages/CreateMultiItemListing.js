@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -24,7 +25,7 @@ import LocationSelector from '../components/LocationSelector';
 import useGeoLocation from '../hooks/useGeoLocation';
 import { formatCurrency } from '../utils/currencyFormatter';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const CreateMultiItemListing = () => {
   const { t, i18n } = useTranslation();

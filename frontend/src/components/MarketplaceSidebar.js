@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { Button } from '../components/ui/button';
@@ -9,7 +10,7 @@ import {
   Filter, Search, X, Loader2
 } from 'lucide-react';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const MarketplaceSidebar = ({ onFiltersChange, className = '' }) => {
   const [filterData, setFilterData] = useState(null);

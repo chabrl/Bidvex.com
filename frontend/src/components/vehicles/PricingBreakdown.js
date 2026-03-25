@@ -1,3 +1,4 @@
+import API_BASE from '../../config';
 /**
  * Vehicle Pricing Breakdown Component
  * Shows itemized fees, taxes, and totals for vehicle auctions
@@ -15,7 +16,7 @@ import {
   ChevronDown, ChevronUp, Crown, Sparkles, AlertCircle
 } from 'lucide-react';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 // Format currency
 const formatPrice = (amount) => {

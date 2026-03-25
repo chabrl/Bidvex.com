@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -15,7 +16,7 @@ import {
 import { toast } from 'sonner';
 import axios from 'axios';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 export default function PartnerDashboard() {
   const { user, token, refreshUser } = useAuth();
@@ -128,7 +129,7 @@ export default function PartnerDashboard() {
       const latest = invoices[0];
       const url = latest.download_url;
       if (url) {
-        window.open(`${process.env.REACT_APP_BACKEND_URL}${url}`, '_blank');
+        window.open(`${API_BASE}${url}`, '_blank');
       } else {
         window.open(`${API}/invoices/${latest.id}/download`, '_blank');
       }

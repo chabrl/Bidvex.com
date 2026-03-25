@@ -1,10 +1,11 @@
+import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, MapPin, Award, TrendingUp, Star } from 'lucide-react';
 import { Badge } from './ui/badge';
 import axios from 'axios';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 /**
  * AuctioneerInfo Component

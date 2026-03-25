@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 /**
  * BidVex Notification Center Component
  * A persistent hub for all platform notifications with the Bell icon
@@ -25,7 +26,7 @@ import {
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 // Notification type icons and colors
 const NOTIFICATION_TYPES = {

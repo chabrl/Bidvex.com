@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent } from './ui/card';
@@ -6,7 +7,7 @@ import { Separator } from './ui/separator';
 import { Info, Calculator, AlertTriangle, Loader2 } from 'lucide-react';
 import axios from 'axios';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 /**
  * PriceBreakdown Component

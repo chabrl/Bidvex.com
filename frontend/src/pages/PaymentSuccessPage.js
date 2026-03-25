@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -8,7 +9,7 @@ import { CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { formatCurrency } from '../utils/currencyFormatter';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const PaymentSuccessPage = () => {
   const { t } = useTranslation();

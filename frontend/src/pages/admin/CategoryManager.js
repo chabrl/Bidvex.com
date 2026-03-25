@@ -1,3 +1,4 @@
+import API_BASE from '../../config';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -6,7 +7,7 @@ import { Input } from '../../components/ui/input';
 import { toast } from 'sonner';
 import { FolderOpen, Plus, Edit2, Trash2 } from 'lucide-react';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const CategoryManager = () => {
   const [categories, setCategories] = useState([]);

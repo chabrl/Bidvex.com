@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 /**
  * SiteModeContext - Provides site mode state across the application
  * Used to enforce maintenance/coming soon mode globally
@@ -6,7 +7,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const SiteModeContext = createContext({
   mode: 'live',

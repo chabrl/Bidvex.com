@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -15,7 +16,7 @@ const ForgotPasswordPage = () => {
   const [loading, setLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
 
-  const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+  const API = `${API_BASE}/api`;
 
   const handleSubmit = async (e) => {
     e.preventDefault();

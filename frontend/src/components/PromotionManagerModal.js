@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
@@ -11,7 +12,7 @@ import axios from 'axios';
 import { Loader2, TrendingUp, Target, Calendar, DollarSign, MapPin, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const PROMOTION_TIERS = [
   {

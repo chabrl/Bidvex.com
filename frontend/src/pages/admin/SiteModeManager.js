@@ -1,3 +1,4 @@
+import API_BASE from '../../config';
 /**
  * SiteModeManager - Admin control for website maintenance/coming soon mode
  * Features: Toggle between Live/Maintenance/Coming Soon, custom messages, subscriber management
@@ -35,7 +36,7 @@ import {
   TableRow,
 } from '../../components/ui/table';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const SITE_MODES = [
   {

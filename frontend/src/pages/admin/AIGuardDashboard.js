@@ -1,3 +1,4 @@
+import API_BASE from '../../config';
 /**
  * AI Guard Dashboard - Fraud Detection Status
  * Shows flagged auctions and AI-detected suspicious activity
@@ -25,7 +26,7 @@ import {
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 // Flag type configurations
 const FLAG_TYPES = {

@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
@@ -11,7 +12,7 @@ import { toast } from 'sonner';
 import { Loader2, Lock, Eye, EyeOff, AlertTriangle, CheckCircle, Square, CheckSquare } from 'lucide-react';
 import axios from 'axios';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const AuthPage = () => {
   const { t } = useTranslation();

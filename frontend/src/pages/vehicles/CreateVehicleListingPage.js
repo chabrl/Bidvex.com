@@ -1,3 +1,4 @@
+import API_BASE from '../../config';
 /**
  * Create Vehicle Listing Page
  * Multi-step form with VIN auto-fill and photo upload
@@ -34,7 +35,7 @@ import {
 import LocationSelector from '../../components/LocationSelector';
 import useGeoLocation from '../../hooks/useGeoLocation';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const BODY_TYPES = [
   { value: 'sedan', label: 'Sedan' },

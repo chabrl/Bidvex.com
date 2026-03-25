@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSearchParams, useNavigate } from 'react-router-dom';
@@ -24,7 +25,7 @@ import {
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 // ========== NOTIFICATION SOUND ==========
 const playMessageSound = () => {

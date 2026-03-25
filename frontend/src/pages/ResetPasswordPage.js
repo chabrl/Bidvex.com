@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -26,7 +27,7 @@ const ResetPasswordPage = () => {
   const [expiresInMinutes, setExpiresInMinutes] = useState(0);
   const [resetSuccess, setResetSuccess] = useState(false);
 
-  const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+  const API = `${API_BASE}/api`;
 
   useEffect(() => {
     if (!token) {

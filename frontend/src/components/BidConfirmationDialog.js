@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
@@ -8,7 +9,7 @@ import { DollarSign, CheckCircle2, Info, Sparkles, ShieldCheck, Receipt } from '
 import { toast } from 'sonner';
 import { formatCurrency } from '../utils/currencyFormatter';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 /**
  * BidConfirmationDialog - Shows transparent cost breakdown before placing a bid

@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 /**
  * Vehicle Auction Context
  * Manages vehicle auction state and API calls
@@ -7,7 +8,7 @@ import React, { createContext, useContext, useState, useCallback } from 'react';
 import axios from 'axios';
 import { useAuth } from './AuthContext';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const VehicleAuctionContext = createContext(null);
 

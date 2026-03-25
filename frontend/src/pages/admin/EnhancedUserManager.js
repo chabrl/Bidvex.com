@@ -1,3 +1,4 @@
+import API_BASE from '../../config';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../contexts/AuthContext';
@@ -29,7 +30,7 @@ import {
   Phone, AlertTriangle, X
 } from 'lucide-react';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const EnhancedUserManager = () => {
   const { token } = useAuth();

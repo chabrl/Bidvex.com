@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRealtimeBidding } from '../hooks/useRealtimeBidding';
@@ -46,7 +47,7 @@ const RealtimeBiddingPanel = ({ listing, onBidPlaced }) => {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [agreedToTotal, setAgreedToTotal] = useState(false);
 
-  const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+  const API_URL = API_BASE || 'http://localhost:8001';
   const quantity = listing.quantity || 1;
   const isMultiQuantity = quantity > 1;
 

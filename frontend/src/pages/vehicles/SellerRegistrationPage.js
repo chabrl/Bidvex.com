@@ -1,3 +1,4 @@
+import API_BASE from '../../config';
 /**
  * Vehicle Seller Registration Page
  * Register as a vehicle seller (Private, Dealer, or Auctioneer)
@@ -22,7 +23,7 @@ import {
 import SellerDocumentManager from '../../components/vehicles/SellerDocumentManager';
 import { useTranslation } from 'react-i18next';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const SELLER_TYPES = [
   {

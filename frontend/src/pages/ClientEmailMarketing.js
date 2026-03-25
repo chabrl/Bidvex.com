@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -33,7 +34,7 @@ import {
   UserPlus, FileText, ArrowRight, Zap, XCircle, Edit3, DollarSign
 } from 'lucide-react';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const ClientEmailMarketing = () => {
   const { t } = useTranslation();

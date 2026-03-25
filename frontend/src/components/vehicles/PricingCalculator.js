@@ -1,3 +1,4 @@
+import API_BASE from '../../config';
 /**
  * PricingCalculator.js
  * Real-time total cost calculator for vehicle auctions
@@ -20,7 +21,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { useTranslation } from 'react-i18next';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 // Format currency
 const formatCurrency = (amount) => {

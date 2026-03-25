@@ -1,3 +1,4 @@
+import API_BASE from '../../config';
 /**
  * SubscriptionAnalytics - Admin dashboard for subscription metrics
  * Features: Revenue tracking, subscriber counts, coupon analytics, growth charts
@@ -17,7 +18,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/currencyFormatter';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const SubscriptionAnalytics = () => {
   const [analytics, setAnalytics] = useState(null);

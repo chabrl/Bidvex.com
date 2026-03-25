@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useCallback, useEffect } from 'react';
 import { GoogleMap, useLoadScript, Marker, Circle } from '@react-google-maps/api';
 import { Button } from './ui/button';
@@ -21,7 +22,7 @@ const LocationSearchMap = ({ onLocationSearch }) => {
   const [apiKey, setApiKey] = useState('');
 
   useEffect(() => {
-    fetch(`${process.env.REACT_APP_BACKEND_URL}/api/config/google-maps-key`)
+    fetch(`${API_BASE}/api/config/google-maps-key`)
       .then(res => res.json())
       .then(data => setApiKey(data.api_key))
       .catch(err => console.error('Failed to fetch API key:', err));

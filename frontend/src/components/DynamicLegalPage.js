@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 /**
  * DynamicLegalPage - Modern Legal Page Component
  * Fully responsive with light/dark mode support
@@ -16,7 +17,7 @@ import {
   Menu, X
 } from 'lucide-react';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 // Section icons mapping
 const SECTION_ICONS = {

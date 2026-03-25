@@ -1,3 +1,4 @@
+import API_BASE from '../../config';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
@@ -15,7 +16,7 @@ import {
   ToggleLeft, Hash, Layers
 } from 'lucide-react';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const AuctionControl = () => {
   const { t } = useTranslation();

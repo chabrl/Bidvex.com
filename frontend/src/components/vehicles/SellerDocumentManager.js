@@ -1,3 +1,4 @@
+import API_BASE from '../../config';
 /**
  * Seller Document Upload Component
  * Handles document upload for seller verification
@@ -17,7 +18,7 @@ import {
   Image, File, Trash2, Eye, RefreshCw, Shield, Info
 } from 'lucide-react';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 // Document type labels
 const DOCUMENT_LABELS = {

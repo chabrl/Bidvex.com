@@ -1,8 +1,9 @@
+import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { X, Info, AlertTriangle, CheckCircle } from 'lucide-react';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const AnnouncementBanner = () => {
   const [announcements, setAnnouncements] = useState([]);

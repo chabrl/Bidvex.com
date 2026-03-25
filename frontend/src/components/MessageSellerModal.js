@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
@@ -8,7 +9,7 @@ import { toast } from 'sonner';
 import axios from 'axios';
 import { Send, Loader2 } from 'lucide-react';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const MessageSellerModal = ({ isOpen, onClose, sellerId, listingId, listingTitle }) => {
   const [subject, setSubject] = useState(`Inquiry about: ${listingTitle || 'Auction'}`);

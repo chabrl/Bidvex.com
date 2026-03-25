@@ -1,3 +1,4 @@
+import API_BASE from '../../config';
 /**
  * CouponManager - Admin panel for managing coupon codes
  * Features: CRUD operations, usage tracking, expiry management
@@ -35,7 +36,7 @@ import {
 import { formatCurrency } from '../../utils/currencyFormatter';
 import { useTranslation } from 'react-i18next';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const CouponManager = () => {
   const { t } = useTranslation();

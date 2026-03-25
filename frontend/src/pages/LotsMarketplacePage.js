@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -17,7 +18,7 @@ import { formatCurrency } from '../utils/currencyFormatter';
 import { SellerRatingInline } from '../components/SellerReputation';
 import { LoadingTimeout } from '../components/LoadingTimeout';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const LotsMarketplacePage = () => {
   const { t } = useTranslation();

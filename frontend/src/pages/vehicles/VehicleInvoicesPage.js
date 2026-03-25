@@ -1,3 +1,4 @@
+import API_BASE from '../../config';
 /**
  * Vehicle Invoices Page
  * Shows all invoices for the current user (as buyer or seller)
@@ -19,7 +20,7 @@ import {
   TrendingUp, Calendar, FileText
 } from 'lucide-react';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const formatPrice = (amount) => {
   return new Intl.NumberFormat('en-CA', {

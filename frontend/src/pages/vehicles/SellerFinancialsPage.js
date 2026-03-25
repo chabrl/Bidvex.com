@@ -1,3 +1,4 @@
+import API_BASE from '../../config';
 /**
  * Seller Financials Dashboard
  * Shows commission rates, pending payouts, and settlement history
@@ -18,7 +19,7 @@ import {
   Calendar, Building2, CreditCard, FileText, Info
 } from 'lucide-react';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const formatPrice = (amount) => {
   const { t } = useTranslation();

@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
@@ -27,7 +28,7 @@ export const useRealtimeMessaging = (conversationId) => {
   const connectRef = useRef(null);
   const maxReconnectAttempts = 10;
 
-  const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+  const API_URL = API_BASE || 'http://localhost:8001';
   const WS_URL = API_URL.replace('https', 'wss').replace('http', 'ws');
 
   // Connect to WebSocket

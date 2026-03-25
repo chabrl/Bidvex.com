@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 /**
  * MaintenancePage - Coming Soon / Maintenance Mode Landing Page
  * Professional design for BidVex auction platform
@@ -16,7 +17,7 @@ import {
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const BIDVEX_LOGO = 'https://customer-assets.emergentagent.com/job_aa51ced5-053b-417a-a5ea-c63c2febfff9/artifacts/xkt9mtpw_logo%20app.png';
 

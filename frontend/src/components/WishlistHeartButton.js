@@ -1,10 +1,11 @@
+import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { Heart } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import { toast } from 'sonner';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const WishlistHeartButton = ({ auctionId, lotId = null, initialWishlisted = false, size = "default", showCount = false, wishlistCount = 0 }) => {
   const { user } = useAuth();

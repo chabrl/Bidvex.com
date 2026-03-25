@@ -1,3 +1,4 @@
+import API_BASE from '../../config';
 /**
  * Vehicle Admin Manager
  * Admin panel for managing vehicle auction sellers and listings
@@ -30,7 +31,7 @@ import {
 import { formatCurrency } from '../../utils/currencyFormatter';
 import { useTranslation } from 'react-i18next';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const formatDate = (date) => {
   if (!date) return 'N/A';

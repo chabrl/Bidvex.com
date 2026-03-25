@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -12,7 +13,7 @@ import {
   RefreshCw, Sparkles, Lock, AlertCircle
 } from 'lucide-react';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 // ========== OTP INPUT COMPONENT ==========
 const OTPInput = ({ length = 6, value, onChange, disabled }) => {

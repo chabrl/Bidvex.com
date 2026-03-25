@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
@@ -38,7 +39,7 @@ const DecomposedMarketplace = () => {
     sort: '-promoted'
   });
 
-  const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+  const API_URL = API_BASE || 'http://localhost:8001';
 
   // Debounced filters — prevents API call on every keystroke
   const [debouncedFilters, setDebouncedFilters] = useState(filters);

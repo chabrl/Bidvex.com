@@ -1,10 +1,11 @@
+import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { Star, Shield, CheckCircle, Clock, Package, MessageSquare, Award } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { Card, CardContent } from './ui/card';
 import axios from 'axios';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 /**
  * SellerTrustScore - Displays seller trust rating and badges

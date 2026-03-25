@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { Calculator, TrendingUp, History, Sparkles, ArrowRight, ToggleLeft, ToggleRight, Lightbulb } from 'lucide-react';
 import { Card, CardContent } from './ui/card';
@@ -5,7 +6,7 @@ import { Slider } from './ui/slider';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 /**
  * PersonalizedSavingsCalculator - Shows ROI based on user's actual transaction history

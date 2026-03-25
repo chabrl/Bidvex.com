@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 /**
  * useVehicleBidding Hook
  * Real-time WebSocket connection for vehicle auctions
@@ -6,7 +7,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 const getWebSocketUrl = () => {
-  const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
+  const backendUrl = API_BASE || '';
   return backendUrl.replace('https://', 'wss://').replace('http://', 'ws://');
 };
 

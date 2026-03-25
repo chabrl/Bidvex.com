@@ -1,3 +1,4 @@
+import API_BASE from '../../config';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -8,7 +9,7 @@ import { toast } from 'sonner';
 import { Megaphone, Plus, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${API_BASE}/api`;
 
 const AnnouncementManager = () => {
   const { t } = useTranslation();
