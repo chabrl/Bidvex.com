@@ -62,6 +62,7 @@ app.add_middleware(
     allow_origins=[
         "https://bidvex.com",
         "https://www.bidvex.com",
+        "https://bidvexcom-production.up.railway.app",
         "http://localhost:3000",
     ],
     allow_credentials=True,
