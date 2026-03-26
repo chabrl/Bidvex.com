@@ -60,7 +60,7 @@ async def require_admin(credentials: HTTPAuthorizationCredentials):
         raise HTTPException(status_code=401, detail="Authentication required")
     db = get_db()
     token = credentials.credentials
-    jwt_secret = os.environ.get("JWT_SECRET", "your-secret-key")
+    jwt_secret = os.environ.get("JWT_SECRET", "dev-secret-key-change-in-production")
     try:
         payload = jwt.decode(token, jwt_secret, algorithms=["HS256"])
         user_id = payload.get("sub")

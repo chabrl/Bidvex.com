@@ -5,6 +5,7 @@ Auto-extracted from server.py during P2 refactoring.
 
 from fastapi import APIRouter, HTTPException, Depends, Request, Query, UploadFile, File, Form, WebSocket, WebSocketDisconnect
 from deps import get_db, get_current_user, get_current_user_optional, User
+from services.fraud_detection import FLAG_TYPES
 from shared import (
     DEFAULT_EMAIL_TEMPLATES, EMAIL_TEMPLATE_CATEGORIES,
     DEFAULT_MARKETPLACE_SETTINGS, AFFILIATE_COMMISSION_RATE,
@@ -32,6 +33,24 @@ logger = logging.getLogger(__name__)
 
 
 trust_safety_router = APIRouter(tags=["Trust & Safety"])
+
+
+async def calculate_trust_score(user_id: str) -> int:
+    """Calculate a trust score (0-100) based on user activity and history."""
+    db = get_db()
+    score = 50  # base score
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user:
+        return score
+    if user.get("is_verified"):
+        score += 15
+    if user.get("tax_verified"):
+        score += 10
+    txn_count = await db.transactions.count_documents({"$or": [{"buyer_id": user_id}, {"seller_id": user_id}]})
+    score += min(txn_count * 2, 20)
+    fraud_count = await db.fraud_flags.count_documents({"user_id": user_id, "status": "confirmed_fraud"})
+    score -= fraud_count * 25
+    return max(0, min(100, score))
 
 
 @trust_safety_router.get("/admin/trust-safety/scores")

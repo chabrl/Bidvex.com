@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 security = HTTPBearer(auto_error=False)
 reviews_router = APIRouter(prefix="/reviews", tags=["Reviews"])
 
-JWT_SECRET = os.environ.get("JWT_SECRET", "your-secret-key")
+JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret-key-change-in-production")
 JWT_ALGORITHM = "HS256"
 _db = None
 

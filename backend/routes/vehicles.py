@@ -126,7 +126,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(status_code=401, detail="Authentication required")
     
     from jose import jwt, JWTError
-    jwt_secret = os.environ.get('JWT_SECRET', 'dev-secret-key')
+    jwt_secret = os.environ.get('JWT_SECRET', 'dev-secret-key-change-in-production')
     
     try:
         payload = jwt.decode(credentials.credentials, jwt_secret, algorithms=["HS256"])

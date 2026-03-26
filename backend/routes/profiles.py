@@ -425,7 +425,7 @@ async def get_seller_profile(
 
     try:
         current_user = None
-        jwt_secret = os.environ.get("JWT_SECRET", "your-secret-key")
+        jwt_secret = os.environ.get("JWT_SECRET", "dev-secret-key-change-in-production")
         token = request.cookies.get("session_token") or (credentials.credentials if credentials else None)
 
         if token:
