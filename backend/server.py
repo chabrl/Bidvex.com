@@ -643,6 +643,7 @@ async def seed_categories():
 async def create_database_indexes():
     try:
         from pymongo import ASCENDING
+        from db.indexes import create_all_indexes
         indexes = [
             ("bids", [("listing_id", ASCENDING)], "idx_bids_listing_id", False),
             ("lot_bids", [("listing_id", ASCENDING), ("lot_number", ASCENDING)], "idx_lot_bids_listing_lot", False),
@@ -668,5 +669,6 @@ async def create_database_indexes():
         for coll, keys, name, unique in indexes:
             await db[coll].create_index(keys, background=True, unique=unique, name=name)
         logger.info("Database indexes created")
+        await create_all_indexes(db)
     except Exception as e:
         logger.warning(f"Index creation note: {e}")
