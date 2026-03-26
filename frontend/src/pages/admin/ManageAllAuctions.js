@@ -32,8 +32,10 @@ const ManageAllAuctions = () => {
         axios.get(`${API}/admin/listings/all`),
         axios.get(`${API}/admin/multi-item-listings/all`)
       ]);
-      setSingleListings(singleRes.data || []);
-      setMultiListings(multiRes.data || []);
+      const singleData = singleRes.data;
+      setSingleListings(Array.isArray(singleData) ? singleData : singleData.listings || []);
+      const multiData = multiRes.data;
+      setMultiListings(Array.isArray(multiData) ? multiData : multiData.listings || []);
     } catch (error) {
       console.error('Failed to load listings:', error);
       toast.error('Failed to load auctions');
