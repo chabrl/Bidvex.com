@@ -102,14 +102,22 @@ async def _get_site_config():
 
 @site_config_router.get("/site-config")
 async def get_public_site_config():
-    db = get_db()
-    config = await _get_site_config()
-    active_banners = await db.hero_banners.find({"active": True}, {"_id": 0}).sort("order", 1).to_list(20)
-    return {
-        "branding": config.get("branding", DEFAULT_SITE_CONFIG["branding"]),
-        "homepage_layout": config.get("homepage_layout", DEFAULT_SITE_CONFIG["homepage_layout"]),
-        "hero_banners": active_banners,
-    }
+    try:
+        db = get_db()
+        config = await _get_site_config()
+        active_banners = await db.hero_banners.find({"active": True}, {"_id": 0}).sort("order", 1).to_list(20)
+        return {
+            "branding": config.get("branding", DEFAULT_SITE_CONFIG["branding"]),
+            "homepage_layout": config.get("homepage_layout", DEFAULT_SITE_CONFIG["homepage_layout"]),
+            "hero_banners": active_banners,
+        }
+    except Exception as e:
+        logger.error(f"site-config DB error, returning defaults: {e}")
+        return {
+            "branding": DEFAULT_SITE_CONFIG["branding"],
+            "homepage_layout": DEFAULT_SITE_CONFIG["homepage_layout"],
+            "hero_banners": [],
+        }
 
 
 @site_config_router.get("/admin/site-config")

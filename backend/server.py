@@ -33,13 +33,14 @@ stripe_api_key = os.environ.get('STRIPE_API_KEY', '')
 from pymongo import ReadPreference
 client = AsyncIOMotorClient(
     mongo_url,
-    serverSelectionTimeoutMS=10000,
-    maxPoolSize=10,
+    serverSelectionTimeoutMS=5000,
+    maxPoolSize=50,
     minPoolSize=2,
     connectTimeoutMS=10000,
     socketTimeoutMS=20000,
     retryReads=True,
     retryWrites=True,
+    w="majority",
 )
 db = client[db_name]
 # Use secondary-preferred reads so queries don't wait for a failing primary
