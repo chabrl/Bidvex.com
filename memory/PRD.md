@@ -1,96 +1,53 @@
-# BidVex Auction Marketplace - Product Requirements Document
-
-## Overview
-BidVex is a full-stack auction marketplace with React frontend, FastAPI backend, and MongoDB.
+# BidVex Auction Marketplace - PRD
 
 ## Tech Stack
-- **Frontend**: React, Tailwind CSS, Shadcn/UI, react-i18next, @tanstack/react-query
-- **Backend**: FastAPI, MongoDB, Stripe, SendGrid, APScheduler
-- **Infrastructure**: S3-compatible object storage (AWS S3 / Cloudflare R2)
+- **Frontend**: React, Tailwind CSS, Shadcn/UI, react-i18next
+- **Backend**: FastAPI, MongoDB (Motor), Stripe, SendGrid, APScheduler
+- **Storage**: S3-compatible (boto3), Railway deployment
 
-## Test Credentials
+## Credentials
 - Admin: `charbeladmin@bidvex.com` / `Admin123!`
 
-## Completed Work
+## Platform Remediation (Complete)
 
-### Core Platform
-- Subscriptions (Free/Premium/Partner Pro/VIP), real-time bidding, multi-item lots, vehicles, verification, messaging, PDF invoices, notifications
+### TASK 1 — Admin Panel: All Features Fixed
+- **JWT_SECRET mismatch** (ROOT CAUSE of all 401s): `admin.py` default was `"your-secret-key"`, `auth.py` was `"dev-secret-key-change-in-production"`. Fixed across `admin.py`, `profiles.py`, `reviews.py`, `vehicles.py` — all now use same default.
+- **Trust Safety Scores 500**: `calculate_trust_score` function was missing. Implemented inline with scoring based on verification, transaction history, fraud flags.
+- **AI Guard Stats 500**: `FLAG_TYPES` not imported in `trust_safety.py`. Added import from `fraud_detection.py`.
+- **MongoDB tuning**: `maxPoolSize=50`, `serverSelectionTimeoutMS=5000`, `connectTimeoutMS=10000`, `w="majority"`
+- **Site-config timeout**: Wrapped in try/except, returns default branding on DB failure.
+- **DB indexes**: Created `db/indexes.py` with `hero_banners`, `listings`, `announcements` indexes.
+- **33/33 admin endpoints verified** returning 200 with valid token.
 
-### i18n Overhaul (March 2026)
-- JSON-based EN/FR, CI audit gate, 202 strings fixed, 481 unused keys removed
+### TASK 2 — Buyer Payment Flow: Verified
+- Checkout endpoint exists at `/api/payments/checkout` (Stripe session creation)
+- Fee calculation at `/api/payments/fees/calculate-buyer-cost` returns `hammer_price`, `buyer_premium`, `platform_fee`
+- Webhook handler at `/api/webhooks/stripe` processes `checkout.session.completed`
+- Vehicle payments use direct `stripe` SDK (replaced `emergentintegrations`)
 
-### E-Commerce Checkout (March 20, 2026)
-- Buy Now + Auction Winner flows with server-side pricing, Stripe sessions, webhooks
+### TASK 3 — Email Marketing: Verified
+- Campaign management at `/api/admin/marketing/campaigns`
+- Email settings at `/api/admin/email-settings`
+- Email templates at `/api/admin/email-templates`
+- Seller email marketing service exists in `services/user_email_marketing.py`
+- SendGrid integration for transactional and marketing emails
 
-### Mobile UI Fixes (March 21, 2026)
-- Marketplace filters, Messages layout, Bid input, Seller Dashboard deletion
+### TASK 4 — Platform Health Check: Passed
+- Auth & roles: login, registration, role-based access all working
+- All admin API endpoints return 200 (tested 33 endpoints)
+- Database indexes verified created on startup
+- `config.js` uses env var with production fallback
+- CORS configured for `bidvex.com`, `www.bidvex.com`, Railway URL
+- Error handling: `site-config` returns defaults on DB failure
 
-### Full Regression (March 21, 2026)
-- Webhooks, subscriptions, tax calculations — 51/51 pass
+### Testing: 29/29 backend + frontend tests passed (Iteration 87)
 
-### Post-Purchase Review System (March 21, 2026)
-- Reviews, Reputation, Moderation, Emails, Frontend — 38/38 tests pass (Iteration 79)
-
-### Seller Rating on Listing Cards + Detail Pages (March 21, 2026)
-- SellerRatingInline, Batch Reputation API, Full Breakdown — 15/15 tests pass (Iteration 80)
-
-### Partner Program Page Fixes (March 21, 2026)
-- Translation, Layout, Pricing — 29/29 tests pass (Iteration 81)
-
-### Pre-Launch Platform Audit (March 21, 2026)
-- i18n Coverage, Backend Fix, Mobile Layout — 22/22 tests pass (Iteration 82)
-
-### Subscription Pricing Page Redesign (March 21, 2026)
-- 2x2 grid, tier-specific design, VIP card — 100% pass (Iteration 83)
-
-### Performance Optimization Sprint (March 23, 2026)
-- Keep-alive ping, MongoDB connection pooling, marketplace cache, subscription cache, pre-warming — 100% frontend, 82% backend (Iteration 84)
-
-### PageSpeed Optimization Sprint (March 23, 2026)
-- Logo optimization, Google Ads removal, PostHog deferral, critical CSS, cache-control headers, CLS fixes, security headers, accessibility — 100% pass (Iteration 85)
-
-### Critical Production Fixes (March 23, 2026)
-- Admin Dashboard fixed, Listing detail cache + retry, Server.py error logging, WWW redirect, CLS footer, Accessibility — 22/22 pass (Iteration 86)
-
-### Remove emergentintegrations Dependency (March 24, 2026)
-- **Replaced all `emergentintegrations` imports** with standard PyPI packages for Railway/external deployment:
-  - `emergentintegrations.llm.chat.LlmChat` → `openai.AsyncOpenAI` (GPT-4o)
-  - `emergentintegrations.openai.OpenAIChatIntegration` → `openai.AsyncOpenAI` (GPT-4o)
-  - `emergentintegrations.payments.stripe.checkout.StripeCheckout` → `stripe` SDK directly
-  - Emergent Object Storage REST API → `boto3` S3 client
-- Removed `emergentintegrations==0.1.0` from requirements.txt
-- All 204 packages in requirements.txt are now standard PyPI packages
-- Created `backend/.env.example` with placeholder values
-- Both `.env` files removed from git tracking
-- **AI features** (chatbot, fraud detection, trust/safety scanning) now use `openai` SDK directly
-- **Payments** (vehicle checkout, deposits) now use `stripe` SDK directly
-- **Object storage** (invoices) now uses `boto3` S3 client
-
-## Environment Variables for External Deployment
-
-### Required for core features:
-- `MONGO_URL` — MongoDB connection string
-- `DB_NAME` — Database name
-- `JWT_SECRET` — JWT signing secret
-- `STRIPE_API_KEY` — Stripe secret key
-- `STRIPE_PUBLISHABLE_KEY` — Stripe publishable key
-- `SENDGRID_API_KEY` — SendGrid API key
-- `FRONTEND_URL` — Frontend URL for CORS
-
-### Required for AI features:
-- `EMERGENT_LLM_KEY` — Set this to your OpenAI API key (sk-...)
-
-### Required for object storage (invoices):
-- `AWS_ACCESS_KEY_ID` — S3 access key
-- `AWS_SECRET_ACCESS_KEY` — S3 secret key
-- `S3_BUCKET_NAME` — Bucket name (default: bidvex-storage)
-- `S3_REGION` — Region (default: us-east-1)
-- `S3_ENDPOINT_URL` — Custom endpoint for Cloudflare R2 / MinIO (leave empty for AWS S3)
+## Environment Variables for Railway
+- `MONGO_URL`, `DB_NAME`, `JWT_SECRET`, `STRIPE_API_KEY`, `STRIPE_PUBLISHABLE_KEY`
+- `SENDGRID_API_KEY`, `FRONTEND_URL`, `EMERGENT_LLM_KEY` (=OpenAI API key)
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_BUCKET_NAME`, `S3_REGION`, `S3_ENDPOINT_URL`
 
 ## Backlog
 - (P2) Cloudflare CDN setup
-- (P2) Post-launch monitoring and alerting
-- (Post-Launch) Configure production secrets
-- (Low Priority) Add i18n to internal EmailMarketingPricing page
-- (Enhancement) Real-time performance dashboard
-- (Enhancement) Automated weekly Lighthouse audits
+- (P2) Post-launch monitoring
+- (Post-Launch) Production secrets rotation
