@@ -560,6 +560,10 @@ app.include_router(api_router)
 async def root():
     return {"status": "healthy", "service": "BidVex API", "version": "1.0"}
 
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return {"status": "no favicon"}
+
 @app.api_route("/health", methods=["GET", "HEAD"])
 async def root_health():
     return {"status": "healthy"}
