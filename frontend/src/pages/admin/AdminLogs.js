@@ -50,7 +50,7 @@ const AdminLogs = ({ searchQuery = '' }) => {
     const csv = [
       ['Date', 'Admin', 'Action', 'Target Type', 'Target ID', 'Details'],
       ...logs.map(log => [
-        new Date(log.created_at).toLocaleString(),
+        log.created_at ? new Date(log.created_at).toLocaleString() : 'N/A',
         log.admin_email,
         log.action,
         log.target_type,
@@ -119,7 +119,7 @@ const AdminLogs = ({ searchQuery = '' }) => {
                       </p>
                     )}
                   </div>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</span>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">{log.created_at ? new Date(log.created_at).toLocaleString() : 'N/A'}</span>
                 </div>
               ))}
             </div>
