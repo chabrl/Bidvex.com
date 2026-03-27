@@ -10,7 +10,7 @@ import json
 from datetime import datetime, timezone, timedelta
 
 # Configuration
-BASE_URL = "https://prod-fix-critical.preview.emergentagent.com/api"
+BASE_URL = "https://prod-verify-2.preview.emergentagent.com/api"
 ADMIN_EMAIL = "admin@bazario.com"
 ADMIN_PASSWORD = "Admin123!"
 

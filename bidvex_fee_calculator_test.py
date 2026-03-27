@@ -11,7 +11,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = "https://prod-fix-critical.preview.emergentagent.com/api"
+BASE_URL = "https://prod-verify-2.preview.emergentagent.com/api"
 
 # Test credentials from review request
 TEST_USERS = {

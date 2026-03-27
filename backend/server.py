@@ -558,10 +558,21 @@ app.include_router(api_router)
 
 @app.get("/")
 async def root():
+    """Serve React SPA index.html"""
+    import os
+    index_path = os.path.join(os.path.dirname(__file__), "..", "frontend", "build", "index.html")
+    if os.path.exists(index_path):
+        from starlette.responses import FileResponse
+        return FileResponse(index_path, media_type="text/html")
     return {"status": "healthy", "service": "BidVex API", "version": "1.0"}
 
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
+    import os
+    fav_path = os.path.join(os.path.dirname(__file__), "..", "frontend", "build", "favicon.ico")
+    if os.path.exists(fav_path):
+        from starlette.responses import FileResponse
+        return FileResponse(fav_path)
     return {"status": "no favicon"}
 
 @app.api_route("/health", methods=["GET", "HEAD"])
@@ -696,3 +707,20 @@ async def create_database_indexes():
         except Exception as e:
             logger.warning(f"Index creation note (non-fatal): {e}")
     asyncio.ensure_future(_create())
+
+
+# ─── Static Frontend & SPA Catch-All (MUST be last) ───
+import os
+_frontend_build = os.path.join(os.path.dirname(__file__), "..", "frontend", "build")
+if os.path.isdir(_frontend_build):
+    from starlette.staticfiles import StaticFiles
+    from starlette.responses import FileResponse
+    app.mount("/static", StaticFiles(directory=os.path.join(_frontend_build, "static")), name="static-assets")
+
+    @app.api_route("/{path:path}", methods=["GET"], include_in_schema=False)
+    async def spa_catch_all(path: str):
+        """Serve React SPA for all non-API routes"""
+        file_path = os.path.join(_frontend_build, path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(os.path.join(_frontend_build, "index.html"), media_type="text/html")
