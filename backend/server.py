@@ -57,17 +57,15 @@ api_router = APIRouter(prefix="/api")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Trust proxy headers from Cloudflare/Railway
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=["*"])
+
 app.add_middleware(GZipMiddleware, minimum_size=500)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://bidvex.com",
-        "https://www.bidvex.com",
-        "https://bidvexcom-production.up.railway.app",
-        "https://bidvex-production.up.railway.app",
-        "http://localhost:3000",
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -643,34 +641,37 @@ async def seed_categories():
 
 @app.on_event("startup")
 async def create_database_indexes():
-    try:
-        from pymongo import ASCENDING
-        from db.indexes import create_all_indexes
-        indexes = [
-            ("bids", [("listing_id", ASCENDING)], "idx_bids_listing_id", False),
-            ("lot_bids", [("listing_id", ASCENDING), ("lot_number", ASCENDING)], "idx_lot_bids_listing_lot", False),
-            ("auto_bids", [("user_id", ASCENDING), ("listing_id", ASCENDING), ("is_active", ASCENDING)], "idx_auto_bids_user_listing", False),
-            ("invoices", [("user_id", ASCENDING)], "idx_invoices_user_id", False),
-            ("subscription_invoices", [("user_id", ASCENDING)], "idx_sub_invoices_user_id", False),
-            ("listings", [("status", ASCENDING), ("created_at", ASCENDING)], "idx_listings_status_created", False),
-            ("listings", [("status", ASCENDING), ("category", ASCENDING)], "idx_listings_status_category", False),
-            ("listings", [("status", ASCENDING), ("auction_end_date", ASCENDING)], "idx_listings_status_enddate", False),
-            ("listings", [("seller_id", ASCENDING), ("status", ASCENDING)], "idx_listings_seller_status", False),
-            ("listings", [("id", ASCENDING)], "idx_listings_id_unique", True),
-            ("users", [("email", ASCENDING)], "idx_users_email_unique", True),
-            ("users", [("role", ASCENDING)], "idx_users_role", False),
-            ("users", [("id", ASCENDING)], "idx_users_id_unique", True),
-            ("transactions", [("status", ASCENDING), ("created_at", ASCENDING)], "idx_transactions_status_created", False),
-            ("transactions", [("buyer_id", ASCENDING)], "idx_transactions_buyer", False),
-            ("transactions", [("seller_id", ASCENDING)], "idx_transactions_seller", False),
-            ("notifications", [("user_id", ASCENDING), ("is_read", ASCENDING), ("created_at", ASCENDING)], "idx_notifications_user_read_date", False),
-            ("messages", [("conversation_id", ASCENDING), ("created_at", ASCENDING)], "idx_messages_conversation_date", False),
-            ("multi_item_listings", [("status", ASCENDING), ("created_at", ASCENDING)], "idx_multi_listings_status_created", False),
-            ("multi_item_listings", [("id", ASCENDING)], "idx_multi_listings_id_unique", True),
-        ]
-        for coll, keys, name, unique in indexes:
-            await db[coll].create_index(keys, background=True, unique=unique, name=name)
-        logger.info("Database indexes created")
-        await create_all_indexes(db)
-    except Exception as e:
-        logger.warning(f"Index creation note: {e}")
+    import asyncio
+    async def _create():
+        try:
+            from pymongo import ASCENDING
+            from db.indexes import create_all_indexes
+            indexes = [
+                ("bids", [("listing_id", ASCENDING)], "idx_bids_listing_id", False),
+                ("lot_bids", [("listing_id", ASCENDING), ("lot_number", ASCENDING)], "idx_lot_bids_listing_lot", False),
+                ("auto_bids", [("user_id", ASCENDING), ("listing_id", ASCENDING), ("is_active", ASCENDING)], "idx_auto_bids_user_listing", False),
+                ("invoices", [("user_id", ASCENDING)], "idx_invoices_user_id", False),
+                ("subscription_invoices", [("user_id", ASCENDING)], "idx_sub_invoices_user_id", False),
+                ("listings", [("status", ASCENDING), ("created_at", ASCENDING)], "idx_listings_status_created", False),
+                ("listings", [("status", ASCENDING), ("category", ASCENDING)], "idx_listings_status_category", False),
+                ("listings", [("status", ASCENDING), ("auction_end_date", ASCENDING)], "idx_listings_status_enddate", False),
+                ("listings", [("seller_id", ASCENDING), ("status", ASCENDING)], "idx_listings_seller_status", False),
+                ("listings", [("id", ASCENDING)], "idx_listings_id_unique", True),
+                ("users", [("email", ASCENDING)], "idx_users_email_unique", True),
+                ("users", [("role", ASCENDING)], "idx_users_role", False),
+                ("users", [("id", ASCENDING)], "idx_users_id_unique", True),
+                ("transactions", [("status", ASCENDING), ("created_at", ASCENDING)], "idx_transactions_status_created", False),
+                ("transactions", [("buyer_id", ASCENDING)], "idx_transactions_buyer", False),
+                ("transactions", [("seller_id", ASCENDING)], "idx_transactions_seller", False),
+                ("notifications", [("user_id", ASCENDING), ("is_read", ASCENDING), ("created_at", ASCENDING)], "idx_notifications_user_read_date", False),
+                ("messages", [("conversation_id", ASCENDING), ("created_at", ASCENDING)], "idx_messages_conversation_date", False),
+                ("multi_item_listings", [("status", ASCENDING), ("created_at", ASCENDING)], "idx_multi_listings_status_created", False),
+                ("multi_item_listings", [("id", ASCENDING)], "idx_multi_listings_id_unique", True),
+            ]
+            for coll, keys, name, unique in indexes:
+                await db[coll].create_index(keys, background=True, unique=unique, name=name)
+            logger.info("Database indexes created")
+            await create_all_indexes(db)
+        except Exception as e:
+            logger.warning(f"Index creation note (non-fatal): {e}")
+    asyncio.ensure_future(_create())
