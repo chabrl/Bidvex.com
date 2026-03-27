@@ -6,10 +6,18 @@ Handles document loading, embedding, and semantic search using ChromaDB
 import os
 import logging
 from typing import List, Dict, Any
-import chromadb
-from chromadb.config import Settings
-from chromadb.utils import embedding_functions
 import glob
+
+try:
+    import chromadb
+    from chromadb.config import Settings
+    from chromadb.utils import embedding_functions
+    CHROMADB_AVAILABLE = True
+except ImportError:
+    chromadb = None
+    Settings = None
+    embedding_functions = None
+    CHROMADB_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
