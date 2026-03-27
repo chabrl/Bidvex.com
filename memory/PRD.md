@@ -13,71 +13,65 @@
 
 ### TASK 1 — Admin Panel (All 11 Sections Fixed)
 - **JWT_SECRET mismatch** — ROOT CAUSE of all admin 401s. Fixed across `admin.py`, `profiles.py`, `reviews.py`, `vehicles.py`
-- **Array normalization** — Fixed 8 admin pages that crashed with `.map is not a function`: ManageAllAuctions, AnalyticsDashboard, AdminLogs, MessagingOversight, ReportManager, DeletionRequestsManager, SubscriptionManager, EmailTemplates
+- **Array normalization** — Fixed 8 admin pages that crashed with `.map is not a function`
 - **Missing imports** — `FLAG_TYPES` in trust_safety.py, `calculate_trust_score` function implemented
 - **MongoDB tuning** — maxPoolSize=50, serverSelectionTimeoutMS=5000, w="majority"
 - **Site-config timeout** — try/except fallback returning defaults on DB failure
 - **DB indexes** — hero_banners, listings, announcements indexes via db/indexes.py
-- **Admin Logs date fix** — Graceful handling of missing created_at timestamps
 - **33/33 admin endpoints verified 200**, 8/8 frontend sections load without errors
 
 ### TASK 2 — Buyer Payment Flow (Verified)
 - Checkout page loads correctly, validates auction winner access
-- POST /api/payments/checkout/auction and /api/payments/auction-winner-checkout/{id} wired
-- GET /api/payments/fees/calculate-buyer-cost returns hammer_price + buyer_premium + platform_fee
-- Stripe webhook at /api/webhooks/stripe handles checkout.session.completed
-- Buy Now redirect → Stripe → return URL properly implemented
+- Stripe webhook handling operational
 
 ### TASK 3 — Email Marketing (Verified)
-- GET /api/admin/marketing/campaigns returns campaign data
-- GET /api/admin/email-settings returns SendGrid config
-- GET /api/admin/email-templates returns template categories
-- Seller email marketing service operational via user_email_marketing.py
+- Campaign data, SendGrid config, template categories all returning correctly
 
 ### TASK 4 — Platform Health Check (Passed)
-- Auth: login/registration/role-based access all working
-- All API endpoints tested (50+ endpoints returning 200)
-- Database indexes verified on startup
-- CORS: bidvex.com, www.bidvex.com, Railway URL
-- config.js uses env var with Railway production fallback
-- Error handling: site-config returns defaults on DB failure
-
-### Testing Results
+- Auth, API endpoints, database indexes, CORS all verified
 - Iteration 87: 29/29 backend tests passed (100%)
 - Iteration 88: 17/17 backend + 8/8 frontend tests passed (100%)
 
+## Bug Fixes
+
+### Settings Page Blank — Fixed (March 27, 2026)
+- **Root Cause**: `ProfileSettingsPage.js` called `GET /api/payment-methods` but the backend route is `GET /api/payments/payment-methods` (payments router prefix). SPA catch-all returned HTML (200), causing `.map()` crash.
+- **Fix**: Updated 3 API paths in `ProfileSettingsPage.js` to include `/payments/` prefix. Added `Array.isArray()` guard.
+- **File**: `/app/frontend/src/pages/ProfileSettingsPage.js` (lines 71, 109, 576)
+
+## Deployment Status
+
+### Confirmed Working
+- Backend: Uvicorn on 0.0.0.0:8001 ✅
+- Frontend: npx serve -s build on 0.0.0.0:3000 ✅
+- requirements.txt: 28 packages (lean) ✅
+- build/index.html: EXISTS ✅
+- /api/health → 200 ✅
+- / → 200 (React SPA) ✅
+
+### Platform Routing Issue (Emergent-side)
+- `prod-verify-2.preview.emergentagent.com` → 104.18.10.243 → HTTP 200 ✅
+- `prod-verify-2.emergent.host` → 104.18.14.241 → HTTP 520 ❌
+- Different Cloudflare zones with different origin IPs
+- 520 errors are infrastructure routing, NOT application code
+
 ## Environment Variables for Railway
-- `MONGO_URL`, `DB_NAME`, `JWT_SECRET` (CRITICAL - must be set!)
+- `MONGO_URL`, `DB_NAME`, `JWT_SECRET` (CRITICAL)
 - `STRIPE_API_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`
 - `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL`, `SENDGRID_FROM_NAME`
-- `FRONTEND_URL`, `EMERGENT_LLM_KEY` (=OpenAI API key)
-- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_BUCKET_NAME`, `S3_REGION`
+- `FRONTEND_URL`, `EMERGENT_LLM_KEY`
 
 ## Deployment Notes
 - Backend entry: `uvicorn main:app --host 0.0.0.0 --port $PORT`
 - `main.py` re-exports `app` from `server.py`
-- `runtime.txt` specifies `python-3.11.x`
-- Git push via "Save to GitHub" button in Emergent chat
-
-## Launch Verification (March 27, 2026)
-- SPA static mount on FastAPI root `/` — VERIFIED
-- All static assets (CSS/JS/images/manifest) serve correctly from backend port 8001
-- Login flow: `/auth` page → admin login → redirect to `/marketplace` — VERIFIED
-- 45 users in bazario_db, admin + 1 real user + 43 test users
-- Site mode switched from `coming_soon` to `live`
-- Backend health: all schedulers running, no errors
-- **IMPORTANT**: On production M10 DB, ensure site mode is set to `live` via Admin Panel or `PUT /api/admin/site-mode {"mode":"live"}`
-
-## Deployment Fixes (March 27, 2026)
-- **`.gitignore` cleaned**: Removed 180+ corrupted lines, restored `*.env` blocking for GitHub push protection
-- **`config.js` fixed**: Removed hardcoded `https://www.bidvex.com/api` fallback — uses only `process.env.REACT_APP_BACKEND_URL/api`
-- **`AuthPage.js` fixed**: Google Auth URL configurable via `REACT_APP_AUTH_SERVICE_URL` env var (no fallback)
-- **`server.py` startup optimized**: S3 init + seed_categories made non-blocking (`ensure_future`), prewarm timeout reduced 45s→15s
-- **SPA catch-all hardened**: Returns 200 JSON instead of crashing with 500 if `index.html` is missing
-- **CRITICAL FIX — Fallback health server on port 3000**: Backend starts a minimal HTTP server on port 3000 if the frontend isn't running after 15 seconds. This ensures the Emergent K8s health check (which routes to port 3000) always passes, even if the frontend process doesn't start. When the frontend IS running, the fallback backs off gracefully.
-- Deployment agent scan: **PASS** (all blockers resolved)
+- Frontend: `npx serve -s build -l 3000`
+- **DO NOT** re-add heavy ML dependencies to requirements.txt
+- **DO NOT** refactor server.py (user directive)
 
 ## Backlog
 - (P2) Cloudflare CDN setup
-- (P2) Post-launch monitoring
-- (Post-Launch) Production secrets rotation
+- (P2) Post-launch monitoring and alerting
+- (Enhancement) Real-time performance dashboard
+- (Enhancement) Automated Lighthouse audits
+- (Enhancement) Server-side PageSpeed monitoring endpoint
+- (Low) i18n for EmailMarketingPricing page

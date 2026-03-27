@@ -68,8 +68,8 @@ const ProfileSettingsPage = () => {
 
   const fetchPaymentMethods = async () => {
     try {
-      const response = await axios.get(`${API}/payment-methods`);
-      setPaymentMethods(response.data);
+      const response = await axios.get(`${API}/payments/payment-methods`);
+      setPaymentMethods(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Failed to fetch payment methods:', error);
     }
@@ -106,7 +106,7 @@ const ProfileSettingsPage = () => {
   const handleDeletePaymentMethod = async (methodId) => {
     if (window.confirm(t('payment.confirmDelete'))) {
       try {
-        await axios.delete(`${API}/payment-methods/${methodId}`);
+        await axios.delete(`${API}/payments/payment-methods/${methodId}`);
         toast.success(t('payment.cardDeleted'));
         fetchPaymentMethods();
       } catch (error) {
@@ -573,7 +573,7 @@ const AddCardForm = ({ onSuccess, onCancel }) => {
       if (error) {
         toast.error(error.message);
       } else {
-        await axios.post(`${API}/payment-methods`, {
+        await axios.post(`${API}/payments/payment-methods`, {
           payment_method_id: paymentMethod.id,
         });
         toast.success('Payment method added successfully!');
