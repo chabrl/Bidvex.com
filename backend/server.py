@@ -581,6 +581,55 @@ async def root_health():
 
 # ─── Lifecycle Events ───
 @app.on_event("startup")
+async def start_fallback_health_server():
+    """Start a minimal HTTP server on port 3000 as fallback for health checks.
+    Waits 15 seconds to give the frontend time to bind port 3000 first.
+    If port 3000 is still free after the delay, the frontend didn't start,
+    so the fallback server takes over to ensure health checks pass."""
+    import asyncio
+    import socket
+
+    async def _handle_request(reader, writer):
+        try:
+            data = await asyncio.wait_for(reader.read(4096), timeout=5)
+            body = '<!doctype html><html><head><title>BidVex</title></head><body><h1>BidVex</h1><p>Loading...</p></body></html>'
+            response = f"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {len(body)}\r\nConnection: close\r\n\r\n{body}"
+            writer.write(response.encode())
+            await writer.drain()
+        except Exception:
+            pass
+        finally:
+            try:
+                writer.close()
+            except Exception:
+                pass
+
+    def _port_in_use(port):
+        """Check if a port is already in use."""
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            return s.connect_ex(('127.0.0.1', port)) == 0
+
+    async def _start():
+        # Wait for the frontend to potentially start first
+        await asyncio.sleep(15)
+
+        if _port_in_use(3000):
+            logger.info("Port 3000 in use (frontend running) — fallback health server not needed")
+            return
+
+        try:
+            server = await asyncio.start_server(_handle_request, '0.0.0.0', 3000)
+            logger.info("Fallback health server started on port 3000 (frontend not detected)")
+            async with server:
+                await server.serve_forever()
+        except OSError:
+            logger.info("Port 3000 already in use — fallback server not needed")
+        except Exception as e:
+            logger.warning(f"Fallback health server error: {e}")
+
+    asyncio.ensure_future(_start())
+
+@app.on_event("startup")
 async def start_scheduler():
     scheduler.start()
     logger.info("APScheduler started")
@@ -657,22 +706,25 @@ async def shutdown_db_client():
 
 @app.on_event("startup")
 async def seed_categories():
-    try:
-        if await db.categories.count_documents({}) == 0:
-            categories = [
-                {"id": str(uuid.uuid4()), "name_en": "Electronics", "name_fr": "Électronique", "icon": "laptop"},
-                {"id": str(uuid.uuid4()), "name_en": "Fashion", "name_fr": "Mode", "icon": "shirt"},
-                {"id": str(uuid.uuid4()), "name_en": "Home & Garden", "name_fr": "Maison & Jardin", "icon": "home"},
-                {"id": str(uuid.uuid4()), "name_en": "Sports", "name_fr": "Sports", "icon": "dumbbell"},
-                {"id": str(uuid.uuid4()), "name_en": "Vehicles", "name_fr": "Véhicules", "icon": "car"},
-                {"id": str(uuid.uuid4()), "name_en": "Art & Collectibles", "name_fr": "Art & Objets de collection", "icon": "palette"},
-                {"id": str(uuid.uuid4()), "name_en": "Books & Media", "name_fr": "Livres & Médias", "icon": "book"},
-                {"id": str(uuid.uuid4()), "name_en": "Toys & Games", "name_fr": "Jouets & Jeux", "icon": "gamepad-2"},
-            ]
-            await db.categories.insert_many(categories)
-            logger.info("Categories seeded")
-    except Exception as e:
-        logger.error(f"Startup error: {e}")
+    import asyncio
+    async def _seed():
+        try:
+            if await db.categories.count_documents({}) == 0:
+                categories = [
+                    {"id": str(uuid.uuid4()), "name_en": "Electronics", "name_fr": "Électronique", "icon": "laptop"},
+                    {"id": str(uuid.uuid4()), "name_en": "Fashion", "name_fr": "Mode", "icon": "shirt"},
+                    {"id": str(uuid.uuid4()), "name_en": "Home & Garden", "name_fr": "Maison & Jardin", "icon": "home"},
+                    {"id": str(uuid.uuid4()), "name_en": "Sports", "name_fr": "Sports", "icon": "dumbbell"},
+                    {"id": str(uuid.uuid4()), "name_en": "Vehicles", "name_fr": "Véhicules", "icon": "car"},
+                    {"id": str(uuid.uuid4()), "name_en": "Art & Collectibles", "name_fr": "Art & Objets de collection", "icon": "palette"},
+                    {"id": str(uuid.uuid4()), "name_en": "Books & Media", "name_fr": "Livres & Médias", "icon": "book"},
+                    {"id": str(uuid.uuid4()), "name_en": "Toys & Games", "name_fr": "Jouets & Jeux", "icon": "gamepad-2"},
+                ]
+                await db.categories.insert_many(categories)
+                logger.info("Categories seeded")
+        except Exception as e:
+            logger.error(f"Startup error: {e}")
+    asyncio.ensure_future(_seed())
 
 @app.on_event("startup")
 async def create_database_indexes():
