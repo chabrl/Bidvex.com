@@ -52,7 +52,8 @@ const EmailTemplates = () => {
       const response = await axios.get(`${API}/admin/email-templates`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setTemplates(response.data);
+      const d = response.data;
+      setTemplates(d.categories ? d : { categories: [], total_templates: 0 });
       setEditedTemplates({});
       setValidationErrors({});
       setHasChanges(false);

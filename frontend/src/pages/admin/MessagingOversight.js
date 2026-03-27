@@ -20,7 +20,8 @@ const MessagingOversight = () => {
   const fetchMessages = async () => {
     try {
       const response = await axios.get(`${API}/admin/messages/flagged`);
-      setMessages(response.data);
+      const d = response.data;
+      setMessages(Array.isArray(d) ? d : d.messages || []);
     } catch (error) {
       toast.error('Failed to load flagged messages');
     } finally {

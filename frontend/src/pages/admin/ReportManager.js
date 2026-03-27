@@ -27,7 +27,8 @@ const ReportManager = () => {
     try {
       const params = new URLSearchParams(filter).toString();
       const response = await axios.get(`${API}/admin/reports${params ? `/filter?${params}` : ''}`);
-      setReports(response.data);
+      const d = response.data;
+      setReports(Array.isArray(d) ? d : d.reports || []);
     } catch (error) {
       toast.error('Failed to load reports');
     } finally {

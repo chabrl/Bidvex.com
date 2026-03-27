@@ -23,7 +23,8 @@ const DeletionRequestsManager = () => {
   const fetchRequests = async () => {
     try {
       const response = await axios.get(`${API}/admin/deletion-requests`);
-      setRequests(response.data || []);
+      const d = response.data;
+      setRequests(Array.isArray(d) ? d : d.requests || []);
     } catch (error) {
       console.error('Failed to fetch deletion requests:', error);
       toast.error('Failed to load deletion requests');

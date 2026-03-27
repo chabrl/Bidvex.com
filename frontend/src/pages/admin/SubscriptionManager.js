@@ -112,7 +112,8 @@ const SubscriptionManager = () => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
       const response = await axios.get(`${API}/admin/users`, { headers });
-      const allUsers = response.data || [];
+      const d = response.data;
+      const allUsers = Array.isArray(d) ? d : d.users || [];
       setUsers(allUsers);
       calculateStats(allUsers);
     } catch (error) {

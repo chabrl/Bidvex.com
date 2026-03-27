@@ -37,7 +37,8 @@ const AdminLogs = ({ searchQuery = '' }) => {
     try {
       const endpoint = filter ? `/admin/logs?action_type=${filter}` : '/admin/logs';
       const response = await axios.get(`${API}${endpoint}`);
-      setLogs(response.data);
+      const d = response.data;
+      setLogs(Array.isArray(d) ? d : d.logs || []);
     } catch (error) {
       toast.error('Failed to load logs');
     } finally {

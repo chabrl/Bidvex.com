@@ -26,8 +26,10 @@ const AnalyticsDashboard = () => {
         axios.get(`${API}/admin/analytics/revenue`),
         axios.get(`${API}/admin/analytics/listings`)
       ]);
-      setRevenueData(revenueRes.data);
-      setListingData(listingsRes.data);
+      const revData = revenueRes.data;
+      setRevenueData(Array.isArray(revData) ? revData : revData.daily || revData.revenue_data || []);
+      const listData = listingsRes.data;
+      setListingData(Array.isArray(listData) ? listData : listData.daily || listData.listing_data || []);
     } catch (error) {
       toast.error('Failed to load analytics');
     } finally {
