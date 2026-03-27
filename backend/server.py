@@ -558,10 +558,10 @@ app.include_router(api_router)
 
 @app.get("/")
 async def root():
-    """Serve React SPA index.html"""
+    """Serve React SPA index.html or return healthy JSON"""
     import os
     index_path = os.path.join(os.path.dirname(__file__), "..", "frontend", "build", "index.html")
-    if os.path.exists(index_path):
+    if os.path.isfile(index_path):
         from starlette.responses import FileResponse
         return FileResponse(index_path, media_type="text/html")
     return {"status": "healthy", "service": "BidVex API", "version": "1.0"}
@@ -626,8 +626,8 @@ async def prewarm_caches():
         try:
             # 4. Marketplace items (warm the cache via HTTP self-call)
             # Wait for server to be ready
-            await asyncio.sleep(3)
-            async with httpx.AsyncClient(base_url="http://127.0.0.1:8001", timeout=45) as c:
+            await asyncio.sleep(2)
+            async with httpx.AsyncClient(base_url="http://127.0.0.1:8001", timeout=15) as c:
                 r = await c.get("/api/marketplace/items?limit=1")
                 logger.info(f"[prewarm] Marketplace items → {r.status_code} ({r.elapsed.total_seconds():.2f}s)")
                 r2 = await c.get("/api/multi-item-listings?limit=1")
@@ -638,11 +638,14 @@ async def prewarm_caches():
 
 @app.on_event("startup")
 async def init_cloud_storage():
-    try:
-        from services.cloud_storage import _get_s3
-        _get_s3()
-    except Exception as e:
-        logger.error(f"Cloud storage init failed (non-fatal): {e}")
+    import asyncio
+    async def _init():
+        try:
+            from services.cloud_storage import _get_s3
+            _get_s3()
+        except Exception as e:
+            logger.error(f"Cloud storage init failed (non-fatal): {e}")
+    asyncio.ensure_future(_init())
 
 @app.on_event("shutdown")
 async def shutdown_scheduler():
@@ -723,4 +726,7 @@ if os.path.isdir(_frontend_build):
         file_path = os.path.join(_frontend_build, path)
         if os.path.isfile(file_path):
             return FileResponse(file_path)
-        return FileResponse(os.path.join(_frontend_build, "index.html"), media_type="text/html")
+        index_file = os.path.join(_frontend_build, "index.html")
+        if os.path.isfile(index_file):
+            return FileResponse(index_file, media_type="text/html")
+        return JSONResponse({"status": "healthy", "detail": "SPA build not found"}, status_code=200)

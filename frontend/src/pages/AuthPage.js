@@ -114,7 +114,8 @@ const AuthPage = () => {
 
   const handleGoogleLogin = () => {
     const redirectUrl = `${window.location.origin}/marketplace`;
-    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+    const authServiceUrl = process.env.REACT_APP_AUTH_SERVICE_URL || 'https://auth.emergentagent.com';
+    window.location.href = `${authServiceUrl}/?redirect=${encodeURIComponent(redirectUrl)}`;
   };
 
   // Forced Password Reset Form
