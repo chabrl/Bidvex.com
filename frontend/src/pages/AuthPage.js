@@ -114,7 +114,11 @@ const AuthPage = () => {
 
   const handleGoogleLogin = () => {
     const redirectUrl = `${window.location.origin}/marketplace`;
-    const authServiceUrl = process.env.REACT_APP_AUTH_SERVICE_URL || 'https://auth.emergentagent.com';
+    const authServiceUrl = process.env.REACT_APP_AUTH_SERVICE_URL;
+    if (!authServiceUrl) {
+      console.warn('REACT_APP_AUTH_SERVICE_URL not configured');
+      return;
+    }
     window.location.href = `${authServiceUrl}/?redirect=${encodeURIComponent(redirectUrl)}`;
   };
 
