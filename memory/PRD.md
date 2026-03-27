@@ -59,6 +59,15 @@
 - `runtime.txt` specifies `python-3.11.x`
 - Git push via "Save to GitHub" button in Emergent chat
 
+## Launch Verification (March 27, 2026)
+- SPA static mount on FastAPI root `/` — VERIFIED ✅
+- All static assets (CSS/JS/images/manifest) serve correctly from backend port 8001
+- Login flow: `/auth` page → admin login → redirect to `/marketplace` — VERIFIED ✅
+- 45 users in bazario_db, admin + 1 real user + 43 test users
+- Site mode switched from `coming_soon` to `live`
+- Backend health: all schedulers running, no errors
+- **IMPORTANT**: On production M10 DB, ensure site mode is set to `live` via Admin Panel or `PUT /api/admin/site-mode {"mode":"live"}`
+
 ## Backlog
 - (P2) Cloudflare CDN setup
 - (P2) Post-launch monitoring
