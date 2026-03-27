@@ -30,6 +30,14 @@ next-env.d.ts
 dist/
 dist
 
+# Environment files
+*.env
+.env
+.env.*
+.env.local
+.env.development
+.env.production
+
 *token.json*
 *credentials.json*
 
@@ -73,3 +81,11 @@ agenthub/agents/youtube/db
 
 # Build caches
 .cache/
+-e 
+# Environment files
+*.env
+*.env.*
+-e 
+# Environment files
+*.env
+*.env.*
