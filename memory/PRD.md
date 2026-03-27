@@ -60,13 +60,21 @@
 - Git push via "Save to GitHub" button in Emergent chat
 
 ## Launch Verification (March 27, 2026)
-- SPA static mount on FastAPI root `/` — VERIFIED ✅
+- SPA static mount on FastAPI root `/` — VERIFIED
 - All static assets (CSS/JS/images/manifest) serve correctly from backend port 8001
-- Login flow: `/auth` page → admin login → redirect to `/marketplace` — VERIFIED ✅
+- Login flow: `/auth` page → admin login → redirect to `/marketplace` — VERIFIED
 - 45 users in bazario_db, admin + 1 real user + 43 test users
 - Site mode switched from `coming_soon` to `live`
 - Backend health: all schedulers running, no errors
 - **IMPORTANT**: On production M10 DB, ensure site mode is set to `live` via Admin Panel or `PUT /api/admin/site-mode {"mode":"live"}`
+
+## Deployment Fixes (March 27, 2026)
+- **`.gitignore` cleaned**: Removed 180+ corrupted lines blocking `.env` files (was preventing Emergent deployment from managing secrets)
+- **`config.js` fixed**: Removed hardcoded `https://www.bidvex.com/api` fallback — now uses only `process.env.REACT_APP_BACKEND_URL/api`
+- **`AuthPage.js` fixed**: Google Auth URL now configurable via `REACT_APP_AUTH_SERVICE_URL` env var
+- **`server.py` startup optimized**: S3 init made non-blocking (`ensure_future`), prewarm timeout reduced from 45s→15s
+- **SPA catch-all hardened**: Returns 200 JSON instead of crashing with 500 if `index.html` is missing
+- Deployment agent scan: **PASS** (all blockers resolved)
 
 ## Backlog
 - (P2) Cloudflare CDN setup
