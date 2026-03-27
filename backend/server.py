@@ -556,6 +556,10 @@ register_ws_handlers(app, db, manager, message_manager)
 # ─── Mount API Router ───
 app.include_router(api_router)
 
+@app.get("/")
+async def root():
+    return {"status": "healthy", "service": "BidVex API", "version": "1.0"}
+
 @app.api_route("/health", methods=["GET", "HEAD"])
 async def root_health():
     return {"status": "healthy"}
@@ -565,6 +569,19 @@ async def root_health():
 async def start_scheduler():
     scheduler.start()
     logger.info("APScheduler started")
+
+@app.on_event("startup")
+async def log_db_status():
+    import asyncio
+    async def _check():
+        try:
+            count = await db.categories.count_documents({})
+            logger.info(f"DB connected — categories found: {count}")
+            users = await db.users.count_documents({})
+            logger.info(f"DB connected — users found: {users}")
+        except Exception as e:
+            logger.warning(f"DB status check failed (non-fatal): {e}")
+    asyncio.ensure_future(_check())
 
 @app.on_event("startup")
 async def prewarm_caches():
