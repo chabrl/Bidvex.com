@@ -9,7 +9,7 @@
 /coverage
 
 # production
-/build
+# /build — committed so deployed container can serve the SPA
 
 # misc
 .DS_Store
