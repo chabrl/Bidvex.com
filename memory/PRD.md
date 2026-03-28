@@ -11,48 +11,47 @@
 
 ## Completed Work
 
-### Deployment Hardening (March 27, 2026)
-- **Google Maps**: Gracefully disabled — backend returns `{"enabled": false}` when no valid key, frontend shows text fallback. Reactivates automatically when real key is added to env.
-- **External Service Wrapping**: All startup initializations (Stripe, MongoDB, WebSocket, APScheduler) wrapped in try/except. No missing/invalid key can crash the server.
-- **Clean Startup Verified**: `uvicorn server:app` produces zero tracebacks, logs "Application startup complete."
-- **.gitignore Fixed**: Removed overly aggressive `.env` blocking patterns so Emergent deployment can track env files.
-- **requirements.txt**: Stays at 28 lean packages.
+### Deployment Fix — Pod Cleanup (March 27, 2026)
+- Nuked 209 → 75 installed packages (removed chromadb, langchain, numpy, pandas, scipy, onnxruntime, etc.)
+- Cleared 309MB pip cache
+- Froze requirements.txt to 75 exact pinned versions (deterministic builds)
+- Clean startup verified: `Application startup complete.` with zero tracebacks
+- `.gitignore` cleaned: removed `.env` blocking patterns for Emergent deployment
 
-### Settings Page Blank Fix (March 27, 2026)
-- **Root Cause**: `ProfileSettingsPage.js` called `GET /api/payment-methods` but route is `GET /api/payments/payment-methods`.
-- **Fix**: Updated 3 API paths, added `Array.isArray()` guard.
+### Deployment Hardening (March 27, 2026)
+- Google Maps gracefully disabled (reactivates when real key added to env)
+- All external service initializations wrapped in try/except (Stripe, MongoDB, WebSocket, APScheduler)
+
+### Settings Page Fix (March 27, 2026)
+- Fixed `ProfileSettingsPage.js` — wrong API path for payment-methods
 
 ### Previous Session Work
 - Admin Panel (11 sections fixed), Buyer Payment Flow, Email Marketing, Platform Health
-- Library migration: Removed `emergentintegrations`, replaced with `openai`, `boto3`, `stripe`
-- Frontend: `npx serve -s build -l 3000` (no webpack dev server)
-- Dependency purge: 220+ → 28 packages
+- Library migration: `emergentintegrations` → `openai`, `boto3`, `stripe`
+- Frontend: `npx serve -s build -l 3000`
 
 ## Architecture
 ```
 /app
 ├── backend/
-│   ├── main.py                 # ASGI Entrypoint (imports app from server.py)
-│   ├── server.py               # FastAPI setup, middleware, routers, lifecycle
-│   ├── requirements.txt        # 28 packages (DO NOT BLOAT)
-│   ├── routes/                 # All API routes
-│   └── services/               # Business logic services
+│   ├── main.py                 # ASGI Entrypoint
+│   ├── server.py               # FastAPI setup, middleware, routers
+│   ├── requirements.txt        # 75 pinned packages (DO NOT BLOAT)
+│   ├── routes/
+│   └── services/
 ├── frontend/
 │   ├── build/                  # Compiled React SPA
 │   ├── src/
 │   └── package.json            # start: "npx serve -s build -l 3000"
-└── .gitignore                  # Clean, no .env blocking
 ```
 
 ## Key Endpoints
 - `GET /api/health` → `{"status": "healthy"}`
-- `GET /health` → same
-- `GET /` → React SPA (index.html)
-- `GET /api/config/google-maps-key` → `{"api_key": "", "enabled": false}` (until key added)
+- `GET /` → React SPA
+- `GET /api/config/google-maps-key` → `{"enabled": false}` until key added
 
 ## Backlog
 - (P2) Cloudflare CDN setup
-- (P2) Post-launch monitoring and alerting
-- (Enhancement) Real-time performance dashboard
-- (Enhancement) Automated Lighthouse audits
-- (Low) i18n for EmailMarketingPricing page
+- (P2) Post-launch monitoring
+- (Enhancement) Performance dashboard, Lighthouse audits
+- (Low) i18n for EmailMarketingPricing
