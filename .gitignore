@@ -73,36 +73,3 @@ agenthub/agents/youtube/db
 
 # Build caches
 .cache/
-
-# Environment files - MUST be last
-.env
-.env.*
-.env.local
-.env.development
-.env.production
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
