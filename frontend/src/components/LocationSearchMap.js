@@ -20,14 +20,50 @@ const LocationSearchMap = ({ onLocationSearch }) => {
   const [radius, setRadius] = useState(50);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [apiKey, setApiKey] = useState('');
+  const [mapsEnabled, setMapsEnabled] = useState(false);
 
   useEffect(() => {
     fetch(`${API_BASE}/config/google-maps-key`)
       .then(res => res.json())
-      .then(data => setApiKey(data.api_key))
+      .then(data => {
+        if (data.api_key && data.enabled) {
+          setApiKey(data.api_key);
+          setMapsEnabled(true);
+        }
+      })
       .catch(err => console.error('Failed to fetch API key:', err));
   }, []);
 
+  // If Maps is disabled, render a plain-text fallback
+  if (!mapsEnabled) {
+    return (
+      <Card className="p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold">Search by Location</h3>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Map-based location search is currently unavailable. Please use the text search to find listings.
+        </p>
+      </Card>
+    );
+  }
+
+  return <LocationSearchMapInner
+    apiKey={apiKey}
+    onLocationSearch={onLocationSearch}
+    center={center}
+    setCenter={setCenter}
+    radius={radius}
+    setRadius={setRadius}
+    selectedLocation={selectedLocation}
+    setSelectedLocation={setSelectedLocation}
+    map={map}
+    setMap={setMap}
+    t={t}
+  />;
+};
+
+const LocationSearchMapInner = ({ apiKey, onLocationSearch, center, setCenter, radius, setRadius, selectedLocation, setSelectedLocation, map, setMap, t }) => {
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: apiKey,
     libraries,
@@ -35,7 +71,7 @@ const LocationSearchMap = ({ onLocationSearch }) => {
 
   const onLoad = useCallback((map) => {
     setMap(map);
-  }, []);
+  }, [setMap]);
 
   const handleMapClick = useCallback((e) => {
     const location = {
@@ -44,7 +80,7 @@ const LocationSearchMap = ({ onLocationSearch }) => {
     };
     setSelectedLocation(location);
     setCenter(location);
-  }, []);
+  }, [setSelectedLocation, setCenter]);
 
   const handleUseMyLocation = () => {
     if (navigator.geolocation) {
@@ -78,7 +114,7 @@ const LocationSearchMap = ({ onLocationSearch }) => {
   };
 
   if (loadError) return <div>{t("common.errorLoadingMaps")}</div>;
-  if (!isLoaded || !apiKey) return <div>Loading maps...</div>;
+  if (!isLoaded) return <div>Loading maps...</div>;
 
   return (
     <Card className="p-4 space-y-4">

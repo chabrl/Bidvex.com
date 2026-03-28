@@ -62,7 +62,11 @@ async def create_category(category: Category, current_user: User = Depends(get_c
 
 @misc_router.get("/config/google-maps-key")
 async def get_google_maps_key():
-    return {"api_key": google_maps_key}
+    api_key = os.environ.get("GOOGLE_MAPS_API_KEY", "")
+    if api_key and api_key != "your-google-maps-api-key-here":
+        return {"api_key": api_key, "enabled": True}
+    else:
+        return {"api_key": "", "enabled": False}
 
 
 

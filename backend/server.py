@@ -29,33 +29,44 @@ mongo_url = os.environ.get('MONGO_URL')
 db_name = os.environ.get('DB_NAME', 'bazario_db')
 stripe_api_key = os.environ.get('STRIPE_API_KEY', '')
 
-# ─── Database (connection pooling) ───
-from pymongo import ReadPreference
-client = AsyncIOMotorClient(
-    mongo_url,
-    serverSelectionTimeoutMS=5000,
-    maxPoolSize=50,
-    minPoolSize=2,
-    connectTimeoutMS=10000,
-    socketTimeoutMS=20000,
-    retryReads=True,
-    retryWrites=True,
-    w="majority",
-)
-db = client[db_name]
-# Use secondary-preferred reads so queries don't wait for a failing primary
-db_read = client.get_database(db_name, read_preference=ReadPreference.SECONDARY_PREFERRED)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-import stripe
-if stripe_api_key:
-    stripe.api_key = stripe_api_key
+# ─── Database (connection pooling) ───
+try:
+    from pymongo import ReadPreference
+    client = AsyncIOMotorClient(
+        mongo_url,
+        serverSelectionTimeoutMS=5000,
+        maxPoolSize=50,
+        minPoolSize=2,
+        connectTimeoutMS=10000,
+        socketTimeoutMS=20000,
+        retryReads=True,
+        retryWrites=True,
+        w="majority",
+    )
+    db = client[db_name]
+    # Use secondary-preferred reads so queries don't wait for a failing primary
+    db_read = client.get_database(db_name, read_preference=ReadPreference.SECONDARY_PREFERRED)
+    logger.info("MongoDB client initialized successfully")
+except Exception as e:
+    logger.error(f"MongoDB client initialization failed: {e}")
+    raise  # DB is a hard dependency — fail fast
+
+try:
+    import stripe
+    if stripe_api_key and stripe_api_key != "your-stripe-api-key-here":
+        stripe.api_key = stripe_api_key
+        logger.info("Stripe initialized successfully")
+    else:
+        logger.info("Stripe disabled — valid API key not yet provided")
+except Exception as e:
+    logger.warning(f"Stripe unavailable at startup: {e}")
 
 # ─── App ───
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # Trust proxy headers from Cloudflare/Railway
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
@@ -550,8 +561,12 @@ except ImportError:
     pass
 
 # ─── WebSocket Handlers ───
-from ws_handlers import register_ws_handlers
-register_ws_handlers(app, db, manager, message_manager)
+try:
+    from ws_handlers import register_ws_handlers
+    register_ws_handlers(app, db, manager, message_manager)
+    logger.info("WebSocket handlers registered successfully")
+except Exception as e:
+    logger.warning(f"WebSocket handlers unavailable at startup: {e}")
 
 # ─── Mount API Router ───
 app.include_router(api_router)
@@ -582,8 +597,11 @@ async def root_health():
 # ─── Lifecycle Events ───
 @app.on_event("startup")
 async def start_scheduler():
-    scheduler.start()
-    logger.info("APScheduler started")
+    try:
+        scheduler.start()
+        logger.info("APScheduler started")
+    except Exception as e:
+        logger.warning(f"APScheduler unavailable at startup: {e}")
 
 @app.on_event("startup")
 async def log_db_status():

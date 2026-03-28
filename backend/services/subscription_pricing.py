@@ -15,8 +15,14 @@ logger = logging.getLogger(__name__)
 
 # Initialize Stripe
 stripe_api_key = os.environ.get('STRIPE_API_KEY', '')
-if stripe_api_key:
-    stripe.api_key = stripe_api_key
+try:
+    if stripe_api_key and stripe_api_key != "your-stripe-api-key-here":
+        stripe.api_key = stripe_api_key
+        logger.info("Stripe initialized in subscription_pricing")
+    else:
+        logger.info("Stripe disabled in subscription_pricing — valid API key not yet provided")
+except Exception as e:
+    logger.warning(f"Stripe unavailable in subscription_pricing: {e}")
 
 
 # ========== PYDANTIC MODELS ==========
