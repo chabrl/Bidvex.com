@@ -1,0 +1,134 @@
+{
+  "summary": "Commercial Readiness Phase iteration 94 testing complete. All 36 tests passed. Verified: Updated NS HST rate (14% for 2026), renamed cookie consent categories (strictly_necessary, functionality, analytics, marketing), new refuse_all and privacy_by_default fields, invoice PDF generation with vehicle info section, R2 private subfolder storage path, and partner endpoints.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_results": {
+    "backend_tests": {
+      "total": 36,
+      "passed": 36,
+      "skipped": 0,
+      "failed": 0,
+      "tests": [
+        "test_health_endpoint - PASSED",
+        "test_nova_scotia_hst_14_percent_2026_rate - PASSED (NS=14% HST verified, changed from 15%)",
+        "test_ontario_hst_13_percent - PASSED (ON=13% HST)",
+        "test_new_brunswick_hst_15_percent - PASSED (NB=15% HST)",
+        "test_newfoundland_hst_15_percent - PASSED (NL=15% HST)",
+        "test_pei_hst_15_percent - PASSED (PE=15% HST)",
+        "test_quebec_dual_tax_gst_qst - PASSED (QC=5% GST + 9.975% QST)",
+        "test_bc_dual_tax_gst_pst - PASSED (BC=5% GST + 7% PST)",
+        "test_saskatchewan_dual_tax_gst_pst - PASSED (SK=5% GST + 6% PST)",
+        "test_alberta_gst_only_5_percent - PASSED (AB=5% GST only)",
+        "test_yukon_gst_only_5_percent - PASSED (YT=5% GST only)",
+        "test_northwest_territories_gst_only_5_percent - PASSED (NT=5% GST only)",
+        "test_nunavut_gst_only_5_percent - PASSED (NU=5% GST only)",
+        "test_cookie_policy_english_default - PASSED",
+        "test_cookie_policy_has_strictly_necessary_category - PASSED (renamed from essential)",
+        "test_cookie_policy_has_functionality_category - PASSED (renamed from functional)",
+        "test_cookie_policy_has_analytics_category - PASSED",
+        "test_cookie_policy_has_marketing_category - PASSED",
+        "test_cookie_policy_has_refuse_all_field_english - PASSED ('Refuse All')",
+        "test_cookie_policy_has_privacy_by_default_field - PASSED",
+        "test_cookie_policy_french_refuse_all - PASSED ('Tout refuser')",
+        "test_cookie_policy_french_accept_all - PASSED ('Tout accepter')",
+        "test_cookie_policy_french_strictly_necessary_name - PASSED ('Strictement necessaires')",
+        "test_cookie_policy_accept_language_header_french - PASSED",
+        "test_invoice_generation_requires_auth - PASSED (401 without auth)",
+        "test_invoice_generation_with_vehicle_info - PASSED (PDF with vehicle section)",
+        "test_invoice_generation_without_vehicle - PASSED",
+        "test_invoice_storage_path_format - PASSED (bidvex/invoices/transactions/{id}.pdf)",
+        "test_invoice_generation_invalid_transaction - PASSED (404 for non-existent)",
+        "test_invoice_french_language - PASSED (French labels TPS/TVQ)",
+        "test_partner_stats_requires_auth - PASSED (401 without auth)",
+        "test_partner_stats_with_admin - PASSED",
+        "test_partner_badge_public_endpoint - PASSED (no auth required)",
+        "test_partner_badge_nonexistent_user - PASSED (404)",
+        "test_list_invoices_requires_auth - PASSED",
+        "test_list_invoices_with_auth - PASSED"
+      ]
+    }
+  },
+  "features_verified": {
+    "multi_province_tax_engine_2026": {
+      "status": "WORKING",
+      "details": {
+        "ns_hst_2026": "NS=14% HST (updated from 15% for 2026)",
+        "hst_provinces": "ON (13%), NB/NL/PE (15%)",
+        "dual_tax_provinces": "QC (5% GST + 9.975% QST), BC (5% GST + 7% PST), SK (5% GST + 6% PST)",
+        "gst_only_territories": "AB, YT, NT, NU (5% GST only)"
+      }
+    },
+    "cookie_consent_law25_updated": {
+      "status": "WORKING",
+      "details": {
+        "renamed_categories": "essential→strictly_necessary, functional→functionality",
+        "all_categories": "strictly_necessary, functionality, analytics, marketing",
+        "new_fields": "refuse_all, privacy_by_default",
+        "french_translations": "refuse_all='Tout refuser', accept_all='Tout accepter', strictly_necessary.name='Strictement necessaires'",
+        "required_flags": "strictly_necessary.required=true, others=false"
+      }
+    },
+    "invoice_pdf_vehicle_section": {
+      "status": "WORKING",
+      "details": {
+        "endpoint": "POST /api/invoices/generate/{transaction_id}",
+        "vehicle_fields": "VIN, Make, Model, Year included when listing has vehicle data",
+        "buyer_seller_info": "Addresses and tax ID placeholders included",
+        "bilingual_labels": "vehicle_info, vin, make, model, year in both EN/FR"
+      }
+    },
+    "r2_invoice_storage": {
+      "status": "WORKING",
+      "details": {
+        "storage_path": "bidvex/invoices/transactions/{transaction_id}.pdf",
+        "acl": "private (default in _put_object)",
+        "subfolder": "transactions subfolder for transaction invoices"
+      }
+    },
+    "partner_endpoints": {
+      "status": "WORKING",
+      "details": {
+        "stats_endpoint": "GET /api/partner/stats (admin auth required)",
+        "badge_endpoint": "GET /api/partner/badge/{user_id} (public)"
+      }
+    }
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_commercial_readiness_94.py",
+    "/app/test_reports/pytest/pytest_results_commercial_readiness_94.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "invoice_service.py line 55: NS HST correctly set to 14% (Decimal('0.14')) for 2026 rate",
+    "legal.py lines 298-419: Cookie consent categories correctly renamed to strictly_necessary, functionality, analytics, marketing",
+    "legal.py: refuse_all and privacy_by_default fields present in both EN and FR",
+    "cloud_storage.py line 51: _put_object now has ACL='private' as default parameter",
+    "cloud_storage.py line 122: store_invoice_pdf uses _put_object without explicit ACL (inherits private default)",
+    "invoices.py lines 1057-1074: Vehicle info (VIN, make, model, year) fetched from listing and passed to invoice_data",
+    "invoice_service.py lines 400-432: Vehicle Information section rendered in PDF when vehicle data present",
+    "invoice_service.py lines 367-388: Buyer/seller addresses and tax ID placeholders included in PDF"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_commercial_readiness_94.py"
+  ],
+  "success_rate": {
+    "backend": "100% (36/36 tests passed)",
+    "frontend": "N/A (backend only testing)"
+  },
+  "test_credentials": {
+    "admin": "charbeladmin@bidvex.com / Admin123!",
+    "test_transaction_with_vehicle": "49e7251f-c69a-4ee3-90b4-6e16fbb57404 (VIN: WBS43AZ09PCL95847, 2023 BMW M3)",
+    "test_transaction_without_vehicle": "5d5e4c3d-5939-4538-a5e2-739f5648bbdb"
+  },
+  "seed_data_creation": "None - used existing test transactions",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 94 verified all updated requirements: NS HST 14% (2026), cookie consent renamed categories (strictly_necessary/functionality/analytics/marketing), refuse_all and privacy_by_default fields, vehicle info in PDF, buyer/seller addresses+tax IDs in PDF, R2 private ACL. All integrations are LIVE (no mocks). Test file: /app/backend/tests/test_commercial_readiness_94.py"
+}

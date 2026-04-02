@@ -48,15 +48,18 @@ def _get_s3():
     return _s3_client
 
 
-def _put_object(path: str, data: bytes, content_type: str) -> dict:
-    """Upload file to S3."""
+def _put_object(path: str, data: bytes, content_type: str, acl: str = "private") -> dict:
+    """Upload file to S3 with explicit ACL (default: private)."""
     client = _get_s3()
-    client.put_object(
-        Bucket=S3_BUCKET,
-        Key=path,
-        Body=data,
-        ContentType=content_type,
-    )
+    params = {
+        "Bucket": S3_BUCKET,
+        "Key": path,
+        "Body": data,
+        "ContentType": content_type,
+    }
+    if acl:
+        params["ACL"] = acl
+    client.put_object(**params)
     return {"path": path}
 
 

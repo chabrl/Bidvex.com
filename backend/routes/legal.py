@@ -306,29 +306,42 @@ COOKIE_CONSENT_STRINGS = {
             "cookies on your device."
         ),
         "accept_all": "Accept All Cookies",
-        "reject_all": "Reject Non-Essential",
+        "refuse_all": "Refuse All",
         "customize": "Customize Preferences",
         "privacy_policy_link": "/privacy-policy",
         "privacy_policy_text": "Read our Privacy Policy",
         "categories": {
-            "essential": {
-                "name": "Essential Cookies",
-                "description": "Required for the website to function. Cannot be disabled.",
+            "strictly_necessary": {
+                "name": "Strictly Necessary",
+                "description": (
+                    "These cookies are essential for the website to function correctly. "
+                    "They enable core features such as authentication, session management, "
+                    "and security. They cannot be disabled."
+                ),
                 "required": True,
             },
+            "functionality": {
+                "name": "Functionality",
+                "description": (
+                    "These cookies enable enhanced features such as remembering your "
+                    "language preferences, saved searches, and personalized settings."
+                ),
+                "required": False,
+            },
             "analytics": {
-                "name": "Analytics Cookies",
-                "description": "Help us understand how visitors interact with the website by collecting anonymous usage data.",
+                "name": "Analytics",
+                "description": (
+                    "These cookies help us understand how visitors interact with the "
+                    "website by collecting anonymous usage data to improve our services."
+                ),
                 "required": False,
             },
             "marketing": {
-                "name": "Marketing Cookies",
-                "description": "Used to deliver personalized advertisements and track campaign performance.",
-                "required": False,
-            },
-            "functional": {
-                "name": "Functional Cookies",
-                "description": "Enable enhanced functionality such as language preferences and saved searches.",
+                "name": "Marketing",
+                "description": (
+                    "These cookies are used to deliver personalized advertisements "
+                    "and track campaign performance across platforms."
+                ),
                 "required": False,
             },
         },
@@ -336,6 +349,10 @@ COOKIE_CONSENT_STRINGS = {
             "Under Quebec's Law 25, you have the right to know what personal information "
             "we collect, to access and rectify it, and to withdraw your consent at any time. "
             "For questions, contact our Privacy Officer at privacy@bidvex.ca."
+        ),
+        "privacy_by_default": (
+            "By default, only Strictly Necessary cookies are enabled. "
+            "Non-essential cookies require your explicit consent."
         ),
     },
     "fr": {
@@ -347,30 +364,44 @@ COOKIE_CONSENT_STRINGS = {
             "matiere de protection des renseignements personnels), nous requierons votre consentement "
             "explicite avant de placer des temoins non essentiels sur votre appareil."
         ),
-        "accept_all": "Accepter tous les temoins",
-        "reject_all": "Refuser les non essentiels",
+        "accept_all": "Tout accepter",
+        "refuse_all": "Tout refuser",
         "customize": "Personnaliser les preferences",
         "privacy_policy_link": "/privacy-policy",
         "privacy_policy_text": "Lire notre politique de confidentialite",
         "categories": {
-            "essential": {
-                "name": "Temoins essentiels",
-                "description": "Necessaires au fonctionnement du site. Ne peuvent pas etre desactives.",
+            "strictly_necessary": {
+                "name": "Strictement necessaires",
+                "description": (
+                    "Ces temoins sont essentiels au bon fonctionnement du site. "
+                    "Ils permettent les fonctionnalites de base telles que l'authentification, "
+                    "la gestion de session et la securite. Ils ne peuvent pas etre desactives."
+                ),
                 "required": True,
             },
+            "functionality": {
+                "name": "Fonctionnalite",
+                "description": (
+                    "Ces temoins permettent des fonctionnalites ameliorees telles que la "
+                    "memorisation de vos preferences de langue, les recherches sauvegardees "
+                    "et les parametres personnalises."
+                ),
+                "required": False,
+            },
             "analytics": {
-                "name": "Temoins analytiques",
-                "description": "Nous aident a comprendre comment les visiteurs interagissent avec le site en collectant des donnees anonymes.",
+                "name": "Analytiques",
+                "description": (
+                    "Ces temoins nous aident a comprendre comment les visiteurs interagissent "
+                    "avec le site en collectant des donnees anonymes afin d'ameliorer nos services."
+                ),
                 "required": False,
             },
             "marketing": {
-                "name": "Temoins publicitaires",
-                "description": "Utilises pour diffuser des publicites personnalisees et mesurer la performance des campagnes.",
-                "required": False,
-            },
-            "functional": {
-                "name": "Temoins fonctionnels",
-                "description": "Permettent des fonctionnalites ameliorees telles que les preferences de langue et les recherches sauvegardees.",
+                "name": "Publicitaires",
+                "description": (
+                    "Ces temoins sont utilises pour diffuser des publicites personnalisees "
+                    "et mesurer la performance des campagnes sur differentes plateformes."
+                ),
                 "required": False,
             },
         },
@@ -379,6 +410,10 @@ COOKIE_CONSENT_STRINGS = {
             "personnels que nous recueillons, d'y acceder, de les rectifier et de retirer votre "
             "consentement a tout moment. Pour toute question, contactez notre responsable de la "
             "protection des renseignements personnels a privacy@bidvex.ca."
+        ),
+        "privacy_by_default": (
+            "Par defaut, seuls les temoins strictement necessaires sont actives. "
+            "Les temoins non essentiels requierent votre consentement explicite."
         ),
     },
 }

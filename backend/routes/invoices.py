@@ -1054,10 +1054,24 @@ async def generate_transaction_invoice(
     if not buyer or not seller:
         raise HTTPException(status_code=404, detail="Buyer or seller not found")
 
-    # Fetch listing for item title
+    # Fetch listing for item title + vehicle info
     listing = await db.listings.find_one(
-        {"id": txn.get("listing_id")}, {"_id": 0, "title": 1}
+        {"id": txn.get("listing_id")},
+        {"_id": 0, "title": 1, "vin": 1, "make": 1, "model": 1, "year": 1,
+         "vehicle_vin": 1, "vehicle_make": 1, "vehicle_model": 1, "vehicle_year": 1}
     )
+
+    # Build vehicle info dict if VIN is available
+    vehicle = None
+    if listing:
+        vin = listing.get("vin") or listing.get("vehicle_vin")
+        if vin:
+            vehicle = {
+                "vin": vin,
+                "make": listing.get("make") or listing.get("vehicle_make", ""),
+                "model": listing.get("model") or listing.get("vehicle_model", ""),
+                "year": listing.get("year") or listing.get("vehicle_year", ""),
+            }
 
     invoice_data = {
         "id": str(uuid.uuid4()),
@@ -1068,6 +1082,7 @@ async def generate_transaction_invoice(
         "buyer_premium": txn.get("buyer_premium", 0),
         "currency": txn.get("currency", "CAD"),
         "created_at": txn.get("created_at", datetime.now(timezone.utc).isoformat()),
+        "vehicle": vehicle,
     }
 
     from services.invoice_service import generate_and_store_invoice

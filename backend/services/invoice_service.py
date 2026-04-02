@@ -1,11 +1,12 @@
 """
 BidVex — Bilingual PDF Invoice Generator (FR/EN)
+CRA & Revenu Quebec compliant invoice generation.
 Generates professional auction invoices using ReportLab,
 uploads to Cloudflare R2 at /invoices/{transaction_id}.pdf.
 
 Includes a Multi-Province Tax Engine supporting:
-  - HST provinces (ON, NB, NS, NL, PE)
-  - Dual-tax provinces (QC, BC, MB, SK)
+  - HST provinces (ON 13%, NB/NL/PE 15%, NS 14% [2026])
+  - Dual-tax provinces (QC GST+QST, BC/MB GST+PST, SK GST+PST)
   - GST-only territories (AB, YT, NT, NU)
 """
 
@@ -30,28 +31,28 @@ logger = logging.getLogger(__name__)
 
 # ─── Platform Identity ───────────────────────────────────────────────
 PLATFORM_NAME = "BidVex Inc."
+PLATFORM_ADDRESS = os.environ.get(
+    "PLATFORM_ADDRESS",
+    "103-761 Chalifoux Street, Sherbrooke, QC, J1G 0A8",
+)
 GST_NUMBER = os.environ.get("PLATFORM_GST_NUMBER", "")
 QST_NUMBER = os.environ.get("PLATFORM_QST_NUMBER", "")
 BUSINESS_NUMBER = os.environ.get("PLATFORM_BUSINESS_NUMBER", "")
 
 
 # =====================================================================
-# MULTI-PROVINCE TAX ENGINE
+# MULTI-PROVINCE TAX ENGINE (2026 rates)
 # =====================================================================
 
 def _round_currency(amount: Decimal) -> Decimal:
     return amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
-# Province/Territory codes → tax configuration
-# HST provinces use a single combined rate
-# Dual-tax provinces show GST + PST/QST separately
-# GST-only jurisdictions show GST alone
 PROVINCE_TAX_CONFIG: Dict[str, Dict[str, Any]] = {
     # ── HST Provinces ──
     "ON": {"type": "hst", "hst_rate": Decimal("0.13"),   "label_en": "HST",  "label_fr": "TVH"},
     "NB": {"type": "hst", "hst_rate": Decimal("0.15"),   "label_en": "HST",  "label_fr": "TVH"},
-    "NS": {"type": "hst", "hst_rate": Decimal("0.15"),   "label_en": "HST",  "label_fr": "TVH"},
+    "NS": {"type": "hst", "hst_rate": Decimal("0.14"),   "label_en": "HST",  "label_fr": "TVH"},  # 14% effective 2026
     "NL": {"type": "hst", "hst_rate": Decimal("0.15"),   "label_en": "HST",  "label_fr": "TVH"},
     "PE": {"type": "hst", "hst_rate": Decimal("0.15"),   "label_en": "HST",  "label_fr": "TVH"},
     # ── Dual-Tax Provinces ──
@@ -94,7 +95,6 @@ PROVINCE_TAX_CONFIG: Dict[str, Dict[str, Any]] = {
     "NU": {"type": "gst_only", "gst_rate": Decimal("0.05")},
 }
 
-# Default province when none is provided
 DEFAULT_PROVINCE = "QC"
 
 
@@ -122,9 +122,6 @@ def calculate_province_tax(
 ) -> ProvinceTaxResult:
     """
     Calculate tax for a given subtotal based on buyer's province/territory.
-
-    Returns a ProvinceTaxResult with separate gst, pst_qst, hst amounts
-    and pre-built line_items for invoice rendering.
     """
     province = buyer_province.upper().strip()
     config = PROVINCE_TAX_CONFIG.get(province)
@@ -155,7 +152,7 @@ def calculate_province_tax(
         gst_rate = config["gst_rate"]
         pst_rate = config["pst_rate"]
         tax_gst = _round_currency(amt * gst_rate)
-        # Important for QC: QST is on subtotal, NOT on subtotal+GST
+        # QST/PST is on subtotal only, NOT on subtotal+GST
         tax_pst_qst = _round_currency(amt * pst_rate)
 
         gst_pct = f"{float(gst_rate * 100):.0f}%"
@@ -211,6 +208,8 @@ LABELS = {
         "transaction_id": "Transaction ID",
         "bill_to": "Bill To",
         "sold_by": "Sold By",
+        "address": "Address",
+        "tax_id": "Tax ID",
         "item": "Item",
         "description": "Description",
         "qty": "Qty",
@@ -224,6 +223,11 @@ LABELS = {
         "gst_number": "GST/TPS #",
         "qst_number": "QST/TVQ #",
         "business_number": "Business #",
+        "vehicle_info": "Vehicle Information",
+        "vin": "VIN",
+        "make": "Make",
+        "model": "Model",
+        "year": "Year",
         "thank_you": "Thank you for your purchase on BidVex.",
         "legal_notice": "This document serves as an official tax invoice.",
         "payment_terms": "Payment Terms: Due upon receipt",
@@ -235,6 +239,8 @@ LABELS = {
         "transaction_id": "ID Transaction",
         "bill_to": "Facturer a",
         "sold_by": "Vendu par",
+        "address": "Adresse",
+        "tax_id": "No. de taxe",
         "item": "Article",
         "description": "Description",
         "qty": "Qte",
@@ -248,6 +254,11 @@ LABELS = {
         "gst_number": "# TPS",
         "qst_number": "# TVQ",
         "business_number": "# Entreprise",
+        "vehicle_info": "Informations sur le vehicule",
+        "vin": "NIV",
+        "make": "Marque",
+        "model": "Modele",
+        "year": "Annee",
         "thank_you": "Merci pour votre achat sur BidVex.",
         "legal_notice": "Ce document constitue une facture fiscale officielle.",
         "payment_terms": "Conditions de paiement : Payable a reception",
@@ -272,8 +283,9 @@ def generate_invoice_pdf(
     buyer_province: str = DEFAULT_PROVINCE,
 ) -> bytes:
     """
-    Generate a bilingual PDF invoice with province-aware tax lines.
-    Returns raw PDF bytes ready for R2 upload.
+    Generate a CRA/Revenu Quebec compliant bilingual PDF invoice.
+    Includes buyer/seller addresses, tax ID placeholders, and an optional
+    Vehicle Information section (VIN, Make, Model, Year).
     """
     L = LABELS.get(lang, LABELS["en"])
     buf = io.BytesIO()
@@ -287,8 +299,8 @@ def generate_invoice_pdf(
     styles.add(ParagraphStyle("InvLabel", parent=styles["Normal"], fontSize=8, textColor=colors.HexColor("#64748b")))
     styles.add(ParagraphStyle("InvValue", parent=styles["Normal"], fontSize=10, textColor=colors.HexColor("#1e293b"), fontName="Helvetica-Bold"))
     styles.add(ParagraphStyle("InvSmall", parent=styles["Normal"], fontSize=7.5, textColor=colors.HexColor("#94a3b8")))
-    styles.add(ParagraphStyle("InvRight", parent=styles["Normal"], fontSize=10, alignment=TA_RIGHT))
     styles.add(ParagraphStyle("InvCenter", parent=styles["Normal"], fontSize=8, alignment=TA_CENTER, textColor=colors.HexColor("#64748b")))
+    styles.add(ParagraphStyle("InvSectionHeader", parent=styles["Normal"], fontSize=9, textColor=colors.HexColor("#334155"), fontName="Helvetica-Bold", spaceBefore=8, spaceAfter=4))
 
     elements = []
     currency = invoice_data.get("currency", "CAD")
@@ -300,27 +312,33 @@ def generate_invoice_pdf(
         except Exception:
             inv_date = str(inv_date)[:10]
 
-    # ── Header ──
+    # ── Header: Platform name + tax registrations ──
     header_data = [
         [Paragraph(PLATFORM_NAME, styles["InvTitle"]), ""],
         [
-            Paragraph(f"{L['gst_number']}: {GST_NUMBER}", styles["InvSmall"]),
+            Paragraph(PLATFORM_ADDRESS, styles["InvSmall"]),
             Paragraph(
                 L["invoice"],
                 ParagraphStyle("BigInv", fontSize=28, textColor=colors.HexColor("#dc2626"), alignment=TA_RIGHT, fontName="Helvetica-Bold"),
             ),
         ],
-        [Paragraph(f"{L['qst_number']}: {QST_NUMBER}", styles["InvSmall"]), ""],
+        [
+            Paragraph(
+                f"{L['gst_number']}: {GST_NUMBER}  |  {L['qst_number']}: {QST_NUMBER}  |  {L['business_number']}: {BUSINESS_NUMBER}",
+                styles["InvSmall"],
+            ),
+            "",
+        ],
     ]
-    header_table = Table(header_data, colWidths=[3.5 * inch, 3.5 * inch])
+    header_table = Table(header_data, colWidths=[4.0 * inch, 3.0 * inch])
     header_table.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("SPAN", (1, 1), (1, 2)),
     ]))
     elements.append(header_table)
-    elements.append(Spacer(1, 12))
+    elements.append(Spacer(1, 10))
     elements.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#e2e8f0")))
-    elements.append(Spacer(1, 12))
+    elements.append(Spacer(1, 10))
 
     # ── Invoice Meta ──
     meta_data = [
@@ -343,27 +361,75 @@ def generate_invoice_pdf(
         ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
     ]))
     elements.append(meta_table)
-    elements.append(Spacer(1, 16))
+    elements.append(Spacer(1, 14))
 
-    # ── Bill To / Sold By ──
+    # ── Bill To / Sold By (with addresses and tax IDs) ──
     buyer_name = buyer.get("name", buyer.get("email", "Buyer"))
     buyer_email = buyer.get("email", "")
+    buyer_address = buyer.get("address") or buyer.get("billing_address") or ""
+    buyer_tax_id = buyer.get("tax_number") or buyer.get("gst_number") or ""
+
     seller_name = seller.get("partner_company_name") or seller.get("name", seller.get("email", "Seller"))
+    seller_email = seller.get("email", "")
+    seller_address = seller.get("address") or ""
+    seller_tax_id = seller.get("tax_number") or seller.get("gst_number") or ""
 
     party_data = [
         [Paragraph(L["bill_to"], styles["InvLabel"]), Paragraph(L["sold_by"], styles["InvLabel"])],
         [Paragraph(buyer_name, styles["InvValue"]), Paragraph(seller_name, styles["InvValue"])],
-        [Paragraph(buyer_email, styles["InvSmall"]), Paragraph(seller.get("email", ""), styles["InvSmall"])],
+        [Paragraph(buyer_email, styles["InvSmall"]), Paragraph(seller_email, styles["InvSmall"])],
+        [
+            Paragraph(f"{L['address']}: {buyer_address}" if buyer_address else "", styles["InvSmall"]),
+            Paragraph(f"{L['address']}: {seller_address}" if seller_address else "", styles["InvSmall"]),
+        ],
+        [
+            Paragraph(f"{L['tax_id']}: {buyer_tax_id}" if buyer_tax_id else f"{L['tax_id']}: —", styles["InvSmall"]),
+            Paragraph(f"{L['tax_id']}: {seller_tax_id}" if seller_tax_id else f"{L['tax_id']}: —", styles["InvSmall"]),
+        ],
     ]
     party_table = Table(party_data, colWidths=[3.5 * inch, 3.5 * inch])
     party_table.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f8fafc")),
         ("TOPPADDING", (0, 0), (-1, 0), 6),
     ]))
     elements.append(party_table)
-    elements.append(Spacer(1, 20))
+    elements.append(Spacer(1, 14))
+
+    # ── Vehicle Information (if present) ──
+    vehicle = invoice_data.get("vehicle")
+    if vehicle:
+        elements.append(Paragraph(L["vehicle_info"], styles["InvSectionHeader"]))
+        v_vin = vehicle.get("vin", "—")
+        v_make = vehicle.get("make", "—")
+        v_model = vehicle.get("model", "—")
+        v_year = str(vehicle.get("year", "—"))
+
+        vehicle_data = [
+            [
+                Paragraph(L["vin"], styles["InvLabel"]),
+                Paragraph(v_vin, styles["InvValue"]),
+                Paragraph(L["year"], styles["InvLabel"]),
+                Paragraph(v_year, styles["InvValue"]),
+            ],
+            [
+                Paragraph(L["make"], styles["InvLabel"]),
+                Paragraph(v_make, styles["InvValue"]),
+                Paragraph(L["model"], styles["InvLabel"]),
+                Paragraph(v_model, styles["InvValue"]),
+            ],
+        ]
+        vehicle_table = Table(vehicle_data, colWidths=[0.8 * inch, 2.7 * inch, 0.8 * inch, 2.7 * inch])
+        vehicle_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f0f9ff")),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#bae6fd")),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        elements.append(vehicle_table)
+        elements.append(Spacer(1, 14))
 
     # ── Line Items ──
     items = invoice_data.get("items", [])
@@ -405,7 +471,6 @@ def generate_invoice_pdf(
     subtotal = invoice_data.get("subtotal", 0)
     buyer_premium = invoice_data.get("buyer_premium", 0)
 
-    # Calculate province-specific tax
     taxable_amount = subtotal + buyer_premium
     tax_result = calculate_province_tax(taxable_amount, buyer_province, lang)
 
@@ -415,7 +480,6 @@ def generate_invoice_pdf(
     if buyer_premium > 0:
         totals_data.append(["", L["buyer_premium"], _fmt_currency(buyer_premium, currency)])
 
-    # Add province-specific tax line items
     for tax_line in tax_result.line_items:
         totals_data.append(["", tax_line["label"], _fmt_currency(tax_line["amount"], currency)])
 
@@ -452,7 +516,7 @@ def generate_invoice_pdf(
 
 
 # =====================================================================
-# GENERATE + STORE (R2) + UPDATE DB
+# GENERATE + STORE (R2 private subfolder) + UPDATE DB
 # =====================================================================
 
 async def generate_and_store_invoice(
@@ -465,9 +529,8 @@ async def generate_and_store_invoice(
     buyer_province: str = DEFAULT_PROVINCE,
 ) -> Optional[str]:
     """
-    Generate a PDF invoice, upload to R2, and update the transaction record
-    with invoice_url and per-tax-type amounts (tax_gst, tax_pst_qst, tax_hst).
-    Returns the R2 storage path or None on failure.
+    Generate a PDF invoice, upload to R2 private subfolder, and update the
+    transaction record with invoice_url and per-tax-type amounts.
     """
     try:
         pdf_bytes = generate_invoice_pdf(invoice_data, buyer, seller, lang, buyer_province)
