@@ -209,7 +209,7 @@ const AIAssistant = () => {
                 </Button>
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
-                Powered by GPT-4 • Available 24/7
+                Powered by Gemini 2.5 Flash &bull; Available 24/7
               </p>
             </div>
           </div>

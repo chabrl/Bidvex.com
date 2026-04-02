@@ -596,7 +596,7 @@ const AIGuardDashboard = () => {
                 AI Guard uses pattern analysis and machine learning to detect potential fraud, 
                 bid manipulation, and suspicious activity across all auctions. Click "Run Scan" 
                 to analyze recent auction activity. Use "AI Analyze" on individual flags to get 
-                GPT-4 powered fraud assessments with risk analysis and recommended actions.
+                Gemini 2.5 Flash powered fraud assessments with risk analysis and recommended actions.
               </p>
             </div>
           </div>

@@ -237,7 +237,7 @@ const TrustSafetyDashboard = () => {
           <Card>
             <CardHeader>
               <CardTitle>AI-Powered Content Scanner</CardTitle>
-              <p className="text-sm text-muted-foreground">Scan listings and messages for scams using GPT-4</p>
+              <p className="text-sm text-muted-foreground">Scan listings and messages for scams using Gemini 2.5 Flash</p>
             </CardHeader>
             <CardContent>
               <div className="text-center py-8">
@@ -247,7 +247,7 @@ const TrustSafetyDashboard = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="p-4 border rounded-lg">
                     <TrendingUp className="h-6 w-6 mx-auto mb-2 text-green-600" />
-                    <p className="text-sm font-semibold">GPT-4 Text Analysis</p>
+                    <p className="text-sm font-semibold">Gemini 2.5 Flash Text Analysis</p>
                     <p className="text-xs text-muted-foreground">Scam keyword detection</p>
                   </div>
                   <div className="p-4 border rounded-lg">
