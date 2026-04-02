@@ -8,7 +8,7 @@ Handles administrative operations including:
 - Trust & Safety
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends, Request, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, EmailStr
 from typing import Optional, Dict, Any, List
@@ -1274,3 +1274,171 @@ async def admin_email_preview(
     except Exception as e:
         logger.error(f"Email preview send error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to send preview: {str(e)}")
+
+
+# ========== TAX REPORT EXPORT ==========
+
+QUARTER_MAP = {
+    "Q1": (1, 3),
+    "Q2": (4, 6),
+    "Q3": (7, 9),
+    "Q4": (10, 12),
+}
+
+
+def _parse_period(period: str):
+    """
+    Parse period string like 'Q1-2026' or '2026' into a (start_dt, end_dt) range.
+    Returns (start_datetime, end_datetime) in UTC, or raises ValueError.
+    """
+    period = period.strip().upper()
+
+    # Quarter format: Q1-2026
+    if "-" in period:
+        parts = period.split("-", 1)
+        quarter_key = parts[0]
+        year_str = parts[1]
+        if quarter_key not in QUARTER_MAP:
+            raise ValueError(f"Invalid quarter '{quarter_key}'. Use Q1, Q2, Q3, or Q4.")
+        try:
+            year = int(year_str)
+        except ValueError:
+            raise ValueError(f"Invalid year '{year_str}'.")
+        start_month, end_month = QUARTER_MAP[quarter_key]
+        start_dt = datetime(year, start_month, 1, tzinfo=timezone.utc)
+        if end_month == 12:
+            end_dt = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+        else:
+            end_dt = datetime(year, end_month + 1, 1, tzinfo=timezone.utc)
+        return start_dt, end_dt
+
+    # Full year: 2026
+    try:
+        year = int(period)
+        return (
+            datetime(year, 1, 1, tzinfo=timezone.utc),
+            datetime(year + 1, 1, 1, tzinfo=timezone.utc),
+        )
+    except ValueError:
+        raise ValueError(f"Invalid period '{period}'. Use 'Q1-2026' or '2026'.")
+
+
+@admin_router.get("/tax-report")
+async def get_tax_report(
+    period: str = Query(..., description="Period filter: Q1-2026, Q2-2026, or 2026"),
+    province: Optional[str] = Query(None, max_length=2, description="Province code filter (e.g. QC, ON, AB)"),
+    format: str = Query("json", regex="^(json|csv)$", description="Response format: json or csv"),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """
+    Tax Report Export for CRA / Revenu Quebec quarterly filings.
+    Returns per-transaction breakdown of Subtotal, GST, PST/QST, HST, Total.
+    Strictly admin-only.
+    """
+    admin_user = await require_admin(credentials)
+    db = get_db()
+
+    # Parse period into date range
+    try:
+        start_dt, end_dt = _parse_period(period)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Build query: completed transactions with tax data, in the given date range
+    query: Dict[str, Any] = {
+        "status": "completed",
+        "created_at": {"$gte": start_dt.isoformat(), "$lte": end_dt.isoformat()},
+    }
+    if province:
+        query["buyer_province"] = province.upper()
+
+    cursor = db.payment_transactions.find(query, {"_id": 0}).sort("created_at", 1)
+    transactions = await cursor.to_list(length=10000)
+
+    # Build report rows
+    rows = []
+    totals = {"subtotal": 0.0, "buyer_premium": 0.0, "tax_gst": 0.0, "tax_pst_qst": 0.0, "tax_hst": 0.0, "total": 0.0}
+
+    for txn in transactions:
+        amount = txn.get("amount", 0)
+        premium = txn.get("buyer_premium", 0)
+        gst = txn.get("tax_gst", 0) or 0
+        pst_qst = txn.get("tax_pst_qst", 0) or 0
+        hst = txn.get("tax_hst", 0) or 0
+        total = amount + premium + gst + pst_qst + hst
+
+        row = {
+            "transaction_id": txn.get("id", ""),
+            "date": str(txn.get("created_at", ""))[:10],
+            "buyer_province": txn.get("buyer_province", "N/A"),
+            "subtotal": round(amount, 2),
+            "buyer_premium": round(premium, 2),
+            "tax_gst": round(gst, 2),
+            "tax_pst_qst": round(pst_qst, 2),
+            "tax_hst": round(hst, 2),
+            "total": round(total, 2),
+            "invoice_url": txn.get("invoice_url", ""),
+        }
+        rows.append(row)
+
+        totals["subtotal"] += amount
+        totals["buyer_premium"] += premium
+        totals["tax_gst"] += gst
+        totals["tax_pst_qst"] += pst_qst
+        totals["tax_hst"] += hst
+        totals["total"] += total
+
+    # Round totals
+    totals = {k: round(v, 2) for k, v in totals.items()}
+
+    if format == "csv":
+        import io
+        import csv
+        from fastapi.responses import StreamingResponse
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow([
+            "Transaction ID", "Date", "Province",
+            "Subtotal", "Buyer Premium", "GST", "PST/QST", "HST", "Total",
+            "Invoice URL",
+        ])
+        for row in rows:
+            writer.writerow([
+                row["transaction_id"], row["date"], row["buyer_province"],
+                row["subtotal"], row["buyer_premium"],
+                row["tax_gst"], row["tax_pst_qst"], row["tax_hst"], row["total"],
+                row["invoice_url"],
+            ])
+        # Totals summary row
+        writer.writerow([])
+        writer.writerow([
+            "TOTALS", "", "",
+            totals["subtotal"], totals["buyer_premium"],
+            totals["tax_gst"], totals["tax_pst_qst"], totals["tax_hst"], totals["total"],
+            "",
+        ])
+
+        output.seek(0)
+        province_suffix = f"_{province.upper()}" if province else ""
+        filename = f"bidvex_tax_report_{period}{province_suffix}.csv"
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+
+    # JSON format (default)
+    return {
+        "period": period,
+        "province_filter": province.upper() if province else "ALL",
+        "date_range": {
+            "start": start_dt.isoformat(),
+            "end": end_dt.isoformat(),
+        },
+        "transaction_count": len(rows),
+        "totals": totals,
+        "transactions": rows,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_by": admin_user.email,
+    }
