@@ -3,55 +3,78 @@
 ## Tech Stack
 - **Frontend**: React, Tailwind CSS, Shadcn/UI, react-i18next
 - **Backend**: FastAPI, MongoDB (Motor), Stripe, SendGrid, APScheduler
-- **Storage**: S3-compatible (boto3)
-- **Deployment**: Emergent (backend port 8001, frontend port 3000)
+- **AI Engine**: Gemini 2.5 Flash (google-genai) — configurable via `AI_MODEL_ID` env var
+- **Storage**: Cloudflare R2 via boto3 (`S3_REGION=auto`)
+- **Deployment**: Railway (single-service monolith serving API + React SPA)
 
 ## Credentials
 - Admin: `charbeladmin@bidvex.com` / `Admin123!`
-
-## Completed Work
-
-### Deployment Fix — Pod Cleanup (March 27, 2026)
-- Nuked 209 → 75 installed packages (removed chromadb, langchain, numpy, pandas, scipy, onnxruntime, etc.)
-- Cleared 309MB pip cache
-- Froze requirements.txt to 75 exact pinned versions (deterministic builds)
-- Clean startup verified: `Application startup complete.` with zero tracebacks
-- `.gitignore` cleaned: removed `.env` blocking patterns for Emergent deployment
-
-### Deployment Hardening (March 27, 2026)
-- Google Maps gracefully disabled (reactivates when real key added to env)
-- All external service initializations wrapped in try/except (Stripe, MongoDB, WebSocket, APScheduler)
-
-### Settings Page Fix (March 27, 2026)
-- Fixed `ProfileSettingsPage.js` — wrong API path for payment-methods
-
-### Previous Session Work
-- Admin Panel (11 sections fixed), Buyer Payment Flow, Email Marketing, Platform Health
-- Library migration: `emergentintegrations` → `openai`, `boto3`, `stripe`
-- Frontend: `npx serve -s build -l 3000`
 
 ## Architecture
 ```
 /app
 ├── backend/
-│   ├── main.py                 # ASGI Entrypoint
-│   ├── server.py               # FastAPI setup, middleware, routers
-│   ├── requirements.txt        # 75 pinned packages (DO NOT BLOAT)
+│   ├── main.py                 # ASGI Entrypoint (Railway)
+│   ├── server.py               # FastAPI setup, middleware, routers, SPA catch-all
+│   ├── requirements.txt        # 78 pinned packages
 │   ├── routes/
 │   └── services/
+│       ├── ai_assistant_v2.py  # Gemini 2.5 Flash (reads AI_MODEL_ID env)
+│       ├── fraud_detection.py  # Gemini 2.5 Flash
+│       └── cloud_storage.py    # boto3 R2 (S3_REGION=auto)
 ├── frontend/
-│   ├── build/                  # Compiled React SPA
+│   ├── build/                  # Compiled React SPA (tracked in Git)
 │   ├── src/
-│   └── package.json            # start: "npx serve -s build -l 3000"
+│   │   └── config.js           # API_BASE = REACT_APP_BACKEND_URL + "/api"
+│   └── package.json
+└── runtime.txt                 # Python 3.11.x
 ```
 
 ## Key Endpoints
-- `GET /api/health` → `{"status": "healthy"}`
-- `GET /` → React SPA
-- `GET /api/config/google-maps-key` → `{"enabled": false}` until key added
+- `GET /health` → `{"status":"ok"}` (Railway health check)
+- `GET /api/health` → `{"status":"healthy"}`
+- `GET /` → React SPA (served from frontend/build)
+- `POST /api/ai-chat/message` → Gemini chatbot
+- `GET /api/admin/ai-guard/flags` → AI Guard fraud flags
+
+## Completed Work
+
+### Railway Migration Prep (April 2, 2026)
+- `S3_REGION=auto` applied in .env (R2/boto3 fix)
+- `AI_MODEL_ID=gemini-2.5-flash` added as configurable env var
+- CORS now reads from `CORS_ORIGINS` env var (production lockdown with `allow_credentials=True`)
+- Full environment manifest generated for Railway AI Agent
+
+### Previous Sessions (Cumulative)
+- AI migrated from OpenAI to Gemini 2.5 Flash (google-genai)
+- emergentintegrations library fully removed
+- All external services wrapped in try/except for safe startup
+- frontend/build tracked in Git, served by FastAPI StaticFiles
+- Admin Panel (11 sections), Buyer Payment Flow, Email Marketing fixed
+- requirements.txt stripped to 78 pinned packages
+- Cloudflare R2 storage configured (bidvex-auctions-prod bucket)
+- Twilio, Stripe, SendGrid live keys connected and verified
+- Google Maps gracefully disabled with UI fallbacks
+- Settings page blank issue fixed
 
 ## Backlog
-- (P2) Cloudflare CDN setup
-- (P2) Post-launch monitoring
-- (Enhancement) Performance dashboard, Lighthouse audits
-- (Low) i18n for EmailMarketingPricing
+
+### P1 - High Priority
+- [ ] Admin Risk Monitoring UI (flag risk_score > 80 for manual review)
+- [ ] server.py Refactor Phase 4: Deduplicate admin user mgmt routes
+- [ ] server.py Refactor Phase 5: Extract listings CRUD, bids, multi-item auctions
+
+### P2 - Medium Priority
+- [ ] Cloudflare CDN setup
+- [ ] Post-launch monitoring & alerting
+- [ ] Cache marketplace filter counts
+- [ ] PDF Invoice Cloud Storage
+- [ ] Partner Dashboard page
+
+### P3 - Low Priority
+- [ ] Partner Pro subscription tier
+- [ ] Cookie consent i18n integration
+- [ ] "Email to Friend" for vehicle listings
+- [ ] "Verified Auction Firm" badge
+- [ ] Database indexing on auction_id in bids collection
+- [ ] E741 linting warnings in dashboard.py

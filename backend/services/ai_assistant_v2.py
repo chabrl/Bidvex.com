@@ -144,7 +144,7 @@ Remember: You are not just an assistant - you are the Master Concierge, the face
         self.api_key = api_key
         self.db = db
         self.client = genai.Client(api_key=api_key)
-        self.model = "gemini-2.5-flash"
+        self.model = os.environ.get("AI_MODEL_ID", "gemini-2.5-flash")
         logger.info("BidVex Master Concierge initialized with Gemini 2.5 Flash")
 
         # Initialize knowledge base
