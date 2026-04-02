@@ -128,6 +128,8 @@ def get_client_ip(request: Request) -> str:
 
 from rate_limit import limiter as _limiter
 
+MAX_LOGIN_ATTEMPTS = 5
+
 
 # ============= AUTH ROUTES =============
 
@@ -247,17 +249,33 @@ async def register(user_data: UserCreate, request: Request):
 @_limiter.limit("10/minute")
 async def login(credentials: UserLogin, request: Request):
     """
-    Authenticate user with email and password
-    
-    Returns JWT token on success
+    Authenticate user with email and password.
+    Brute-force protected: 5 failed attempts per IP → 24h block.
     """
+    from services.brute_force import check_blocked, record_failure, reset_failures
+
+    client_ip = get_client_ip(request)
+
+    # ── Check if IP is blocked ──
+    block_info = await check_blocked(client_ip)
+    if block_info:
+        raise HTTPException(status_code=429, detail=block_info["reason"])
+
     user_doc = await db.users.find_one({"email": credentials.email})
-    
+
     if not user_doc:
+        await record_failure(client_ip)
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    
+
     if not verify_password(credentials.password, user_doc.get("password", "")):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        result = await record_failure(client_ip)
+        remaining = MAX_LOGIN_ATTEMPTS - result["attempts"]
+        detail = "Invalid credentials"
+        if 0 < remaining <= 2:
+            detail = f"Invalid credentials. {remaining} attempt{'s' if remaining != 1 else ''} remaining before your IP is blocked."
+        elif result["blocked"]:
+            detail = "Too many failed login attempts. Your IP has been blocked for 24 hours."
+        raise HTTPException(status_code=401, detail=detail)
 
     if user_doc.get("status") == "suspended":
         raise HTTPException(status_code=403, detail="Account suspended. Please contact support.")
@@ -265,8 +283,10 @@ async def login(credentials: UserLogin, request: Request):
     if user_doc.get("status") == "deactivated":
         raise HTTPException(status_code=403, detail="Account deactivated. Please contact support to reactivate.")
 
+    # ── Success: clear failure counter ──
+    await reset_failures(client_ip)
+
     # Track last login
-    client_ip = get_client_ip(request)
     user_agent = request.headers.get("user-agent", "unknown") if request else "unknown"
     await db.users.update_one(
         {"email": credentials.email},

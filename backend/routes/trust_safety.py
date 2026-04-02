@@ -35,6 +35,30 @@ logger = logging.getLogger(__name__)
 trust_safety_router = APIRouter(tags=["Trust & Safety"])
 
 
+# ─── Brute Force Admin Endpoints ─────────────────────────────────────
+
+@trust_safety_router.get("/admin/blocked-ips")
+async def get_blocked_ips_list(current_user: User = Depends(get_current_user)):
+    """List all IPs currently blocked by brute-force protection."""
+    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    from services.brute_force import get_blocked_ips
+    blocked = await get_blocked_ips()
+    return {"blocked_ips": blocked, "total": len(blocked)}
+
+
+@trust_safety_router.post("/admin/blocked-ips/{ip}/unblock")
+async def admin_unblock_ip(ip: str, current_user: User = Depends(get_current_user)):
+    """Manually unblock an IP address."""
+    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    from services.brute_force import unblock_ip
+    removed = await unblock_ip(ip)
+    if not removed:
+        raise HTTPException(status_code=404, detail="IP not found in block list")
+    return {"success": True, "ip": ip, "message": f"IP {ip} has been unblocked"}
+
+
 async def calculate_trust_score(user_id: str) -> int:
     """Calculate a trust score (0-100) based on user activity and history."""
     db = get_db()
