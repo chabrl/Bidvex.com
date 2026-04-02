@@ -68,6 +68,17 @@ except Exception as e:
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
+# ─── Root Health Check (MUST be first — before all middleware) ───
+@app.get("/health")
+@app.head("/health")
+async def root_health():
+    return {"status": "ok"}
+
+@app.get("/api/health")
+@app.head("/api/health")
+async def api_health():
+    return {"status": "healthy"}
+
 # Trust proxy headers from Cloudflare/Railway
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=["*"])
@@ -428,10 +439,6 @@ scheduler.add_job(keepalive_ping, trigger=IntervalTrigger(minutes=4),
 async def root():
     return {"message": "Bazario API v1.0"}
 
-@api_router.api_route("/health", methods=["GET", "HEAD"])
-async def health():
-    return {"status": "healthy"}
-
 # ─── Register All Routers ───
 try:
     # Core routers (with dependency injection)
@@ -589,10 +596,6 @@ async def favicon():
         from starlette.responses import FileResponse
         return FileResponse(fav_path)
     return {"status": "no favicon"}
-
-@app.api_route("/health", methods=["GET", "HEAD"])
-async def root_health():
-    return {"status": "healthy"}
 
 # ─── Lifecycle Events ───
 @app.on_event("startup")
