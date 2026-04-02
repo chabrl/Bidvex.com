@@ -30,6 +30,29 @@ export function useCookieConsent() {
     return null;
   });
 
+  // Listen for cross-component resets via custom storage events
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === STORAGE_KEY) {
+        if (e.newValue === null) {
+          setConsent(null);
+        } else {
+          try { setConsent(JSON.parse(e.newValue)); } catch { /* ignore */ }
+        }
+      }
+    };
+    window.addEventListener('storage', handler);
+
+    // Custom event for same-tab communication
+    const customHandler = () => setConsent(null);
+    window.addEventListener('bidvex-cookie-reset', customHandler);
+
+    return () => {
+      window.removeEventListener('storage', handler);
+      window.removeEventListener('bidvex-cookie-reset', customHandler);
+    };
+  }, []);
+
   const hasConsented = consent !== null;
 
   const persist = useCallback((next) => {
@@ -58,6 +81,8 @@ export function useCookieConsent() {
   const resetConsent = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
     setConsent(null);
+    // Notify other hook instances in the same tab
+    window.dispatchEvent(new Event('bidvex-cookie-reset'));
   }, []);
 
   // Gate helper — returns true only if the given category was explicitly accepted
