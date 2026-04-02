@@ -5,7 +5,7 @@ Auto-extracted from server.py during P2 refactoring.
 
 from fastapi import APIRouter, HTTPException, Depends, Request, Query, UploadFile, File, Form, WebSocket, WebSocketDisconnect
 from deps import get_db, get_current_user, get_current_user_optional, User
-from services.fraud_detection import FLAG_TYPES, get_fraud_detection_service
+from services.fraud_detection import FLAG_TYPES, FLAG_STATUSES, get_fraud_detection_service
 from shared import (
     DEFAULT_EMAIL_TEMPLATES, EMAIL_TEMPLATE_CATEGORIES,
     DEFAULT_MARKETPLACE_SETTINGS, AFFILIATE_COMMISSION_RATE,
@@ -405,6 +405,111 @@ async def get_fraud_stats(current_user: User = Depends(get_current_user)):
             "by_type": type_counts
         }
     }
+
+@trust_safety_router.get("/admin/risk-monitoring")
+async def get_risk_monitoring(
+    min_risk: int = 80,
+    include_cleared: bool = False,
+    current_user: User = Depends(get_current_user)
+):
+    """Risk Monitoring Dashboard — returns high-risk flags, users, and aggregate stats."""
+    db = get_db()
+    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    threshold = min_risk / 100.0
+
+    # 1) High-confidence fraud flags
+    flag_query = {"confidence": {"$gte": threshold}}
+    if not include_cleared:
+        flag_query["status"] = {"$nin": ["cleared"]}
+    high_risk_flags = await db.fraud_flags.find(flag_query, {"_id": 0}).sort("confidence", -1).to_list(200)
+
+    # 2) Users with low trust scores (high risk)
+    users_cursor = db.users.find({}, {"_id": 0, "password": 0}).to_list(200)
+    all_users = await users_cursor
+    high_risk_users = []
+    for u in all_users:
+        ts = await calculate_trust_score(u["id"])
+        risk_score = 100 - ts
+        if risk_score >= min_risk:
+            high_risk_users.append({
+                "user_id": u["id"],
+                "name": u.get("name", "Unknown"),
+                "email": u.get("email", ""),
+                "trust_score": ts,
+                "risk_score": risk_score,
+                "role": u.get("role", "user"),
+                "created_at": u.get("created_at", ""),
+                "is_verified": u.get("is_verified", False),
+                "province": u.get("province", ""),
+            })
+    high_risk_users.sort(key=lambda x: x["risk_score"], reverse=True)
+
+    # 3) Aggregate stats
+    total_flags = await db.fraud_flags.count_documents({})
+    high_risk_count = await db.fraud_flags.count_documents({"confidence": {"$gte": threshold}})
+    pending_high = await db.fraud_flags.count_documents({"confidence": {"$gte": threshold}, "status": "pending_review"})
+    cleared_today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    cleared_today = await db.fraud_flags.count_documents({
+        "confidence": {"$gte": threshold},
+        "status": "cleared",
+        "updated_at": {"$gte": cleared_today_start.isoformat()}
+    })
+
+    return {
+        "success": True,
+        "threshold": min_risk,
+        "flags": high_risk_flags,
+        "users": high_risk_users,
+        "stats": {
+            "total_flags_system": total_flags,
+            "high_risk_flags": high_risk_count,
+            "pending_review": pending_high,
+            "cleared_today": cleared_today,
+            "high_risk_users": len(high_risk_users),
+        }
+    }
+
+
+@trust_safety_router.post("/admin/risk-monitoring/clear/{flag_id}")
+async def risk_monitoring_clear_flag(
+    flag_id: str,
+    data: Dict[str, Any],
+    current_user: User = Depends(get_current_user)
+):
+    """Quick-clear a high-risk flag (false positive) with admin notes."""
+    db = get_db()
+    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    notes = data.get("notes", "Cleared via Risk Monitoring Dashboard")
+    result = await db.fraud_flags.update_one(
+        {"id": flag_id},
+        {"$set": {
+            "status": "cleared",
+            "cleared_by": current_user.id,
+            "cleared_by_email": current_user.email,
+            "cleared_notes": notes,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Flag not found")
+
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_user.id,
+        "admin_email": current_user.email,
+        "action": "risk_monitoring_clear",
+        "target_type": "fraud_flag",
+        "target_id": flag_id,
+        "details": notes,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+
+    return {"success": True, "flag_id": flag_id, "new_status": "cleared"}
+
 
 # PHASE 2: AI INTEGRATION
 

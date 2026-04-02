@@ -35,6 +35,7 @@ import BrandingLayoutManager from './admin/BrandingLayoutManager';
 import SiteContentManager from './admin/SiteContentManager';
 import VehicleAdminManager from './admin/VehicleAdminManager';
 import AIGuardDashboard from './admin/AIGuardDashboard';
+import RiskMonitoringDashboard from './admin/RiskMonitoringDashboard';
 import PricingManager from './admin/PricingManager';
 import CouponManager from './admin/CouponManager';
 import SubscriptionAnalytics from './admin/SubscriptionAnalytics';
@@ -48,7 +49,7 @@ import {
   Users, Package, Gavel, Shield, TrendingUp, Bell, Settings, FileText, 
   MessageSquare, DollarSign, Search, Image, CreditCard, Megaphone, 
   Activity, AlertTriangle, ChevronRight, Power, Zap, Eye, History,
-  ToggleLeft, ToggleRight, Clock, Mail, Sliders, Car, Send, Bot, Ticket, BarChart3, Globe, Building2, BarChart2
+  ToggleLeft, ToggleRight, Clock, Mail, Sliders, Car, Send, Bot, Ticket, BarChart3, Globe, Building2, BarChart2, ShieldAlert
 } from 'lucide-react';
 
 const API = API_BASE;
@@ -81,6 +82,7 @@ const SECONDARY_TABS = {
   vehicles: [
     { id: 'vehicle-admin', label: 'Vehicle Administration', icon: '🚗', lucideIcon: Car },
     { id: 'ai-guard', label: 'AI Guard', icon: '🤖', lucideIcon: Bot },
+    { id: 'risk-monitoring', label: 'Risk Monitoring', icon: '🔴', lucideIcon: ShieldAlert },
   ],
   settings: [
     { id: 'site-mode', label: 'Site Mode', icon: '🌐', lucideIcon: Globe },
@@ -311,6 +313,7 @@ const AdminDashboard = () => {
         switch (secondaryTab) {
           case 'vehicle-admin': return <VehicleAdminManager />;
           case 'ai-guard': return <AIGuardDashboard />;
+          case 'risk-monitoring': return <RiskMonitoringDashboard />;
           default: return <VehicleAdminManager />;
         }
       case 'settings':
