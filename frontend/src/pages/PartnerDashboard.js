@@ -24,6 +24,7 @@ export default function PartnerDashboard() {
   const { t, i18n } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [dashboard, setDashboard] = useState(null);
+  const [partnerStats, setPartnerStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [billingLoading, setBillingLoading] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
@@ -32,10 +33,13 @@ export default function PartnerDashboard() {
 
   const fetchDashboard = useCallback(async () => {
     try {
-      const res = await axios.get(`${API}/partner/dashboard`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setDashboard(res.data);
+      const headers = { Authorization: `Bearer ${token}` };
+      const [dashRes, statsRes] = await Promise.all([
+        axios.get(`${API}/partner/dashboard`, { headers }),
+        axios.get(`${API}/partner/stats`, { headers }).catch(() => null),
+      ]);
+      setDashboard(dashRes.data);
+      if (statsRes?.data) setPartnerStats(statsRes.data);
     } catch (err) {
       if (err.response?.status === 400) {
         navigate('/');
@@ -250,6 +254,50 @@ export default function PartnerDashboard() {
             </Button>
           )}
         </div>
+
+        {/* ─── SaaS Stats Grid (from /api/partner/stats) ─── */}
+        {partnerStats && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8" data-testid="partner-stats-grid">
+            <div className="relative overflow-hidden rounded-xl border border-blue-100 dark:border-blue-900/40 bg-gradient-to-br from-blue-50 to-white dark:from-blue-950/20 dark:to-slate-900 p-5 shadow-sm">
+              <div className="absolute -top-4 -right-4 h-20 w-20 rounded-full" style={{ backgroundColor: 'rgba(37,99,235,0.06)' }} />
+              <dt className="text-xs font-medium uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-1">
+                {t('partnerDashboard.activeListings', 'Active Listings')}
+              </dt>
+              <dd className="text-3xl font-bold text-slate-900 dark:text-white" data-testid="stat-active-listings">
+                {partnerStats.my_active_listings}
+              </dd>
+              <p className="text-xs text-slate-400 mt-1">
+                {partnerStats.my_total_listings} {t('partnerDashboard.totalListingsLabel', 'total')}
+              </p>
+            </div>
+
+            <div className="relative overflow-hidden rounded-xl border border-emerald-100 dark:border-emerald-900/40 bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-950/20 dark:to-slate-900 p-5 shadow-sm">
+              <div className="absolute -top-4 -right-4 h-20 w-20 rounded-full" style={{ backgroundColor: 'rgba(16,185,129,0.06)' }} />
+              <dt className="text-xs font-medium uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-1">
+                {t('partnerDashboard.bidsReceived', 'Bids Received')}
+              </dt>
+              <dd className="text-3xl font-bold text-slate-900 dark:text-white" data-testid="stat-bids-received">
+                {partnerStats.my_total_bids_received}
+              </dd>
+              <p className="text-xs text-slate-400 mt-1">
+                {t('partnerDashboard.acrossAllListings', 'across all listings')}
+              </p>
+            </div>
+
+            <div className="relative overflow-hidden rounded-xl border border-amber-100 dark:border-amber-900/40 bg-gradient-to-br from-amber-50 to-white dark:from-amber-950/20 dark:to-slate-900 p-5 shadow-sm">
+              <div className="absolute -top-4 -right-4 h-20 w-20 rounded-full" style={{ backgroundColor: 'rgba(245,158,11,0.06)' }} />
+              <dt className="text-xs font-medium uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-1">
+                {t('partnerDashboard.projectedRevenue', 'Projected Revenue')}
+              </dt>
+              <dd className="text-3xl font-bold text-slate-900 dark:text-white" data-testid="stat-projected-revenue">
+                ${partnerStats.my_projected_revenue?.toLocaleString('en-CA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              </dd>
+              <p className="text-xs text-slate-400 mt-1">
+                {t('partnerDashboard.basedOnHighestBids', 'based on current highest bids')}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Main Grid */}
         <div className="grid lg:grid-cols-3 gap-6">

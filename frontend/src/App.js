@@ -177,7 +177,7 @@ const MaintenanceGuard = ({ children }) => {
   if (isAdminRoute) return children;
   
   const isAuthRoute = location.pathname === '/auth';
-  const isPartnerRoute = location.pathname === '/become-a-partner';
+  const isPartnerRoute = location.pathname === '/become-a-partner' || location.pathname.startsWith('/partner');
   const isLegalRoute = location.pathname === '/legal';
   const isInviteRoute = location.pathname.startsWith('/invite/');
   if (isAuthRoute || isPartnerRoute || isLegalRoute || isInviteRoute) return children;

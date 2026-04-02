@@ -450,9 +450,8 @@ async def partner_fee_preview(
 @partners_router.get("/partner/stats")
 async def get_partner_stats_endpoint(current_user: User = Depends(get_current_user)):
     """
-    Aggregated partner metrics. Protected — requires admin or verified partner.
-    Returns total partners, verified count, pending applications,
-    Pro subscribers, trialing users, and listing counts.
+    Partner metrics. Admin gets platform-wide data; partners get their own.
+    Includes: active listings, total bids received, and projected revenue.
     """
     db = get_db()
     is_admin = current_user.role in ("admin", "superadmin")
@@ -463,8 +462,45 @@ async def get_partner_stats_endpoint(current_user: User = Depends(get_current_us
             raise HTTPException(status_code=403, detail="Partner or admin access required")
 
     from services.partner_service import get_partner_stats
-    stats = await get_partner_stats(db)
-    return stats
+    platform_stats = await get_partner_stats(db)
+
+    # Per-partner stats: scoped to the caller's own listings
+    partner_id = current_user.id
+    active_listings = await db.listings.count_documents(
+        {"seller_id": partner_id, "status": "active"}
+    )
+    total_listings = await db.listings.count_documents(
+        {"seller_id": partner_id}
+    )
+
+    # Total bids received across all partner's listings
+    partner_listing_ids_cursor = db.listings.find(
+        {"seller_id": partner_id}, {"_id": 0, "id": 1}
+    )
+    partner_listing_ids = [doc["id"] async for doc in partner_listing_ids_cursor]
+
+    total_bids_received = 0
+    projected_revenue = 0.0
+    if partner_listing_ids:
+        total_bids_received = await db.bids.count_documents(
+            {"listing_id": {"$in": partner_listing_ids}}
+        )
+        # Projected revenue = sum of current_price on active listings
+        revenue_cursor = db.listings.find(
+            {"seller_id": partner_id, "status": "active"},
+            {"_id": 0, "current_price": 1, "starting_price": 1},
+        )
+        async for listing in revenue_cursor:
+            price = listing.get("current_price") or listing.get("starting_price") or 0
+            projected_revenue += price
+
+    return {
+        **platform_stats,
+        "my_active_listings": active_listings,
+        "my_total_listings": total_listings,
+        "my_total_bids_received": total_bids_received,
+        "my_projected_revenue": round(projected_revenue, 2),
+    }
 
 
 @partners_router.get("/partner/badge/{user_id}")

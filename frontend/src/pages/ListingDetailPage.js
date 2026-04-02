@@ -27,6 +27,7 @@ import BidConfirmationDialog from '../components/BidConfirmationDialog';
 import PriceBreakdown from '../components/PriceBreakdown';
 import PrivateSaleBadge, { BusinessSellerBadge } from '../components/PrivateSaleBadge';
 import { VerifiedBadge } from '../components/VerifiedBadge';
+import PartnerBadge from '../components/PartnerBadge';
 import { useTrustStatus, BidBlocker } from '../components/TrustVerification';
 import { SellerReputationCard, SellerReviewsList } from '../components/SellerReputation';
 import Lightbox from 'yet-another-react-lightbox';
@@ -358,9 +359,9 @@ const ListingDetailPage = () => {
                 <BusinessSellerBadge variant="default" className="mb-4" />
               )}
 
-              {/* Verified Auction Firm Badge */}
-              {seller && seller.is_verified_firm && (
-                <div className="mb-4"><VerifiedBadge size="md" /></div>
+              {/* Verified Auction Firm Badge — fetched from API */}
+              {listing?.seller_id && (
+                <div className="mb-4"><PartnerBadge sellerId={listing.seller_id} size="md" /></div>
               )}
 
               <Separator className="my-4" />

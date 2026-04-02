@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import VehicleFilterModern from '../../components/VehicleFilterModern';
 import { TrustIndicators } from '../../components/vehicles/TrustBadges';
+import PartnerBadge from '../../components/PartnerBadge';
 
 const API = API_BASE;
 
@@ -213,6 +214,7 @@ const VehicleCard = ({ vehicle, onClick }) => {
                 <User className="h-3 w-3" /> Private
               </Badge>
             )}
+            {vehicle.seller_id && <PartnerBadge sellerId={vehicle.seller_id} size="sm" />}
           </div>
           
           {/* Specs Grid */}
