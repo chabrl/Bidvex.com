@@ -605,6 +605,7 @@ Provide a brief fraud analysis summary with risk assessment and recommended acti
     async def save_flag(self, flag: Dict[str, Any]) -> bool:
         """
         Save a fraud flag to the database.
+        Sends an email alert to info@bidvex.com when confidence >= 0.90.
         """
         try:
             # Use upsert to avoid duplicates
@@ -613,10 +614,87 @@ Provide a brief fraud analysis summary with risk assessment and recommended acti
                 {"$set": flag},
                 upsert=True
             )
+            # Trigger email alert for high-risk flags (>= 90%)
+            confidence = flag.get("confidence", 0)
+            if confidence >= 0.90:
+                asyncio.ensure_future(self._send_risk_alert(flag))
             return True
         except Exception as e:
             logger.error(f"Error saving fraud flag: {e}")
             return False
+
+    async def _send_risk_alert(self, flag: Dict[str, Any]):
+        """Send a high-risk alert email via SendGrid to info@bidvex.com."""
+        try:
+            api_key = os.environ.get("SENDGRID_API_KEY", "")
+            if not api_key or api_key.startswith("SG.your"):
+                logger.info("SendGrid not configured — skipping risk alert email")
+                return
+
+            from_email_addr = os.environ.get("SENDGRID_FROM_EMAIL", "noreply@bidvex.com")
+            from_name = os.environ.get("SENDGRID_FROM_NAME", "BidVex")
+            to_email = os.environ.get("RISK_ALERT_EMAIL", "info@bidvex.com")
+
+            conf_pct = round((flag.get("confidence", 0)) * 100)
+            flag_type = (flag.get("flag_type", "unknown")).replace("_", " ").title()
+            severity = (flag.get("severity", "high")).upper()
+            auction_title = flag.get("auction_title", "Unknown Auction")
+            seller = flag.get("seller_name", "Unknown")
+            reason = flag.get("reason", "No details available")
+            flag_id = flag.get("id", "N/A")
+            detected = flag.get("detected_at", datetime.now(timezone.utc).isoformat())
+
+            subject = f"[BidVex ALERT] {severity} Risk Flag — {conf_pct}% Confidence — {flag_type}"
+
+            html = f"""
+            <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
+              <div style="background:linear-gradient(135deg,#dc2626,#ea580c);padding:24px 28px;color:#fff">
+                <h1 style="margin:0;font-size:20px">High-Risk Flag Detected</h1>
+                <p style="margin:6px 0 0;opacity:0.9;font-size:14px">Confidence: {conf_pct}% &bull; Severity: {severity}</p>
+              </div>
+              <div style="padding:24px 28px">
+                <table style="width:100%;border-collapse:collapse;font-size:14px">
+                  <tr><td style="padding:8px 0;color:#64748b;width:130px">Flag Type</td><td style="padding:8px 0;font-weight:600">{flag_type}</td></tr>
+                  <tr><td style="padding:8px 0;color:#64748b">Auction</td><td style="padding:8px 0;font-weight:600">{auction_title}</td></tr>
+                  <tr><td style="padding:8px 0;color:#64748b">Seller</td><td style="padding:8px 0">{seller}</td></tr>
+                  <tr><td style="padding:8px 0;color:#64748b">Reason</td><td style="padding:8px 0">{reason}</td></tr>
+                  <tr><td style="padding:8px 0;color:#64748b">Flag ID</td><td style="padding:8px 0;font-family:monospace;font-size:12px">{flag_id}</td></tr>
+                  <tr><td style="padding:8px 0;color:#64748b">Detected</td><td style="padding:8px 0">{detected}</td></tr>
+                </table>
+                <div style="margin-top:20px;padding:14px;background:#fef2f2;border-radius:8px;border-left:4px solid #dc2626">
+                  <p style="margin:0;font-size:13px;color:#991b1b"><strong>Action Required:</strong> Review this flag in the Admin Panel under Vehicles &rarr; Risk Monitoring. Clear if it is a false positive, or escalate to investigation.</p>
+                </div>
+              </div>
+              <div style="padding:16px 28px;background:#f8fafc;border-top:1px solid #e2e8f0;text-align:center">
+                <p style="margin:0;font-size:12px;color:#94a3b8">BidVex AI Guard &bull; Automated Risk Alert</p>
+              </div>
+            </div>"""
+
+            import sendgrid
+            from sendgrid.helpers.mail import Mail, Email, To, Content
+            sg = sendgrid.SendGridAPIClient(api_key=api_key)
+            mail = Mail(
+                from_email=Email(from_email_addr, from_name),
+                to_emails=To(to_email),
+                subject=subject,
+                html_content=Content("text/html", html),
+            )
+            sg.client.mail.send.post(request_body=mail.get())
+            logger.info(f"Risk alert email sent to {to_email} for flag {flag_id} ({conf_pct}% confidence)")
+
+            # Log the alert in DB
+            await self.db.admin_logs.insert_one({
+                "id": f"risk-alert-{flag_id}",
+                "admin_id": "SYSTEM",
+                "admin_email": "system@bidvex.com",
+                "action": "risk_alert_email_sent",
+                "target_type": "fraud_flag",
+                "target_id": flag_id,
+                "details": f"High-risk alert ({conf_pct}%) sent to {to_email}",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+        except Exception as e:
+            logger.warning(f"Failed to send risk alert email: {e}")
     
     async def update_flag_status(
         self,
