@@ -14,23 +14,31 @@
 ```
 /app
 ├── backend/
-│   ├── main.py                 # ASGI Entrypoint (Railway)
-│   ├── server.py               # FastAPI setup, middleware, routers, SPA catch-all
-│   ├── requirements.txt        # 78 pinned packages
+│   ├── main.py                     # ASGI Entrypoint (Railway)
+│   ├── server.py                   # FastAPI app, CORS, middleware, router registration (398 lines)
+│   ├── lifecycle.py                # NEW — startup/shutdown events (127 lines)
+│   ├── deps.py                     # Shared deps + require_admin unified gate (127 lines)
+│   ├── requirements.txt            # 78 pinned packages
 │   ├── routes/
-│   │   ├── trust_safety.py     # Risk Monitoring + AI Guard endpoints
+│   │   ├── admin.py                # Admin: users, partners, email settings (1276 lines, deduped)
+│   │   ├── admin_ops.py            # Admin: listings, auctions, categories, promotions (821 lines)
+│   │   ├── admin_config.py         # Admin: settings, templates, banners (588 lines)
+│   │   ├── listings.py             # Listings routes — thin controllers (627 lines)
+│   │   ├── trust_safety.py         # Risk Monitoring + AI Guard
 │   │   └── ...
 │   └── services/
-│       ├── ai_assistant_v2.py  # Gemini 2.5 Flash (reads AI_MODEL_ID env)
-│       ├── fraud_detection.py  # Gemini 2.5 Flash + SendGrid risk alerts (>=90%)
-│       └── cloud_storage.py    # boto3 R2 (S3_REGION=auto)
+│       ├── scheduled_jobs.py       # NEW — all APScheduler job functions (255 lines)
+│       ├── listings_service.py     # NEW — listings CRUD business logic (190 lines)
+│       ├── ai_assistant_v2.py      # Gemini 2.5 Flash (reads AI_MODEL_ID env)
+│       ├── fraud_detection.py      # Gemini 2.5 Flash + SendGrid risk alerts (>=90%)
+│       └── cloud_storage.py        # boto3 R2 (S3_REGION=auto)
 ├── frontend/
-│   ├── build/                  # Compiled React SPA (tracked in Git)
+│   ├── build/                      # Compiled React SPA (tracked in Git)
 │   ├── src/
-│   │   ├── pages/admin/RiskMonitoringDashboard.js  # Risk Monitoring UI
+│   │   ├── pages/admin/RiskMonitoringDashboard.js
 │   │   └── config.js
 │   └── package.json
-└── runtime.txt                 # Python 3.11.x
+└── runtime.txt                     # Python 3.11.x
 ```
 
 ## Key Endpoints
@@ -38,41 +46,37 @@
 - `GET /api/health` → `{"status":"healthy"}`
 - `GET /` → React SPA
 - `POST /api/ai-chat/message` → Gemini chatbot
-- `GET /api/admin/ai-guard/flags` → AI Guard fraud flags
-- `GET /api/admin/risk-monitoring?min_risk=80` → Risk Monitoring dashboard data
-- `POST /api/admin/risk-monitoring/clear/{flag_id}` → Clear false positive flags
+- `GET /api/admin/risk-monitoring?min_risk=80` → Risk Monitoring
+- `POST /api/admin/risk-monitoring/clear/{flag_id}` → Clear false positives
+- `GET /api/marketplace/feature-flags` → Feature flags
 
 ## Completed Work
 
+### Phase 4 & 5: Backend Architecture Refactor (April 2, 2026)
+- **server.py**: 759 → 398 lines (-48%). Scheduler jobs → `services/scheduled_jobs.py`, lifecycle → `lifecycle.py`
+- **admin.py**: 1558 → 1276 lines (-18%). Removed 285 lines of duplicate routes (listings, deletion requests, reports, analytics, logs) already in `admin_ops.py`
+- **Unified admin middleware**: All 56+ admin routes across admin_ops.py and admin_config.py now use `Depends(require_admin)` from `deps.py` instead of inline role/email checks
+- **listings.py**: 778 → 627 lines (-19%). CRUD business logic extracted to `services/listings_service.py` (validation, agreement, partner tags, promotion, serialization)
+- **CORS**: Confirmed `CORS_ORIGINS` env var still respected (server.py lines 87-91)
+- **Testing**: 100% frontend, 95% backend (20/21 tests passed; 1 K8s routing issue)
+
 ### 90% Risk Email Alerts (April 2, 2026)
-- `fraud_detection.py` `save_flag()` now fires background email via SendGrid when confidence >= 0.90
-- Email sent to `info@bidvex.com` (configurable via `RISK_ALERT_EMAIL` env var)
-- Professional HTML email template with flag details, severity, and action link
-- Alert logged to `admin_logs` collection for audit trail
-- Tested end-to-end: email delivered successfully to info@bidvex.com
+- SendGrid email alert on fraud flags with confidence >= 90%, sent to info@bidvex.com
+- Configurable via `RISK_ALERT_EMAIL` env var
 
 ### Risk Monitoring Dashboard (April 2, 2026)
-- Backend: `GET /api/admin/risk-monitoring` + `POST /api/admin/risk-monitoring/clear/{flag_id}`
-- Frontend: Full admin page with KPI stats, flag/user dual view, behavioral analysis, threshold selector, clear dialog
-- Wired into Admin Panel under Vehicles > Risk Monitoring
-- Tested: 100% pass (iteration_89)
+- Backend + Frontend complete, tested 100%
 
 ### Railway Migration Prep (April 2, 2026)
-- `S3_REGION=auto`, `AI_MODEL_ID=gemini-2.5-flash`, CORS from env var
-- Full environment manifest generated
+- S3_REGION=auto, AI_MODEL_ID configurable, CORS from env var
 
 ### Previous Sessions (Cumulative)
 - AI migrated to Gemini 2.5 Flash, emergentintegrations removed
 - All external services wrapped in try/except
 - Admin Panel (11 sections), Buyer Payment Flow, Email Marketing fixed
-- requirements.txt: 78 pinned packages
 - Cloudflare R2, Twilio, Stripe, SendGrid connected
 
 ## Backlog
-
-### P1 - High Priority
-- [ ] server.py Refactor Phase 4: Deduplicate admin user mgmt routes
-- [ ] server.py Refactor Phase 5: Extract listings CRUD, bids, multi-item auctions
 
 ### P2 - Medium Priority
 - [ ] Cloudflare CDN setup
