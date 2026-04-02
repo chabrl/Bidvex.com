@@ -59,7 +59,15 @@ class FraudDetectionService:
     
     def __init__(self, db: AsyncIOMotorDatabase):
         self.db = db
-        self.llm_key = os.environ.get('EMERGENT_LLM_KEY')
+        self.gemini_key = os.environ.get('GEMINI_API_KEY')
+        self._gemini_client = None
+
+    @property
+    def gemini_client(self):
+        if self._gemini_client is None and self.gemini_key:
+            from google import genai
+            self._gemini_client = genai.Client(api_key=self.gemini_key)
+        return self._gemini_client
         
     async def analyze_auction(self, auction_id: str) -> List[Dict[str, Any]]:
         """
@@ -539,14 +547,10 @@ class FraudDetectionService:
         """
         Use GPT-4 to generate a human-readable fraud summary.
         """
-        if not self.llm_key:
+        if not self.gemini_client:
             return flag.get("reason", "No summary available")
         
         try:
-            from openai import AsyncOpenAI
-            
-            client = AsyncOpenAI(api_key=self.llm_key)
-            
             prompt = f"""Analyze this fraud flag and provide a summary:
 
 Flag Type: {flag.get('flag_type')}
@@ -558,19 +562,19 @@ Additional Data:
 - Seller: {flag.get('seller_name')}
 - Detected: {flag.get('detected_at')}
 
-Provide a brief fraud analysis summary with risk assessment and recommended action."""
+Provide a brief fraud analysis summary with risk assessment and recommended action. Keep under 150 words. Be specific and actionable."""
 
-            response = await client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": "You are an expert fraud analyst for a vehicle auction platform. Analyze the provided fraud flag data and generate a concise, professional summary explaining the suspicious pattern, potential risks, and recommended actions. Keep the summary under 150 words. Be specific and actionable."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.3,
-                max_tokens=256,
+            response = self.gemini_client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=[prompt],
+                config={
+                    "system_instruction": "You are an expert fraud analyst for a vehicle auction platform. Analyze the provided fraud flag data and generate a concise, professional summary explaining the suspicious pattern, potential risks, and recommended actions.",
+                    "temperature": 0.3,
+                    "max_output_tokens": 256,
+                }
             )
             
-            return response.choices[0].message.content
+            return response.text
             
         except Exception as e:
             logger.error(f"Error generating fraud summary: {e}")

@@ -35,7 +35,6 @@ jmespath==1.1.0
 limits==5.8.0
 motor==3.7.0
 multidict==6.7.1
-openai==2.30.0
 packaging==26.0
 passlib==1.7.4
 pillow==12.1.1

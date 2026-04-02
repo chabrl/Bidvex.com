@@ -47,6 +47,8 @@ async def ai_chat_message(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
     """Send message to AI Assistant and get response"""
+    import time
+    start_time = time.time()
     try:
         user_id = None
         if credentials:
@@ -68,19 +70,25 @@ async def ai_chat_message(
             listing_id=request.listing_id
         )
 
+        latency_ms = round((time.time() - start_time) * 1000)
+        logger.info(f"[Gemini 2.5 Flash] Chat response — {latency_ms}ms | lang={response.get('language','?')} | user={user_id or 'anon'}")
+
         if user_id:
             await db.ai_chat_history.insert_one({
                 "user_id": user_id,
                 "message": request.message,
                 "response": response["message"],
                 "language": response["language"],
+                "latency_ms": latency_ms,
+                "model": "gemini-2.5-flash",
                 "created_at": datetime.utcnow()
             })
 
         return AIChatResponse(**response)
 
     except Exception as e:
-        logger.error(f"Error in AI chat endpoint: {e}", exc_info=True)
+        latency_ms = round((time.time() - start_time) * 1000)
+        logger.error(f"[Gemini 2.5 Flash] Chat ERROR — {latency_ms}ms | {e}", exc_info=True)
         return AIChatResponse(
             success=False,
             message="I apologize, but I'm experiencing technical difficulties. Please try again or contact support@bidvex.com.",
