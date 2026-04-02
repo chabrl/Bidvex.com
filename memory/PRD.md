@@ -13,43 +13,41 @@
 
 ## Key Endpoints
 - `POST /api/auth/login` - Brute force protected (5 fails = 24h block)
-- `GET /api/admin/blocked-ips` - List blocked IPs
-- `GET /api/admin/risk-monitoring` - Risk Monitoring
 - `GET /api/admin/tax-report?period=Q2-2026&province=QC&format=csv` - CRA/RQ tax export
 - `POST /api/invoices/generate/{transaction_id}?lang=en&buyer_province=QC` - Bilingual PDF invoice
-- `GET /api/partner/stats` - Partner metrics (admin/partner)
+- `GET /api/partner/stats` - Partner metrics (per-partner + platform-wide)
 - `GET /api/partner/badge/{user_id}` - Public badge endpoint
 - `GET /api/legal/cookie-policy?lang=fr` - i18n cookie consent (Law 25)
 
 ## Completed Work
 
+### Partner & Trust Features (April 2, 2026)
+- **PartnerBadge.js**: Reusable component fetching from `/api/partner/badge/{sellerId}`
+  - Gold shield for VIP Verified, Blue shield for Verified Firm, Green for Approved Partner
+  - Hover tooltip: "BidVex Verified: This firm has met our professional standards..."
+  - Integrated into ListingDetailPage and VehicleAuctionsPage
+- **Partner Dashboard Enhancement**: SaaS-style 3-card stats grid at top
+  - Active Listings (blue), Bids Received (green), Projected Revenue (amber)
+  - Fetches from `/api/partner/stats` (returns `my_active_listings`, `my_total_bids_received`, `my_projected_revenue`)
+- **MaintenanceGuard**: Updated to allow `/partner/*` routes through
+- Testing: 14/14 passed (8 backend, 5 frontend, 1 expected behavior)
+
 ### Law 25 Cookie Consent Banner (April 2, 2026)
-- `CookieConsentBanner.js`: Fetches `/api/legal/cookie-policy`, renders server-driven bilingual strings
-- `useCookieConsent.js` hook: localStorage persistence, `isAllowed()` to gate GA/FB scripts
-- Privacy by Default: all non-essential categories OFF by default
-- 3 buttons: Accept All, Refuse All (Tout refuser), Customize (with per-category toggles)
-- Footer "Cookie Settings" link resets consent and re-shows banner (no reload needed)
-- 11/11 tests passed (100%)
+- CookieConsentBanner.js + useCookieConsent hook
+- Privacy by Default, Accept All / Refuse All / Customize
+- Footer "Cookie Settings" link for right-to-withdraw
+- 11/11 tests passed
 
 ### Tax Report Export (April 2, 2026)
-- `GET /api/admin/tax-report` — admin-only, period+province filters, JSON+CSV
-- 22/22 tests passed (100%)
+- Admin-only CSV/JSON export with period+province filters
+- 22/22 tests passed
 
 ### Commercial Readiness Phase v2 (April 2, 2026)
-- Multi-Province Tax Engine: NS 14% (2026), ON 13%, NB/NL/PE 15%, QC GST+QST, etc.
-- Bilingual PDF Invoice with vehicle info, addresses, tax IDs
-- Partner Service: is_verified_firm, badge logic, stats
-- Cookie Consent API (Law 25): strictly_necessary/functionality/analytics/marketing
-- 36/36 tests passed (100%)
-
-### Previous Phases
-- Brute Force Protection (Redis, 5 fails = 24h block)
-- Redis Cache Integration (Upstash + in-memory fallback)
-- Backend Architecture Refactor
-- Risk Monitoring Dashboard + 90% Risk Email Alerts
+- Multi-Province Tax Engine (NS 14% 2026 rate), Bilingual PDF Invoice with vehicle info
+- Partner Service, Cookie Consent API (Law 25)
+- 36/36 tests passed
 
 ## Backlog
-- [ ] Frontend: Partner Pro stats dashboard
-- [ ] Frontend: Verified firm badges
 - [ ] Cloudflare CDN setup (P2)
 - [ ] Post-launch monitoring (P2)
+- [ ] Consent analytics endpoint
