@@ -323,6 +323,11 @@ class PaymentTransaction(BaseModel):
     status: str = "pending"
     stripe_payment_intent_id: Optional[str] = None
     stripe_checkout_session_id: Optional[str] = None
+    invoice_url: Optional[str] = None
+    buyer_province: Optional[str] = None
+    tax_gst: Optional[float] = None
+    tax_pst_qst: Optional[float] = None
+    tax_hst: Optional[float] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     completed_at: Optional[datetime] = None
 

@@ -2,18 +2,27 @@
 BidVex — Bilingual PDF Invoice Generator (FR/EN)
 Generates professional auction invoices using ReportLab,
 uploads to Cloudflare R2 at /invoices/{transaction_id}.pdf.
+
+Includes a Multi-Province Tax Engine supporting:
+  - HST provinces (ON, NB, NS, NL, PE)
+  - Dual-tax provinces (QC, BC, MB, SK)
+  - GST-only territories (AB, YT, NT, NU)
 """
 
 import os
 import io
 import logging
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional
+from decimal import Decimal, ROUND_HALF_UP
+from typing import Dict, Any, Optional, List
+from dataclasses import dataclass, asdict
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
-from reportlab.lib.units import inch, mm
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
+from reportlab.lib.units import inch
+from reportlab.platypus import (
+    SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable,
+)
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_LEFT, TA_RIGHT, TA_CENTER
 
@@ -26,7 +35,174 @@ QST_NUMBER = os.environ.get("PLATFORM_QST_NUMBER", "")
 BUSINESS_NUMBER = os.environ.get("PLATFORM_BUSINESS_NUMBER", "")
 
 
-# ─── Bilingual Labels ────────────────────────────────────────────────
+# =====================================================================
+# MULTI-PROVINCE TAX ENGINE
+# =====================================================================
+
+def _round_currency(amount: Decimal) -> Decimal:
+    return amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+# Province/Territory codes → tax configuration
+# HST provinces use a single combined rate
+# Dual-tax provinces show GST + PST/QST separately
+# GST-only jurisdictions show GST alone
+PROVINCE_TAX_CONFIG: Dict[str, Dict[str, Any]] = {
+    # ── HST Provinces ──
+    "ON": {"type": "hst", "hst_rate": Decimal("0.13"),   "label_en": "HST",  "label_fr": "TVH"},
+    "NB": {"type": "hst", "hst_rate": Decimal("0.15"),   "label_en": "HST",  "label_fr": "TVH"},
+    "NS": {"type": "hst", "hst_rate": Decimal("0.15"),   "label_en": "HST",  "label_fr": "TVH"},
+    "NL": {"type": "hst", "hst_rate": Decimal("0.15"),   "label_en": "HST",  "label_fr": "TVH"},
+    "PE": {"type": "hst", "hst_rate": Decimal("0.15"),   "label_en": "HST",  "label_fr": "TVH"},
+    # ── Dual-Tax Provinces ──
+    "QC": {
+        "type": "dual",
+        "gst_rate": Decimal("0.05"),
+        "pst_rate": Decimal("0.09975"),
+        "pst_label_en": "QST",
+        "pst_label_fr": "TVQ",
+        "pst_on_gst": False,  # QST is on subtotal only, NOT on GST-inclusive amount
+    },
+    "BC": {
+        "type": "dual",
+        "gst_rate": Decimal("0.05"),
+        "pst_rate": Decimal("0.07"),
+        "pst_label_en": "PST",
+        "pst_label_fr": "TVP",
+        "pst_on_gst": False,
+    },
+    "MB": {
+        "type": "dual",
+        "gst_rate": Decimal("0.05"),
+        "pst_rate": Decimal("0.07"),
+        "pst_label_en": "RST",
+        "pst_label_fr": "TVD",
+        "pst_on_gst": False,
+    },
+    "SK": {
+        "type": "dual",
+        "gst_rate": Decimal("0.05"),
+        "pst_rate": Decimal("0.06"),
+        "pst_label_en": "PST",
+        "pst_label_fr": "TVP",
+        "pst_on_gst": False,
+    },
+    # ── GST-Only Jurisdictions ──
+    "AB": {"type": "gst_only", "gst_rate": Decimal("0.05")},
+    "YT": {"type": "gst_only", "gst_rate": Decimal("0.05")},
+    "NT": {"type": "gst_only", "gst_rate": Decimal("0.05")},
+    "NU": {"type": "gst_only", "gst_rate": Decimal("0.05")},
+}
+
+# Default province when none is provided
+DEFAULT_PROVINCE = "QC"
+
+
+@dataclass
+class ProvinceTaxResult:
+    """Result of a multi-province tax calculation."""
+    province: str
+    tax_type: str          # "hst" | "dual" | "gst_only"
+    subtotal: float
+    tax_gst: float         # Federal GST amount (0 for HST provinces)
+    tax_pst_qst: float     # Provincial PST/QST/RST amount (0 for HST/GST-only)
+    tax_hst: float          # HST amount (0 for non-HST provinces)
+    total_tax: float
+    total_with_tax: float
+    line_items: List[Dict[str, Any]]   # [{label, rate_display, amount}]
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+def calculate_province_tax(
+    subtotal: float,
+    buyer_province: str = DEFAULT_PROVINCE,
+    lang: str = "en",
+) -> ProvinceTaxResult:
+    """
+    Calculate tax for a given subtotal based on buyer's province/territory.
+
+    Returns a ProvinceTaxResult with separate gst, pst_qst, hst amounts
+    and pre-built line_items for invoice rendering.
+    """
+    province = buyer_province.upper().strip()
+    config = PROVINCE_TAX_CONFIG.get(province)
+    if not config:
+        logger.warning(f"Unknown province '{province}', defaulting to {DEFAULT_PROVINCE}")
+        province = DEFAULT_PROVINCE
+        config = PROVINCE_TAX_CONFIG[province]
+
+    amt = Decimal(str(subtotal))
+    tax_type = config["type"]
+    tax_gst = Decimal("0")
+    tax_pst_qst = Decimal("0")
+    tax_hst = Decimal("0")
+    line_items: List[Dict[str, Any]] = []
+
+    if tax_type == "hst":
+        hst_rate = config["hst_rate"]
+        tax_hst = _round_currency(amt * hst_rate)
+        label = config["label_en"] if lang == "en" else config["label_fr"]
+        rate_pct = f"{float(hst_rate * 100):.0f}%"
+        line_items.append({
+            "label": f"{label} ({rate_pct})",
+            "rate_display": rate_pct,
+            "amount": float(tax_hst),
+        })
+
+    elif tax_type == "dual":
+        gst_rate = config["gst_rate"]
+        pst_rate = config["pst_rate"]
+        tax_gst = _round_currency(amt * gst_rate)
+        # Important for QC: QST is on subtotal, NOT on subtotal+GST
+        tax_pst_qst = _round_currency(amt * pst_rate)
+
+        gst_pct = f"{float(gst_rate * 100):.0f}%"
+        pst_label = config["pst_label_en"] if lang == "en" else config["pst_label_fr"]
+        pst_pct = f"{float(pst_rate * 100):.3f}%" if province == "QC" else f"{float(pst_rate * 100):.0f}%"
+
+        line_items.append({
+            "label": f"GST ({gst_pct})" if lang == "en" else f"TPS ({gst_pct})",
+            "rate_display": gst_pct,
+            "amount": float(tax_gst),
+        })
+        line_items.append({
+            "label": f"{pst_label} ({pst_pct})",
+            "rate_display": pst_pct,
+            "amount": float(tax_pst_qst),
+        })
+
+    else:  # gst_only
+        gst_rate = config["gst_rate"]
+        tax_gst = _round_currency(amt * gst_rate)
+        gst_pct = f"{float(gst_rate * 100):.0f}%"
+        line_items.append({
+            "label": f"GST ({gst_pct})" if lang == "en" else f"TPS ({gst_pct})",
+            "rate_display": gst_pct,
+            "amount": float(tax_gst),
+        })
+
+    total_tax = tax_gst + tax_pst_qst + tax_hst
+    total_with_tax = _round_currency(amt + total_tax)
+
+    return ProvinceTaxResult(
+        province=province,
+        tax_type=tax_type,
+        subtotal=float(_round_currency(amt)),
+        tax_gst=float(tax_gst),
+        tax_pst_qst=float(tax_pst_qst),
+        tax_hst=float(tax_hst),
+        total_tax=float(total_tax),
+        total_with_tax=float(total_with_tax),
+        line_items=line_items,
+    )
+
+
+# =====================================================================
+# BILINGUAL LABELS
+# =====================================================================
+
 LABELS = {
     "en": {
         "invoice": "INVOICE",
@@ -42,10 +218,9 @@ LABELS = {
         "amount": "Amount",
         "subtotal": "Subtotal",
         "buyer_premium": "Buyer's Premium",
-        "gst": "GST/TPS (5%)",
-        "qst": "QST/TVQ (9.975%)",
         "total": "Total Due",
         "currency": "Currency",
+        "province": "Province",
         "gst_number": "GST/TPS #",
         "qst_number": "QST/TVQ #",
         "business_number": "Business #",
@@ -67,10 +242,9 @@ LABELS = {
         "amount": "Montant",
         "subtotal": "Sous-total",
         "buyer_premium": "Prime acheteur",
-        "gst": "TPS (5%)",
-        "qst": "TVQ (9,975%)",
         "total": "Total a payer",
         "currency": "Devise",
+        "province": "Province",
         "gst_number": "# TPS",
         "qst_number": "# TVQ",
         "business_number": "# Entreprise",
@@ -86,19 +260,27 @@ def _fmt_currency(amount: float, currency: str = "CAD") -> str:
     return f"{symbol}{amount:,.2f}"
 
 
+# =====================================================================
+# PDF GENERATION
+# =====================================================================
+
 def generate_invoice_pdf(
     invoice_data: Dict[str, Any],
     buyer: Dict[str, Any],
     seller: Dict[str, Any],
     lang: str = "en",
+    buyer_province: str = DEFAULT_PROVINCE,
 ) -> bytes:
     """
-    Generate a bilingual PDF invoice.
+    Generate a bilingual PDF invoice with province-aware tax lines.
     Returns raw PDF bytes ready for R2 upload.
     """
     L = LABELS.get(lang, LABELS["en"])
     buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=letter, topMargin=0.6 * inch, bottomMargin=0.8 * inch)
+    doc = SimpleDocTemplate(
+        buf, pagesize=letter,
+        topMargin=0.6 * inch, bottomMargin=0.8 * inch,
+    )
 
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle("InvTitle", parent=styles["Title"], fontSize=22, textColor=colors.HexColor("#1e293b"), spaceAfter=4))
@@ -121,12 +303,20 @@ def generate_invoice_pdf(
     # ── Header ──
     header_data = [
         [Paragraph(PLATFORM_NAME, styles["InvTitle"]), ""],
-        [Paragraph(f"{L['gst_number']}: {GST_NUMBER}", styles["InvSmall"]),
-         Paragraph(L["invoice"], ParagraphStyle("BigInv", fontSize=28, textColor=colors.HexColor("#dc2626"), alignment=TA_RIGHT, fontName="Helvetica-Bold"))],
+        [
+            Paragraph(f"{L['gst_number']}: {GST_NUMBER}", styles["InvSmall"]),
+            Paragraph(
+                L["invoice"],
+                ParagraphStyle("BigInv", fontSize=28, textColor=colors.HexColor("#dc2626"), alignment=TA_RIGHT, fontName="Helvetica-Bold"),
+            ),
+        ],
         [Paragraph(f"{L['qst_number']}: {QST_NUMBER}", styles["InvSmall"]), ""],
     ]
     header_table = Table(header_data, colWidths=[3.5 * inch, 3.5 * inch])
-    header_table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("SPAN", (1, 1), (1, 2))]))
+    header_table.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("SPAN", (1, 1), (1, 2)),
+    ]))
     elements.append(header_table)
     elements.append(Spacer(1, 12))
     elements.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#e2e8f0")))
@@ -134,14 +324,24 @@ def generate_invoice_pdf(
 
     # ── Invoice Meta ──
     meta_data = [
-        [Paragraph(L["invoice_number"], styles["InvLabel"]), Paragraph(str(inv_number), styles["InvValue"]),
-         Paragraph(L["date"], styles["InvLabel"]), Paragraph(str(inv_date), styles["InvValue"])],
-        [Paragraph(L["transaction_id"], styles["InvLabel"]),
-         Paragraph(str(invoice_data.get("transaction_id", invoice_data.get("auction_id", ""))), styles["InvValue"]),
-         Paragraph(L["currency"], styles["InvLabel"]), Paragraph(currency, styles["InvValue"])],
+        [
+            Paragraph(L["invoice_number"], styles["InvLabel"]),
+            Paragraph(str(inv_number), styles["InvValue"]),
+            Paragraph(L["date"], styles["InvLabel"]),
+            Paragraph(str(inv_date), styles["InvValue"]),
+        ],
+        [
+            Paragraph(L["transaction_id"], styles["InvLabel"]),
+            Paragraph(str(invoice_data.get("transaction_id", invoice_data.get("auction_id", ""))), styles["InvValue"]),
+            Paragraph(L["province"], styles["InvLabel"]),
+            Paragraph(buyer_province.upper(), styles["InvValue"]),
+        ],
     ]
     meta_table = Table(meta_data, colWidths=[1.2 * inch, 2.3 * inch, 1.2 * inch, 2.3 * inch])
-    meta_table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("BOTTOMPADDING", (0, 0), (-1, -1), 6)]))
+    meta_table.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
     elements.append(meta_table)
     elements.append(Spacer(1, 16))
 
@@ -201,22 +401,25 @@ def generate_invoice_pdf(
     elements.append(items_table)
     elements.append(Spacer(1, 12))
 
-    # ── Totals ──
+    # ── Totals (with province-aware tax lines) ──
     subtotal = invoice_data.get("subtotal", 0)
     buyer_premium = invoice_data.get("buyer_premium", 0)
-    gst = invoice_data.get("gst_amount", 0)
-    qst = invoice_data.get("qst_amount", 0)
-    total = invoice_data.get("total_amount", subtotal + buyer_premium + gst + qst)
+
+    # Calculate province-specific tax
+    taxable_amount = subtotal + buyer_premium
+    tax_result = calculate_province_tax(taxable_amount, buyer_province, lang)
 
     totals_data = [
         ["", L["subtotal"], _fmt_currency(subtotal, currency)],
     ]
     if buyer_premium > 0:
         totals_data.append(["", L["buyer_premium"], _fmt_currency(buyer_premium, currency)])
-    if gst > 0:
-        totals_data.append(["", L["gst"], _fmt_currency(gst, currency)])
-    if qst > 0:
-        totals_data.append(["", L["qst"], _fmt_currency(qst, currency)])
+
+    # Add province-specific tax line items
+    for tax_line in tax_result.line_items:
+        totals_data.append(["", tax_line["label"], _fmt_currency(tax_line["amount"], currency)])
+
+    total = taxable_amount + tax_result.total_tax
     totals_data.append(["", L["total"], _fmt_currency(total, currency)])
 
     totals_table = Table(totals_data, colWidths=[3.8 * inch, 1.7 * inch, 1.5 * inch])
@@ -239,11 +442,18 @@ def generate_invoice_pdf(
     elements.append(Paragraph(L["legal_notice"], styles["InvCenter"]))
     elements.append(Paragraph(L["payment_terms"], styles["InvCenter"]))
     elements.append(Spacer(1, 4))
-    elements.append(Paragraph(f"{PLATFORM_NAME} | {L['business_number']}: {BUSINESS_NUMBER}", styles["InvCenter"]))
+    elements.append(Paragraph(
+        f"{PLATFORM_NAME} | {L['business_number']}: {BUSINESS_NUMBER}",
+        styles["InvCenter"],
+    ))
 
     doc.build(elements)
     return buf.getvalue()
 
+
+# =====================================================================
+# GENERATE + STORE (R2) + UPDATE DB
+# =====================================================================
 
 async def generate_and_store_invoice(
     db,
@@ -252,20 +462,33 @@ async def generate_and_store_invoice(
     buyer: Dict[str, Any],
     seller: Dict[str, Any],
     lang: str = "en",
+    buyer_province: str = DEFAULT_PROVINCE,
 ) -> Optional[str]:
     """
-    Generate a PDF invoice, upload to R2, and update the transaction record.
+    Generate a PDF invoice, upload to R2, and update the transaction record
+    with invoice_url and per-tax-type amounts (tax_gst, tax_pst_qst, tax_hst).
     Returns the R2 storage path or None on failure.
     """
     try:
-        pdf_bytes = generate_invoice_pdf(invoice_data, buyer, seller, lang)
+        pdf_bytes = generate_invoice_pdf(invoice_data, buyer, seller, lang, buyer_province)
 
         from services.cloud_storage import store_invoice_pdf
         storage_path = await store_invoice_pdf(transaction_id, pdf_bytes, subfolder="transactions")
 
+        # Province tax for the DB record
+        subtotal = invoice_data.get("subtotal", 0)
+        buyer_premium = invoice_data.get("buyer_premium", 0)
+        tax_result = calculate_province_tax(subtotal + buyer_premium, buyer_province, lang)
+
         await db.payment_transactions.update_one(
             {"id": transaction_id},
-            {"$set": {"invoice_url": storage_path}},
+            {"$set": {
+                "invoice_url": storage_path,
+                "tax_gst": tax_result.tax_gst,
+                "tax_pst_qst": tax_result.tax_pst_qst,
+                "tax_hst": tax_result.tax_hst,
+                "buyer_province": buyer_province.upper(),
+            }},
         )
 
         if invoice_data.get("id"):

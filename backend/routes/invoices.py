@@ -1013,3 +1013,85 @@ async def get_email_logs(
     }
 
 
+
+
+@invoices_router.post("/invoices/generate/{transaction_id}")
+async def generate_transaction_invoice(
+    transaction_id: str,
+    lang: str = Query("en", regex="^(en|fr)$"),
+    buyer_province: str = Query("QC", max_length=2),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Generate a bilingual PDF invoice for a payment transaction,
+    upload to Cloudflare R2, and store per-province tax breakdown
+    (tax_gst, tax_pst_qst, tax_hst) on the transaction record.
+
+    Requires: admin or buyer/seller of the transaction.
+    """
+    db = get_db()
+
+    txn = await db.payment_transactions.find_one(
+        {"id": transaction_id}, {"_id": 0}
+    )
+    if not txn:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    # Auth: admin, buyer, or seller
+    is_admin = current_user.role in ("admin", "superadmin")
+    is_buyer = txn.get("buyer_id") == current_user.id
+    is_seller = txn.get("seller_id") == current_user.id
+    if not (is_admin or is_buyer or is_seller):
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    # Fetch buyer and seller docs
+    buyer = await db.users.find_one(
+        {"id": txn["buyer_id"]}, {"_id": 0, "password": 0}
+    )
+    seller = await db.users.find_one(
+        {"id": txn["seller_id"]}, {"_id": 0, "password": 0}
+    )
+    if not buyer or not seller:
+        raise HTTPException(status_code=404, detail="Buyer or seller not found")
+
+    # Fetch listing for item title
+    listing = await db.listings.find_one(
+        {"id": txn.get("listing_id")}, {"_id": 0, "title": 1}
+    )
+
+    invoice_data = {
+        "id": str(uuid.uuid4()),
+        "invoice_number": f"BV-INV-{transaction_id[:8].upper()}",
+        "transaction_id": transaction_id,
+        "item_title": listing.get("title", "Auction Item") if listing else "Auction Item",
+        "subtotal": txn.get("amount", 0),
+        "buyer_premium": txn.get("buyer_premium", 0),
+        "currency": txn.get("currency", "CAD"),
+        "created_at": txn.get("created_at", datetime.now(timezone.utc).isoformat()),
+    }
+
+    from services.invoice_service import generate_and_store_invoice
+    storage_path = await generate_and_store_invoice(
+        db, transaction_id, invoice_data, buyer, seller,
+        lang=lang, buyer_province=buyer_province.upper(),
+    )
+
+    if not storage_path:
+        raise HTTPException(status_code=500, detail="Invoice generation failed")
+
+    from services.cloud_storage import generate_signed_url
+    download_url = generate_signed_url(transaction_id)
+
+    # Calculate tax summary for response
+    from services.invoice_service import calculate_province_tax
+    subtotal = invoice_data["subtotal"] + invoice_data["buyer_premium"]
+    tax = calculate_province_tax(subtotal, buyer_province.upper(), lang)
+
+    return {
+        "success": True,
+        "transaction_id": transaction_id,
+        "invoice_number": invoice_data["invoice_number"],
+        "storage_path": storage_path,
+        "download_url": download_url,
+        "tax_breakdown": tax.to_dict(),
+    }

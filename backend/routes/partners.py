@@ -445,3 +445,43 @@ async def partner_fee_preview(
 
 
 
+
+
+@partners_router.get("/partner/stats")
+async def get_partner_stats_endpoint(current_user: User = Depends(get_current_user)):
+    """
+    Aggregated partner metrics. Protected — requires admin or verified partner.
+    Returns total partners, verified count, pending applications,
+    Pro subscribers, trialing users, and listing counts.
+    """
+    db = get_db()
+    is_admin = current_user.role in ("admin", "superadmin")
+
+    if not is_admin:
+        user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
+        if not user_doc or not user_doc.get("is_partner"):
+            raise HTTPException(status_code=403, detail="Partner or admin access required")
+
+    from services.partner_service import get_partner_stats
+    stats = await get_partner_stats(db)
+    return stats
+
+
+@partners_router.get("/partner/badge/{user_id}")
+async def get_partner_badge(user_id: str):
+    """
+    Public endpoint returning the badge type for a given user.
+    Returns null badge_type if user has no badge.
+    """
+    db = get_db()
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    from services.partner_service import get_badge_type, is_verified_firm, get_partner_tier
+    return {
+        "user_id": user_id,
+        "badge_type": get_badge_type(user),
+        "is_verified_firm": is_verified_firm(user),
+        "partner_tier": get_partner_tier(user),
+    }

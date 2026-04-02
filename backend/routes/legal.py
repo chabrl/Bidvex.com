@@ -291,3 +291,151 @@ async def seed_legal_pages(
 
 
 
+
+
+# ─── Cookie Consent i18n (Law 25 - Quebec Privacy) ─────────────────
+
+COOKIE_CONSENT_STRINGS = {
+    "en": {
+        "banner_title": "Cookie Consent",
+        "banner_text": (
+            "We use cookies and similar technologies to enhance your browsing experience, "
+            "analyze site traffic, and personalize content. In accordance with Quebec's "
+            "Law 25 (Act to modernize legislative provisions respecting the protection of "
+            "personal information), we require your explicit consent before placing non-essential "
+            "cookies on your device."
+        ),
+        "accept_all": "Accept All Cookies",
+        "reject_all": "Reject Non-Essential",
+        "customize": "Customize Preferences",
+        "privacy_policy_link": "/privacy-policy",
+        "privacy_policy_text": "Read our Privacy Policy",
+        "categories": {
+            "essential": {
+                "name": "Essential Cookies",
+                "description": "Required for the website to function. Cannot be disabled.",
+                "required": True,
+            },
+            "analytics": {
+                "name": "Analytics Cookies",
+                "description": "Help us understand how visitors interact with the website by collecting anonymous usage data.",
+                "required": False,
+            },
+            "marketing": {
+                "name": "Marketing Cookies",
+                "description": "Used to deliver personalized advertisements and track campaign performance.",
+                "required": False,
+            },
+            "functional": {
+                "name": "Functional Cookies",
+                "description": "Enable enhanced functionality such as language preferences and saved searches.",
+                "required": False,
+            },
+        },
+        "law25_notice": (
+            "Under Quebec's Law 25, you have the right to know what personal information "
+            "we collect, to access and rectify it, and to withdraw your consent at any time. "
+            "For questions, contact our Privacy Officer at privacy@bidvex.ca."
+        ),
+    },
+    "fr": {
+        "banner_title": "Consentement aux temoins",
+        "banner_text": (
+            "Nous utilisons des temoins (cookies) et des technologies similaires pour ameliorer "
+            "votre experience de navigation, analyser le trafic du site et personnaliser le contenu. "
+            "Conformement a la Loi 25 du Quebec (Loi modernisant des dispositions legislatives en "
+            "matiere de protection des renseignements personnels), nous requierons votre consentement "
+            "explicite avant de placer des temoins non essentiels sur votre appareil."
+        ),
+        "accept_all": "Accepter tous les temoins",
+        "reject_all": "Refuser les non essentiels",
+        "customize": "Personnaliser les preferences",
+        "privacy_policy_link": "/privacy-policy",
+        "privacy_policy_text": "Lire notre politique de confidentialite",
+        "categories": {
+            "essential": {
+                "name": "Temoins essentiels",
+                "description": "Necessaires au fonctionnement du site. Ne peuvent pas etre desactives.",
+                "required": True,
+            },
+            "analytics": {
+                "name": "Temoins analytiques",
+                "description": "Nous aident a comprendre comment les visiteurs interagissent avec le site en collectant des donnees anonymes.",
+                "required": False,
+            },
+            "marketing": {
+                "name": "Temoins publicitaires",
+                "description": "Utilises pour diffuser des publicites personnalisees et mesurer la performance des campagnes.",
+                "required": False,
+            },
+            "functional": {
+                "name": "Temoins fonctionnels",
+                "description": "Permettent des fonctionnalites ameliorees telles que les preferences de langue et les recherches sauvegardees.",
+                "required": False,
+            },
+        },
+        "law25_notice": (
+            "En vertu de la Loi 25 du Quebec, vous avez le droit de connaitre les renseignements "
+            "personnels que nous recueillons, d'y acceder, de les rectifier et de retirer votre "
+            "consentement a tout moment. Pour toute question, contactez notre responsable de la "
+            "protection des renseignements personnels a privacy@bidvex.ca."
+        ),
+    },
+}
+
+
+@legal_router.get("/legal/cookie-policy")
+async def get_cookie_policy(request: Request):
+    """
+    Return localized cookie consent strings for the frontend banner.
+    Language is determined by:
+      1. ?lang=fr query param (explicit override)
+      2. Accept-Language header (auto-detect)
+      3. Default: English
+    """
+    # Explicit query param takes priority
+    lang_param = request.query_params.get("lang", "").lower().strip()
+    if lang_param in ("fr", "en"):
+        lang = lang_param
+    else:
+        # Parse Accept-Language header
+        accept = request.headers.get("accept-language", "")
+        lang = _parse_accept_language(accept)
+
+    strings = COOKIE_CONSENT_STRINGS.get(lang, COOKIE_CONSENT_STRINGS["en"])
+    return {
+        "language": lang,
+        "consent": strings,
+    }
+
+
+def _parse_accept_language(header: str) -> str:
+    """
+    Simple Accept-Language parser.
+    Returns 'fr' if French is preferred, else 'en'.
+    """
+    if not header:
+        return "en"
+    # Parse comma-separated values, e.g. "fr-CA,fr;q=0.9,en;q=0.8"
+    parts = header.split(",")
+    best_lang = "en"
+    best_q = 0.0
+    for part in parts:
+        segments = part.strip().split(";")
+        tag = segments[0].strip().lower()
+        q = 1.0
+        for seg in segments[1:]:
+            seg = seg.strip()
+            if seg.startswith("q="):
+                try:
+                    q = float(seg[2:])
+                except ValueError:
+                    q = 0.0
+        if q > best_q:
+            if tag.startswith("fr"):
+                best_lang = "fr"
+                best_q = q
+            elif tag.startswith("en"):
+                best_lang = "en"
+                best_q = q
+    return best_lang
