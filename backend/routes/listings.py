@@ -107,49 +107,16 @@ async def create_listing(
     current_user: User = Depends(get_current_user),
     request: Request = None
 ):
+    from services.listings_service import (
+        validate_seller, build_agreement_metadata, apply_partner_tags, persist_listing,
+    )
     db = get_db()
 
-    # ========== MANDATORY: SELLER BINDING AGREEMENT VALIDATION ==========
-    if not listing_data.agreement_accepted:
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "type": "agreement_required",
-                "msg": "You must accept the binding agreement to sell before creating a listing. This agreement certifies you are the legal owner and will honor the winning bid.",
-                "field": "agreement_accepted"
-            }
-        )
+    await validate_seller(db, current_user, listing_data.agreement_accepted)
 
     client_ip = request.client.host if request else "unknown"
     user_agent = request.headers.get("user-agent", "unknown") if request else "unknown"
-    agreement_metadata = {
-        "accepted": True,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "ip_address": client_ip,
-        "user_agent": user_agent,
-        "user_id": current_user.id,
-        "user_email": current_user.email
-    }
-
-    # ========== HIGH-TRUST GATEKEEPING ==========
-    if current_user.role != 'admin':
-        # Partner fee check
-        if current_user.is_partner and not current_user.platform_fee_paid:
-            raise HTTPException(
-                status_code=403,
-                detail="Your annual partner fee is required to create listings. Please complete your payment to activate your account."
-            )
-        if not current_user.phone_verified:
-            raise HTTPException(
-                status_code=403,
-                detail="Phone verification required. Please verify your phone number before creating listings."
-            )
-        payment_methods = await db.payment_methods.count_documents({"user_id": current_user.id})
-        if payment_methods == 0:
-            raise HTTPException(
-                status_code=403,
-                detail="Payment method required. Please add a payment card before creating listings."
-            )
+    agreement_metadata = build_agreement_metadata(current_user, client_ip, user_agent)
 
     listing = Listing(
         seller_id=current_user.id, title=listing_data.title, description=listing_data.description,
@@ -165,36 +132,9 @@ async def create_listing(
     )
     listing_dict = listing.model_dump()
 
-    # Auto-tag partner listings & set buyer premium
-    seller_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
-    if seller_doc and seller_doc.get("is_partner") and seller_doc.get("partner_verification_status") == "verified":
-        listing_dict["is_partner_listing"] = True
-        listing_dict["is_verified_firm"] = seller_doc.get("is_verified_firm", False)
-        # Listing-level premium: use form value → org default → None
-        if listing_data.buyers_premium_rate is not None:
-            listing_dict["custom_buyer_premium_rate"] = listing_data.buyers_premium_rate
-        else:
-            listing_dict["custom_buyer_premium_rate"] = seller_doc.get("custom_premium_rate")
-    else:
-        listing_dict["is_partner_listing"] = False
-        listing_dict["is_verified_firm"] = False
-        # Non-partner: use form value if provided, else None (tier default applies at calc time)
-        if listing_data.buyers_premium_rate is not None:
-            listing_dict["custom_buyer_premium_rate"] = listing_data.buyers_premium_rate
-        else:
-            listing_dict["custom_buyer_premium_rate"] = None
-
-    listing_dict["agreement_metadata"] = agreement_metadata
-    listing_dict["auction_end_date"] = listing_dict["auction_end_date"].isoformat()
-    listing_dict["created_at"] = listing_dict["created_at"].isoformat()
-    await db.listings.insert_one(listing_dict)
-    listing_dict.pop("_id", None)
-    
-    # Invalidate public caches on new listing
-    from services.api_cache import invalidate_listing_caches
-    invalidate_listing_caches()
-    
-    return listing_dict
+    await apply_partner_tags(db, current_user, listing_dict, listing_data.buyers_premium_rate)
+    result = await persist_listing(db, listing_dict, agreement_metadata)
+    return result
 
 
 @listings_router.get("/listings", response_model=List[Listing])
@@ -298,36 +238,18 @@ async def create_multi_item_listing(
     current_user: User = Depends(get_current_user),
     request: Request = None
 ):
+    from services.listings_service import (
+        validate_seller, build_agreement_metadata,
+        resolve_multi_item_status, compute_promotion,
+        build_lots_with_end_time, serialise_datetimes,
+    )
     db = get_db()
 
-    # ========== MANDATORY: SELLER BINDING AGREEMENT VALIDATION ==========
-    if not listing_data.agreement_accepted:
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "type": "agreement_required",
-                "msg": "You must accept the binding agreement to sell before creating a listing. This agreement certifies you are the legal owner and will honor the winning bid.",
-                "field": "agreement_accepted"
-            }
-        )
+    await validate_seller(db, current_user, listing_data.agreement_accepted)
 
     client_ip = request.client.host if request else "unknown"
     user_agent = request.headers.get("user-agent", "unknown") if request else "unknown"
-    agreement_metadata = {
-        "accepted": True,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "ip_address": client_ip,
-        "user_agent": user_agent,
-        "user_id": current_user.id,
-        "user_email": current_user.email
-    }
-
-    # ========== PARTNER FEE GATEKEEPING ==========
-    if current_user.is_partner and not current_user.platform_fee_paid:
-        raise HTTPException(
-            status_code=403,
-            detail="Your annual partner fee is required to create listings. Please complete your payment to activate your account."
-        )
+    agreement_metadata = build_agreement_metadata(current_user, client_ip, user_agent)
 
     # ========== ENFORCE MARKETPLACE SETTINGS ==========
     settings = await get_marketplace_settings(db)
@@ -357,61 +279,15 @@ async def create_multi_item_listing(
             detail=f"Maximum {max_lots} lots allowed per auction. You submitted {len(listing_data.lots)} lots."
         )
 
-    now = datetime.now(timezone.utc)
-    status = "active"
-
-    if settings.get("require_approval_new_sellers", False):
-        completed_count = await db.multi_item_listings.count_documents({
-            "seller_id": current_user.id,
-            "status": "completed"
-        })
-        if completed_count < 1:
-            status = "pending"
-            logger.info(f"New seller {current_user.email} listing set to PENDING for approval")
-
-    if listing_data.auction_start_date:
-        if listing_data.auction_start_date > now and status != "pending":
-            status = "upcoming"
+    status = await resolve_multi_item_status(db, current_user, listing_data, settings)
 
     currency = listing_data.currency
     if not currency:
-        currency = detect_currency_from_location(
-            city=listing_data.city,
-            region=listing_data.region
-        )
-
+        currency = detect_currency_from_location(city=listing_data.city, region=listing_data.region)
     tax_rates = get_tax_rates_for_currency(currency)
 
-    is_featured = False
-    promotion_expiry = None
-    if current_user.subscription_tier == "premium":
-        is_featured = True
-        promotion_expiry = now + timedelta(days=3)
-    elif current_user.subscription_tier == "vip":
-        is_featured = True
-        promotion_expiry = now + timedelta(days=7)
-
-    promotion_tier = listing_data.promotion_tier
-    is_promoted = listing_data.is_promoted
-    promotion_start = None
-    promotion_end = None
-
-    if promotion_tier in ['premium', 'elite']:
-        is_promoted = True
-        promotion_start = now
-        if promotion_tier == 'premium':
-            promotion_end = now + timedelta(days=7)
-        elif promotion_tier == 'elite':
-            promotion_end = now + timedelta(days=14)
-            is_featured = True
-        logger.info(f"Seller promoted listing: tier={promotion_tier}, ends={promotion_end}")
-
-    auction_end = listing_data.auction_end_date
-    lots_with_end_time = []
-    for idx, lot in enumerate(listing_data.lots):
-        lot_dict = lot.model_dump()
-        lot_dict['lot_end_time'] = auction_end + timedelta(minutes=idx)
-        lots_with_end_time.append(lot_dict)
+    promo = compute_promotion(current_user, listing_data)
+    lots_with_end_time = build_lots_with_end_time(listing_data.lots, listing_data.auction_end_date)
 
     listing = MultiItemListing(
         seller_id=current_user.id,
@@ -431,12 +307,12 @@ async def create_multi_item_listing(
         currency=currency,
         tax_rate_gst=tax_rates["tax_rate_gst"],
         tax_rate_qst=tax_rates["tax_rate_qst"],
-        is_featured=is_featured,
-        promotion_expiry=promotion_expiry,
-        is_promoted=is_promoted,
-        promotion_tier=promotion_tier,
-        promotion_start=promotion_start,
-        promotion_end=promotion_end,
+        is_featured=promo["is_featured"],
+        promotion_expiry=promo["promotion_expiry"],
+        is_promoted=promo["is_promoted"],
+        promotion_tier=promo["promotion_tier"],
+        promotion_start=promo["promotion_start"],
+        promotion_end=promo["promotion_end"],
         documents=listing_data.documents,
         shipping_info=listing_data.shipping_info,
         visit_availability=listing_data.visit_availability,
@@ -446,20 +322,7 @@ async def create_multi_item_listing(
 
     listing_dict = listing.model_dump()
     listing_dict["agreement_metadata"] = agreement_metadata
-    listing_dict["auction_end_date"] = listing_dict["auction_end_date"].isoformat()
-    listing_dict["created_at"] = listing_dict["created_at"].isoformat()
-    if listing_dict["auction_start_date"]:
-        listing_dict["auction_start_date"] = listing_dict["auction_start_date"].isoformat()
-    if listing_dict["promotion_expiry"]:
-        listing_dict["promotion_expiry"] = listing_dict["promotion_expiry"].isoformat()
-    if listing_dict.get("promotion_start"):
-        listing_dict["promotion_start"] = listing_dict["promotion_start"].isoformat()
-    if listing_dict.get("promotion_end"):
-        listing_dict["promotion_end"] = listing_dict["promotion_end"].isoformat()
-
-    for lot in listing_dict.get("lots", []):
-        if lot.get("lot_end_time"):
-            lot["lot_end_time"] = lot["lot_end_time"].isoformat()
+    serialise_datetimes(listing_dict)
 
     await db.multi_item_listings.insert_one(listing_dict)
     return listing
@@ -522,15 +385,8 @@ async def get_multi_item_listings(
     logger.info(f"[multi-item] Got {len(listings)} docs from DB")
 
     for listing in listings:
-        if isinstance(listing.get("created_at"), str):
-            listing["created_at"] = datetime.fromisoformat(listing["created_at"])
-        if isinstance(listing.get("auction_end_date"), str):
-            listing["auction_end_date"] = datetime.fromisoformat(listing["auction_end_date"])
-        if isinstance(listing.get("auction_start_date"), str):
-            listing["auction_start_date"] = datetime.fromisoformat(listing["auction_start_date"])
-        for lot in listing.get("lots", []):
-            if isinstance(lot.get("lot_end_time"), str):
-                lot["lot_end_time"] = datetime.fromisoformat(lot["lot_end_time"])
+        from services.listings_service import parse_listing_dates
+        parse_listing_dates(listing)
 
     logger.info(f"[multi-item] Processed, returning {len(listings)} listings")
 
@@ -552,14 +408,8 @@ async def get_multi_item_listing(listing_id: str):
         raise HTTPException(status_code=404, detail="Listing not found")
 
     if isinstance(listing.get("created_at"), str):
-        listing["created_at"] = datetime.fromisoformat(listing["created_at"])
-    if isinstance(listing.get("auction_end_date"), str):
-        listing["auction_end_date"] = datetime.fromisoformat(listing["auction_end_date"])
-    if isinstance(listing.get("auction_start_date"), str):
-        listing["auction_start_date"] = datetime.fromisoformat(listing["auction_start_date"])
-    for lot in listing.get("lots", []):
-        if isinstance(lot.get("lot_end_time"), str):
-            lot["lot_end_time"] = datetime.fromisoformat(lot["lot_end_time"])
+        from services.listings_service import parse_listing_dates
+        parse_listing_dates(listing)
 
     return MultiItemListing(**listing)
 

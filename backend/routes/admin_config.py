@@ -4,7 +4,7 @@ Auto-extracted from server.py during P2 refactoring.
 """
 
 from fastapi import APIRouter, HTTPException, Depends, Request, Query, UploadFile, File, Form, WebSocket, WebSocketDisconnect
-from deps import get_db, get_current_user, get_current_user_optional, User
+from deps import get_db, get_current_user, get_current_user_optional, require_admin, User
 from shared import (
     DEFAULT_EMAIL_TEMPLATES, EMAIL_TEMPLATE_CATEGORIES,
     DEFAULT_MARKETPLACE_SETTINGS, AFFILIATE_COMMISSION_RATE,
@@ -55,11 +55,8 @@ async def get_public_feature_flags():
 
 
 @admin_config_router.get("/admin/marketplace-settings")
-async def get_admin_marketplace_settings(current_user: User = Depends(get_current_user)):
+async def get_admin_marketplace_settings(current_user: User = Depends(require_admin)):
     """Get current marketplace settings (admin only)."""
-    if current_user.role != "admin" and not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     db = get_db()
     settings = await get_marketplace_settings(db)
     return settings
@@ -69,12 +66,9 @@ async def get_admin_marketplace_settings(current_user: User = Depends(get_curren
 @admin_config_router.put("/admin/marketplace-settings")
 async def update_marketplace_settings(
     settings_data: Dict,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_admin)
 ):
     """Update marketplace settings (admin only). Changes take effect immediately."""
-    if current_user.role != "admin" and not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     db = get_db()
     # Get current settings for comparison
     current_settings = await get_marketplace_settings(db)
@@ -168,12 +162,9 @@ async def update_marketplace_settings(
 
 
 @admin_config_router.post("/admin/marketplace-settings/restore-defaults")
-async def restore_marketplace_defaults(current_user: User = Depends(get_current_user)):
+async def restore_marketplace_defaults(current_user: User = Depends(require_admin)):
     """Restore marketplace settings to factory defaults (admin only)."""
     db = get_db()
-    if current_user.role != "admin" and not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     # Get current settings before reset for audit
     current_settings = await get_marketplace_settings(db)
     
@@ -221,11 +212,8 @@ async def restore_marketplace_defaults(current_user: User = Depends(get_current_
 
 
 @admin_config_router.get("/admin/email-templates")
-async def get_admin_email_templates(current_user: User = Depends(get_current_user)):
+async def get_admin_email_templates(current_user: User = Depends(require_admin)):
     """Get all email templates with categories (admin only)."""
-    if current_user.role != "admin" and not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     db = get_db()
     templates = await get_email_templates(db)
     
@@ -267,12 +255,9 @@ async def get_admin_email_templates(current_user: User = Depends(get_current_use
 @admin_config_router.put("/admin/email-templates")
 async def update_email_templates(
     updates: Dict[str, Any],
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_admin)
 ):
     """Update email template IDs (admin only)."""
-    if current_user.role != "admin" and not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     db = get_db()
     templates = await get_email_templates(db)
     current_templates = templates.get("templates", {})
@@ -331,12 +316,9 @@ async def update_email_templates(
 @admin_config_router.get("/admin/email-templates/search")
 async def search_email_templates(
     q: str = "",
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_admin)
 ):
     """Search email templates by name or ID (admin only)."""
-    if current_user.role != "admin" and not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     db = get_db()
     templates = await get_email_templates(db)
     template_dict = templates.get("templates", {})
@@ -372,12 +354,9 @@ async def search_email_templates(
 @admin_config_router.get("/admin/email-templates/audit-log")
 async def get_email_template_audit_log(
     limit: int = 50,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_admin)
 ):
     """Get audit log of email template changes (admin only)."""
-    if current_user.role != "admin" and not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     db = get_db()
     logs = await db.admin_action_logs.find(
         {"action": "email_template_update"},
@@ -389,11 +368,8 @@ async def get_email_template_audit_log(
 
 
 @admin_config_router.post("/admin/logs")
-async def admin_create_log(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
+async def admin_create_log(data: Dict[str, Any], current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     log = {
         "id": str(uuid.uuid4()),
         "admin_id": current_user.id,
@@ -410,11 +386,8 @@ async def admin_create_log(data: Dict[str, Any], current_user: User = Depends(ge
 
 
 @admin_config_router.get("/admin/logs")
-async def admin_get_logs(action_type: str = None, limit: int = 100, current_user: User = Depends(get_current_user)):
+async def admin_get_logs(action_type: str = None, limit: int = 100, current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     query = {}
     if action_type:
         query["action"] = action_type
@@ -426,22 +399,16 @@ async def admin_get_logs(action_type: str = None, limit: int = 100, current_user
 
 
 @admin_config_router.get("/admin/announcements")
-async def admin_get_announcements(current_user: User = Depends(get_current_user)):
+async def admin_get_announcements(current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     announcements = await db.announcements.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
     return announcements
 
 
 
 @admin_config_router.post("/admin/announcements")
-async def admin_create_announcement(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
+async def admin_create_announcement(data: Dict[str, Any], current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     announcement = {
         "id": str(uuid.uuid4()),
         "title": data.get("title"),
@@ -479,18 +446,15 @@ async def get_active_announcements():
 
 
 @admin_config_router.delete("/admin/announcements/{announcement_id}")
-async def admin_delete_announcement(announcement_id: str, current_user: User = Depends(get_current_user)):
+async def admin_delete_announcement(announcement_id: str, current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     await db.announcements.delete_one({"id": announcement_id})
     return {"message": "Announcement deleted"}
 
 
 
 @admin_config_router.get("/admin/banners")
-async def get_admin_banners(current_user: User = Depends(get_current_user)):
+async def get_admin_banners(current_user: User = Depends(require_admin)):
     """Get all banners (admin only)"""
     db = get_db()
     if current_user.role != 'admin':
@@ -502,7 +466,7 @@ async def get_admin_banners(current_user: User = Depends(get_current_user)):
 
 
 @admin_config_router.post("/admin/banners")
-async def create_admin_banner(banner_data: BannerCreate, current_user: User = Depends(get_current_user)):
+async def create_admin_banner(banner_data: BannerCreate, current_user: User = Depends(require_admin)):
     """Create a new banner (admin only)"""
     db = get_db()
     if current_user.role != 'admin':
@@ -529,7 +493,7 @@ async def create_admin_banner(banner_data: BannerCreate, current_user: User = De
 
 
 @admin_config_router.put("/admin/banners/{banner_id}")
-async def update_admin_banner(banner_id: str, banner_data: dict, current_user: User = Depends(get_current_user)):
+async def update_admin_banner(banner_id: str, banner_data: dict, current_user: User = Depends(require_admin)):
     """Update a banner (admin only)"""
     db = get_db()
     if current_user.role != 'admin':
@@ -551,7 +515,7 @@ async def update_admin_banner(banner_id: str, banner_data: dict, current_user: U
 
 
 @admin_config_router.delete("/admin/banners/{banner_id}")
-async def delete_admin_banner(banner_id: str, current_user: User = Depends(get_current_user)):
+async def delete_admin_banner(banner_id: str, current_user: User = Depends(require_admin)):
     """Delete a banner (admin only)"""
     db = get_db()
     if current_user.role != 'admin':

@@ -1,0 +1,190 @@
+"""
+BidVex — Listings Service Layer
+Extracted from routes/listings.py (Phase 5 refactor).
+Contains shared validation, creation, and query logic for both single-item
+and multi-item auction listings.
+"""
+
+from datetime import datetime, timezone, timedelta
+from typing import Dict, Any, Optional
+from fastapi import HTTPException
+from deps import User
+import logging
+import uuid
+
+logger = logging.getLogger(__name__)
+
+
+# ─── Shared Validation ───────────────────────────────────────────────
+
+async def validate_seller(db, current_user: User, agreement_accepted: bool):
+    """
+    Run all gatekeeping checks before a seller can create a listing.
+    Raises HTTPException on failure; returns agreement_metadata on success.
+    """
+    if not agreement_accepted:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "type": "agreement_required",
+                "msg": "You must accept the binding agreement to sell before creating a listing. "
+                       "This agreement certifies you are the legal owner and will honor the winning bid.",
+                "field": "agreement_accepted"
+            }
+        )
+
+    if current_user.role != 'admin':
+        if current_user.is_partner and not current_user.platform_fee_paid:
+            raise HTTPException(
+                status_code=403,
+                detail="Your annual partner fee is required to create listings. "
+                       "Please complete your payment to activate your account."
+            )
+        if not current_user.phone_verified:
+            raise HTTPException(
+                status_code=403,
+                detail="Phone verification required. Please verify your phone number before creating listings."
+            )
+        payment_methods = await db.payment_methods.count_documents({"user_id": current_user.id})
+        if payment_methods == 0:
+            raise HTTPException(
+                status_code=403,
+                detail="Payment method required. Please add a payment card before creating listings."
+            )
+
+
+def build_agreement_metadata(current_user: User, client_ip: str, user_agent: str) -> Dict[str, Any]:
+    """Construct the legally-binding agreement metadata stamp."""
+    return {
+        "accepted": True,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "ip_address": client_ip,
+        "user_agent": user_agent,
+        "user_id": current_user.id,
+        "user_email": current_user.email,
+    }
+
+
+# ─── Single-Item Creation ────────────────────────────────────────────
+
+async def apply_partner_tags(db, current_user: User, listing_dict: Dict, buyers_premium_rate):
+    """Tag listing with partner badge and buyer premium rate."""
+    seller_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
+    if seller_doc and seller_doc.get("is_partner") and seller_doc.get("partner_verification_status") == "verified":
+        listing_dict["is_partner_listing"] = True
+        listing_dict["is_verified_firm"] = seller_doc.get("is_verified_firm", False)
+        listing_dict["custom_buyer_premium_rate"] = (
+            buyers_premium_rate if buyers_premium_rate is not None
+            else seller_doc.get("custom_premium_rate")
+        )
+    else:
+        listing_dict["is_partner_listing"] = False
+        listing_dict["is_verified_firm"] = False
+        listing_dict["custom_buyer_premium_rate"] = buyers_premium_rate
+
+
+async def persist_listing(db, listing_dict: Dict, agreement_metadata: Dict) -> Dict:
+    """Insert a single-item listing into MongoDB and return the clean dict."""
+    listing_dict["agreement_metadata"] = agreement_metadata
+    listing_dict["auction_end_date"] = listing_dict["auction_end_date"].isoformat()
+    listing_dict["created_at"] = listing_dict["created_at"].isoformat()
+    await db.listings.insert_one(listing_dict)
+    listing_dict.pop("_id", None)
+
+    from services.api_cache import invalidate_listing_caches
+    invalidate_listing_caches()
+
+    return listing_dict
+
+
+# ─── Multi-Item Creation ─────────────────────────────────────────────
+
+async def resolve_multi_item_status(db, current_user: User, listing_data, settings: Dict) -> str:
+    """Determine listing status based on marketplace settings and seller history."""
+    status = "active"
+    if settings.get("require_approval_new_sellers", False):
+        completed_count = await db.multi_item_listings.count_documents({
+            "seller_id": current_user.id,
+            "status": "completed"
+        })
+        if completed_count < 1:
+            status = "pending"
+            logger.info(f"New seller {current_user.email} listing set to PENDING for approval")
+    if listing_data.auction_start_date:
+        now = datetime.now(timezone.utc)
+        if listing_data.auction_start_date > now and status != "pending":
+            status = "upcoming"
+    return status
+
+
+def compute_promotion(current_user: User, listing_data) -> Dict[str, Any]:
+    """Calculate promotion flags based on subscription tier and explicit promotion tier."""
+    now = datetime.now(timezone.utc)
+    is_featured = False
+    promotion_expiry = None
+
+    if current_user.subscription_tier == "premium":
+        is_featured = True
+        promotion_expiry = now + timedelta(days=3)
+    elif current_user.subscription_tier == "vip":
+        is_featured = True
+        promotion_expiry = now + timedelta(days=7)
+
+    promotion_tier = listing_data.promotion_tier
+    is_promoted = listing_data.is_promoted
+    promotion_start = None
+    promotion_end = None
+
+    if promotion_tier in ['premium', 'elite']:
+        is_promoted = True
+        promotion_start = now
+        if promotion_tier == 'premium':
+            promotion_end = now + timedelta(days=7)
+        elif promotion_tier == 'elite':
+            promotion_end = now + timedelta(days=14)
+            is_featured = True
+        logger.info(f"Seller promoted listing: tier={promotion_tier}, ends={promotion_end}")
+
+    return {
+        "is_featured": is_featured,
+        "promotion_expiry": promotion_expiry,
+        "is_promoted": is_promoted,
+        "promotion_tier": promotion_tier,
+        "promotion_start": promotion_start,
+        "promotion_end": promotion_end,
+    }
+
+
+def build_lots_with_end_time(lots, auction_end_date) -> list:
+    """Assign staggered lot end times (1 minute apart)."""
+    result = []
+    for idx, lot in enumerate(lots):
+        lot_dict = lot.model_dump()
+        lot_dict['lot_end_time'] = auction_end_date + timedelta(minutes=idx)
+        result.append(lot_dict)
+    return result
+
+
+def serialise_datetimes(listing_dict: Dict):
+    """Convert all datetime fields to ISO strings in-place."""
+    for key in ("auction_end_date", "created_at", "auction_start_date",
+                "promotion_expiry", "promotion_start", "promotion_end"):
+        if listing_dict.get(key):
+            val = listing_dict[key]
+            if hasattr(val, 'isoformat'):
+                listing_dict[key] = val.isoformat()
+    for lot in listing_dict.get("lots", []):
+        if lot.get("lot_end_time") and hasattr(lot["lot_end_time"], 'isoformat'):
+            lot["lot_end_time"] = lot["lot_end_time"].isoformat()
+
+
+# ─── Read Helpers ─────────────────────────────────────────────────────
+
+def parse_listing_dates(listing: Dict):
+    """Convert ISO string dates back to datetime objects (in-place)."""
+    for key in ("created_at", "auction_end_date", "auction_start_date"):
+        if isinstance(listing.get(key), str):
+            listing[key] = datetime.fromisoformat(listing[key])
+    for lot in listing.get("lots", []):
+        if isinstance(lot.get("lot_end_time"), str):
+            lot["lot_end_time"] = datetime.fromisoformat(lot["lot_end_time"])

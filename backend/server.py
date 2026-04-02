@@ -159,280 +159,34 @@ set_deps_db(db)
 # ─── Scheduler ───
 scheduler = AsyncIOScheduler()
 
-async def transition_upcoming_auctions():
-    try:
-        now = datetime.now(timezone.utc)
-        upcoming = await db.multi_item_listings.find({
-            "status": "upcoming",
-            "auction_start_date": {"$lte": now.isoformat()}
-        }).to_list(100)
-        for auction in upcoming:
-            await db.multi_item_listings.update_one(
-                {"id": auction["id"]}, {"$set": {"status": "active"}}
-            )
-        if upcoming:
-            logger.info(f"Transitioned {len(upcoming)} upcoming auction(s) to active")
-    except Exception as e:
-        logger.error(f"Error in transition_upcoming_auctions: {e}")
+from services.scheduled_jobs import (
+    transition_upcoming_auctions,
+    expire_partner_pro_trials,
+    send_trial_reminder_emails,
+    send_auction_payment_reminders,
+    process_overdue_auction_payments,
+    send_review_request_emails,
+    keepalive_ping,
+)
 
 async def run_process_ended_auctions():
     from routes.auctions import process_ended_auctions
     await process_ended_auctions()
 
-scheduler.add_job(transition_upcoming_auctions, trigger=IntervalTrigger(minutes=5),
+scheduler.add_job(lambda: transition_upcoming_auctions(db), trigger=IntervalTrigger(minutes=5),
                   id='transition_upcoming_auctions', replace_existing=True)
 scheduler.add_job(run_process_ended_auctions, trigger=IntervalTrigger(minutes=1),
                   id='process_ended_auctions', replace_existing=True)
-
-
-async def expire_partner_pro_trials():
-    """Revert expired Partner Pro trials to free tier."""
-    try:
-        now = datetime.now(timezone.utc).isoformat()
-        expired = await db.users.find({
-            "subscription_status": "trialing",
-            "subscription_source": "trial",
-            "partner_pro_trial_end": {"$lte": now},
-        }).to_list(100)
-        for user in expired:
-            await db.users.update_one(
-                {"id": user["id"]},
-                {"$set": {
-                    "subscription_tier": "free",
-                    "subscription_status": "expired",
-                    "updated_at": now,
-                }}
-            )
-            logger.info(f"Trial expired for user {user['id']}")
-            # Send trial-expired email
-            try:
-                from services.email_service import get_email_service
-                from services.partner_pro_emails import trial_expired
-                svc = get_email_service()
-                if svc and svc.is_configured() and user.get("email"):
-                    tmpl = trial_expired(user.get("name", "there"))
-                    await svc.send_raw_html(user["email"], tmpl["subject"], tmpl["html"])
-            except Exception as em:
-                logger.warning(f"Trial expired email failed for {user.get('email')}: {em}")
-    except Exception as e:
-        logger.error(f"Error in expire_partner_pro_trials: {e}")
-
-
-async def send_trial_reminder_emails():
-    """Send reminder emails for trials expiring in 3 days via SendGrid."""
-    try:
-        now = datetime.now(timezone.utc).isoformat()
-        pending = await db.scheduled_emails.find({
-            "type": "trial_expiry_reminder",
-            "sent": False,
-            "scheduled_for": {"$lte": now},
-        }).to_list(50)
-        for item in pending:
-            try:
-                from services.email_service import get_email_service
-                from services.partner_pro_emails import trial_reminder
-                svc = get_email_service()
-                if svc and svc.is_configured():
-                    user = await db.users.find_one({"id": item["user_id"]}, {"_id": 0})
-                    tmpl = trial_reminder(user.get("name", "there") if user else "there", 3)
-                    await svc.send_raw_html(item["email"], tmpl["subject"], tmpl["html"])
-                await db.scheduled_emails.update_one(
-                    {"id": item["id"]}, {"$set": {"sent": True, "sent_at": now}}
-                )
-                logger.info(f"Trial reminder sent to {item['email']}")
-            except Exception as em:
-                logger.error(f"Failed to send trial reminder to {item.get('email')}: {em}")
-    except Exception as e:
-        logger.error(f"Error in send_trial_reminder_emails: {e}")
-
-
-scheduler.add_job(expire_partner_pro_trials, trigger=IntervalTrigger(hours=1),
-                  id='expire_partner_pro_trials', replace_existing=True)
-scheduler.add_job(send_trial_reminder_emails, trigger=IntervalTrigger(hours=1),
-                  id='send_trial_reminder_emails', replace_existing=True)
-
-
-async def send_auction_payment_reminders():
-    """Send payment reminders for auctions where deadline is in ~4 days (day 10 of 14)."""
-    try:
-        now = datetime.now(timezone.utc)
-        # Find listings with payment due in 3-5 days that haven't had a reminder sent
-        reminder_window_start = (now + timedelta(days=3)).isoformat()
-        reminder_window_end = (now + timedelta(days=5)).isoformat()
-
-        pending_listings = await db.listings.find({
-            "payment_status": "pending_payment",
-            "payment_deadline": {"$gte": reminder_window_start, "$lte": reminder_window_end},
-            "reminder_sent": {"$ne": True},
-        }, {"_id": 0}).to_list(100)
-
-        for listing in pending_listings:
-            try:
-                winner_id = listing.get("winner_id")
-                if not winner_id:
-                    continue
-                winner = await db.users.find_one({"id": winner_id}, {"_id": 0, "email": 1, "name": 1})
-                if not winner or not winner.get("email"):
-                    continue
-
-                deadline_dt = datetime.fromisoformat(listing["payment_deadline"])
-                days_remaining = max(0, (deadline_dt - now).days)
-
-                from services.email_notifications import send_payment_reminder_email
-                await send_payment_reminder_email(
-                    winner_email=winner["email"],
-                    winner_name=winner.get("name", "Winner"),
-                    item_title=listing.get("title", "Item"),
-                    final_price=listing.get("final_price", 0),
-                    listing_id=listing["id"],
-                    days_remaining=days_remaining,
-                    payment_deadline=listing["payment_deadline"],
-                )
-
-                await db.listings.update_one(
-                    {"id": listing["id"]},
-                    {"$set": {"reminder_sent": True}},
-                )
-                logger.info(f"Payment reminder sent for listing {listing['id']} to {winner['email']}")
-            except Exception as e:
-                logger.error(f"Failed to send payment reminder for listing {listing.get('id')}: {e}")
-    except Exception as e:
-        logger.error(f"Error in send_auction_payment_reminders: {e}")
-
-
-async def process_overdue_auction_payments():
-    """Mark overdue payments (day 14+) and apply 2%/month penalty."""
-    try:
-        now = datetime.now(timezone.utc)
-        now_str = now.isoformat()
-
-        overdue_listings = await db.listings.find({
-            "payment_status": "pending_payment",
-            "payment_deadline": {"$lte": now_str},
-            "overdue_notified": {"$ne": True},
-        }, {"_id": 0}).to_list(100)
-
-        for listing in overdue_listings:
-            try:
-                listing_id = listing["id"]
-                winner_id = listing.get("winner_id")
-                hammer_price = listing.get("final_price", 0)
-
-                if not winner_id:
-                    continue
-
-                # Calculate penalty (2% per month, minimum 1 month)
-                deadline_dt = datetime.fromisoformat(listing["payment_deadline"])
-                days_late = max(0, (now - deadline_dt).days)
-                months_late = max(1, (days_late + 29) // 30)
-                penalty_rate = 0.02 * months_late
-                penalty_amount = round(hammer_price * penalty_rate, 2)
-                total_with_penalty = hammer_price + penalty_amount
-
-                # Update listing
-                await db.listings.update_one(
-                    {"id": listing_id},
-                    {"$set": {
-                        "payment_status": "overdue",
-                        "overdue_notified": True,
-                        "late_penalty_rate": penalty_rate,
-                        "late_penalty_amount": penalty_amount,
-                        "overdue_at": now_str,
-                    }},
-                )
-
-                # Create overdue notification
-                await db.notifications.insert_one({
-                    "id": str(uuid.uuid4()),
-                    "user_id": winner_id,
-                    "type": "payment_overdue",
-                    "title": "Payment Overdue",
-                    "message": f"Your payment for {listing.get('title')} is overdue. A late penalty of ${penalty_amount:.2f} has been applied.",
-                    "listing_id": listing_id,
-                    "data": {
-                        "checkout_url": f"/checkout/{listing_id}",
-                        "penalty_amount": penalty_amount,
-                    },
-                    "read": False,
-                    "created_at": now_str,
-                })
-
-                # Send overdue email
-                winner = await db.users.find_one({"id": winner_id}, {"_id": 0, "email": 1, "name": 1})
-                if winner and winner.get("email"):
-                    from services.email_notifications import send_payment_overdue_email
-                    await send_payment_overdue_email(
-                        winner_email=winner["email"],
-                        winner_name=winner.get("name", "Winner"),
-                        item_title=listing.get("title", "Item"),
-                        final_price=hammer_price,
-                        listing_id=listing_id,
-                        penalty_amount=penalty_amount,
-                        total_with_penalty=total_with_penalty,
-                    )
-
-                logger.info(f"Overdue processed for listing {listing_id}: penalty=${penalty_amount:.2f}")
-            except Exception as e:
-                logger.error(f"Failed to process overdue for listing {listing.get('id')}: {e}")
-    except Exception as e:
-        logger.error(f"Error in process_overdue_auction_payments: {e}")
-
-
-scheduler.add_job(send_auction_payment_reminders, trigger=IntervalTrigger(hours=6),
-                  id='send_auction_payment_reminders', replace_existing=True)
-scheduler.add_job(process_overdue_auction_payments, trigger=IntervalTrigger(hours=6),
-                  id='process_overdue_auction_payments', replace_existing=True)
-
-
-async def send_review_request_emails():
-    """Send 'How was your purchase?' emails 24h after payment confirmation."""
-    try:
-        now = datetime.now(timezone.utc)
-        now_str = now.isoformat()
-
-        pending_requests = await db.review_requests.find({
-            "send_at": {"$lte": now_str},
-            "sent": False,
-        }, {"_id": 0}).to_list(50)
-
-        for req in pending_requests:
-            try:
-                buyer = await db.users.find_one({"id": req["buyer_id"]}, {"_id": 0})
-                if buyer and buyer.get("email"):
-                    from services.email_notifications import send_review_request_email
-                    await send_review_request_email(
-                        buyer_email=buyer["email"],
-                        buyer_name=buyer.get("name", "Buyer"),
-                        item_title=req.get("item_title", "Item"),
-                        transaction_id=req["transaction_id"],
-                        seller_name=req.get("seller_name", "Seller"),
-                    )
-                await db.review_requests.update_one(
-                    {"transaction_id": req["transaction_id"]},
-                    {"$set": {"sent": True, "sent_at": now_str}},
-                )
-                logger.info(f"Review request email sent for txn {req['transaction_id']}")
-            except Exception as e:
-                logger.error(f"Failed to send review request: {e}")
-    except Exception as e:
-        logger.error(f"Error in send_review_request_emails: {e}")
-
-
-scheduler.add_job(send_review_request_emails, trigger=IntervalTrigger(hours=1),
-                  id='send_review_request_emails', replace_existing=True)
-
-# ─── Keep-Alive Self-Ping (prevents backend sleep) ───
-async def keepalive_ping():
-    """Ping own endpoints every 4 min to prevent cold starts."""
-    endpoints = ["/api/health", "/api/marketplace/items?limit=1", "/api/multi-item-listings?limit=1"]
-    async with httpx.AsyncClient(base_url="http://127.0.0.1:8001", timeout=10) as c:
-        for ep in endpoints:
-            try:
-                r = await c.get(ep)
-                logger.debug(f"[keepalive] GET {ep} → {r.status_code} ({r.elapsed.total_seconds():.2f}s)")
-            except Exception as e:
-                logger.debug(f"[keepalive] GET {ep} → error: {e}")
-
+scheduler.add_job(lambda: expire_partner_pro_trials(db), trigger=IntervalTrigger(hours=1),
+                  id='expire_trials', replace_existing=True)
+scheduler.add_job(lambda: send_trial_reminder_emails(db), trigger=IntervalTrigger(hours=1),
+                  id='trial_reminders', replace_existing=True)
+scheduler.add_job(lambda: send_auction_payment_reminders(db), trigger=IntervalTrigger(hours=6),
+                  id='payment_reminders', replace_existing=True)
+scheduler.add_job(lambda: process_overdue_auction_payments(db), trigger=IntervalTrigger(hours=6),
+                  id='overdue_payments', replace_existing=True)
+scheduler.add_job(lambda: send_review_request_emails(db), trigger=IntervalTrigger(hours=1),
+                  id='review_requests', replace_existing=True)
 scheduler.add_job(keepalive_ping, trigger=IntervalTrigger(minutes=4),
                   id='keepalive_ping', replace_existing=True)
 
@@ -581,7 +335,7 @@ except Exception as e:
 app.include_router(api_router)
 
 @app.get("/")
-async def root():
+async def serve_spa_root():
     """Serve React SPA index.html or return healthy JSON"""
     import os
     index_path = os.path.join(os.path.dirname(__file__), "..", "frontend", "build", "index.html")
@@ -600,142 +354,28 @@ async def favicon():
     return {"status": "no favicon"}
 
 # ─── Lifecycle Events ───
+from lifecycle import (
+    log_db_status, prewarm_caches, init_cloud_storage,
+    seed_categories, create_database_indexes,
+)
+
 @app.on_event("startup")
-async def start_scheduler():
+async def on_startup():
     try:
         scheduler.start()
         logger.info("APScheduler started")
     except Exception as e:
         logger.warning(f"APScheduler unavailable at startup: {e}")
-
-@app.on_event("startup")
-async def log_db_status():
-    import asyncio
-    async def _check():
-        try:
-            count = await db.categories.count_documents({})
-            logger.info(f"DB connected — categories found: {count}")
-            users = await db.users.count_documents({})
-            logger.info(f"DB connected — users found: {users}")
-        except Exception as e:
-            logger.warning(f"DB status check failed (non-fatal): {e}")
-    asyncio.ensure_future(_check())
-
-@app.on_event("startup")
-async def prewarm_caches():
-    """Pre-warm frequently-accessed data so first user never waits."""
-    import asyncio
-    async def _warm():
-        try:
-            # 1. Subscription plans
-            from services.subscription_pricing import get_pricing_service
-            ps = get_pricing_service(db)
-            await ps.get_all_plans()
-            logger.info("[prewarm] Subscription plans cached")
-        except Exception as e:
-            logger.warning(f"[prewarm] subscription plans: {e}")
-        try:
-            # 2. Categories
-            cats = await db.categories.find({}, {"_id": 0}).to_list(100)
-            logger.info(f"[prewarm] {len(cats)} categories loaded")
-        except Exception as e:
-            logger.warning(f"[prewarm] categories: {e}")
-        try:
-            # 3. Active listing count
-            count = await db.listings.count_documents({"status": "active"})
-            logger.info(f"[prewarm] {count} active listings counted")
-        except Exception as e:
-            logger.warning(f"[prewarm] listing count: {e}")
-        try:
-            # 4. Marketplace items (warm the cache via HTTP self-call)
-            # Wait for server to be ready
-            await asyncio.sleep(2)
-            async with httpx.AsyncClient(base_url="http://127.0.0.1:8001", timeout=15) as c:
-                r = await c.get("/api/marketplace/items?limit=1")
-                logger.info(f"[prewarm] Marketplace items → {r.status_code} ({r.elapsed.total_seconds():.2f}s)")
-                r2 = await c.get("/api/multi-item-listings?limit=1")
-                logger.info(f"[prewarm] Multi-item listings → {r2.status_code} ({r2.elapsed.total_seconds():.2f}s)")
-        except Exception as e:
-            logger.warning(f"[prewarm] marketplace: {e}")
-    asyncio.ensure_future(_warm())
-
-@app.on_event("startup")
-async def init_cloud_storage():
-    import asyncio
-    async def _init():
-        try:
-            from services.cloud_storage import _get_s3
-            _get_s3()
-        except Exception as e:
-            logger.error(f"Cloud storage init failed (non-fatal): {e}")
-    asyncio.ensure_future(_init())
+    await log_db_status(db)
+    await prewarm_caches(db)
+    await init_cloud_storage()
+    await seed_categories(db)
+    await create_database_indexes(db)
 
 @app.on_event("shutdown")
-async def shutdown_scheduler():
+async def on_shutdown():
     scheduler.shutdown()
-
-@app.on_event("shutdown")
-async def shutdown_db_client():
     client.close()
-
-@app.on_event("startup")
-async def seed_categories():
-    import asyncio
-    async def _seed():
-        try:
-            if await db.categories.count_documents({}) == 0:
-                categories = [
-                    {"id": str(uuid.uuid4()), "name_en": "Electronics", "name_fr": "Électronique", "icon": "laptop"},
-                    {"id": str(uuid.uuid4()), "name_en": "Fashion", "name_fr": "Mode", "icon": "shirt"},
-                    {"id": str(uuid.uuid4()), "name_en": "Home & Garden", "name_fr": "Maison & Jardin", "icon": "home"},
-                    {"id": str(uuid.uuid4()), "name_en": "Sports", "name_fr": "Sports", "icon": "dumbbell"},
-                    {"id": str(uuid.uuid4()), "name_en": "Vehicles", "name_fr": "Véhicules", "icon": "car"},
-                    {"id": str(uuid.uuid4()), "name_en": "Art & Collectibles", "name_fr": "Art & Objets de collection", "icon": "palette"},
-                    {"id": str(uuid.uuid4()), "name_en": "Books & Media", "name_fr": "Livres & Médias", "icon": "book"},
-                    {"id": str(uuid.uuid4()), "name_en": "Toys & Games", "name_fr": "Jouets & Jeux", "icon": "gamepad-2"},
-                ]
-                await db.categories.insert_many(categories)
-                logger.info("Categories seeded")
-        except Exception as e:
-            logger.error(f"Startup error: {e}")
-    asyncio.ensure_future(_seed())
-
-@app.on_event("startup")
-async def create_database_indexes():
-    import asyncio
-    async def _create():
-        try:
-            from pymongo import ASCENDING
-            from db.indexes import create_all_indexes
-            indexes = [
-                ("bids", [("listing_id", ASCENDING)], "idx_bids_listing_id", False),
-                ("lot_bids", [("listing_id", ASCENDING), ("lot_number", ASCENDING)], "idx_lot_bids_listing_lot", False),
-                ("auto_bids", [("user_id", ASCENDING), ("listing_id", ASCENDING), ("is_active", ASCENDING)], "idx_auto_bids_user_listing", False),
-                ("invoices", [("user_id", ASCENDING)], "idx_invoices_user_id", False),
-                ("subscription_invoices", [("user_id", ASCENDING)], "idx_sub_invoices_user_id", False),
-                ("listings", [("status", ASCENDING), ("created_at", ASCENDING)], "idx_listings_status_created", False),
-                ("listings", [("status", ASCENDING), ("category", ASCENDING)], "idx_listings_status_category", False),
-                ("listings", [("status", ASCENDING), ("auction_end_date", ASCENDING)], "idx_listings_status_enddate", False),
-                ("listings", [("seller_id", ASCENDING), ("status", ASCENDING)], "idx_listings_seller_status", False),
-                ("listings", [("id", ASCENDING)], "idx_listings_id_unique", True),
-                ("users", [("email", ASCENDING)], "idx_users_email_unique", True),
-                ("users", [("role", ASCENDING)], "idx_users_role", False),
-                ("users", [("id", ASCENDING)], "idx_users_id_unique", True),
-                ("transactions", [("status", ASCENDING), ("created_at", ASCENDING)], "idx_transactions_status_created", False),
-                ("transactions", [("buyer_id", ASCENDING)], "idx_transactions_buyer", False),
-                ("transactions", [("seller_id", ASCENDING)], "idx_transactions_seller", False),
-                ("notifications", [("user_id", ASCENDING), ("is_read", ASCENDING), ("created_at", ASCENDING)], "idx_notifications_user_read_date", False),
-                ("messages", [("conversation_id", ASCENDING), ("created_at", ASCENDING)], "idx_messages_conversation_date", False),
-                ("multi_item_listings", [("status", ASCENDING), ("created_at", ASCENDING)], "idx_multi_listings_status_created", False),
-                ("multi_item_listings", [("id", ASCENDING)], "idx_multi_listings_id_unique", True),
-            ]
-            for coll, keys, name, unique in indexes:
-                await db[coll].create_index(keys, background=True, unique=unique, name=name)
-            logger.info("Database indexes created")
-            await create_all_indexes(db)
-        except Exception as e:
-            logger.warning(f"Index creation note (non-fatal): {e}")
-    asyncio.ensure_future(_create())
 
 
 # ─── Static Frontend & SPA Catch-All (MUST be last) ───

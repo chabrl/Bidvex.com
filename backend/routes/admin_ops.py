@@ -4,7 +4,7 @@ Auto-extracted from server.py during P2 refactoring.
 """
 
 from fastapi import APIRouter, HTTPException, Depends, Request, Query, UploadFile, File, Form, WebSocket, WebSocketDisconnect
-from deps import get_db, get_current_user, get_current_user_optional, User
+from deps import get_db, get_current_user, get_current_user_optional, require_admin, User
 from shared import (
     DEFAULT_EMAIL_TEMPLATES, EMAIL_TEMPLATE_CATEGORIES,
     DEFAULT_MARKETPLACE_SETTINGS, AFFILIATE_COMMISSION_RATE,
@@ -39,10 +39,8 @@ admin_ops_router = APIRouter(tags=["Admin Operations"])
 
 
 @admin_ops_router.get("/admin/reports")
-async def admin_get_reports(current_user: User = Depends(get_current_user)):
+async def admin_get_reports(current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
     reports = await db.reports.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
     return reports
 
@@ -50,24 +48,18 @@ async def admin_get_reports(current_user: User = Depends(get_current_user)):
 
 
 @admin_ops_router.get("/admin/listings/all")
-async def get_all_listings_admin(current_user: User = Depends(get_current_user)):
+async def get_all_listings_admin(current_user: User = Depends(require_admin)):
     """Admin: Get all single listings"""
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     listings = await db.listings.find({}, {"_id": 0}).sort("created_at", -1).to_list(None)
     return listings
 
 
 
 @admin_ops_router.get("/admin/multi-item-listings/all")
-async def get_all_multi_listings_admin(current_user: User = Depends(get_current_user)):
+async def get_all_multi_listings_admin(current_user: User = Depends(require_admin)):
     """Admin: Get all multi-item listings"""
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     listings = await db.multi_item_listings.find({}, {"_id": 0}).sort("created_at", -1).to_list(None)
     return listings
 
@@ -75,12 +67,9 @@ async def get_all_multi_listings_admin(current_user: User = Depends(get_current_
 
 
 @admin_ops_router.get("/admin/deletion-requests")
-async def get_deletion_requests(current_user: User = Depends(get_current_user)):
+async def get_deletion_requests(current_user: User = Depends(require_admin)):
     """Admin: Get all pending deletion requests"""
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     requests = await db.deletion_requests.find(
         {"status": "pending"},
         {"_id": 0}
@@ -93,12 +82,9 @@ async def get_deletion_requests(current_user: User = Depends(get_current_user)):
 @admin_ops_router.post("/admin/deletion-requests/{request_id}/approve")
 async def approve_deletion_request(
     request_id: str,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_admin)
 ):
     """Admin: Approve and execute deletion request"""
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     request_doc = await db.deletion_requests.find_one({"id": request_id})
     if not request_doc:
         raise HTTPException(status_code=404, detail="Request not found")
@@ -127,12 +113,9 @@ async def approve_deletion_request(
 @admin_ops_router.post("/admin/deletion-requests/{request_id}/reject")
 async def reject_deletion_request(
     request_id: str,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_admin)
 ):
     """Admin: Reject deletion request"""
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     request_doc = await db.deletion_requests.find_one({"id": request_id})
     if not request_doc:
         raise HTTPException(status_code=404, detail="Request not found")
@@ -168,21 +151,16 @@ async def reject_deletion_request(
 
 
 @admin_ops_router.get("/admin/listings/pending")
-async def admin_get_pending_listings(current_user: User = Depends(get_current_user)):
+async def admin_get_pending_listings(current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
     listings = await db.listings.find({"status": "pending"}, {"_id": 0}).sort("created_at", -1).to_list(100)
     return [Listing(**listing) for listing in listings]
 
 
 
 @admin_ops_router.put("/admin/listings/{listing_id}/moderate")
-async def admin_moderate_listing(listing_id: str, data: Dict[str, str], current_user: User = Depends(get_current_user)):
+async def admin_moderate_listing(listing_id: str, data: Dict[str, str], current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     action = data.get("action")
     if action == "approve":
         await db.listings.update_one({"id": listing_id}, {"$set": {"status": "active"}})
@@ -198,21 +176,16 @@ async def admin_moderate_listing(listing_id: str, data: Dict[str, str], current_
 
 
 @admin_ops_router.get("/admin/transactions")
-async def admin_get_transactions(current_user: User = Depends(get_current_user), limit: int = 50):
+async def admin_get_transactions(current_user: User = Depends(require_admin), limit: int = 50):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
     transactions = await db.payment_transactions.find({}, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
     return transactions
 
 
 
 @admin_ops_router.get("/admin/analytics")
-async def admin_get_analytics(current_user: User = Depends(get_current_user)):
+async def admin_get_analytics(current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     active_listings = await db.listings.count_documents({"status": "active"})
     total_users = await db.users.count_documents({})
     
@@ -229,21 +202,16 @@ async def admin_get_analytics(current_user: User = Depends(get_current_user)):
 
 
 @admin_ops_router.get("/admin/promotions")
-async def admin_get_promotions(current_user: User = Depends(get_current_user)):
+async def admin_get_promotions(current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
     promotions = await db.promotions.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
     return promotions
 
 
 
 @admin_ops_router.post("/admin/promotions/create")
-async def admin_create_promotion(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
+async def admin_create_promotion(data: Dict[str, Any], current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     promotion = {
         "id": str(uuid.uuid4()),
         "listing_id": data.get("listing_id"),
@@ -259,11 +227,8 @@ async def admin_create_promotion(data: Dict[str, Any], current_user: User = Depe
 
 
 @admin_ops_router.delete("/admin/promotions/{promotion_id}")
-async def admin_delete_promotion(promotion_id: str, current_user: User = Depends(get_current_user)):
+async def admin_delete_promotion(promotion_id: str, current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     promotion = await db.promotions.find_one({"id": promotion_id})
     if promotion:
         await db.listings.update_one({"id": promotion.get("listing_id")}, {"$set": {"is_promoted": False}})
@@ -273,11 +238,8 @@ async def admin_delete_promotion(promotion_id: str, current_user: User = Depends
 
 
 @admin_ops_router.put("/admin/listings/{listing_id}/feature")
-async def admin_feature_listing(listing_id: str, data: Dict[str, bool], current_user: User = Depends(get_current_user)):
+async def admin_feature_listing(listing_id: str, data: Dict[str, bool], current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     is_featured = data.get("is_featured", False)
     await db.listings.update_one({"id": listing_id}, {"$set": {"is_featured": is_featured}})
     return {"message": f"Listing {'featured' if is_featured else 'unfeatured'}"}
@@ -286,11 +248,8 @@ async def admin_feature_listing(listing_id: str, data: Dict[str, bool], current_
 
 
 @admin_ops_router.post("/admin/categories")
-async def admin_create_category(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
+async def admin_create_category(data: Dict[str, Any], current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     category = {
         "id": str(uuid.uuid4()),
         "name_en": data.get("name_en"),
@@ -305,22 +264,16 @@ async def admin_create_category(data: Dict[str, Any], current_user: User = Depen
 
 
 @admin_ops_router.put("/admin/categories/{category_id}")
-async def admin_update_category(category_id: str, data: Dict[str, Any], current_user: User = Depends(get_current_user)):
+async def admin_update_category(category_id: str, data: Dict[str, Any], current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     await db.categories.update_one({"id": category_id}, {"$set": data})
     return {"message": "Category updated"}
 
 
 
 @admin_ops_router.delete("/admin/categories/{category_id}")
-async def admin_delete_category(category_id: str, current_user: User = Depends(get_current_user)):
+async def admin_delete_category(category_id: str, current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     await db.categories.delete_one({"id": category_id})
     return {"message": "Category deleted"}
 
@@ -328,11 +281,8 @@ async def admin_delete_category(category_id: str, current_user: User = Depends(g
 
 
 @admin_ops_router.get("/admin/auctions")
-async def admin_get_auctions(status: str = None, current_user: User = Depends(get_current_user)):
+async def admin_get_auctions(status: str = None, current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     query = {}
     if status:
         query["status"] = status
@@ -343,33 +293,24 @@ async def admin_get_auctions(status: str = None, current_user: User = Depends(ge
 
 
 @admin_ops_router.put("/admin/auctions/{listing_id}/pause")
-async def admin_pause_auction(listing_id: str, current_user: User = Depends(get_current_user)):
+async def admin_pause_auction(listing_id: str, current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     await db.listings.update_one({"id": listing_id}, {"$set": {"status": "paused"}})
     return {"message": "Auction paused"}
 
 
 
 @admin_ops_router.put("/admin/auctions/{listing_id}/resume")
-async def admin_resume_auction(listing_id: str, current_user: User = Depends(get_current_user)):
+async def admin_resume_auction(listing_id: str, current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     await db.listings.update_one({"id": listing_id}, {"$set": {"status": "active"}})
     return {"message": "Auction resumed"}
 
 
 
 @admin_ops_router.put("/admin/auctions/{listing_id}/extend")
-async def admin_extend_auction(listing_id: str, data: Dict[str, Any], current_user: User = Depends(get_current_user)):
+async def admin_extend_auction(listing_id: str, data: Dict[str, Any], current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     new_end_date = data.get("new_end_date")
     await db.listings.update_one({"id": listing_id}, {"$set": {"auction_end_date": new_end_date}})
     return {"message": "Auction extended"}
@@ -377,11 +318,8 @@ async def admin_extend_auction(listing_id: str, data: Dict[str, Any], current_us
 
 
 @admin_ops_router.delete("/admin/auctions/{listing_id}/cancel")
-async def admin_cancel_auction(listing_id: str, current_user: User = Depends(get_current_user)):
+async def admin_cancel_auction(listing_id: str, current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     await db.listings.update_one({"id": listing_id}, {"$set": {"status": "cancelled"}})
     return {"message": "Auction cancelled"}
 
@@ -389,22 +327,16 @@ async def admin_cancel_auction(listing_id: str, current_user: User = Depends(get
 
 
 @admin_ops_router.get("/admin/affiliates")
-async def admin_get_affiliates(current_user: User = Depends(get_current_user)):
+async def admin_get_affiliates(current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     affiliates = await db.affiliates.find({}, {"_id": 0}).to_list(100)
     return affiliates
 
 
 
 @admin_ops_router.put("/admin/users/{user_id}/affiliate")
-async def admin_set_affiliate_status(user_id: str, data: Dict[str, bool], current_user: User = Depends(get_current_user)):
+async def admin_set_affiliate_status(user_id: str, data: Dict[str, bool], current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     is_affiliate = data.get("is_affiliate", False)
     if is_affiliate:
         affiliate_code = str(uuid.uuid4())[:8]
@@ -423,11 +355,8 @@ async def admin_set_affiliate_status(user_id: str, data: Dict[str, bool], curren
 
 
 @admin_ops_router.get("/admin/users/filter")
-async def admin_filter_users(account_type: str = None, current_user: User = Depends(get_current_user)):
+async def admin_filter_users(account_type: str = None, current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     query = {}
     if account_type:
         query["account_type"] = account_type
@@ -438,11 +367,8 @@ async def admin_filter_users(account_type: str = None, current_user: User = Depe
 
 
 @admin_ops_router.put("/admin/users/{user_id}/verify")
-async def admin_verify_user(user_id: str, data: Dict[str, bool], current_user: User = Depends(get_current_user)):
+async def admin_verify_user(user_id: str, data: Dict[str, bool], current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     is_verified = data.get("is_verified", False)
     await db.users.update_one({"id": user_id}, {"$set": {"verified": is_verified, "verified_at": datetime.now(timezone.utc).isoformat()}})
     return {"message": f"User {'verified' if is_verified else 'unverified'}"}
@@ -450,11 +376,8 @@ async def admin_verify_user(user_id: str, data: Dict[str, bool], current_user: U
 
 
 @admin_ops_router.get("/admin/analytics/users")
-async def admin_user_analytics(current_user: User = Depends(get_current_user)):
+async def admin_user_analytics(current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     personal_users = await db.users.count_documents({"account_type": "personal"})
     business_users = await db.users.count_documents({"account_type": "business"})
     
@@ -468,22 +391,16 @@ async def admin_user_analytics(current_user: User = Depends(get_current_user)):
 
 
 @admin_ops_router.get("/admin/lots/pending")
-async def admin_get_pending_lots(current_user: User = Depends(get_current_user)):
+async def admin_get_pending_lots(current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     lots = await db.multi_item_listings.find({"status": "pending"}, {"_id": 0}).sort("created_at", -1).to_list(100)
     return lots
 
 
 
 @admin_ops_router.put("/admin/lots/{lot_id}/moderate")
-async def admin_moderate_lot(lot_id: str, data: Dict[str, str], current_user: User = Depends(get_current_user)):
+async def admin_moderate_lot(lot_id: str, data: Dict[str, str], current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     action = data.get("action")
     if action == "approve":
         await db.multi_item_listings.update_one({"id": lot_id}, {"$set": {"status": "active"}})
@@ -498,11 +415,8 @@ async def admin_moderate_lot(lot_id: str, data: Dict[str, str], current_user: Us
 
 
 @admin_ops_router.put("/admin/reports/{report_id}/update")
-async def admin_update_report(report_id: str, data: Dict[str, Any], current_user: User = Depends(get_current_user)):
+async def admin_update_report(report_id: str, data: Dict[str, Any], current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     update_data = {}
     if "status" in data:
         update_data["status"] = data["status"]
@@ -519,11 +433,8 @@ async def admin_update_report(report_id: str, data: Dict[str, Any], current_user
 
 
 @admin_ops_router.get("/admin/reports/filter")
-async def admin_filter_reports(category: str = None, severity: str = None, status: str = None, current_user: User = Depends(get_current_user)):
+async def admin_filter_reports(category: str = None, severity: str = None, status: str = None, current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     query = {}
     if category:
         query["category"] = category
@@ -539,11 +450,8 @@ async def admin_filter_reports(category: str = None, severity: str = None, statu
 
 
 @admin_ops_router.get("/admin/analytics/revenue")
-async def admin_revenue_analytics(current_user: User = Depends(get_current_user)):
+async def admin_revenue_analytics(current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     # Get transactions from last 30 days grouped by date
     thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
     transactions = await db.payment_transactions.find(
@@ -562,11 +470,8 @@ async def admin_revenue_analytics(current_user: User = Depends(get_current_user)
 
 
 @admin_ops_router.get("/admin/analytics/listings")
-async def admin_listing_analytics(current_user: User = Depends(get_current_user)):
+async def admin_listing_analytics(current_user: User = Depends(require_admin)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     active = await db.listings.count_documents({"status": "active"})
     sold = await db.listings.count_documents({"status": "sold"})
     pending = await db.listings.count_documents({"status": "pending"})
@@ -585,12 +490,9 @@ async def admin_listing_analytics(current_user: User = Depends(get_current_user)
 async def export_transactions_csv(
     partner_only: bool = False,
     search: Optional[str] = None,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_admin)
 ):
     """Admin: Export all transactions as CSV for accounting."""
-    if current_user.role not in ["admin", "superadmin"]:
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     query = {}
     if partner_only:
         query["is_partner_transaction"] = True
@@ -646,12 +548,9 @@ async def export_transactions_csv(
 
 
 @admin_ops_router.get("/admin/finance/revenue-summary")
-async def admin_revenue_summary(current_user: User = Depends(get_current_user)):
+async def admin_revenue_summary(current_user: User = Depends(require_admin)):
     """Admin: Revenue dashboard — collected fees, partner fees, standard commissions."""
     db = get_db()
-    if current_user.role not in ["admin", "superadmin"]:
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     # Aggregate from transactions collection
     pipeline = [
         {"$match": {"status": {"$in": ["completed", "paid", "succeeded"]}}},
@@ -733,12 +632,9 @@ async def admin_transaction_logs(
     limit: int = 25,
     partner_only: bool = False,
     search: Optional[str] = None,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_admin)
 ):
     """Admin: Searchable transaction history with partner/BidVex fee split."""
-    if current_user.role not in ["admin", "superadmin"]:
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     query = {}
     if partner_only:
         query["is_partner_transaction"] = True
@@ -767,11 +663,9 @@ async def admin_transaction_logs(
 
 
 @admin_ops_router.post("/admin/users/{user_id}/pause")
-async def admin_pause_user(user_id: str, current_user: User = Depends(get_current_user)):
+async def admin_pause_user(user_id: str, current_user: User = Depends(require_admin)):
     """Admin: Pause (suspend) a user account."""
     db = get_db()
-    if current_user.role not in ["admin", "superadmin"]:
-        raise HTTPException(status_code=403, detail="Admin access required")
     user_doc = await db.users.find_one({"id": user_id})
     if not user_doc:
         raise HTTPException(status_code=404, detail="User not found")
@@ -790,11 +684,9 @@ async def admin_pause_user(user_id: str, current_user: User = Depends(get_curren
 
 
 @admin_ops_router.delete("/admin/users/{user_id}")
-async def admin_delete_user(user_id: str, current_user: User = Depends(get_current_user)):
+async def admin_delete_user(user_id: str, current_user: User = Depends(require_admin)):
     """Admin: Soft-delete a user account."""
     db = get_db()
-    if current_user.role not in ["admin", "superadmin"]:
-        raise HTTPException(status_code=403, detail="Admin access required")
     if user_id == current_user.id:
         raise HTTPException(status_code=400, detail="Cannot delete your own account")
     
@@ -811,12 +703,9 @@ async def admin_delete_user(user_id: str, current_user: User = Depends(get_curre
 
 
 @admin_ops_router.get("/admin/listings-promotions")
-async def get_admin_listings_promotions(current_user: User = Depends(get_current_user)):
+async def get_admin_listings_promotions(current_user: User = Depends(require_admin)):
     """Get all listings with their promotion levels (admin only)"""
     db = get_db()
-    if current_user.role != 'admin':
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     # Get all active/upcoming listings with promotion info
     listings = await db.multi_item_listings.find(
         {"status": {"$in": ["active", "upcoming", "pending"]}},
@@ -863,12 +752,9 @@ async def get_admin_listings_promotions(current_user: User = Depends(get_current
 
 
 @admin_ops_router.get("/admin/users/{user_id}/detail")
-async def get_admin_user_detail(user_id: str, current_user: User = Depends(get_current_user)):
+async def get_admin_user_detail(user_id: str, current_user: User = Depends(require_admin)):
     """Get comprehensive user details for admin panel"""
     db = get_db()
-    if current_user.role != 'admin':
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
     user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
     if not user_doc:
         raise HTTPException(status_code=404, detail="User not found")
