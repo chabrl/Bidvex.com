@@ -18,6 +18,8 @@
 │   ├── server.py               # FastAPI setup, middleware, routers, SPA catch-all
 │   ├── requirements.txt        # 78 pinned packages
 │   ├── routes/
+│   │   ├── trust_safety.py     # Risk Monitoring + AI Guard endpoints
+│   │   └── ...
 │   └── services/
 │       ├── ai_assistant_v2.py  # Gemini 2.5 Flash (reads AI_MODEL_ID env)
 │       ├── fraud_detection.py  # Gemini 2.5 Flash
@@ -25,6 +27,7 @@
 ├── frontend/
 │   ├── build/                  # Compiled React SPA (tracked in Git)
 │   ├── src/
+│   │   ├── pages/admin/RiskMonitoringDashboard.js  # NEW - Risk Monitoring UI
 │   │   └── config.js           # API_BASE = REACT_APP_BACKEND_URL + "/api"
 │   └── package.json
 └── runtime.txt                 # Python 3.11.x
@@ -36,8 +39,17 @@
 - `GET /` → React SPA (served from frontend/build)
 - `POST /api/ai-chat/message` → Gemini chatbot
 - `GET /api/admin/ai-guard/flags` → AI Guard fraud flags
+- `GET /api/admin/risk-monitoring?min_risk=80` → Risk Monitoring (high-risk flags + users)
+- `POST /api/admin/risk-monitoring/clear/{flag_id}` → Clear false positive flags
 
 ## Completed Work
+
+### Risk Monitoring Dashboard (April 2, 2026)
+- Backend: `GET /api/admin/risk-monitoring` — aggregates high-confidence fraud flags (confidence >= threshold/100) and users with low trust scores
+- Backend: `POST /api/admin/risk-monitoring/clear/{flag_id}` — quick-clear with admin notes and audit logging
+- Frontend: `RiskMonitoringDashboard.js` — full admin page with KPI stats, flag/user dual view, behavioral analysis, threshold selector, search, clear dialog
+- Wired into AdminDashboard under Vehicles > Risk Monitoring tab
+- Tested: 100% backend (4/4) + 100% frontend pass rate
 
 ### Railway Migration Prep (April 2, 2026)
 - `S3_REGION=auto` applied in .env (R2/boto3 fix)
@@ -60,7 +72,6 @@
 ## Backlog
 
 ### P1 - High Priority
-- [ ] Admin Risk Monitoring UI (flag risk_score > 80 for manual review)
 - [ ] server.py Refactor Phase 4: Deduplicate admin user mgmt routes
 - [ ] server.py Refactor Phase 5: Extract listings CRUD, bids, multi-item auctions
 
