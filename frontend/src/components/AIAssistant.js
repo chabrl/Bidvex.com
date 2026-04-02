@@ -21,7 +21,7 @@ const AIAssistant = () => {
   const messagesEndRef = useRef(null);
   const { token } = useAuth();
   const navigate = useNavigate();
-  const backendUrl = import.meta.env.REACT_APP_BACKEND_URL || API_BASE;
+  const backendUrl = API_BASE;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -48,7 +48,7 @@ const AIAssistant = () => {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const response = await fetch(`${backendUrl}/api/ai-chat/message`, {
+      const response = await fetch(`${backendUrl}/ai-chat/message`, {
         method: 'POST',
         headers,
         body: JSON.stringify({

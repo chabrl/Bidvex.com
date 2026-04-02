@@ -5,7 +5,7 @@ Auto-extracted from server.py during P2 refactoring.
 
 from fastapi import APIRouter, HTTPException, Depends, Request, Query, UploadFile, File, Form, WebSocket, WebSocketDisconnect
 from deps import get_db, get_current_user, get_current_user_optional, User
-from services.fraud_detection import FLAG_TYPES
+from services.fraud_detection import FLAG_TYPES, get_fraud_detection_service
 from shared import (
     DEFAULT_EMAIL_TEMPLATES, EMAIL_TEMPLATE_CATEGORIES,
     DEFAULT_MARKETPLACE_SETTINGS, AFFILIATE_COMMISSION_RATE,
@@ -207,7 +207,7 @@ async def get_fraud_flags(
     if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    fraud_service = get_fraud_detection_service(db)
+    fraud_service = get_fraud_detection_service(get_db())
     flags = await fraud_service.get_flagged_auctions(status=status, flag_type=flag_type, limit=limit)
     
     return {
@@ -228,7 +228,7 @@ async def scan_for_fraud(
     if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    fraud_service = get_fraud_detection_service(db)
+    fraud_service = get_fraud_detection_service(get_db())
     
     try:
         # Run the scan
@@ -261,7 +261,7 @@ async def analyze_single_auction(
     if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    fraud_service = get_fraud_detection_service(db)
+    fraud_service = get_fraud_detection_service(get_db())
     flags = await fraud_service.analyze_auction(auction_id)
     
     # Save any detected flags
@@ -293,7 +293,7 @@ async def update_flag_status(
     if new_status not in FLAG_STATUSES:
         raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {FLAG_STATUSES}")
     
-    fraud_service = get_fraud_detection_service(db)
+    fraud_service = get_fraud_detection_service(get_db())
     success = await fraud_service.update_flag_status(
         flag_id=flag_id,
         new_status=new_status,
@@ -324,7 +324,7 @@ async def suspend_auction(
     
     reason = data.get("reason", "Suspended for fraud investigation")
     
-    fraud_service = get_fraud_detection_service(db)
+    fraud_service = get_fraud_detection_service(get_db())
     success = await fraud_service.suspend_auction(
         auction_id=auction_id,
         admin_id=current_user.id,
@@ -352,12 +352,13 @@ async def generate_flag_summary(
     if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
+    db = get_db()
     # Get the flag from database
     flag = await db.fraud_flags.find_one({"id": flag_id}, {"_id": 0})
     if not flag:
         raise HTTPException(status_code=404, detail="Flag not found")
     
-    fraud_service = get_fraud_detection_service(db)
+    fraud_service = get_fraud_detection_service(get_db())
     summary = await fraud_service.generate_fraud_summary(flag)
     
     # Save summary to flag
