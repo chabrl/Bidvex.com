@@ -195,6 +195,11 @@ scheduler.add_job(keepalive_ping, trigger=IntervalTrigger(minutes=4),
 async def root():
     return {"message": "Bazario API v1.0"}
 
+@api_router.get("/cache-stats")
+async def get_cache_statistics():
+    from services.api_cache import get_cache_stats
+    return await get_cache_stats()
+
 # ─── Register All Routers ───
 try:
     # Core routers (with dependency injection)

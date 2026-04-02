@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException
 from datetime import datetime, timezone, timedelta
 import logging
 
-from services.api_cache import cache, LISTINGS_NS
+from services.api_cache import cache_get, cache_set, LISTINGS_NS
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +75,7 @@ async def get_featured_listings(limit: int = 12):
 async def get_new_listings(limit: int = 12):
     """Get newest listings (created in last 7 days) — cached 60s"""
     cache_key = f"{LISTINGS_NS}new:{limit}"
-    cached = cache.get(cache_key)
+    cached = await cache_get(cache_key)
     if cached is not None:
         return cached
     try:
@@ -85,7 +85,7 @@ async def get_new_listings(limit: int = 12):
             {"status": "active", "created_at": {"$gte": seven_days_ago.isoformat()}},
             {"_id": 0},
         ).sort("created_at", -1).limit(limit).to_list(limit)
-        cache.set(cache_key, listings, ttl=60)
+        await cache_set(cache_key, listings, 60)
         return listings
     except Exception as e:
         logger.error(f"Error fetching new listings: {str(e)}")
@@ -96,7 +96,7 @@ async def get_new_listings(limit: int = 12):
 async def get_recently_sold(limit: int = 12):
     """Get recently sold items — cached 60s"""
     cache_key = f"{LISTINGS_NS}sold:{limit}"
-    cached = cache.get(cache_key)
+    cached = await cache_get(cache_key)
     if cached is not None:
         return cached
     try:
@@ -104,7 +104,7 @@ async def get_recently_sold(limit: int = 12):
         listings = await db.listings.find(
             {"status": "sold"}, {"_id": 0}
         ).sort("sold_at", -1).limit(limit).to_list(limit)
-        cache.set(cache_key, listings, ttl=60)
+        await cache_set(cache_key, listings, 60)
         return listings
     except Exception as e:
         logger.error(f"Error fetching recently sold: {str(e)}")
@@ -115,7 +115,7 @@ async def get_recently_sold(limit: int = 12):
 async def get_top_sellers(limit: int = 10):
     """Top sellers — cached 60s"""
     cache_key = f"{LISTINGS_NS}top_sellers:{limit}"
-    cached = cache.get(cache_key)
+    cached = await cache_get(cache_key)
     if cached is not None:
         return cached
     db = get_db()
@@ -136,7 +136,7 @@ async def get_top_sellers(limit: int = 10):
                 "total_sales": result["total_sales"],
                 "items_sold": result["count"],
             })
-    cache.set(cache_key, sellers, ttl=60)
+    await cache_set(cache_key, sellers, 60)
     return sellers
 
 

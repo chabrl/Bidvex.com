@@ -38,14 +38,14 @@ misc_router = APIRouter(tags=["Misc"])
 @misc_router.get("/categories", response_model=List[Category])
 async def get_categories():
     db = get_db()
-    from services.api_cache import cache, CATEGORIES_NS
+    from services.api_cache import cache_get, cache_set, CATEGORIES_NS
     cache_key = f"{CATEGORIES_NS}all"
-    cached = cache.get(cache_key)
+    cached = await cache_get(cache_key)
     if cached is not None:
         return cached
     categories = await db.categories.find({}, {"_id": 0}).to_list(100)
     result = [Category(**cat) for cat in categories]
-    cache.set(cache_key, result, ttl=300)
+    await cache_set(cache_key, result, 300)
     return result
 
 

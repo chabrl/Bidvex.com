@@ -12,6 +12,11 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
+from services.api_cache import (
+    cache_get, cache_set, invalidate_prefix,
+    make_cache_key, MARKETPLACE_ITEMS_NS, FILTER_COUNTS_NS,
+    ITEMS_TTL, FILTER_TTL,
+)
 import asyncio
 import time
 import logging
@@ -47,21 +52,9 @@ def get_read_db():
     return _db_read if _db_read is not None else _db
 
 
-# ========== STALE-WHILE-REVALIDATE CACHE (5-min TTL) ==========
-_filter_counts_cache = {
-    "data": None,
-    "fresh_until": 0,       # epoch — data is considered fresh until this time
-    "refreshing": False,    # guard to prevent concurrent refresh tasks
-}
-_CACHE_TTL = 300  # 5 minutes
-
-# ========== MARKETPLACE ITEMS CACHE (30s TTL) ==========
-_items_cache = {
-    "data": None,           # full sorted list of all active items
-    "fresh_until": 0,
-    "refreshing": False,
-}
-_ITEMS_CACHE_TTL = 30  # 30 seconds
+# ========== CACHE STATE (in-process guards for stale-while-revalidate) ==========
+_refreshing_items = False
+_refreshing_filters = False
 
 
 class LocationSearchParams(BaseModel):
@@ -238,22 +231,22 @@ async def _build_marketplace_items():
 
 
 async def _refresh_items_cache():
-    """Background task: rebuild and cache the marketplace items."""
-    global _items_cache
+    """Background task: rebuild and cache the marketplace items in Redis."""
+    global _refreshing_items
     try:
         items = await _build_marketplace_items()
-        _items_cache["data"] = items
-        _items_cache["fresh_until"] = time.time() + _ITEMS_CACHE_TTL
+        await cache_set(f"{MARKETPLACE_ITEMS_NS}all", items, ITEMS_TTL)
         logger.info(f"[cache] Marketplace items refreshed: {len(items)} items")
     except Exception as e:
         logger.error(f"[cache] Marketplace items refresh failed: {e}")
     finally:
-        _items_cache["refreshing"] = False
+        _refreshing_items = False
 
 
 async def _warm_marketplace_cache():
     """Called from server startup to pre-warm the cache."""
-    _items_cache["refreshing"] = True
+    global _refreshing_items
+    _refreshing_items = True
     await _refresh_items_cache()
 
 
@@ -273,28 +266,29 @@ async def get_marketplace_items(
     track_impression: bool = False
 ):
     """
-    Marketplace view: cached, paginated, with stale-while-revalidate.
+    Marketplace view: Redis-cached, paginated, with stale-while-revalidate.
     Cold cache returns empty list with loading=True flag.
     """
-    now_t = time.time()
-    cache = _items_cache
+    global _refreshing_items
+
+    cached_items = await cache_get(f"{MARKETPLACE_ITEMS_NS}all")
 
     # If cache is cold (first request ever), kick off background build
-    # and return empty immediately so frontend isn't blocked
-    if cache["data"] is None:
-        if not cache["refreshing"]:
-            cache["refreshing"] = True
+    if cached_items is None:
+        if not _refreshing_items:
+            _refreshing_items = True
             asyncio.ensure_future(_refresh_items_cache())
         return {"items": [], "total": 0, "limit": limit, "skip": 0,
                 "has_more": False, "next_cursor": None, "cache_warming": True}
 
-    # If stale, refresh in background but serve stale data
-    if cache["fresh_until"] < now_t and not cache["refreshing"]:
-        cache["refreshing"] = True
+    # Stale-while-revalidate: always refresh in background on every hit
+    # (Redis TTL handles expiry; this ensures near-real-time data)
+    if not _refreshing_items:
+        _refreshing_items = True
         asyncio.ensure_future(_refresh_items_cache())
 
     # Filter the cached items
-    items = cache["data"]
+    items = cached_items
 
     if search:
         s_lower = search.lower()
@@ -412,8 +406,8 @@ async def search_by_location(params: LocationSearchParams):
 # ========== FILTER COUNTS ==========
 
 async def _refresh_filter_counts():
-    """Background task: recompute filter counts and update the cache."""
-    global _filter_counts_cache
+    """Background task: recompute filter counts and store in Redis."""
+    global _refreshing_filters
     try:
         db = get_db()
 
@@ -487,14 +481,13 @@ async def _refresh_filter_counts():
             "total_active_items": total_active,
         }
 
-        _filter_counts_cache["data"] = result
-        _filter_counts_cache["fresh_until"] = time.time() + _CACHE_TTL
+        await cache_set(f"{FILTER_COUNTS_NS}all", result, FILTER_TTL)
         logger.info("Filter counts cache refreshed")
 
     except Exception as e:
         logger.error(f"Background filter-counts refresh failed: {e}")
     finally:
-        _filter_counts_cache["refreshing"] = False
+        _refreshing_filters = False
 
 
 @marketplace_router.get("/marketplace/filter-counts")
@@ -504,23 +497,21 @@ async def marketplace_filter_counts():
     Stale-While-Revalidate: serves cached data instantly
     and refreshes in the background when stale.
     """
-    now = time.time()
-    cache = _filter_counts_cache
+    global _refreshing_filters
 
-    # FRESH — return immediately
-    if cache["data"] and cache["fresh_until"] > now:
-        return cache["data"]
+    cached = await cache_get(f"{FILTER_COUNTS_NS}all")
 
-    # STALE — return stale data, kick off background refresh
-    if cache["data"]:
-        if not cache["refreshing"]:
-            cache["refreshing"] = True
+    # FRESH — return immediately (Redis TTL handles staleness)
+    if cached:
+        if not _refreshing_filters:
+            _refreshing_filters = True
             asyncio.ensure_future(_refresh_filter_counts())
-        return cache["data"]
+        return cached
 
     # COLD (first request ever) — must wait for data
     await _refresh_filter_counts()
-    return cache["data"] or {"auctioneers": [], "categories": [], "locations": [], "total_active_items": 0}
+    result = await cache_get(f"{FILTER_COUNTS_NS}all")
+    return result or {"auctioneers": [], "categories": [], "locations": [], "total_active_items": 0}
 
 
 # ========== PROMOTED LISTINGS ==========
