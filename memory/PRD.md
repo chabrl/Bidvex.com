@@ -4,6 +4,7 @@
 - **Frontend**: React, Tailwind CSS, Shadcn/UI, react-i18next
 - **Backend**: FastAPI, MongoDB (Motor), Stripe, SendGrid, APScheduler
 - **AI Engine**: Gemini 2.5 Flash (google-genai) — configurable via `AI_MODEL_ID` env var
+- **Cache**: Upstash Redis (`REDIS_URL`) with in-memory fallback
 - **Storage**: Cloudflare R2 via boto3 (`S3_REGION=auto`)
 - **Deployment**: Railway (single-service monolith serving API + React SPA)
 
@@ -15,73 +16,65 @@
 /app
 ├── backend/
 │   ├── main.py                     # ASGI Entrypoint (Railway)
-│   ├── server.py                   # FastAPI app, CORS, middleware, router registration (398 lines)
-│   ├── lifecycle.py                # NEW — startup/shutdown events (127 lines)
-│   ├── deps.py                     # Shared deps + require_admin unified gate (127 lines)
-│   ├── requirements.txt            # 78 pinned packages
+│   ├── server.py                   # FastAPI app, CORS, middleware, router registration (402 lines)
+│   ├── lifecycle.py                # Startup/shutdown events
+│   ├── deps.py                     # Shared deps + require_admin unified gate
+│   ├── requirements.txt            # 80 pinned packages (added redis, hiredis)
 │   ├── routes/
-│   │   ├── admin.py                # Admin: users, partners, email settings (1276 lines, deduped)
-│   │   ├── admin_ops.py            # Admin: listings, auctions, categories, promotions (821 lines)
-│   │   ├── admin_config.py         # Admin: settings, templates, banners (588 lines)
-│   │   ├── listings.py             # Listings routes — thin controllers (627 lines)
-│   │   ├── trust_safety.py         # Risk Monitoring + AI Guard
+│   │   ├── marketplace.py          # Marketplace with Redis-backed caching
+│   │   ├── carousel.py             # Carousel with Redis-backed caching
 │   │   └── ...
 │   └── services/
-│       ├── scheduled_jobs.py       # NEW — all APScheduler job functions (255 lines)
-│       ├── listings_service.py     # NEW — listings CRUD business logic (190 lines)
-│       ├── ai_assistant_v2.py      # Gemini 2.5 Flash (reads AI_MODEL_ID env)
-│       ├── fraud_detection.py      # Gemini 2.5 Flash + SendGrid risk alerts (>=90%)
-│       └── cloud_storage.py        # boto3 R2 (S3_REGION=auto)
+│       ├── api_cache.py            # REWRITTEN: Redis + in-memory fallback
+│       ├── scheduled_jobs.py       # All APScheduler job functions
+│       ├── listings_service.py     # Listings CRUD business logic
+│       └── ...
 ├── frontend/
 │   ├── build/                      # Compiled React SPA (tracked in Git)
-│   ├── src/
-│   │   ├── pages/admin/RiskMonitoringDashboard.js
-│   │   └── config.js
-│   └── package.json
+│   └── ...
 └── runtime.txt                     # Python 3.11.x
 ```
 
 ## Key Endpoints
-- `GET /health` → `{"status":"ok"}`
+- `GET /api/cache-stats` → Redis/memory status + key count
 - `GET /api/health` → `{"status":"healthy"}`
-- `GET /` → React SPA
-- `POST /api/ai-chat/message` → Gemini chatbot
-- `GET /api/admin/risk-monitoring?min_risk=80` → Risk Monitoring
-- `POST /api/admin/risk-monitoring/clear/{flag_id}` → Clear false positives
-- `GET /api/marketplace/feature-flags` → Feature flags
+- `GET /api/marketplace/items` → Redis-cached marketplace listings
+- `GET /api/marketplace/filter-counts` → Redis-cached filter aggregations
+- `GET /api/categories` → Redis-cached categories
+- `GET /api/admin/risk-monitoring` → Risk Monitoring dashboard
 
 ## Completed Work
 
-### Phase 4 & 5: Backend Architecture Refactor (April 2, 2026)
-- **server.py**: 759 → 398 lines (-48%). Scheduler jobs → `services/scheduled_jobs.py`, lifecycle → `lifecycle.py`
-- **admin.py**: 1558 → 1276 lines (-18%). Removed 285 lines of duplicate routes (listings, deletion requests, reports, analytics, logs) already in `admin_ops.py`
-- **Unified admin middleware**: All 56+ admin routes across admin_ops.py and admin_config.py now use `Depends(require_admin)` from `deps.py` instead of inline role/email checks
-- **listings.py**: 778 → 627 lines (-19%). CRUD business logic extracted to `services/listings_service.py` (validation, agreement, partner tags, promotion, serialization)
-- **CORS**: Confirmed `CORS_ORIGINS` env var still respected (server.py lines 87-91)
-- **Testing**: 100% frontend, 95% backend (20/21 tests passed; 1 K8s routing issue)
+### Redis/Upstash Cache Integration (April 2, 2026)
+- Rewrote `services/api_cache.py`: Redis-backed cache via `REDIS_URL` with automatic in-memory fallback
+- Pydantic-safe JSON serialization (model_dump() before storing)
+- Namespace-based cache keys: `listings:`, `marketplace:`, `categories:`, `filter_counts:`, `mp_items:`
+- TTLs: 5min general, 30s marketplace items, 5min filter counts
+- Updated `routes/marketplace.py`, `routes/carousel.py`, `routes/misc.py` to use async `cache_get`/`cache_set`
+- Added `GET /api/cache-stats` diagnostic endpoint
+- **Testing**: 18/18 backend tests passed (100%)
 
-### 90% Risk Email Alerts (April 2, 2026)
-- SendGrid email alert on fraud flags with confidence >= 90%, sent to info@bidvex.com
-- Configurable via `RISK_ALERT_EMAIL` env var
+### Backend Architecture Refactor Phase 4 & 5 (April 2, 2026)
+- server.py: 759 → 398 lines (-48%). Scheduler → scheduled_jobs.py, lifecycle → lifecycle.py
+- admin.py: 285 duplicate routes removed. 56+ admin routes use `require_admin` dependency
+- listings.py: CRUD logic extracted to `services/listings_service.py`
 
-### Risk Monitoring Dashboard (April 2, 2026)
-- Backend + Frontend complete, tested 100%
+### Previous (April 2, 2026)
+- Risk Monitoring Dashboard (frontend + backend), 90% Risk Email Alerts
+- Railway migration manifest, S3_REGION=auto, AI_MODEL_ID configurable, CORS from env var
 
-### Railway Migration Prep (April 2, 2026)
-- S3_REGION=auto, AI_MODEL_ID configurable, CORS from env var
-
-### Previous Sessions (Cumulative)
-- AI migrated to Gemini 2.5 Flash, emergentintegrations removed
-- All external services wrapped in try/except
-- Admin Panel (11 sections), Buyer Payment Flow, Email Marketing fixed
-- Cloudflare R2, Twilio, Stripe, SendGrid connected
+## Railway Environment Variables to Add
+```
+REDIS_URL=<your-upstash-redis-url>
+UPSTASH_REDIS_REST_URL=<your-upstash-rest-url>
+UPSTASH_REDIS_REST_TOKEN=<your-upstash-rest-token>
+```
 
 ## Backlog
 
 ### P2 - Medium Priority
 - [ ] Cloudflare CDN setup
 - [ ] Post-launch monitoring & alerting
-- [ ] Cache marketplace filter counts
 - [ ] PDF Invoice Cloud Storage
 - [ ] Partner Dashboard page
 
@@ -91,4 +84,3 @@
 - [ ] "Email to Friend" for vehicle listings
 - [ ] "Verified Auction Firm" badge
 - [ ] Database indexing on auction_id in bids collection
-- [ ] E741 linting warnings in dashboard.py
