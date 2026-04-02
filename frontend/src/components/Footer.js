@@ -2,6 +2,7 @@ import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useCookieConsent } from '../hooks/useCookieConsent';
 import axios from 'axios';
 
 const API = API_BASE;
@@ -9,6 +10,7 @@ const API = API_BASE;
 const Footer = () => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const { resetConsent } = useCookieConsent();
   const [footerLinks, setFooterLinks] = useState(null);
   const language = i18n.language || 'en';
 
@@ -98,6 +100,14 @@ const Footer = () => {
           {renderLink('terms_of_service', 'Terms of Service', '/terms-of-service')}
           <span className="text-gray-600">|</span>
           {renderLink('support', 'Contact Support', 'mailto:support@bidvex.com')}
+          <span className="text-gray-600">|</span>
+          <button
+            onClick={resetConsent}
+            className="hover:text-white transition-colors text-sm"
+            data-testid="footer-cookie-settings"
+          >
+            {t('footer.cookieSettings', language === 'fr' ? 'Parametres des temoins' : 'Cookie Settings')}
+          </button>
         </div>
 
         {/* Mailing Address */}
