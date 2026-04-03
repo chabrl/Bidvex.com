@@ -405,6 +405,7 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
                 onClick={handleBid}
                 disabled={bidding || !user || ((vehicle?.starting_price || 0) >= 10000 && !depositAuthorized)}
                 className="w-full h-14 text-lg bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+                style={i18n.language === 'fr' ? { letterSpacing: '-0.02em' } : {}}
                 data-testid="place-bid-btn"
               >
                 {bidding ? (

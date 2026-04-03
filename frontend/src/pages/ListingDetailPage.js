@@ -29,6 +29,7 @@ import PrivateSaleBadge, { BusinessSellerBadge } from '../components/PrivateSale
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import PartnerBadge from '../components/PartnerBadge';
 import SecurityDepositBanner from '../components/SecurityDepositBanner';
+import ListingPromotionModal from '../components/ListingPromotionModal';
 import { useTrustStatus, BidBlocker } from '../components/TrustVerification';
 import { SellerReputationCard, SellerReviewsList } from '../components/SellerReputation';
 import Lightbox from 'yet-another-react-lightbox';
@@ -58,6 +59,7 @@ const ListingDetailPage = () => {
   const [placingBid, setPlacingBid] = useState(false);
   const [showVerificationPrompt, setShowVerificationPrompt] = useState(false);
   const [depositAuthorized, setDepositAuthorized] = useState(false);
+  const [showPromoModal, setShowPromoModal] = useState(false);
   
   // Trust status for bid blocking
   const { isVerified, canBid, loading: trustLoading, refresh: refreshTrustStatus } = useTrustStatus();
@@ -466,7 +468,7 @@ const ListingDetailPage = () => {
                       </p>
                       <Button 
                         className="gradient-button text-white border-0"
-                        onClick={() => setShowPromotionModal(true)}
+                        onClick={() => setShowPromoModal(true)}
                         data-testid="promote-listing-btn"
                       >
                         <TrendingUp className="mr-2 h-4 w-4" />
@@ -549,6 +551,7 @@ const ListingDetailPage = () => {
                       type="submit" 
                       className="w-full gradient-button text-white border-0" 
                       disabled={!canBid || ((listing.starting_price || 0) >= 10000 && !depositAuthorized)}
+                      style={i18n.language === 'fr' ? { letterSpacing: '-0.02em', fontSize: '0.875rem' } : {}}
                       data-testid="place-bid-btn"
                     >
                       {canBid ? (
@@ -787,6 +790,14 @@ const ListingDetailPage = () => {
       <PromotionManagerModal
         open={showPromotionModal}
         onClose={() => setShowPromotionModal(false)}
+        listingId={listing?.id}
+        listingTitle={listing?.title}
+      />
+
+      {/* Pay-As-You-Go Promotion Checkout */}
+      <ListingPromotionModal
+        isOpen={showPromoModal}
+        onClose={() => setShowPromoModal(false)}
         listingId={listing?.id}
         listingTitle={listing?.title}
       />

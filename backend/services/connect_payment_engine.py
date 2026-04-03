@@ -37,6 +37,7 @@ from services.pricing_config import (
     DEPOSIT_AMOUNT_CENTS,
     PROMOTION_TIERS,
     calculate_email_credit_cost,
+    AFFILIATE_COMMISSION_RATE,
 )
 
 logger = logging.getLogger(__name__)
@@ -338,6 +339,7 @@ async def create_connect_checkout_session(
     """
     Create a Stripe Checkout Session with Connect (application_fee + transfer_data).
     Uses itemized line items so GST/QST appear as separate rows (Quebec compliance).
+    Includes transfer_group for affiliate payouts.
     """
     buyer = await db.users.find_one({"id": buyer_id})
     if not buyer:
@@ -372,9 +374,15 @@ async def create_connect_checkout_session(
         is_vehicle=is_vehicle,
     )
 
+    # Check if the seller was referred (affiliate tracking)
+    affiliate_id = seller.get("referred_by") if seller else None
+
     # Build metadata
     flow_type = breakdown.get("flow_type", "STANDARD_FLOW")
-    seller_is_partner = breakdown.get("seller_is_partner", False)
+
+    import uuid as _uuid
+    transfer_group = f"tg_{listing.get('id', '')}_{str(_uuid.uuid4())[:8]}"
+
     meta = {
         "user_id": buyer_id,
         "listing_id": listing.get("id", ""),
@@ -382,6 +390,7 @@ async def create_connect_checkout_session(
         "transaction_type": payment_type,
         "type": payment_type,
         "flow_type": flow_type,
+        "transfer_group": transfer_group,
         "hammer_price": str(breakdown["hammer_price"]),
         "platform_fee": str(breakdown["platform_fee"]),
         "buyer_premium": str(breakdown["buyer_premium"]),
@@ -390,6 +399,8 @@ async def create_connect_checkout_session(
         "qst": str(breakdown["qst"]),
         "late_penalty": str(late_penalty),
     }
+    if affiliate_id:
+        meta["affiliate_id"] = affiliate_id
     if metadata_extra:
         meta.update(metadata_extra)
 
@@ -409,25 +420,20 @@ async def create_connect_checkout_session(
         "metadata": meta,
     }
 
-    # If seller has Connect account, split the payment based on flow type
+    # If seller has Connect account, split the payment
     if connect_account_id and not is_vehicle:
-        if seller_is_partner:
-            # PARTNER FLOW: BidVex takes only seller commission; rest goes to Partner
-            session_params["payment_intent_data"] = {
-                "application_fee_amount": app_fee_cents,
-                "transfer_data": {"destination": connect_account_id},
-                "metadata": meta,
-            }
-        else:
-            # STANDARD FLOW: BidVex takes premium + commission + taxes
-            session_params["payment_intent_data"] = {
-                "application_fee_amount": app_fee_cents,
-                "transfer_data": {"destination": connect_account_id},
-                "metadata": meta,
-            }
+        session_params["payment_intent_data"] = {
+            "application_fee_amount": app_fee_cents,
+            "transfer_data": {"destination": connect_account_id},
+            "transfer_group": transfer_group,
+            "metadata": meta,
+        }
     else:
         # No Connect account or vehicle — BidVex collects everything
-        session_params["payment_intent_data"] = {"metadata": meta}
+        session_params["payment_intent_data"] = {
+            "transfer_group": transfer_group,
+            "metadata": meta,
+        }
 
     # Enable Stripe Radar for high-value transactions
     if breakdown["hammer_price"] >= 5000:
@@ -449,6 +455,8 @@ async def create_connect_checkout_session(
         "breakdown": breakdown,
         "total_cents": total_cents,
         "late_penalty": late_penalty,
+        "transfer_group": transfer_group,
+        "affiliate_id": affiliate_id,
     }
 
 
@@ -576,26 +584,55 @@ def create_promotion_checkout(
     success_url: str,
     cancel_url: str,
 ) -> Dict[str, Any]:
-    """Create a Stripe Checkout for listing promotion purchase."""
+    """Create a Stripe Checkout for listing promotion purchase with GST/QST."""
     promo = PROMOTION_TIERS.get(tier)
     if not promo:
         raise ValueError(f"Invalid promotion tier: {tier}")
 
-    session = stripe.checkout.Session.create(
-        customer=customer_id,
-        payment_method_types=["card"],
-        mode="payment",
-        line_items=[{
+    base_cents = promo["price_cents"]
+    base_dollars = Decimal(str(base_cents)) / 100
+    gst = (base_dollars * GST_RATE).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    qst = (base_dollars * QST_RATE).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    gst_cents = _to_cents(gst)
+    qst_cents = _to_cents(qst)
+
+    line_items = [
+        {
             "price_data": {
                 "currency": "cad",
-                "unit_amount": promo["price_cents"],
+                "unit_amount": base_cents,
                 "product_data": {
                     "name": f"BidVex {promo['label']}",
                     "description": f"{promo['duration_days']}-day listing boost: {', '.join(promo['features'])}",
                 },
             },
             "quantity": 1,
-        }],
+        },
+    ]
+    if gst_cents > 0:
+        line_items.append({
+            "price_data": {
+                "currency": "cad",
+                "unit_amount": gst_cents,
+                "product_data": {"name": "GST (TPS 5%)", "description": f"Federal GST — GST# {os.environ.get('PLATFORM_GST_NUMBER', '')}"},
+            },
+            "quantity": 1,
+        })
+    if qst_cents > 0:
+        line_items.append({
+            "price_data": {
+                "currency": "cad",
+                "unit_amount": qst_cents,
+                "product_data": {"name": "QST (TVQ 9.975%)", "description": f"Quebec QST — QST# {os.environ.get('PLATFORM_QST_NUMBER', '')}"},
+            },
+            "quantity": 1,
+        })
+
+    session = stripe.checkout.Session.create(
+        customer=customer_id,
+        payment_method_types=["card"],
+        mode="payment",
+        line_items=line_items,
         success_url=success_url,
         cancel_url=cancel_url,
         metadata={
@@ -607,7 +644,16 @@ def create_promotion_checkout(
             "transaction_type": "promotion",
         },
     )
-    return {"session_id": session.id, "checkout_url": session.url, "tier": tier, "price": promo["price_cents"] / 100}
+    total_cents = base_cents + gst_cents + qst_cents
+    return {
+        "session_id": session.id,
+        "checkout_url": session.url,
+        "tier": tier,
+        "price": base_cents / 100,
+        "gst": float(gst),
+        "qst": float(qst),
+        "total": total_cents / 100,
+    }
 
 
 def create_email_credits_checkout(
@@ -617,15 +663,17 @@ def create_email_credits_checkout(
     success_url: str,
     cancel_url: str,
 ) -> Dict[str, Any]:
-    """Create a Stripe Checkout for email marketing credits."""
+    """Create a Stripe Checkout for email marketing credits with GST/QST."""
     total_cents = calculate_email_credit_cost(quantity)
     per_email = total_cents / quantity if quantity > 0 else 0
+    base_dollars = Decimal(str(total_cents)) / 100
+    gst = (base_dollars * GST_RATE).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    qst = (base_dollars * QST_RATE).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    gst_cents = _to_cents(gst)
+    qst_cents = _to_cents(qst)
 
-    session = stripe.checkout.Session.create(
-        customer=customer_id,
-        payment_method_types=["card"],
-        mode="payment",
-        line_items=[{
+    line_items = [
+        {
             "price_data": {
                 "currency": "cad",
                 "unit_amount": total_cents,
@@ -635,7 +683,32 @@ def create_email_credits_checkout(
                 },
             },
             "quantity": 1,
-        }],
+        },
+    ]
+    if gst_cents > 0:
+        line_items.append({
+            "price_data": {
+                "currency": "cad",
+                "unit_amount": gst_cents,
+                "product_data": {"name": "GST (TPS 5%)", "description": f"Federal GST — GST# {os.environ.get('PLATFORM_GST_NUMBER', '')}"},
+            },
+            "quantity": 1,
+        })
+    if qst_cents > 0:
+        line_items.append({
+            "price_data": {
+                "currency": "cad",
+                "unit_amount": qst_cents,
+                "product_data": {"name": "QST (TVQ 9.975%)", "description": f"Quebec QST — QST# {os.environ.get('PLATFORM_QST_NUMBER', '')}"},
+            },
+            "quantity": 1,
+        })
+
+    session = stripe.checkout.Session.create(
+        customer=customer_id,
+        payment_method_types=["card"],
+        mode="payment",
+        line_items=line_items,
         success_url=success_url,
         cancel_url=cancel_url,
         metadata={
@@ -645,4 +718,114 @@ def create_email_credits_checkout(
             "transaction_type": "email_credits",
         },
     )
-    return {"session_id": session.id, "checkout_url": session.url, "quantity": quantity, "total_cents": total_cents}
+    grand_total_cents = total_cents + gst_cents + qst_cents
+    return {
+        "session_id": session.id,
+        "checkout_url": session.url,
+        "quantity": quantity,
+        "total_cents": grand_total_cents,
+        "subtotal_cents": total_cents,
+        "gst": float(gst),
+        "qst": float(qst),
+    }
+
+
+async def process_affiliate_payout(
+    db,
+    session_metadata: Dict[str, str],
+    payment_intent_id: str,
+) -> Optional[Dict[str, Any]]:
+    """
+    Process affiliate cash-back payout using Stripe Transfer.
+    Called from webhook after a successful checkout on a referred seller's listing.
+
+    Calculates 15% of BidVex's commission and transfers it to the affiliate's
+    Connect account within the same transfer_group.
+    """
+    affiliate_id = session_metadata.get("affiliate_id")
+    if not affiliate_id:
+        return None
+
+    transfer_group = session_metadata.get("transfer_group")
+    flow_type = session_metadata.get("flow_type", "STANDARD_FLOW")
+
+    # Look up the affiliate user
+    affiliate = await db.users.find_one({"id": affiliate_id})
+    if not affiliate:
+        logger.warning(f"Affiliate user not found: {affiliate_id}")
+        return None
+
+    affiliate_connect_id = affiliate.get("stripe_connect_account_id")
+
+    # Calculate BidVex's commission (what we can share from)
+    seller_commission = float(session_metadata.get("seller_commission", "0"))
+    buyer_premium = float(session_metadata.get("buyer_premium", "0"))
+
+    if flow_type == "PARTNER_FLOW":
+        # Partner flow: BidVex only keeps seller commission
+        bidvex_revenue = seller_commission
+    else:
+        # Standard flow: BidVex keeps both
+        bidvex_revenue = buyer_premium + seller_commission
+
+    # Affiliate gets 15% of BidVex's revenue
+    affiliate_payout = round(bidvex_revenue * float(AFFILIATE_COMMISSION_RATE), 2)
+    affiliate_payout_cents = int(round(affiliate_payout * 100))
+
+    if affiliate_payout_cents <= 0:
+        return None
+
+    # Record the affiliate payout
+    from datetime import datetime, timezone
+    import uuid
+
+    payout_record = {
+        "id": str(uuid.uuid4()),
+        "affiliate_id": affiliate_id,
+        "seller_id": session_metadata.get("seller_id", ""),
+        "listing_id": session_metadata.get("listing_id", ""),
+        "payment_intent_id": payment_intent_id,
+        "transfer_group": transfer_group,
+        "flow_type": flow_type,
+        "bidvex_revenue": bidvex_revenue,
+        "affiliate_rate": float(AFFILIATE_COMMISSION_RATE),
+        "affiliate_payout": affiliate_payout,
+        "affiliate_payout_cents": affiliate_payout_cents,
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    if affiliate_connect_id:
+        # Execute the Stripe Transfer immediately
+        try:
+            transfer = stripe.Transfer.create(
+                amount=affiliate_payout_cents,
+                currency=session_metadata.get("currency", "cad").lower(),
+                destination=affiliate_connect_id,
+                transfer_group=transfer_group,
+                metadata={
+                    "affiliate_id": affiliate_id,
+                    "seller_id": session_metadata.get("seller_id", ""),
+                    "listing_id": session_metadata.get("listing_id", ""),
+                    "type": "affiliate_cashback",
+                },
+                description=f"BidVex Affiliate Cash-Back — Listing {session_metadata.get('listing_id', '')}",
+            )
+            payout_record["stripe_transfer_id"] = transfer.id
+            payout_record["status"] = "transferred"
+            logger.info(f"Affiliate payout: ${affiliate_payout:.2f} to {affiliate_id} via transfer {transfer.id}")
+        except stripe.StripeError as e:
+            payout_record["status"] = "failed"
+            payout_record["error"] = str(e)
+            logger.error(f"Affiliate payout failed: {e}")
+    else:
+        # Credit to internal balance (no Connect account)
+        await db.users.update_one(
+            {"id": affiliate_id},
+            {"$inc": {"affiliate_balance": affiliate_payout}},
+        )
+        payout_record["status"] = "credited_internally"
+        logger.info(f"Affiliate payout: ${affiliate_payout:.2f} credited to {affiliate_id} internal balance")
+
+    await db.affiliate_payouts.insert_one(payout_record)
+    return payout_record

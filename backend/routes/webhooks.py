@@ -607,6 +607,17 @@ async def _handle_checkout_completed(db, session):
             
             # Generate and store PDF invoice
             await _generate_and_store_invoice(db, listing, buyer_id, breakdown, invoice_id)
+
+            # ── Affiliate Cash-Back Payout ──
+            try:
+                from services.connect_payment_engine import process_affiliate_payout
+                await process_affiliate_payout(
+                    db=db,
+                    session_metadata=metadata,
+                    payment_intent_id=session.get("payment_intent", ""),
+                )
+            except Exception as e:
+                logger.warning(f"Affiliate payout processing error: {e}")
             
     elif payment_type == "vehicle_fees":
         # Vehicle auction - BidVex fees paid, hammer still due
@@ -755,6 +766,17 @@ async def _handle_checkout_completed(db, session):
                     )
                 except Exception as e:
                     logger.warning(f"Failed to schedule review request: {e}")
+
+                # ── Affiliate Cash-Back Payout ──
+                try:
+                    from services.connect_payment_engine import process_affiliate_payout
+                    await process_affiliate_payout(
+                        db=db,
+                        session_metadata=metadata,
+                        payment_intent_id=session.get("payment_intent", ""),
+                    )
+                except Exception as e:
+                    logger.warning(f"Affiliate payout processing error: {e}")
     
     logger.info(f"Checkout completed processing finished: {session_id}")
 

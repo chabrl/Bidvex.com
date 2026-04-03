@@ -1,0 +1,90 @@
+{
+  "summary": "Completed testing of BidVex Growth & Monetization Phase - Affiliate Cash-Back Engine, Promotion/Email Credit Storefronts with GST/QST, and CSS Polish. Backend: 23/23 tests passed. All affiliate payout calculations, tax calculations, and frontend component verifications passed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_affiliate_promotion_email_105.py",
+    "/app/test_reports/pytest/pytest_results_affiliate_promo_105.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AFFILIATE ENGINE: process_affiliate_payout function exists in connect_payment_engine.py",
+    "AFFILIATE ENGINE: AFFILIATE_COMMISSION_RATE = 0.15 (15% of BidVex commission)",
+    "AFFILIATE ENGINE: Standard flow payout = 15% of (buyer_premium + seller_commission)",
+    "AFFILIATE ENGINE: Partner flow payout = 15% of seller_commission only",
+    "AFFILIATE ENGINE: create_connect_checkout_session includes transfer_group and affiliate_id in metadata",
+    "AFFILIATE ENGINE: Webhook handler (_handle_checkout_completed) calls process_affiliate_payout",
+    "PROMOTION TAX: create_promotion_checkout returns gst and qst fields",
+    "PROMOTION TAX: Basic $9.99 -> GST $0.50, QST $1.00, Total $11.49 (verified)",
+    "PROMOTION TAX: Standard $24.99 -> GST $1.25, QST $2.49, Total $28.73 (verified)",
+    "PROMOTION TAX: Premium $49.99 -> GST $2.50, QST $4.99, Total $57.48 (verified)",
+    "EMAIL CREDIT TAX: create_email_credits_checkout returns gst and qst fields",
+    "EMAIL CREDIT TAX: 500 credits at $0.018/ea = $9.00 subtotal + GST $0.45 + QST $0.90 (verified)",
+    "EMAIL CREDIT TAX: 5000 credits at $0.015/ea = $75.00 subtotal + GST $3.75 + QST $7.48 (verified)",
+    "PRICING CONFIG: GET /api/payments/pricing-config returns promotion tiers, email credit info, and commissions",
+    "FRONTEND: ListingPromotionModal.js exists with 3 tiers (basic/standard/premium) and data-testid='promotion-modal'",
+    "FRONTEND: EmailCreditPurchase.js exists with Slider, GST/QST breakdown, and data-testid='email-credit-purchase'",
+    "FRONTEND: PartnerDashboard.js integrates EmailCreditPurchase and has data-testid='partner-benefit-card'",
+    "CSS POLISH: French letter-spacing -0.02em applied in ListingDetailPage.js, VehicleDetailPage.js, MultiItemListingDetailPage.js"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_affiliate_promotion_email_105.py"
+  ],
+  "success_rate": {
+    "backend": "100% (23/23 tests passed)",
+    "frontend": "100% (code verification complete)"
+  },
+  "test_credentials": "Admin: charbeladmin@bidvex.com / Admin123!",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Growth & Monetization Phase fully verified. Affiliate engine calculates 15% of BidVex commission (Standard: buyer_premium + seller_commission, Partner: seller_commission only). Promotion tiers: Basic $9.99/7d, Standard $24.99/14d, Premium $49.99/30d with GST/QST. Email credits: sliding scale $0.018-$0.010/email with GST/QST. French bid button has letter-spacing -0.02em on all detail pages. Site is in 'Coming Soon' mode for non-authenticated users.",
+  "verified_features": {
+    "affiliate_engine": {
+      "commission_rate": "15% of BidVex commission",
+      "standard_flow": "15% of (buyer_premium + seller_commission)",
+      "partner_flow": "15% of seller_commission only",
+      "transfer_group": "Included in checkout metadata",
+      "affiliate_id": "Included in checkout metadata when seller has referred_by",
+      "webhook_integration": "_handle_checkout_completed calls process_affiliate_payout"
+    },
+    "promotion_storefront": {
+      "tiers": {
+        "basic": {"price": "$9.99", "duration": "7 days", "gst": "$0.50", "qst": "$1.00", "total": "$11.49"},
+        "standard": {"price": "$24.99", "duration": "14 days", "gst": "$1.25", "qst": "$2.49", "total": "$28.73"},
+        "premium": {"price": "$49.99", "duration": "30 days", "gst": "$2.50", "qst": "$4.99", "total": "$57.48"}
+      },
+      "component": "ListingPromotionModal.js",
+      "data_testid": "promotion-modal, buy-promo-{tier}"
+    },
+    "email_credit_storefront": {
+      "pricing": {
+        "1-1000": "$0.018/email",
+        "1001-5000": "$0.015/email",
+        "5001-10000": "$0.012/email",
+        "10001+": "$0.010/email"
+      },
+      "tax_example_500": {"subtotal": "$9.00", "gst": "$0.45", "qst": "$0.90"},
+      "tax_example_5000": {"subtotal": "$75.00", "gst": "$3.75", "qst": "$7.48"},
+      "component": "EmailCreditPurchase.js",
+      "data_testid": "email-credit-purchase, buy-email-credits-btn"
+    },
+    "pricing_config_endpoint": {
+      "url": "/api/payments/pricing-config",
+      "auth_required": false,
+      "returns": ["commissions", "buyer_premiums", "seller_commissions", "subscriptions", "promotions", "email_credits", "deposit"]
+    },
+    "css_polish": {
+      "french_letter_spacing": "-0.02em",
+      "applied_to": ["ListingDetailPage.js", "VehicleDetailPage.js", "MultiItemListingDetailPage.js"],
+      "condition": "i18n.language === 'fr'"
+    }
+  }
+}

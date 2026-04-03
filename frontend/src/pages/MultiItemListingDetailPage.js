@@ -1340,6 +1340,7 @@ const MultiItemListingDetailPage = () => {
                                 className="gradient-button text-white border-0 min-h-[48px] w-full text-sm whitespace-nowrap"
                                 disabled={(listing.auction_terms_en || listing.auction_terms_fr) && !agreedToTerms}
                                 title={!agreedToTerms && (listing.auction_terms_en || listing.auction_terms_fr) ? t('auction.mustAgreeToTermsFirst', 'Please agree to terms & conditions first') : ''}
+                                style={i18n.language === 'fr' ? { letterSpacing: '-0.02em' } : {}}
                                 data-testid="place-bid-btn"
                               >
                                 <Gavel className="mr-1.5 h-4 w-4 shrink-0" />

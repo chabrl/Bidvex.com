@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
+import EmailCreditPurchase from '../components/EmailCreditPurchase';
 
 const API = API_BASE;
 
@@ -459,6 +460,9 @@ export default function PartnerDashboard() {
                 </p>
               </CardContent>
             </Card>
+
+            {/* Email Marketing Credits */}
+            {isActive && <EmailCreditPurchase />}
 
             {/* Recent Activity */}
             <Card className="border-slate-200 dark:border-slate-800 shadow-sm" data-testid="recent-activity-card">

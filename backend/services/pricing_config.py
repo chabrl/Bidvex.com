@@ -95,6 +95,10 @@ DEPOSIT_THRESHOLD_CAD = 10000   # Auctions starting above $10k CAD require depos
 DEPOSIT_AMOUNT_CENTS = 100000   # $1,000.00 CAD pre-auth hold
 DEPOSIT_AMOUNT_DOLLARS = 1000
 
+# ============= AFFILIATE REFERRAL =============
+
+AFFILIATE_COMMISSION_RATE = Decimal("0.15")  # 15% of BidVex's commission goes to affiliate
+
 # ============= TAX RATES (Quebec / Canada) =============
 
 GST_RATE = Decimal("0.05")      # 5% Federal
