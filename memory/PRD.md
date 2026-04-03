@@ -17,20 +17,17 @@
 - BidVex takes ONLY Seller Commission (2.5% vehicles / 3.0% general) from Hammer
 - 100% of Buyer Premium transferred to Partner's Connect account
 - Stripe fees deducted from Partner's payout (NOT charged to buyer)
-- Buyer pays: Hammer + Premium + Taxes
-- Stripe metadata tagged: `PARTNER_FLOW`
+- Stripe metadata: `PARTNER_FLOW`
 
 ### Standard Flow (is_partner=False)
 - BidVex takes BOTH Buyer Premium AND Seller Commission
 - Seller receives: Hammer - Seller Commission
 - Stripe processing fee passed to buyer
-- Buyer pays: Hammer + Premium + Taxes + Processing Fee
-- Stripe metadata tagged: `STANDARD_FLOW`
+- Stripe metadata: `STANDARD_FLOW`
 
 ### Tax Calculation (Both Flows)
 - GST (TPS 5%) + QST (TVQ 9.975%) on **Total Taxable Amount (Hammer + Premium)**
-- Tax registration numbers from env vars PLATFORM_GST_NUMBER / PLATFORM_QST_NUMBER
-- GST and QST shown as **separate Stripe checkout line items** for Quebec compliance
+- Separate Stripe checkout line items for Quebec compliance
 
 ### Tier-Based Fees
 - Standard: 5% Buyer / 4% Seller
@@ -40,20 +37,30 @@
 
 ## Completed Work
 
+### Growth & Monetization Phase — April 3, 2026
+- **Affiliate Cash-Back Engine**: 15% of BidVex commission auto-paid to affiliates via Stripe Transfer Group
+  - Standard flow: 15% of (buyer_premium + seller_commission)
+  - Partner flow: 15% of seller_commission only
+  - transfer_group + affiliate_id in checkout metadata
+  - Webhook triggers `process_affiliate_payout()` on successful sale
+- **Listing Promotion Storefront**: 3-tier system (Basic $9.99/7d, Standard $24.99/14d, Premium $49.99/30d)
+  - `ListingPromotionModal.js` with GST/QST breakdown on each tier
+  - Integrated into ListingDetailPage "Promote" button
+- **Email Marketing Credits**: Pay-As-You-Go sliding scale ($0.018→$0.010/email)
+  - `EmailCreditPurchase.js` with slider, live pricing, and tax breakdown
+  - Integrated into PartnerDashboard for active partners
+- **GST/QST on Digital Products**: All promotions and email credits now include separate GST/QST line items
+- **CSS Polish**: French `letter-spacing: -0.02em` on bid buttons across all 3 detail pages
+- Testing: iteration_105 — 23/23 backend, 100% frontend
+
 ### Two-Tier Marketplace Economy — April 3, 2026
-- `calculate_connect_checkout()` now accepts `seller_is_partner` flag
-- Partner Flow: application_fee = seller_commission only; $0 Stripe fee to buyer; partner_premium_retained tracked
-- Standard Flow: application_fee = buyer_premium + seller_commission + taxes; Stripe fee to buyer
-- Tax base changed from (premium + platform_fee) to (Hammer + Premium) for Quebec compliance
-- All Stripe metadata tagged PARTNER_FLOW or STANDARD_FLOW
-- Partner Dashboard: "Partner Benefit" card showing retained premiums this month
-- CheckoutPage: Dynamic flow_type badge, conditional Processing Fee visibility
+- Partner vs Standard flow with different application_fee logic
+- Tax base changed to (Hammer + Premium) for Quebec compliance
+- Partner Dashboard "Partner Benefit" card
 - Testing: iteration_104 — 16/16 backend, 100% frontend
 
 ### Stripe Connect Financial Engine — April 3, 2026
-- Tier-Based Fees, Platform Fee, Itemized Line Items (GST/QST separate)
-- $1,000 Security Deposit for >$10k auctions with frontend UX
-- Vehicle auctions: hammer offline, only fees via Stripe
+- Tier-Based Fees, itemized GST/QST line items, $1k security deposit, vehicle offline hammer
 - Testing: iteration_103 — 16/16 backend, 100% frontend
 
 ### Previous Sessions
@@ -61,12 +68,11 @@
 - Law 25 Cookie Consent, Tax Reports, Commercial Readiness, Architecture Refactor
 
 ## In Progress
-- [ ] Affiliate Cash-Back Payouts (Stripe Transfer Group)
-- [ ] Pay-As-You-Go Frontend UIs (Listing Promotions, Email Marketing credits)
+None
 
 ## Backlog
 - [ ] Cloudflare CDN setup (P2)
 - [ ] Post-launch monitoring/alerting (P2)
 - [ ] Real-time performance dashboard (Enhancement)
 - [ ] Refactor payments.py (~2300 lines) into modular routers (Tech debt)
-- [ ] French 'Placer une enchère' button CSS regression monitor
+- [ ] Automated Lighthouse audits weekly (Enhancement)
