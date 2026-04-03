@@ -166,8 +166,6 @@ const PhoneVerificationRoute = ({ children }) => {
 };
 
 const FooterWrapper = () => {
-  const location = useLocation();
-  if (location.pathname === '/messages') return null;
   return <Footer />;
 };
 
@@ -175,6 +173,12 @@ const MobileNavWrapper = () => {
   const location = useLocation();
   if (location.pathname === '/messages') return null;
   return <MobileBottomNav />;
+};
+
+const AIAssistantWrapper = () => {
+  const location = useLocation();
+  if (location.pathname === '/messages') return null;
+  return <AIAssistant />;
 };
 
 const MaintenanceGuard = ({ children }) => {
@@ -365,7 +369,7 @@ const App = () => {
           </Suspense>
           <FooterWrapper />
           <Suspense fallback={null}>
-            <AIAssistant />
+            <AIAssistantWrapper />
           </Suspense>
           <MessageNotificationListener />
           <Toaster position="top-right" />

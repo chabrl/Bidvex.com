@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import PartnerQuickActions from '../components/PartnerQuickActions';
 import axios from 'axios';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -414,11 +415,15 @@ const MessagesPage = () => {
     const viewport = window.visualViewport;
     if (!viewport) return;
 
+    const chatPage = document.querySelector('[data-testid="messages-page"]');
     const handleResize = () => {
-      const inputBar = document.querySelector('[data-testid="message-input-bar"]');
-      if (!inputBar) return;
+      if (!chatPage) return;
       const offset = window.innerHeight - viewport.height;
-      inputBar.style.transform = offset > 50 ? `translateY(-${offset}px)` : '';
+      if (offset > 50) {
+        chatPage.style.height = `${viewport.height}px`;
+      } else {
+        chatPage.style.height = '';
+      }
     };
 
     viewport.addEventListener('resize', handleResize);
@@ -426,6 +431,7 @@ const MessagesPage = () => {
     return () => {
       viewport.removeEventListener('resize', handleResize);
       viewport.removeEventListener('scroll', handleResize);
+      if (chatPage) chatPage.style.height = '';
     };
   }, []);
 
@@ -703,7 +709,7 @@ const MessagesPage = () => {
   }
 
   return (
-    <div className="h-[100dvh] flex bg-white dark:bg-slate-900" data-testid="messages-page">
+    <div className="flex bg-white dark:bg-slate-900" style={{ height: 'calc(100dvh - 64px)' }} data-testid="messages-page">
       {/* Hidden file input */}
       <input
         type="file"
@@ -779,10 +785,10 @@ const MessagesPage = () => {
       </div>
 
       {/* ========== CHAT AREA (Right Pane) ========== */}
-      <div className={`${showMobileConversations ? 'hidden' : 'flex'} md:flex flex-col flex-1 min-w-0 relative`}>
+      <div className={`${showMobileConversations ? 'hidden' : 'flex'} md:flex flex-col flex-1 min-w-0`}>
         {selectedConversation ? (
-          <>
-            {/* Chat Header */}
+          <div className="flex flex-col h-full">
+            {/* Chat Header — shrinks */}
             <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0 z-10">
               {/* User Info Bar */}
               <div className="p-4 flex items-center justify-between">
@@ -868,9 +874,9 @@ const MessagesPage = () => {
               <ProductMiniCard info={listingInfo} navigate={navigate} />
             </div>
 
-            {/* Messages Area — padded bottom so content isn't hidden behind fixed input */}
+            {/* Messages Area — fills remaining space */}
             <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950" data-testid="messages-scroll-area">
-              <div className="p-4 pb-24 space-y-4 max-w-3xl mx-auto">
+              <div className="p-4 space-y-4 max-w-3xl mx-auto">
                 {messages.map((msg) => (
                   msg.message_type === 'system' || msg.message_type === 'auction_won' ? (
                     <SystemMessageCard key={msg.id} message={msg} />
@@ -901,19 +907,28 @@ const MessagesPage = () => {
               </div>
             </div>
 
-            {/* Upload Progress (positioned above fixed input) */}
+            {/* Upload Progress */}
             {uploadProgress && (
-              <div className="fixed bottom-20 left-0 right-0 md:left-96 z-20 px-4"
-                style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+              <div className="px-4 py-2 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800">
                 <div className="max-w-3xl mx-auto">
                   <UploadProgress progress={uploadProgress.progress} fileName={uploadProgress.fileName} />
                 </div>
               </div>
             )}
 
-            {/* Fixed-Bottom Message Input */}
+            {/* Partner Quick Actions — above input, VIP / Partner Pro only */}
+            <PartnerQuickActions
+              onSendMessage={(text) => { setNewMessage(text); setTimeout(() => sendMessage(), 50); }}
+              lang={(navigator.language || 'en').startsWith('fr') ? 'fr' : 'en'}
+              isPartnerOrVip={
+                user?.is_partner ||
+                ['partner_pro', 'vip', 'vip_elite'].includes(user?.subscription_tier)
+              }
+            />
+
+            {/* Sticky Bottom Input */}
             <div
-              className="fixed bottom-0 left-0 right-0 md:left-96 z-20 bg-white dark:bg-slate-900 border-t border-slate-200/80 dark:border-slate-700/80 shadow-[0_-2px_12px_rgba(0,0,0,0.06)]"
+              className="shrink-0 bg-white dark:bg-slate-900 border-t border-slate-200/80 dark:border-slate-700/80 shadow-[0_-2px_12px_rgba(0,0,0,0.04)]"
               style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
               data-testid="message-input-bar"
             >
@@ -930,7 +945,11 @@ const MessagesPage = () => {
                   <input
                     ref={inputRef}
                     type="text"
-                    placeholder="Type a message..."
+                    placeholder={
+                      (navigator.language || 'en').startsWith('fr')
+                        ? 'Ecrire un message...'
+                        : 'Type a message...'
+                    }
                     value={newMessage}
                     onChange={handleInputChange}
                     onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
@@ -953,7 +972,7 @@ const MessagesPage = () => {
                 </div>
               </div>
             </div>
-          </>
+          </div>
         ) : (
           <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950">
             <div className="text-center max-w-md p-8">
