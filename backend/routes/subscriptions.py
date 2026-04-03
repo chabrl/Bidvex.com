@@ -667,18 +667,51 @@ async def create_subscription_checkout(
                 "quantity": 1
             }]
         else:
-            # Create one-time payment if no recurring price
-            checkout_params["line_items"] = [{
-                "price_data": {
-                    "currency": "cad",
-                    "product_data": {
-                        "name": f"BidVex {plan.get('name')} - {billing_period.capitalize()}",
-                        "description": f"BidVex {plan.get('name')} subscription"
+            # Create one-time payment with GST/QST as separate line items (Quebec compliance)
+            import os
+            from decimal import Decimal, ROUND_HALF_UP
+            base_cents = int(final_price * 100)
+            base_dec = Decimal(str(final_price))
+            gst = (base_dec * Decimal("0.05")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            qst = (base_dec * Decimal("0.09975")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            gst_cents = int(gst * 100)
+            qst_cents = int(qst * 100)
+
+            checkout_params["line_items"] = [
+                {
+                    "price_data": {
+                        "currency": "cad",
+                        "product_data": {
+                            "name": f"BidVex {plan.get('name')} - {billing_period.capitalize()}",
+                            "description": f"BidVex {plan.get('name')} subscription"
+                        },
+                        "unit_amount": base_cents,
                     },
-                    "unit_amount": int(final_price * 100),
+                    "quantity": 1
                 },
-                "quantity": 1
-            }]
+                {
+                    "price_data": {
+                        "currency": "cad",
+                        "product_data": {
+                            "name": "GST (TPS 5%)",
+                            "description": f"Federal GST — GST# {os.environ.get('PLATFORM_GST_NUMBER', '')}",
+                        },
+                        "unit_amount": gst_cents,
+                    },
+                    "quantity": 1
+                },
+                {
+                    "price_data": {
+                        "currency": "cad",
+                        "product_data": {
+                            "name": "QST (TVQ 9.975%)",
+                            "description": f"Quebec QST — QST# {os.environ.get('PLATFORM_QST_NUMBER', '')}",
+                        },
+                        "unit_amount": qst_cents,
+                    },
+                    "quantity": 1
+                },
+            ]
             checkout_params["mode"] = "payment"
         
         # Apply coupon if we have a Stripe coupon ID

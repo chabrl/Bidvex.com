@@ -12,11 +12,10 @@ import { Mail, Loader2, Info } from 'lucide-react';
 const API = API_BASE;
 
 const EMAIL_TIERS = [
-  { min: 100, max: 499, per_email: 0.018 },
-  { min: 500, max: 1999, per_email: 0.016 },
-  { min: 2000, max: 4999, per_email: 0.014 },
-  { min: 5000, max: 9999, per_email: 0.012 },
-  { min: 10000, max: 100000, per_email: 0.010 },
+  { min: 1, max: 1000, per_email: 0.018 },
+  { min: 1001, max: 5000, per_email: 0.015 },
+  { min: 5001, max: 10000, per_email: 0.012 },
+  { min: 10001, max: 100000, per_email: 0.010 },
 ];
 
 function getPerEmailRate(qty) {
