@@ -107,55 +107,62 @@ async def create_checkout_session(
             {"$set": {"stripe_customer_id": customer_id}},
         )
 
-    # ── Listing purchase checkout ──
+    # ── Listing purchase checkout (Stripe Connect) ──
     if data.listing_id:
         listing = await db.listings.find_one({"id": data.listing_id}, {"_id": 0})
         if not listing:
             raise HTTPException(status_code=404, detail="Listing not found")
 
-        buyer_fee = 0.05 if getattr(current_user, "account_type", "personal") == "personal" else 0.045
-        total_amount = listing["current_price"] * (1 + buyer_fee)
-        amount_cents = int(round(total_amount * 100))
+        from services.connect_payment_engine import calculate_connect_checkout, create_connect_checkout_session
 
-        listing_currency = listing.get("currency", "CAD").lower()
-        origin = data.origin_url or "https://bidvex.com"
-        session = stripe.checkout.Session.create(
-            customer=customer_id,
-            payment_method_types=["card"],
-            line_items=[{
-                "price_data": {
-                    "currency": listing_currency,
-                    "unit_amount": amount_cents,
-                    "product_data": {"name": listing.get("title", "Auction Purchase")},
-                },
-                "quantity": 1,
-            }],
-            mode="payment",
-            success_url=f"{origin}/payment/success?session_id={{CHECKOUT_SESSION_ID}}",
-            cancel_url=f"{origin}/listing/{data.listing_id}",
-            metadata={
-                "user_id": current_user.id,
-                "listing_id": data.listing_id,
-                "buyer_fee": str(buyer_fee),
-                "type": "listing_purchase",
-            },
+        # Get buyer and seller tiers
+        buyer_tier = user.get("subscription_tier", "free")
+        seller = await db.users.find_one({"id": listing.get("seller_id")})
+        seller_tier = seller.get("subscription_tier", "free") if seller else "free"
+
+        breakdown = calculate_connect_checkout(
+            hammer_price=listing["current_price"],
+            category=listing.get("category", "general"),
+            buyer_tier=buyer_tier,
+            seller_tier=seller_tier,
+            currency=listing.get("currency", "CAD"),
+            province=listing.get("region", "QC"),
         )
 
-        # Record transaction
+        origin = data.origin_url or "https://bidvex.com"
+        result = await create_connect_checkout_session(
+            db=db,
+            buyer_id=current_user.id,
+            listing=listing,
+            breakdown=breakdown,
+            success_url=f"{origin}/payment/success?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{origin}/listing/{data.listing_id}",
+            payment_type="listing_purchase",
+        )
+
+        # Record transaction with full breakdown
         txn = {
             "id": str(uuid.uuid4()),
-            "session_id": session.id,
+            "session_id": result["session_id"],
             "user_id": current_user.id,
             "listing_id": data.listing_id,
-            "amount": total_amount,
-            "currency": listing_currency,
+            "seller_id": listing.get("seller_id", ""),
+            "amount": breakdown["buyer_total"],
+            "hammer_price": breakdown["hammer_price"],
+            "buyer_premium": breakdown["buyer_premium"],
+            "platform_fee": breakdown["platform_fee"],
+            "seller_commission": breakdown["seller_commission"],
+            "tax_gst": breakdown["gst"],
+            "tax_qst": breakdown["qst"],
+            "stripe_processing_fee": breakdown["stripe_processing_fee"],
+            "currency": breakdown["currency"].lower(),
             "payment_status": "pending",
-            "metadata": {"buyer_fee": str(buyer_fee)},
+            "payment_type": "listing_purchase",
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
         await db.payment_transactions.insert_one(txn)
 
-        return {"url": session.url, "session_id": session.id}
+        return {"url": result["checkout_url"], "session_id": result["session_id"], "breakdown": breakdown}
 
     # ── Subscription checkout ──
     if not data.price_id or not data.success_url:
@@ -568,44 +575,73 @@ async def create_promotion(
     data: Dict[str, Any],
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
-    """Create a listing promotion (featured/highlighted)"""
+    """
+    Create a listing promotion with Stripe Checkout.
+    Tiers: basic ($9.99/7d), standard ($24.99/14d), premium ($49.99/30d).
+    """
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentication required")
-    
+
     current_user = await _get_current_user(credentials)
     db = get_db()
-    
+
     listing_id = data.get("listing_id")
-    promotion_type = data.get("type", "featured")  # featured, highlighted
-    duration_days = data.get("duration_days", 7)
-    
+    tier = data.get("tier", "basic")  # basic, standard, premium
+    origin_url = data.get("origin_url", "https://bidvex.com")
+
     # Verify listing ownership
-    listing = await db.listings.find_one({
-        "id": listing_id,
-        "seller_id": current_user.id
-    })
-    
+    listing = await db.listings.find_one({"id": listing_id, "seller_id": current_user.id})
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found or not owned by you")
-    
+
+    user = await db.users.find_one({"id": current_user.id})
+    customer_id = user.get("stripe_customer_id") if user else None
+    if not customer_id:
+        customer = stripe.Customer.create(
+            email=current_user.email,
+            metadata={"user_id": current_user.id},
+        )
+        customer_id = customer.id
+        await db.users.update_one({"id": current_user.id}, {"$set": {"stripe_customer_id": customer_id}})
+
+    from services.connect_payment_engine import create_promotion_checkout
+
+    result = create_promotion_checkout(
+        customer_id=customer_id,
+        listing_id=listing_id,
+        user_id=current_user.id,
+        tier=tier,
+        success_url=f"{origin_url}/payment/success?type=promotion&session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{origin_url}/listing/{listing_id}",
+    )
+
+    # Store pending promotion
+    from services.pricing_config import PROMOTION_TIERS
+    promo_config = PROMOTION_TIERS.get(tier, PROMOTION_TIERS["basic"])
     now = datetime.now(timezone.utc)
-    
+
     promotion = {
         "id": str(uuid.uuid4()),
         "listing_id": listing_id,
         "user_id": current_user.id,
-        "type": promotion_type,
-        "start_date": now.isoformat(),
-        "end_date": (now + timedelta(days=duration_days)).isoformat(),
+        "tier": tier,
+        "session_id": result["session_id"],
+        "duration_days": promo_config["duration_days"],
+        "features": promo_config["features"],
+        "price_cents": promo_config["price_cents"],
+        "start_date": None,  # Set on payment confirmation
+        "end_date": None,
         "status": "pending_payment",
-        "created_at": now.isoformat()
+        "created_at": now.isoformat(),
     }
-    
     await db.promotions.insert_one(promotion)
-    
+
     return {
         "promotion_id": promotion["id"],
-        "status": "created"
+        "checkout_url": result["checkout_url"],
+        "session_id": result["session_id"],
+        "tier": tier,
+        "price": result["price"],
     }
 
 
@@ -626,6 +662,100 @@ async def get_my_promotions(
     ).to_list(100)
     
     return {"promotions": promotions}
+
+
+
+# ========== EMAIL MARKETING CREDITS ==========
+
+class EmailCreditsRequest(BaseModel):
+    quantity: int = Field(..., ge=100, le=100000, description="Number of email credits to purchase")
+    origin_url: Optional[str] = "https://bidvex.com"
+
+
+@payments_router.post("/email-credits/purchase")
+async def purchase_email_credits(
+    data: EmailCreditsRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """
+    Purchase email marketing credits (pay-as-you-go).
+    Pricing: 1-1k=$0.018/ea, 1k-5k=$0.015/ea, 5k-10k=$0.012/ea, 10k+=$0.010/ea.
+    """
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    current_user = await _get_current_user(credentials)
+    db = get_db()
+
+    user = await db.users.find_one({"id": current_user.id})
+    customer_id = user.get("stripe_customer_id") if user else None
+    if not customer_id:
+        customer = stripe.Customer.create(
+            email=current_user.email,
+            metadata={"user_id": current_user.id},
+        )
+        customer_id = customer.id
+        await db.users.update_one({"id": current_user.id}, {"$set": {"stripe_customer_id": customer_id}})
+
+    from services.connect_payment_engine import create_email_credits_checkout
+
+    result = create_email_credits_checkout(
+        customer_id=customer_id,
+        user_id=current_user.id,
+        quantity=data.quantity,
+        success_url=f"{data.origin_url}/payment/success?type=email_credits&session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{data.origin_url}/email-marketing",
+    )
+
+    return {
+        "checkout_url": result["checkout_url"],
+        "session_id": result["session_id"],
+        "quantity": result["quantity"],
+        "total_amount": result["total_cents"] / 100,
+        "per_email": round(result["total_cents"] / result["quantity"] / 100, 4),
+    }
+
+
+@payments_router.get("/email-credits/balance")
+async def get_email_credit_balance(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """Get the current user's email credit balance."""
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    current_user = await _get_current_user(credentials)
+    db = get_db()
+
+    user = await db.users.find_one({"id": current_user.id}, {"_id": 0, "email_credits": 1})
+    return {"credits": user.get("email_credits", 0) if user else 0}
+
+
+@payments_router.get("/pricing-config")
+async def get_pricing_config():
+    """Public endpoint returning current platform pricing for UI display."""
+    from services.pricing_config import (
+        BUYER_PREMIUM_RATES, SELLER_COMMISSION_RATES,
+        SUBSCRIPTION_TIERS, PROMOTION_TIERS, EMAIL_CREDIT_TIERS,
+        DEPOSIT_THRESHOLD_CAD, DEPOSIT_AMOUNT_DOLLARS,
+        PLATFORM_FEE_GENERAL, PLATFORM_FEE_VEHICLE,
+    )
+    return {
+        "commissions": {
+            "general": float(PLATFORM_FEE_GENERAL),
+            "vehicle": float(PLATFORM_FEE_VEHICLE),
+        },
+        "buyer_premiums": {k: float(v) for k, v in BUYER_PREMIUM_RATES.items()},
+        "seller_commissions": {k: float(v) for k, v in SELLER_COMMISSION_RATES.items()},
+        "subscriptions": SUBSCRIPTION_TIERS,
+        "promotions": PROMOTION_TIERS,
+        "email_credits": EMAIL_CREDIT_TIERS,
+        "deposit": {
+            "threshold_cad": DEPOSIT_THRESHOLD_CAD,
+            "amount_dollars": DEPOSIT_AMOUNT_DOLLARS,
+        },
+    }
+
 
 
 # ========== FEE CALCULATIONS ==========

@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 class SubscriptionTier(str, Enum):
     FREE = "free"
     BASIC = "basic"  # Alias for free
+    PARTNER = "partner"  # $100/yr Annual Partner Fee
     PREMIUM = "premium"
     PARTNER_PRO = "partner_pro"
     VIP = "vip"
@@ -30,6 +31,7 @@ class SubscriptionTier(str, Enum):
 STRIPE_PRICE_IDS = {
     "free": "price_1T5V79Bd6Wtvh7hsnp69zu1F",
     "basic": "price_1T5V79Bd6Wtvh7hsnp69zu1F",  # Same as free
+    "partner": "",  # $100/yr — Created dynamically on startup
     "premium": "price_1T5V5xBd6Wtvh7hscWcNnk34",
     "partner_pro": "",  # Created dynamically on startup
     "vip": "price_1T5V2bBd6Wtvh7hsqLLmAZSH",
@@ -46,6 +48,7 @@ PRICE_ID_TO_TIER = {
 SUBSCRIPTION_PRICES = {
     "free": {"amount": 0, "currency": "CAD", "interval": "year", "display": "Free"},
     "basic": {"amount": 0, "currency": "CAD", "interval": "year", "display": "Free"},
+    "partner": {"amount": 10000, "currency": "CAD", "interval": "year", "display": "$100.00 CAD/year + taxes"},
     "premium": {"amount": 18000, "currency": "CAD", "interval": "year", "display": "$180.00 CAD/year + taxes"},
     "partner_pro": {"amount": 24000, "currency": "CAD", "interval": "year", "display": "$240.00 CAD/year + taxes"},
     "vip": {"amount": 30000, "currency": "CAD", "interval": "year", "display": "$300.00 CAD/year + taxes"},

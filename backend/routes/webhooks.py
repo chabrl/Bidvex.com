@@ -256,6 +256,28 @@ async def handle_stripe_webhook(request: Request):
         elif event_type == "payment_method.attached":
             await _handle_payment_method_attached(db, data)
 
+        # --- Deposit holds (pre-auth) ---
+        elif event_type == "payment_intent.amount_capturable_updated":
+            # Deposit hold successfully authorized
+            pi_id = data.get("id")
+            pi_meta = data.get("metadata", {})
+            if pi_meta.get("transaction_type") == "bidding_deposit":
+                await db.bidding_deposits.update_one(
+                    {"payment_intent_id": pi_id},
+                    {"$set": {"status": "requires_capture", "authorized_at": datetime.now(timezone.utc).isoformat()}},
+                )
+                logger.info(f"Bidding deposit authorized: {pi_id}")
+
+        elif event_type == "payment_intent.canceled":
+            pi_id = data.get("id")
+            pi_meta = data.get("metadata", {})
+            if pi_meta.get("transaction_type") == "bidding_deposit":
+                await db.bidding_deposits.update_one(
+                    {"payment_intent_id": pi_id},
+                    {"$set": {"status": "released", "released_at": datetime.now(timezone.utc).isoformat()}},
+                )
+                logger.info(f"Bidding deposit released: {pi_id}")
+
         else:
             logger.info(f"Unhandled Stripe event: {event_type}")
 
@@ -735,6 +757,68 @@ async def _handle_checkout_completed(db, session):
                     logger.warning(f"Failed to schedule review request: {e}")
     
     logger.info(f"Checkout completed processing finished: {session_id}")
+
+    # ── Listing Promotion Checkout ──
+    if payment_type == "promotion" or payment_type == "listing_promotion":
+        listing_id = metadata.get("listing_id")
+        user_id = metadata.get("user_id")
+        tier = metadata.get("promotion_tier", "basic")
+        duration_days = int(metadata.get("duration_days", "7"))
+
+        now = datetime.now(timezone.utc)
+
+        # Activate promotion
+        await db.promotions.update_one(
+            {"listing_id": listing_id, "user_id": user_id, "status": "pending_payment"},
+            {"$set": {
+                "status": "active",
+                "start_date": now.isoformat(),
+                "end_date": (now + timedelta(days=duration_days)).isoformat(),
+                "paid_at": now.isoformat(),
+                "stripe_session_id": session_id,
+            }},
+        )
+
+        # Mark listing as promoted
+        await db.listings.update_one(
+            {"id": listing_id},
+            {"$set": {
+                "is_promoted": True,
+                "promotion_tier": tier,
+                "promotion_end": (now + timedelta(days=duration_days)).isoformat(),
+            }},
+        )
+        logger.info(f"Promotion activated: listing={listing_id}, tier={tier}, days={duration_days}")
+
+    # ── Email Marketing Credits Checkout ──
+    elif payment_type == "email_credits":
+        user_id = metadata.get("user_id")
+        quantity = int(metadata.get("credit_quantity", "0"))
+
+        if user_id and quantity > 0:
+            await db.users.update_one(
+                {"id": user_id},
+                {"$inc": {"email_credits": quantity}},
+            )
+            # Log the purchase
+            await db.email_credit_purchases.insert_one({
+                "user_id": user_id,
+                "quantity": quantity,
+                "stripe_session_id": session_id,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+            logger.info(f"Email credits added: user={user_id}, quantity={quantity}")
+
+    # ── Update payment_transactions is_paid for all types ──
+    await db.payment_transactions.update_one(
+        {"session_id": session_id},
+        {"$set": {
+            "payment_status": "paid",
+            "is_paid": True,
+            "paid_at": datetime.now(timezone.utc).isoformat(),
+            "stripe_payment_intent": session.get("payment_intent"),
+        }},
+    )
 
 
 async def _send_purchase_confirmation_emails(db, listing, buyer_id, breakdown, invoice_id):
