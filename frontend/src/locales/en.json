@@ -1319,5 +1319,13 @@
     "pleaseRefresh": "Please refresh the page.",
     "refresh": "Refresh",
     "takingLonger": "Taking longer than usual... still loading"
+  },
+  "messaging": {
+    "typing": "typing...",
+    "online": "Online",
+    "offline": "Offline",
+    "seenAt": "Seen at {{time}}",
+    "typeMessage": "Type a message...",
+    "delivered": "Delivered"
   }
 }

@@ -166,12 +166,12 @@ const PhoneVerificationRoute = ({ children }) => {
 };
 
 const FooterWrapper = () => {
+  const location = useLocation();
+  if (location.pathname === '/messages') return null;
   return <Footer />;
 };
 
 const MobileNavWrapper = () => {
-  const location = useLocation();
-  if (location.pathname === '/messages') return null;
   return <MobileBottomNav />;
 };
 

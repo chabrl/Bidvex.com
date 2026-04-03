@@ -1319,5 +1319,13 @@
     "pleaseRefresh": "Veuillez actualiser la page.",
     "refresh": "Actualiser",
     "takingLonger": "Plus long que d'habitude... chargement en cours"
+  },
+  "messaging": {
+    "typing": "écrit...",
+    "online": "En ligne",
+    "offline": "Hors ligne",
+    "seenAt": "Vu à {{time}}",
+    "typeMessage": "Écrire un message...",
+    "delivered": "Livré"
   }
 }

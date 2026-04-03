@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkfrontend=self.webpackChunkfrontend||[]).push([[9122],{59122(n,e,s){s.r(e),s.d(e,{default:()=>a});s(9950);var t=s(55030),r=s(33189),u=s(44414);const a=()=>{const{i18n:n}=(0,t.Bd)(),e=n.language||"en";return"fr"===e||e.startsWith("fr")?(0,u.jsx)(r.oL,{}):(0,u.jsx)(r.Lu,{})}}}]);

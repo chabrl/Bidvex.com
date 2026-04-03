@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import PartnerQuickActions from '../components/PartnerQuickActions';
+import { useCookieConsent } from '../hooks/useCookieConsent';
 import axios from 'axios';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -285,19 +286,21 @@ const UploadProgress = ({ progress, fileName }) => (
 );
 
 // ========== MESSAGE BUBBLE ==========
-const MessageBubble = ({ message, isOwn, onViewAttachment }) => {
+const MessageBubble = ({ message, isOwn, onViewAttachment, functionalityAllowed, t }) => {
   const hasAttachment = message.attachments?.length > 0;
   const hasItemDetails = message.message_type === 'item_details';
-  
+
+  const formatReadTime = (readAt) => {
+    if (!readAt) return '';
+    try { return new Date(readAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+    catch { return ''; }
+  };
+
   return (
     <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-200`}>
-      <div className={`max-w-[75%] ${isOwn ? '' : ''}`}>
-        {/* Item Details Card */}
-        {hasItemDetails && message.item_data && (
-          <ItemDetailsCard data={message.item_data} />
-        )}
-        
-        {/* Attachments */}
+      <div className="max-w-[75%]">
+        {hasItemDetails && message.item_data && <ItemDetailsCard data={message.item_data} />}
+
         {hasAttachment && (
           <div className="flex flex-wrap gap-2 mb-2">
             {message.attachments.map((att, idx) => (
@@ -305,8 +308,7 @@ const MessageBubble = ({ message, isOwn, onViewAttachment }) => {
             ))}
           </div>
         )}
-        
-        {/* Text Message */}
+
         {message.content && (
           <div className={`rounded-2xl p-4 ${
             isOwn
@@ -316,7 +318,7 @@ const MessageBubble = ({ message, isOwn, onViewAttachment }) => {
             <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
           </div>
         )}
-        
+
         {/* Timestamp & Read Receipt */}
         <div className={`flex items-center gap-1.5 mt-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
           <span className="text-xs text-slate-400">
@@ -325,8 +327,15 @@ const MessageBubble = ({ message, isOwn, onViewAttachment }) => {
           {isOwn && (
             message._pending ? (
               <Loader2 className="h-3 w-3 animate-spin text-slate-400" />
-            ) : message.is_read ? (
-              <CheckCheck className="h-3.5 w-3.5 text-[#06B6D4]" />
+            ) : functionalityAllowed && message.is_read ? (
+              <span className="inline-flex items-center gap-1" data-testid="read-receipt">
+                <CheckCheck className="h-3.5 w-3.5 text-[#38BDF8] drop-shadow-[0_0_4px_rgba(56,189,248,0.4)]" />
+                {message.read_at && (
+                  <span className="text-[10px] text-slate-400">
+                    {t('messaging.seenAt', { time: formatReadTime(message.read_at) })}
+                  </span>
+                )}
+              </span>
             ) : (
               <Check className="h-3.5 w-3.5 text-slate-400" />
             )
@@ -404,6 +413,9 @@ const MessagesPage = () => {
   const [lightboxAttachment, setLightboxAttachment] = useState(null);
   const [showMobileConversations, setShowMobileConversations] = useState(true);
   
+  const { isAllowed } = useCookieConsent();
+  const functionalityAllowed = isAllowed('functionality');
+
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -505,9 +517,9 @@ const MessagesPage = () => {
     scrollToBottom();
   }, [messages]);
 
-  // Mark messages as read
+  // Mark messages as read (gated by Law 25 functionality consent)
   useEffect(() => {
-    if (messages.length > 0 && isConnected) {
+    if (functionalityAllowed && messages.length > 0 && isConnected) {
       const unreadIds = messages
         .filter(m => m.receiver_id === user?.id && !m.is_read)
         .map(m => m.id);
@@ -515,7 +527,7 @@ const MessagesPage = () => {
         markAsRead(unreadIds);
       }
     }
-  }, [messages, isConnected, user?.id, markAsRead]);
+  }, [messages, isConnected, user?.id, markAsRead, functionalityAllowed]);
 
   const fetchConversations = async () => {
     try {
@@ -673,19 +685,15 @@ const MessagesPage = () => {
 
   const handleInputChange = (e) => {
     setNewMessage(e.target.value);
-    
-    if (e.target.value.length > 0) {
-      sendTypingStart();
-      
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-      
-      typingTimeoutRef.current = setTimeout(() => {
+
+    if (functionalityAllowed) {
+      if (e.target.value.length > 0) {
+        sendTypingStart();
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = setTimeout(() => { sendTypingStop(); }, 2000);
+      } else {
         sendTypingStop();
-      }, 2000);
-    } else {
-      sendTypingStop();
+      }
     }
   };
 
@@ -709,7 +717,7 @@ const MessagesPage = () => {
   }
 
   return (
-    <div className="flex bg-white dark:bg-slate-900" style={{ height: 'calc(100dvh - 64px)' }} data-testid="messages-page">
+    <div className="flex bg-white dark:bg-slate-900 pb-14 lg:pb-0" style={{ height: 'calc(100dvh - 64px)' }} data-testid="messages-page">
       {/* Hidden file input */}
       <input
         type="file"
@@ -822,16 +830,16 @@ const MessagesPage = () => {
                       {otherUser?.name || selectedConversation.other_user?.name}
                     </p>
                     <p className={`text-xs ${otherUserOnline ? 'text-green-500' : 'text-slate-400'}`}>
-                      {otherUserTyping ? (
-                        <span className="flex items-center gap-1">
+                      {functionalityAllowed && otherUserTyping ? (
+                        <span className="flex items-center gap-1" data-testid="typing-indicator-header">
                           <span className="flex gap-0.5">
                             <span className="w-1.5 h-1.5 bg-[#06B6D4] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                             <span className="w-1.5 h-1.5 bg-[#06B6D4] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                             <span className="w-1.5 h-1.5 bg-[#06B6D4] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                           </span>
-                          typing...
+                          {t('messaging.typing')}
                         </span>
-                      ) : otherUserOnline ? 'Online' : 'Offline'}
+                      ) : otherUserOnline ? t('messaging.online') : t('messaging.offline')}
                     </p>
                   </div>
                 </div>
@@ -886,18 +894,23 @@ const MessagesPage = () => {
                       message={msg} 
                       isOwn={msg.sender_id === user.id}
                       onViewAttachment={setLightboxAttachment}
+                      functionalityAllowed={functionalityAllowed}
+                      t={t}
                     />
                   )
                 ))}
                 
-                {/* Typing indicator */}
-                {otherUserTyping && (
-                  <div className="flex justify-start animate-in fade-in">
+                {/* Typing indicator — gated by Law 25 functionality consent */}
+                {functionalityAllowed && otherUserTyping && (
+                  <div className="flex justify-start animate-in fade-in" data-testid="typing-indicator">
                     <div className="bg-slate-200 dark:bg-slate-800 rounded-2xl rounded-bl-sm p-4">
-                      <div className="flex gap-1">
-                        <span className="w-2 h-2 bg-[#06B6D4] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <span className="w-2 h-2 bg-[#06B6D4] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <span className="w-2 h-2 bg-[#06B6D4] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      <div className="flex items-center gap-2">
+                        <div className="flex gap-1">
+                          <span className="w-2 h-2 bg-[#06B6D4] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <span className="w-2 h-2 bg-[#06B6D4] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <span className="w-2 h-2 bg-[#06B6D4] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </div>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">{t('messaging.typing')}</span>
                       </div>
                     </div>
                   </div>
@@ -928,7 +941,7 @@ const MessagesPage = () => {
 
             {/* Sticky Bottom Input */}
             <div
-              className="shrink-0 bg-white dark:bg-slate-900 border-t border-slate-200/80 dark:border-slate-700/80 shadow-[0_-2px_12px_rgba(0,0,0,0.04)]"
+              className="shrink-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200/60 dark:border-slate-700/60 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]"
               style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
               data-testid="message-input-bar"
             >
@@ -945,11 +958,7 @@ const MessagesPage = () => {
                   <input
                     ref={inputRef}
                     type="text"
-                    placeholder={
-                      (navigator.language || 'en').startsWith('fr')
-                        ? 'Ecrire un message...'
-                        : 'Type a message...'
-                    }
+                    placeholder={t('messaging.typeMessage')}
                     value={newMessage}
                     onChange={handleInputChange}
                     onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}

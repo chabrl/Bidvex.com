@@ -1,0 +1,2 @@
+/*! For license information please see 6890.39df0001.chunk.js.LICENSE.txt */
+"use strict";(self.webpackChunkfrontend=self.webpackChunkfrontend||[]).push([[6890],{6890(n,e,p){p.d(e,{A:()=>s});const s=(0,p(36230).A)("trending-up",[["polyline",{points:"22 7 13.5 15.5 8.5 10.5 2 17",key:"126l90"}],["polyline",{points:"16 7 22 7 22 13",key:"kwv8wd"}]])}}]);
