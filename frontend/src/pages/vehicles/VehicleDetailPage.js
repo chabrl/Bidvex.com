@@ -73,6 +73,7 @@ import {
   LiveStatusIndicator
 } from '../../components/vehicles/AuctionRulesDisplay';
 import { formatListingPrice } from '../../utils/currencyFormatter';
+import SecurityDepositBanner from '../../components/SecurityDepositBanner';
 
 const API = API_BASE;
 
@@ -180,6 +181,7 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [depositPaid, setDepositPaid] = useState(false);
+  const [depositAuthorized, setDepositAuthorized] = useState(false);
   
   // Real-time bidding data
   const { 
@@ -362,6 +364,14 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
           {/* Bid Input */}
           {!isEnded && (
             <div className="space-y-3">
+              {/* Security Deposit Banner for High-Value Vehicles */}
+              <SecurityDepositBanner
+                listingId={vehicle?.id}
+                startingPrice={vehicle?.starting_price || 0}
+                currency={vehicle?.currency || 'CAD'}
+                onDepositStatusChange={setDepositAuthorized}
+              />
+              
               <div>
                 <label className="text-sm text-slate-500 mb-1 block">Your Bid</label>
                 <div className="relative">
@@ -373,6 +383,7 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
                     className="pl-10 text-lg font-semibold"
                     min={minBid}
                     step={vehicle?.bid_increment || 100}
+                    disabled={(vehicle?.starting_price || 0) >= 10000 && !depositAuthorized}
                     data-testid="bid-input"
                   />
                 </div>
@@ -390,19 +401,9 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
                 />
               )}
               
-              {/* Deposit Notice */}
-              {vehicle?.requires_deposit && !depositPaid && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-sm text-blue-700 flex items-center gap-2">
-                    <CreditCard className="h-4 w-4" />
-                    Refundable deposit of {formatPrice(vehicle.deposit_amount, vehicle?.currency)} required
-                  </p>
-                </div>
-              )}
-              
               <Button 
                 onClick={handleBid}
-                disabled={bidding || !user}
+                disabled={bidding || !user || ((vehicle?.starting_price || 0) >= 10000 && !depositAuthorized)}
                 className="w-full h-14 text-lg bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
                 data-testid="place-bid-btn"
               >
@@ -410,6 +411,11 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
                   <>{t('common.processing', 'Processing...')}</>
                 ) : !user ? (
                   <>{t("auction.loginToBid")}</>
+                ) : ((vehicle?.starting_price || 0) >= 10000 && !depositAuthorized) ? (
+                  <>
+                    <Shield className="h-5 w-5 mr-2" />
+                    Deposit Required to Bid
+                  </>
                 ) : (
                   <>
                     <Gavel className="h-5 w-5 mr-2" />

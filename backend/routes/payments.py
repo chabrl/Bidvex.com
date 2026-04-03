@@ -2074,8 +2074,8 @@ async def auction_winner_preview(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
     """
-    Preview checkout breakdown for auction winner.
-    Includes late penalty calculation if past deadline.
+    Preview checkout breakdown for auction winner using Connect engine.
+    Shows tier-based fees + separate GST/QST amounts.
     """
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -2087,38 +2087,35 @@ async def auction_winner_preview(
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
 
-    # Verify caller is the winner
     if listing.get("winner_id") != current_user.id:
         raise HTTPException(status_code=403, detail="Only the auction winner can view this checkout")
 
     if listing.get("payment_status") == "paid":
         raise HTTPException(status_code=400, detail="This auction has already been paid")
 
+    from services.connect_payment_engine import calculate_connect_checkout
+
     hammer_price = listing.get("final_price", listing.get("current_price", 0))
 
     user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
     buyer_tier = user_doc.get("subscription_tier", "free") if user_doc else "free"
 
-    seller = await db.users.find_one({"id": listing["seller_id"]}, {"_id": 0})
+    seller = await db.users.find_one({"id": listing.get("seller_id")}, {"_id": 0})
+    seller_tier = seller.get("subscription_tier", "free") if seller else "free"
     seller_is_business = seller.get("is_tax_registered", False) if seller else False
-    seller_tier = seller.get("subscription_tier", "basic") if seller else "basic"
 
-    category = listing.get("category", "").lower()
-    is_vehicle = any(kw in category for kw in ["vehicle", "car", "auto", "truck", "motorcycle"])
+    category = listing.get("category", "general")
+    currency = listing.get("currency", "CAD")
 
-    if is_vehicle:
-        breakdown = calculate_vehicle_checkout(
-            hammer_price=hammer_price,
-            buyer_tier=buyer_tier
-        )
-    else:
-        breakdown = calculate_general_checkout(
-            hammer_price=hammer_price,
-            buyer_tier=buyer_tier,
-            seller_tier=seller_tier,
-            seller_is_tax_registered=seller_is_business,
-            include_processing_fee=True
-        )
+    breakdown = calculate_connect_checkout(
+        hammer_price=hammer_price,
+        category=category,
+        buyer_tier=buyer_tier,
+        seller_tier=seller_tier,
+        currency=currency,
+        province=listing.get("region", "QC"),
+        include_stripe_fee=True,
+    )
 
     # Late penalty calculation
     late_penalty = 0.0
@@ -2129,32 +2126,36 @@ async def auction_winner_preview(
         if now > deadline_dt:
             days_late = (now - deadline_dt).days
             months_late = max(1, (days_late + 29) // 30)
-            penalty_rate = 0.02 * months_late  # 2% per month
+            penalty_rate = 0.02 * months_late
             late_penalty = round(hammer_price * penalty_rate, 2)
 
-    total_with_penalty = float(breakdown.buyer_total) + late_penalty
+    total_with_penalty = breakdown["buyer_total"] + late_penalty
 
     return {
         "listing_id": listing_id,
         "title": listing.get("title", ""),
         "hammer_price": hammer_price,
-        "checkout_type": "vehicle" if is_vehicle else "general",
-        "buyer_premium_rate": float(breakdown.buyer_premium_rate),
-        "buyer_premium": float(breakdown.buyer_premium),
-        "platform_fee": float(breakdown.platform_fee),
-        "gst_on_fees": float(breakdown.gst_on_fees),
-        "qst_on_fees": float(breakdown.qst_on_fees),
-        "gst_on_hammer": float(breakdown.gst_on_hammer),
-        "qst_on_hammer": float(breakdown.qst_on_hammer),
-        "total_tax": float(breakdown.total_tax),
-        "processing_fee": float(breakdown.processing_fee),
-        "buyer_total_before_penalty": float(breakdown.buyer_total),
+        "currency": currency,
+        "checkout_type": "vehicle" if breakdown.get("platform_fee_rate", 0) == 0.025 else "general",
+        "buyer_tier": buyer_tier,
+        "seller_tier": seller_tier,
+        "buyer_premium_rate": breakdown["buyer_premium_rate"],
+        "buyer_premium": breakdown["buyer_premium"],
+        "seller_commission_rate": breakdown["seller_commission_rate"],
+        "seller_commission": breakdown["seller_commission"],
+        "platform_fee": breakdown["platform_fee"],
+        "gst": breakdown["gst"],
+        "qst": breakdown["qst"],
+        "total_tax": breakdown["total_tax"],
+        "stripe_processing_fee": breakdown["stripe_processing_fee"],
+        "buyer_total_before_penalty": breakdown["buyer_total"],
         "late_penalty": late_penalty,
         "buyer_total": total_with_penalty,
+        "seller_payout": breakdown["seller_payout"],
         "payment_deadline": payment_deadline,
         "is_overdue": late_penalty > 0,
         "seller_is_business": seller_is_business,
-        "breakdown": breakdown.to_dict(),
+        "breakdown": breakdown,
         "images": listing.get("images", []),
         "category": listing.get("category", ""),
     }
@@ -2167,12 +2168,12 @@ async def auction_winner_checkout(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
     """
-    Create Stripe checkout session for auction winner.
-    Uses idempotency key to prevent double charges.
-    All prices recalculated server-side from MongoDB.
+    Create Stripe checkout session for auction winner using Connect engine.
+    - Dynamic tier-based buyer premium / seller commission
+    - Stripe fee pass-through to buyer
+    - GST/QST as separate Stripe line items (Quebec compliance)
+    - Idempotency key prevents double charges
     """
-    import stripe as stripe_mod
-
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -2193,29 +2194,29 @@ async def auction_winner_checkout(
     if listing.get("payment_status") == "paid":
         raise HTTPException(status_code=400, detail="Already paid")
 
-    # Server-side price calculation
+    # Server-side price calculation via Connect engine
+    from services.connect_payment_engine import calculate_connect_checkout, create_connect_checkout_session
+
     hammer_price = listing.get("final_price", listing.get("current_price", 0))
 
     user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
     buyer_tier = user_doc.get("subscription_tier", "free") if user_doc else "free"
 
-    seller = await db.users.find_one({"id": listing["seller_id"]}, {"_id": 0})
-    seller_is_business = seller.get("is_tax_registered", False) if seller else False
-    seller_tier = seller.get("subscription_tier", "basic") if seller else "basic"
+    seller = await db.users.find_one({"id": listing.get("seller_id")}, {"_id": 0})
+    seller_tier = seller.get("subscription_tier", "free") if seller else "free"
 
-    category = listing.get("category", "").lower()
-    is_vehicle = any(kw in category for kw in ["vehicle", "car", "auto", "truck", "motorcycle"])
+    category = listing.get("category", "general")
+    currency = listing.get("currency", "CAD")
 
-    if is_vehicle:
-        breakdown = calculate_vehicle_checkout(hammer_price=hammer_price, buyer_tier=buyer_tier)
-    else:
-        breakdown = calculate_general_checkout(
-            hammer_price=hammer_price,
-            buyer_tier=buyer_tier,
-            seller_tier=seller_tier,
-            seller_is_tax_registered=seller_is_business,
-            include_processing_fee=True
-        )
+    breakdown = calculate_connect_checkout(
+        hammer_price=hammer_price,
+        category=category,
+        buyer_tier=buyer_tier,
+        seller_tier=seller_tier,
+        currency=currency,
+        province=listing.get("region", "QC"),
+        include_stripe_fee=True,
+    )
 
     # Late penalty
     late_penalty = 0.0
@@ -2229,85 +2230,35 @@ async def auction_winner_checkout(
             penalty_rate = 0.02 * months_late
             late_penalty = round(hammer_price * penalty_rate, 2)
 
-    total_cents = breakdown.buyer_total_cents + int(round(late_penalty * 100))
-
-    # Stripe customer
-    customer_id = user_doc.get("stripe_customer_id") if user_doc else None
-    if not customer_id:
-        customer = stripe_mod.Customer.create(
-            email=current_user.email,
-            name=getattr(current_user, "name", current_user.email),
-            metadata={"user_id": current_user.id},
-        )
-        customer_id = customer.id
-        await db.users.update_one(
-            {"id": current_user.id},
-            {"$set": {"stripe_customer_id": customer_id}},
-        )
-
-    # Idempotency key: auction_{listingId}_{winnerId}
+    return_url = data.get("return_url", f"https://bidvex.com/checkout/{listing_id}")
     idempotency_key = f"auction_{listing_id}_{current_user.id}"
 
-    return_url = data.get("return_url", f"https://bidvex.com/checkout/{listing_id}")
-
-    winner_currency = listing.get("currency", "CAD").lower()
-
-    desc_parts = [f"Winning Bid: ${hammer_price:,.2f}"]
-    if late_penalty > 0:
-        desc_parts.append(f"Late Penalty: ${late_penalty:,.2f}")
-    description = " | ".join(desc_parts)
-
-    session_params = {
-        "customer": customer_id,
-        "payment_method_types": ["card"],
-        "mode": "payment",
-        "line_items": [{
-            "price_data": {
-                "currency": winner_currency,
-                "unit_amount": total_cents,
-                "product_data": {
-                    "name": f"Auction Win - {listing.get('title', 'Item')}",
-                    "description": description,
-                },
-            },
-            "quantity": 1,
-        }],
-        "success_url": f"{return_url}?status=success&session_id={{CHECKOUT_SESSION_ID}}",
-        "cancel_url": f"{return_url}?status=cancelled",
-        "metadata": {
-            "type": "auction_winner",
-            "listing_id": listing_id,
-            "buyer_id": current_user.id,
-            "hammer_price": str(hammer_price),
-            "late_penalty": str(late_penalty),
-        },
-    }
-
-    seller_connect_id = seller.get("stripe_connect_account_id") if seller else None
-    if seller_connect_id and not is_vehicle:
-        app_fee_cents = breakdown.stripe_application_fee_cents + int(round(late_penalty * 100))
-        session_params["payment_intent_data"] = {
-            "application_fee_amount": app_fee_cents,
-            "transfer_data": {"destination": seller_connect_id},
-        }
-
-    session = stripe_mod.checkout.Session.create(
-        **session_params,
-        idempotency_key=idempotency_key
+    result = await create_connect_checkout_session(
+        db=db,
+        buyer_id=current_user.id,
+        listing=listing,
+        breakdown=breakdown,
+        success_url=f"{return_url}?status=success&session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{return_url}?status=cancelled",
+        payment_type="auction_winner",
+        metadata_extra={"listing_id": listing_id},
+        late_penalty=late_penalty,
+        idempotency_key=idempotency_key,
     )
 
-    # Store pending payment
+    # Store pending payment with full Connect breakdown
     await db.pending_payments.update_one(
         {"listing_id": listing_id, "buyer_id": current_user.id, "type": "auction_winner"},
         {"$set": {
             "id": str(uuid.uuid4()),
-            "session_id": session.id,
+            "session_id": result["session_id"],
             "listing_id": listing_id,
             "buyer_id": current_user.id,
+            "seller_id": listing.get("seller_id", ""),
             "type": "auction_winner",
-            "breakdown": breakdown.to_dict(),
+            "breakdown": breakdown,
             "late_penalty": late_penalty,
-            "total_cents": total_cents,
+            "total_cents": result["total_cents"],
             "status": "pending",
             "created_at": datetime.now(timezone.utc).isoformat(),
         }},
@@ -2321,9 +2272,9 @@ async def auction_winner_checkout(
     )
 
     return {
-        "checkout_url": session.url,
-        "session_id": session.id,
-        "total_cents": total_cents,
+        "checkout_url": result["checkout_url"],
+        "session_id": result["session_id"],
+        "total_cents": result["total_cents"],
         "late_penalty": late_penalty,
-        "breakdown": breakdown.to_dict(),
+        "breakdown": breakdown,
     }

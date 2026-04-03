@@ -28,6 +28,7 @@ import PriceBreakdown from '../components/PriceBreakdown';
 import PrivateSaleBadge, { BusinessSellerBadge } from '../components/PrivateSaleBadge';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import PartnerBadge from '../components/PartnerBadge';
+import SecurityDepositBanner from '../components/SecurityDepositBanner';
 import { useTrustStatus, BidBlocker } from '../components/TrustVerification';
 import { SellerReputationCard, SellerReviewsList } from '../components/SellerReputation';
 import Lightbox from 'yet-another-react-lightbox';
@@ -56,6 +57,7 @@ const ListingDetailPage = () => {
   const [pendingBidAmount, setPendingBidAmount] = useState(0);
   const [placingBid, setPlacingBid] = useState(false);
   const [showVerificationPrompt, setShowVerificationPrompt] = useState(false);
+  const [depositAuthorized, setDepositAuthorized] = useState(false);
   
   // Trust status for bid blocking
   const { isVerified, canBid, loading: trustLoading, refresh: refreshTrustStatus } = useTrustStatus();
@@ -503,6 +505,14 @@ const ListingDetailPage = () => {
                     </Alert>
                   )}
                   
+                  {/* Security Deposit Banner for High-Value Auctions */}
+                  <SecurityDepositBanner
+                    listingId={id}
+                    startingPrice={listing.starting_price || 0}
+                    currency={listing.currency || 'CAD'}
+                    onDepositStatusChange={setDepositAuthorized}
+                  />
+                  
                   <form onSubmit={handlePlaceBid} className="space-y-3">
                     <div>
                       <div className="flex items-center justify-between mb-2">
@@ -519,7 +529,7 @@ const ListingDetailPage = () => {
                         onChange={(e) => setBidAmount(e.target.value)}
                         placeholder={`Min: ${formatListingPrice((realtimePrice ?? listing.current_price) + 1, listing.currency)}`}
                         required
-                        disabled={!canBid}
+                        disabled={!canBid || ((listing.starting_price || 0) >= 10000 && !depositAuthorized)}
                         data-testid="bid-amount-input"
                       />
                     </div>
@@ -538,14 +548,21 @@ const ListingDetailPage = () => {
                     <Button 
                       type="submit" 
                       className="w-full gradient-button text-white border-0" 
-                      disabled={!canBid}
+                      disabled={!canBid || ((listing.starting_price || 0) >= 10000 && !depositAuthorized)}
                       data-testid="place-bid-btn"
                     >
                       {canBid ? (
-                        <>
-                          <DollarSign className="mr-2 h-4 w-4" />
-                          {t('listing.placeBid')}
-                        </>
+                        ((listing.starting_price || 0) >= 10000 && !depositAuthorized) ? (
+                          <>
+                            <Shield className="mr-2 h-4 w-4" />
+                            {i18n.language === 'fr' ? 'Dépôt requis pour enchérir' : 'Deposit Required to Bid'}
+                          </>
+                        ) : (
+                          <>
+                            <DollarSign className="mr-2 h-4 w-4" />
+                            {t('listing.placeBid')}
+                          </>
+                        )
                       ) : (
                         <>
                           <Shield className="mr-2 h-4 w-4" />

@@ -55,36 +55,48 @@ def calculate_connect_checkout(
     """
     Calculate the full payment breakdown for a Stripe Connect checkout.
 
+    General auctions:
+      - Stripe charges: hammer + buyer_premium + tax + stripe_fee
+      - application_fee: platform_fee + buyer_premium + seller_commission + tax
+      - Seller receives: hammer - seller_commission (via Connect transfer)
+
+    Vehicle auctions:
+      - Hammer paid offline (bank draft)
+      - Stripe charges: buyer_premium + platform_fee + tax + stripe_fee
+      - BidVex collects everything via Stripe (no Connect transfer)
+      - Seller receives hammer offline, minus nothing via Stripe
+
     Returns dict with all amounts in both dollars and cents.
     """
     hp = Decimal(str(hammer_price))
     cur = currency.upper()
+    cat = category.lower() if category else "general"
+    is_vehicle = any(kw in cat for kw in ("vehicle", "car", "auto", "truck", "motorcycle"))
 
     # Rates
     platform_rate = get_platform_fee_rate(category)
     buyer_premium_rate = get_buyer_premium_rate(buyer_tier)
     seller_commission_rate = get_seller_commission_rate(seller_tier)
 
-    # Buyer premium (on top of hammer price)
+    # Fee amounts (all computed off hammer)
     buyer_premium = (hp * buyer_premium_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
-    # Platform commission (from the hammer price)
     platform_fee = (hp * platform_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
-    # Seller commission (deducted from seller payout)
     seller_commission = (hp * seller_commission_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
-    # Subtotal before tax (what the buyer sees: hammer + buyer premium)
-    subtotal = hp + buyer_premium
-
-    # Taxes (Quebec: GST + QST on the buyer premium + platform fee)
+    # Taxes (Quebec: GST + QST on BidVex service fees)
     taxable = buyer_premium + platform_fee
     gst = (taxable * GST_RATE).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     qst = (taxable * QST_RATE).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     total_tax = gst + qst
 
-    # Grand total before Stripe processing fee
-    pre_stripe_total = subtotal + total_tax
+    if is_vehicle:
+        # Vehicle: only BidVex fees go through Stripe
+        # Buyer premium + platform fee + tax
+        pre_stripe_total = buyer_premium + platform_fee + total_tax
+    else:
+        # General: hammer + buyer premium + tax
+        # Platform fee is internal (part of application_fee from transfer)
+        pre_stripe_total = hp + buyer_premium + total_tax
 
     # Stripe processing fee (passed to buyer)
     if include_stripe_fee:
@@ -94,20 +106,28 @@ def calculate_connect_checkout(
     else:
         stripe_fee = Decimal("0")
 
-    # Final buyer total
-    buyer_total = pre_stripe_total + stripe_fee
+    # Stripe charge total (what Stripe actually charges the buyer's card)
+    stripe_charge = pre_stripe_total + stripe_fee
 
-    # Application fee = platform commission + buyer premium + seller commission + taxes
-    # This is what BidVex keeps after Stripe deducts processing
-    application_fee = platform_fee + buyer_premium + seller_commission + total_tax
+    # Full buyer cost (including offline amounts for vehicles)
+    buyer_total_full = hp + buyer_premium + platform_fee + total_tax + stripe_fee
 
-    # Seller payout = hammer - seller commission
+    # Application fee = what BidVex keeps
+    if is_vehicle:
+        # For vehicles, BidVex collects everything via Stripe (no Connect transfer)
+        application_fee = stripe_charge  # BidVex keeps entire Stripe charge
+    else:
+        # General: application_fee routes to BidVex from the Connect transfer
+        application_fee = platform_fee + buyer_premium + seller_commission + total_tax
+
+    # Seller payout
     seller_payout = hp - seller_commission
 
     return {
         "hammer_price": float(hp),
         "currency": cur,
         "category": category,
+        "is_vehicle": is_vehicle,
         "buyer_tier": buyer_tier,
         "seller_tier": seller_tier,
         # Rates
@@ -125,14 +145,142 @@ def calculate_connect_checkout(
         # Stripe
         "stripe_processing_fee": float(stripe_fee),
         # Totals
-        "buyer_total": float(buyer_total),
+        "buyer_total": float(buyer_total_full),
+        "stripe_charge": float(stripe_charge),
         "seller_payout": float(seller_payout),
         "application_fee": float(application_fee),
         # Cents (for Stripe API)
-        "buyer_total_cents": _to_cents(buyer_total),
+        "buyer_total_cents": _to_cents(stripe_charge),
         "application_fee_cents": _to_cents(application_fee),
         "seller_payout_cents": _to_cents(seller_payout),
     }
+
+
+def build_itemized_line_items(
+    breakdown: Dict[str, Any],
+    listing_title: str = "Auction Purchase",
+    late_penalty: float = 0.0,
+    is_vehicle: bool = False,
+) -> list:
+    """
+    Build separate Stripe line_items for Quebec tax compliance.
+    GST and QST appear as distinct rows on the Stripe checkout page.
+
+    General: Hammer + Buyer Premium + GST + QST + Stripe Fee
+    Vehicle: Buyer Premium + Platform Fee + GST + QST + Stripe Fee (hammer paid offline)
+    """
+    currency = breakdown.get("currency", "CAD").lower()
+    items = []
+
+    # 1. Hammer Price (general only — vehicles pay hammer offline via bank draft)
+    if not is_vehicle:
+        hammer_cents = _to_cents(Decimal(str(breakdown["hammer_price"])))
+        items.append({
+            "price_data": {
+                "currency": currency,
+                "unit_amount": hammer_cents,
+                "product_data": {
+                    "name": listing_title,
+                    "description": "Winning bid amount",
+                },
+            },
+            "quantity": 1,
+        })
+
+    # 2. Buyer Premium
+    premium_cents = _to_cents(Decimal(str(breakdown["buyer_premium"])))
+    if premium_cents > 0:
+        rate_pct = round(breakdown["buyer_premium_rate"] * 100, 1)
+        items.append({
+            "price_data": {
+                "currency": currency,
+                "unit_amount": premium_cents,
+                "product_data": {
+                    "name": f"Buyer Premium ({rate_pct}%)",
+                    "description": "BidVex service fee based on subscription tier",
+                },
+            },
+            "quantity": 1,
+        })
+
+    # 3. Platform Fee (vehicles only — explicitly charged to buyer; for general it's internal)
+    if is_vehicle:
+        platform_fee_cents = _to_cents(Decimal(str(breakdown["platform_fee"])))
+        if platform_fee_cents > 0:
+            pf_rate = round(breakdown.get("platform_fee_rate", 0.025) * 100, 1)
+            items.append({
+                "price_data": {
+                    "currency": currency,
+                    "unit_amount": platform_fee_cents,
+                    "product_data": {
+                        "name": f"Platform Fee ({pf_rate}%)",
+                        "description": "BidVex vehicle transaction fee",
+                    },
+                },
+                "quantity": 1,
+            })
+
+    # 4. GST (5% Federal)
+    gst_cents = _to_cents(Decimal(str(breakdown["gst"])))
+    if gst_cents > 0:
+        items.append({
+            "price_data": {
+                "currency": currency,
+                "unit_amount": gst_cents,
+                "product_data": {
+                    "name": "GST (TPS 5%)",
+                    "description": f"Federal Goods & Services Tax — GST# {os.environ.get('PLATFORM_GST_NUMBER', '')}",
+                },
+            },
+            "quantity": 1,
+        })
+
+    # 5. QST (9.975% Quebec)
+    qst_cents = _to_cents(Decimal(str(breakdown["qst"])))
+    if qst_cents > 0:
+        items.append({
+            "price_data": {
+                "currency": currency,
+                "unit_amount": qst_cents,
+                "product_data": {
+                    "name": "QST (TVQ 9.975%)",
+                    "description": f"Quebec Sales Tax — QST# {os.environ.get('PLATFORM_QST_NUMBER', '')}",
+                },
+            },
+            "quantity": 1,
+        })
+
+    # 6. Stripe Processing Fee (pass-through to buyer)
+    stripe_fee_cents = _to_cents(Decimal(str(breakdown["stripe_processing_fee"])))
+    if stripe_fee_cents > 0:
+        items.append({
+            "price_data": {
+                "currency": currency,
+                "unit_amount": stripe_fee_cents,
+                "product_data": {
+                    "name": "Payment Processing Fee",
+                    "description": "Credit card processing (2.9% + $0.30)",
+                },
+            },
+            "quantity": 1,
+        })
+
+    # 7. Late Penalty (if applicable)
+    if late_penalty > 0:
+        penalty_cents = _to_cents(Decimal(str(late_penalty)))
+        items.append({
+            "price_data": {
+                "currency": currency,
+                "unit_amount": penalty_cents,
+                "product_data": {
+                    "name": "Late Payment Penalty",
+                    "description": "2% per month overdue",
+                },
+            },
+            "quantity": 1,
+        })
+
+    return items
 
 
 async def create_connect_checkout_session(
@@ -144,9 +292,12 @@ async def create_connect_checkout_session(
     cancel_url: str,
     payment_type: str = "auction_purchase",
     metadata_extra: Optional[Dict[str, str]] = None,
+    late_penalty: float = 0.0,
+    idempotency_key: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Create a Stripe Checkout Session with Connect (application_fee + transfer_data).
+    Uses itemized line items so GST/QST appear as separate rows (Quebec compliance).
     """
     buyer = await db.users.find_one({"id": buyer_id})
     if not buyer:
@@ -169,8 +320,17 @@ async def create_connect_checkout_session(
             {"$set": {"stripe_customer_id": customer_id}},
         )
 
-    currency = breakdown.get("currency", "CAD").lower()
-    line_item_name = listing.get("title", "Auction Purchase")
+    listing_title = listing.get("title", "Auction Purchase")
+    category = listing.get("category", "general").lower()
+    is_vehicle = any(kw in category for kw in ("vehicle", "car", "auto", "truck", "motorcycle"))
+
+    # Build itemized line items (GST/QST as separate rows)
+    line_items = build_itemized_line_items(
+        breakdown=breakdown,
+        listing_title=listing_title,
+        late_penalty=late_penalty,
+        is_vehicle=is_vehicle,
+    )
 
     # Build metadata
     meta = {
@@ -182,59 +342,61 @@ async def create_connect_checkout_session(
         "hammer_price": str(breakdown["hammer_price"]),
         "platform_fee": str(breakdown["platform_fee"]),
         "buyer_premium": str(breakdown["buyer_premium"]),
+        "seller_commission": str(breakdown["seller_commission"]),
         "gst": str(breakdown["gst"]),
         "qst": str(breakdown["qst"]),
+        "late_penalty": str(late_penalty),
     }
     if metadata_extra:
         meta.update(metadata_extra)
+
+    # Application fee includes late penalty (BidVex keeps it)
+    app_fee_cents = breakdown["application_fee_cents"]
+    if late_penalty > 0:
+        app_fee_cents += _to_cents(Decimal(str(late_penalty)))
 
     # Build session params
     session_params = {
         "customer": customer_id,
         "payment_method_types": ["card"],
         "mode": "payment",
-        "line_items": [
-            {
-                "price_data": {
-                    "currency": currency,
-                    "unit_amount": breakdown["buyer_total_cents"],
-                    "product_data": {
-                        "name": line_item_name,
-                        "description": (
-                            f"Hammer: ${breakdown['hammer_price']:,.2f} | "
-                            f"Premium: ${breakdown['buyer_premium']:,.2f} | "
-                            f"Tax: ${breakdown['total_tax']:,.2f}"
-                        ),
-                    },
-                },
-                "quantity": 1,
-            }
-        ],
+        "line_items": line_items,
         "success_url": success_url,
         "cancel_url": cancel_url,
         "metadata": meta,
     }
 
     # If seller has Connect account, split the payment
-    if connect_account_id:
+    if connect_account_id and not is_vehicle:
         session_params["payment_intent_data"] = {
-            "application_fee_amount": breakdown["application_fee_cents"],
+            "application_fee_amount": app_fee_cents,
             "transfer_data": {"destination": connect_account_id},
             "metadata": meta,
         }
     else:
-        # No Connect account — BidVex collects everything
+        # No Connect account or vehicle — BidVex collects everything
         session_params["payment_intent_data"] = {"metadata": meta}
 
     # Enable Stripe Radar for high-value transactions
     if breakdown["hammer_price"] >= 5000:
         session_params["payment_intent_data"]["statement_descriptor_suffix"] = "BIDVEX"
 
-    session = stripe.checkout.Session.create(**session_params)
+    create_kwargs = {}
+    if idempotency_key:
+        create_kwargs["idempotency_key"] = idempotency_key
+
+    session = stripe.checkout.Session.create(**session_params, **create_kwargs)
+
+    total_cents = breakdown["buyer_total_cents"]
+    if late_penalty > 0:
+        total_cents += _to_cents(Decimal(str(late_penalty)))
+
     return {
         "session_id": session.id,
         "checkout_url": session.url,
         "breakdown": breakdown,
+        "total_cents": total_cents,
+        "late_penalty": late_penalty,
     }
 
 

@@ -520,6 +520,21 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
         raise HTTPException(status_code=400, detail="Cannot bid on your own listing")
     if listing["status"] != "active":
         raise HTTPException(status_code=400, detail="Listing is not active")
+
+    # ========== HIGH-VALUE DEPOSIT CHECK ($1k hold for >$10k auctions) ==========
+    from services.pricing_config import DEPOSIT_THRESHOLD_CAD, DEPOSIT_AMOUNT_DOLLARS
+    starting_price = listing.get("starting_price", 0)
+    if starting_price >= DEPOSIT_THRESHOLD_CAD and current_user.role != 'admin':
+        active_deposit = await db.bidding_deposits.find_one({
+            "user_id": current_user.id,
+            "listing_id": bid_data.listing_id,
+            "status": {"$in": ["requires_capture", "succeeded"]},
+        })
+        if not active_deposit:
+            raise HTTPException(
+                status_code=403,
+                detail=f"A refundable ${DEPOSIT_AMOUNT_DOLLARS:,} security deposit is required to bid on this high-value auction. Please authorize the hold before placing a bid."
+            )
     if isinstance(listing.get("auction_end_date"), str):
         auction_end = datetime.fromisoformat(listing["auction_end_date"])
     else:
