@@ -13,16 +13,24 @@
 
 ## Completed Work
 
+### App-Style Mobile Stack & Premium Real-Time Messaging (April 3, 2026)
+- **Mobile Stack**: MobileBottomNav re-enabled on `/messages` route; chat input stacks directly above it with `pb-14 lg:pb-0`
+- **Frosted Glass Input**: Input bar uses `bg-white/90 backdrop-blur-xl` for clear glass effect, no visual clutter from scrolling messages
+- **Footer**: Hidden on `/messages` via FooterWrapper location check
+- **Read Receipts**: Vibrant BidVex blue double checkmark (`#38BDF8`) with bilingual "Seen at {{time}}" / "Vu à {{time}}"
+- **Typing Indicators**: Bilingual dots animation + text in both chat header and message bubble area
+- **Law 25 Compliance**: All read receipts, typing indicators, and mark-as-read gated behind `isAllowed('functionality')` from `useCookieConsent`
+- **i18n**: Added `messaging` key to en.json/fr.json (typing, online, offline, seenAt, typeMessage, delivered)
+- **Testing**: 14/14 tests passed (iteration_100.json) — 100% backend + 100% frontend
+
 ### Messaging UI Refactoring — Bilingual & Partner Features (April 3, 2026)
-- **Hybrid Layout**: Flex column (header → messages flex-1 → quick actions → sticky input → footer)
+- **Hybrid Layout**: Flex column (header -> messages flex-1 -> quick actions -> sticky input)
 - **AI Chatbot**: Hidden on `/messages` via `AIAssistantWrapper` in App.js
 - **PartnerQuickActions** (VIP/Partner Pro only):
-  - Bilingual Quick Replies (EN: "Still available?", "Price is firm"… / FR: "Toujours disponible?", "Prix ferme"…)
+  - Bilingual Quick Replies (EN: "Still available?", "Price is firm" / FR: "Toujours disponible?", "Prix ferme")
   - Inspection Scheduler: Calendar date picker via Popover
   - Auction Terms: Shares bilingual terms into chat
-- **Language Detection**: `navigator.language` for placeholder and quick reply language
 - **visualViewport API**: Mobile keyboard handling + `env(safe-area-inset-bottom)`
-- **Footer visible** at absolute bottom on /messages; MobileBottomNav hidden
 - Testing: 28/28 passed (15 desktop + 13 mobile)
 
 ### Previous Sessions
@@ -34,5 +42,9 @@
 
 ## Backlog
 - [ ] Cloudflare CDN setup (P2)
-- [ ] Post-launch monitoring (P2)
-- [ ] Read receipts / "seen at" timestamps in message bubbles
+- [ ] Post-launch monitoring and alerting (P2)
+- [ ] Real-time performance dashboard (Enhancement)
+- [ ] Automated Lighthouse audits weekly (Enhancement)
+- [ ] Server-side PageSpeed monitoring endpoint (Enhancement)
+- [ ] i18n for EmailMarketingPricing page (Low)
+- [ ] Refactor MessagesPage.js (~1000 lines) into smaller components (Tech debt)
