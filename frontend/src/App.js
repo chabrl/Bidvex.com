@@ -165,6 +165,18 @@ const PhoneVerificationRoute = ({ children }) => {
   return children;
 };
 
+const FooterWrapper = () => {
+  const location = useLocation();
+  if (location.pathname === '/messages') return null;
+  return <Footer />;
+};
+
+const MobileNavWrapper = () => {
+  const location = useLocation();
+  if (location.pathname === '/messages') return null;
+  return <MobileBottomNav />;
+};
+
 const MaintenanceGuard = ({ children }) => {
   const { mode, message, expectedBack, socialLinks, loading, isMaintenanceOrComingSoon } = useSiteMode();
   const { user, loading: authLoading } = useAuth();
@@ -180,7 +192,8 @@ const MaintenanceGuard = ({ children }) => {
   const isPartnerRoute = location.pathname === '/become-a-partner' || location.pathname.startsWith('/partner');
   const isLegalRoute = location.pathname === '/legal';
   const isInviteRoute = location.pathname.startsWith('/invite/');
-  if (isAuthRoute || isPartnerRoute || isLegalRoute || isInviteRoute) return children;
+  const isMessagesRoute = location.pathname === '/messages';
+  if (isAuthRoute || isPartnerRoute || isLegalRoute || isInviteRoute || isMessagesRoute) return children;
   
   if (loading || authLoading) return <PageLoader />;
   
@@ -350,13 +363,13 @@ const App = () => {
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
           </Suspense>
-          <Footer />
+          <FooterWrapper />
           <Suspense fallback={null}>
             <AIAssistant />
           </Suspense>
           <MessageNotificationListener />
           <Toaster position="top-right" />
-            <MobileBottomNav />
+            <MobileNavWrapper />
           </div>
           </MaintenanceGuard>
           </SiteModeProvider>

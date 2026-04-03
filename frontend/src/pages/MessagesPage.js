@@ -407,6 +407,27 @@ const MessagesPage = () => {
   const inputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const fileInputRef = useRef(null);
+  const chatContainerRef = useRef(null);
+
+  // Mobile keyboard handling via visualViewport API
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+
+    const handleResize = () => {
+      const inputBar = document.querySelector('[data-testid="message-input-bar"]');
+      if (!inputBar) return;
+      const offset = window.innerHeight - viewport.height;
+      inputBar.style.transform = offset > 50 ? `translateY(-${offset}px)` : '';
+    };
+
+    viewport.addEventListener('resize', handleResize);
+    viewport.addEventListener('scroll', handleResize);
+    return () => {
+      viewport.removeEventListener('resize', handleResize);
+      viewport.removeEventListener('scroll', handleResize);
+    };
+  }, []);
 
   // Real-time messaging hook
   const {
@@ -682,7 +703,7 @@ const MessagesPage = () => {
   }
 
   return (
-    <div className="h-[calc(100vh-64px)] flex bg-white dark:bg-slate-900" data-testid="messages-page">
+    <div className="h-[100dvh] flex bg-white dark:bg-slate-900" data-testid="messages-page">
       {/* Hidden file input */}
       <input
         type="file"
@@ -758,11 +779,11 @@ const MessagesPage = () => {
       </div>
 
       {/* ========== CHAT AREA (Right Pane) ========== */}
-      <div className={`${showMobileConversations ? 'hidden' : 'flex'} md:flex flex-col flex-1 min-w-0`}>
+      <div className={`${showMobileConversations ? 'hidden' : 'flex'} md:flex flex-col flex-1 min-w-0 relative`}>
         {selectedConversation ? (
           <>
             {/* Chat Header */}
-            <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+            <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0 z-10">
               {/* User Info Bar */}
               <div className="p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -847,9 +868,9 @@ const MessagesPage = () => {
               <ProductMiniCard info={listingInfo} navigate={navigate} />
             </div>
 
-            {/* Messages Area */}
-            <ScrollArea className="flex-1 p-4 bg-slate-50 dark:bg-slate-950">
-              <div className="space-y-4 max-w-3xl mx-auto">
+            {/* Messages Area — padded bottom so content isn't hidden behind fixed input */}
+            <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950" data-testid="messages-scroll-area">
+              <div className="p-4 pb-24 space-y-4 max-w-3xl mx-auto">
                 {messages.map((msg) => (
                   msg.message_type === 'system' || msg.message_type === 'auction_won' ? (
                     <SystemMessageCard key={msg.id} message={msg} />
@@ -878,49 +899,58 @@ const MessagesPage = () => {
                 
                 <div ref={messagesEndRef} />
               </div>
-            </ScrollArea>
+            </div>
 
-            {/* Upload Progress */}
+            {/* Upload Progress (positioned above fixed input) */}
             {uploadProgress && (
-              <div className="px-4 pb-2">
-                <UploadProgress progress={uploadProgress.progress} fileName={uploadProgress.fileName} />
+              <div className="fixed bottom-20 left-0 right-0 md:left-96 z-20 px-4"
+                style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+                <div className="max-w-3xl mx-auto">
+                  <UploadProgress progress={uploadProgress.progress} fileName={uploadProgress.fileName} />
+                </div>
               </div>
             )}
 
-            {/* Message Input */}
-            <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-              <div className="flex gap-2 max-w-3xl mx-auto">
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={!!uploadProgress}
-                  className="text-slate-500 hover:text-[#06B6D4] hover:bg-[#06B6D4]/10"
-                >
-                  <Paperclip className="h-5 w-5" />
-                </Button>
-                <Input
-                  ref={inputRef}
-                  placeholder="Type a message..."
-                  value={newMessage}
-                  onChange={handleInputChange}
-                  onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-                  data-testid="message-input"
-                  disabled={sending}
-                  className="flex-1 border-slate-200 dark:border-slate-700 focus:border-[#06B6D4] focus:ring-[#06B6D4]/20"
-                />
-                <Button 
-                  onClick={sendMessage} 
-                  className="bg-gradient-to-r from-[#1E3A8A] to-[#06B6D4] text-white hover:opacity-90 shadow-lg shadow-[#06B6D4]/30" 
-                  data-testid="send-message-btn"
-                  disabled={!newMessage.trim() || sending}
-                >
-                  {sending ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    <Send className="h-5 w-5" />
-                  )}
-                </Button>
+            {/* Fixed-Bottom Message Input */}
+            <div
+              className="fixed bottom-0 left-0 right-0 md:left-96 z-20 bg-white dark:bg-slate-900 border-t border-slate-200/80 dark:border-slate-700/80 shadow-[0_-2px_12px_rgba(0,0,0,0.06)]"
+              style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+              data-testid="message-input-bar"
+            >
+              <div className="px-3 py-2.5 sm:px-4 sm:py-3 max-w-3xl mx-auto">
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={!!uploadProgress}
+                    className="flex items-center justify-center w-10 h-10 rounded-full text-slate-400 hover:text-[#06B6D4] hover:bg-[#06B6D4]/10 transition-colors shrink-0 disabled:opacity-40"
+                    data-testid="message-attach-btn"
+                  >
+                    <Paperclip className="h-5 w-5" />
+                  </button>
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    placeholder="Type a message..."
+                    value={newMessage}
+                    onChange={handleInputChange}
+                    onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                    data-testid="message-input"
+                    disabled={sending}
+                    className="flex-1 h-11 px-4 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-[#06B6D4] focus:ring-2 focus:ring-[#06B6D4]/20 transition-all"
+                  />
+                  <button
+                    onClick={sendMessage} 
+                    data-testid="send-message-btn"
+                    disabled={!newMessage.trim() || sending}
+                    className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-[#1E3A8A] to-[#06B6D4] text-white shadow-lg shadow-[#06B6D4]/25 hover:opacity-90 transition-opacity shrink-0 disabled:opacity-40 disabled:shadow-none"
+                  >
+                    {sending ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <Send className="h-5 w-5 -ml-0.5" />
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </>
