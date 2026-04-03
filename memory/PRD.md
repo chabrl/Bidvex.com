@@ -13,35 +13,32 @@
 
 ## Completed Work
 
-### Multi-Currency Support (CAD/USD) — April 3, 2026
-- **Schema**: `Listing` model now includes `currency: str = "CAD"` field; `ListingCreate` accepts optional `currency`
-- **Auto-Detection**: Uses `detect_currency_from_location()` — country=CA → CAD, country=US → USD
-- **Seller Flow**: Currency Toggle (CAD/USD with flag icons) on `CreateListingPage.js`; warning tooltip about immutability; price labels show dynamic currency code
-- **Bilingual Display**: New `formatListingPrice(amount, currency)` in `currencyFormatter.js`: EN → `$5,000.00 CAD` / FR → `5 000,00 $ CAD`
-- **Updated Components**: ListingDetailPage, VehicleDetailPage, VehicleAuctionsPage, WatchlistPage, LotsMarketplacePage, HomePage, useRealtimeBidding
-- **Bidding**: Bid input shows currency badge ("Bid in USD"); backend includes currency in bid response and WebSocket broadcasts
-- **Stripe**: All 4 checkout flows (listing purchase, buy-now, auction-winner, transaction record) use `listing.get("currency", "CAD").lower()` instead of hardcoded `"cad"`
-- **i18n**: Added `currency` section to en.json/fr.json (selector, warningTitle, warningBody, bidIn, listedIn)
-- **Testing**: iteration_101 — 12/16 backend (4 auth-env related), 100% frontend
+### French Bid Button Overflow Fix — April 3, 2026
+- **Layout**: Lot card bid input + button now stack vertically (`flex-col`) on all viewports to prevent "Placer une enchère" overflow
+- **Responsive Text**: Mobile shows compact "Enchérir" (`sm:hidden`), desktop shows full "Placer une enchère" (`hidden sm:inline`)
+- **Button Styling**: Full-width (`w-full`), `text-sm` font, consistent padding
+- **i18n**: Added `bid.placeBidCompact`, `bid.buyNow`, `bid.biddingEnded`, `bid.buyNowSkip`, `bid.buyNowAvailable` to en.json/fr.json
+- **Buy Now**: Localized with i18n (EN: "Buy Now", FR: "Acheter"); proper flex stacking on mobile
+- **Testing**: iteration_102 — 100% backend + 100% frontend
 
-### App-Style Mobile Stack & Premium Real-Time Messaging — April 3, 2026
-- Mobile Stack: MobileBottomNav visible on `/messages`; chat input stacks above with frosted glass backdrop-blur
-- Read Receipts: Vibrant BidVex blue (#38BDF8) double checkmarks; bilingual "Seen at" / "Vu à"
-- Typing Indicators: Bilingual dots animation gated by Law 25 functionality consent
-- Testing: 14/14 passed (iteration_100)
+### Multi-Currency Support (CAD/USD) — April 3, 2026
+- **Schema**: `Listing` model has `currency: str = "CAD"` with auto-detection from location
+- **Seller Flow**: Currency Toggle (🇨🇦 CAD / 🇺🇸 USD) with warning tooltip on Create Listing
+- **Bilingual Display**: `formatListingPrice()` → EN: `$5,000.00 CAD` / FR: `5 000,00 $ CAD`
+- **Updated**: ListingDetailPage, VehicleDetailPage, VehicleAuctionsPage, WatchlistPage, LotsMarketplacePage, HomePage, useRealtimeBidding
+- **Stripe**: All 4 checkout flows use dynamic `listing.get("currency","CAD").lower()`
+- **Testing**: iteration_101 — 100% frontend
+
+### App-Style Mobile Stack & Premium Messaging — April 3, 2026
+- Mobile Stack, Read Receipts, Typing Indicators with Law 25 gating
+- Testing: iteration_100 — 14/14 passed
 
 ### Previous Sessions
-- Messaging UI Refactoring (Partner Quick Actions, Inspection Scheduler) — 28/28 tests
-- Partner & Trust Features (badges, dashboard) — 14/14 tests
-- Law 25 Cookie Consent Banner — 11/11 tests
-- Tax Report Export — 22/22 tests
-- Commercial Readiness (tax engine, PDF invoices) — 36/36 tests
-- Brute Force, Redis Cache, Architecture Refactor, Risk Monitoring
+- Messaging UI Refactoring, Partner & Trust Features, Law 25 Cookie Consent, Tax Report Export, Commercial Readiness (tax engine, PDF invoices), Architecture Refactor
 
 ## Backlog
 - [ ] Cloudflare CDN setup (P2)
 - [ ] Post-launch monitoring and alerting (P2)
 - [ ] Real-time performance dashboard (Enhancement)
 - [ ] Automated Lighthouse audits weekly (Enhancement)
-- [ ] Server-side PageSpeed monitoring endpoint (Enhancement)
 - [ ] Refactor MessagesPage.js (~1000 lines) into smaller components (Tech debt)
