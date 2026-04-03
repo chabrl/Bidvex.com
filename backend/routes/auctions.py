@@ -587,7 +587,8 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
     # Real-time broadcast
     broadcast_data = {
         'bid_count': new_bid_count,
-        'current_price': bid_data.amount
+        'current_price': bid_data.amount,
+        'currency': listing.get("currency", "CAD"),
     }
 
     if extension_applied and new_auction_end:
@@ -680,6 +681,7 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
 
     response = bid.model_dump()
     response["created_at"] = bid_dict["created_at"]
+    response["currency"] = listing.get("currency", "CAD")
     if extension_applied:
         response["extension_applied"] = True
         response["new_auction_end"] = new_auction_end.isoformat()

@@ -919,9 +919,14 @@
     "mustAgreeToTerms": "Vous devez accepter les conditions de l'enchère avant de placer une enchère"
   },
   "currency": {
-    "locked": "Verrouillée",
-    "complianceMessage": "La devise est déterminée par votre emplacement pour se conformer aux règles fiscales locales.",
-    "requestChange": "Demander un Changement de Devise"
+    "cad": "CAD",
+    "usd": "USD",
+    "selector": "Devise de l'annonce",
+    "selectorHint": "Sélectionnez la devise pour cette enchère",
+    "warningTitle": "Avis sur la devise",
+    "warningBody": "Changer la devise exigera que tous les enchérisseurs paient dans cette devise. Ceci ne peut pas être modifié une fois l'enchère commencée.",
+    "bidIn": "Enchérir en {{currency}}",
+    "listedIn": "Annoncé en {{currency}}"
   },
   "bidErrorGuide": {
     "title": "Erreurs Courantes d'Enchères",

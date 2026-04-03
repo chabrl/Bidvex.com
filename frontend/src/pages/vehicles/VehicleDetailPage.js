@@ -72,17 +72,13 @@ import {
   AuctionRulesSummary,
   LiveStatusIndicator
 } from '../../components/vehicles/AuctionRulesDisplay';
+import { formatListingPrice } from '../../utils/currencyFormatter';
 
 const API = API_BASE;
 
-// Format helpers
-const formatPrice = (price) => {
-  const { t } = useTranslation();
-  return new Intl.NumberFormat('en-CA', {
-    style: 'currency',
-    currency: 'CAD',
-    minimumFractionDigits: 0,
-  }).format(price);
+// Format helpers — uses listing currency
+const formatPrice = (price, currency = 'CAD') => {
+  return formatListingPrice(price, currency);
 };
 
 const formatMileage = (mileage) => {
@@ -221,7 +217,7 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
     
     const amount = parseFloat(bidAmount);
     if (isNaN(amount) || amount < minBid) {
-      toast.error(`Minimum bid is ${formatPrice(minBid)}`);
+      toast.error(`Minimum bid is ${formatPrice(minBid, vehicle?.currency)}`);
       return;
     }
     
@@ -248,7 +244,7 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      toast.success(`Bid placed: ${formatPrice(amount)}`);
+      toast.success(`Bid placed: ${formatPrice(amount, vehicle?.currency)}`);
       onBidPlaced?.(response.data);
       setBidAmount((amount + (vehicle?.bid_increment || 100)).toString());
       
@@ -291,7 +287,7 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-blue-100 text-sm">Current Bid</p>
-              <p className="text-3xl font-bold">{formatPrice(displayBid)}</p>
+              <p className="text-3xl font-bold">{formatPrice(displayBid, vehicle?.currency)}</p>
             </div>
             {connected && (
               <Badge className="bg-green-500 animate-pulse">
@@ -381,7 +377,7 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
                   />
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
-                  Minimum bid: {formatPrice(minBid)} (increment: {formatPrice(vehicle?.bid_increment || 100)})
+                  Minimum bid: {formatPrice(minBid, vehicle?.currency)} (increment: {formatPrice(vehicle?.bid_increment || 100, vehicle?.currency)})
                 </p>
               </div>
               
@@ -399,7 +395,7 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                   <p className="text-sm text-blue-700 flex items-center gap-2">
                     <CreditCard className="h-4 w-4" />
-                    Refundable deposit of {formatPrice(vehicle.deposit_amount)} required
+                    Refundable deposit of {formatPrice(vehicle.deposit_amount, vehicle?.currency)} required
                   </p>
                 </div>
               )}
@@ -425,7 +421,7 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
               {/* Buy Now */}
               {vehicle?.buy_now_price && displayBid < vehicle.buy_now_price && (
                 <Button variant="outline" className="w-full h-12">
-                  Buy Now: {formatPrice(vehicle.buy_now_price)}
+                  Buy Now: {formatPrice(vehicle.buy_now_price, vehicle?.currency)}
                 </Button>
               )}
             </div>
@@ -860,7 +856,7 @@ const VehicleDetailPage = () => {
                               </div>
                             </div>
                             <p className={`font-bold ${i === 0 ? 'text-blue-600' : ''}`}>
-                              {formatPrice(bid.amount)}
+                              {formatPrice(bid.amount, vehicle?.currency)}
                             </p>
                           </div>
                         ))}

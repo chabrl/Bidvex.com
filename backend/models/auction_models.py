@@ -33,6 +33,7 @@ class ListingCreate(BaseModel):
     agreement_metadata: Optional[Dict[str, Any]] = None
     # Listing-level buyer's premium (rate, e.g. 0.15 for 15%). None = use org/tier default
     buyers_premium_rate: Optional[float] = None
+    currency: Optional[str] = None  # CAD or USD; auto-detected from location if omitted
 
 
 class Listing(BaseModel):
@@ -64,6 +65,7 @@ class Listing(BaseModel):
     visit_availability: Optional[Dict[str, Any]] = None
     custom_buyer_premium_rate: Optional[float] = None
     is_partner_listing: bool = False
+    currency: str = "CAD"
 
 
 # ========== BIDS ==========

@@ -4,7 +4,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { extractErrorMessage } from '../utils/errorHandler';
-import { formatCurrency, formatPercent } from '../utils/currencyFormatter';
+import { formatCurrency, formatPercent, formatListingPrice } from '../utils/currencyFormatter';
 import axios from 'axios';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -394,7 +394,7 @@ const ListingDetailPage = () => {
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">{t('marketplace.currentBid')}</p>
                     <p className="text-4xl font-bold gradient-text" data-testid="current-price">
-                      {formatCurrency(realtimePrice ?? listing.current_price)}
+                      {formatListingPrice(realtimePrice ?? listing.current_price, listing.currency)}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
                       {realtimeBidCount ?? listing.bid_count ?? 0} {(realtimeBidCount ?? listing.bid_count ?? 0) === 1 ? 'bid' : 'bids'} placed
@@ -505,14 +505,19 @@ const ListingDetailPage = () => {
                   
                   <form onSubmit={handlePlaceBid} className="space-y-3">
                     <div>
-                      <label className="text-sm font-medium mb-2 block">{t('listing.yourBid')}</label>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-sm font-medium">{t('listing.yourBid')}</label>
+                        <Badge variant="outline" className="text-xs font-mono" data-testid="bid-currency-badge">
+                          {t('currency.bidIn', { currency: listing.currency || 'CAD' })}
+                        </Badge>
+                      </div>
                       <Input
                         type="number"
                         step="0.01"
                         min={(realtimePrice ?? listing.current_price) + 0.01}
                         value={bidAmount}
                         onChange={(e) => setBidAmount(e.target.value)}
-                        placeholder={`Min: ${formatCurrency((realtimePrice ?? listing.current_price) + 1)}`}
+                        placeholder={`Min: ${formatListingPrice((realtimePrice ?? listing.current_price) + 1, listing.currency)}`}
                         required
                         disabled={!canBid}
                         data-testid="bid-amount-input"
@@ -594,7 +599,7 @@ const ListingDetailPage = () => {
                         onClick={handleBuyNow}
                         data-testid="buy-now-btn"
                       >
-                        {t('marketplace.buyNow')}: {formatCurrency(listing.buy_now_price)}
+                        {t('marketplace.buyNow')}: {formatListingPrice(listing.buy_now_price, listing.currency)}
                       </Button>
                     </>
                   )}
@@ -739,7 +744,7 @@ const ListingDetailPage = () => {
                         </div>
                         
                         {/* Bid Amount */}
-                        <span className="font-bold text-lg gradient-text">{formatCurrency(bid.amount)}</span>
+                        <span className="font-bold text-lg gradient-text">{formatListingPrice(bid.amount, listing.currency)}</span>
                       </div>
                     ))}
                   </div>

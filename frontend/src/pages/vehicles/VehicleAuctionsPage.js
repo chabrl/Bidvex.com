@@ -47,14 +47,11 @@ const bodyTypeIcons = {
   other: '🚘',
 };
 
-// Format price
-const formatPrice = (price) => {
-  return new Intl.NumberFormat('en-CA', {
-    style: 'currency',
-    currency: 'CAD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(price);
+import { formatListingPrice } from '../../utils/currencyFormatter';
+
+// Format price — uses listing currency
+const formatPrice = (price, currency = 'CAD') => {
+  return formatListingPrice(price, currency);
 };
 
 // Format mileage
@@ -242,7 +239,7 @@ const VehicleCard = ({ vehicle, onClick }) => {
             <div>
               <p className="text-xs text-slate-500 uppercase tracking-wide">Current Bid</p>
               <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                {vehicle.current_bid > 0 ? formatPrice(vehicle.current_bid) : formatPrice(vehicle.starting_price)}
+                {vehicle.current_bid > 0 ? formatPrice(vehicle.current_bid, vehicle.currency) : formatPrice(vehicle.starting_price, vehicle.currency)}
               </p>
             </div>
             <Button size="sm" className="bg-blue-600 hover:bg-blue-700">

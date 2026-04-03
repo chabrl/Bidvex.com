@@ -919,9 +919,14 @@
     "mustAgreeToTerms": "You must agree to the auction terms before placing a bid"
   },
   "currency": {
-    "locked": "Locked",
-    "complianceMessage": "Currency is determined by your location to comply with local tax rules.",
-    "requestChange": "Request Currency Change"
+    "cad": "CAD",
+    "usd": "USD",
+    "selector": "Listing Currency",
+    "selectorHint": "Select the currency for this auction",
+    "warningTitle": "Currency Notice",
+    "warningBody": "Changing the currency will require all bidders to pay in this currency. This cannot be changed once the auction starts.",
+    "bidIn": "Bid in {{currency}}",
+    "listedIn": "Listed in {{currency}}"
   },
   "bidErrorGuide": {
     "title": "Common Bid Errors",

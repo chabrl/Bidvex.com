@@ -1,7 +1,7 @@
 import i18n from '../i18n';
 
 /**
- * Format a numeric amount as localized currency.
+ * Format a numeric amount as localized currency (symbol only, no code suffix).
  *
  * EN:    $1,250.50
  * FR-QC: 1 250,50 $
@@ -12,7 +12,7 @@ import i18n from '../i18n';
  */
 export function formatCurrency(amount, currency = 'CAD') {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  if (num == null || isNaN(num)) return currency === 'USD' ? '$0.00' : '$0.00';
+  if (num == null || isNaN(num)) return '$0.00';
 
   const lang = i18n.language || 'en';
   const isFr = lang.startsWith('fr');
@@ -28,6 +28,39 @@ export function formatCurrency(amount, currency = 'CAD') {
   } catch {
     // Fallback
     return `$${num.toFixed(2)}`;
+  }
+}
+
+/**
+ * Format a listing price with currency code suffix.
+ * Follows strict Canadian bilingual standards:
+ *
+ * EN: $5,000.00 CAD  |  $5,000.00 USD
+ * FR: 5 000,00 $ CAD |  5 000,00 $ USD
+ *
+ * @param {number|string|null|undefined} amount
+ * @param {string} [currency='CAD'] - ISO 4217 code
+ * @returns {string}
+ */
+export function formatListingPrice(amount, currency = 'CAD') {
+  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+  if (num == null || isNaN(num)) return `$0.00 ${currency}`;
+
+  const lang = i18n.language || 'en';
+  const isFr = lang.startsWith('fr');
+  const code = (currency || 'CAD').toUpperCase();
+
+  try {
+    const formatted = new Intl.NumberFormat(isFr ? 'fr-CA' : 'en-CA', {
+      style: 'currency',
+      currency: code,
+      currencyDisplay: 'narrowSymbol',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(num);
+    return `${formatted} ${code}`;
+  } catch {
+    return `$${num.toFixed(2)} ${code}`;
   }
 }
 

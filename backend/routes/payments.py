@@ -117,13 +117,14 @@ async def create_checkout_session(
         total_amount = listing["current_price"] * (1 + buyer_fee)
         amount_cents = int(round(total_amount * 100))
 
+        listing_currency = listing.get("currency", "CAD").lower()
         origin = data.origin_url or "https://bidvex.com"
         session = stripe.checkout.Session.create(
             customer=customer_id,
             payment_method_types=["card"],
             line_items=[{
                 "price_data": {
-                    "currency": "cad",
+                    "currency": listing_currency,
                     "unit_amount": amount_cents,
                     "product_data": {"name": listing.get("title", "Auction Purchase")},
                 },
@@ -147,7 +148,7 @@ async def create_checkout_session(
             "user_id": current_user.id,
             "listing_id": data.listing_id,
             "amount": total_amount,
-            "currency": "cad",
+            "currency": listing_currency,
             "payment_status": "pending",
             "metadata": {"buyer_fee": str(buyer_fee)},
             "created_at": datetime.now(timezone.utc).isoformat(),
@@ -1884,13 +1885,15 @@ async def buy_now_checkout(
 
     seller_connect_id = seller.get("stripe_connect_account_id") if seller else None
 
+    auction_currency = auction.get("currency", "CAD").lower()
+
     session_params = {
         "customer": customer_id,
         "payment_method_types": ["card"],
         "mode": "payment",
         "line_items": [{
             "price_data": {
-                "currency": "cad",
+                "currency": auction_currency,
                 "unit_amount": breakdown.buyer_total_cents,
                 "product_data": {
                     "name": f"Buy Now - {lot_title}",
@@ -2117,6 +2120,8 @@ async def auction_winner_checkout(
 
     return_url = data.get("return_url", f"https://bidvex.com/checkout/{listing_id}")
 
+    winner_currency = listing.get("currency", "CAD").lower()
+
     desc_parts = [f"Winning Bid: ${hammer_price:,.2f}"]
     if late_penalty > 0:
         desc_parts.append(f"Late Penalty: ${late_penalty:,.2f}")
@@ -2128,7 +2133,7 @@ async def auction_winner_checkout(
         "mode": "payment",
         "line_items": [{
             "price_data": {
-                "currency": "cad",
+                "currency": winner_currency,
                 "unit_amount": total_cents,
                 "product_data": {
                     "name": f"Auction Win - {listing.get('title', 'Item')}",

@@ -14,7 +14,7 @@ import Countdown from 'react-countdown';
 import WishlistHeartButton from '../components/WishlistHeartButton';
 import MarketplaceSidebar from '../components/MarketplaceSidebar';
 import { VerifiedBadge } from '../components/VerifiedBadge';
-import { formatCurrency } from '../utils/currencyFormatter';
+import { formatCurrency, formatListingPrice } from '../utils/currencyFormatter';
 import { SellerRatingInline } from '../components/SellerReputation';
 import { LoadingTimeout } from '../components/LoadingTimeout';
 
@@ -154,7 +154,7 @@ const LotsMarketplacePage = () => {
             <div>
               <p className="text-xs uppercase tracking-wider" style={{ color: '#9ca3af' }}>{t('marketplace.startingFrom', 'Starting from')}</p>
               <p className="text-xl font-bold" style={{ background: 'linear-gradient(to right, #2563eb, #06b6d4)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>
-                {formatCurrency(firstLot?.starting_price || 0)}
+                {formatListingPrice(firstLot?.starting_price || 0, firstLot?.currency)}
               </p>
             </div>
             <WishlistHeartButton auctionId={listing.id} wishlistCount={listing.wishlist_count || 0} />

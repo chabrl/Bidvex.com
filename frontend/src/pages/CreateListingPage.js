@@ -12,9 +12,10 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from 'sonner';
-import { Loader2, Upload } from 'lucide-react';
+import { Loader2, Upload, AlertTriangle } from 'lucide-react';
 import LocationSelector from '../components/LocationSelector';
 import useGeoLocation from '../hooks/useGeoLocation';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
 
 const API = API_BASE;
 
@@ -39,6 +40,7 @@ const CreateListingPage = () => {
     postal_code: '',
     location: '',
     auction_end_date: '',
+    currency: 'CAD',
   });
 
   // Buyer's Premium — default to org setting
@@ -268,7 +270,7 @@ const CreateListingPage = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="starting_price">{t('createListing.startingPrice', 'Starting Price')} ($) *</Label>
+                  <Label htmlFor="starting_price">{t('createListing.startingPrice', 'Starting Price')} ({formData.currency}) *</Label>
                   <Input
                     id="starting_price"
                     name="starting_price"
@@ -285,7 +287,7 @@ const CreateListingPage = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="buy_now_price">{t('createListing.buyNowPrice', 'Buy Now Price')} ($)</Label>
+                  <Label htmlFor="buy_now_price">{t('createListing.buyNowPrice', 'Buy Now Price')} ({formData.currency})</Label>
                   <Input
                     id="buy_now_price"
                     name="buy_now_price"
@@ -328,6 +330,7 @@ const CreateListingPage = () => {
                 }}
                 geoSuggestion={geo}
                 onChange={({ country, region, city, postalCode }) => {
+                  const detectedCurrency = country === 'US' ? 'USD' : 'CAD';
                   setFormData(prev => ({
                     ...prev,
                     country,
@@ -335,9 +338,48 @@ const CreateListingPage = () => {
                     city,
                     postal_code: postalCode,
                     location: [city, region, postalCode].filter(Boolean).join(', '),
+                    currency: detectedCurrency,
                   }));
                 }}
               />
+
+              {/* Currency Selector */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label>{t('currency.selector', 'Listing Currency')}</Label>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AlertTriangle className="h-4 w-4 text-amber-500 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs text-sm">
+                        <p className="font-semibold mb-1">{t('currency.warningTitle', 'Currency Notice')}</p>
+                        <p>{t('currency.warningBody', 'Changing the currency will require all bidders to pay in this currency. This cannot be changed once the auction starts.')}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <div className="flex gap-2" data-testid="currency-selector">
+                  {['CAD', 'USD'].map((cur) => (
+                    <button
+                      key={cur}
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, currency: cur }))}
+                      className={`flex-1 py-2.5 px-4 rounded-lg border-2 text-sm font-semibold transition-all ${
+                        formData.currency === cur
+                          ? 'border-[#06B6D4] bg-[#06B6D4]/10 text-[#06B6D4]'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-500 hover:border-slate-300'
+                      }`}
+                      data-testid={`currency-${cur.toLowerCase()}`}
+                    >
+                      {cur === 'CAD' ? '🇨🇦 CAD' : '🇺🇸 USD'}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-500">
+                  {t('currency.selectorHint', 'Select the currency for this auction')}
+                </p>
+              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="auction_end_date">{t('createListing.auctionEndDate', 'Auction End Date')} *</Label>

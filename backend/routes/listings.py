@@ -128,7 +128,10 @@ async def create_listing(
         latitude=listing_data.latitude, longitude=listing_data.longitude,
         auction_end_date=listing_data.auction_end_date,
         shipping_info=listing_data.shipping_info,
-        visit_availability=listing_data.visit_availability
+        visit_availability=listing_data.visit_availability,
+        currency=listing_data.currency if listing_data.currency else detect_currency_from_location(
+            city=listing_data.city, region=listing_data.region, country=listing_data.country
+        ),
     )
     listing_dict = listing.model_dump()
 
@@ -141,7 +144,8 @@ async def create_listing(
 async def get_listings(
     category: Optional[str] = None, city: Optional[str] = None, region: Optional[str] = None,
     condition: Optional[str] = None, min_price: Optional[float] = None, max_price: Optional[float] = None,
-    search: Optional[str] = None, sort: str = "created_at", limit: int = 50, skip: int = 0
+    search: Optional[str] = None, sort: str = "created_at", limit: int = 50, skip: int = 0,
+    currency: Optional[str] = None,
 ):
     db = get_db()
     query = {"status": "active"}
@@ -153,6 +157,8 @@ async def get_listings(
         query["region"] = region
     if condition:
         query["condition"] = condition
+    if currency:
+        query["currency"] = currency
     if min_price is not None:
         query["current_price"] = {"$gte": min_price}
     if max_price is not None:
