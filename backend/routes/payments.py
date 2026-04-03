@@ -119,6 +119,7 @@ async def create_checkout_session(
         buyer_tier = user.get("subscription_tier", "free")
         seller = await db.users.find_one({"id": listing.get("seller_id")})
         seller_tier = seller.get("subscription_tier", "free") if seller else "free"
+        seller_is_partner = bool(seller.get("is_partner") and seller.get("platform_fee_paid")) if seller else False
 
         breakdown = calculate_connect_checkout(
             hammer_price=listing["current_price"],
@@ -127,6 +128,7 @@ async def create_checkout_session(
             seller_tier=seller_tier,
             currency=listing.get("currency", "CAD"),
             province=listing.get("region", "QC"),
+            seller_is_partner=seller_is_partner,
         )
 
         origin = data.origin_url or "https://bidvex.com"
@@ -147,11 +149,13 @@ async def create_checkout_session(
             "user_id": current_user.id,
             "listing_id": data.listing_id,
             "seller_id": listing.get("seller_id", ""),
+            "flow_type": breakdown["flow_type"],
             "amount": breakdown["buyer_total"],
             "hammer_price": breakdown["hammer_price"],
             "buyer_premium": breakdown["buyer_premium"],
             "platform_fee": breakdown["platform_fee"],
             "seller_commission": breakdown["seller_commission"],
+            "partner_premium_retained": breakdown.get("partner_premium_retained", 0),
             "tax_gst": breakdown["gst"],
             "tax_qst": breakdown["qst"],
             "stripe_processing_fee": breakdown["stripe_processing_fee"],
@@ -2103,6 +2107,7 @@ async def auction_winner_preview(
     seller = await db.users.find_one({"id": listing.get("seller_id")}, {"_id": 0})
     seller_tier = seller.get("subscription_tier", "free") if seller else "free"
     seller_is_business = seller.get("is_tax_registered", False) if seller else False
+    seller_is_partner = bool(seller.get("is_partner") and seller.get("platform_fee_paid")) if seller else False
 
     category = listing.get("category", "general")
     currency = listing.get("currency", "CAD")
@@ -2115,6 +2120,7 @@ async def auction_winner_preview(
         currency=currency,
         province=listing.get("region", "QC"),
         include_stripe_fee=True,
+        seller_is_partner=seller_is_partner,
     )
 
     # Late penalty calculation
@@ -2136,7 +2142,9 @@ async def auction_winner_preview(
         "title": listing.get("title", ""),
         "hammer_price": hammer_price,
         "currency": currency,
-        "checkout_type": "vehicle" if breakdown.get("platform_fee_rate", 0) == 0.025 else "general",
+        "checkout_type": "vehicle" if breakdown.get("is_vehicle") else "general",
+        "flow_type": breakdown["flow_type"],
+        "seller_is_partner": seller_is_partner,
         "buyer_tier": buyer_tier,
         "seller_tier": seller_tier,
         "buyer_premium_rate": breakdown["buyer_premium_rate"],
@@ -2144,6 +2152,7 @@ async def auction_winner_preview(
         "seller_commission_rate": breakdown["seller_commission_rate"],
         "seller_commission": breakdown["seller_commission"],
         "platform_fee": breakdown["platform_fee"],
+        "partner_premium_retained": breakdown.get("partner_premium_retained", 0),
         "gst": breakdown["gst"],
         "qst": breakdown["qst"],
         "total_tax": breakdown["total_tax"],
@@ -2155,6 +2164,7 @@ async def auction_winner_preview(
         "payment_deadline": payment_deadline,
         "is_overdue": late_penalty > 0,
         "seller_is_business": seller_is_business,
+        "is_partner_listing": seller_is_partner,
         "breakdown": breakdown,
         "images": listing.get("images", []),
         "category": listing.get("category", ""),
@@ -2204,6 +2214,7 @@ async def auction_winner_checkout(
 
     seller = await db.users.find_one({"id": listing.get("seller_id")}, {"_id": 0})
     seller_tier = seller.get("subscription_tier", "free") if seller else "free"
+    seller_is_partner = bool(seller.get("is_partner") and seller.get("platform_fee_paid")) if seller else False
 
     category = listing.get("category", "general")
     currency = listing.get("currency", "CAD")
@@ -2216,6 +2227,7 @@ async def auction_winner_checkout(
         currency=currency,
         province=listing.get("region", "QC"),
         include_stripe_fee=True,
+        seller_is_partner=seller_is_partner,
     )
 
     # Late penalty

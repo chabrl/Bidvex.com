@@ -494,12 +494,36 @@ async def get_partner_stats_endpoint(current_user: User = Depends(get_current_us
             price = listing.get("current_price") or listing.get("starting_price") or 0
             projected_revenue += price
 
+    # ── Partner Benefit: premiums retained this month via PARTNER_FLOW ──
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+    benefit_pipeline = [
+        {"$match": {
+            "seller_id": partner_id,
+            "flow_type": "PARTNER_FLOW",
+            "payment_status": {"$in": ["paid", "completed", "succeeded"]},
+            "created_at": {"$gte": month_start},
+        }},
+        {"$group": {
+            "_id": None,
+            "total_premium_retained": {"$sum": "$partner_premium_retained"},
+            "count": {"$sum": 1},
+        }},
+    ]
+    benefit_result = await db.payment_transactions.aggregate(benefit_pipeline).to_list(1)
+    partner_benefit = {
+        "premiums_retained_this_month": round(benefit_result[0]["total_premium_retained"], 2) if benefit_result else 0,
+        "transactions_this_month": benefit_result[0]["count"] if benefit_result else 0,
+    }
+
     return {
         **platform_stats,
         "my_active_listings": active_listings,
         "my_total_listings": total_listings,
         "my_total_bids_received": total_bids_received,
         "my_projected_revenue": round(projected_revenue, 2),
+        "partner_benefit": partner_benefit,
     }
 
 

@@ -1,16 +1,22 @@
 """
 BidVex Stripe Connect Payment Engine
-Handles multi-party payments, platform commissions, deposits, and payouts.
+Handles multi-party payments with two-tier marketplace economy:
 
-Payment Flow:
-1. Buyer pays total (hammer + buyer premium + taxes + Stripe processing fee)
-2. Stripe deducts processing fee (~2.9% + $0.30)
-3. application_fee_amount routes platform commission to BidVex Treasury
-4. Remainder is transferred to Seller's Connect account
+PARTNER FLOW (is_partner=True, $100/yr Annual Fee):
+  - BidVex keeps ONLY Seller Commission (2.5% vehicle / 3.0% general)
+  - 100% of Buyer Premium goes to Partner's Connect account
+  - Stripe fees deducted from Partner's final payout (NOT passed to buyer)
+  - Taxes on (Hammer + Premium)
 
-For Vehicles:
-- Hammer price is settled outside Stripe (bank draft)
-- Only BidVex fees (buyer premium + platform fee + taxes) go through Stripe
+STANDARD FLOW (is_partner=False):
+  - BidVex keeps BOTH Buyer Premium AND Seller Commission
+  - Seller receives only Hammer - Seller Commission
+  - Stripe processing fee passed to buyer
+  - Taxes on (Hammer + Premium)
+
+For Vehicles (both flows):
+  - Hammer price settled outside Stripe (bank draft)
+  - Only fees go through Stripe
 """
 
 import os
@@ -51,83 +57,111 @@ def calculate_connect_checkout(
     currency: str = "CAD",
     province: str = "QC",
     include_stripe_fee: bool = True,
+    seller_is_partner: bool = False,
 ) -> Dict[str, Any]:
     """
-    Calculate the full payment breakdown for a Stripe Connect checkout.
+    Calculate payment breakdown using the Two-Tier marketplace economy.
 
-    General auctions:
-      - Stripe charges: hammer + buyer_premium + tax + stripe_fee
-      - application_fee: platform_fee + buyer_premium + seller_commission + tax
-      - Seller receives: hammer - seller_commission (via Connect transfer)
-
-    Vehicle auctions:
-      - Hammer paid offline (bank draft)
-      - Stripe charges: buyer_premium + platform_fee + tax + stripe_fee
-      - BidVex collects everything via Stripe (no Connect transfer)
-      - Seller receives hammer offline, minus nothing via Stripe
-
-    Returns dict with all amounts in both dollars and cents.
+    Partner sellers: BidVex takes only platform commission (2.5%/3%).
+                     Buyer Premium flows to Partner. Stripe fees from Partner payout.
+    Standard sellers: BidVex takes both Buyer Premium + Seller Commission.
+                      Stripe fee passed to buyer.
+    Taxes: GST+QST on (Hammer + Buyer Premium) regardless of seller type.
     """
     hp = Decimal(str(hammer_price))
     cur = currency.upper()
     cat = category.lower() if category else "general"
     is_vehicle = any(kw in cat for kw in ("vehicle", "car", "auto", "truck", "motorcycle"))
 
+    flow_type = "PARTNER_FLOW" if seller_is_partner else "STANDARD_FLOW"
+
     # Rates
     platform_rate = get_platform_fee_rate(category)
     buyer_premium_rate = get_buyer_premium_rate(buyer_tier)
-    seller_commission_rate = get_seller_commission_rate(seller_tier)
 
-    # Fee amounts (all computed off hammer)
+    # Buyer premium (always charged on top of hammer)
     buyer_premium = (hp * buyer_premium_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    platform_fee = (hp * platform_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    seller_commission = (hp * seller_commission_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
-    # Taxes (Quebec: GST + QST on BidVex service fees)
-    taxable = buyer_premium + platform_fee
+    # Platform commission (BidVex's cut from the transaction)
+    platform_fee = (hp * platform_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    if seller_is_partner:
+        # PARTNER FLOW: BidVex takes only platform commission (2.5%/3%)
+        # Seller commission = platform fee rate (not tier-based)
+        seller_commission = platform_fee
+        seller_commission_rate = platform_rate
+    else:
+        # STANDARD FLOW: Tier-based seller commission
+        seller_commission_rate_val = get_seller_commission_rate(seller_tier)
+        seller_commission = (hp * seller_commission_rate_val).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        seller_commission_rate = seller_commission_rate_val
+
+    # ── TAXES: GST + QST on (Hammer + Buyer Premium) ──
+    taxable = hp + buyer_premium
     gst = (taxable * GST_RATE).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     qst = (taxable * QST_RATE).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     total_tax = gst + qst
 
+    # ── Stripe charge computation ──
     if is_vehicle:
-        # Vehicle: only BidVex fees go through Stripe
-        # Buyer premium + platform fee + tax
-        pre_stripe_total = buyer_premium + platform_fee + total_tax
+        # Vehicle: only fees go through Stripe (hammer paid offline)
+        if seller_is_partner:
+            pre_stripe_total = buyer_premium + platform_fee + total_tax
+        else:
+            pre_stripe_total = buyer_premium + platform_fee + total_tax
     else:
-        # General: hammer + buyer premium + tax
-        # Platform fee is internal (part of application_fee from transfer)
+        # General: hammer + premium + tax go through Stripe
         pre_stripe_total = hp + buyer_premium + total_tax
 
-    # Stripe processing fee (passed to buyer)
-    if include_stripe_fee:
+    # Stripe processing fee
+    if include_stripe_fee and not seller_is_partner:
+        # STANDARD: Stripe fee passed to buyer
         stripe_fee = ((pre_stripe_total * STRIPE_PROCESSING_RATE) + STRIPE_PROCESSING_FIXED).quantize(
             Decimal("0.01"), rounding=ROUND_HALF_UP
         )
     else:
+        # PARTNER: Stripe fee deducted from Partner's payout, NOT charged to buyer
         stripe_fee = Decimal("0")
 
-    # Stripe charge total (what Stripe actually charges the buyer's card)
+    # Total Stripe charge
     stripe_charge = pre_stripe_total + stripe_fee
 
-    # Full buyer cost (including offline amounts for vehicles)
-    buyer_total_full = hp + buyer_premium + platform_fee + total_tax + stripe_fee
-
-    # Application fee = what BidVex keeps
+    # Full buyer cost (for display; includes offline hammer for vehicles)
     if is_vehicle:
-        # For vehicles, BidVex collects everything via Stripe (no Connect transfer)
-        application_fee = stripe_charge  # BidVex keeps entire Stripe charge
+        buyer_total_full = hp + buyer_premium + platform_fee + total_tax + stripe_fee
     else:
-        # General: application_fee routes to BidVex from the Connect transfer
-        application_fee = platform_fee + buyer_premium + seller_commission + total_tax
+        buyer_total_full = hp + buyer_premium + total_tax + stripe_fee
+
+    # ── Application fee (what BidVex keeps via Stripe) ──
+    if seller_is_partner:
+        # PARTNER: BidVex keeps ONLY the seller commission (platform fee)
+        if is_vehicle:
+            application_fee = stripe_charge  # No Connect for vehicles; BidVex collects all
+        else:
+            application_fee = seller_commission  # Only platform commission
+    else:
+        # STANDARD: BidVex keeps buyer premium + seller commission + taxes
+        if is_vehicle:
+            application_fee = stripe_charge  # BidVex collects all vehicle Stripe fees
+        else:
+            application_fee = buyer_premium + seller_commission + total_tax
 
     # Seller payout
-    seller_payout = hp - seller_commission
+    if seller_is_partner:
+        # Partner keeps: total - BidVex commission - Stripe fee (deducted by Stripe)
+        seller_payout = hp - seller_commission  # Plus they keep the buyer premium
+        partner_premium_retained = buyer_premium
+    else:
+        seller_payout = hp - seller_commission
+        partner_premium_retained = Decimal("0")
 
     return {
         "hammer_price": float(hp),
         "currency": cur,
         "category": category,
         "is_vehicle": is_vehicle,
+        "flow_type": flow_type,
+        "seller_is_partner": seller_is_partner,
         "buyer_tier": buyer_tier,
         "seller_tier": seller_tier,
         # Rates
@@ -138,7 +172,9 @@ def calculate_connect_checkout(
         "buyer_premium": float(buyer_premium),
         "platform_fee": float(platform_fee),
         "seller_commission": float(seller_commission),
-        # Tax
+        "partner_premium_retained": float(partner_premium_retained),
+        # Tax (on Hammer + Premium)
+        "taxable_amount": float(taxable),
         "gst": float(gst),
         "qst": float(qst),
         "total_tax": float(total_tax),
@@ -166,10 +202,12 @@ def build_itemized_line_items(
     Build separate Stripe line_items for Quebec tax compliance.
     GST and QST appear as distinct rows on the Stripe checkout page.
 
-    General: Hammer + Buyer Premium + GST + QST + Stripe Fee
-    Vehicle: Buyer Premium + Platform Fee + GST + QST + Stripe Fee (hammer paid offline)
+    General: Hammer + Buyer Premium + GST + QST + Stripe Fee (Standard only)
+    Vehicle: Buyer Premium + Platform Fee + GST + QST + Stripe Fee (Standard only)
+    Partner flow: No Processing Fee line (deducted from Partner payout by Stripe)
     """
     currency = breakdown.get("currency", "CAD").lower()
+    is_partner = breakdown.get("seller_is_partner", False)
     items = []
 
     # 1. Hammer Price (general only — vehicles pay hammer offline via bank draft)
@@ -191,13 +229,14 @@ def build_itemized_line_items(
     premium_cents = _to_cents(Decimal(str(breakdown["buyer_premium"])))
     if premium_cents > 0:
         rate_pct = round(breakdown["buyer_premium_rate"] * 100, 1)
+        desc = "100% transferred to Partner seller" if is_partner else "BidVex service fee based on subscription tier"
         items.append({
             "price_data": {
                 "currency": currency,
                 "unit_amount": premium_cents,
                 "product_data": {
                     "name": f"Buyer Premium ({rate_pct}%)",
-                    "description": "BidVex service fee based on subscription tier",
+                    "description": desc,
                 },
             },
             "quantity": 1,
@@ -220,7 +259,7 @@ def build_itemized_line_items(
                 "quantity": 1,
             })
 
-    # 4. GST (5% Federal)
+    # 4. GST (5% Federal) — on (Hammer + Premium)
     gst_cents = _to_cents(Decimal(str(breakdown["gst"])))
     if gst_cents > 0:
         items.append({
@@ -235,7 +274,7 @@ def build_itemized_line_items(
             "quantity": 1,
         })
 
-    # 5. QST (9.975% Quebec)
+    # 5. QST (9.975% Quebec) — on (Hammer + Premium)
     qst_cents = _to_cents(Decimal(str(breakdown["qst"])))
     if qst_cents > 0:
         items.append({
@@ -250,20 +289,21 @@ def build_itemized_line_items(
             "quantity": 1,
         })
 
-    # 6. Stripe Processing Fee (pass-through to buyer)
-    stripe_fee_cents = _to_cents(Decimal(str(breakdown["stripe_processing_fee"])))
-    if stripe_fee_cents > 0:
-        items.append({
-            "price_data": {
-                "currency": currency,
-                "unit_amount": stripe_fee_cents,
-                "product_data": {
-                    "name": "Payment Processing Fee",
-                    "description": "Credit card processing (2.9% + $0.30)",
+    # 6. Stripe Processing Fee (STANDARD flow only — Partners absorb this)
+    if not is_partner:
+        stripe_fee_cents = _to_cents(Decimal(str(breakdown["stripe_processing_fee"])))
+        if stripe_fee_cents > 0:
+            items.append({
+                "price_data": {
+                    "currency": currency,
+                    "unit_amount": stripe_fee_cents,
+                    "product_data": {
+                        "name": "Payment Processing Fee",
+                        "description": "Credit card processing (2.9% + $0.30)",
+                    },
                 },
-            },
-            "quantity": 1,
-        })
+                "quantity": 1,
+            })
 
     # 7. Late Penalty (if applicable)
     if late_penalty > 0:
@@ -333,12 +373,15 @@ async def create_connect_checkout_session(
     )
 
     # Build metadata
+    flow_type = breakdown.get("flow_type", "STANDARD_FLOW")
+    seller_is_partner = breakdown.get("seller_is_partner", False)
     meta = {
         "user_id": buyer_id,
         "listing_id": listing.get("id", ""),
         "seller_id": seller_id or "",
         "transaction_type": payment_type,
         "type": payment_type,
+        "flow_type": flow_type,
         "hammer_price": str(breakdown["hammer_price"]),
         "platform_fee": str(breakdown["platform_fee"]),
         "buyer_premium": str(breakdown["buyer_premium"]),
@@ -366,13 +409,22 @@ async def create_connect_checkout_session(
         "metadata": meta,
     }
 
-    # If seller has Connect account, split the payment
+    # If seller has Connect account, split the payment based on flow type
     if connect_account_id and not is_vehicle:
-        session_params["payment_intent_data"] = {
-            "application_fee_amount": app_fee_cents,
-            "transfer_data": {"destination": connect_account_id},
-            "metadata": meta,
-        }
+        if seller_is_partner:
+            # PARTNER FLOW: BidVex takes only seller commission; rest goes to Partner
+            session_params["payment_intent_data"] = {
+                "application_fee_amount": app_fee_cents,
+                "transfer_data": {"destination": connect_account_id},
+                "metadata": meta,
+            }
+        else:
+            # STANDARD FLOW: BidVex takes premium + commission + taxes
+            session_params["payment_intent_data"] = {
+                "application_fee_amount": app_fee_cents,
+                "transfer_data": {"destination": connect_account_id},
+                "metadata": meta,
+            }
     else:
         # No Connect account or vehicle — BidVex collects everything
         session_params["payment_intent_data"] = {"metadata": meta}

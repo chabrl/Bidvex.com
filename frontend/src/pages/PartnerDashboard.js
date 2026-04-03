@@ -299,6 +299,39 @@ export default function PartnerDashboard() {
           </div>
         )}
 
+        {/* ─── Partner Benefit Summary Card ─── */}
+        {partnerStats?.partner_benefit && isActive && (
+          <Card className="mb-8 border-emerald-200 dark:border-emerald-900/40 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 shadow-sm" data-testid="partner-benefit-card">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center">
+                    <TrendingUp className="h-5 w-5 text-emerald-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-emerald-900 dark:text-emerald-100 text-sm">
+                      {i18n.language === 'fr' ? 'Avantage Partenaire' : 'Partner Benefit'}
+                    </h3>
+                    <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                      {i18n.language === 'fr'
+                        ? `En tant que Partenaire BidVex, vous avez conservé ${new Intl.NumberFormat('fr-CA', { style: 'currency', currency: 'CAD' }).format(partnerStats.partner_benefit.premiums_retained_this_month)} en primes acheteurs ce mois-ci.`
+                        : `As a BidVex Partner, you retained ${new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' }).format(partnerStats.partner_benefit.premiums_retained_this_month)} in Buyer Premiums this month.`}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300" data-testid="partner-benefit-amount">
+                    ${partnerStats.partner_benefit.premiums_retained_this_month?.toLocaleString('en-CA', { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                    {partnerStats.partner_benefit.transactions_this_month} {i18n.language === 'fr' ? 'transactions' : 'transactions'}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Main Grid */}
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Column 1: Subscription & Billing (Priority 1) */}

@@ -84,6 +84,7 @@ const CheckoutPage = () => {
         setBreakdown(winnerRes.data.breakdown);
         setCheckoutType(winnerRes.data.checkout_type);
         setSellerIsTaxRegistered(winnerRes.data.seller_is_business);
+        setIsPartnerListing(winnerRes.data.is_partner_listing || false);
         setLatePenalty(winnerRes.data.late_penalty || 0);
         setIsOverdue(winnerRes.data.is_overdue || false);
         setPaymentDeadline(winnerRes.data.payment_deadline);
@@ -332,8 +333,19 @@ const CheckoutPage = () => {
                 
                 {/* BidVex Fees Section */}
                 <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-4">
-                  <h3 className="font-semibold text-sm text-blue-600 dark:text-blue-400 mb-3">
-                    {isFrench ? 'FRAIS DE SERVICE BIDVEX' : 'BIDVEX SERVICE FEES'}
+                  <h3 className="font-semibold text-sm text-blue-600 dark:text-blue-400 mb-3 flex items-center justify-between">
+                    <span>{isFrench ? 'FRAIS DE SERVICE BIDVEX' : 'BIDVEX SERVICE FEES'}</span>
+                    {breakdown?.flow_type && (
+                      <Badge variant="outline" className={`text-[10px] ${
+                        breakdown.flow_type === 'PARTNER_FLOW'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-slate-50 text-slate-600 border-slate-200'
+                      }`} data-testid="flow-type-badge">
+                        {breakdown.flow_type === 'PARTNER_FLOW'
+                          ? (isFrench ? 'Vendeur Partenaire' : 'Partner Seller')
+                          : (isFrench ? 'Vendeur Standard' : 'Standard Seller')}
+                      </Badge>
+                    )}
                   </h3>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
@@ -346,12 +358,18 @@ const CheckoutPage = () => {
                       <span>{formatCurrency(breakdown?.buyer_premium)}</span>
                     </div>
                     
+                    {breakdown?.flow_type === 'PARTNER_FLOW' && (
+                      <p className="text-xs text-emerald-600 -mt-1">
+                        {isFrench ? '100% transféré au vendeur partenaire' : '100% transferred to Partner seller'}
+                      </p>
+                    )}
+                    
                     {(isVehicle || isPartnerListing) && breakdown?.platform_fee > 0 && (
                       <div className="flex justify-between">
                         <span>
                           {isFrench ? 'Frais plateforme' : 'Platform Fee'}
                           <span className="text-slate-400 ml-1">
-                            ({isPartnerListing ? '3%' : '2.5%'})
+                            ({(breakdown?.platform_fee_rate * 100)?.toFixed(1)}%)
                           </span>
                         </span>
                         <span>{formatCurrency(breakdown?.platform_fee)}</span>
@@ -361,17 +379,23 @@ const CheckoutPage = () => {
                     <Separator className="my-2" />
                     
                     <div className="flex justify-between">
-                      <span>{isFrench ? 'TPS sur les frais' : 'GST on Fees'} (5%)</span>
-                      <span>{formatCurrency(breakdown?.gst_on_fees)}</span>
+                      <span>{isFrench ? 'TPS' : 'GST'} (5%)</span>
+                      <span>{formatCurrency(breakdown?.gst)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>{isFrench ? 'TVQ sur les frais' : 'QST on Fees'} (9.975%)</span>
-                      <span>{formatCurrency(breakdown?.qst_on_fees)}</span>
+                      <span>{isFrench ? 'TVQ' : 'QST'} (9.975%)</span>
+                      <span>{formatCurrency(breakdown?.qst)}</span>
                     </div>
+                    <p className="text-xs text-slate-400">
+                      {isFrench
+                        ? `Taxe calculée sur ${formatCurrency(breakdown?.taxable_amount || (breakdown?.hammer_price + breakdown?.buyer_premium))}`
+                        : `Tax calculated on ${formatCurrency(breakdown?.taxable_amount || (breakdown?.hammer_price + breakdown?.buyer_premium))}`}
+                    </p>
                   </div>
                 </div>
                 
-                {/* Processing Fee Section */}
+                {/* Processing Fee Section (Standard flow only — Partners absorb this) */}
+                {breakdown?.flow_type !== 'PARTNER_FLOW' && (
                 <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-4">
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-2">
@@ -381,9 +405,10 @@ const CheckoutPage = () => {
                       </span>
                       <span className="text-xs text-amber-600">(2.9% + $0.30)</span>
                     </div>
-                    <span className="font-medium">{formatCurrency(breakdown?.processing_fee)}</span>
+                    <span className="font-medium">{formatCurrency(breakdown?.stripe_processing_fee || breakdown?.processing_fee)}</span>
                   </div>
                 </div>
+                )}
 
                 {/* Late Penalty Section */}
                 {latePenalty > 0 && (

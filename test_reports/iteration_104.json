@@ -1,0 +1,98 @@
+{
+  "summary": "Completed testing of BidVex Two-Tier Marketplace Economy. Backend: 16/16 tests passed. All PARTNER_FLOW and STANDARD_FLOW calculations verified. Frontend: CheckoutPage.js flow_type badge and PartnerDashboard.js partner-benefit-card code verified.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_two_tier_economy_104.py",
+    "/app/test_reports/pytest/pytest_results_two_tier_104.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "PARTNER FLOW: calculate_connect_checkout correctly returns flow_type=PARTNER_FLOW when seller_is_partner=True",
+    "PARTNER FLOW: application_fee = seller_commission only (3% general / 2.5% vehicle) - BidVex takes ONLY platform commission",
+    "PARTNER FLOW: stripe_processing_fee = $0 (Partner absorbs Stripe fees)",
+    "PARTNER FLOW: partner_premium_retained = buyer_premium (100% transferred to Partner)",
+    "PARTNER FLOW: build_itemized_line_items does NOT include 'Processing Fee' line",
+    "STANDARD FLOW: calculate_connect_checkout correctly returns flow_type=STANDARD_FLOW when seller_is_partner=False",
+    "STANDARD FLOW: application_fee = buyer_premium + seller_commission + taxes (BidVex keeps both)",
+    "STANDARD FLOW: stripe_processing_fee > $0 (Buyer pays)",
+    "STANDARD FLOW: build_itemized_line_items includes 'Processing Fee' line",
+    "TAX: GST (5%) calculated on (Hammer + Premium) - verified $5000 general: GST = $262.50",
+    "TAX: QST (9.975%) calculated on (Hammer + Premium) - verified $5000 general: QST = $523.69",
+    "Line items sum matches buyer_total_cents for both Partner and Standard flows",
+    "Vehicle flows: hammer not in line items, platform fee IS in line items",
+    "GET /api/partner/stats returns partner_benefit object with premiums_retained_this_month",
+    "GET /api/payments/pricing-config returns tier rates (public endpoint)",
+    "Stripe metadata includes flow_type field in breakdown",
+    "CheckoutPage.js shows flow_type badge (data-testid='flow-type-badge') - Partner Seller / Standard Seller",
+    "CheckoutPage.js hides Processing Fee section for PARTNER_FLOW (line 398)",
+    "PartnerDashboard.js has partner-benefit-card (data-testid='partner-benefit-card') - shows when isActive"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_two_tier_economy_104.py"
+  ],
+  "success_rate": {
+    "backend": "100% (16/16 tests passed)",
+    "frontend": "100% (code verification complete)"
+  },
+  "test_credentials": "Admin: charbeladmin@bidvex.com / Admin123!",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Two-Tier Marketplace Economy fully verified. PARTNER_FLOW: BidVex takes only 3%/2.5% seller commission, Partner retains 100% buyer premium, $0 Stripe fee to buyer. STANDARD_FLOW: BidVex takes both buyer premium + seller commission + taxes, Stripe fee passed to buyer. Taxes calculated on (Hammer + Premium). CheckoutPage.js shows flow_type badge and conditionally hides Processing Fee. PartnerDashboard.js shows partner-benefit-card when partner is active (has paid $100/yr fee).",
+  "verified_features": {
+    "two_tier_economy": {
+      "partner_flow": {
+        "flow_type": "PARTNER_FLOW",
+        "application_fee": "seller_commission only (3% general / 2.5% vehicle)",
+        "stripe_processing_fee": "$0 (Partner absorbs)",
+        "partner_premium_retained": "100% of buyer_premium",
+        "line_items": "No Processing Fee line"
+      },
+      "standard_flow": {
+        "flow_type": "STANDARD_FLOW",
+        "application_fee": "buyer_premium + seller_commission + taxes",
+        "stripe_processing_fee": "> $0 (Buyer pays)",
+        "partner_premium_retained": "$0",
+        "line_items": "Includes Processing Fee line"
+      }
+    },
+    "tax_calculation": {
+      "taxable_base": "Hammer + Buyer Premium",
+      "gst_rate": "5%",
+      "qst_rate": "9.975%",
+      "example_5000_general": {
+        "taxable": "$5,250",
+        "gst": "$262.50",
+        "qst": "$523.69"
+      }
+    },
+    "pricing_config_endpoint": {
+      "url": "/api/payments/pricing-config",
+      "auth_required": false,
+      "returns": "commissions, buyer_premiums, seller_commissions, subscriptions, promotions, email_credits, deposit"
+    },
+    "partner_stats_endpoint": {
+      "url": "/api/partner/stats",
+      "auth_required": true,
+      "returns": "partner_benefit with premiums_retained_this_month, transactions_this_month"
+    },
+    "frontend_components": {
+      "CheckoutPage.js": {
+        "flow_type_badge": "data-testid='flow-type-badge' at line 343",
+        "processing_fee_hidden": "Conditional render at line 398 for PARTNER_FLOW"
+      },
+      "PartnerDashboard.js": {
+        "partner_benefit_card": "data-testid='partner-benefit-card' at line 304",
+        "shows_when": "partnerStats?.partner_benefit && isActive"
+      }
+    }
+  }
+}
