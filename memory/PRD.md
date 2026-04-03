@@ -11,68 +11,63 @@
 ## Credentials
 - Admin: `charbeladmin@bidvex.com` / `Admin123!`
 
-## Two-Tier Marketplace Economy
+## Official Fee Schedule (Audited April 3, 2026)
 
-### Partner Flow (is_partner=True, $100/yr)
-- BidVex takes ONLY Seller Commission (2.5% vehicles / 3.0% general) from Hammer
-- 100% of Buyer Premium transferred to Partner's Connect account
-- Stripe fees deducted from Partner's payout (NOT charged to buyer)
-- Stripe metadata: `PARTNER_FLOW`
+### §7.1 User Tiers
+| Tier | Annual Fee | Buyer Premium | Seller Commission |
+|------|-----------|---------------|-------------------|
+| Standard | Free | 5% | 4% |
+| Premium | $180 CAD | 3.5% | 2.5% |
+| VIP Elite | $300 CAD | 3% | 2% |
+- GST/QST applied to subscription checkout as separate line items
 
-### Standard Flow (is_partner=False)
-- BidVex takes BOTH Buyer Premium AND Seller Commission
-- Seller receives: Hammer - Seller Commission
-- Stripe processing fee passed to buyer
-- Stripe metadata: `STANDARD_FLOW`
+### §7.2 Partner Platform Access ($100 CAD/yr)
+- BidVex takes ONLY 3% Hammer Commission (general) / 2.5% (vehicle)
+- 0% of Buyer Premium retained by BidVex — 100% flows to Partner
 
-### Tax Calculation (Both Flows)
-- GST (TPS 5%) + QST (TVQ 9.975%) on **Total Taxable Amount (Hammer + Premium)**
-- Separate Stripe checkout line items for Quebec compliance
+### §7.3 Vehicle Platform Fee
+- 2.5% mandatory (overrides standard 3%)
 
-### Tier-Based Fees
-- Standard: 5% Buyer / 4% Seller
-- Premium ($180/yr): 3.5% Buyer / 2.5% Seller
-- VIP Elite ($300/yr): 3% Buyer / 2% Seller
-- Platform Fee: 3% General / 2.5% Vehicle
+### §7.4 Tax Calculation
+- GST (TPS 5%) + QST (TVQ 9.975%) on **(Hammer + Buyer Premium)**
+- Separate line items on all Stripe checkouts
+
+### §7.5 Payment Terms
+- 14-day payment deadline with day-10 reminder
+- 2%/month late penalty via `process_overdue_auction_payments` cron (every 6h)
+- Metadata flag: `payment_status: "overdue"`
+
+### Email Credit Rates
+| Quantity | Rate/Email |
+|----------|-----------|
+| 1-1,000 | $0.018 |
+| 1,001-5,000 | $0.015 |
+| 5,001-10,000 | $0.012 |
+| 10,001+ | $0.010 |
 
 ## Completed Work
 
-### Growth & Monetization Phase — April 3, 2026
-- **Affiliate Cash-Back Engine**: 15% of BidVex commission auto-paid to affiliates via Stripe Transfer Group
-  - Standard flow: 15% of (buyer_premium + seller_commission)
-  - Partner flow: 15% of seller_commission only
-  - transfer_group + affiliate_id in checkout metadata
-  - Webhook triggers `process_affiliate_payout()` on successful sale
-- **Listing Promotion Storefront**: 3-tier system (Basic $9.99/7d, Standard $24.99/14d, Premium $49.99/30d)
-  - `ListingPromotionModal.js` with GST/QST breakdown on each tier
-  - Integrated into ListingDetailPage "Promote" button
-- **Email Marketing Credits**: Pay-As-You-Go sliding scale ($0.018→$0.010/email)
-  - `EmailCreditPurchase.js` with slider, live pricing, and tax breakdown
-  - Integrated into PartnerDashboard for active partners
-- **GST/QST on Digital Products**: All promotions and email credits now include separate GST/QST line items
-- **CSS Polish**: French `letter-spacing: -0.02em` on bid buttons across all 3 detail pages
-- Testing: iteration_105 — 23/23 backend, 100% frontend
+### Fee Schedule Audit — April 3, 2026
+- **FIX**: Added GST/QST as separate Stripe line items on subscription checkout (subscriptions.py)
+- **FIX**: Aligned frontend EmailCreditPurchase.js tiers to backend ($0.016→$0.015, boundaries corrected)
+- 34/34 audit tests passed, all rates verified to 0.0% deviation
 
-### Two-Tier Marketplace Economy — April 3, 2026
-- Partner vs Standard flow with different application_fee logic
-- Tax base changed to (Hammer + Premium) for Quebec compliance
-- Partner Dashboard "Partner Benefit" card
-- Testing: iteration_104 — 16/16 backend, 100% frontend
+### Growth & Monetization — April 3, 2026
+- Affiliate Cash-Back Engine (15% of BidVex commission via Stripe Transfer Group)
+- Listing Promotion Storefront ($9.99/$24.99/$49.99 + tax)
+- Email Marketing Credits (Pay-As-You-Go + tax)
+- GST/QST on all digital products
+- CSS Polish: French letter-spacing -0.02em
 
-### Stripe Connect Financial Engine — April 3, 2026
-- Tier-Based Fees, itemized GST/QST line items, $1k security deposit, vehicle offline hammer
-- Testing: iteration_103 — 16/16 backend, 100% frontend
+### Two-Tier Economy — April 3, 2026
+- Partner vs Standard flow (application_fee logic, metadata tagging)
+- Tax base: Hammer + Premium
 
-### Previous Sessions
-- Multi-Currency (CAD/USD), French UI fixes, Mobile Messaging, Partner Features
-- Law 25 Cookie Consent, Tax Reports, Commercial Readiness, Architecture Refactor
-
-## In Progress
-None
+### Stripe Connect Engine — April 3, 2026
+- Itemized line items, $1k deposit, vehicle offline hammer
 
 ## Backlog
 - [ ] Cloudflare CDN setup (P2)
 - [ ] Post-launch monitoring/alerting (P2)
-- [ ] Real-time performance dashboard (Enhancement)
-- [ ] Refactor payments.py (~2300 lines) into modular routers (Tech debt)
-- [ ] Automated Lighthouse audits weekly (Enhancement)
+- [ ] Real-time performance dashboard
+- [ ] Refactor payments.py into modular routers
