@@ -1237,13 +1237,13 @@ const MultiItemListingDetailPage = () => {
                         {/* Buy Now Section */}
                         {lot.buy_now_enabled && lot.buy_now_price && lot.lot_status !== 'sold_out' && !auctionEnded && (
                           <div className="bg-gradient-to-r from-[#06B6D4]/10 to-[#1E3A8A]/10 border-2 border-[#06B6D4] rounded-lg p-4 mb-4">
-                            <div className="flex items-center justify-between flex-wrap gap-4">
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-[#06B6D4] flex items-center justify-center">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-10 h-10 rounded-full bg-[#06B6D4] flex items-center justify-center shrink-0">
                                   <Zap className="h-5 w-5 text-white" />
                                 </div>
-                                <div>
-                                  <p className="text-sm font-medium text-[#06B6D4]">⚡ Buy Now Available</p>
+                                <div className="min-w-0">
+                                  <p className="text-sm font-medium text-[#06B6D4]">⚡ {t('bid.buyNowAvailable', 'Buy Now Available')}</p>
                                   <p className="text-2xl font-bold text-[#1E3A8A] dark:text-white">
                                     {formatCurrency(lot.buy_now_price)}
                                   </p>
@@ -1257,23 +1257,23 @@ const MultiItemListingDetailPage = () => {
                               <Button
                                 onClick={() => handleBuyNow(lot)}
                                 disabled={buyNowLoading[lot.lot_number] || lot.lot_status === 'sold_out'}
-                                className="bg-gradient-to-r from-[#06B6D4] to-[#1E3A8A] hover:opacity-90 text-white px-6 py-3 h-auto"
+                                className="bg-gradient-to-r from-[#06B6D4] to-[#1E3A8A] hover:opacity-90 text-white px-5 py-3 h-auto w-full sm:w-auto text-sm whitespace-nowrap shrink-0"
                               >
                                 {buyNowLoading[lot.lot_number] ? (
                                   <>
                                     <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                                    Processing...
+                                    {t('common.processing', 'Processing...')}
                                   </>
                                 ) : (
                                   <>
-                                    <ShoppingCart className="h-5 w-5 mr-2" />
-                                    Buy Now
+                                    <ShoppingCart className="h-5 w-5 mr-1.5" />
+                                    {t('bid.buyNow', 'Buy Now')}
                                   </>
                                 )}
                               </Button>
                             </div>
                             <p className="text-xs text-muted-foreground mt-2">
-                              Skip the bidding - purchase instantly at the fixed price
+                              {t('bid.buyNowSkip', 'Skip the bidding - purchase instantly at the fixed price')}
                             </p>
                           </div>
                         )}
@@ -1323,7 +1323,7 @@ const MultiItemListingDetailPage = () => {
                             </div>
 
                             {/* Standard Bid Input */}
-                            <div className="flex flex-col sm:flex-row gap-2">
+                            <div className="flex flex-col gap-2">
                               <input
                                 type="number"
                                 step="0.01"
@@ -1331,19 +1331,20 @@ const MultiItemListingDetailPage = () => {
                                 placeholder={`Min: ${formatCurrency(lot.current_price + getMinimumIncrement(lot.current_price))}`}
                                 value={bidAmounts[lot.lot_number] || ''}
                                 onChange={(e) => handleBidChange(lot.lot_number, e.target.value)}
-                                className="flex-1 px-4 py-3 border border-input rounded-md bg-background min-h-[48px] text-base"
+                                className="w-full px-4 py-3 border border-input rounded-md bg-background min-h-[48px] text-base"
                                 disabled={(listing.auction_terms_en || listing.auction_terms_fr) && !agreedToTerms}
                                 data-testid="bid-amount-input"
                               />
                               <Button 
                                 onClick={() => handlePlaceBid(lot.lot_number, 'normal')}
-                                className="gradient-button text-white border-0 min-h-[48px] w-full sm:w-auto whitespace-nowrap"
+                                className="gradient-button text-white border-0 min-h-[48px] w-full text-sm whitespace-nowrap"
                                 disabled={(listing.auction_terms_en || listing.auction_terms_fr) && !agreedToTerms}
                                 title={!agreedToTerms && (listing.auction_terms_en || listing.auction_terms_fr) ? t('auction.mustAgreeToTermsFirst', 'Please agree to terms & conditions first') : ''}
                                 data-testid="place-bid-btn"
                               >
-                                <Gavel className="mr-2 h-4 w-4" />
-                                {t('bid.placeBid', 'Place Bid')}
+                                <Gavel className="mr-1.5 h-4 w-4 shrink-0" />
+                                <span className="sm:hidden">{t('bid.placeBidCompact', 'Bid')}</span>
+                                <span className="hidden sm:inline">{t('bid.placeBid', 'Place Bid')}</span>
                               </Button>
                             </div>
                             {!agreedToTerms && (listing.auction_terms_en || listing.auction_terms_fr) && (
@@ -1380,7 +1381,7 @@ const MultiItemListingDetailPage = () => {
                         {auctionEnded && !isPreviewMode && (
                           <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 text-center">
                             <AlertCircle className="h-6 w-6 mx-auto text-muted-foreground mb-2" />
-                            <p className="text-sm text-muted-foreground">Bidding has ended for this lot</p>
+                            <p className="text-sm text-muted-foreground">{t('bid.biddingEnded', 'Bidding has ended for this lot')}</p>
                           </div>
                         )}
                       </div>

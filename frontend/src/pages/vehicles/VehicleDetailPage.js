@@ -407,13 +407,13 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
                 data-testid="place-bid-btn"
               >
                 {bidding ? (
-                  <>Processing...</>
+                  <>{t('common.processing', 'Processing...')}</>
                 ) : !user ? (
                   <>{t("auction.loginToBid")}</>
                 ) : (
                   <>
                     <Gavel className="h-5 w-5 mr-2" />
-                    Place Bid
+                    {t('bid.placeBid', 'Place Bid')}
                   </>
                 )}
               </Button>
@@ -421,7 +421,7 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
               {/* Buy Now */}
               {vehicle?.buy_now_price && displayBid < vehicle.buy_now_price && (
                 <Button variant="outline" className="w-full h-12">
-                  Buy Now: {formatPrice(vehicle.buy_now_price, vehicle?.currency)}
+                  {t('bid.buyNow', 'Buy Now')}: {formatPrice(vehicle.buy_now_price, vehicle?.currency)}
                 </Button>
               )}
             </div>

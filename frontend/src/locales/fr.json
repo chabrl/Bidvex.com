@@ -916,7 +916,12 @@
   },
   "bid": {
     "placeBid": "Placer une enchère",
-    "mustAgreeToTerms": "Vous devez accepter les conditions de l'enchère avant de placer une enchère"
+    "mustAgreeToTerms": "Vous devez accepter les conditions de l'enchère avant de placer une enchère",
+    "placeBidCompact": "Enchérir",
+    "buyNow": "Acheter",
+    "buyNowSkip": "Passez les enchères - achetez instantanément au prix fixe",
+    "biddingEnded": "Les enchères sont terminées pour ce lot",
+    "buyNowAvailable": "Achat immédiat disponible"
   },
   "currency": {
     "cad": "CAD",

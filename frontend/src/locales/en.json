@@ -916,7 +916,12 @@
   },
   "bid": {
     "placeBid": "Place Bid",
-    "mustAgreeToTerms": "You must agree to the auction terms before placing a bid"
+    "mustAgreeToTerms": "You must agree to the auction terms before placing a bid",
+    "placeBidCompact": "Bid",
+    "buyNow": "Buy Now",
+    "buyNowSkip": "Skip the bidding - purchase instantly at the fixed price",
+    "biddingEnded": "Bidding has ended for this lot",
+    "buyNowAvailable": "Buy Now Available"
   },
   "currency": {
     "cad": "CAD",
