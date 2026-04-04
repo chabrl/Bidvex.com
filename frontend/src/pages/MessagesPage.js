@@ -412,6 +412,7 @@ const MessagesPage = () => {
   const [uploadProgress, setUploadProgress] = useState(null);
   const [lightboxAttachment, setLightboxAttachment] = useState(null);
   const [showMobileConversations, setShowMobileConversations] = useState(true);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
   
   const { isAllowed } = useCookieConsent();
   const functionalityAllowed = isAllowed('functionality');
@@ -422,6 +423,13 @@ const MessagesPage = () => {
   const fileInputRef = useRef(null);
   const chatContainerRef = useRef(null);
 
+  // Lock body scroll when messages page is mounted (prevents iOS page bounce)
+  useEffect(() => {
+    const orig = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = orig; };
+  }, []);
+
   // Mobile keyboard handling via visualViewport API
   useEffect(() => {
     const viewport = window.visualViewport;
@@ -431,16 +439,28 @@ const MessagesPage = () => {
       const chatPage = document.querySelector('[data-testid="messages-page"]');
       if (!chatPage) return;
       const keyboardOffset = window.innerHeight - viewport.height;
-      if (keyboardOffset > 50) {
-        // Keyboard is open — shrink container to visible area
+      const isKbOpen = keyboardOffset > 50;
+      setKeyboardOpen(isKbOpen);
+
+      if (isKbOpen) {
+        // Pin the container to the visual viewport so it doesn't scroll behind the keyboard
+        chatPage.style.position = 'fixed';
+        chatPage.style.top = '0';
+        chatPage.style.left = '0';
+        chatPage.style.right = '0';
         chatPage.style.height = `${viewport.height}px`;
         chatPage.style.maxHeight = `${viewport.height}px`;
-        // Scroll messages into view after layout shift
+        // Prevent iOS page scroll
+        window.scrollTo(0, 0);
         requestAnimationFrame(() => {
           messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
         });
       } else {
-        // Keyboard closed — reset to CSS-driven height
+        // Keyboard closed — reset to CSS-driven layout
+        chatPage.style.position = '';
+        chatPage.style.top = '';
+        chatPage.style.left = '';
+        chatPage.style.right = '';
         chatPage.style.height = '';
         chatPage.style.maxHeight = '';
       }
@@ -453,6 +473,10 @@ const MessagesPage = () => {
       viewport.removeEventListener('scroll', handleResize);
       const chatPage = document.querySelector('[data-testid="messages-page"]');
       if (chatPage) {
+        chatPage.style.position = '';
+        chatPage.style.top = '';
+        chatPage.style.left = '';
+        chatPage.style.right = '';
         chatPage.style.height = '';
         chatPage.style.maxHeight = '';
       }
@@ -729,7 +753,7 @@ const MessagesPage = () => {
   }
 
   return (
-    <div className="flex bg-white dark:bg-slate-900" style={{ height: '100dvh', paddingTop: '64px', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }} data-testid="messages-page">
+    <div className="flex bg-white dark:bg-slate-900 overflow-hidden" style={{ height: '100dvh', paddingTop: '64px', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }} data-testid="messages-page">
       {/* Hidden file input */}
       <input
         type="file"
@@ -941,27 +965,29 @@ const MessagesPage = () => {
               </div>
             )}
 
-            {/* Partner Quick Actions — above input, VIP / Partner Pro only */}
-            <PartnerQuickActions
-              onSendMessage={(text) => { setNewMessage(text); setTimeout(() => sendMessage(), 50); }}
-              lang={(navigator.language || 'en').startsWith('fr') ? 'fr' : 'en'}
-              isPartnerOrVip={
-                user?.is_partner ||
-                ['partner_pro', 'vip', 'vip_elite'].includes(user?.subscription_tier)
-              }
-            />
+            {/* Partner Quick Actions — hidden when keyboard is open to save space */}
+            {!keyboardOpen && (
+              <PartnerQuickActions
+                onSendMessage={(text) => { setNewMessage(text); setTimeout(() => sendMessage(), 50); }}
+                lang={(navigator.language || 'en').startsWith('fr') ? 'fr' : 'en'}
+                isPartnerOrVip={
+                  user?.is_partner ||
+                  ['partner_pro', 'vip', 'vip_elite'].includes(user?.subscription_tier)
+                }
+              />
+            )}
 
             {/* Sticky Bottom Input */}
             <div
-              className="shrink-0 z-20 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200/60 dark:border-slate-700/60 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]"
+              className="shrink-0 z-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200/60 dark:border-slate-700/60"
               data-testid="message-input-bar"
             >
-              <div className="px-3 py-2.5 sm:px-4 sm:py-3 max-w-3xl mx-auto">
-                <div className="flex items-center gap-2">
+              <div className="px-2 py-2 sm:px-4 sm:py-3 max-w-3xl mx-auto">
+                <div className="flex items-center gap-1.5 sm:gap-2">
                   <button 
                     onClick={() => fileInputRef.current?.click()}
                     disabled={!!uploadProgress}
-                    className="flex items-center justify-center w-10 h-10 rounded-full text-slate-400 hover:text-[#06B6D4] hover:bg-[#06B6D4]/10 transition-colors shrink-0 disabled:opacity-40"
+                    className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full text-slate-400 hover:text-[#06B6D4] hover:bg-[#06B6D4]/10 transition-colors shrink-0 disabled:opacity-40"
                     data-testid="message-attach-btn"
                   >
                     <Paperclip className="h-5 w-5" />
@@ -976,13 +1002,13 @@ const MessagesPage = () => {
                     onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
                     data-testid="message-input"
                     disabled={sending}
-                    className="flex-1 h-11 px-4 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-[#06B6D4] focus:ring-2 focus:ring-[#06B6D4]/20 transition-all"
+                    className="flex-1 min-w-0 h-10 sm:h-11 px-4 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-[#06B6D4] focus:ring-2 focus:ring-[#06B6D4]/20 transition-all"
                   />
                   <button
                     onClick={sendMessage} 
                     data-testid="send-message-btn"
                     disabled={!newMessage.trim() || sending}
-                    className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-[#1E3A8A] to-[#06B6D4] text-white shadow-lg shadow-[#06B6D4]/25 hover:opacity-90 transition-opacity shrink-0 disabled:opacity-40 disabled:shadow-none"
+                    className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-[#1E3A8A] to-[#06B6D4] text-white shadow-lg shadow-[#06B6D4]/25 hover:opacity-90 transition-opacity shrink-0 disabled:opacity-40 disabled:shadow-none"
                   >
                     {sending ? (
                       <Loader2 className="h-5 w-5 animate-spin" />

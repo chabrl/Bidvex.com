@@ -69,10 +69,12 @@
 ### Mobile Messaging UI Fixes — April 4, 2026
 - Added `viewport-fit=cover` meta tag to `public/index.html` for iOS safe-area-inset support
 - Hidden `MobileBottomNav` on `/messages` route (App.js MobileNavWrapper)
-- Switched container to `100dvh` full viewport, removed `pb-14` padding hack
+- Switched container to `100dvh` full viewport with `overflow: hidden`, removed `pb-14` padding hack
 - Added `z-20` to message input bar for proper layering above scroll area
 - Added `onFocus` scroll-to-bottom on message text input for keyboard visibility
-- Refined `visualViewport` API handler with `requestAnimationFrame` scroll + `maxHeight` reset
+- Refined `visualViewport` API handler: pins container `position: fixed` when keyboard opens, hides PartnerQuickActions to maximize visible chat area, calls `window.scrollTo(0,0)` to prevent iOS page bounce
+- Body scroll locked while on messages page (cleanup restores scroll on unmount)
+- Tightened input bar padding and button sizes on mobile to prevent send button clipping
 
 ## Backlog
 - [ ] Cloudflare CDN setup (P2)
