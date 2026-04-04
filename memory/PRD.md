@@ -66,8 +66,17 @@
 ### Stripe Connect Engine — April 3, 2026
 - Itemized line items, $1k deposit, vehicle offline hammer
 
+### Mobile Messaging UI Fixes — April 4, 2026
+- Added `viewport-fit=cover` meta tag to `public/index.html` for iOS safe-area-inset support
+- Hidden `MobileBottomNav` on `/messages` route (App.js MobileNavWrapper)
+- Switched container to `100dvh` full viewport, removed `pb-14` padding hack
+- Added `z-20` to message input bar for proper layering above scroll area
+- Added `onFocus` scroll-to-bottom on message text input for keyboard visibility
+- Refined `visualViewport` API handler with `requestAnimationFrame` scroll + `maxHeight` reset
+
 ## Backlog
 - [ ] Cloudflare CDN setup (P2)
 - [ ] Post-launch monitoring/alerting (P2)
 - [ ] Real-time performance dashboard
 - [ ] Refactor payments.py into modular routers
+- [ ] Clean backend lint warnings (webhooks.py, partners.py, subscriptions.py)
