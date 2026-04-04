@@ -66,15 +66,24 @@
 ### Stripe Connect Engine — April 3, 2026
 - Itemized line items, $1k deposit, vehicle offline hammer
 
-### Mobile Messaging UI Fixes — April 4, 2026
-- Added `viewport-fit=cover` meta tag to `public/index.html` for iOS safe-area-inset support
-- Hidden `MobileBottomNav` on `/messages` route (App.js MobileNavWrapper)
-- Switched container to `100dvh` full viewport with `overflow: hidden`, removed `pb-14` padding hack
-- Added `z-20` to message input bar for proper layering above scroll area
-- Added `onFocus` scroll-to-bottom on message text input for keyboard visibility
-- Refined `visualViewport` API handler: pins container `position: fixed` when keyboard opens, hides PartnerQuickActions to maximize visible chat area, calls `window.scrollTo(0,0)` to prevent iOS page bounce
-- Body scroll locked while on messages page (cleanup restores scroll on unmount)
-- Tightened input bar padding and button sizes on mobile to prevent send button clipping
+### Mobile Messaging UI — Clean Rebuild (April 4, 2026)
+**Removed all previous hacks:**
+- Deleted body/html `position:fixed`, `overflow:hidden` locks
+- Deleted `visualViewport` height/bottom/position manipulation
+- Deleted `focusin`/`focusout` document listeners
+- Deleted staggered `setTimeout(scrollToBottom, 100/400/800)` hacks
+- Deleted `window.scrollTo(0,0)` calls
+- Deleted `interactive-widget=resizes-content` meta tag
+
+**Clean architecture:**
+- Container: `h-[calc(100dvh-3.5rem)] sm:h-[calc(100dvh-4rem)]` — accounts for navbar spacer (h-14/sm:h-16), `display:flex`
+- Scroll area: `flex:1 overflow-y:auto` with `-webkit-overflow-scrolling:touch` and `overscroll-behavior-y:contain`
+- Input bar: `shrink-0 z-20` with `padding-bottom: env(safe-area-inset-bottom)`
+- Keyboard detection: `visualViewport.resize` ONLY — sets `keyboardVisible` state to hide quick actions
+- Auto-scroll: `scrollAreaRef.current.scrollTop = scrollHeight` on new messages, keyboard open, and input focus
+- Input: `enterKeyHint="send"`, `text-base` (prevents iOS auto-zoom), `onFocus={scrollToBottom}`
+- MobileBottomNav hidden on `/messages` via App.js `MobileNavWrapper`
+- Meta viewport: `viewport-fit=cover, maximum-scale=1`
 
 ## Backlog
 - [ ] Cloudflare CDN setup (P2)
