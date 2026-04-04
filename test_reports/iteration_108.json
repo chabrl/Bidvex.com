@@ -1,0 +1,145 @@
+{
+  "summary": "Mobile messaging chat layout complete rebuild verification - Iteration 108. All 16 test cases passed (100%). Verified the new pure flex layout architecture: no position:fixed on body/html, no overflow:hidden body hacks, no timeout-based scroll hacks. Layout uses height:calc(100dvh-3.5rem) flex column, messages flex-1 overflow-y:auto with overscrollBehaviorY:contain, input bar shrink-0 at bottom. MobileBottomNav correctly hidden on /messages route.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    ".screenshots/mobile_messages_layout.png",
+    ".screenshots/mobile_messages_with_chat.png",
+    ".screenshots/desktop_messages_layout.png",
+    ".screenshots/desktop_messages_with_chat.png"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "VERIFIED: Messages page container uses position:static (NOT position:fixed) - computed position is 'static'",
+    "VERIFIED: document.body.style.position is empty string (no body hacks)",
+    "VERIFIED: document.body.style.overflow is empty string (no body hacks)",
+    "VERIFIED: Messages page container height is calc(100dvh - 3.5rem) = 796px on mobile (852px viewport - 56px navbar)",
+    "VERIFIED: messages-scroll-area has flex-grow:1 and overflow-y:auto",
+    "VERIFIED: messages-scroll-area has overscrollBehaviorY:contain for native scroll behavior",
+    "VERIFIED: message-input-bar bottom edge (852px) <= viewport height (852px) - within viewport",
+    "VERIFIED: send-message-btn right edge (385px) <= viewport width (393px) - not cut off",
+    "VERIFIED: MobileBottomNav (nav.fixed.bottom-0) is NOT present on /messages route",
+    "VERIFIED: MobileBottomNav IS present on /marketplace route after navigating away from /messages",
+    "VERIFIED: body.style.overflow is restored to empty after navigating from /messages to /marketplace",
+    "VERIFIED: Desktop two-pane layout renders correctly with 384px conversation list + 1536px chat pane at 1920x800",
+    "VERIFIED: Desktop message-input-bar bottom edge (800px) <= 800px viewport height",
+    "VERIFIED: message-input has enterKeyHint='send' attribute",
+    "VERIFIED: Meta viewport has viewport-fit=cover and maximum-scale=1",
+    "VERIFIED: message-input onFocus handler exists (scrollToBottom call)"
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "N/A (frontend only testing)",
+    "frontend": "100% (16/16 tests passed)"
+  },
+  "test_credentials": "Admin: charbeladmin@bidvex.com / Admin123!",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Mobile messaging UI layout complete rebuild verified. All previous hacks removed: no body.position=fixed, no body.overflow=hidden, no visualViewport height manipulation, no focusin/focusout fallbacks, no staggered setTimeout scrolls. New architecture uses pure flex layout with height:calc(100dvh-navbar_spacer), flex-direction:column. Scroll area is flex:1 overflow-y:auto with overscrollBehaviorY:contain. Input bar is shrink-0 at bottom with z-20. visualViewport is used ONLY to detect keyboardVisible state (to hide quick actions). MobileNavWrapper in App.js returns null on /messages route.",
+  "verified_features": {
+    "viewport_meta": {
+      "content": "width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover",
+      "location": "/app/frontend/public/index.html line 5"
+    },
+    "mobile_bottom_nav": {
+      "visible_on_marketplace": true,
+      "hidden_on_messages": true,
+      "height": "57px",
+      "classes": "fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 z-50 lg:hidden safe-area-bottom"
+    },
+    "messages_page_container": {
+      "position": "static",
+      "height": "796px",
+      "display": "flex",
+      "flexDirection": "row",
+      "data_testid": "messages-page"
+    },
+    "body_styles_on_messages": {
+      "position": "",
+      "overflow": "",
+      "computedPosition": "static",
+      "computedOverflow": "visible"
+    },
+    "messages_scroll_area": {
+      "found": true,
+      "flexGrow": "1",
+      "overflowY": "auto",
+      "overscrollBehaviorY": "contain",
+      "height": 476,
+      "data_testid": "messages-scroll-area"
+    },
+    "message_input_bar": {
+      "found": true,
+      "bottom": 852,
+      "top": 791,
+      "height": 61,
+      "withinViewport": true,
+      "classes": "shrink-0 z-20 bg-white dark:bg-slate-900 border-t border-slate-200/60 dark:border-slate-700/60",
+      "zIndex": "20",
+      "data_testid": "message-input-bar"
+    },
+    "send_message_btn": {
+      "found": true,
+      "right": 385,
+      "bottom": 842,
+      "viewportWidth": 393,
+      "withinViewport": true,
+      "data_testid": "send-message-btn"
+    },
+    "message_input": {
+      "found": true,
+      "enterKeyHint": "send",
+      "type": "text",
+      "onFocusHandlerExists": true,
+      "data_testid": "message-input"
+    },
+    "desktop_two_pane_layout": {
+      "display": "flex",
+      "paneCount": 2,
+      "panes": [
+        {"width": 384, "display": "flex"},
+        {"width": 1536, "display": "flex"}
+      ],
+      "viewport": "1920x800"
+    },
+    "desktop_input_bar": {
+      "found": true,
+      "bottom": 800,
+      "viewportHeight": 800,
+      "withinViewport": true
+    },
+    "desktop_scroll_area": {
+      "found": true,
+      "overflowY": "auto",
+      "overscrollBehaviorY": "contain"
+    }
+  },
+  "test_cases_executed": [
+    {"test": "Meta viewport has viewport-fit=cover", "result": "PASS"},
+    {"test": "Meta viewport has maximum-scale=1", "result": "PASS"},
+    {"test": "Messages container NOT position:fixed", "result": "PASS"},
+    {"test": "body.style.position is empty", "result": "PASS"},
+    {"test": "body.style.overflow is empty", "result": "PASS"},
+    {"test": "MobileBottomNav hidden on /messages", "result": "PASS"},
+    {"test": "Scroll area found (mobile)", "result": "PASS"},
+    {"test": "Scroll area flex-grow: 1", "result": "PASS"},
+    {"test": "Scroll area overflow-y: auto", "result": "PASS"},
+    {"test": "Scroll area overscrollBehaviorY: contain", "result": "PASS"},
+    {"test": "Input bar within viewport (mobile)", "result": "PASS"},
+    {"test": "Send button within viewport (mobile)", "result": "PASS"},
+    {"test": "enterKeyHint='send' on input", "result": "PASS"},
+    {"test": "body.overflow restored after navigation", "result": "PASS"},
+    {"test": "MobileBottomNav visible on /marketplace", "result": "PASS"},
+    {"test": "Desktop two-pane layout", "result": "PASS"},
+    {"test": "Desktop input bar within viewport", "result": "PASS"},
+    {"test": "Desktop scroll area overscrollBehaviorY: contain", "result": "PASS"}
+  ]
+}

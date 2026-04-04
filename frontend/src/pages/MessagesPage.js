@@ -412,117 +412,29 @@ const MessagesPage = () => {
   const [uploadProgress, setUploadProgress] = useState(null);
   const [lightboxAttachment, setLightboxAttachment] = useState(null);
   const [showMobileConversations, setShowMobileConversations] = useState(true);
-  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   
   const { isAllowed } = useCookieConsent();
   const functionalityAllowed = isAllowed('functionality');
 
   const messagesEndRef = useRef(null);
+  const scrollAreaRef = useRef(null);
   const inputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const fileInputRef = useRef(null);
-  const chatContainerRef = useRef(null);
 
-  // Lock body/html scroll to prevent iOS page bounce behind the fixed container
+  // ────── KEYBOARD DETECTION (visualViewport ONLY) ──────
   useEffect(() => {
-    const origBody = document.body.style.overflow;
-    const origHtml = document.documentElement.style.overflow;
-    document.body.style.overflow = 'hidden';
-    document.documentElement.style.overflow = 'hidden';
-    document.body.style.position = 'fixed';
-    document.body.style.width = '100%';
-    document.body.style.height = '100%';
-    return () => {
-      document.body.style.overflow = origBody;
-      document.documentElement.style.overflow = origHtml;
-      document.body.style.position = '';
-      document.body.style.width = '';
-      document.body.style.height = '';
-    };
-  }, []);
+    const vv = window.visualViewport;
+    if (!vv) return;
 
-  // Mobile keyboard handling — adjusts bottom inset of the fixed container
-  useEffect(() => {
-    const viewport = window.visualViewport;
-    const chatPage = () => document.querySelector('[data-testid="messages-page"]');
-
-    const applyKeyboardLayout = () => {
-      const el = chatPage();
-      if (!el) return;
-
-      // Try visualViewport first (most accurate)
-      if (viewport) {
-        const keyboardOffset = window.innerHeight - viewport.height;
-        const isKbOpen = keyboardOffset > 80;
-        setKeyboardOpen(isKbOpen);
-
-        if (isKbOpen) {
-          // Shrink from the bottom — keyboard takes `keyboardOffset` px
-          el.style.bottom = `${keyboardOffset}px`;
-          el.style.paddingBottom = '0';
-          window.scrollTo(0, 0);
-          requestAnimationFrame(() => {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
-          });
-        } else {
-          el.style.bottom = '0';
-          el.style.paddingBottom = '';
-        }
-        return;
-      }
-
-      // Fallback: no visualViewport API — just scroll to bottom on focus
-      requestAnimationFrame(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
-      });
+    const onResize = () => {
+      const offset = window.innerHeight - vv.height;
+      setKeyboardVisible(offset > 100);
     };
 
-    // Listen on visualViewport if available
-    if (viewport) {
-      viewport.addEventListener('resize', applyKeyboardLayout);
-      viewport.addEventListener('scroll', applyKeyboardLayout);
-    }
-
-    // Fallback: also listen to window resize (some iOS versions fire this)
-    window.addEventListener('resize', applyKeyboardLayout);
-
-    // Fallback: focusin/focusout on the document to catch keyboard open/close
-    const handleFocusIn = (e) => {
-      if (e.target.matches('input, textarea, [contenteditable]')) {
-        // Give iOS time to finish keyboard animation
-        setTimeout(applyKeyboardLayout, 100);
-        setTimeout(applyKeyboardLayout, 400);
-      }
-    };
-    const handleFocusOut = (e) => {
-      if (e.target.matches('input, textarea, [contenteditable]')) {
-        setTimeout(() => {
-          const el = chatPage();
-          if (el) {
-            el.style.bottom = '0';
-            el.style.paddingBottom = '';
-          }
-          setKeyboardOpen(false);
-        }, 100);
-      }
-    };
-    document.addEventListener('focusin', handleFocusIn);
-    document.addEventListener('focusout', handleFocusOut);
-
-    return () => {
-      if (viewport) {
-        viewport.removeEventListener('resize', applyKeyboardLayout);
-        viewport.removeEventListener('scroll', applyKeyboardLayout);
-      }
-      window.removeEventListener('resize', applyKeyboardLayout);
-      document.removeEventListener('focusin', handleFocusIn);
-      document.removeEventListener('focusout', handleFocusOut);
-      const el = chatPage();
-      if (el) {
-        el.style.bottom = '';
-        el.style.paddingBottom = '';
-      }
-    };
+    vv.addEventListener('resize', onResize);
+    return () => vv.removeEventListener('resize', onResize);
   }, []);
 
   // Real-time messaging hook
@@ -590,10 +502,15 @@ const MessagesPage = () => {
     }
   }, [selectedConversation]);
 
-  // Auto-scroll to bottom
+  // Auto-scroll to bottom on new messages
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Scroll to bottom when keyboard opens
+  useEffect(() => {
+    if (keyboardVisible) scrollToBottom();
+  }, [keyboardVisible]);
 
   // Mark messages as read (gated by Law 25 functionality consent)
   useEffect(() => {
@@ -776,7 +693,9 @@ const MessagesPage = () => {
   };
 
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+    if (scrollAreaRef.current) {
+      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+    }
   }, []);
 
   const filteredConversations = conversations.filter(convo =>
@@ -796,8 +715,7 @@ const MessagesPage = () => {
 
   return (
     <div
-      className="flex bg-white dark:bg-slate-900 overflow-hidden"
-      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, paddingTop: '64px', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      className="flex bg-white dark:bg-slate-900 h-[calc(100dvh-3.5rem)] sm:h-[calc(100dvh-4rem)]"
       data-testid="messages-page"
     >
       {/* Hidden file input */}
@@ -875,9 +793,9 @@ const MessagesPage = () => {
       </div>
 
       {/* ========== CHAT AREA (Right Pane) ========== */}
-      <div className={`${showMobileConversations ? 'hidden' : 'flex'} md:flex flex-col flex-1 min-w-0`}>
+      <div className={`${showMobileConversations ? 'hidden' : 'flex'} md:flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden`}>
         {selectedConversation ? (
-          <div className="flex flex-col h-full">
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
             {/* Chat Header — shrinks */}
             <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0 z-10">
               {/* User Info Bar */}
@@ -964,8 +882,13 @@ const MessagesPage = () => {
               <ProductMiniCard info={listingInfo} navigate={navigate} />
             </div>
 
-            {/* Messages Area — fills remaining space */}
-            <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950" data-testid="messages-scroll-area">
+            {/* Messages Scroll Area — flex-1 fills remaining space */}
+            <div
+              ref={scrollAreaRef}
+              className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950"
+              style={{ minHeight: 0, WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
+              data-testid="messages-scroll-area"
+            >
               <div className="p-4 space-y-4 max-w-3xl mx-auto">
                 {messages.map((msg) => (
                   msg.message_type === 'system' || msg.message_type === 'auction_won' ? (
@@ -982,7 +905,7 @@ const MessagesPage = () => {
                   )
                 ))}
                 
-                {/* Typing indicator — gated by Law 25 functionality consent */}
+                {/* Typing indicator */}
                 {functionalityAllowed && otherUserTyping && (
                   <div className="flex justify-start animate-in fade-in" data-testid="typing-indicator">
                     <div className="bg-slate-200 dark:bg-slate-800 rounded-2xl rounded-bl-sm p-4">
@@ -1004,28 +927,31 @@ const MessagesPage = () => {
 
             {/* Upload Progress */}
             {uploadProgress && (
-              <div className="px-4 py-2 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800">
+              <div className="shrink-0 px-4 py-2 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800">
                 <div className="max-w-3xl mx-auto">
                   <UploadProgress progress={uploadProgress.progress} fileName={uploadProgress.fileName} />
                 </div>
               </div>
             )}
 
-            {/* Partner Quick Actions — hidden when keyboard is open to save space */}
-            {!keyboardOpen && (
-              <PartnerQuickActions
-                onSendMessage={(text) => { setNewMessage(text); setTimeout(() => sendMessage(), 50); }}
-                lang={(navigator.language || 'en').startsWith('fr') ? 'fr' : 'en'}
-                isPartnerOrVip={
-                  user?.is_partner ||
-                  ['partner_pro', 'vip', 'vip_elite'].includes(user?.subscription_tier)
-                }
-              />
+            {/* Quick Actions — horizontal scroll, collapses on keyboard */}
+            {!keyboardVisible && (
+              <div className="shrink-0">
+                <PartnerQuickActions
+                  onSendMessage={(text) => { setNewMessage(text); setTimeout(() => sendMessage(), 50); }}
+                  lang={(navigator.language || 'en').startsWith('fr') ? 'fr' : 'en'}
+                  isPartnerOrVip={
+                    user?.is_partner ||
+                    ['partner_pro', 'vip', 'vip_elite'].includes(user?.subscription_tier)
+                  }
+                />
+              </div>
             )}
 
-            {/* Sticky Bottom Input */}
+            {/* Input Bar — always at the bottom of flex column */}
             <div
-              className="shrink-0 z-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200/60 dark:border-slate-700/60"
+              className="shrink-0 z-20 bg-white dark:bg-slate-900 border-t border-slate-200/60 dark:border-slate-700/60"
+              style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
               data-testid="message-input-bar"
             >
               <div className="px-2 py-2 sm:px-4 sm:py-3 max-w-3xl mx-auto">
@@ -1033,7 +959,7 @@ const MessagesPage = () => {
                   <button 
                     onClick={() => fileInputRef.current?.click()}
                     disabled={!!uploadProgress}
-                    className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full text-slate-400 hover:text-[#06B6D4] hover:bg-[#06B6D4]/10 transition-colors shrink-0 disabled:opacity-40"
+                    className="flex items-center justify-center w-10 h-10 rounded-full text-slate-400 hover:text-[#06B6D4] hover:bg-[#06B6D4]/10 transition-colors shrink-0 disabled:opacity-40"
                     data-testid="message-attach-btn"
                   >
                     <Paperclip className="h-5 w-5" />
@@ -1041,25 +967,21 @@ const MessagesPage = () => {
                   <input
                     ref={inputRef}
                     type="text"
+                    enterKeyHint="send"
                     placeholder={t('messaging.typeMessage')}
                     value={newMessage}
                     onChange={handleInputChange}
-                    onFocus={() => {
-                      // Staggered scroll — first quick scroll, then after keyboard settles
-                      setTimeout(() => scrollToBottom(), 100);
-                      setTimeout(() => scrollToBottom(), 400);
-                      setTimeout(() => scrollToBottom(), 800);
-                    }}
+                    onFocus={scrollToBottom}
                     onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
                     data-testid="message-input"
                     disabled={sending}
-                    className="flex-1 min-w-0 h-10 sm:h-11 px-4 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-[#06B6D4] focus:ring-2 focus:ring-[#06B6D4]/20 transition-all"
+                    className="flex-1 min-w-0 h-11 px-4 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-base text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-[#06B6D4] focus:ring-2 focus:ring-[#06B6D4]/20 transition-all"
                   />
                   <button
                     onClick={sendMessage} 
                     data-testid="send-message-btn"
                     disabled={!newMessage.trim() || sending}
-                    className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-[#1E3A8A] to-[#06B6D4] text-white shadow-lg shadow-[#06B6D4]/25 hover:opacity-90 transition-opacity shrink-0 disabled:opacity-40 disabled:shadow-none"
+                    className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-[#1E3A8A] to-[#06B6D4] text-white shadow-lg shadow-[#06B6D4]/25 hover:opacity-90 transition-opacity shrink-0 disabled:opacity-40 disabled:shadow-none"
                   >
                     {sending ? (
                       <Loader2 className="h-5 w-5 animate-spin" />
