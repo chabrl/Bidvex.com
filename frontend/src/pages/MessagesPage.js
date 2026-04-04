@@ -423,62 +423,104 @@ const MessagesPage = () => {
   const fileInputRef = useRef(null);
   const chatContainerRef = useRef(null);
 
-  // Lock body scroll when messages page is mounted (prevents iOS page bounce)
+  // Lock body/html scroll to prevent iOS page bounce behind the fixed container
   useEffect(() => {
-    const orig = document.body.style.overflow;
+    const origBody = document.body.style.overflow;
+    const origHtml = document.documentElement.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = orig; };
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+    document.body.style.height = '100%';
+    return () => {
+      document.body.style.overflow = origBody;
+      document.documentElement.style.overflow = origHtml;
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.height = '';
+    };
   }, []);
 
-  // Mobile keyboard handling via visualViewport API
+  // Mobile keyboard handling — adjusts bottom inset of the fixed container
   useEffect(() => {
     const viewport = window.visualViewport;
-    if (!viewport) return;
+    const chatPage = () => document.querySelector('[data-testid="messages-page"]');
 
-    const handleResize = () => {
-      const chatPage = document.querySelector('[data-testid="messages-page"]');
-      if (!chatPage) return;
-      const keyboardOffset = window.innerHeight - viewport.height;
-      const isKbOpen = keyboardOffset > 50;
-      setKeyboardOpen(isKbOpen);
+    const applyKeyboardLayout = () => {
+      const el = chatPage();
+      if (!el) return;
 
-      if (isKbOpen) {
-        // Pin the container to the visual viewport so it doesn't scroll behind the keyboard
-        chatPage.style.position = 'fixed';
-        chatPage.style.top = '0';
-        chatPage.style.left = '0';
-        chatPage.style.right = '0';
-        chatPage.style.height = `${viewport.height}px`;
-        chatPage.style.maxHeight = `${viewport.height}px`;
-        // Prevent iOS page scroll
-        window.scrollTo(0, 0);
-        requestAnimationFrame(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-        });
-      } else {
-        // Keyboard closed — reset to CSS-driven layout
-        chatPage.style.position = '';
-        chatPage.style.top = '';
-        chatPage.style.left = '';
-        chatPage.style.right = '';
-        chatPage.style.height = '';
-        chatPage.style.maxHeight = '';
+      // Try visualViewport first (most accurate)
+      if (viewport) {
+        const keyboardOffset = window.innerHeight - viewport.height;
+        const isKbOpen = keyboardOffset > 80;
+        setKeyboardOpen(isKbOpen);
+
+        if (isKbOpen) {
+          // Shrink from the bottom — keyboard takes `keyboardOffset` px
+          el.style.bottom = `${keyboardOffset}px`;
+          el.style.paddingBottom = '0';
+          window.scrollTo(0, 0);
+          requestAnimationFrame(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
+          });
+        } else {
+          el.style.bottom = '0';
+          el.style.paddingBottom = '';
+        }
+        return;
       }
+
+      // Fallback: no visualViewport API — just scroll to bottom on focus
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
+      });
     };
 
-    viewport.addEventListener('resize', handleResize);
-    viewport.addEventListener('scroll', handleResize);
+    // Listen on visualViewport if available
+    if (viewport) {
+      viewport.addEventListener('resize', applyKeyboardLayout);
+      viewport.addEventListener('scroll', applyKeyboardLayout);
+    }
+
+    // Fallback: also listen to window resize (some iOS versions fire this)
+    window.addEventListener('resize', applyKeyboardLayout);
+
+    // Fallback: focusin/focusout on the document to catch keyboard open/close
+    const handleFocusIn = (e) => {
+      if (e.target.matches('input, textarea, [contenteditable]')) {
+        // Give iOS time to finish keyboard animation
+        setTimeout(applyKeyboardLayout, 100);
+        setTimeout(applyKeyboardLayout, 400);
+      }
+    };
+    const handleFocusOut = (e) => {
+      if (e.target.matches('input, textarea, [contenteditable]')) {
+        setTimeout(() => {
+          const el = chatPage();
+          if (el) {
+            el.style.bottom = '0';
+            el.style.paddingBottom = '';
+          }
+          setKeyboardOpen(false);
+        }, 100);
+      }
+    };
+    document.addEventListener('focusin', handleFocusIn);
+    document.addEventListener('focusout', handleFocusOut);
+
     return () => {
-      viewport.removeEventListener('resize', handleResize);
-      viewport.removeEventListener('scroll', handleResize);
-      const chatPage = document.querySelector('[data-testid="messages-page"]');
-      if (chatPage) {
-        chatPage.style.position = '';
-        chatPage.style.top = '';
-        chatPage.style.left = '';
-        chatPage.style.right = '';
-        chatPage.style.height = '';
-        chatPage.style.maxHeight = '';
+      if (viewport) {
+        viewport.removeEventListener('resize', applyKeyboardLayout);
+        viewport.removeEventListener('scroll', applyKeyboardLayout);
+      }
+      window.removeEventListener('resize', applyKeyboardLayout);
+      document.removeEventListener('focusin', handleFocusIn);
+      document.removeEventListener('focusout', handleFocusOut);
+      const el = chatPage();
+      if (el) {
+        el.style.bottom = '';
+        el.style.paddingBottom = '';
       }
     };
   }, []);
@@ -733,9 +775,9 @@ const MessagesPage = () => {
     }
   };
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+  }, []);
 
   const filteredConversations = conversations.filter(convo =>
     convo.other_user?.name?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -753,7 +795,11 @@ const MessagesPage = () => {
   }
 
   return (
-    <div className="flex bg-white dark:bg-slate-900 overflow-hidden" style={{ height: '100dvh', paddingTop: '64px', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }} data-testid="messages-page">
+    <div
+      className="flex bg-white dark:bg-slate-900 overflow-hidden"
+      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, paddingTop: '64px', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      data-testid="messages-page"
+    >
       {/* Hidden file input */}
       <input
         type="file"
@@ -998,7 +1044,12 @@ const MessagesPage = () => {
                     placeholder={t('messaging.typeMessage')}
                     value={newMessage}
                     onChange={handleInputChange}
-                    onFocus={() => { setTimeout(() => scrollToBottom(), 300); }}
+                    onFocus={() => {
+                      // Staggered scroll — first quick scroll, then after keyboard settles
+                      setTimeout(() => scrollToBottom(), 100);
+                      setTimeout(() => scrollToBottom(), 400);
+                      setTimeout(() => scrollToBottom(), 800);
+                    }}
                     onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
                     data-testid="message-input"
                     disabled={sending}
