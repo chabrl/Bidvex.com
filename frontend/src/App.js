@@ -172,6 +172,8 @@ const FooterWrapper = () => {
 };
 
 const MobileNavWrapper = () => {
+  const location = useLocation();
+  if (location.pathname === '/messages') return null;
   return <MobileBottomNav />;
 };
 

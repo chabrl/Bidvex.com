@@ -427,14 +427,22 @@ const MessagesPage = () => {
     const viewport = window.visualViewport;
     if (!viewport) return;
 
-    const chatPage = document.querySelector('[data-testid="messages-page"]');
     const handleResize = () => {
+      const chatPage = document.querySelector('[data-testid="messages-page"]');
       if (!chatPage) return;
-      const offset = window.innerHeight - viewport.height;
-      if (offset > 50) {
+      const keyboardOffset = window.innerHeight - viewport.height;
+      if (keyboardOffset > 50) {
+        // Keyboard is open — shrink container to visible area
         chatPage.style.height = `${viewport.height}px`;
+        chatPage.style.maxHeight = `${viewport.height}px`;
+        // Scroll messages into view after layout shift
+        requestAnimationFrame(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        });
       } else {
+        // Keyboard closed — reset to CSS-driven height
         chatPage.style.height = '';
+        chatPage.style.maxHeight = '';
       }
     };
 
@@ -443,7 +451,11 @@ const MessagesPage = () => {
     return () => {
       viewport.removeEventListener('resize', handleResize);
       viewport.removeEventListener('scroll', handleResize);
-      if (chatPage) chatPage.style.height = '';
+      const chatPage = document.querySelector('[data-testid="messages-page"]');
+      if (chatPage) {
+        chatPage.style.height = '';
+        chatPage.style.maxHeight = '';
+      }
     };
   }, []);
 
@@ -717,7 +729,7 @@ const MessagesPage = () => {
   }
 
   return (
-    <div className="flex bg-white dark:bg-slate-900 pb-14 lg:pb-0" style={{ height: 'calc(100dvh - 64px)' }} data-testid="messages-page">
+    <div className="flex bg-white dark:bg-slate-900" style={{ height: '100dvh', paddingTop: '64px', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }} data-testid="messages-page">
       {/* Hidden file input */}
       <input
         type="file"
@@ -941,8 +953,7 @@ const MessagesPage = () => {
 
             {/* Sticky Bottom Input */}
             <div
-              className="shrink-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200/60 dark:border-slate-700/60 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]"
-              style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+              className="shrink-0 z-20 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200/60 dark:border-slate-700/60 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]"
               data-testid="message-input-bar"
             >
               <div className="px-3 py-2.5 sm:px-4 sm:py-3 max-w-3xl mx-auto">
@@ -961,6 +972,7 @@ const MessagesPage = () => {
                     placeholder={t('messaging.typeMessage')}
                     value={newMessage}
                     onChange={handleInputChange}
+                    onFocus={() => { setTimeout(() => scrollToBottom(), 300); }}
                     onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
                     data-testid="message-input"
                     disabled={sending}

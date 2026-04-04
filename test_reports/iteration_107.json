@@ -1,0 +1,80 @@
+{
+  "summary": "Mobile messaging UI layout bug fixes verification - Iteration 107. All 9 test cases passed (100%). Verified all 6 fixes: viewport-fit=cover meta tag, MobileBottomNav hidden on /messages, 100dvh container height, z-20 on input bar, onFocus scroll-to-bottom, and visualViewport API handler. Desktop two-pane layout also verified working at 1920x800.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    ".screenshots/mobile_marketplace_with_nav.png",
+    ".screenshots/mobile_messages_no_nav.png",
+    ".screenshots/mobile_messages_chat.png",
+    ".screenshots/desktop_messages_twopane.png"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "FIX 1 VERIFIED: viewport-fit=cover in index.html line 5 - meta content: 'width=device-width,initial-scale=1,viewport-fit=cover'",
+    "FIX 2 VERIFIED: MobileNavWrapper in App.js lines 174-178 returns null on /messages route - MobileBottomNav NOT in DOM on /messages",
+    "FIX 3 VERIFIED: MessagesPage.js line 732 uses inline style height: '100dvh' - confirmed in computed styles",
+    "FIX 4 VERIFIED: message-input-bar has z-20 class - classes include 'shrink-0 z-20 bg-white/90...'",
+    "FIX 5 VERIFIED: message-input onFocus handler at line 975 calls scrollToBottom() - field is functional",
+    "FIX 6 VERIFIED: visualViewport API handler in MessagesPage.js lines 426-460 handles keyboard resizing",
+    "Desktop two-pane layout working: flex container with 384px conversation list + 1536px chat pane at 1920x800"
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "N/A (frontend only testing)",
+    "frontend": "100% (9/9 tests passed)"
+  },
+  "test_credentials": "Admin: charbeladmin@bidvex.com / Admin123!",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Mobile messaging UI layout fixes verified. All 6 fixes working correctly: (1) viewport-fit=cover meta tag, (2) MobileBottomNav hidden on /messages, (3) 100dvh container, (4) z-20 on input bar, (5) onFocus scroll-to-bottom, (6) visualViewport keyboard handler. Desktop two-pane layout also working. Site is in 'Coming Soon' mode for non-authenticated users - login required to access /messages.",
+  "verified_features": {
+    "viewport_meta": {
+      "content": "width=device-width,initial-scale=1,viewport-fit=cover",
+      "location": "/app/frontend/public/index.html line 5"
+    },
+    "mobile_bottom_nav": {
+      "visible_on_marketplace": true,
+      "hidden_on_messages": true,
+      "height": "57px",
+      "classes": "fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 z-50 lg:hidden safe-area-bottom"
+    },
+    "messages_page_container": {
+      "height": "100dvh",
+      "computed_height_mobile": "844px",
+      "data_testid": "messages-page"
+    },
+    "message_input_bar": {
+      "has_z20": true,
+      "classes": "shrink-0 z-20 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200/60 dark:border-slate-700/60 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]",
+      "data_testid": "message-input-bar"
+    },
+    "send_message_btn": {
+      "visible": true,
+      "bounds": {"x": 338, "y": 792, "width": 40, "height": 40},
+      "data_testid": "send-message-btn"
+    },
+    "message_attach_btn": {
+      "visible": true,
+      "bounds": {"x": 12, "y": 792, "width": 40, "height": 40},
+      "data_testid": "message-attach-btn"
+    },
+    "messages_scroll_area": {
+      "overflow_y": "auto",
+      "data_testid": "messages-scroll-area"
+    },
+    "desktop_two_pane_layout": {
+      "display": "flex",
+      "visible_panes": 2,
+      "pane_widths": [384, 1536],
+      "viewport": "1920x800"
+    }
+  }
+}
