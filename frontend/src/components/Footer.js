@@ -110,11 +110,6 @@ const Footer = () => {
           </button>
         </div>
 
-        {/* Mailing Address */}
-        <div className="text-center text-xs text-gray-500 mb-4" data-testid="footer-address">
-          103-761 Chalifoux Street, Sherbrooke, Quebec, J1G 0A8
-        </div>
-
         {/* Copyright & Language Selector */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-6 border-t border-gray-800">
           <p className="text-sm text-center md:text-left" data-testid="footer-copyright">

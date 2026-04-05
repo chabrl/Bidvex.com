@@ -215,7 +215,6 @@ const LegalPage = () => {
               <h3 className="text-lg font-semibold">17. Contact Information</h3>
               <p>BidVex Legal &amp; Data Protection Officer</p>
               <p><strong>Email:</strong> <a href="mailto:support@bidvex.com" className="text-primary hover:underline">support@bidvex.com</a></p>
-              <p><strong>Mailing Address:</strong><br />103-761 Chalifoux Street<br />Sherbrooke, Quebec, Canada<br />J1G 0A8</p>
               <p className="text-xs text-muted-foreground mt-4">&copy; 2026 BidVex Inc. All rights reserved.</p>
             </div>
           </CardContent>
@@ -334,7 +333,6 @@ const LegalPage = () => {
               <p>For questions regarding this policy or our data practices, please contact:</p>
               <p>BidVex Data Protection Officer</p>
               <p><strong>Email:</strong> <a href="mailto:support@bidvex.com" className="text-primary hover:underline">support@bidvex.com</a></p>
-              <p><strong>Mailing Address:</strong><br />103-761 Chalifoux Street<br />Sherbrooke, Quebec, Canada<br />J1G 0A8</p>
               <p className="text-xs text-muted-foreground mt-4">&copy; 2026 BidVex Inc. All rights reserved.</p>
             </div>
           </CardContent>
