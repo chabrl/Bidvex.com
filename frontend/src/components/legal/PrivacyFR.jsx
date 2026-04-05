@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { 
-  Shield, Mail, MapPin, Lock, Eye, Users, Building2,
+  Shield, Mail, Lock, Eye, Users, Building2,
   CreditCard, Database, Cookie, Cpu, Clock, CheckCircle,
   FileText, Globe, UserCheck, Server, AlertTriangle
 } from 'lucide-react';
@@ -453,19 +453,6 @@ export const PrivacyFR = () => {
                   <div>
                     <p className="text-sm text-slate-500">Courriel</p>
                     <a href="mailto:support@bidvex.com" className="font-medium text-blue-600 hover:underline">support@bidvex.com</a>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center flex-shrink-0">
-                    <MapPin className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-500">Adresse postale</p>
-                    <p className="font-medium">
-                      103-761, rue Chalifoux<br />
-                      Sherbrooke (Québec) Canada<br />
-                      J1G 0A8
-                    </p>
                   </div>
                 </div>
               </div>

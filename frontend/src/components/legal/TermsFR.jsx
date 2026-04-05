@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { 
-  FileText, Mail, MapPin, Shield, AlertTriangle, Gavel, 
+  FileText, Mail, Shield, AlertTriangle, Gavel, 
   Users, DollarSign, Scale, Lock, Ban, Clock, CheckCircle,
   XCircle, CreditCard, Building2
 } from 'lucide-react';
@@ -457,15 +457,6 @@ export const TermsFR = () => {
               <div className="flex items-center gap-3">
                 <Mail className="h-5 w-5 text-blue-600" />
                 <span><strong>Courriel :</strong> support@bidvex.com</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <MapPin className="h-5 w-5 text-blue-600 mt-0.5" />
-                <div>
-                  <strong>Adresse postale :</strong><br />
-                  103-761, rue Chalifoux<br />
-                  Sherbrooke (Québec) Canada<br />
-                  J1G 0A8
-                </div>
               </div>
             </div>
           </section>
