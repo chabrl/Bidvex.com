@@ -67,6 +67,13 @@ Full-stack bilingual (EN/FR) auction marketplace for high-value vehicles and gen
 - **Backfill**: All existing listings (3 single, 4 multi, 5 lots) auto-translated via backfill endpoint.
 - Verified via testing agent (iteration_113: 15/15 tests passed, 100% backend + frontend).
 
+### Phase 7 — High-Velocity Marketplace Sorting (Complete - April 7, 2026)
+- **Task 1 (Sorting Algorithm)**: Refactored `_build_marketplace_items` with `high_velocity_sort_key`: active items sorted by `auction_end_date` ascending (ending soonest first), ended items pushed to bottom, featured/promoted items break ties.
+- **Task 2 (DB & API)**: Created compound indexes `[status:1, auction_end_date:1, created_at:-1]` on both `listings` and `multi_item_listings`. Default API sort changed from `-promoted` to `ending_soon`. Added `newest` sort option.
+- **Task 3 (Urgency UI)**: Added `Flame` icon "Ending Soon" badge (`data-testid="ending-soon-badge"`) with red pulsing animation when <1 hour remaining. Timer pill turns red (`bg-red-500 animate-pulse`). Badge text is bilingual: "Ending Soon" / "Se terminant bientôt".
+- **Task 4 (Multi-Item Consistency)**: Lots inside `MultiItemListingDetailPage` now sorted by `lot_end_time` ascending with ended lots at bottom. Lot timer panel switches to red urgency styling when <1 hour.
+- Verified via testing agent (iteration_114: 15/15 passed, 2 skipped).
+
 ---
 
 ## Architecture
