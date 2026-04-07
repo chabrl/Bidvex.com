@@ -145,7 +145,10 @@
     "loginToBid": "Login to Bid",
     "buyerProtection": "Buyer Protection",
     "securePayment": "Secure Payment",
-    "allBidsLegallyBinding": "All bids are legally binding"
+    "allBidsLegallyBinding": "All bids are legally binding",
+    "estimatedTotal": "Est. Total Out-of-Pocket",
+    "buyersPremium": "Buyer's Premium",
+    "premiumSavings": "Premium members save 1.5% on buyer's premium. Tax calculated at checkout if applicable."
   },
   "marketplace": {
     "title": "Active Auctions",
@@ -170,7 +173,29 @@
     "allConditions": "All Conditions",
     "likeNew": "Like New",
     "allCategories": "All Categories",
-    "excellent": "Excellent"
+    "excellent": "Excellent",
+    "privateSales": "Private Sales",
+    "privateSale": "Private Sale",
+    "business": "Business",
+    "verifiedPartner": "Verified Partner",
+    "noTaxOnItem": "Save ~15% - No tax on item price!",
+    "noTaxOnHammer": "Private Sale - No tax on hammer price!",
+    "loadMore": "Load More Items",
+    "noItemsFound": "No items found",
+    "tryAdjusting": "Try adjusting your filters or search terms",
+    "clearAllFilters": "Clear All Filters",
+    "bids": "bids",
+    "timeEnded": "Ended",
+    "sponsored": "Sponsored",
+    "searchItems": "Search items...",
+    "reviewTotalCost": "Review Total Cost",
+    "items": "items",
+    "shippingOptions": "Shipping Options",
+    "bidHistory": "Bid History",
+    "conditionsGenerales": "Terms & Conditions",
+    "buyerPremiumNote": "A buyer's premium of {{rate}}% will be added to the hammer price of each lot.",
+    "viewAuction": "View Auction",
+    "fromAuction": "From: {{auction}}"
   },
   "vehicles": {
     "vehicleAuctions": "Vehicle Auctions",

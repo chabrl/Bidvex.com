@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { extractErrorMessage } from '../utils/errorHandler';
 import { formatCurrency, formatPercent, formatListingPrice } from '../utils/currencyFormatter';
+import { getLocalized } from '../utils/localization';
 import axios from 'axios';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -293,7 +294,7 @@ const ListingDetailPage = () => {
               {listing.images && listing.images.length > 0 ? (
                 <img
                   src={listing.images[0]}
-                  alt={listing.title}
+                  alt={getLocalized(listing, 'title')}
                   className="w-full h-full object-cover"
                 />
               ) : (
@@ -314,7 +315,7 @@ const ListingDetailPage = () => {
                       setLightboxOpen(true);
                     }}
                   >
-                    <img src={img} alt={`${listing.title} ${idx + 2}`} className="w-full h-full object-cover" />
+                    <img src={img} alt={`${getLocalized(listing, 'title')} ${idx + 2}`} className="w-full h-full object-cover" />
                   </div>
                 ))}
               </div>
@@ -324,16 +325,16 @@ const ListingDetailPage = () => {
           <div className="space-y-6">
             <div>
               <div className="flex items-start justify-between gap-4 mb-2">
-                <h1 className="text-3xl font-bold flex-1" data-testid="listing-title">{listing.title}</h1>
+                <h1 className="text-3xl font-bold flex-1" data-testid="listing-title">{getLocalized(listing, 'title')}</h1>
                 <div className="flex items-center gap-3">
                   {/* Watchlist Button */}
                   <WatchlistButton listingId={listing.id} size="large" showLabel={true} />
                   
                   {/* Social Share Button */}
                   <SocialShare 
-                    title={listing.title}
+                    title={getLocalized(listing, 'title')}
                     url={window.location.href}
-                    description={`Check out this auction on BidVex: ${listing.title} - Current bid: $${listing.current_price}`}
+                    description={`Check out this auction on BidVex: ${getLocalized(listing, 'title')} - Current bid: $${listing.current_price}`}
                   />
                   
                   {listing.is_promoted && (
@@ -717,7 +718,7 @@ const ListingDetailPage = () => {
                 <CardTitle className="text-lg">Description</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">{listing.description}</p>
+                <p className="text-sm text-muted-foreground">{getLocalized(listing, 'description')}</p>
               </CardContent>
             </Card>
 

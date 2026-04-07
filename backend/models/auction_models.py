@@ -34,6 +34,12 @@ class ListingCreate(BaseModel):
     # Listing-level buyer's premium (rate, e.g. 0.15 for 15%). None = use org/tier default
     buyers_premium_rate: Optional[float] = None
     currency: Optional[str] = None  # CAD or USD; auto-detected from location if omitted
+    # i18n: manual overrides (auto-translated if omitted)
+    title_en: Optional[str] = None
+    title_fr: Optional[str] = None
+    description_en: Optional[str] = None
+    description_fr: Optional[str] = None
+    content_language: Optional[str] = "en"  # source language of title/description
 
 
 class Listing(BaseModel):
@@ -66,6 +72,11 @@ class Listing(BaseModel):
     custom_buyer_premium_rate: Optional[float] = None
     is_partner_listing: bool = False
     currency: str = "CAD"
+    # i18n bilingual fields
+    title_en: Optional[str] = None
+    title_fr: Optional[str] = None
+    description_en: Optional[str] = None
+    description_fr: Optional[str] = None
 
 
 # ========== BIDS ==========
@@ -144,6 +155,11 @@ class Lot(BaseModel):
     promotion_tier: Optional[str] = None
     impressions: int = 0
     clicks: int = 0
+    # i18n bilingual fields
+    title_en: Optional[str] = None
+    title_fr: Optional[str] = None
+    description_en: Optional[str] = None
+    description_fr: Optional[str] = None
 
 
 class MultiItemListingCreate(BaseModel):
@@ -168,6 +184,12 @@ class MultiItemListingCreate(BaseModel):
     agreement_metadata: Optional[Dict[str, Any]] = None
     promotion_tier: Optional[str] = None
     is_promoted: bool = False
+    # i18n: manual overrides (auto-translated if omitted)
+    title_en: Optional[str] = None
+    title_fr: Optional[str] = None
+    description_en: Optional[str] = None
+    description_fr: Optional[str] = None
+    content_language: Optional[str] = "en"  # source language of title/description
 
 
 class MultiItemListing(BaseModel):
@@ -216,3 +238,8 @@ class MultiItemListing(BaseModel):
     auction_terms_en: Optional[str] = None
     auction_terms_fr: Optional[str] = None
     seller_obligations: Optional[Dict[str, Any]] = None
+    # i18n bilingual fields
+    title_en: Optional[str] = None
+    title_fr: Optional[str] = None
+    description_en: Optional[str] = None
+    description_fr: Optional[str] = None

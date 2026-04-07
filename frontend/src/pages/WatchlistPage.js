@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import WatchlistButton from '../components/WatchlistButton';
 import Countdown from 'react-countdown';
 import { formatCurrency, formatListingPrice } from '../utils/currencyFormatter';
+import { getLocalized } from '../utils/localization';
 
 const API = API_BASE;
 
@@ -62,7 +63,7 @@ const WatchlistPage = () => {
           <Badge className="absolute top-2 left-2 z-10 bg-red-500 hover:bg-red-600">Watched</Badge>
           <div className="aspect-video overflow-hidden bg-gray-100">
             {listing.images && listing.images.length > 0 ? (
-              <img src={listing.images[0]} alt={listing.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+              <img src={listing.images[0]} alt={getLocalized(listing, "title")} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-6xl">📦</div>
             )}
@@ -70,7 +71,7 @@ const WatchlistPage = () => {
         </div>
         <CardContent className="p-4 space-y-3">
           <div>
-            <h3 className="font-semibold line-clamp-2 mb-2">{listing.title}</h3>
+            <h3 className="font-semibold line-clamp-2 mb-2">{getLocalized(listing, "title")}</h3>
             <div className="flex flex-wrap gap-2 mb-2">
               <Badge variant="secondary" className="text-xs"><Tag className="h-3 w-3 mr-1" />{listing.category}</Badge>
               <Badge variant="outline" className="text-xs">Marketplace</Badge>
@@ -116,7 +117,7 @@ const WatchlistPage = () => {
           <Badge className="absolute top-2 left-2 z-10 bg-red-500 hover:bg-red-600">Watched</Badge>
           <div className="aspect-video overflow-hidden bg-gray-100">
             {auction.lots && auction.lots[0]?.images && auction.lots[0].images.length > 0 ? (
-              <img src={auction.lots[0].images[0]} alt={auction.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+              <img src={auction.lots[0].images[0]} alt={getLocalized(auction, "title")} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-6xl">🎯</div>
             )}
@@ -124,7 +125,7 @@ const WatchlistPage = () => {
         </div>
         <CardContent className="p-4 space-y-3">
           <div>
-            <h3 className="font-semibold line-clamp-2 mb-2">{auction.title}</h3>
+            <h3 className="font-semibold line-clamp-2 mb-2">{getLocalized(auction, "title")}</h3>
             <div className="flex flex-wrap gap-2 mb-2">
               <Badge variant="secondary" className="text-xs"><Tag className="h-3 w-3 mr-1" />{auction.category}</Badge>
               <Badge variant="default" className="text-xs bg-purple-500">Multi-Lot</Badge>
@@ -172,7 +173,7 @@ const WatchlistPage = () => {
           <Badge className="absolute top-2 left-2 z-10 bg-red-500 hover:bg-red-600">Watched</Badge>
           <div className="aspect-video overflow-hidden bg-gray-100">
             {lot.images && lot.images.length > 0 ? (
-              <img src={lot.images[0]} alt={lot.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+              <img src={lot.images[0]} alt={getLocalized(lot, "title")} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-6xl">🎲</div>
             )}
@@ -181,7 +182,7 @@ const WatchlistPage = () => {
         <CardContent className="p-4 space-y-3">
           <div>
             <Badge variant="outline" className="mb-2 text-xs">Lot #{lot.lot_number}</Badge>
-            <h3 className="font-semibold line-clamp-2 mb-1">{lot.title}</h3>
+            <h3 className="font-semibold line-clamp-2 mb-1">{getLocalized(lot, "title")}</h3>
             <p className="text-xs text-muted-foreground line-clamp-1">From: {lotItem.auction_title}</p>
           </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">

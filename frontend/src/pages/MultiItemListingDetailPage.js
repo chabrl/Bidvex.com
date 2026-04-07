@@ -38,6 +38,7 @@ import { SellerReputationCard, SellerReviewsList } from '../components/SellerRep
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../components/ui/sheet';
 import { extractErrorMessage } from '../utils/errorHandler';
 import { useCurrency } from '../contexts/CurrencyContext';
+import { getLocalized, getBuyerPremiumText } from '../utils/localization';
 
 const API = API_BASE;
 
@@ -302,7 +303,7 @@ const MultiItemListingDetailPage = () => {
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
       
-      toast.success(`Congratulations! You purchased "${lot.title}" for ${formatCurrency(lot.buy_now_price)}!`);
+      toast.success(`Congratulations! You purchased "${getLocalized(lot, 'title')}" for ${formatCurrency(lot.buy_now_price)}!`);
       
       // Refresh listing to update lot status
       fetchListing();
@@ -431,8 +432,8 @@ const MultiItemListingDetailPage = () => {
                         />
                       )}
                     </div>
-                    <CardTitle className="text-3xl mb-4 text-slate-900 dark:text-white" style={{ fontWeight: 700 }}>{listing.title}</CardTitle>
-                    <p className="mb-4 text-slate-600 dark:text-slate-300">{listing.description}</p>
+                    <CardTitle className="text-3xl mb-4 text-slate-900 dark:text-white" style={{ fontWeight: 700 }}>{getLocalized(listing, 'title')}</CardTitle>
+                    <p className="mb-4 text-slate-600 dark:text-slate-300">{getLocalized(listing, 'description')}</p>
 
                     {/* Private Sale / Business Seller Badge */}
                     {sellerInfo && !sellerInfo.is_tax_registered && (
@@ -1094,7 +1095,7 @@ const MultiItemListingDetailPage = () => {
                               >
                                 <img 
                                   src={img} 
-                                  alt={`${lot.title} - ${idx + 1}`}
+                                  alt={`${getLocalized(lot, 'title')} - ${idx + 1}`}
                                   className="w-full h-full object-cover"
                                 />
                               </div>
@@ -1108,7 +1109,7 @@ const MultiItemListingDetailPage = () => {
                         <div className="flex items-start justify-between mb-4">
                           <div className="flex-1">
                             <h3 className="text-xl font-bold mb-2">
-                              Lot #{lot.lot_number} - {lot.title}
+                              Lot #{lot.lot_number} - {getLocalized(lot, 'title')}
                             </h3>
                             <div className="flex gap-2 flex-wrap">
                               <Badge variant="outline">
@@ -1138,13 +1139,13 @@ const MultiItemListingDetailPage = () => {
                             />
                             <ShareButton 
                               url={`${window.location.origin}/lots/${id}?lot=${lot.lot_number}`}
-                              title={`Lot #${lot.lot_number} - ${lot.title}`}
-                              description={`${lot.description} - Starting at $${lot.starting_price}`}
+                              title={`Lot #${lot.lot_number} - ${getLocalized(lot, 'title')}`}
+                              description={`${getLocalized(lot, 'description')} - Starting at $${lot.starting_price}`}
                             />
                           </div>
                         </div>
 
-                        <p className="text-muted-foreground mb-4 line-clamp-2">{lot.description}</p>
+                        <p className="text-muted-foreground mb-4 line-clamp-2">{getLocalized(lot, 'description')}</p>
 
                         {/* Simplified Price Display - Clean & Professional */}
                         <div className="grid grid-cols-2 gap-4 mb-4">
@@ -1182,24 +1183,51 @@ const MultiItemListingDetailPage = () => {
                             </div>
                             
                             {/* Buyer's Premium */}
-                            <div className="flex items-center justify-between py-2 border-b border-slate-200 dark:border-slate-700">
-                              <span className="text-sm text-slate-700 dark:text-slate-300">Buyer&apos;s Premium:</span>
-                              <div className="text-right">
-                                <span className="font-bold text-blue-700 dark:text-blue-300">5%</span>
-                                <p className="text-xs text-green-600 dark:text-green-400">(3.5% for Premium, 3% for VIP)</p>
-                              </div>
-                            </div>
+                            {(() => {
+                              const premium = getBuyerPremiumText(
+                                user?.subscription_tier || 'free',
+                                listing?.custom_buyer_premium_rate
+                              );
+                              return (
+                                <div className="flex items-center justify-between py-2 border-b border-slate-200 dark:border-slate-700">
+                                  <span className="text-sm text-slate-700 dark:text-slate-300">
+                                    {t('marketplace.conditionsGenerales', 'Buyer\'s Premium')}:
+                                  </span>
+                                  <div className="text-right">
+                                    <span className="font-bold text-blue-700 dark:text-blue-300">{premium.rate}%</span>
+                                    <p className="text-xs text-green-600 dark:text-green-400">(3.5% Premium, 3% VIP)</p>
+                                  </div>
+                                </div>
+                              );
+                            })()}
                             
                             {/* Estimated Total */}
-                            <div className="flex items-center justify-between py-2 bg-blue-100 dark:bg-blue-900/30 -mx-4 px-4 rounded">
-                              <span className="text-sm font-semibold text-blue-900 dark:text-blue-100">Est. Total Out-of-Pocket:</span>
-                              <span className="text-lg font-bold text-blue-700 dark:text-blue-300">
-                                {formatCurrency(lot.current_price * 1.05)}
-                              </span>
-                            </div>
+                            {(() => {
+                              const premium = getBuyerPremiumText(
+                                user?.subscription_tier || 'free',
+                                listing?.custom_buyer_premium_rate
+                              );
+                              const multiplier = 1 + (premium.rate / 100);
+                              return (
+                                <div className="flex items-center justify-between py-2 bg-blue-100 dark:bg-blue-900/30 -mx-4 px-4 rounded">
+                                  <span className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                                    {t('auction.estimatedTotal', 'Est. Total Out-of-Pocket')}:
+                                  </span>
+                                  <span className="text-lg font-bold text-blue-700 dark:text-blue-300">
+                                    {formatCurrency(lot.current_price * multiplier)}
+                                  </span>
+                                </div>
+                              );
+                            })()}
                             
                             <p className="text-xs text-slate-500 dark:text-slate-400 italic">
-                              * Premium members save 1.5% on buyer&apos;s premium. Tax calculated at checkout if applicable.
+                              {(() => {
+                                const premium = getBuyerPremiumText(
+                                  user?.subscription_tier || 'free',
+                                  listing?.custom_buyer_premium_rate
+                                );
+                                return premium.text;
+                              })()}
                             </p>
                           </div>
                         </details>
@@ -1434,7 +1462,7 @@ const MultiItemListingDetailPage = () => {
                           <Flame className="h-4 w-4 text-amber-400" />
                         )}
                       </div>
-                      <p className="text-xs truncate mb-1">{lot.title}</p>
+                      <p className="text-xs truncate mb-1">{getLocalized(lot, 'title')}</p>
                       <div className="flex items-center justify-between text-xs mb-1">
                         <span>Qty: {lot.quantity}</span>
                         <span className="font-semibold">{formatCurrency(lot.current_price)}</span>
@@ -1511,7 +1539,7 @@ const MultiItemListingDetailPage = () => {
                         <Flame className={`h-4 w-4 ${activeLotId === lot.lot_number ? 'text-white' : 'text-amber-500'}`} />
                       )}
                     </div>
-                    <p className="text-xs truncate mb-1">{lot.title}</p>
+                    <p className="text-xs truncate mb-1">{getLocalized(lot, 'title')}</p>
                     <div className="flex items-center justify-between text-xs">
                       <span>Qty: {lot.quantity}</span>
                       <span className={`font-bold ${lotIsHighStakes && activeLotId !== lot.lot_number ? 'text-amber-600' : ''}`}>
@@ -1565,7 +1593,7 @@ const MultiItemListingDetailPage = () => {
           onClose={() => setMessageModalOpen(false)}
           sellerId={listing.seller_id}
           listingId={listing.id}
-          listingTitle={listing.title}
+          listingTitle={getLocalized(listing, 'title')}
         />
       )}
 

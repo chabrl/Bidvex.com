@@ -24,6 +24,43 @@ from utils import (
 
 logger = logging.getLogger(__name__)
 
+
+async def _translate_listing_bg(db, listing_id: str, title: str, description: str, source_lang: str = "en"):
+    """Background task: translate listing fields and update DB."""
+    try:
+        from services.translation_service import translate_listing_fields
+        fields = await translate_listing_fields(title, description, source_lang)
+        await db.listings.update_one({"id": listing_id}, {"$set": fields})
+        logger.info(f"[i18n] Translated single listing {listing_id}")
+        from services.api_cache import invalidate_listing_caches
+        invalidate_listing_caches()
+    except Exception as e:
+        logger.error(f"[i18n] Background translation failed for listing {listing_id}: {e}")
+
+
+async def _translate_multi_listing_bg(db, listing_id: str, title: str, description: str, lots: list, source_lang: str = "en"):
+    """Background task: translate multi-item listing + lots fields and update DB."""
+    try:
+        from services.translation_service import translate_listing_fields, translate_lot_fields
+        fields = await translate_listing_fields(title, description, source_lang)
+
+        if lots:
+            translated_lots = await translate_lot_fields(
+                [{"title": l.get("title", ""), "description": l.get("description", "")} for l in lots],
+                source_lang,
+            )
+            for i, tl in enumerate(translated_lots):
+                for key in ["title_en", "title_fr", "description_en", "description_fr"]:
+                    if key in tl:
+                        fields[f"lots.{i}.{key}"] = tl[key]
+
+        await db.multi_item_listings.update_one({"id": listing_id}, {"$set": fields})
+        logger.info(f"[i18n] Translated multi listing {listing_id} ({len(lots)} lots)")
+        from services.api_cache import invalidate_listing_caches
+        invalidate_listing_caches()
+    except Exception as e:
+        logger.error(f"[i18n] Background translation failed for multi-listing {listing_id}: {e}")
+
 listings_router = APIRouter(tags=["Listings"])
 
 # Database instance — injected from server.py at startup
@@ -132,11 +169,21 @@ async def create_listing(
         currency=listing_data.currency if listing_data.currency else detect_currency_from_location(
             city=listing_data.city, region=listing_data.region, country=listing_data.country
         ),
+        title_en=listing_data.title_en,
+        title_fr=listing_data.title_fr,
+        description_en=listing_data.description_en,
+        description_fr=listing_data.description_fr,
     )
     listing_dict = listing.model_dump()
 
     await apply_partner_tags(db, current_user, listing_dict, listing_data.buyers_premium_rate)
     result = await persist_listing(db, listing_dict, agreement_metadata)
+
+    # Background translation — if _en/_fr not already provided
+    if not listing_data.title_en or not listing_data.title_fr:
+        import asyncio as _aio
+        _aio.ensure_future(_translate_listing_bg(db, result["id"], listing_data.title, listing_data.description, listing_data.content_language or "en"))
+
     return result
 
 
@@ -209,13 +256,26 @@ async def update_listing(listing_id: str, updates: Dict[str, Any], current_user:
         raise HTTPException(status_code=404, detail="Listing not found")
     if listing["seller_id"] != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
-    allowed_fields = ["title", "description", "category", "condition", "images", "location", "city", "region", "country", "postal_code", "status"]
+    allowed_fields = ["title", "description", "category", "condition", "images", "location", "city", "region", "country", "postal_code", "status",
+                      "title_en", "title_fr", "description_en", "description_fr"]
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
+
+    # If title or description changed but no explicit translations, re-translate
+    needs_retranslation = ("title" in update_data or "description" in update_data) and not ("title_en" in update_data and "title_fr" in update_data)
+
     if update_data:
         await db.listings.update_one({"id": listing_id}, {"$set": update_data})
-        # Invalidate public caches on listing update
         from services.api_cache import invalidate_listing_caches
         invalidate_listing_caches()
+
+        if needs_retranslation:
+            import asyncio as _aio
+            _aio.ensure_future(_translate_listing_bg(
+                db, listing_id,
+                update_data.get("title", listing.get("title", "")),
+                update_data.get("description", listing.get("description", "")),
+                "en"
+            ))
     updated_listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
     if isinstance(updated_listing.get("created_at"), str):
         updated_listing["created_at"] = datetime.fromisoformat(updated_listing["created_at"])
@@ -323,7 +383,11 @@ async def create_multi_item_listing(
         shipping_info=listing_data.shipping_info,
         visit_availability=listing_data.visit_availability,
         auction_terms_en=listing_data.auction_terms_en,
-        auction_terms_fr=listing_data.auction_terms_fr
+        auction_terms_fr=listing_data.auction_terms_fr,
+        title_en=listing_data.title_en,
+        title_fr=listing_data.title_fr,
+        description_en=listing_data.description_en,
+        description_fr=listing_data.description_fr,
     )
 
     listing_dict = listing.model_dump()
@@ -331,6 +395,17 @@ async def create_multi_item_listing(
     serialise_datetimes(listing_dict)
 
     await db.multi_item_listings.insert_one(listing_dict)
+    listing_dict.pop("_id", None)
+
+    # Background translation — if _en/_fr not already provided
+    if not listing_data.title_en or not listing_data.title_fr:
+        import asyncio as _aio
+        raw_lots = [l.model_dump() if hasattr(l, "model_dump") else l for l in listing_data.lots]
+        _aio.ensure_future(_translate_multi_listing_bg(
+            db, listing.id, listing_data.title, listing_data.description,
+            raw_lots, listing_data.content_language or "en"
+        ))
+
     return listing
 
 
@@ -631,3 +706,77 @@ async def request_multi_listing_deletion(
     )
 
     return {"success": True, "message": "Deletion request submitted"}
+
+
+# ========== TRANSLATION MANAGEMENT ==========
+
+@listings_router.put("/listings/{listing_id}/translations")
+async def update_listing_translations(
+    listing_id: str,
+    translations: Dict[str, Any],
+    current_user: User = Depends(get_current_user)
+):
+    """Seller manually overrides translations for a single listing."""
+    db = get_db()
+    listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    if listing["seller_id"] != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    allowed = ["title_en", "title_fr", "description_en", "description_fr"]
+    update_data = {k: v for k, v in translations.items() if k in allowed and v}
+    if update_data:
+        await db.listings.update_one({"id": listing_id}, {"$set": update_data})
+        from services.api_cache import invalidate_listing_caches
+        invalidate_listing_caches()
+
+    return {"success": True, "updated_fields": list(update_data.keys())}
+
+
+@listings_router.put("/multi-item-listings/{listing_id}/translations")
+async def update_multi_listing_translations(
+    listing_id: str,
+    translations: Dict[str, Any],
+    current_user: User = Depends(get_current_user)
+):
+    """Seller manually overrides translations for a multi-item listing and its lots."""
+    db = get_db()
+    listing = await db.multi_item_listings.find_one({"id": listing_id}, {"_id": 0})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    if listing["seller_id"] != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    allowed = ["title_en", "title_fr", "description_en", "description_fr"]
+    update_data = {k: v for k, v in translations.items() if k in allowed and v}
+
+    # Handle lot-level translations: lots[0].title_fr, etc.
+    lot_translations = translations.get("lots", [])
+    for i, lot_t in enumerate(lot_translations):
+        for key in allowed:
+            if key in lot_t and lot_t[key]:
+                update_data[f"lots.{i}.{key}"] = lot_t[key]
+
+    if update_data:
+        await db.multi_item_listings.update_one({"id": listing_id}, {"$set": update_data})
+        from services.api_cache import invalidate_listing_caches
+        invalidate_listing_caches()
+
+    return {"success": True, "updated_fields": list(update_data.keys())}
+
+
+@listings_router.post("/admin/backfill-translations")
+async def admin_backfill_translations(current_user: User = Depends(get_current_user)):
+    """Admin-only: backfill translations for all existing listings."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    db = get_db()
+    import asyncio as _aio
+    from services.translation_service import backfill_listing_translations
+
+    # Run in background to avoid timeout
+    _aio.ensure_future(backfill_listing_translations(db))
+
+    return {"success": True, "message": "Backfill started in background. Check server logs for progress."}

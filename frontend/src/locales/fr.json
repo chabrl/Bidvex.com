@@ -145,7 +145,10 @@
     "loginToBid": "Connectez-vous pour enchérir",
     "buyerProtection": "Protection acheteur",
     "securePayment": "Paiement sécurisé",
-    "allBidsLegallyBinding": "Toutes les enchères sont juridiquement contraignantes"
+    "allBidsLegallyBinding": "Toutes les enchères sont juridiquement contraignantes",
+    "estimatedTotal": "Total estimé hors taxes",
+    "buyersPremium": "Prime d'acheteur",
+    "premiumSavings": "Les membres Premium économisent 1,5 % sur la prime d'acheteur. Les taxes sont calculées au moment du paiement, le cas échéant."
   },
   "marketplace": {
     "title": "Enchères Actives",
@@ -170,7 +173,29 @@
     "allConditions": "Tous les états",
     "likeNew": "Comme neuf",
     "allCategories": "Toutes les catégories",
-    "excellent": "Excellent"
+    "excellent": "Excellent",
+    "privateSales": "Ventes privées",
+    "privateSale": "Vente privée",
+    "business": "Entreprise",
+    "verifiedPartner": "Partenaire vérifié",
+    "noTaxOnItem": "Économisez ~15 % – Aucune taxe sur le prix de l'article !",
+    "noTaxOnHammer": "Vente privée – Aucune taxe sur le prix d'adjudication !",
+    "loadMore": "Charger plus d'articles",
+    "noItemsFound": "Aucun article trouvé",
+    "tryAdjusting": "Essayez de modifier vos filtres ou vos termes de recherche",
+    "clearAllFilters": "Effacer tous les filtres",
+    "bids": "enchères",
+    "timeEnded": "Terminé",
+    "sponsored": "Sponsorisé",
+    "searchItems": "Rechercher des articles...",
+    "reviewTotalCost": "Voir le coût total",
+    "items": "articles",
+    "shippingOptions": "Options de livraison",
+    "bidHistory": "Historique des enchères",
+    "conditionsGenerales": "Conditions générales",
+    "buyerPremiumNote": "Une prime d'acheteur de {{rate}} % sera ajoutée au prix d'adjudication de chaque lot.",
+    "viewAuction": "Voir l'enchère",
+    "fromAuction": "De : {{auction}}"
   },
   "vehicles": {
     "vehicleAuctions": "Enchères de véhicules",

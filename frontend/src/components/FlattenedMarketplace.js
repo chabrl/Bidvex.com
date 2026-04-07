@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '../utils/currencyFormatter';
+import { getLocalized } from '../utils/localization';
 import { useCategories } from '../hooks/useCategories';
 import { useMarketplaceItems } from '../hooks/useMarketplaceItems';
 import { SellerRatingInline } from './SellerReputation';
@@ -248,14 +249,14 @@ const FlattenedMarketplace = ({
               size="sm"
             >
               <User className="h-3.5 w-3.5" />
-              {filters.private_sales_only ? 'Private Sales' : 'Private Sales'}
+              {filters.private_sales_only ? t('marketplace.privateSales') : t('marketplace.privateSales')}
             </Button>
 
             {/* Search */}
             <div className="relative flex-shrink-0 w-44 sm:w-56">
               <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-muted-foreground h-3.5 w-3.5" />
               <Input
-                placeholder="Search items..."
+                placeholder={t('marketplace.searchItems', 'Search items...')}
                 value={filters.search}
                 onChange={(e) => handleFilterChange('search', e.target.value)}
                 className="pl-8 h-9 text-xs"
@@ -337,9 +338,9 @@ const FlattenedMarketplace = ({
       ) : items.length === 0 ? (
         <div className="text-center py-16 bg-slate-50 dark:bg-slate-800 rounded-xl">
           <Package className="h-16 w-16 text-slate-400 dark:text-slate-500 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold mb-2 text-slate-900 dark:text-white">No items found</h3>
+          <h3 className="text-xl font-semibold mb-2 text-slate-900 dark:text-white">{t('marketplace.noItemsFound')}</h3>
           <p className="text-slate-600 dark:text-slate-400 mb-4">
-            Try adjusting your filters or search terms
+            {t('marketplace.tryAdjusting')}
           </p>
           <Button onClick={() => setFilters({
             search: '',
@@ -350,7 +351,7 @@ const FlattenedMarketplace = ({
             sort: '-promoted',
             private_sales_only: false
           })} className="bg-blue-600 text-white hover:bg-blue-700">
-            Clear All Filters
+            {t('marketplace.clearAllFilters')}
           </Button>
         </div>
       ) : (
@@ -378,7 +379,7 @@ const FlattenedMarketplace = ({
             className="px-8"
             disabled={isFetchingNextPage}
           >
-            {isFetchingNextPage ? 'Loading...' : 'Load More Items'}
+            {isFetchingNextPage ? t('common.loading') : t('marketplace.loadMore')}
           </Button>
         </div>
       )}
@@ -392,7 +393,7 @@ const FlattenedMarketplace = ({
               Quick Bid
             </DialogTitle>
             <DialogDescription>
-              Place a bid on &quot;{selectedItem?.title}&quot;
+              Place a bid on &quot;{selectedItem && getLocalized(selectedItem, 'title')}&quot;
             </DialogDescription>
           </DialogHeader>
 
@@ -426,7 +427,7 @@ const FlattenedMarketplace = ({
                   <div className="flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-green-600" />
                     <span className="font-medium text-green-700 dark:text-green-400">
-                      Private Sale - No tax on hammer price!
+                      {t('marketplace.noTaxOnHammer')}
                     </span>
                   </div>
                 </div>
@@ -473,7 +474,7 @@ const FlattenedMarketplace = ({
           onClose={() => setBidConfirmOpen(false)}
           onConfirm={confirmBid}
           bidAmount={parseFloat(bidAmount) || 0}
-          listingTitle={selectedItem.title}
+          listingTitle={selectedItem && getLocalized(selectedItem, 'title')}
           sellerIsBusiness={selectedItem.seller_is_business || false}
           region={selectedItem.region || 'QC'}
           loading={placingBid}
@@ -506,6 +507,7 @@ const FlattenedMarketplace = ({
  * ItemCard - Individual item card component
  */
 const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, sellerRep }) => {
+  const { t } = useTranslation();
   const [timeLeft, setTimeLeft] = useState('');
   const [isUrgent, setIsUrgent] = useState(false);
 
@@ -581,7 +583,7 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
           {item.images?.[0] ? (
             <img
               src={item.images[0]}
-              alt={item.title}
+              alt={getLocalized(item, 'title')}
               width={400}
               height={208}
               loading="lazy"
@@ -598,19 +600,19 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
             {isPrivateSale ? (
               <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 shadow-lg text-xs">
                 <User className="h-3 w-3 mr-1" />
-                Private Sale
+                {t('marketplace.privateSale')}
               </Badge>
             ) : (
               <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-xs">
                 <ShieldCheck className="h-3 w-3 mr-1" />
-                Business
+                {t('marketplace.business')}
               </Badge>
             )}
             {/* Verified Partner Badge */}
             {item.is_partner_listing && (
               <Badge className="bg-violet-600 text-white border-0 shadow-lg text-xs" data-testid="partner-badge">
                 <ShieldCheck className="h-3 w-3 mr-1" />
-                Verified Partner
+                {t('marketplace.verifiedPartner')}
               </Badge>
             )}
           </div>
@@ -650,7 +652,7 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
             {item.bid_count > 0 && (
               <div className="bg-slate-900/80 backdrop-blur text-white px-2 py-1 rounded-full text-xs">
                 <Gavel className="h-3 w-3 inline mr-1" />
-                {item.bid_count} bids
+                {item.bid_count} {t('marketplace.bids')}
               </div>
             )}
           </div>
@@ -668,7 +670,7 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
             className="font-semibold text-base line-clamp-2 text-slate-900 dark:text-white hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors"
             data-testid="item-title"
           >
-            {item.title}
+            {getLocalized(item, 'title')}
           </h3>
         </Link>
 
@@ -687,7 +689,7 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
         {isPrivateSale && (
           <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-3 py-1.5 text-xs">
             <span className="font-medium text-green-700 dark:text-green-400">
-              Save ~15% - No tax on item price!
+              {t('marketplace.noTaxOnItem')}
             </span>
           </div>
         )}
@@ -698,7 +700,7 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
         {/* Pricing */}
         <div className="space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">Current Bid</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('marketplace.currentBid')}</span>
             <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
               {formatCurrency(item.current_price || item.starting_price || 0)}
             </span>
@@ -706,7 +708,7 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
 
           {item.buy_now_enabled && item.buy_now_price && (
             <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-600 dark:text-slate-400">Buy Now</span>
+              <span className="text-slate-600 dark:text-slate-400">{t('marketplace.buyNowLabel')}</span>
               <span className="font-semibold text-green-600 dark:text-green-400">
                 {formatCurrency(item.buy_now_price)}
               </span>
@@ -722,7 +724,7 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
               to={`/lots/${item.auction_id}`}
               className="text-cyan-600 dark:text-cyan-400 hover:underline inline-flex items-center gap-1"
             >
-              {item.parent_auction_title || 'Auction'}
+              {getLocalized(item, 'parent_auction_title') || t('marketplace.viewAuction')}
               <ExternalLink className="h-3 w-3" />
             </Link>
           </div>
@@ -737,12 +739,12 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
             data-testid="quick-bid-btn"
           >
             <Zap className="h-3.5 w-3.5 mr-1 flex-shrink-0" />
-            Quick Bid
+            {t('marketplace.quickBid')}
           </Button>
           <Link to={detailLink} className="flex-1">
             <Button variant="outline" size="sm" className="w-full border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 h-9 text-sm" data-testid="view-item-btn">
               <Eye className="h-3.5 w-3.5 mr-1 flex-shrink-0" />
-              View
+              {t('common.view')}
             </Button>
           </Link>
         </div>

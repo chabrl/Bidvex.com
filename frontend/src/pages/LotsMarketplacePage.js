@@ -15,6 +15,7 @@ import WishlistHeartButton from '../components/WishlistHeartButton';
 import MarketplaceSidebar from '../components/MarketplaceSidebar';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { formatCurrency, formatListingPrice } from '../utils/currencyFormatter';
+import { getLocalized } from '../utils/localization';
 import { SellerRatingInline } from '../components/SellerReputation';
 import { LoadingTimeout } from '../components/LoadingTimeout';
 
@@ -95,7 +96,7 @@ const LotsMarketplacePage = () => {
         <Link to={`/lots/${listing.id}`} className="block relative">
           <div className="aspect-[4/3] overflow-hidden bg-slate-100 dark:bg-slate-800">
             {imageUrl ? (
-              <img src={imageUrl} alt={listing.title} width={400} height={300} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+              <img src={imageUrl} alt={getLocalized(listing, "title")} width={400} height={300} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <Package className="h-16 w-16" style={{ color: '#94a3b8' }} />
@@ -134,7 +135,7 @@ const LotsMarketplacePage = () => {
         <CardContent className="p-4" data-testid="listing-content">
           <Link to={`/lots/${listing.id}`}>
             <h3 className="font-semibold text-lg mb-2 line-clamp-2 hover:text-cyan-600 transition-colors" style={{ color: '#1a1a1a', fontWeight: 600 }}>
-              {listing.title}
+              {getLocalized(listing, "title")}
             </h3>
           </Link>
           <div className="flex items-center gap-1 text-sm mb-3" style={{ color: '#6b7280' }}>

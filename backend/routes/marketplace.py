@@ -75,6 +75,7 @@ _LISTING_PROJECTION = {
     "is_promoted": 1, "promotion_tier": 1, "is_featured": 1,
     "is_partner_listing": 1, "city": 1, "region": 1, "country": 1,
     "created_at": 1,
+    "title_en": 1, "title_fr": 1, "description_en": 1, "description_fr": 1,
 }
 _MULTI_PROJECTION = {
     "_id": 0, "id": 1, "title": 1, "description": 1, "category": 1,
@@ -82,6 +83,7 @@ _MULTI_PROJECTION = {
     "status": 1, "seller_id": 1, "is_promoted": 1, "promotion_tier": 1,
     "is_featured": 1, "is_partner_listing": 1, "region": 1, "country": 1,
     "created_at": 1,
+    "title_en": 1, "title_fr": 1, "description_en": 1, "description_fr": 1,
 }
 
 
@@ -163,6 +165,13 @@ async def _build_marketplace_items():
                 "region": auction.get("region"),
                 "country": auction.get("country"),
                 "created_at": auction.get("created_at"),
+                # i18n fields — lot-level overrides, fallback to auction-level
+                "title_en": lot.get("title_en") or auction.get("title_en"),
+                "title_fr": lot.get("title_fr") or auction.get("title_fr"),
+                "description_en": lot.get("description_en") or auction.get("description_en"),
+                "description_fr": lot.get("description_fr") or auction.get("description_fr"),
+                "parent_auction_title_en": auction.get("title_en"),
+                "parent_auction_title_fr": auction.get("title_fr"),
             })
 
     for listing in single_listings:
@@ -201,6 +210,13 @@ async def _build_marketplace_items():
             "region": listing.get("region"),
             "country": listing.get("country"),
             "created_at": listing.get("created_at"),
+            # i18n fields
+            "title_en": listing.get("title_en"),
+            "title_fr": listing.get("title_fr"),
+            "description_en": listing.get("description_en"),
+            "description_fr": listing.get("description_fr"),
+            "parent_auction_title_en": None,
+            "parent_auction_title_fr": None,
         })
 
     # Default sort: featured > promoted > recent
