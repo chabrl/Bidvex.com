@@ -1,99 +1,134 @@
-# BidVex Auction Marketplace - PRD
+# BidVex Auction Marketplace — PRD
 
-## Tech Stack
-- **Frontend**: React, Tailwind CSS, Shadcn/UI, react-i18next
-- **Backend**: FastAPI, MongoDB (Motor), Stripe Connect, SendGrid, APScheduler
-- **AI Engine**: Gemini 2.5 Flash (google-genai)
-- **Cache**: Upstash Redis with in-memory fallback
-- **Storage**: Cloudflare R2 via boto3 (ACL=private default)
-- **Deployment**: Railway (single-service monolith serving API + React SPA)
+## Original Problem Statement
+Full-stack bilingual (EN/FR) auction marketplace for high-value vehicles and general items in Quebec, Canada. Built with React frontend, FastAPI backend, and MongoDB.
 
-## Credentials
+## Core Requirements
+- Bilingual (EN/FR) UI with i18n toggle
+- High-value vehicle auctions with $1,000 pre-authorization deposit
+- Stripe payments with Connect for seller payouts
+- Quebec tax compliance (GST/QST)
+- Admin dashboard with monitoring
+- Mobile-first responsive design
+- Railway deployment ready
+
+## User Personas
+- **Buyers**: Browse auctions, place bids, manage deposits
+- **Sellers**: List items, manage auctions, track earnings
+- **Partners**: Professional dealers with Pro license
+- **Admins**: Platform oversight, monitoring, configuration
+
+---
+
+## What's Been Implemented
+
+### Phase 1 — Core Platform (Complete)
+- Full auction CRUD with real-time bidding via WebSockets
+- User auth (JWT + Google OAuth)
+- Stripe checkout, Connect splits, subscription tiers
+- Admin panel with 15+ management tabs
+- Vehicle auction category with specialized flows
+
+### Phase 2 — Production Hardening (Complete)
+- Library migration: Removed `emergentintegrations`, replaced with `openai`, `boto3`, `stripe`
+- Railway deployment support: `main.py` entry, lazy DB connections, ProxyHeadersMiddleware
+- Frontend built as SPA served by FastAPI backend
+- PageSpeed & Accessibility fixes (CLS, aria-labels, unused scripts)
+- Fixed Admin Panel array normalization across 10+ components
+
+### Phase 3 — Mobile & UI Polish (Complete)
+- Mobile Messaging interface rebuilt with `position: fixed; inset: 0` for iOS keyboard
+- Legal pages/footer mailing address removal
+- Subscription page VIP text color fix (CSS `!important` override)
+- Subscription page EN/FR toggle fix (z-index, JSON translations)
+
+### Phase 4 — Subscription Decoupling (Complete)
+- `UserTierGrid.js`: 3-column desktop grid for Standard tiers (Starter/Premium/VIP)
+- `PartnerLicenseCard.js`: Isolated Partner Pro card for Partner Dashboard
+- Deleted deprecated `TrendySubscriptionCards.js`
+- Verified via testing agent (iteration_111: 12/12 tests passed)
+
+### Phase 5 — Infrastructure Hardening (Complete - April 7, 2026)
+- **$1,000 Deposit Security**: Verified `place_bid` blocks on >$10k listings without deposit in both `auctions.py` and `vehicles.py`. SecurityDepositBanner renders on ListingDetailPage and VehicleDetailPage.
+- **System Monitoring Dashboard**: New `routes/monitoring.py` with admin-only endpoints for errors, webhooks, health checks. Frontend dashboard at Admin > Analytics > System Monitoring with real-time metrics (auto-refresh 30s).
+- **Error Tracking Middleware**: 500 errors and unhandled exceptions automatically logged to `monitoring_events` MongoDB collection.
+- **Webhook Failure Tracking**: Stripe and SendGrid webhook outcomes logged to `webhook_log` collection with success/failure status.
+- **Cloudflare CDN Headers**: Enhanced cache headers with `CDN-Cache-Control` for static assets, images (including .avif), and API no-store rules.
+- **payments.py Refactored**: Split from 2,293 to 1,594 lines. Extracted `payments_fees.py` (293 lines), `payments_promotions.py` (190 lines), `payments_shared.py` (37 lines).
+- **Backend Lint Fixes**: Resolved all warnings in `webhooks.py` (missing timedelta), `partners.py` (undefined db/os, missing helpers), `subscriptions.py` (unused variables, duplicate function name).
+- Verified via testing agent (iteration_112: 19/19 backend tests passed, frontend System Monitoring confirmed rendering).
+
+---
+
+## Architecture
+
+```
+/app
+├── backend/
+│   ├── main.py                     # Railway entrypoint
+│   ├── server.py                   # FastAPI setup, middleware, SPA mount
+│   ├── routes/
+│   │   ├── payments.py             # Core checkout, methods, subscriptions (1594 lines)
+│   │   ├── payments_fees.py        # Fee calculations & tax endpoints
+│   │   ├── payments_promotions.py  # Promotions & email credits
+│   │   ├── payments_shared.py      # Shared DI for payment sub-routers
+│   │   ├── monitoring.py           # System monitoring & alerting
+│   │   ├── auctions.py             # Auction CRUD & bidding
+│   │   ├── vehicles.py             # Vehicle auction flows
+│   │   ├── deposits.py             # $1k pre-auth deposit management
+│   │   ├── webhooks.py             # Stripe/SendGrid webhook handlers
+│   │   └── ...
+│   └── services/
+│       ├── pricing_config.py       # Centralized pricing constants
+│       ├── fee_calculation_engine.py
+│       └── tax_engine.py
+├── frontend/
+│   ├── build/                      # Compiled React SPA
+│   └── src/
+│       ├── config.js               # Centralized API base URL
+│       ├── components/
+│       │   ├── UserTierGrid.js
+│       │   ├── PartnerLicenseCard.js
+│       │   └── SecurityDepositBanner.js
+│       └── pages/
+│           ├── admin/
+│           │   └── SystemMonitoringDashboard.js
+│           ├── AdminDashboard.js
+│           └── ProfileSettingsPage.js
+└── runtime.txt
+```
+
+---
+
+## Prioritized Backlog
+
+### P0 (Launch Blockers) — None remaining
+
+### P1 (Post-Launch)
+- Cloudflare CDN DNS routing (manual setup per INFRASTRUCTURE_P2.md)
+- Production monitoring alert notifications (email/Slack on critical errors)
+
+### P2 (Enhancements)
+- Real-time performance dashboard
+- Automated weekly Lighthouse audits
+- Server-side PageSpeed monitoring endpoint
+- i18n for EmailMarketingPricing page
+
+### P3 (Technical Debt)
+- Further payments.py decomposition (advanced checkout, buy now, seller earnings)
+- `server.py` decomposition into lifecycle, middleware, routing modules
+- Remove `E741` lint warnings in `dashboard.py`
+
+---
+
+## 3rd Party Integrations
+| Service | Purpose | Key Required |
+|---------|---------|-------------|
+| Stripe | Payments & Connect | STRIPE_API_KEY |
+| OpenAI GPT-4o | AI Assistant | OPENAI_API_KEY |
+| SendGrid | Email Marketing | SENDGRID_API_KEY |
+| Twilio | SMS/Verify | TWILIO_* |
+| Cloudflare R2 | Object Storage | AWS S3 compatible keys |
+
+## Test Credentials
 - Admin: `charbeladmin@bidvex.com` / `Admin123!`
-
-## Official Fee Schedule (Audited April 3, 2026)
-
-### §7.1 User Tiers
-| Tier | Annual Fee | Buyer Premium | Seller Commission |
-|------|-----------|---------------|-------------------|
-| Standard | Free | 5% | 4% |
-| Premium | $180 CAD | 3.5% | 2.5% |
-| VIP Elite | $300 CAD | 3% | 2% |
-- GST/QST applied to subscription checkout as separate line items
-
-### §7.2 Partner Platform Access ($100 CAD/yr)
-- BidVex takes ONLY 3% Hammer Commission (general) / 2.5% (vehicle)
-- 0% of Buyer Premium retained by BidVex — 100% flows to Partner
-
-### §7.3 Vehicle Platform Fee
-- 2.5% mandatory (overrides standard 3%)
-
-### §7.4 Tax Calculation
-- GST (TPS 5%) + QST (TVQ 9.975%) on **(Hammer + Buyer Premium)**
-- Separate line items on all Stripe checkouts
-
-### §7.5 Payment Terms
-- 14-day payment deadline with day-10 reminder
-- 2%/month late penalty via `process_overdue_auction_payments` cron (every 6h)
-- Metadata flag: `payment_status: "overdue"`
-
-### Email Credit Rates
-| Quantity | Rate/Email |
-|----------|-----------|
-| 1-1,000 | $0.018 |
-| 1,001-5,000 | $0.015 |
-| 5,001-10,000 | $0.012 |
-| 10,001+ | $0.010 |
-
-## Completed Work
-
-### Fee Schedule Audit — April 3, 2026
-- **FIX**: Added GST/QST as separate Stripe line items on subscription checkout (subscriptions.py)
-- **FIX**: Aligned frontend EmailCreditPurchase.js tiers to backend ($0.016→$0.015, boundaries corrected)
-- 34/34 audit tests passed, all rates verified to 0.0% deviation
-
-### Growth & Monetization — April 3, 2026
-- Affiliate Cash-Back Engine (15% of BidVex commission via Stripe Transfer Group)
-- Listing Promotion Storefront ($9.99/$24.99/$49.99 + tax)
-- Email Marketing Credits (Pay-As-You-Go + tax)
-- GST/QST on all digital products
-- CSS Polish: French letter-spacing -0.02em
-
-### Two-Tier Economy — April 3, 2026
-- Partner vs Standard flow (application_fee logic, metadata tagging)
-- Tax base: Hammer + Premium
-
-### Stripe Connect Engine — April 3, 2026
-- Itemized line items, $1k deposit, vehicle offline hammer
-
-### Mobile Messaging UI — Clean Rebuild (April 4, 2026)
-**Removed all previous hacks:**
-- Deleted body/html `position:fixed`, `overflow:hidden` locks
-- Deleted `visualViewport` height/bottom/position manipulation
-- Deleted `focusin`/`focusout` document listeners
-- Deleted staggered `setTimeout(scrollToBottom, 100/400/800)` hacks
-- Deleted `window.scrollTo(0,0)` calls
-- Deleted `interactive-widget=resizes-content` meta tag
-
-**Clean architecture:**
-- Container: `h-[calc(100dvh-3.5rem)] sm:h-[calc(100dvh-4rem)]` — accounts for navbar spacer (h-14/sm:h-16), `display:flex`
-- Scroll area: `flex:1 overflow-y:auto` with `-webkit-overflow-scrolling:touch` and `overscroll-behavior-y:contain`
-- Input bar: `shrink-0 z-20` with `padding-bottom: env(safe-area-inset-bottom)`
-- Keyboard detection: `visualViewport.resize` ONLY — sets `keyboardVisible` state to hide quick actions
-- Auto-scroll: `scrollAreaRef.current.scrollTop = scrollHeight` on new messages, keyboard open, and input focus
-- Input: `enterKeyHint="send"`, `text-base` (prevents iOS auto-zoom), `onFocus={scrollToBottom}`
-- MobileBottomNav hidden on `/messages` via App.js `MobileNavWrapper`
-- Meta viewport: `viewport-fit=cover, maximum-scale=1`
-
-### Subscription Cards — Text Visibility + i18n Fix (April 7, 2026)
-- Fixed VIP Elite title color: removed `!important` from global heading CSS rule in index.css, added inline `style={{ color: '#FFFFFF' }}` for VIP cards
-- Fixed FR language toggle: raised Navbar z-index from z-50 to z-[70] above TrendyAnnouncementBar (z-[60]) which was intercepting clicks
-- Full i18n for TrendySubscriptionCards: all 4 plan names, descriptions, features, CTAs, badges, savings text, terms, and trial strings now use `t()` keys
-- Added `subCards` namespace to both `en.json` and `fr.json` with complete EN/FR translations
-
-## Backlog
-- [ ] Cloudflare CDN setup (P2)
-- [ ] Post-launch monitoring/alerting (P2)
-- [ ] Real-time performance dashboard
-- [ ] Refactor payments.py into modular routers
-- [ ] Clean backend lint warnings (webhooks.py, partners.py, subscriptions.py)
