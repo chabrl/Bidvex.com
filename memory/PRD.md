@@ -67,6 +67,14 @@ Full-stack bilingual (EN/FR) auction marketplace for high-value vehicles and gen
 - **Backfill**: All existing listings (3 single, 4 multi, 5 lots) auto-translated via backfill endpoint.
 - Verified via testing agent (iteration_113: 15/15 tests passed, 100% backend + frontend).
 
+### Hotfix — Railway Build Failure (Fixed - April 7, 2026)
+- **Root Cause**: `pip freeze` in previous session captured Emergent-internal packages (`emergentintegrations`, `litellm` with private wheel URL `customer-assets.emergentagent.com`) into `requirements.txt`. Railway's builder couldn't access the private CDN, causing "Build Image" stage crash.
+- **Fix**: 
+  1. Cleaned `requirements.txt` — removed `emergentintegrations`, `litellm` custom wheel, and all Emergent-internal transitive deps. Kept only public PyPI packages.
+  2. Rewrote `translation_service.py` with dual-SDK strategy: uses `emergentintegrations` in Emergent preview (auto-detected), falls back to `google-generativeai` (public PyPI) on Railway with `GEMINI_API_KEY`.
+  3. If neither SDK nor API key is available, translations are silently skipped (listings save normally).
+- **Railway env var needed**: Set `GEMINI_API_KEY` in Railway dashboard for production translations.
+
 ### Phase 7 — High-Velocity Marketplace Sorting (Complete - April 7, 2026)
 - **Task 1 (Sorting Algorithm)**: Refactored `_build_marketplace_items` with `high_velocity_sort_key`: active items sorted by `auction_end_date` ascending (ending soonest first), ended items pushed to bottom, featured/promoted items break ties.
 - **Task 2 (DB & API)**: Created compound indexes `[status:1, auction_end_date:1, created_at:-1]` on both `listings` and `multi_item_listings`. Default API sort changed from `-promoted` to `ending_soon`. Added `newest` sort option.

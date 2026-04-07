@@ -1,20 +1,66 @@
 """
-BidVex Translation Service — Gemini 2.5 Flash via Emergent LLM Key
+BidVex Translation Service — Gemini 2.5 Flash
 Provides automated EN<->FR translation for listing content.
+
+Strategy:
+- Preview environment: uses emergentintegrations + EMERGENT_LLM_KEY (if available)
+- Railway production: uses google-generativeai + GEMINI_API_KEY
+- Both missing: translation silently skipped (listing saves normally, just not translated)
 """
 
 import os
 import logging
 import asyncio
 from typing import Optional, Dict
-from dotenv import load_dotenv
-from pathlib import Path
-
-load_dotenv(Path(__file__).parent.parent / ".env", override=False)
 
 logger = logging.getLogger(__name__)
 
-EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
+# Resolve API key: prefer GEMINI_API_KEY (production), fallback to EMERGENT_LLM_KEY (preview)
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") or os.environ.get("EMERGENT_LLM_KEY", "")
+
+# Detect which SDK is available
+_USE_EMERGENT = False
+_USE_GOOGLE = False
+
+try:
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    _USE_EMERGENT = True
+    logger.info("[i18n] Using emergentintegrations SDK for translations")
+except ImportError:
+    pass
+
+if not _USE_EMERGENT:
+    try:
+        import google.generativeai as genai
+        _USE_GOOGLE = True
+        logger.info("[i18n] Using google-generativeai SDK for translations")
+    except ImportError:
+        logger.warning("[i18n] No translation SDK available — translations will be skipped")
+
+
+async def _translate_via_emergent(text: str, system_prompt: str) -> Optional[str]:
+    """Translate using emergentintegrations (Emergent preview environment)."""
+    chat = LlmChat(
+        api_key=GEMINI_API_KEY,
+        session_id=f"translate-{id(text)}",
+        system_message=system_prompt,
+    )
+    chat.with_model("gemini", "gemini-2.5-flash")
+    response = await chat.send_message(UserMessage(text=text))
+    return response.strip() if response else None
+
+
+async def _translate_via_google(text: str, system_prompt: str) -> Optional[str]:
+    """Translate using standard google-generativeai SDK (Railway production)."""
+    genai.configure(api_key=GEMINI_API_KEY)
+    model = genai.GenerativeModel(
+        model_name="gemini-2.5-flash",
+        system_instruction=system_prompt,
+    )
+    response = await asyncio.to_thread(
+        model.generate_content, text
+    )
+    return response.text.strip() if response and response.text else None
 
 
 async def translate_text(text: str, source_lang: str = "en", target_lang: str = "fr") -> Optional[str]:
@@ -24,39 +70,36 @@ async def translate_text(text: str, source_lang: str = "en", target_lang: str = 
     """
     if not text or not text.strip():
         return text
-    if not EMERGENT_LLM_KEY:
-        logger.warning("EMERGENT_LLM_KEY not set — skipping translation")
+    if not GEMINI_API_KEY:
+        logger.warning("[i18n] No API key set — skipping translation")
         return None
 
     lang_names = {"en": "English", "fr": "French"}
     src = lang_names.get(source_lang, "English")
     tgt = lang_names.get(target_lang, "French")
 
+    system_prompt = (
+        f"You are a professional translator specializing in Quebec French (Canadian French). "
+        f"Translate the following {src} text to {tgt}. "
+        f"Preserve all formatting, line breaks, and HTML tags. "
+        f"Use natural Quebec French conventions (e.g., 'enchères' not 'ventes aux enchères'). "
+        f"Return ONLY the translated text with no explanations or preamble."
+    )
+
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        if _USE_EMERGENT:
+            translated = await _translate_via_emergent(text, system_prompt)
+        elif _USE_GOOGLE:
+            translated = await _translate_via_google(text, system_prompt)
+        else:
+            return None
 
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"translate-{id(text)}",
-            system_message=(
-                f"You are a professional translator specializing in Quebec French (Canadian French). "
-                f"Translate the following {src} text to {tgt}. "
-                f"Preserve all formatting, line breaks, and HTML tags. "
-                f"Use natural Quebec French conventions (e.g., 'enchères' not 'ventes aux enchères'). "
-                f"Return ONLY the translated text with no explanations or preamble."
-            ),
-        )
-        chat.with_model("gemini", "gemini-2.5-flash")
-
-        user_message = UserMessage(text=text)
-        response = await chat.send_message(user_message)
-        translated = response.strip() if response else None
         if translated:
-            logger.info(f"Translated ({source_lang}->{target_lang}): '{text[:50]}...' -> '{translated[:50]}...'")
+            logger.info(f"[i18n] Translated ({source_lang}->{target_lang}): '{text[:50]}...' -> '{translated[:50]}...'")
         return translated
 
     except Exception as e:
-        logger.error(f"Translation failed ({source_lang}->{target_lang}): {e}")
+        logger.error(f"[i18n] Translation failed ({source_lang}->{target_lang}): {e}")
         return None
 
 
@@ -168,5 +211,5 @@ async def backfill_listing_translations(db) -> Dict[str, int]:
             logger.error(f"Backfill failed for multi-listing {doc['id']}: {e}")
             stats["errors"] += 1
 
-    logger.info(f"Backfill complete: {stats}")
+    logger.info(f"[i18n] Backfill complete: {stats}")
     return stats
