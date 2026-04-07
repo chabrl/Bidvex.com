@@ -83,73 +83,73 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
   const tiers = [
     {
       id: 'free',
-      name: 'Starter',
-      period: 'Forever Free',
-      description: 'Perfect for occasional bidders',
+      nameKey: 'subCards.plans.free.name',
+      periodKey: 'subCards.plans.free.period',
+      descKey: 'subCards.plans.free.description',
       icon: Zap,
       iconBg: 'bg-slate-100 dark:bg-slate-800',
       iconColor: 'text-slate-600 dark:text-slate-400',
       cardClass: 'bg-white/70 dark:bg-slate-800/70 border-slate-200 dark:border-slate-700',
       hoverClass: 'hover:bg-white/90 dark:hover:bg-slate-800/90 hover:shadow-xl hover:shadow-slate-200/50 dark:hover:shadow-slate-900/50',
       features: [
-        { icon: Check, text: 'Standard Bidding', included: true },
-        { icon: Check, text: 'Wishlist Access', included: true },
-        { icon: Percent, text: '4% Seller / 5% Buyer Fees', included: true },
-        { icon: TrendingUp, text: 'Basic Listing Visibility', included: true },
+        { icon: Check, textKey: 'subCards.features.standardBidding', included: true },
+        { icon: Check, textKey: 'subCards.features.wishlistAccess', included: true },
+        { icon: Percent, textKey: 'subCards.features.feeStandard', included: true },
+        { icon: TrendingUp, textKey: 'subCards.features.basicVisibility', included: true },
       ],
-      cta: 'Current Plan',
+      ctaKey: 'subCards.currentPlan',
       ctaDisabled: true,
     },
     {
       id: 'premium',
-      name: 'Premium',
-      period: '/year',
-      description: 'For serious buyers & sellers',
+      nameKey: 'subCards.plans.premium.name',
+      periodKey: 'subCards.plans.premium.period',
+      descKey: 'subCards.plans.premium.description',
       icon: Star,
       iconBg: 'bg-purple-100 dark:bg-purple-900/50',
       iconColor: 'text-purple-600 dark:text-purple-400',
       cardClass: 'bg-gradient-to-br from-purple-50/80 via-white/80 to-blue-50/80 dark:from-purple-900/30 dark:via-slate-800/80 dark:to-blue-900/30 border-purple-300 dark:border-purple-700',
       hoverClass: 'hover:shadow-2xl hover:shadow-purple-300/50 dark:hover:shadow-purple-900/50 hover:scale-[1.02] hover:border-purple-400',
       features: [
-        { icon: Percent, text: '2.5% Seller / 3.5% Buyer', included: true, highlight: 'Save 1.5%' },
-        { icon: Shield, text: 'Auto-Bid Bot Access', included: true },
-        { icon: Megaphone, text: '3-Day Listing Promotion', included: true },
-        { icon: TrendingUp, text: 'Priority Search Ranking', included: true },
-        { icon: Star, text: 'Premium Seller Badge', included: true },
+        { icon: Percent, textKey: 'subCards.features.feePremium', included: true, highlightKey: 'subCards.highlights.save15' },
+        { icon: Shield, textKey: 'subCards.features.autoBidBot', included: true },
+        { icon: Megaphone, textKey: 'subCards.features.promo3Day', included: true },
+        { icon: TrendingUp, textKey: 'subCards.features.priorityRanking', included: true },
+        { icon: Star, textKey: 'subCards.features.premiumBadge', included: true },
       ],
-      cta: 'Upgrade to Premium',
+      ctaKey: 'subCards.plans.premium.cta',
       ctaClass: 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700',
     },
     {
       id: 'partner_pro',
-      name: 'Partner Pro',
-      period: '/year',
-      description: 'Power tools for high-volume sellers',
+      nameKey: 'subCards.plans.partner_pro.name',
+      periodKey: 'subCards.plans.partner_pro.period',
+      descKey: 'subCards.plans.partner_pro.description',
       icon: Store,
       iconBg: 'bg-cyan-100 dark:bg-cyan-900/50',
       iconColor: 'text-cyan-600 dark:text-cyan-400',
       cardClass: 'bg-gradient-to-br from-cyan-50/80 via-white/80 to-teal-50/80 dark:from-cyan-900/30 dark:via-slate-800/80 dark:to-teal-900/30 border-cyan-300 dark:border-cyan-700',
       hoverClass: 'hover:shadow-2xl hover:shadow-cyan-300/50 dark:hover:shadow-cyan-900/50 hover:scale-[1.02] hover:border-cyan-400',
-      badge: 'PRO TOOLS',
+      badgeKey: 'subCards.plans.partner_pro.badge',
       badgeClass: 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white',
       featured: true,
       features: [
-        { icon: Percent, text: '25% Buyer & Seller Discount', included: true, highlight: 'Pro Rate' },
-        { icon: Store, text: 'Branded Storefront Page', included: true },
-        { icon: FileSpreadsheet, text: 'CSV Bulk Listing Import', included: true },
-        { icon: Sparkles, text: '2h Early Auction Access', included: true },
-        { icon: Megaphone, text: '10 Featured Listings/Month', included: true },
-        { icon: BarChart3, text: 'Analytics Export (CSV/JSON)', included: true },
-        { icon: Headphones, text: 'Priority Chat + Email Support', included: true },
+        { icon: Percent, textKey: 'subCards.features.discount25', included: true, highlightKey: 'subCards.highlights.proRate' },
+        { icon: Store, textKey: 'subCards.features.storefront', included: true },
+        { icon: FileSpreadsheet, textKey: 'subCards.features.csvImport', included: true },
+        { icon: Sparkles, textKey: 'subCards.features.earlyAccess2h', included: true },
+        { icon: Megaphone, textKey: 'subCards.features.featured10', included: true },
+        { icon: BarChart3, textKey: 'subCards.features.analyticsExport', included: true },
+        { icon: Headphones, textKey: 'subCards.features.prioritySupport', included: true },
       ],
-      cta: 'Go Partner Pro',
+      ctaKey: 'subCards.plans.partner_pro.cta',
       ctaClass: 'bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-700 hover:to-teal-700',
     },
     {
       id: 'vip',
-      name: 'VIP Elite',
-      period: '/year',
-      description: 'Ultimate auction experience',
+      nameKey: 'subCards.plans.vip.name',
+      periodKey: 'subCards.plans.vip.period',
+      descKey: 'subCards.plans.vip.description',
       icon: Crown,
       iconBg: 'bg-gradient-to-br from-amber-200 to-yellow-300 dark:from-amber-700 dark:to-yellow-600',
       iconColor: 'text-amber-800 dark:text-amber-100',
@@ -157,14 +157,14 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
       hoverClass: 'hover:shadow-2xl hover:shadow-amber-500/30 hover:scale-[1.02] hover:border-amber-400',
       darkTheme: true,
       features: [
-        { icon: Percent, text: '2% Seller / 3% Buyer', included: true, highlight: 'Save 2%' },
-        { icon: Shield, text: 'Auto-Bid Bot + Priority', included: true },
-        { icon: Megaphone, text: '7-Day Listing Promotion', included: true },
-        { icon: Sparkles, text: '24h Early Access to Auctions', included: true },
-        { icon: Crown, text: 'VIP Elite Badge', included: true },
-        { icon: Headphones, text: 'Dedicated Support Line', included: true },
+        { icon: Percent, textKey: 'subCards.features.feeVip', included: true, highlightKey: 'subCards.highlights.save2' },
+        { icon: Shield, textKey: 'subCards.features.autoBidPriority', included: true },
+        { icon: Megaphone, textKey: 'subCards.features.promo7Day', included: true },
+        { icon: Sparkles, textKey: 'subCards.features.earlyAccess24h', included: true },
+        { icon: Crown, textKey: 'subCards.features.vipBadge', included: true },
+        { icon: Headphones, textKey: 'subCards.features.dedicatedSupport', included: true },
       ],
-      cta: 'Go VIP Elite',
+      ctaKey: 'subCards.plans.vip.cta',
       ctaClass: 'bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-black font-bold',
     },
   ];
@@ -257,16 +257,16 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
               data-testid={`subscription-card-${tier.id}`}
             >
               {/* Badge */}
-              {tier.badge && !isCurrentTier && (
+              {tier.badgeKey && !isCurrentTier && (
                 <div className={`absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full text-xs font-bold tracking-wide shadow-lg ${tier.badgeClass}`}>
-                  {tier.badge}
+                  {t(tier.badgeKey)}
                 </div>
               )}
 
               {/* Current Plan Indicator */}
               {isCurrentTier && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-green-500 text-white text-xs font-semibold rounded-full shadow-md">
-                  CURRENT PLAN
+                  {t('subCards.currentPlan')}
                 </div>
               )}
 
@@ -275,11 +275,11 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
                 <div className={`w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center ${tier.iconBg} shadow-lg`}>
                   <Icon className={`h-8 w-8 ${tier.iconColor}`} />
                 </div>
-                <h3 className={`text-2xl font-bold mb-1 ${tier.darkTheme ? 'text-white' : 'text-slate-900 dark:text-white'}`}>
-                  {tier.name}
+                <h3 className={`text-2xl font-bold mb-1 ${tier.darkTheme ? '' : 'text-slate-900 dark:text-white'}`} style={tier.darkTheme ? { color: '#FFFFFF' } : undefined} data-testid={`plan-title-${tier.id}`}>
+                  {t(tier.nameKey)}
                 </h3>
                 <p className={`text-sm ${tier.darkTheme ? 'text-slate-300' : 'text-slate-600 dark:text-slate-400'}`}>
-                  {tier.description}
+                  {t(tier.descKey)}
                 </p>
               </div>
 
@@ -293,7 +293,7 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
                     </span>
                     {savingsPercent && (
                       <span className="ml-2 text-xs px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full font-semibold">
-                        {savingsPercent}% OFF
+                        {savingsPercent}% {t('subCards.off')}
                       </span>
                     )}
                   </div>
@@ -303,17 +303,17 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
                     ${formatPrice(price)}
                   </span>
                   <span className={`text-sm mb-2 ${tier.darkTheme ? 'text-slate-400' : 'text-slate-500 dark:text-slate-400'}`}>
-                    {tier.period}
+                    {t(tier.periodKey)}
                   </span>
                 </div>
                 {/* Promo badge - show savings amount if original exists */}
                 {originalPrice ? (
                   <span className="inline-block mt-2 px-3 py-1 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400 text-xs font-semibold rounded-full">
-                    Save ${formatPrice(originalPrice - price)}!
+                    {t('subCards.saveAmount', { amount: formatPrice(originalPrice - price) })}
                   </span>
                 ) : tier.id !== 'free' && (
                   <span className="inline-block mt-2 px-3 py-1 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400 text-xs font-semibold rounded-full">
-                    2 Months Free!
+                    {t('subCards.twoMonthsFree')}
                   </span>
                 )}
 
@@ -327,7 +327,7 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
                       }`}
                       data-testid={`price-breakdown-toggle-${tier.id}`}
                     >
-                      {expandedBreakdown === tier.id ? 'Hide' : 'View'} price breakdown
+                      {expandedBreakdown === tier.id ? t('subCards.hideBreakdown') : t('subCards.viewBreakdown')}
                     </button>
                     {expandedBreakdown === tier.id && (
                       <div className={`mt-2 mx-auto max-w-[240px] text-left rounded-lg p-3 text-xs space-y-1.5 ${
@@ -354,7 +354,7 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
                         <div className={`flex justify-between pt-1.5 border-t font-semibold ${
                           tier.darkTheme ? 'border-white/20 text-white' : 'border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white'
                         }`}>
-                          <span>Total</span>
+                          <span>{t('subCards.total')}</span>
                           <span>${formatPrice(breakdowns[tier.id].total)} CAD</span>
                         </div>
                       </div>
@@ -386,15 +386,15 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
                       </div>
                       <div className="flex-1">
                         <span className={`text-sm font-medium ${tier.darkTheme ? 'text-white' : 'text-slate-900 dark:text-white'}`}>
-                          {feature.text}
+                          {t(feature.textKey)}
                         </span>
-                        {feature.highlight && (
+                        {feature.highlightKey && (
                           <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${
                             tier.darkTheme 
                               ? 'bg-green-500/20 text-green-400' 
                               : 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400'
                           }`}>
-                            {feature.highlight}
+                            {t(feature.highlightKey)}
                           </span>
                         )}
                       </div>
@@ -416,15 +416,15 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
                 data-testid={`upgrade-btn-${tier.id}`}
               >
                 {upgrading === tier.id ? (
-                  <><RefreshCw className="h-4 w-4 animate-spin mr-2" /> Processing...</>
-                ) : isCurrentTier ? 'Current Plan' : tier.cta}
+                  <><RefreshCw className="h-4 w-4 animate-spin mr-2" /> {t('subCards.processing')}</>
+                ) : isCurrentTier ? t('subCards.currentPlan') : t(tier.ctaKey)}
               </Button>
 
               {/* Terms of Sale */}
               {!isCurrentTier && tier.id !== 'free' && (
                 <div className="mt-3 space-y-2">
                   <p className={`text-[11px] leading-relaxed text-center ${tier.darkTheme ? 'text-slate-500' : 'text-slate-400 dark:text-slate-500'}`}>
-                    By purchasing, you agree that all payments are final and non-refundable. If you cancel, access continues until the end of your billing cycle.
+                    {t('subCards.termsText')}
                   </p>
                 </div>
               )}
@@ -438,14 +438,14 @@ const TrendySubscriptionCards = ({ currentTier = 'free', onUpgrade }) => {
                     className="text-sm font-semibold text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 underline underline-offset-2 transition-colors"
                     data-testid="start-trial-btn"
                   >
-                    {startingTrial ? 'Starting...' : 'Try free for 14 days — no credit card needed'}
+                    {startingTrial ? t('subCards.starting') : t('subCards.tryFree')}
                   </button>
                 </div>
               )}
               {tier.id === 'partner_pro' && trialStatus?.is_trialing && (
                 <div className="mt-3 text-center">
                   <span className="text-xs font-medium px-3 py-1 rounded-full bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300" data-testid="trial-active-badge">
-                    Trial active — {trialStatus.days_remaining} days left
+                    {t('subCards.trialActive', { days: trialStatus.days_remaining })}
                   </span>
                 </div>
               )}

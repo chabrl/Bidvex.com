@@ -220,7 +220,7 @@ const SubscriptionPricingPage = () => {
                       <Icon className={`h-5 w-5 ${plan.plan_id === 'vip' ? 'text-[#FFD700]' : tier.checkColor}`} />
                     </div>
                     <div>
-                      <h3 className={`text-lg font-bold ${tier.textName}`} data-testid={`plan-name-${plan.plan_id}`}>{displayName}</h3>
+                      <h3 className={`text-lg font-bold ${tier.textName}`} style={plan.plan_id === 'vip' ? { color: '#FFFFFF' } : undefined} data-testid={`plan-name-${plan.plan_id}`}>{displayName}</h3>
                       {tagline && <p className={`text-xs ${tier.textDesc}`}>{tagline}</p>}
                     </div>
                   </div>

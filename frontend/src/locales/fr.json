@@ -1337,5 +1337,75 @@
     "seenAt": "Vu à {{time}}",
     "typeMessage": "Écrire un message...",
     "delivered": "Livré"
+  },
+  "subCards": {
+    "plans": {
+      "free": {
+        "name": "Débutant",
+        "period": "Gratuit pour toujours",
+        "description": "Parfait pour les enchérisseurs occasionnels",
+        "cta": "Plan actuel"
+      },
+      "premium": {
+        "name": "Premium",
+        "period": "/an",
+        "description": "Pour les acheteurs et vendeurs sérieux",
+        "cta": "Passer au Premium"
+      },
+      "partner_pro": {
+        "name": "Partenaire Pro",
+        "period": "/an",
+        "description": "Outils puissants pour les vendeurs à volume élevé",
+        "cta": "Passer Partenaire Pro",
+        "badge": "OUTILS PRO"
+      },
+      "vip": {
+        "name": "VIP Élite",
+        "period": "/an",
+        "description": "L'expérience d'enchères ultime",
+        "cta": "Passer VIP Élite"
+      }
+    },
+    "features": {
+      "standardBidding": "Enchères standards",
+      "wishlistAccess": "Accès liste de souhaits",
+      "feeStandard": "Frais de 4 % vendeur / 5 % acheteur",
+      "basicVisibility": "Visibilité de base des annonces",
+      "feePremium": "2,5 % vendeur / 3,5 % acheteur",
+      "autoBidBot": "Accès à l'enchère automatique",
+      "promo3Day": "Promotion d'annonce 3 jours",
+      "priorityRanking": "Classement prioritaire",
+      "premiumBadge": "Badge vendeur Premium",
+      "discount25": "25 % de réduction acheteur et vendeur",
+      "storefront": "Page vitrine personnalisée",
+      "csvImport": "Importation en lot CSV",
+      "earlyAccess2h": "Accès anticipé aux enchères 2h",
+      "featured10": "10 annonces vedettes/mois",
+      "analyticsExport": "Exportation analytique (CSV/JSON)",
+      "prioritySupport": "Support prioritaire (chat + courriel)",
+      "feeVip": "2 % vendeur / 3 % acheteur",
+      "autoBidPriority": "Enchère auto + Priorité",
+      "promo7Day": "Promotion d'annonce 7 jours",
+      "earlyAccess24h": "Accès anticipé de 24h aux enchères",
+      "vipBadge": "Badge VIP Élite",
+      "dedicatedSupport": "Ligne d'assistance dédiée"
+    },
+    "highlights": {
+      "save15": "Économisez 1,5 %",
+      "proRate": "Tarif Pro",
+      "save2": "Économisez 2 %"
+    },
+    "saveAmount": "Économisez {{amount}} $ !",
+    "twoMonthsFree": "2 mois gratuits !",
+    "viewBreakdown": "Voir le détail des prix",
+    "hideBreakdown": "Masquer le détail des prix",
+    "total": "Total",
+    "processing": "Traitement...",
+    "currentPlan": "Plan actuel",
+    "off": "RABAIS",
+    "termsText": "En achetant, vous acceptez que tous les paiements sont définitifs et non remboursables. Si vous annulez, l'accès continue jusqu'à la fin de votre cycle de facturation.",
+    "tryFree": "Essayez gratuitement 14 jours — sans carte de crédit",
+    "starting": "Démarrage...",
+    "trialActive": "Essai actif — {{days}} jours restants"
   }
 }

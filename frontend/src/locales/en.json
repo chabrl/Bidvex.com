@@ -1337,5 +1337,75 @@
     "seenAt": "Seen at {{time}}",
     "typeMessage": "Type a message...",
     "delivered": "Delivered"
+  },
+  "subCards": {
+    "plans": {
+      "free": {
+        "name": "Starter",
+        "period": "Forever Free",
+        "description": "Perfect for occasional bidders",
+        "cta": "Current Plan"
+      },
+      "premium": {
+        "name": "Premium",
+        "period": "/year",
+        "description": "For serious buyers & sellers",
+        "cta": "Upgrade to Premium"
+      },
+      "partner_pro": {
+        "name": "Partner Pro",
+        "period": "/year",
+        "description": "Power tools for high-volume sellers",
+        "cta": "Go Partner Pro",
+        "badge": "PRO TOOLS"
+      },
+      "vip": {
+        "name": "VIP Elite",
+        "period": "/year",
+        "description": "Ultimate auction experience",
+        "cta": "Go VIP Elite"
+      }
+    },
+    "features": {
+      "standardBidding": "Standard Bidding",
+      "wishlistAccess": "Wishlist Access",
+      "feeStandard": "4% Seller / 5% Buyer Fees",
+      "basicVisibility": "Basic Listing Visibility",
+      "feePremium": "2.5% Seller / 3.5% Buyer",
+      "autoBidBot": "Auto-Bid Bot Access",
+      "promo3Day": "3-Day Listing Promotion",
+      "priorityRanking": "Priority Search Ranking",
+      "premiumBadge": "Premium Seller Badge",
+      "discount25": "25% Buyer & Seller Discount",
+      "storefront": "Branded Storefront Page",
+      "csvImport": "CSV Bulk Listing Import",
+      "earlyAccess2h": "2h Early Auction Access",
+      "featured10": "10 Featured Listings/Month",
+      "analyticsExport": "Analytics Export (CSV/JSON)",
+      "prioritySupport": "Priority Chat + Email Support",
+      "feeVip": "2% Seller / 3% Buyer",
+      "autoBidPriority": "Auto-Bid Bot + Priority",
+      "promo7Day": "7-Day Listing Promotion",
+      "earlyAccess24h": "24h Early Access to Auctions",
+      "vipBadge": "VIP Elite Badge",
+      "dedicatedSupport": "Dedicated Support Line"
+    },
+    "highlights": {
+      "save15": "Save 1.5%",
+      "proRate": "Pro Rate",
+      "save2": "Save 2%"
+    },
+    "saveAmount": "Save ${{amount}}!",
+    "twoMonthsFree": "2 Months Free!",
+    "viewBreakdown": "View price breakdown",
+    "hideBreakdown": "Hide price breakdown",
+    "total": "Total",
+    "processing": "Processing...",
+    "currentPlan": "Current Plan",
+    "off": "OFF",
+    "termsText": "By purchasing, you agree that all payments are final and non-refundable. If you cancel, access continues until the end of your billing cycle.",
+    "tryFree": "Try free for 14 days — no credit card needed",
+    "starting": "Starting...",
+    "trialActive": "Trial active — {{days}} days left"
   }
 }
