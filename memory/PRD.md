@@ -58,6 +58,15 @@ Full-stack bilingual (EN/FR) auction marketplace for high-value vehicles and gen
 - **Backend Lint Fixes**: Resolved all warnings in `webhooks.py` (missing timedelta), `partners.py` (undefined db/os, missing helpers), `subscriptions.py` (unused variables, duplicate function name).
 - Verified via testing agent (iteration_112: 19/19 backend tests passed, frontend System Monitoring confirmed rendering).
 
+### Phase 6 — Bilingual Content & Gemini Translation Engine (Complete - April 7, 2026)
+- **Phase 1 (DB & API)**: Added `title_en`, `title_fr`, `description_en`, `description_fr` fields to `Listing`, `MultiItemListing`, and `Lot` models. Marketplace items API returns all i18n fields. Updated projections to include bilingual data.
+- **Phase 2 (Gemini Translation)**: Created `services/translation_service.py` using Gemini 2.5 Flash via Emergent LLM Key. Auto-translates title + description on listing creation (background async). Manual override endpoints: `PUT /api/listings/{id}/translations` and `PUT /api/multi-item-listings/{id}/translations`. Admin backfill endpoint: `POST /api/admin/backfill-translations`.
+- **Phase 3 (Frontend Refactor)**: Created `utils/localization.js` with `getLocalized(item, field)`, `formatLocalizedCurrency(amount, currency)`, and `getBuyerPremiumText(tier, customRate)`. Refactored `FlattenedMarketplace.js`, `ListingDetailPage.js`, `MultiItemListingDetailPage.js`, `WatchlistPage.js`, `LotsMarketplacePage.js` to use `getLocalized()` for all user-generated content.
+- **Phase 4 (i18next Mapping)**: Extended `en.json` and `fr.json` marketplace sections with 25+ new keys: privateSales, business, verifiedPartner, noTaxOnItem, noTaxOnHammer, loadMore, noItemsFound, shippingOptions, bidHistory, conditionsGenerales, buyerPremiumNote, etc.
+- **Phase 5 (Currency & Legal)**: Quebec currency format `5,00 $` enforced via `Intl.NumberFormat('fr-CA')`. Dynamic Buyer Premium % (5% free, 3.5% Premium, 3% VIP) injected into French legal text using `getBuyerPremiumText()`.
+- **Backfill**: All existing listings (3 single, 4 multi, 5 lots) auto-translated via backfill endpoint.
+- Verified via testing agent (iteration_113: 15/15 tests passed, 100% backend + frontend).
+
 ---
 
 ## Architecture
@@ -79,22 +88,33 @@ Full-stack bilingual (EN/FR) auction marketplace for high-value vehicles and gen
 │   │   ├── webhooks.py             # Stripe/SendGrid webhook handlers
 │   │   └── ...
 │   └── services/
-│       ├── pricing_config.py       # Centralized pricing constants
+│       ├── translation_service.py    # Gemini 2.5 Flash EN<->FR translation
+│       ├── pricing_config.py         # Centralized pricing constants
 │       ├── fee_calculation_engine.py
 │       └── tax_engine.py
 ├── frontend/
 │   ├── build/                      # Compiled React SPA
 │   └── src/
 │       ├── config.js               # Centralized API base URL
+│       ├── utils/
+│       │   ├── localization.js     # getLocalized(), formatLocalizedCurrency(), getBuyerPremiumText()
+│       │   └── currencyFormatter.js
 │       ├── components/
+│       │   ├── FlattenedMarketplace.js  # Localized ItemCard
 │       │   ├── UserTierGrid.js
 │       │   ├── PartnerLicenseCard.js
 │       │   └── SecurityDepositBanner.js
+│       ├── locales/
+│       │   ├── en.json             # Extended with marketplace i18n keys
+│       │   └── fr.json             # Quebec French translations
 │       └── pages/
 │           ├── admin/
 │           │   └── SystemMonitoringDashboard.js
-│           ├── AdminDashboard.js
-│           └── ProfileSettingsPage.js
+│           ├── ListingDetailPage.js       # Localized
+│           ├── MultiItemListingDetailPage.js  # Localized + dynamic Buyer Premium
+│           ├── WatchlistPage.js           # Localized
+│           ├── LotsMarketplacePage.js     # Localized
+│           └── AdminDashboard.js
 └── runtime.txt
 ```
 
@@ -107,12 +127,14 @@ Full-stack bilingual (EN/FR) auction marketplace for high-value vehicles and gen
 ### P1 (Post-Launch)
 - Cloudflare CDN DNS routing (manual setup per INFRASTRUCTURE_P2.md)
 - Production monitoring alert notifications (email/Slack on critical errors)
+- Refactor `auctions.py` (1,140+ lines) and `vehicles.py` (2,500+ lines)
 
 ### P2 (Enhancements)
 - Real-time performance dashboard
 - Automated weekly Lighthouse audits
 - Server-side PageSpeed monitoring endpoint
 - i18n for EmailMarketingPricing page
+- Seller Dashboard translation editor UI (manual override interface)
 
 ### P3 (Technical Debt)
 - Further payments.py decomposition (advanced checkout, buy now, seller earnings)
@@ -129,6 +151,7 @@ Full-stack bilingual (EN/FR) auction marketplace for high-value vehicles and gen
 | SendGrid | Email Marketing | SENDGRID_API_KEY |
 | Twilio | SMS/Verify | TWILIO_* |
 | Cloudflare R2 | Object Storage | AWS S3 compatible keys |
+| Gemini 2.5 Flash | Auto-Translation EN<->FR | EMERGENT_LLM_KEY (Emergent Universal Key) |
 
 ## Test Credentials
 - Admin: `charbeladmin@bidvex.com` / `Admin123!`
