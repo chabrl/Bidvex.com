@@ -360,16 +360,15 @@ const VehicleAuctionsPage = () => {
           <div className="flex items-center gap-3 mb-4">
             <Car className="h-10 w-10 text-blue-400" />
             <Badge className="bg-blue-500/20 text-blue-300 border-blue-400/30">
-              Vehicle Auctions
+              {t('vehicleAuctions.badge', 'Vehicle Auctions')}
             </Badge>
           </div>
           
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">
-            Vehicle Auctions
+          <h1 className="text-4xl md:text-5xl font-bold mb-4 text-white" data-testid="vehicle-auctions-header">
+            {t('vehicleAuctions.title', 'Vehicle Auctions')}
           </h1>
           <p className="text-xl text-blue-200 max-w-2xl mb-8">
-            Professional automotive auctions for dealers, auctioneers, and private buyers.
-            Verified sellers. Clean titles. Transparent bidding.
+            {t('vehicleAuctions.subtitle', 'Professional automotive auctions for dealers, auctioneers, and private buyers. Verified sellers. Clean titles. Transparent bidding.')}
           </p>
           
           {/* Search Bar */}
@@ -378,7 +377,7 @@ const VehicleAuctionsPage = () => {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
               <Input
                 type="text"
-                placeholder="Search by make, model, or VIN..."
+                placeholder={t('vehicleAuctions.searchPlaceholder', 'Search by make, model, or VIN...')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-12 h-14 bg-white/10 border-white/20 text-white placeholder:text-slate-400 focus:bg-white/20"
@@ -387,10 +386,10 @@ const VehicleAuctionsPage = () => {
             </div>
             <Button 
               size="lg" 
-              className="h-14 px-8 bg-blue-500 hover:bg-blue-600"
+              className="h-14 px-8 bg-blue-500 hover:bg-blue-600 text-white"
               onClick={() => handleFilterChange('make', searchQuery)}
             >
-              Search
+              {t('common.search', 'Search')}
             </Button>
           </div>
           
@@ -398,15 +397,15 @@ const VehicleAuctionsPage = () => {
           <div className="flex flex-wrap gap-6 mt-8">
             <div className="flex items-center gap-2">
               <Eye className="h-5 w-5 text-blue-400" />
-              <span className="text-slate-300">{total} Active Auctions</span>
+              <span className="text-slate-300">{total} {t('vehicleAuctions.activeAuctions', 'Active Auctions')}</span>
             </div>
             <div className="flex items-center gap-2">
               <Shield className="h-5 w-5 text-green-400" />
-              <span className="text-slate-300">Verified Sellers</span>
+              <span className="text-slate-300">{t('vehicleAuctions.verifiedSellers', 'Verified Sellers')}</span>
             </div>
             <div className="flex items-center gap-2">
               <Award className="h-5 w-5 text-yellow-400" />
-              <span className="text-slate-300">Title Guarantee</span>
+              <span className="text-slate-300">{t('vehicleAuctions.titleGuarantee', 'Title Guarantee')}</span>
             </div>
           </div>
           
@@ -418,9 +417,9 @@ const VehicleAuctionsPage = () => {
                   <Eye className="h-5 w-5 text-amber-300" />
                 </div>
                 <div>
-                  <h4 className="text-amber-200 font-semibold">Discovery Mode</h4>
+                  <h4 className="text-amber-200 font-semibold">{t('vehicleAuctions.discoveryMode', 'Discovery Mode')}</h4>
                   <p className="text-amber-300/80 text-sm">
-                    Vehicle auctions are currently in preview mode. Browse and discover vehicles while we finalize permits.
+                    {t('vehicleAuctions.discoveryModeDesc', 'Vehicle auctions are currently in preview mode. Browse and discover vehicles while we finalize permits.')}
                   </p>
                 </div>
               </div>

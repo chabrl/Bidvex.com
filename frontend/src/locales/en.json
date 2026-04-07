@@ -1433,5 +1433,16 @@
     "tryFree": "Try free for 14 days — no credit card needed",
     "starting": "Starting...",
     "trialActive": "Trial active — {{days}} days left"
+  },
+  "vehicleAuctions": {
+    "badge": "Vehicle Auctions",
+    "title": "Vehicle Auctions",
+    "subtitle": "Professional automotive auctions for dealers, auctioneers, and private buyers. Verified sellers. Clean titles. Transparent bidding.",
+    "searchPlaceholder": "Search by make, model, or VIN...",
+    "activeAuctions": "Active Auctions",
+    "verifiedSellers": "Verified Sellers",
+    "titleGuarantee": "Title Guarantee",
+    "discoveryMode": "Discovery Mode",
+    "discoveryModeDesc": "Vehicle auctions are currently in preview mode. Browse and discover vehicles while we finalize permits."
   }
 }

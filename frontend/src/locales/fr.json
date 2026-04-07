@@ -1433,5 +1433,16 @@
     "tryFree": "Essayez gratuitement 14 jours — sans carte de crédit",
     "starting": "Démarrage...",
     "trialActive": "Essai actif — {{days}} jours restants"
+  },
+  "vehicleAuctions": {
+    "badge": "Enchères de véhicules",
+    "title": "Enchères de véhicules",
+    "subtitle": "Enchères automobiles professionnelles pour concessionnaires, encanteurs et acheteurs privés. Vendeurs vérifiés. Titres clairs. Enchères transparentes.",
+    "searchPlaceholder": "Rechercher par marque, modèle ou NIV...",
+    "activeAuctions": "Enchères actives",
+    "verifiedSellers": "Vendeurs vérifiés",
+    "titleGuarantee": "Garantie de titre",
+    "discoveryMode": "Mode découverte",
+    "discoveryModeDesc": "Les enchères de véhicules sont actuellement en mode aperçu. Parcourez et découvrez des véhicules pendant que nous finalisons les permis."
   }
 }
