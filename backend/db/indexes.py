@@ -8,8 +8,11 @@ async def create_all_indexes(db: AsyncIOMotorDatabase):
         # Fix for the /api/site-config timeout causing the empty site
         await db.hero_banners.create_index([("active", 1), ("order", 1)])
         
-        # Performance for Marketplace and Announcements
-        await db.listings.create_index([("status", 1), ("end_time", 1)])
+        # High-Velocity marketplace sort: status + end_date ASC + created_at DESC
+        await db.listings.create_index([("status", 1), ("auction_end_date", 1), ("created_at", -1)])
+        await db.multi_item_listings.create_index([("status", 1), ("auction_end_date", 1), ("created_at", -1)])
+        
+        # Performance for announcements
         await db.announcements.create_index([("is_active", 1)])
         
         logger.info("[indexes] All database indexes verified/created")

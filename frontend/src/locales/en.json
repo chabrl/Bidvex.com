@@ -148,7 +148,8 @@
     "allBidsLegallyBinding": "All bids are legally binding",
     "estimatedTotal": "Est. Total Out-of-Pocket",
     "buyersPremium": "Buyer's Premium",
-    "premiumSavings": "Premium members save 1.5% on buyer's premium. Tax calculated at checkout if applicable."
+    "premiumSavings": "Premium members save 1.5% on buyer's premium. Tax calculated at checkout if applicable.",
+    "thisLotEndsIn": "This lot ends in:"
   },
   "marketplace": {
     "title": "Active Auctions",

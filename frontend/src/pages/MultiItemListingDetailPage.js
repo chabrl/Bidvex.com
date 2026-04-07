@@ -168,6 +168,21 @@ const MultiItemListingDetailPage = () => {
     try {
       setLoading(true);
       const response = await axios.get(`${API}/multi-item-listings/${id}`);
+      
+      // Sort lots by ending soonest first (High-Velocity ordering)
+      if (response.data.lots && response.data.lots.length > 0) {
+        const now = new Date();
+        response.data.lots.sort((a, b) => {
+          const endA = a.lot_end_time ? new Date(a.lot_end_time) : new Date('9999-12-31');
+          const endB = b.lot_end_time ? new Date(b.lot_end_time) : new Date('9999-12-31');
+          const endedA = endA <= now ? 1 : 0;
+          const endedB = endB <= now ? 1 : 0;
+          // Ended lots go last, then sort by end time ascending
+          if (endedA !== endedB) return endedA - endedB;
+          return endA - endB;
+        });
+      }
+      
       setListing(response.data);
       if (response.data.lots.length > 0) {
         setActiveLotId(response.data.lots[0].lot_number);
@@ -1234,20 +1249,39 @@ const MultiItemListingDetailPage = () => {
 
                         {/* Lot Countdown Timer */}
                         {lot.lot_end_time && !auctionEnded && (
-                          <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
+                          <div className={`border rounded-lg p-3 mb-4 ${
+                            new Date(lot.lot_end_time) - new Date() < 3600000 && new Date(lot.lot_end_time) > new Date()
+                              ? 'bg-red-50 dark:bg-red-950 border-red-300 dark:border-red-800'
+                              : 'bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800'
+                          }`}>
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
-                                <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                                <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                                  This lot ends in:
-                                </span>
+                                {new Date(lot.lot_end_time) - new Date() < 3600000 && new Date(lot.lot_end_time) > new Date() ? (
+                                  <>
+                                    <Flame className="h-5 w-5 text-red-600 dark:text-red-400 animate-pulse" />
+                                    <span className="text-sm font-bold text-red-700 dark:text-red-300">
+                                      {t('marketplace.endingSoon')}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                    <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                                      {t('auction.thisLotEndsIn', 'This lot ends in:')}
+                                    </span>
+                                  </>
+                                )}
                               </div>
-                              <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                              <div className={`text-lg font-bold ${
+                                new Date(lot.lot_end_time) - new Date() < 3600000 && new Date(lot.lot_end_time) > new Date()
+                                  ? 'text-red-600 dark:text-red-400'
+                                  : 'text-blue-600 dark:text-blue-400'
+                              }`}>
                                 <Countdown 
                                   date={new Date(lot.lot_end_time)}
                                   renderer={({ days, hours, minutes, seconds, completed }) => {
                                     if (completed) {
-                                      return <span className="text-red-600">Ended</span>;
+                                      return <span className="text-red-600">{t('marketplace.timeEnded', 'Ended')}</span>;
                                     }
                                     return (
                                       <span>

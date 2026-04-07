@@ -31,7 +31,8 @@ import {
   ExternalLink,
   Receipt,
   Scale,
-  X
+  X,
+  Flame
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '../utils/currencyFormatter';
@@ -72,7 +73,7 @@ const FlattenedMarketplace = ({
     min_price: '',
     max_price: '',
     condition: '',
-    sort: '-promoted',
+    sort: 'ending_soon',
     private_sales_only: false // New filter for tax savings
   });
   
@@ -295,8 +296,9 @@ const FlattenedMarketplace = ({
               onChange={(e) => handleFilterChange('sort', e.target.value)}
               className="px-3 py-1.5 border border-input rounded-md bg-background text-xs h-9 flex-shrink-0"
             >
-              <option value="-promoted">{t("marketplace.featuredFirst")}</option>
               <option value="ending_soon">{t("marketplace.endingSoon")}</option>
+              <option value="-promoted">{t("marketplace.featuredFirst")}</option>
+              <option value="newest">{t("marketplace.newestFirst")}</option>
               <option value="price">Price: Low → High</option>
               <option value="-price">Price: High → Low</option>
               <option value="-created_at">{t("marketplace.newestFirst")}</option>
@@ -348,7 +350,7 @@ const FlattenedMarketplace = ({
             min_price: '',
             max_price: '',
             condition: '',
-            sort: '-promoted',
+            sort: 'ending_soon',
             private_sales_only: false
           })} className="bg-blue-600 text-white hover:bg-blue-700">
             {t('marketplace.clearAllFilters')}
@@ -519,7 +521,7 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
       const now = new Date();
       const diff = end - now;
       
-      if (diff <= 0) return 'Ended';
+      if (diff <= 0) return t('marketplace.timeEnded', 'Ended');
       
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
       const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
@@ -537,7 +539,7 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
     setTimeLeft(calculateTimeLeft());
     const timer = setInterval(() => setTimeLeft(calculateTimeLeft()), 1000);
     return () => clearInterval(timer);
-  }, [item.auction_end_date]);
+  }, [item.auction_end_date, t]);
 
   const getPromotionBadge = () => {
     if (item.promotion_tier === 'premium') {
@@ -638,15 +640,23 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
             <Scale className="h-3.5 w-3.5" />
           </button>
 
-          {/* Bottom - Timer */}
+          {/* Bottom - Timer + Urgency Badge */}
           <div className="absolute bottom-3 left-3 right-3 flex justify-between items-center">
-            <div className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-lg ${
-              isUrgent 
-                ? 'bg-red-500 text-white animate-pulse' 
-                : 'bg-slate-900/80 backdrop-blur text-white'
-            }`}>
-              <Timer className="h-3.5 w-3.5" />
-              {timeLeft}
+            <div className="flex items-center gap-1.5">
+              {isUrgent && timeLeft !== t('marketplace.timeEnded', 'Ended') && (
+                <div className="bg-red-600 text-white px-2 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 shadow-lg animate-pulse" data-testid="ending-soon-badge">
+                  <Flame className="h-3.5 w-3.5" />
+                  {t('marketplace.endingSoon')}
+                </div>
+              )}
+              <div className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-lg ${
+                isUrgent 
+                  ? 'bg-red-500 text-white animate-pulse' 
+                  : 'bg-slate-900/80 backdrop-blur text-white'
+              }`} data-testid="countdown-timer">
+                <Timer className="h-3.5 w-3.5" />
+                {timeLeft}
+              </div>
             </div>
             
             {item.bid_count > 0 && (

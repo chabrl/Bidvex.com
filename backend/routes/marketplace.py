@@ -88,18 +88,24 @@ _MULTI_PROJECTION = {
 
 
 async def _build_marketplace_items():
-    """Build the full sorted marketplace items list (called from cache refresh)."""
+    """Build the full sorted marketplace items list (called from cache refresh).
+    
+    High-Velocity Sorting Algorithm:
+    1. Primary: auction_end_date ASC (ending soonest first)
+    2. Secondary: created_at DESC (newest among non-urgent)
+    3. Ended auctions pushed to bottom
+    """
     db = get_read_db()
     now = datetime.now(timezone.utc)
 
     # Fetch with projection and limit — cap at 500 each
     auctions = await db.multi_item_listings.find(
-        {"status": "active"}, _MULTI_PROJECTION
-    ).sort("created_at", -1).limit(500).to_list(500)
+        {"status": {"$in": ["active", "upcoming"]}}, _MULTI_PROJECTION
+    ).sort("auction_end_date", 1).limit(500).to_list(500)
 
     single_listings = await db.listings.find(
         {"status": "active"}, _LISTING_PROJECTION
-    ).sort("created_at", -1).limit(500).to_list(500)
+    ).sort("auction_end_date", 1).limit(500).to_list(500)
 
     # Batch-fetch seller tax status
     all_seller_ids = list(set(
@@ -219,29 +225,44 @@ async def _build_marketplace_items():
             "parent_auction_title_fr": None,
         })
 
-    # Default sort: featured > promoted > recent
-    promotion_weight = {"premium": 3, "standard": 2, "basic": 1, None: 0}
+    # ── High-Velocity Sort ──
+    # Primary: ending soonest first (active items ahead of ended)
+    # Secondary: newest first for items with the same urgency tier
+    now_iso = now.isoformat()
+    far_future = "9999-12-31T23:59:59+00:00"
 
-    def urgency_score(item):
-        if item.get("auction_end_date"):
-            try:
-                end_str = item["auction_end_date"]
-                end_time = datetime.fromisoformat(end_str.replace("Z", "+00:00")) if isinstance(end_str, str) else end_str
-                if end_time.tzinfo is None:
-                    end_time = end_time.replace(tzinfo=timezone.utc)
-                remaining = (end_time - now).total_seconds()
-                if 0 < remaining <= 3600:
-                    return 1000 - remaining
-            except Exception:
-                pass
+    def _parse_end(item):
+        """Parse auction_end_date to a comparable ISO string."""
+        end = item.get("auction_end_date")
+        if not end:
+            return far_future
+        if isinstance(end, datetime):
+            return end.isoformat()
+        return str(end)
+
+    def _parse_created(item):
+        """Parse created_at to a timestamp for descending sort."""
+        c = item.get("created_at")
+        if isinstance(c, datetime):
+            return c.timestamp()
         return 0
 
-    items.sort(key=lambda x: (
-        -1 if x.get("is_featured") else 0,
-        -urgency_score(x),
-        -promotion_weight.get(x.get("promotion_tier"), 0),
-        -(x.get("created_at").timestamp() if isinstance(x.get("created_at"), datetime) else 0),
-    ))
+    def high_velocity_sort_key(item):
+        end_str = _parse_end(item)
+        is_ended = end_str <= now_iso
+        is_featured = item.get("is_featured", False)
+        is_promoted = item.get("is_promoted", False)
+
+        # Sort order: (ended_flag, -featured, -promoted, end_date_asc, -created_desc)
+        return (
+            1 if is_ended else 0,       # Ended items go to bottom
+            0 if is_featured else 1,     # Featured first among actives
+            0 if is_promoted else 1,     # Promoted next
+            end_str,                     # Ending soonest first
+            -_parse_created(item),       # Newest first as tiebreaker
+        )
+
+    items.sort(key=high_velocity_sort_key)
 
     return items
 
@@ -275,7 +296,7 @@ async def get_marketplace_items(
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
     condition: Optional[str] = None,
-    sort: str = "-promoted",
+    sort: str = "ending_soon",
     limit: int = 20,
     skip: int = 0,
     cursor: Optional[str] = None,
@@ -319,16 +340,22 @@ async def get_marketplace_items(
     if condition:
         items = [i for i in items if i.get("condition") == condition]
 
-    # Re-sort if not default
+    # Re-sort if not default (cache is already sorted by ending_soon)
     if sort == "price":
         items = sorted(items, key=lambda x: x.get("current_price", 0))
     elif sort == "-price":
         items = sorted(items, key=lambda x: -x.get("current_price", 0))
-    elif sort == "ending_soon":
+    elif sort == "-promoted":
+        # Legacy: featured/promoted first, then by creation date
+        promo_w = {"premium": 3, "standard": 2, "basic": 1, None: 0}
         items = sorted(items, key=lambda x: (
             0 if x.get("is_featured") else 1,
-            x.get("auction_end_date") or "9999"
+            -promo_w.get(x.get("promotion_tier"), 0),
+            -(x.get("created_at").timestamp() if isinstance(x.get("created_at"), datetime) else 0),
         ))
+    elif sort == "newest":
+        items = sorted(items, key=lambda x: -(x.get("created_at").timestamp() if isinstance(x.get("created_at"), datetime) else 0))
+    # "ending_soon" is the default — already sorted by cache builder
 
     total_items = len(items)
 

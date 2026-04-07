@@ -148,7 +148,8 @@
     "allBidsLegallyBinding": "Toutes les enchères sont juridiquement contraignantes",
     "estimatedTotal": "Total estimé hors taxes",
     "buyersPremium": "Prime d'acheteur",
-    "premiumSavings": "Les membres Premium économisent 1,5 % sur la prime d'acheteur. Les taxes sont calculées au moment du paiement, le cas échéant."
+    "premiumSavings": "Les membres Premium économisent 1,5 % sur la prime d'acheteur. Les taxes sont calculées au moment du paiement, le cas échéant.",
+    "thisLotEndsIn": "Ce lot se termine dans :"
   },
   "marketplace": {
     "title": "Enchères Actives",
