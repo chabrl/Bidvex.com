@@ -1,0 +1,137 @@
+{
+  "summary": "Iteration 112 testing: Backend monitoring APIs (19/19 PASSED), payments refactoring (no regressions), frontend System Monitoring Dashboard (NOT RENDERING - needs frontend rebuild), Subscription UI (PASSED - UserTierGrid with 3 tiers working)",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "AdminDashboard - System Monitoring tab",
+        "issue": "System Monitoring tab not rendering in Analytics secondary navigation. Code exists at line 108 of AdminDashboard.js but tab is not visible in UI. Frontend may need rebuild.",
+        "selector": "button:has-text('System Monitoring')",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_monitoring_payments_112.py",
+    "/app/test_reports/pytest/pytest_results_monitoring_112.xml"
+  ],
+  "action_items": [
+    "CRITICAL: Frontend needs rebuild - System Monitoring tab defined in code but not rendering. The SystemMonitoringDashboard.js was created at 01:19 but build was done at 00:58. Run 'yarn build' or restart frontend with fresh build.",
+    "Verify System Monitoring tab appears after frontend rebuild"
+  ],
+  "critical_code_review_comments": [
+    "monitoring.py: Well-structured admin-only endpoints with proper auth guards",
+    "payments.py refactoring: Clean separation into sub-routers (fees, promotions) - no regressions detected",
+    "SystemMonitoringDashboard.js: Component has proper data-testid attributes for testing",
+    "SecurityDepositBanner.js: Correctly integrated in ListingDetailPage.js at line 511-516"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_monitoring_payments_112.py"
+  ],
+  "success_rate": {
+    "backend": "100% (19/19 tests passed)",
+    "frontend": "50% (Subscription UI passed, System Monitoring not rendering)"
+  },
+  "test_credentials": "Admin: charbeladmin@bidvex.com / Admin123!",
+  "seed_data_creation": "None",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend monitoring APIs fully working. Frontend System Monitoring Dashboard component exists but tab not rendering - likely stale build. Subscription UI with UserTierGrid working correctly (3 tiers: free, premium, vip). SecurityDepositBanner integrated but no high-value listings (>$10k) to test with.",
+  "tests_performed": [
+    {
+      "test": "GET /api/monitoring/dashboard (admin)",
+      "result": "PASS",
+      "details": "Returns system_status, errors, webhooks, recent_alerts, recent_webhook_failures, recent_500s"
+    },
+    {
+      "test": "GET /api/monitoring/health-check (admin)",
+      "result": "PASS",
+      "details": "Returns mongodb, stripe, collections health checks"
+    },
+    {
+      "test": "GET /api/monitoring/errors (admin with filters)",
+      "result": "PASS",
+      "details": "Paginated error log with severity/event_type filters"
+    },
+    {
+      "test": "GET /api/monitoring/webhooks (admin with filters)",
+      "result": "PASS",
+      "details": "Paginated webhook log with provider/status filters"
+    },
+    {
+      "test": "Monitoring endpoints require auth",
+      "result": "PASS",
+      "details": "Returns 401/403 without authentication"
+    },
+    {
+      "test": "GET /api/payments/fees/calculate-hybrid (vehicle)",
+      "result": "PASS",
+      "details": "Fee calculation for vehicle category working"
+    },
+    {
+      "test": "GET /api/payments/fees/calculate-hybrid (general)",
+      "result": "PASS",
+      "details": "Fee calculation for general category working"
+    },
+    {
+      "test": "GET /api/payments/tax/vehicle",
+      "result": "PASS",
+      "details": "Vehicle tax calculation with Quebec rates"
+    },
+    {
+      "test": "GET /api/payments/tax/general",
+      "result": "PASS",
+      "details": "General tax calculation with Quebec rates"
+    },
+    {
+      "test": "GET /api/payments/tax/rates",
+      "result": "PASS",
+      "details": "Returns GST 5%, QST 9.975%, combined 14.975%"
+    },
+    {
+      "test": "GET /api/payments/pricing-config",
+      "result": "PASS",
+      "details": "Returns commissions, buyer_premiums, seller_commissions, subscriptions, deposit info"
+    },
+    {
+      "test": "GET /api/payments/subscriptions/tiers",
+      "result": "PASS",
+      "details": "Returns subscription tier information"
+    },
+    {
+      "test": "GET /api/payments/email-credits/balance (auth)",
+      "result": "PASS",
+      "details": "Returns user's email credit balance"
+    },
+    {
+      "test": "GET /api/deposits/status/{listing_id} (auth)",
+      "result": "PASS",
+      "details": "Returns deposit status for listing"
+    },
+    {
+      "test": "GET /api/payments/fees/processing",
+      "result": "PASS",
+      "details": "Returns Stripe processing fee info (2.9% + $0.30)"
+    },
+    {
+      "test": "Admin Panel > Analytics > System Monitoring tab",
+      "result": "FAIL",
+      "details": "Tab not rendering in secondary navigation despite being defined in code"
+    },
+    {
+      "test": "/settings > Subscription tab > UserTierGrid",
+      "result": "PASS",
+      "details": "UserTierGrid renders with 3 tier cards (free, premium, vip)"
+    },
+    {
+      "test": "SecurityDepositBanner integration",
+      "result": "PASS (code review)",
+      "details": "Component integrated in ListingDetailPage.js, shows for listings >= $10k"
+    }
+  ]
+}

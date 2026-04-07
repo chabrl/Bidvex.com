@@ -43,6 +43,7 @@ import SiteModeManager from './admin/SiteModeManager';
 import PartnerManager from './admin/PartnerManager';
 import FinanceDashboard from './admin/FinanceDashboard';
 import EmailSettings from './admin/EmailSettings';
+import SystemMonitoringDashboard from './admin/SystemMonitoringDashboard';
 import TeamManager from '../components/admin/TeamManager';
 import AdminTaxDashboard from './AdminTaxDashboard';
 import { 
@@ -104,6 +105,7 @@ const SECONDARY_TABS = {
   analytics: [
     { id: 'dashboard', label: 'Dashboard', icon: '📈', lucideIcon: TrendingUp },
     { id: 'reports', label: 'Reports', icon: '📑', lucideIcon: FileText },
+    { id: 'system-monitoring', label: 'System Monitoring', icon: '🔧', lucideIcon: Activity },
   ],
   'partners-finance': [
     { id: 'finance-overview', label: 'Finance Dashboard', icon: '📊', lucideIcon: TrendingUp },
@@ -341,6 +343,7 @@ const AdminDashboard = () => {
         switch (secondaryTab) {
           case 'dashboard': return <AnalyticsDashboard />;
           case 'reports': return <ReportManager />;
+          case 'system-monitoring': return <SystemMonitoringDashboard />;
           default: return <AnalyticsDashboard />;
         }
       case 'partners-finance':

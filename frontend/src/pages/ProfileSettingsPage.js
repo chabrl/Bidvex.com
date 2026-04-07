@@ -16,7 +16,6 @@ import { Elements, CardElement, useStripe, useElements } from '@stripe/react-str
 import AvatarUpload from '../components/AvatarUpload';
 import SubscriptionBadge from '../components/SubscriptionBadge';
 import TrustBadge from '../components/TrustBadge';
-import TrendySubscriptionCards from '../components/TrendySubscriptionCards';
 import UserTierGrid from '../components/UserTierGrid';
 import PartnerLicenseCard from '../components/PartnerLicenseCard';
 import SubscriptionManagement from '../components/SubscriptionManagement';

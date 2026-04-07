@@ -472,7 +472,6 @@ async def cancel_subscription(current_user: User = Depends(get_current_user)):
     """
     Cancel subscription at period end. No refund — user keeps access until billing cycle ends.
     """
-    db = get_db()
     user = await get_db().users.find_one({"id": current_user.id})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -522,7 +521,6 @@ async def cancel_subscription(current_user: User = Depends(get_current_user)):
 @subscriptions_router.post("/subscriptions/reactivate")
 async def reactivate_subscription(current_user: User = Depends(get_current_user)):
     """Reactivate a subscription that was set to cancel at period end."""
-    db = get_db()
     user = await get_db().users.find_one({"id": current_user.id})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -532,7 +530,7 @@ async def reactivate_subscription(current_user: User = Depends(get_current_user)
         raise HTTPException(status_code=400, detail="No subscription to reactivate")
 
     try:
-        updated_sub = stripe.Subscription.modify(sub_id, cancel_at_period_end=False)
+        stripe.Subscription.modify(sub_id, cancel_at_period_end=False)
         await get_db().users.update_one(
             {"id": current_user.id},
             {"$set": {
@@ -555,7 +553,6 @@ async def get_subscription_status(current_user: User = Depends(get_current_user)
     """
     Get detailed subscription status for the management panel.
     """
-    db = get_db()
     user = await get_db().users.find_one({"id": current_user.id})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -763,7 +760,6 @@ async def get_subscription_analytics(current_user: User = Depends(get_current_us
     Get comprehensive subscription analytics for admin dashboard.
     Includes revenue metrics, subscriber counts, plan distribution, coupon usage.
     """
-    db = get_db()
     if not current_user.email.endswith("@bidvex.com"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
@@ -928,7 +924,7 @@ async def get_subscription_analytics(current_user: User = Depends(get_current_us
 
 
 @subscriptions_router.get("/subscription/status")
-async def get_subscription_status(current_user: User = Depends(get_current_user)):
+async def get_subscription_status_simple(current_user: User = Depends(get_current_user)):
     """Get user's subscription status and features - Yearly billing, no Power Bids"""
     tier = current_user.subscription_tier
     

@@ -1,10 +1,7 @@
 """
 BidVex Payments Router
-Handles Stripe payment operations:
-- Checkout sessions
-- Subscription management
-- Payment methods
-- Promotions
+Core payment operations: Checkout, Payment Methods, Subscriptions, Advanced Checkout.
+Fee calculations → payments_fees.py | Promotions & Credits → payments_promotions.py
 """
 
 from fastapi import APIRouter, HTTPException, Depends
@@ -17,49 +14,34 @@ import uuid
 import os
 import stripe
 
+from routes.payments_shared import (
+    set_payments_db, set_payments_auth, get_db,
+    get_current_user_wrapper, security,
+)
+from routes.payments_fees import fees_sub_router
+from routes.payments_promotions import promotions_sub_router
+
 # Configure Stripe API key
 stripe.api_key = os.environ.get('STRIPE_API_KEY', '')
 
 logger = logging.getLogger(__name__)
 
 payments_router = APIRouter(prefix="/payments", tags=["Payments"])
-security = HTTPBearer(auto_error=False)
 
-# Database and service instances
-_db = None
-_get_current_user = None
+# Include sub-routers
+payments_router.include_router(fees_sub_router)
+payments_router.include_router(promotions_sub_router)
 
-
-def set_payments_db(db_instance):
-    """Set database instance"""
-    global _db
-    _db = db_instance
+# Re-export DI setters so server.py doesn't need to change its imports
+__all__ = ["payments_router", "set_payments_db", "set_payments_auth"]
 
 
-def set_payments_auth(get_current_user_func):
-    """
-    Set authentication function
-    
-    Note: The passed function expects (Request, credentials) but most routes
-    only have access to credentials. We create a wrapper that works with credentials only.
-    """
-    global _get_current_user
-    
-    async def wrapper(credentials):
-        """Wrapper that creates a mock request for cookie-less auth"""
-        # Create a minimal mock request since we're using Bearer token auth
-        # The real function checks cookies first, then credentials
-        class MockRequest:
-            cookies = {}
-        return await get_current_user_func(MockRequest(), credentials)
-    
-    _get_current_user = wrapper
-
-
-def get_db():
-    if _db is None:
-        raise RuntimeError("Database not initialized")
-    return _db
+async def _auth(credentials):
+    """Authenticate user from Bearer credentials."""
+    fn = get_current_user_wrapper()
+    if fn is None:
+        raise RuntimeError("Auth not initialized")
+    return await fn(credentials)
 
 
 # ========== CHECKOUT ENDPOINTS ==========
@@ -89,7 +71,7 @@ async def create_checkout_session(
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    current_user = await _get_current_user(credentials)
+    current_user = await _auth(credentials)
     db = get_db()
 
     user = await db.users.find_one({"id": current_user.id})
@@ -214,7 +196,7 @@ async def get_subscription_status(
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentication required")
     
-    current_user = await _get_current_user(credentials)
+    current_user = await _auth(credentials)
     db = get_db()
     
     user = await db.users.find_one({"id": current_user.id})
@@ -265,7 +247,7 @@ async def create_setup_intent(
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentication required")
     
-    current_user = await _get_current_user(credentials)
+    current_user = await _auth(credentials)
     db = get_db()
     
     user = await db.users.find_one({"id": current_user.id})
@@ -321,7 +303,7 @@ async def confirm_setup_intent(
     if not setup_intent_id:
         raise HTTPException(status_code=400, detail="SetupIntent ID required")
     
-    current_user = await _get_current_user(credentials)
+    current_user = await _auth(credentials)
     db = get_db()
     
     # Retrieve and verify the SetupIntent
@@ -407,7 +389,7 @@ async def get_trust_status(
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentication required")
     
-    current_user = await _get_current_user(credentials)
+    current_user = await _auth(credentials)
     db = get_db()
     
     user = await db.users.find_one({"id": current_user.id})
@@ -457,7 +439,7 @@ async def add_payment_method(
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    current_user = await _get_current_user(credentials)
+    current_user = await _auth(credentials)
     db = get_db()
 
     payment_method_id = data.get("payment_method_id")
@@ -534,7 +516,7 @@ async def get_payment_methods(
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    current_user = await _get_current_user(credentials)
+    current_user = await _auth(credentials)
     db = get_db()
 
     methods = await db.payment_methods.find(
@@ -554,7 +536,7 @@ async def delete_payment_method(
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    current_user = await _get_current_user(credentials)
+    current_user = await _auth(credentials)
     db = get_db()
 
     method = await db.payment_methods.find_one(
@@ -570,663 +552,6 @@ async def delete_payment_method(
 
     await db.payment_methods.delete_one({"id": method_id})
     return {"message": "Payment method deleted"}
-
-
-# ========== PROMOTIONS ==========
-
-@payments_router.post("/promote")
-async def create_promotion(
-    data: Dict[str, Any],
-    credentials: HTTPAuthorizationCredentials = Depends(security)
-):
-    """
-    Create a listing promotion with Stripe Checkout.
-    Tiers: basic ($9.99/7d), standard ($24.99/14d), premium ($49.99/30d).
-    """
-    if not credentials:
-        raise HTTPException(status_code=401, detail="Authentication required")
-
-    current_user = await _get_current_user(credentials)
-    db = get_db()
-
-    listing_id = data.get("listing_id")
-    tier = data.get("tier", "basic")  # basic, standard, premium
-    origin_url = data.get("origin_url", "https://bidvex.com")
-
-    # Verify listing ownership
-    listing = await db.listings.find_one({"id": listing_id, "seller_id": current_user.id})
-    if not listing:
-        raise HTTPException(status_code=404, detail="Listing not found or not owned by you")
-
-    user = await db.users.find_one({"id": current_user.id})
-    customer_id = user.get("stripe_customer_id") if user else None
-    if not customer_id:
-        customer = stripe.Customer.create(
-            email=current_user.email,
-            metadata={"user_id": current_user.id},
-        )
-        customer_id = customer.id
-        await db.users.update_one({"id": current_user.id}, {"$set": {"stripe_customer_id": customer_id}})
-
-    from services.connect_payment_engine import create_promotion_checkout
-
-    result = create_promotion_checkout(
-        customer_id=customer_id,
-        listing_id=listing_id,
-        user_id=current_user.id,
-        tier=tier,
-        success_url=f"{origin_url}/payment/success?type=promotion&session_id={{CHECKOUT_SESSION_ID}}",
-        cancel_url=f"{origin_url}/listing/{listing_id}",
-    )
-
-    # Store pending promotion
-    from services.pricing_config import PROMOTION_TIERS
-    promo_config = PROMOTION_TIERS.get(tier, PROMOTION_TIERS["basic"])
-    now = datetime.now(timezone.utc)
-
-    promotion = {
-        "id": str(uuid.uuid4()),
-        "listing_id": listing_id,
-        "user_id": current_user.id,
-        "tier": tier,
-        "session_id": result["session_id"],
-        "duration_days": promo_config["duration_days"],
-        "features": promo_config["features"],
-        "price_cents": promo_config["price_cents"],
-        "start_date": None,  # Set on payment confirmation
-        "end_date": None,
-        "status": "pending_payment",
-        "created_at": now.isoformat(),
-    }
-    await db.promotions.insert_one(promotion)
-
-    return {
-        "promotion_id": promotion["id"],
-        "checkout_url": result["checkout_url"],
-        "session_id": result["session_id"],
-        "tier": tier,
-        "price": result["price"],
-    }
-
-
-@payments_router.get("/promotions/my")
-async def get_my_promotions(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
-):
-    """Get user's active promotions"""
-    if not credentials:
-        raise HTTPException(status_code=401, detail="Authentication required")
-    
-    current_user = await _get_current_user(credentials)
-    db = get_db()
-    
-    promotions = await db.promotions.find(
-        {"user_id": current_user.id},
-        {"_id": 0}
-    ).to_list(100)
-    
-    return {"promotions": promotions}
-
-
-
-# ========== EMAIL MARKETING CREDITS ==========
-
-class EmailCreditsRequest(BaseModel):
-    quantity: int = Field(..., ge=100, le=100000, description="Number of email credits to purchase")
-    origin_url: Optional[str] = "https://bidvex.com"
-
-
-@payments_router.post("/email-credits/purchase")
-async def purchase_email_credits(
-    data: EmailCreditsRequest,
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-):
-    """
-    Purchase email marketing credits (pay-as-you-go).
-    Pricing: 1-1k=$0.018/ea, 1k-5k=$0.015/ea, 5k-10k=$0.012/ea, 10k+=$0.010/ea.
-    """
-    if not credentials:
-        raise HTTPException(status_code=401, detail="Authentication required")
-
-    current_user = await _get_current_user(credentials)
-    db = get_db()
-
-    user = await db.users.find_one({"id": current_user.id})
-    customer_id = user.get("stripe_customer_id") if user else None
-    if not customer_id:
-        customer = stripe.Customer.create(
-            email=current_user.email,
-            metadata={"user_id": current_user.id},
-        )
-        customer_id = customer.id
-        await db.users.update_one({"id": current_user.id}, {"$set": {"stripe_customer_id": customer_id}})
-
-    from services.connect_payment_engine import create_email_credits_checkout
-
-    result = create_email_credits_checkout(
-        customer_id=customer_id,
-        user_id=current_user.id,
-        quantity=data.quantity,
-        success_url=f"{data.origin_url}/payment/success?type=email_credits&session_id={{CHECKOUT_SESSION_ID}}",
-        cancel_url=f"{data.origin_url}/email-marketing",
-    )
-
-    return {
-        "checkout_url": result["checkout_url"],
-        "session_id": result["session_id"],
-        "quantity": result["quantity"],
-        "total_amount": result["total_cents"] / 100,
-        "per_email": round(result["total_cents"] / result["quantity"] / 100, 4),
-    }
-
-
-@payments_router.get("/email-credits/balance")
-async def get_email_credit_balance(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-):
-    """Get the current user's email credit balance."""
-    if not credentials:
-        raise HTTPException(status_code=401, detail="Authentication required")
-
-    current_user = await _get_current_user(credentials)
-    db = get_db()
-
-    user = await db.users.find_one({"id": current_user.id}, {"_id": 0, "email_credits": 1})
-    return {"credits": user.get("email_credits", 0) if user else 0}
-
-
-@payments_router.get("/pricing-config")
-async def get_pricing_config():
-    """Public endpoint returning current platform pricing for UI display."""
-    from services.pricing_config import (
-        BUYER_PREMIUM_RATES, SELLER_COMMISSION_RATES,
-        SUBSCRIPTION_TIERS, PROMOTION_TIERS, EMAIL_CREDIT_TIERS,
-        DEPOSIT_THRESHOLD_CAD, DEPOSIT_AMOUNT_DOLLARS,
-        PLATFORM_FEE_GENERAL, PLATFORM_FEE_VEHICLE,
-    )
-    return {
-        "commissions": {
-            "general": float(PLATFORM_FEE_GENERAL),
-            "vehicle": float(PLATFORM_FEE_VEHICLE),
-        },
-        "buyer_premiums": {k: float(v) for k, v in BUYER_PREMIUM_RATES.items()},
-        "seller_commissions": {k: float(v) for k, v in SELLER_COMMISSION_RATES.items()},
-        "subscriptions": SUBSCRIPTION_TIERS,
-        "promotions": PROMOTION_TIERS,
-        "email_credits": EMAIL_CREDIT_TIERS,
-        "deposit": {
-            "threshold_cad": DEPOSIT_THRESHOLD_CAD,
-            "amount_dollars": DEPOSIT_AMOUNT_DOLLARS,
-        },
-    }
-
-
-
-# ========== FEE CALCULATIONS ==========
-
-# Import the hybrid fee calculation engine
-from services.fee_calculation_engine import (
-    calculate_fees,
-    calculate_vehicle_fees,
-    calculate_general_fees,
-    get_fee_structure_summary,
-    FeeCalculationResult
-)
-
-
-class FeeCalculationRequest(BaseModel):
-    """Request model for fee calculation"""
-    hammer_price: float = Field(..., gt=0, description="Winning bid amount in dollars")
-    category: str = Field(default="general", description="Auction category: 'vehicle' or 'general'")
-    buyer_tier: str = Field(default="basic", description="Buyer subscription tier")
-    seller_tier: str = Field(default="basic", description="Seller subscription tier")
-
-
-@payments_router.post("/fees/calculate")
-async def calculate_auction_fees(request: FeeCalculationRequest):
-    """
-    Calculate complete fee breakdown for an auction transaction
-    
-    Supports two fee structures:
-    - VEHICLE: Buyer pays premium + 2.5% platform fee, Seller gets 100%
-    - GENERAL: Buyer pays premium, Seller pays commission
-    
-    All amounts returned in both dollars and cents (for Stripe)
-    """
-    result = calculate_fees(
-        hammer_price=request.hammer_price,
-        category=request.category,
-        buyer_tier=request.buyer_tier,
-        seller_tier=request.seller_tier
-    )
-    
-    return result.to_dict()
-
-
-@payments_router.get("/fees/calculate-hybrid")
-async def calculate_hybrid_fees(
-    price: float,
-    category: str = "general",
-    buyer_tier: str = "basic",
-    seller_tier: str = "basic"
-):
-    """
-    GET endpoint for fee calculation (alternative to POST)
-    
-    Args:
-        price: Hammer price (winning bid) in dollars
-        category: 'vehicle' or 'general'
-        buyer_tier: Buyer's subscription tier
-        seller_tier: Seller's subscription tier
-    """
-    result = calculate_fees(
-        hammer_price=price,
-        category=category,
-        buyer_tier=buyer_tier,
-        seller_tier=seller_tier
-    )
-    
-    return result.to_dict()
-
-
-@payments_router.get("/fees/vehicle")
-async def calculate_vehicle_auction_fees(
-    price: float,
-    buyer_tier: str = "basic"
-):
-    """
-    Calculate fees specifically for vehicle auctions
-    
-    Vehicle Fee Structure:
-    - Buyer pays: Price + Buyer Premium + 2.5% Platform Fee
-    - Seller receives: 100% of hammer price
-    - BidVex keeps: Buyer Premium + Platform Fee
-    """
-    result = calculate_vehicle_fees(
-        hammer_price=price,
-        buyer_tier=buyer_tier
-    )
-    
-    return {
-        "auction_type": "vehicle",
-        "hammer_price": result.hammer_price,
-        "buyer": {
-            "premium_rate": f"{result.buyer_premium_rate * 100:.1f}%",
-            "premium_amount": result.buyer_premium,
-            "platform_fee_rate": f"{result.platform_fee_rate * 100:.1f}%",
-            "platform_fee_amount": result.platform_fee,
-            "total_cost": result.buyer_total,
-            "total_cost_cents": result.buyer_total_cents
-        },
-        "seller": {
-            "commission_rate": "0%",
-            "commission_amount": 0.0,
-            "net_payout": result.seller_net_payout,
-            "net_payout_cents": result.seller_net_payout_cents
-        },
-        "bidvex": {
-            "revenue": result.bidvex_revenue,
-            "revenue_cents": result.bidvex_revenue_cents
-        },
-        "stripe": {
-            "amount_cents": result.stripe_amount_cents,
-            "application_fee_cents": result.stripe_application_fee_cents,
-            "transfer_amount_cents": result.stripe_transfer_amount_cents
-        }
-    }
-
-
-@payments_router.get("/fees/general")
-async def calculate_general_auction_fees(
-    price: float,
-    buyer_tier: str = "basic",
-    seller_tier: str = "basic"
-):
-    """
-    Calculate fees specifically for general auctions
-    
-    General Fee Structure:
-    - Buyer pays: Price + Buyer Premium
-    - Seller receives: Price - Commission
-    - BidVex keeps: Buyer Premium + Seller Commission
-    """
-    result = calculate_general_fees(
-        hammer_price=price,
-        buyer_tier=buyer_tier,
-        seller_tier=seller_tier
-    )
-    
-    return {
-        "auction_type": "general",
-        "hammer_price": result.hammer_price,
-        "buyer": {
-            "premium_rate": f"{result.buyer_premium_rate * 100:.1f}%",
-            "premium_amount": result.buyer_premium,
-            "platform_fee_rate": "0%",
-            "platform_fee_amount": 0.0,
-            "total_cost": result.buyer_total,
-            "total_cost_cents": result.buyer_total_cents
-        },
-        "seller": {
-            "commission_rate": f"{result.seller_commission_rate * 100:.1f}%",
-            "commission_amount": result.seller_commission,
-            "net_payout": result.seller_net_payout,
-            "net_payout_cents": result.seller_net_payout_cents
-        },
-        "bidvex": {
-            "revenue": result.bidvex_revenue,
-            "revenue_cents": result.bidvex_revenue_cents
-        },
-        "stripe": {
-            "amount_cents": result.stripe_amount_cents,
-            "application_fee_cents": result.stripe_application_fee_cents,
-            "transfer_amount_cents": result.stripe_transfer_amount_cents
-        }
-    }
-
-
-@payments_router.get("/fees/structure")
-async def get_fee_structures():
-    """
-    Get complete fee structure documentation for both auction types
-    """
-    return get_fee_structure_summary()
-
-
-# Legacy endpoints (kept for backward compatibility)
-@payments_router.get("/fees/calculate-buyer-cost")
-async def calculate_buyer_cost(
-    price: float,
-    tier: str = "free"
-):
-    """Calculate total buyer cost including fees (legacy endpoint)"""
-    # Buyer premium rates
-    rates = {
-        "free": 0.10,      # 10%
-        "premium": 0.08,   # 8%
-        "vip": 0.05        # 5%
-    }
-    
-    rate = rates.get(tier, rates["free"])
-    buyer_premium = price * rate
-    total = price + buyer_premium
-    
-    return {
-        "base_price": price,
-        "buyer_premium": round(buyer_premium, 2),
-        "buyer_premium_rate": rate,
-        "total_cost": round(total, 2)
-    }
-
-
-@payments_router.get("/fees/calculate-seller-net")
-async def calculate_seller_net(
-    price: float,
-    tier: str = "free"
-):
-    """Calculate seller net after commission (legacy endpoint)"""
-    # Commission rates
-    rates = {
-        "free": 0.04,      # 4%
-        "premium": 0.025,  # 2.5%
-        "vip": 0.02        # 2%
-    }
-    
-    rate = rates.get(tier, rates["free"])
-    commission = price * rate
-    net = price - commission
-    
-    return {
-        "sale_price": price,
-        "commission": round(commission, 2),
-        "commission_rate": rate,
-        "seller_net": round(net, 2)
-    }
-
-
-@payments_router.get("/fees/subscription-benefits")
-async def get_subscription_benefits():
-    """Get subscription tier benefits breakdown"""
-    return {
-        "free": {
-            "commission_rate": 0.04,
-            "buyer_premium": 0.10,
-            "email_sends_monthly": 0,
-            "contact_limit": 50,
-            "features": ["Basic listings", "Standard support"]
-        },
-        "premium": {
-            "commission_rate": 0.025,
-            "buyer_premium": 0.08,
-            "email_sends_monthly": 5000,
-            "contact_limit": 5000,
-            "features": [
-                "Lower commission",
-                "Email marketing (500/day)",
-                "Priority support",
-                "Analytics dashboard"
-            ]
-        },
-        "vip": {
-            "commission_rate": 0.02,
-            "buyer_premium": 0.05,
-            "email_sends_monthly": 50000,
-            "contact_limit": 25000,
-            "features": [
-                "Lowest commission",
-                "Email marketing (2000/day)",
-                "Priority sending",
-                "Dedicated support",
-                "Advanced analytics"
-            ]
-        }
-    }
-
-
-from datetime import timedelta
-
-# Import the tax engine for Quebec-compliant calculations
-from services.tax_engine import (
-    calculate_vehicle_payment,
-    calculate_general_payment,
-    get_tax_structure_summary,
-    SellerInfo,
-    VehiclePaymentResult,
-    GeneralPaymentResult,
-    GST_RATE,
-    QST_RATE,
-    BIDVEX_GST_NUMBER,
-    BIDVEX_QST_NUMBER,
-)
-
-
-# ========== TAX & COMPLIANCE ENDPOINTS ==========
-
-class TaxCalculationRequest(BaseModel):
-    """Request model for tax-inclusive payment calculation"""
-    hammer_price: float = Field(..., gt=0, description="Winning bid amount in dollars")
-    category: str = Field(default="general", description="Auction category: 'vehicle' or 'general'")
-    buyer_tier: str = Field(default="basic", description="Buyer subscription tier")
-    seller_tier: str = Field(default="basic", description="Seller subscription tier")
-    seller_is_business: bool = Field(default=False, description="Whether seller is a registered business")
-    seller_gst_number: Optional[str] = Field(default=None, description="Seller's GST registration number")
-    seller_qst_number: Optional[str] = Field(default=None, description="Seller's QST registration number")
-    buyers_premium_rate: Optional[float] = Field(default=None, description="Listing-level buyer premium rate (e.g. 0.15 for 15%)")
-
-
-@payments_router.post("/tax/calculate")
-async def calculate_payment_with_tax(request: TaxCalculationRequest):
-    """
-    Calculate complete payment breakdown with Quebec taxes (GST/QST)
-    
-    Quebec Tax Rates:
-    - GST (Federal): 5%
-    - QST (Provincial): 9.975%
-    - Combined: 14.975%
-    
-    Tax Logic:
-    - VEHICLE auctions: Only BidVex fees are charged via Stripe (with tax).
-      Hammer price is paid directly to seller via Bank Draft.
-    - GENERAL auctions: Full amount through Stripe.
-      - Private seller: No tax on hammer price
-      - Business seller: 14.975% tax on hammer price (collected for seller)
-    """
-    category_lower = request.category.lower()
-    
-    if category_lower in ["vehicle", "car", "auto", "automobile", "truck", "motorcycle"]:
-        # Vehicle payment - only fees through Stripe
-        result = calculate_vehicle_payment(
-            hammer_price=request.hammer_price,
-            buyer_tier=request.buyer_tier,
-            buyer_premium_rate_override=request.buyers_premium_rate
-        )
-        return {
-            "payment_type": "vehicle",
-            "description": "Vehicle auction - BidVex fees charged via Stripe, hammer price paid directly to seller",
-            **result.to_dict()
-        }
-    else:
-        # General payment - full amount through Stripe
-        seller_info = SellerInfo(
-            is_business=request.seller_is_business,
-            gst_number=request.seller_gst_number,
-            qst_number=request.seller_qst_number
-        ) if request.seller_is_business else None
-        
-        result = calculate_general_payment(
-            hammer_price=request.hammer_price,
-            buyer_tier=request.buyer_tier,
-            seller_tier=request.seller_tier,
-            seller_is_business=request.seller_is_business,
-            seller_info=seller_info,
-            buyer_premium_rate_override=request.buyers_premium_rate
-        )
-        return {
-            "payment_type": "general",
-            "description": "General auction - full amount charged via Stripe",
-            **result.to_dict()
-        }
-
-
-@payments_router.get("/tax/vehicle")
-async def calculate_vehicle_payment_with_tax(
-    price: float,
-    buyer_tier: str = "basic",
-    buyers_premium_rate: Optional[float] = None
-):
-    """
-    Calculate vehicle auction payment with Quebec taxes
-    
-    IMPORTANT: For vehicles, only BidVex fees are charged through Stripe.
-    The hammer price is paid directly to seller via Bank Draft.
-    
-    Stripe charges: (Buyer Premium + Platform Fee) + 14.975% Tax
-    
-    If buyers_premium_rate is provided, overrides the tier default.
-    """
-    result = calculate_vehicle_payment(
-        hammer_price=price,
-        buyer_tier=buyer_tier,
-        buyer_premium_rate_override=buyers_premium_rate
-    )
-    
-    return {
-        "auction_type": "vehicle",
-        "payment_method": "hybrid",
-        "description": "BidVex fees charged via Stripe, hammer price via Bank Draft to seller",
-        **result.to_dict()
-    }
-
-
-@payments_router.get("/tax/general")
-async def calculate_general_payment_with_tax(
-    price: float,
-    buyer_tier: str = "basic",
-    seller_tier: str = "basic",
-    seller_is_business: bool = False
-):
-    """
-    Calculate general auction payment with Quebec taxes
-    
-    Tax Logic:
-    - BidVex fees: Always taxed at 14.975%
-    - Hammer price:
-      - Private seller (is_business=false): NO tax on hammer price
-      - Business seller (is_business=true): 14.975% tax (collected for seller via Stripe Connect)
-    
-    Example for $1,000 item (basic tier, private seller):
-    - Hammer price: $1,000
-    - Buyer Premium (5%): $50
-    - GST on fees (5%): $2.50
-    - QST on fees (9.975%): $4.99
-    - Total buyer pays: $1,057.49
-    
-    Example for $1,000 item (basic tier, business seller):
-    - Hammer price: $1,000
-    - GST on item (5%): $50
-    - QST on item (9.975%): $99.75
-    - Buyer Premium (5%): $50
-    - GST on fees (5%): $2.50
-    - QST on fees (9.975%): $4.99
-    - Total buyer pays: $1,207.24
-    """
-    result = calculate_general_payment(
-        hammer_price=price,
-        buyer_tier=buyer_tier,
-        seller_tier=seller_tier,
-        seller_is_business=seller_is_business
-    )
-    
-    return {
-        "auction_type": "general",
-        "payment_method": "stripe_full",
-        "description": "Full amount charged via Stripe" + (
-            " (tax collected on behalf of business seller)" if seller_is_business else ""
-        ),
-        **result.to_dict()
-    }
-
-
-@payments_router.get("/tax/structure")
-async def get_tax_structure():
-    """
-    Get Quebec tax structure documentation
-    
-    Returns:
-    - Tax rates (GST, QST, combined)
-    - BidVex registration numbers
-    - Vehicle vs General auction tax treatment
-    - Private vs Business seller tax logic
-    """
-    return get_tax_structure_summary()
-
-
-@payments_router.get("/tax/rates")
-async def get_tax_rates():
-    """
-    Get current Quebec tax rates
-    """
-    return {
-        "jurisdiction": "Quebec, Canada",
-        "gst": {
-            "name": "Goods and Services Tax (Federal)",
-            "rate": float(GST_RATE),
-            "rate_display": "5%",
-            "registration": BIDVEX_GST_NUMBER
-        },
-        "qst": {
-            "name": "Quebec Sales Tax (Provincial)",
-            "rate": float(QST_RATE),
-            "rate_display": "9.975%",
-            "registration": BIDVEX_QST_NUMBER
-        },
-        "combined": {
-            "name": "Total Quebec Tax",
-            "rate": float(GST_RATE) + float(QST_RATE),
-            "rate_display": "14.975%"
-        }
-    }
-
 
 
 # ========== CHECKOUT ENDPOINTS WITH FULL BREAKDOWN ==========
@@ -1266,7 +591,7 @@ async def create_auction_checkout(
         raise HTTPException(status_code=401, detail="Authentication required")
     
     db = get_db()
-    current_user = await _get_current_user(credentials)
+    current_user = await _auth(credentials)
     
     # Get listing
     listing = await db.listings.find_one({"id": request.listing_id})
@@ -1391,7 +716,7 @@ async def preview_checkout_breakdown(
         raise HTTPException(status_code=401, detail="Authentication required")
     
     db = get_db()
-    current_user = await _get_current_user(credentials)
+    current_user = await _auth(credentials)
     
     # Get listing
     listing = await db.listings.find_one({"id": listing_id})
@@ -1499,29 +824,6 @@ async def download_invoice(invoice_id: str):
     raise HTTPException(status_code=404, detail="Invoice not found")
 
 
-@payments_router.get("/fees/processing")
-async def get_processing_fee_info():
-    """
-    Get Stripe processing fee information
-    
-    Processing fee (2.9% + $0.30) is passed to buyer using gross-up formula.
-    """
-    return {
-        "percentage_rate": float(STRIPE_PERCENTAGE_FEE),
-        "percentage_display": "2.9%",
-        "fixed_fee": float(STRIPE_FIXED_FEE),
-        "fixed_fee_display": "$0.30",
-        "description": "Card processing fee (2.9% + $0.30)",
-        "gross_up_formula": "gross_amount = (net_amount + 0.30) / (1 - 0.029)",
-        "example": {
-            "net_to_receive": 100.00,
-            "gross_charge": 103.30,
-            "stripe_fee": 3.30
-        }
-    }
-
-
-
 # ========== SUBSCRIPTION ENDPOINTS ==========
 
 from services.subscription_service import (
@@ -1558,7 +860,7 @@ async def get_my_subscription_status(
         raise HTTPException(status_code=401, detail="Authentication required")
     
     db = get_db()
-    current_user = await _get_current_user(credentials)
+    current_user = await _auth(credentials)
     
     return await get_user_subscription_status(db, current_user.id)
 
@@ -1590,7 +892,7 @@ async def upgrade_subscription(
         raise HTTPException(status_code=400, detail="Invalid tier. Must be 'premium' or 'vip'")
     
     db = get_db()
-    current_user = await _get_current_user(credentials)
+    current_user = await _auth(credentials)
     
     result = await create_subscription_checkout(
         db=db,
@@ -1615,7 +917,7 @@ async def get_fee_rates(
         raise HTTPException(status_code=401, detail="Authentication required")
     
     db = get_db()
-    current_user = await _get_current_user(credentials)
+    current_user = await _auth(credentials)
     
     user = await db.users.find_one({"id": current_user.id})
     tier = user.get("subscription_tier", "free") if user else "free"
@@ -1655,7 +957,7 @@ async def get_seller_earnings(
         raise HTTPException(status_code=401, detail="Authentication required")
     
     db = get_db()
-    current_user = await _get_current_user(credentials)
+    current_user = await _auth(credentials)
     
     user = await db.users.find_one({"id": current_user.id})
     connect_account_id = user.get("stripe_connect_account_id") if user else None
@@ -1757,7 +1059,7 @@ async def get_seller_transactions(
         raise HTTPException(status_code=401, detail="Authentication required")
     
     db = get_db()
-    current_user = await _get_current_user(credentials)
+    current_user = await _auth(credentials)
     
     # Get invoices where user is seller
     invoices_cursor = db.invoices.find(
@@ -1820,7 +1122,7 @@ async def buy_now_preview(
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    current_user = await _get_current_user(credentials)
+    current_user = await _auth(credentials)
     db = get_db()
 
     auction = await db.multi_item_listings.find_one({"id": data.auction_id}, {"_id": 0})
@@ -1896,7 +1198,7 @@ async def buy_now_checkout(
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    current_user = await _get_current_user(credentials)
+    current_user = await _auth(credentials)
     db = get_db()
 
     # Check if buy-now is enabled
@@ -2084,7 +1386,7 @@ async def auction_winner_preview(
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    current_user = await _get_current_user(credentials)
+    current_user = await _auth(credentials)
     db = get_db()
 
     listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
@@ -2187,7 +1489,7 @@ async def auction_winner_checkout(
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    current_user = await _get_current_user(credentials)
+    current_user = await _auth(credentials)
     db = get_db()
 
     # Server-side validation

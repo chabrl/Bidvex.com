@@ -116,12 +116,19 @@ async def response_time_middleware(request: Request, call_next):
         logger.warning(f"SLOW {request.method} {path} — {elapsed}ms")
     response.headers["X-Response-Time"] = f"{elapsed}ms"
     # FIX 5: Cache-Control — static assets get 1yr, HTML must revalidate
+    # Cloudflare CDN-specific headers for high-res image delivery
     if path.startswith("/static/") or any(path.endswith(ext) for ext in (".js", ".css", ".woff2", ".woff")):
         response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-    elif any(path.endswith(ext) for ext in (".png", ".jpg", ".jpeg", ".webp", ".svg", ".ico", ".gif")):
+        response.headers["CDN-Cache-Control"] = "public, max-age=31536000"
+    elif any(path.endswith(ext) for ext in (".png", ".jpg", ".jpeg", ".webp", ".svg", ".ico", ".gif", ".avif")):
         response.headers["Cache-Control"] = "public, max-age=31536000"
+        response.headers["CDN-Cache-Control"] = "public, max-age=31536000"
+        response.headers["Vary"] = "Accept-Encoding"
     elif path.endswith(".html") or path == "/":
         response.headers["Cache-Control"] = "no-cache"
+    elif path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        response.headers["CDN-Cache-Control"] = "no-store"
     # FIX 8: Security headers
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
@@ -137,6 +144,41 @@ async def response_time_middleware(request: Request, call_next):
         "base-uri 'self'"
     )
     return response
+
+# ─── 500 Error & Webhook Failure Tracking Middleware ───
+@app.middleware("http")
+async def error_tracking_middleware(request: Request, call_next):
+    try:
+        response = await call_next(request)
+        if response.status_code >= 500:
+            import asyncio
+            from routes.monitoring import log_error_event
+            asyncio.ensure_future(log_error_event(
+                event_type="http_500",
+                message=f"{request.method} {request.url.path} returned {response.status_code}",
+                details={
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status_code": response.status_code,
+                    "query": str(request.query_params),
+                },
+                severity="error",
+            ))
+        return response
+    except Exception as exc:
+        import asyncio
+        from routes.monitoring import log_error_event
+        asyncio.ensure_future(log_error_event(
+            event_type="unhandled_exception",
+            message=f"Unhandled exception on {request.method} {request.url.path}: {str(exc)[:200]}",
+            details={
+                "method": request.method,
+                "path": request.url.path,
+                "error": str(exc)[:500],
+            },
+            severity="critical",
+        ))
+        raise
 
 # ─── Rate Limiting ───
 from rate_limit import limiter
@@ -288,6 +330,7 @@ try:
         ("routes.misc", "misc_router", None, False),
         ("routes.partner_pro", "partner_pro_router", "set_partner_pro_db", False),
         ("routes.reviews", "reviews_router", "set_reviews_db", False),
+        ("routes.monitoring", "monitoring_router", None, False),
     ]
 
     for module_path, router_name, db_setter_name, app_level in SELF_CONTAINED_ROUTERS:

@@ -7,7 +7,7 @@ Handles external webhooks from third-party services:
 
 from fastapi import APIRouter, HTTPException, Request
 from typing import Dict, Any, List
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import logging
 import json
 
@@ -147,13 +147,23 @@ async def handle_sendgrid_webhook(request: Request):
             processed += 1
         
         logger.info(f"Processed {processed} SendGrid webhook events")
+        from routes.monitoring import log_webhook_event
+        import asyncio
+        asyncio.ensure_future(log_webhook_event("sendgrid", f"batch_{processed}", "success", {"count": processed}))
         return {"status": "ok", "processed": processed}
         
     except json.JSONDecodeError:
         logger.error("Invalid JSON in SendGrid webhook")
+        from routes.monitoring import log_webhook_event
+        import asyncio
+        asyncio.ensure_future(log_webhook_event("sendgrid", "invalid_json", "failed"))
         raise HTTPException(status_code=400, detail="Invalid JSON")
     except Exception as e:
         logger.error(f"Error processing SendGrid webhook: {e}")
+        from routes.monitoring import log_webhook_event, log_error_event
+        import asyncio
+        asyncio.ensure_future(log_webhook_event("sendgrid", "processing_error", "failed", {"error": str(e)[:300]}))
+        asyncio.ensure_future(log_error_event("sendgrid_webhook_failure", f"SendGrid webhook error: {str(e)[:200]}", severity="error"))
         raise HTTPException(status_code=500, detail="Internal error")
 
 
@@ -281,14 +291,31 @@ async def handle_stripe_webhook(request: Request):
         else:
             logger.info(f"Unhandled Stripe event: {event_type}")
 
+        # Track successful webhook processing
+        from routes.monitoring import log_webhook_event
+        import asyncio
+        asyncio.ensure_future(log_webhook_event("stripe", event_type, "success"))
+
         return {"status": "ok", "event_type": event_type}
 
     except HTTPException:
+        # Track webhook verification failures
+        from routes.monitoring import log_webhook_event, log_error_event
+        import asyncio
+        asyncio.ensure_future(log_webhook_event("stripe", "verification_failed", "failed", {"error": "signature_or_http_error"}))
+        asyncio.ensure_future(log_error_event("stripe_webhook_failure", "Stripe webhook verification failed", severity="error"))
         raise
     except json.JSONDecodeError:
+        from routes.monitoring import log_webhook_event
+        import asyncio
+        asyncio.ensure_future(log_webhook_event("stripe", "invalid_json", "failed", {"error": "JSONDecodeError"}))
         raise HTTPException(status_code=400, detail="Invalid JSON")
     except Exception as e:
         logger.error(f"Stripe webhook error: {e}")
+        from routes.monitoring import log_webhook_event, log_error_event
+        import asyncio
+        asyncio.ensure_future(log_webhook_event("stripe", event_type if 'event_type' in dir() else "unknown", "failed", {"error": str(e)[:300]}))
+        asyncio.ensure_future(log_error_event("stripe_webhook_failure", f"Stripe webhook processing error: {str(e)[:200]}", severity="error"))
         return {"status": "error", "message": str(e)}
 
 

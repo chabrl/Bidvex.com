@@ -32,6 +32,26 @@ logger = logging.getLogger(__name__)
 import stripe
 from starlette.responses import FileResponse
 
+# Helpers defined in admin module
+async def _get_sendgrid_config():
+    """Fetch SendGrid config from site_config collection."""
+    _db = get_db()
+    config = await _db.site_config.find_one({"key": "sendgrid"}, {"_id": 0})
+    if not config or not config.get("api_key"):
+        return None
+    return config
+
+async def _get_or_create_partner_fee_price():
+    """Get or create Stripe Price for the partner annual fee."""
+    _db = get_db()
+    config = await _db.site_config.find_one({"key": "partner_fee_price_id"}, {"_id": 0})
+    if config and config.get("price_id"):
+        return config["price_id"]
+    product = stripe.Product.create(name="BidVex Partner Annual Access", metadata={"type": "partner_annual_fee"})
+    price = stripe.Price.create(unit_amount=10000, currency="cad", recurring={"interval": "year"}, product=product.id)
+    await _db.site_config.update_one({"key": "partner_fee_price_id"}, {"$set": {"key": "partner_fee_price_id", "price_id": price.id}}, upsert=True)
+    return price.id
+
 partners_router = APIRouter(tags=["Partners"])
 
 
@@ -48,7 +68,8 @@ async def apply_for_partner(
     Sets partner_verification_status to 'pending'.
     """
     # Check not already partner or pending
-    user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
+    _db = get_db()
+    user_doc = await _db.users.find_one({"id": current_user.id}, {"_id": 0})
     if user_doc and user_doc.get("is_partner"):
         raise HTTPException(status_code=400, detail="Account is already a verified partner.")
     if user_doc and user_doc.get("partner_verification_status") == "pending":
@@ -67,7 +88,7 @@ async def apply_for_partner(
     # Store files
     upload_dir = Path("uploads/partner_docs")
     upload_dir.mkdir(parents=True, exist_ok=True)
-    base_url = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001")
+    base_url = _os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001")
 
     # Save NEQ document
     neq_contents = await neq_document.read()
@@ -93,7 +114,7 @@ async def apply_for_partner(
 
     # Update user document
     now = datetime.now(timezone.utc).isoformat()
-    await db.users.update_one(
+    await _db.users.update_one(
         {"id": current_user.id},
         {"$set": {
             "is_partner": False,
@@ -108,7 +129,7 @@ async def apply_for_partner(
     )
 
     # Log the application for admin audit
-    await db.admin_logs.insert_one({
+    await _db.admin_logs.insert_one({
         "id": str(uuid.uuid4()),
         "action": "partner_application_submitted",
         "user_id": current_user.id,
@@ -232,7 +253,6 @@ async def get_partner_status(current_user: User = Depends(get_current_user)):
 async def serve_partner_document(filename: str, current_user: User = Depends(get_current_user)):
     """Serve uploaded partner documents (auth required)."""
     db = get_db()
-    from fastapi.responses import FileResponse
     file_path = Path("uploads/partner_docs") / filename
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
@@ -278,7 +298,7 @@ async def create_partner_checkout(current_user: User = Depends(get_current_user)
     
     try:
         price_id = await _get_or_create_partner_fee_price()
-        base_url = os.environ.get("REACT_APP_BACKEND_URL", "https://www.bidvex.com")
+        base_url = _os.environ.get("REACT_APP_BACKEND_URL", "https://www.bidvex.com")
         
         customer_id = current_user.stripe_customer_id
         if not customer_id:
@@ -329,7 +349,7 @@ async def create_partner_billing_portal(current_user: User = Depends(get_current
         raise HTTPException(status_code=400, detail="No billing account found. Please complete your initial payment first.")
     
     try:
-        base_url = os.environ.get("REACT_APP_BACKEND_URL", "https://www.bidvex.com")
+        base_url = _os.environ.get("REACT_APP_BACKEND_URL", "https://www.bidvex.com")
         
         # Configure portal to open on invoices/billing history page
         session = stripe.billing_portal.Session.create(
