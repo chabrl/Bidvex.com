@@ -67,6 +67,12 @@ Full-stack bilingual (EN/FR) auction marketplace for high-value vehicles and gen
 - **Backfill**: All existing listings (3 single, 4 multi, 5 lots) auto-translated via backfill endpoint.
 - Verified via testing agent (iteration_113: 15/15 tests passed, 100% backend + frontend).
 
+### Production Push — Build Fix, Sorting, Subscription & Refactor (Complete - April 7, 2026)
+- **Railway Build Fix**: Cleaned `requirements.txt` removing Emergent-internal packages (`emergentintegrations`, `litellm`). Rewrote `translation_service.py` with dual-SDK: auto-detects `emergentintegrations` (preview) or `google-generativeai` (Railway). Added `GEMINI_API_KEY` env var.
+- **Subscription UI**: Removed "Partenaire Pro" from pricing grid. `/subscriptions` now shows 3-column layout: Starter, Premium, VIP Elite only.
+- **Code Refactor**: `auctions.py` 1,139→372 lines (extracted `auctions_bids.py` 687 lines). `vehicles.py` 2,543→1,165 lines (extracted `vehicles_admin.py` 1,510 lines). Testing agent caught and fixed auth signature bug in vehicles_admin.py.
+- Verified via testing agent (iteration_115: 18/18 backend + frontend all pass).
+
 ### Hotfix — Railway Build Failure (Fixed - April 7, 2026)
 - **Root Cause**: `pip freeze` in previous session captured Emergent-internal packages (`emergentintegrations`, `litellm` with private wheel URL `customer-assets.emergentagent.com`) into `requirements.txt`. Railway's builder couldn't access the private CDN, causing "Build Image" stage crash.
 - **Fix**: 
@@ -142,7 +148,6 @@ Full-stack bilingual (EN/FR) auction marketplace for high-value vehicles and gen
 ### P1 (Post-Launch)
 - Cloudflare CDN DNS routing (manual setup per INFRASTRUCTURE_P2.md)
 - Production monitoring alert notifications (email/Slack on critical errors)
-- Refactor `auctions.py` (1,140+ lines) and `vehicles.py` (2,500+ lines)
 
 ### P2 (Enhancements)
 - Real-time performance dashboard
