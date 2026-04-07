@@ -1,0 +1,143 @@
+{
+  "summary": "Iteration 115: Production push verification - Refactored modules, subscription UI, sorting. Fixed critical bug in vehicles_admin.py auth. All 18 backend tests pass, frontend verified.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_115.py",
+    "/app/test_reports/pytest/pytest_results_iteration_115.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "FIXED: vehicles_admin.py had incorrect function signatures - get_current_user and get_admin_user were passing Request instead of HTTPAuthorizationCredentials. Fixed by updating signatures to match parent functions in vehicles.py",
+    "Refactoring verified: auctions.py reduced from 1139 to 372 lines, vehicles.py reduced from 2543 to 1165 lines",
+    "New modules created: auctions_bids.py (687 lines), vehicles_admin.py (1510 lines)",
+    "Translation service has graceful degradation - when GEMINI_API_KEY missing, logs warning and skips translation (listing saves normally)",
+    "Subscription pricing page correctly filters to show only 3 plans (free, premium, vip) - partner_pro excluded via frontend filter",
+    "3-column grid layout confirmed on pricing page (md:grid-cols-3)",
+    "Marketplace default sort is 'ending_soon' - countdown timers visible on all cards",
+    "Ending Soon badge (data-testid='ending-soon-badge') CSS exists with Flame icon - only appears for items <1h remaining"
+  ],
+  "updated_files": [
+    "/app/backend/routes/vehicles_admin.py",
+    "/app/backend/tests/test_iteration_115.py"
+  ],
+  "success_rate": {
+    "backend": "100% (18/18 tests passed)",
+    "frontend": "100% (All features verified)"
+  },
+  "test_credentials": "Admin: charbeladmin@bidvex.com / Admin123!",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Iteration 115 verified all refactored modules working. Fixed auth bug in vehicles_admin.py. Subscription page at /pricing (not /subscriptions). Backend API returns 4 plans but frontend filters to 3. Ending Soon badge only appears when <1h remaining - currently no items in that window.",
+  "tests_performed": [
+    {
+      "test": "API /api/health returns healthy",
+      "result": "PASS"
+    },
+    {
+      "test": "API /api/marketplace/items returns items sorted by ending_soon",
+      "result": "PASS"
+    },
+    {
+      "test": "Sort parameter sort=ending_soon works",
+      "result": "PASS"
+    },
+    {
+      "test": "Sort parameter sort=-promoted works",
+      "result": "PASS"
+    },
+    {
+      "test": "Sort parameter sort=newest works",
+      "result": "PASS"
+    },
+    {
+      "test": "POST /api/bids endpoint accessible",
+      "result": "PASS"
+    },
+    {
+      "test": "GET /api/auctions/end-status/{id} works",
+      "result": "PASS"
+    },
+    {
+      "test": "POST /api/buy-now endpoint accessible",
+      "result": "PASS"
+    },
+    {
+      "test": "GET /api/vehicle-admin/pending-sellers accessible",
+      "result": "PASS (after fix)"
+    },
+    {
+      "test": "GET /api/vehicles/system/status works",
+      "result": "PASS"
+    },
+    {
+      "test": "POST /api/admin/backfill-translations accessible",
+      "result": "PASS"
+    },
+    {
+      "test": "Subscription plans API returns expected plans",
+      "result": "PASS"
+    },
+    {
+      "test": "Admin login successful",
+      "result": "PASS"
+    },
+    {
+      "test": "Admin backfill translations authenticated",
+      "result": "PASS"
+    },
+    {
+      "test": "Admin vehicle pending sellers authenticated",
+      "result": "PASS"
+    },
+    {
+      "test": "Auctions router accessible",
+      "result": "PASS"
+    },
+    {
+      "test": "Auctions extend endpoint accessible",
+      "result": "PASS"
+    },
+    {
+      "test": "Bids listing endpoint accessible",
+      "result": "PASS"
+    },
+    {
+      "test": "Pricing page shows 3 plan cards (no partner_pro)",
+      "result": "PASS"
+    },
+    {
+      "test": "3-column grid layout on pricing page",
+      "result": "PASS"
+    },
+    {
+      "test": "Countdown timers visible on marketplace cards",
+      "result": "PASS"
+    },
+    {
+      "test": "Marketplace default sort is ending_soon",
+      "result": "PASS"
+    }
+  ],
+  "bug_fixed": {
+    "file": "/app/backend/routes/vehicles_admin.py",
+    "issue": "get_current_user and get_admin_user functions had incorrect signatures - were passing Request object instead of HTTPAuthorizationCredentials",
+    "root_cause": "During refactoring, the wrapper functions in vehicles_admin.py were created with Request parameter but the parent functions in vehicles.py expect HTTPAuthorizationCredentials from Depends(security)",
+    "fix": "Updated function signatures to use HTTPAuthorizationCredentials = Depends(security) to match parent functions",
+    "impact": "All vehicle admin endpoints were returning 500 Internal Server Error"
+  },
+  "refactoring_verification": {
+    "auctions.py": "372 lines (down from 1139)",
+    "auctions_bids.py": "687 lines (new - extracted bid endpoints)",
+    "vehicles.py": "1165 lines (down from 2543)",
+    "vehicles_admin.py": "1510 lines (new - extracted admin/invoice/doc endpoints)"
+  }
+}

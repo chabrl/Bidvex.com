@@ -1,6 +1,6 @@
 import API_BASE from '../config';
 /**
- * SubscriptionPricingPage – 2x2 premium pricing grid
+ * SubscriptionPricingPage – 3-column pricing grid (Starter, Premium, VIP Elite)
  */
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
@@ -12,7 +12,7 @@ import { Switch } from '../components/ui/switch';
 import { toast } from 'sonner';
 import {
   Crown, Star, User as UserIcon, Check, ArrowRight,
-  RefreshCw, Sparkles, Shield, Gift, TrendingDown, PartyPopper,
+  RefreshCw, Sparkles, Gift, TrendingDown, PartyPopper,
   Settings, PiggyBank, CreditCard, Calendar,
 } from 'lucide-react';
 import { formatCurrency } from '../utils/currencyFormatter';
@@ -53,22 +53,6 @@ const TIERS = {
     discountBadgeBg: 'bg-purple-100 text-purple-700',
     ring: 'ring-purple-400',
   },
-  partner_pro: {
-    icon: Shield,
-    accentTop: 'bg-gradient-to-r from-teal-500 to-cyan-500',
-    cardBg: 'bg-white',
-    textName: 'text-slate-900',
-    textDesc: 'text-slate-500',
-    textPrice: 'text-slate-900',
-    textStrike: 'text-slate-400',
-    textFeature: 'text-slate-600',
-    checkColor: 'text-teal-500',
-    savingColor: 'text-green-600',
-    ctaClass: 'bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white',
-    ctaActiveClass: 'bg-slate-200 text-slate-500 cursor-default hover:bg-slate-200',
-    discountBadgeBg: 'bg-teal-100 text-teal-700',
-    ring: 'ring-teal-400',
-  },
   vip: {
     icon: Crown,
     accentTop: 'bg-gradient-to-r from-amber-400 to-yellow-500',
@@ -106,8 +90,9 @@ const SubscriptionPricingPage = () => {
     try {
       const res = await axios.get(`${API}/subscription-plans`);
       if (res.data.success) {
-        const order = ['free', 'premium', 'partner_pro', 'vip'];
-        setPlans((res.data.plans || []).sort((a, b) => order.indexOf(a.plan_id) - order.indexOf(b.plan_id)));
+        const order = ['free', 'premium', 'vip'];
+        const filtered = (res.data.plans || []).filter(p => order.includes(p.plan_id));
+        setPlans(filtered.sort((a, b) => order.indexOf(a.plan_id) - order.indexOf(b.plan_id)));
       }
     } catch { toast.error(t('pricingPage.loadError')); }
     finally { setLoading(false); }
@@ -177,9 +162,9 @@ const SubscriptionPricingPage = () => {
         </div>
       </section>
 
-      {/* ── 2x2 Pricing Grid ── */}
-      <section className="max-w-[920px] mx-auto px-4 pb-12 sm:pb-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      {/* ── 3-Column Pricing Grid ── */}
+      <section className="max-w-[1100px] mx-auto px-4 pb-12 sm:pb-16">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {plans.map((plan) => {
             const tier = TIERS[plan.plan_id] || TIERS.free;
             const Icon = tier.icon;

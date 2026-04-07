@@ -361,10 +361,13 @@ except Exception as e:
 # ─── Vehicle Module (standalone) ───
 try:
     from routes.vehicles import vehicle_router, set_vehicle_db
+    from routes.vehicles_admin import vehicle_admin_router, _init_vehicle_admin
     from services.scheduler import init_scheduler as init_vehicle_scheduler, start_scheduler as start_vehicle_scheduler
     set_vehicle_db(db)
+    _init_vehicle_admin(db)
     init_vehicle_scheduler(db)
     app.include_router(vehicle_router)
+    app.include_router(vehicle_admin_router)
 
     @app.on_event("startup")
     async def start_vehicle_auction_scheduler():
