@@ -17,6 +17,8 @@ import AvatarUpload from '../components/AvatarUpload';
 import SubscriptionBadge from '../components/SubscriptionBadge';
 import TrustBadge from '../components/TrustBadge';
 import TrendySubscriptionCards from '../components/TrendySubscriptionCards';
+import UserTierGrid from '../components/UserTierGrid';
+import PartnerLicenseCard from '../components/PartnerLicenseCard';
 import SubscriptionManagement from '../components/SubscriptionManagement';
 import PersonalizedSavingsCalculator from '../components/PersonalizedSavingsCalculator';
 import { useTranslation } from 'react-i18next';
@@ -540,8 +542,12 @@ const ProfileSettingsPage = () => {
                 {/* Subscription Management Panel */}
                 <SubscriptionManagement />
 
-                {/* Trendy Subscription Cards */}
-                <TrendySubscriptionCards currentTier={user?.subscription_tier || 'free'} />
+                {/* Show PartnerLicenseCard for partners, UserTierGrid for regular users */}
+                {user?.is_partner ? (
+                  <PartnerLicenseCard user={user} />
+                ) : (
+                  <UserTierGrid currentTier={user?.subscription_tier || 'free'} />
+                )}
 
                 {/* Personalized Savings Calculator */}
                 <PersonalizedSavingsCalculator currentTier={user?.subscription_tier || 'free'} />
