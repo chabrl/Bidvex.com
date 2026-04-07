@@ -85,6 +85,12 @@
 - MobileBottomNav hidden on `/messages` via App.js `MobileNavWrapper`
 - Meta viewport: `viewport-fit=cover, maximum-scale=1`
 
+### Subscription Cards — Text Visibility + i18n Fix (April 7, 2026)
+- Fixed VIP Elite title color: removed `!important` from global heading CSS rule in index.css, added inline `style={{ color: '#FFFFFF' }}` for VIP cards
+- Fixed FR language toggle: raised Navbar z-index from z-50 to z-[70] above TrendyAnnouncementBar (z-[60]) which was intercepting clicks
+- Full i18n for TrendySubscriptionCards: all 4 plan names, descriptions, features, CTAs, badges, savings text, terms, and trial strings now use `t()` keys
+- Added `subCards` namespace to both `en.json` and `fr.json` with complete EN/FR translations
+
 ## Backlog
 - [ ] Cloudflare CDN setup (P2)
 - [ ] Post-launch monitoring/alerting (P2)
