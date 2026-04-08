@@ -55,8 +55,8 @@ class Listing(BaseModel):
     buy_now_price: Optional[float] = None
     images: List[str] = []
     location: str
-    city: str
-    region: str
+    city: Optional[str] = ""
+    region: Optional[str] = ""
     country: Optional[str] = "CA"
     postal_code: Optional[str] = None
     latitude: Optional[float] = None
