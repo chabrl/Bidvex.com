@@ -1,87 +1,120 @@
-# BidVex Auction Marketplace — PRD
+# BidVex — Auction Marketplace PRD
 
-## Product Overview
-BidVex is a bilingual (EN/FR) production-ready auction marketplace with:
-- Real-time bidding (WebSocket), auto-bid bots, anti-sniping extensions
-- Vehicle and General marketplace with category isolation
-- AI user behavioral tracking for personalization
-- OPC-certified seller buyer's premium control
-- Multi-payment orchestration (Stripe/Cash/E-Transfer)
-- Admin dashboard with full moderation
-- Push notifications, email marketing (SendGrid), SMS (Twilio)
-- Stripe payments, Cloudflare R2 storage, Gemini AI assistant
+## Original Problem Statement
+Full-stack auction marketplace (React frontend, FastAPI backend, MongoDB) with three major development phases:
+1. **Retention Phase**: Outbid Alerts, Zero-Latency Timer Extensions, Winner's Circle persistence, AI User Interest tracking, stealth WebSocket reconnect.
+2. **Dealer Experience**: OPC-Certified Seller BP Control, Category & Role restrictions, Payment Orchestration (Stripe/Cash/E-Transfer), Timer "Loading..." fix, AI bulk data.
+3. **Correcting Vehicle Routing & Analytics**: Vehicle Identity routing, Real-Time Marketplace Sync, Dynamic Buyer's Premium, Seller Rating Dashboard, Payment Transparency, Sidebar Filter auto-fetch, Terms fix.
+
+Additional requirements: PageSpeed optimization, Railway deployment support, removal of `emergentintegrations` library.
+
+## User Personas
+- **Buyers**: Browse, bid, and win auctions. Need real-time price updates and transparent pricing.
+- **Sellers (Standard)**: List general items. Cannot list vehicles.
+- **Sellers (Partner/Admin)**: Can list vehicles, set OPC certification, customize Buyer's Premium.
+- **Admin**: Manages platform, monitors fraud, processes invoices.
+
+## Core Requirements
+- Live WebSocket bidding with anti-sniping extensions
+- Smart routing: vehicles → VehicleDetailView, general → ListingDetailPage
+- OPC-certified seller logic with customizable Buyer's Premium (0%–25%)
+- Offline payment options (Cash/E-Transfer) with automated admin invoicing
+- AI behavioral tracking via `user_interests` collection
+- Sidebar filters with sub-second auto-fetch
+- Real-time marketplace sync (WebSocket updates propagate to grid cards)
 
 ## Architecture
-- Frontend: React (CRA) served as static build via `npx serve -s build`
-- Backend: FastAPI (Python) on port 8001
-- Database: MongoDB Atlas
-- Real-time: WebSocket for bidding + notifications
-- Deployment: Prepared for Railway / PaaS
+```
+/app
+├── backend/
+│   ├── server.py                # FastAPI setup, CORS, SPA static mount
+│   ├── ws_managers.py           # ConnectionManager, MessageConnectionManager, MarketplaceConnectionManager
+│   ├── ws_handlers.py           # WebSocket endpoints (listings, messages, marketplace)
+│   ├── routes/
+│   │   ├── auctions.py          # Auction lifecycle, offline invoice
+│   │   ├── auctions_bids.py     # Manual/auto bids, anti-sniping, marketplace broadcasts
+│   │   ├── vehicles.py          # Vehicle listings & terms acceptance
+│   │   ├── marketplace.py       # General listings & filter logic
+│   │   ├── users.py             # User profiles & ratings
+│   │   └── user_insights.py     # AI tracking endpoints
+│   ├── models/auction_models.py # Pydantic models
+│   └── db/indexes.py            # MongoDB index creation
+├── frontend/
+│   ├── src/
+│   │   ├── hooks/useMarketplaceSync.js   # Global marketplace WebSocket hook
+│   │   ├── hooks/useHomePageData.js      # React Query hooks for homepage sections
+│   │   ├── hooks/useMarketplaceItems.js  # React Query infinite scroll
+│   │   ├── components/FlattenedMarketplace.js  # Main grid & filters
+│   │   ├── components/vehicles/PricingCalculator.js  # Dynamic BP
+│   │   ├── components/vehicles/PricingBreakdown.js   # Payment disclaimers
+│   │   ├── pages/HomePage.js             # Smart routing + WS sync
+│   │   ├── pages/ListingDetailPage.js    # Identity guard redirect
+│   │   ├── pages/SellerDashboard.js      # Ratings panel
+│   │   └── pages/CreateMultiItemListing.js # Vehicle category guard
+```
 
-## Completed Features
+## What's Been Implemented
 
-### Core
-- Multi-user bidding with server-side timestamp validation (hard stop 403)
-- Auto-bid bot with recursive counter-bidding and personality toasts
-- Anti-sniping: 2-minute extensions when bid placed in final minutes
-- Zero-latency timer sync via WebSocket TIME_EXTENSION events
-- Vehicle category isolation from general marketplace
-- Bulk listings (20 items: 10 vehicles, 10 general)
+### Phase 1 — Retention (COMPLETE, Tested 100%)
+- Outbid Alert System (SendGrid email + Toast)
+- AI User Tracking (`user_interests` collection)
+- WebSocket stealth reconnection
+- Zero-Latency Timer Extensions
+- Winner's Circle persistence
 
-### Retention Phase (Apr 8, 2026)
-- Task 1: Outbid Alert System — Email (SendGrid) + WebSocket AUTO_BID_EXCEEDED
-- Task 2: Service Recovery — Sidebar filters (category/region/city), Lots page, Vehicle timer white text
-- Task 3: Zero-Latency Extension Sync — BID_UPDATE + TIME_EXTENSION events
-- Task 4: Winner's Circle — WINNER/GAGNANT badge + persist_auction_winner (30-day TTL)
-- Task 5: Gemini Insight User Profiling — user_interests collection, batched tracking
-- Task 6: Stealth WebSocket Reconnection
+### Phase 2 — Dealer Experience (COMPLETE, Tested 100%)
+- OPC-Certified Seller BP Control (0%–25%)
+- Category restrictions (non-partners blocked from vehicles)
+- Payment Orchestration (Stripe, Cash, E-Transfer)
+- Timer "Loading..." fix on VehicleDetailPage
 
-### Dealer Experience Phase (Apr 8, 2026)
-- **Task 1: OPC-Certified Seller BP Control** — `is_opc_certified` user flag, BP slider (0-25%) for OPC sellers, "Vendeur Certifie OPC" badge on 0% BP, pricing calculator updated
-- **Task 2: Category & Role Restrictions** — Standard users blocked from listing vehicles (403). Only Partner/Admin can list vehicles. Enforced on both single-item and multi-item flows
-- **Task 3: Payment Orchestration** — Seller payment method selection (Stripe/Cash/E-Transfer) with legal disclosure for offline methods. Stripe labeled "Recommended"
-- **Task 4: High-Priority UI Fixes** — Timer "Loading..." bug FIXED (useVehicleBidding rewritten to use correct WS endpoint + fallback to vehicleData). Terms acceptance fixed (listings collection fallback). Vehicle timer text changed to white high-visibility
-- **Task 5: AI & Bulk Data Update** — 12 vehicles set to is_opc_certified:true with 0% BP. Payment preference and OPC interest tracking added to useInsightsTracker
+### Phase 3 — Vehicle Routing & Analytics (COMPLETE, Tested April 8 2026)
+- Vehicle Identity Routing: `/listing/:id` → `/vehicle-auctions/:id` redirect
+- Real-Time Marketplace Sync: Global WebSocket (`/api/ws/marketplace`) broadcasts bid/timer updates to all grid cards
+- Dynamic Buyer's Premium: PricingCalculator pulls seller-defined `buyers_premium_percent`
+- OPC 0% Badge: "Vendeur Certifié OPC : 0 $ de frais d'achat"
+- Seller Rating Dashboard: Stars, reviews, completed auctions
+- Payment Transparency: "Direct Settlement" disclaimer for offline payments
+- Admin Invoice: Auto-created for Cash/E-Transfer auction wins
+- Sidebar Filters: onChange auto-fetch with 300ms debounce + MongoDB indexes
+- Vehicle Category Guard: Non-partners blocked in both single + multi-item listings
+- Accept-Terms: `POST /api/vehicles/{id}/accept-terms` working
 
-### Bug Fixes
-- P0: Vehicle Detail Page blank screen (useTranslation in helper functions)
-- P0: Timer "Loading..." hang (useVehicleBidding connected to non-existent WS endpoint)
-- Terms acceptance 404 (vehicle in listings collection, not vehicle_listings)
+### Infrastructure & Deployment (COMPLETE)
+- Railway deployment support (runtime.txt, main.py entry point)
+- Removed `emergentintegrations` library
+- Centralized `config.js` for frontend API base URL
+- SPA static mount from FastAPI
+- ProxyHeadersMiddleware for Cloudflare
+- Lazy DB startup to prevent 520 timeouts
 
 ## Key API Endpoints
-- GET /api/health
-- GET /api/marketplace/items?categories=X&regions=Y&cities=Z
-- GET /api/marketplace/filter-counts
-- GET /api/vehicles, GET /api/vehicles/:id
-- POST /api/vehicles/{id}/accept-terms
-- POST /api/bids
-- POST /api/listings (with buyers_premium_rate, payment_method, category restrictions)
-- POST /api/multi-item-listings (with category restrictions)
-- POST /api/insights/track, POST /api/insights/track-batch
-- GET /api/insights/profile/:user_id
-- GET /api/winners/my-wins
+- `GET /api/health` — Health check
+- `POST /api/auth/login` — Authentication
+- `GET /api/listings/:id` — Listing detail (with vehicle redirect guard)
+- `POST /api/vehicles/:id/accept-terms` — Accept bidding terms
+- `GET /api/users/:id/ratings` — Seller ratings
+- `POST /api/insights/track` — AI behavioral tracking
+- `WS /api/ws/marketplace` — Global marketplace real-time updates
+- `WS /api/ws/listings/:id` — Per-listing real-time bidding
 
-## DB Collections
-- listings, vehicle_listings, multi_item_listings
-- users (is_opc_certified field)
-- bids, auto_bids, notifications
-- user_interests (TTL: 90 days)
-- won_auctions (TTL: 30 days)
+## Key DB Schema
+- `listings`: status, category, auction_end_date, is_opc_certified, buyers_premium_percent, payment_method
+- `vehicle_listings`: Dedicated vehicle collection
+- `user_interests`: AI behavioral tracking (TTL: 90 days)
+- `won_auctions`: Winner's Circle (TTL: 30 days)
+- `seller_invoices`: Offline payment admin invoices
 
 ## 3rd Party Integrations
-- OpenAI GPT-4o (EMERGENT_LLM_KEY / OPENAI_API_KEY)
-- Stripe (Payments)
-- SendGrid (Emails)
-- Twilio (SMS)
-- Cloudflare R2 / S3 (Storage via boto3)
-- Gemini 2.5 Flash (EMERGENT_LLM_KEY / GEMINI_API_KEY)
+- Stripe (Payments) — User API Key
+- SendGrid (Emails) — User API Key
+- Twilio (SMS) — User API Key
+- Cloudflare R2 / AWS S3 (Object Storage via boto3) — User API Key
+- Gemini 2.5 Flash — Emergent LLM Key (local) / GEMINI_API_KEY (prod)
 
-## Backlog / Future
-- (P2) Cloudflare CDN setup per /app/memory/INFRASTRUCTURE_P2.md
-- Post-launch monitoring and alerting
-- Real-time performance dashboard
-- Automated weekly Lighthouse audits
-- Server-side PageSpeed monitoring endpoint
-- i18n for EmailMarketingPricing page
-- Personalized "Picked for You" email campaigns using user_interests data
-- Seller Rating Dashboard (individual reviews + average scores)
+## Backlog
+- (P2) Cloudflare CDN setup per `/app/memory/INFRASTRUCTURE_P2.md`
+- (P2) Post-launch monitoring and alerting
+- (Enhancement) Real-time performance dashboard
+- (Enhancement) Automated Lighthouse audits
+- (Low) i18n for EmailMarketingPricing page
