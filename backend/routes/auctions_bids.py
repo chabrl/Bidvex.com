@@ -101,8 +101,9 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
     extension_applied = False
     new_auction_end = None
 
-    if time_remaining < -GRACE_PERIOD:
-        raise HTTPException(status_code=400, detail="Auction has ended")
+    # ========== HARD STOP: Server-Side Timestamp Validation ==========
+    if time_remaining <= 0:
+        raise HTTPException(status_code=403, detail="Auction has already ended")
 
     if anti_sniping_enabled and time_remaining <= ANTI_SNIPE_WINDOW:
         new_auction_end = now + timedelta(seconds=ANTI_SNIPE_WINDOW)
@@ -147,6 +148,13 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
             "$inc": {"bid_count": 1}
         }
     )
+
+    # Invalidate listing cache after update
+    try:
+        from routes.listings import _listing_cache
+        _listing_cache.pop(bid_data.listing_id, None)
+    except ImportError:
+        pass
 
     # Real-time broadcast
     broadcast_data = {
@@ -243,6 +251,12 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
 
     logger.info(f"Bid placed: listing={bid_data.listing_id}, bidder={current_user.id}, amount={bid_data.amount}, extension={extension_applied}")
 
+    # ========== AUTO-BID PROCESSOR: Trigger counter-bids ==========
+    try:
+        await _process_auto_bids(db, bid_data.listing_id, bid_data.amount, current_user.id)
+    except Exception as auto_bid_err:
+        logger.warning(f"Auto-bid processing error: {auto_bid_err}")
+
     response = bid.model_dump()
     response["created_at"] = bid_dict["created_at"]
     response["currency"] = listing.get("currency", "CAD")
@@ -251,6 +265,76 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
         response["new_auction_end"] = new_auction_end.isoformat()
 
     return response
+
+
+async def _process_auto_bids(db, listing_id: str, current_price: float, manual_bidder_id: str):
+    """
+    Auto-Bid Processor: After a manual bid, check all active auto-bids for this listing.
+    If an auto-bid user's max_bid exceeds the current price + min increment, place a counter-bid.
+    """
+    settings = await get_marketplace_settings(db)
+    min_increment = settings.get("minimum_bid_increment", 1.0)
+
+    auto_bids = await db.auto_bids.find({
+        "listing_id": listing_id,
+        "is_active": True,
+        "user_id": {"$ne": manual_bidder_id}  # Don't counter-bid yourself
+    }).to_list(100)
+
+    if not auto_bids:
+        return
+
+    # Sort by max_bid descending — highest auto-bid wins
+    auto_bids.sort(key=lambda x: x.get("max_bid", 0), reverse=True)
+
+    for ab in auto_bids:
+        counter_amount = current_price + min_increment
+        if counter_amount > ab["max_bid"]:
+            # Auto-bid exhausted — deactivate
+            await db.auto_bids.update_one({"id": ab["id"]}, {"$set": {"is_active": False}})
+            logger.info(f"Auto-bid {ab['id']} exhausted (max={ab['max_bid']}, needed={counter_amount})")
+            continue
+
+        # Place the counter-bid
+        auto_bid_obj = Bid(
+            listing_id=listing_id,
+            bidder_id=ab["user_id"],
+            amount=counter_amount,
+            bid_type="auto"
+        )
+        bid_dict = auto_bid_obj.model_dump()
+        bid_dict["created_at"] = bid_dict["created_at"].isoformat()
+        await db.bids.insert_one(bid_dict)
+
+        await db.listings.update_one(
+            {"id": listing_id},
+            {"$set": {"current_price": counter_amount, "highest_bidder_id": ab["user_id"]},
+             "$inc": {"bid_count": 1}}
+        )
+
+        logger.info(f"Auto-bid triggered: user={ab['user_id']}, amount={counter_amount}, listing={listing_id}")
+
+        # Invalidate listing cache so next fetch returns updated price
+        try:
+            from routes.listings import _listing_cache
+            _listing_cache.pop(listing_id, None)
+        except ImportError:
+            pass
+
+        # Broadcast the auto-bid via WebSocket
+        if _ws_manager:
+            listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
+            new_bid_count = listing.get("bid_count", 0) if listing else 0
+            await _ws_manager.broadcast_bid_update(
+                listing_id,
+                {'id': bid_dict['id'], 'bidder_id': ab["user_id"],
+                 'amount': counter_amount, 'created_at': bid_dict['created_at']},
+                {'bid_count': new_bid_count, 'current_price': counter_amount,
+                 'currency': listing.get("currency", "CAD") if listing else "CAD"}
+            )
+
+        # Only the highest auto-bid wins each round
+        break
 
 
 # ========== BUY NOW ==========
@@ -609,10 +693,11 @@ async def bid_on_lot(listing_id: str, lot_number: int, data: Dict[str, Any], cur
 
 @bids_router.post("/bids/auto-bid")
 async def setup_auto_bid(listing_id: str, max_bid: float, current_user: User = Depends(get_current_user)):
-    """Setup Auto-Bid Bot (Premium/VIP only)"""
+    """Setup Auto-Bid Bot (Premium/VIP/Partner only)"""
     db = get_db()
     try:
-        if current_user.subscription_tier == "free":
+        allowed_tiers = ["premium", "vip", "partner", "business"]
+        if current_user.subscription_tier not in allowed_tiers:
             raise HTTPException(
                 status_code=403,
                 detail="Auto-Bid Bot is a Premium feature. Upgrade to Premium or VIP to use this feature."
@@ -622,7 +707,7 @@ async def setup_auto_bid(listing_id: str, max_bid: float, current_user: User = D
         if not listing:
             raise HTTPException(status_code=404, detail="Listing not found")
 
-        current_bid = listing.get("current_bid", listing.get("starting_price", 0))
+        current_bid = listing.get("current_price", listing.get("starting_price", 0))
         if max_bid <= current_bid:
             raise HTTPException(status_code=400, detail="Max bid must be higher than current bid")
 

@@ -99,12 +99,15 @@ async def _build_marketplace_items():
     now = datetime.now(timezone.utc)
 
     # Fetch with projection and limit — cap at 500 each
+    # Exclude vehicles from general marketplace (they have their own dedicated page)
+    VEHICLE_CATEGORIES = ["vehicles", "vehicle", "car", "auto", "automobile", "truck", "motorcycle"]
+    
     auctions = await db.multi_item_listings.find(
-        {"status": {"$in": ["active", "upcoming"]}}, _MULTI_PROJECTION
+        {"status": {"$in": ["active", "upcoming"]}, "category": {"$nin": VEHICLE_CATEGORIES}}, _MULTI_PROJECTION
     ).sort("auction_end_date", 1).limit(500).to_list(500)
 
     single_listings = await db.listings.find(
-        {"status": "active"}, _LISTING_PROJECTION
+        {"status": "active", "category": {"$nin": VEHICLE_CATEGORIES}}, _LISTING_PROJECTION
     ).sort("auction_end_date", 1).limit(500).to_list(500)
 
     # Batch-fetch seller tax status
@@ -474,9 +477,10 @@ async def _refresh_filter_counts():
                     "count": a["count"],
                 })
 
-        # Category counts (single + multi combined)
+        # Category counts (single + multi combined) — exclude vehicles (they have their own page)
+        VEHICLE_CATEGORIES = ["vehicles", "vehicle", "car", "auto", "automobile", "truck", "motorcycle"]
         cat_pipeline = [
-            {"$match": {"status": "active"}},
+            {"$match": {"status": "active", "category": {"$nin": VEHICLE_CATEGORIES}}},
             {"$group": {"_id": "$category", "count": {"$sum": 1}}},
             {"$sort": {"count": -1}},
         ]
@@ -515,7 +519,7 @@ async def _refresh_filter_counts():
             for r, data in sorted(regions.items(), key=lambda x: x[1]["count"], reverse=True)
         ]
 
-        total_active = await db.listings.count_documents({"status": "active"})
+        total_active = await db.listings.count_documents({"status": "active", "category": {"$nin": VEHICLE_CATEGORIES}})
 
         result = {
             "auctioneers": auctioneers,

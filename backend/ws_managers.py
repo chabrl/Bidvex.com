@@ -72,8 +72,13 @@ class ConnectionManager:
                         'bid_status': bid_status,
                         'timestamp': datetime.now(timezone.utc).isoformat(),
                         'bid_data': bid_data,
-                        'auction_end_date': listing_data.get('auction_end_date'),
-                        'anti_sniping_extended': listing_data.get('anti_sniping_extended', False),
+                        'currency': listing_data.get('currency', 'CAD'),
+                        # Anti-sniping extension sync fields
+                        'time_extended': listing_data.get('time_extended', False),
+                        'new_auction_end': listing_data.get('new_auction_end'),
+                        'new_auction_end_epoch': listing_data.get('new_auction_end_epoch'),
+                        'server_time_epoch': listing_data.get('server_time_epoch'),
+                        'extension_reason': listing_data.get('extension_reason'),
                     }
                     await websocket.send_json(message)
                     sent_count += 1
@@ -96,7 +101,11 @@ class ConnectionManager:
                             'bid_status': 'UNKNOWN',
                             'timestamp': datetime.now(timezone.utc).isoformat(),
                             'bid_data': bid_data,
-                            'auction_end_date': listing_data.get('auction_end_date'),
+                            'currency': listing_data.get('currency', 'CAD'),
+                            'time_extended': listing_data.get('time_extended', False),
+                            'new_auction_end': listing_data.get('new_auction_end'),
+                            'new_auction_end_epoch': listing_data.get('new_auction_end_epoch'),
+                            'server_time_epoch': listing_data.get('server_time_epoch'),
                         }
                         await websocket.send_json(message)
                         sent_count += 1

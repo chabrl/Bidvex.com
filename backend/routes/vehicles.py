@@ -861,11 +861,33 @@ async def list_vehicles(
     
     total = await db.vehicle_listings.count_documents(query)
     
+    # Also include vehicle-category items from the general listings collection
+    general_vehicle_query = {
+        "status": "active",
+        "category": {"$in": ["vehicles", "vehicle", "car", "auto"]}
+    }
+    general_vehicles = await db.listings.find(
+        general_vehicle_query, {"_id": 0}
+    ).sort("auction_end_date", 1).to_list(500)
+    
+    # Normalize general listings to match vehicle_listings shape
+    for gv in general_vehicles:
+        gv.setdefault("end_time", gv.get("auction_end_date"))
+        gv.setdefault("current_bid", gv.get("current_price", gv.get("starting_price", 0)))
+        gv.setdefault("make", "")
+        gv.setdefault("model", "")
+        gv.setdefault("year", 0)
+        gv.setdefault("source", "listings")
+    
+    # Merge and re-sort
+    all_vehicles = vehicles + general_vehicles
+    general_total = await db.listings.count_documents(general_vehicle_query)
+    
     return {
-        "vehicles": vehicles,
-        "total": total,
+        "vehicles": all_vehicles,
+        "total": total + general_total,
         "page": page,
-        "pages": (total + limit - 1) // limit
+        "pages": ((total + general_total) + limit - 1) // limit
     }
 
 
