@@ -25,7 +25,6 @@ const API = API_BASE;
 
 // Format currency
 const formatCurrency = (amount) => {
-  const { t } = useTranslation();
   return new Intl.NumberFormat('en-CA', {
     style: 'currency',
     currency: 'CAD',
@@ -151,6 +150,7 @@ export const PricingCalculator = ({
   expanded: initialExpanded = false 
 }) => {
   const { user, token } = useAuth();
+  const { t } = useTranslation();
   const [bidAmount, setBidAmount] = useState(initialBidAmount || 0);
   const [expanded, setExpanded] = useState(initialExpanded);
   const [breakdown, setBreakdown] = useState(null);

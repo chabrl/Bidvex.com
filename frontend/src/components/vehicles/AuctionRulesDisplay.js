@@ -18,7 +18,6 @@ import {
 
 // Format currency
 const formatCurrency = (amount) => {
-  const { t } = useTranslation();
   return new Intl.NumberFormat('en-CA', {
     style: 'currency',
     currency: 'CAD',
@@ -75,6 +74,7 @@ export const AntiSnipingNotice = ({ timeExtended, extensionReason, newEndTime })
 
 // Anti-Sniping Rules Card
 export const AntiSnipingRulesCard = ({ compact = false }) => {
+  const { t } = useTranslation();
   if (compact) {
     return (
       <TooltipProvider>
@@ -348,7 +348,9 @@ export const ActiveBiddersCount = ({ count, watchersCount }) => (
 );
 
 // Auction Rules Summary Card
-export const AuctionRulesSummary = ({ vehicle }) => (
+export const AuctionRulesSummary = ({ vehicle }) => {
+  const { t } = useTranslation();
+  return (
   <Card className="border-slate-200" data-testid="auction-rules-summary">
     <CardHeader className="pb-2">
       <CardTitle className="text-base flex items-center gap-2">
@@ -383,7 +385,8 @@ export const AuctionRulesSummary = ({ vehicle }) => (
       )}
     </CardContent>
   </Card>
-);
+  );
+};
 
 // Live Status Indicator
 export const LiveStatusIndicator = ({ isLive, endTime, extended = false }) => {

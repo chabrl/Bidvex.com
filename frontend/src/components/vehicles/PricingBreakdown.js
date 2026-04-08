@@ -20,7 +20,6 @@ const API = API_BASE;
 
 // Format currency
 const formatPrice = (amount) => {
-  const { t } = useTranslation();
   return new Intl.NumberFormat('en-CA', {
     style: 'currency',
     currency: 'CAD',
@@ -52,6 +51,7 @@ const TierBadge = ({ tier }) => {
 // Pricing breakdown component for before bidding
 export const PricingEstimate = ({ vehicleId, bidAmount, province }) => {
   const { token } = useAuth();
+  const { t } = useTranslation();
   const [breakdown, setBreakdown] = useState(null);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -227,6 +227,7 @@ export const SellerPricingInfo = ({ subscriptionTier = 'basic' }) => {
 
 // Full invoice view component
 export const InvoiceView = ({ invoice }) => {
+  const { t } = useTranslation();
   if (!invoice) return null;
 
   const isPaid = invoice.payment_status === 'paid';

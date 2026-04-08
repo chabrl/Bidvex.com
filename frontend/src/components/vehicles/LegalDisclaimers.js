@@ -166,6 +166,7 @@ export const PaymentTermsDisplay = ({ deadline, penaltyRate = 2 }) => (
 
 // Binding Bid Notice
 export const BindingBidNotice = ({ compact = false }) => {
+  const { t } = useTranslation();
   if (compact) {
     return (
       <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 dark:bg-slate-800/50 rounded px-2 py-1">
@@ -346,7 +347,9 @@ export const TermsAcceptanceDialog = ({
 };
 
 // Deposit Notice
-export const DepositNotice = ({ amount, isPaid = false }) => (
+export const DepositNotice = ({ amount, isPaid = false }) => {
+  const { t } = useTranslation();
+  return (
   <Alert 
     className={isPaid 
       ? "border-green-200 bg-green-50 dark:bg-green-950/30" 
@@ -369,7 +372,8 @@ export const DepositNotice = ({ amount, isPaid = false }) => (
       )}
     </AlertDescription>
   </Alert>
-);
+  );
+};
 
 // Help Contact Card
 export const HelpContactCard = () => (

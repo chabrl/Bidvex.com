@@ -275,6 +275,7 @@ const UploadDropzone = ({ documentType, onUpload, isUploading }) => {
 // Main document manager component
 const SellerDocumentManager = ({ onVerificationComplete }) => {
   const { token } = useAuth();
+  const { t } = useTranslation();
   const [documents, setDocuments] = useState([]);
   const [requiredDocs, setRequiredDocs] = useState([]);
   const [verificationStatus, setVerificationStatus] = useState(null);
