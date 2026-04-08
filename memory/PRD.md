@@ -46,47 +46,37 @@ Full-stack bilingual (EN/FR) auction marketplace for high-value vehicles and gen
 - `UserTierGrid.js`: 3-column desktop grid for Standard tiers (Starter/Premium/VIP)
 - `PartnerLicenseCard.js`: Isolated Partner Pro card for Partner Dashboard
 - Deleted deprecated `TrendySubscriptionCards.js`
-- Verified via testing agent (iteration_111: 12/12 tests passed)
 
 ### Phase 5 — Infrastructure Hardening (Complete - April 7, 2026)
-- **$1,000 Deposit Security**: Verified `place_bid` blocks on >$10k listings without deposit in both `auctions.py` and `vehicles.py`. SecurityDepositBanner renders on ListingDetailPage and VehicleDetailPage.
-- **System Monitoring Dashboard**: New `routes/monitoring.py` with admin-only endpoints for errors, webhooks, health checks. Frontend dashboard at Admin > Analytics > System Monitoring with real-time metrics (auto-refresh 30s).
-- **Error Tracking Middleware**: 500 errors and unhandled exceptions automatically logged to `monitoring_events` MongoDB collection.
-- **Webhook Failure Tracking**: Stripe and SendGrid webhook outcomes logged to `webhook_log` collection with success/failure status.
-- **Cloudflare CDN Headers**: Enhanced cache headers with `CDN-Cache-Control` for static assets, images (including .avif), and API no-store rules.
-- **payments.py Refactored**: Split from 2,293 to 1,594 lines. Extracted `payments_fees.py` (293 lines), `payments_promotions.py` (190 lines), `payments_shared.py` (37 lines).
-- **Backend Lint Fixes**: Resolved all warnings in `webhooks.py` (missing timedelta), `partners.py` (undefined db/os, missing helpers), `subscriptions.py` (unused variables, duplicate function name).
-- Verified via testing agent (iteration_112: 19/19 backend tests passed, frontend System Monitoring confirmed rendering).
+- **$1,000 Deposit Security**: Verified `place_bid` blocks on >$10k listings without deposit
+- **System Monitoring Dashboard**: Admin endpoints for errors, webhooks, health checks
+- **Error Tracking Middleware**: 500 errors logged to `monitoring_events` collection
+- **Webhook Failure Tracking**: Stripe/SendGrid webhook outcomes logged
+- **Cloudflare CDN Headers**: Enhanced cache headers for static assets
+- **payments.py Refactored**: Split into `payments_fees.py`, `payments_promotions.py`, `payments_shared.py`
 
 ### Phase 6 — Bilingual Content & Gemini Translation Engine (Complete - April 7, 2026)
-- **Phase 1 (DB & API)**: Added `title_en`, `title_fr`, `description_en`, `description_fr` fields to `Listing`, `MultiItemListing`, and `Lot` models. Marketplace items API returns all i18n fields. Updated projections to include bilingual data.
-- **Phase 2 (Gemini Translation)**: Created `services/translation_service.py` using Gemini 2.5 Flash via Emergent LLM Key. Auto-translates title + description on listing creation (background async). Manual override endpoints: `PUT /api/listings/{id}/translations` and `PUT /api/multi-item-listings/{id}/translations`. Admin backfill endpoint: `POST /api/admin/backfill-translations`.
-- **Phase 3 (Frontend Refactor)**: Created `utils/localization.js` with `getLocalized(item, field)`, `formatLocalizedCurrency(amount, currency)`, and `getBuyerPremiumText(tier, customRate)`. Refactored `FlattenedMarketplace.js`, `ListingDetailPage.js`, `MultiItemListingDetailPage.js`, `WatchlistPage.js`, `LotsMarketplacePage.js` to use `getLocalized()` for all user-generated content.
-- **Phase 4 (i18next Mapping)**: Extended `en.json` and `fr.json` marketplace sections with 25+ new keys: privateSales, business, verifiedPartner, noTaxOnItem, noTaxOnHammer, loadMore, noItemsFound, shippingOptions, bidHistory, conditionsGenerales, buyerPremiumNote, etc.
-- **Phase 5 (Currency & Legal)**: Quebec currency format `5,00 $` enforced via `Intl.NumberFormat('fr-CA')`. Dynamic Buyer Premium % (5% free, 3.5% Premium, 3% VIP) injected into French legal text using `getBuyerPremiumText()`.
-- **Backfill**: All existing listings (3 single, 4 multi, 5 lots) auto-translated via backfill endpoint.
-- Verified via testing agent (iteration_113: 15/15 tests passed, 100% backend + frontend).
-
-### Production Push — Build Fix, Sorting, Subscription & Refactor (Complete - April 7, 2026)
-- **Railway Build Fix**: Cleaned `requirements.txt` removing Emergent-internal packages (`emergentintegrations`, `litellm`). Rewrote `translation_service.py` with dual-SDK: auto-detects `emergentintegrations` (preview) or `google-generativeai` (Railway). Added `GEMINI_API_KEY` env var.
-- **Subscription UI**: Removed "Partenaire Pro" from pricing grid. `/subscriptions` now shows 3-column layout: Starter, Premium, VIP Elite only.
-- **Code Refactor**: `auctions.py` 1,139→372 lines (extracted `auctions_bids.py` 687 lines). `vehicles.py` 2,543→1,165 lines (extracted `vehicles_admin.py` 1,510 lines). Testing agent caught and fixed auth signature bug in vehicles_admin.py.
-- Verified via testing agent (iteration_115: 18/18 backend + frontend all pass).
-
-### Hotfix — Railway Build Failure (Fixed - April 7, 2026)
-- **Root Cause**: `pip freeze` in previous session captured Emergent-internal packages (`emergentintegrations`, `litellm` with private wheel URL `customer-assets.emergentagent.com`) into `requirements.txt`. Railway's builder couldn't access the private CDN, causing "Build Image" stage crash.
-- **Fix**: 
-  1. Cleaned `requirements.txt` — removed `emergentintegrations`, `litellm` custom wheel, and all Emergent-internal transitive deps. Kept only public PyPI packages.
-  2. Rewrote `translation_service.py` with dual-SDK strategy: uses `emergentintegrations` in Emergent preview (auto-detected), falls back to `google-generativeai` (public PyPI) on Railway with `GEMINI_API_KEY`.
-  3. If neither SDK nor API key is available, translations are silently skipped (listings save normally).
-- **Railway env var needed**: Set `GEMINI_API_KEY` in Railway dashboard for production translations.
+- Automated Gemini 2.5 Flash translation engine for all new listings
+- `services/translation_service.py` with dual-SDK: Emergent LLM Key (preview) / `google-generativeai` (Railway)
+- `utils/localization.js` with `getLocalized()` helper across all frontend pages
+- Extended `en.json` and `fr.json` with 25+ marketplace i18n keys
+- Backfill endpoint for existing listings
 
 ### Phase 7 — High-Velocity Marketplace Sorting (Complete - April 7, 2026)
-- **Task 1 (Sorting Algorithm)**: Refactored `_build_marketplace_items` with `high_velocity_sort_key`: active items sorted by `auction_end_date` ascending (ending soonest first), ended items pushed to bottom, featured/promoted items break ties.
-- **Task 2 (DB & API)**: Created compound indexes `[status:1, auction_end_date:1, created_at:-1]` on both `listings` and `multi_item_listings`. Default API sort changed from `-promoted` to `ending_soon`. Added `newest` sort option.
-- **Task 3 (Urgency UI)**: Added `Flame` icon "Ending Soon" badge (`data-testid="ending-soon-badge"`) with red pulsing animation when <1 hour remaining. Timer pill turns red (`bg-red-500 animate-pulse`). Badge text is bilingual: "Ending Soon" / "Se terminant bientôt".
-- **Task 4 (Multi-Item Consistency)**: Lots inside `MultiItemListingDetailPage` now sorted by `lot_end_time` ascending with ended lots at bottom. Lot timer panel switches to red urgency styling when <1 hour.
-- Verified via testing agent (iteration_114: 15/15 passed, 2 skipped).
+- Active items sorted by `auction_end_date` ascending (ending soonest first)
+- Compound indexes `[status:1, auction_end_date:1, created_at:-1]`
+- "Ending Soon" badge with red pulsing animation when <1 hour remaining
+
+### Production Push — Build Fix, Sorting, Subscription & Refactor (Complete - April 7, 2026)
+- Railway build fix: Cleaned `requirements.txt` from Emergent-internal packages
+- Subscription UI: 3-column layout (Starter/Premium/VIP) without Partenaire Pro
+- Route modularization: `auctions_bids.py` and `vehicles_admin.py` extracted
+
+### Multi-User Sniping Test Setup (Complete - April 8, 2026)
+- Created 3 super-verified test users: starter@test.com (free), premium@test.com (premium), partner@test.com (partner)
+- All users have full verification flags, mock payment methods, zero permission barriers
+- Created 3 test listings: Tesla Model 3 (5 min), Herman Miller Chair (10 min), Breville Espresso (24h)
+- Login verified ✅ | Bid placement verified ✅ | Cross-user bidding verified ✅
 
 ---
 
@@ -98,44 +88,26 @@ Full-stack bilingual (EN/FR) auction marketplace for high-value vehicles and gen
 │   ├── main.py                     # Railway entrypoint
 │   ├── server.py                   # FastAPI setup, middleware, SPA mount
 │   ├── routes/
-│   │   ├── payments.py             # Core checkout, methods, subscriptions (1594 lines)
-│   │   ├── payments_fees.py        # Fee calculations & tax endpoints
-│   │   ├── payments_promotions.py  # Promotions & email credits
-│   │   ├── payments_shared.py      # Shared DI for payment sub-routers
-│   │   ├── monitoring.py           # System monitoring & alerting
-│   │   ├── auctions.py             # Auction CRUD & bidding
+│   │   ├── auctions.py             # Auction CRUD
+│   │   ├── auctions_bids.py        # Bid logic (extracted)
 │   │   ├── vehicles.py             # Vehicle auction flows
-│   │   ├── deposits.py             # $1k pre-auth deposit management
-│   │   ├── webhooks.py             # Stripe/SendGrid webhook handlers
+│   │   ├── vehicles_admin.py       # Vehicle admin (extracted)
+│   │   ├── payments.py             # Core checkout (1594 lines)
+│   │   ├── payments_fees.py        # Fee calculations
+│   │   ├── payments_promotions.py  # Promotions
+│   │   ├── monitoring.py           # System monitoring
 │   │   └── ...
 │   └── services/
-│       ├── translation_service.py    # Gemini 2.5 Flash EN<->FR translation
-│       ├── pricing_config.py         # Centralized pricing constants
-│       ├── fee_calculation_engine.py
-│       └── tax_engine.py
+│       ├── translation_service.py  # Gemini 2.5 Flash EN<->FR
+│       ├── pricing_config.py       # Centralized pricing
+│       └── brute_force.py          # IP-based login protection
 ├── frontend/
 │   ├── build/                      # Compiled React SPA
 │   └── src/
 │       ├── config.js               # Centralized API base URL
-│       ├── utils/
-│       │   ├── localization.js     # getLocalized(), formatLocalizedCurrency(), getBuyerPremiumText()
-│       │   └── currencyFormatter.js
-│       ├── components/
-│       │   ├── FlattenedMarketplace.js  # Localized ItemCard
-│       │   ├── UserTierGrid.js
-│       │   ├── PartnerLicenseCard.js
-│       │   └── SecurityDepositBanner.js
-│       ├── locales/
-│       │   ├── en.json             # Extended with marketplace i18n keys
-│       │   └── fr.json             # Quebec French translations
+│       ├── utils/localization.js   # getLocalized() helper
+│       ├── locales/                # en.json, fr.json
 │       └── pages/
-│           ├── admin/
-│           │   └── SystemMonitoringDashboard.js
-│           ├── ListingDetailPage.js       # Localized
-│           ├── MultiItemListingDetailPage.js  # Localized + dynamic Buyer Premium
-│           ├── WatchlistPage.js           # Localized
-│           ├── LotsMarketplacePage.js     # Localized
-│           └── AdminDashboard.js
 └── runtime.txt
 ```
 
@@ -154,12 +126,12 @@ Full-stack bilingual (EN/FR) auction marketplace for high-value vehicles and gen
 - Automated weekly Lighthouse audits
 - Server-side PageSpeed monitoring endpoint
 - i18n for EmailMarketingPricing page
-- Seller Dashboard translation editor UI (manual override interface)
+- Seller Dashboard translation editor UI
 
 ### P3 (Technical Debt)
-- Further payments.py decomposition (advanced checkout, buy now, seller earnings)
-- `server.py` decomposition into lifecycle, middleware, routing modules
-- Remove `E741` lint warnings in `dashboard.py`
+- Further payments.py decomposition
+- server.py decomposition into lifecycle, middleware, routing modules
+- Remove E741 lint warnings in dashboard.py
 
 ---
 
@@ -171,7 +143,10 @@ Full-stack bilingual (EN/FR) auction marketplace for high-value vehicles and gen
 | SendGrid | Email Marketing | SENDGRID_API_KEY |
 | Twilio | SMS/Verify | TWILIO_* |
 | Cloudflare R2 | Object Storage | AWS S3 compatible keys |
-| Gemini 2.5 Flash | Auto-Translation EN<->FR | EMERGENT_LLM_KEY (Emergent Universal Key) |
+| Gemini 2.5 Flash | Auto-Translation EN<->FR | EMERGENT_LLM_KEY / GEMINI_API_KEY |
 
 ## Test Credentials
 - Admin: `charbeladmin@bidvex.com` / `Admin123!`
+- Starter: `starter@test.com` / `TestUser2026!` (free)
+- Premium: `premium@test.com` / `TestUser2026!` (premium)
+- Partner: `partner@test.com` / `TestUser2026!` (partner)
