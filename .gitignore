@@ -81,3 +81,15 @@ agenthub/agents/youtube/db
 # Build caches
 .cache/
 
+-e 
+# Environment files
+*.env
+*.env.*
+-e 
+# Environment files
+*.env
+*.env.*
+-e 
+# Environment files
+*.env
+*.env.*

@@ -31,11 +31,26 @@ def set_push_db(db_instance):
 def _get_vapid():
     global _vapid_private_key, _vapid_claims
     if _vapid_private_key is None:
-        key_path = os.environ.get("VAPID_PRIVATE_KEY_PATH", "vapid_private.pem")
-        if os.path.isfile(key_path):
-            _vapid_private_key = key_path
+        # Priority 1: Direct key content from env var (Railway / cloud deploys)
+        key_content = os.environ.get("VAPID_PRIVATE_KEY_CONTENT", "")
+        if key_content:
+            # Handle escaped newlines from env vars
+            key_content = key_content.replace("\\n", "\n")
+            import tempfile
+            tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False)
+            tmp.write(key_content)
+            tmp.flush()
+            tmp.close()
+            _vapid_private_key = tmp.name
+            logger.info("[Push] VAPID key loaded from VAPID_PRIVATE_KEY_CONTENT env var")
         else:
-            logger.warning("[Push] VAPID private key not found")
+            # Priority 2: File path fallback (local dev)
+            key_path = os.environ.get("VAPID_PRIVATE_KEY_PATH", "vapid_private.pem")
+            if os.path.isfile(key_path):
+                _vapid_private_key = key_path
+                logger.info(f"[Push] VAPID key loaded from file: {key_path}")
+            else:
+                logger.warning("[Push] VAPID private key not found (set VAPID_PRIVATE_KEY_CONTENT or VAPID_PRIVATE_KEY_PATH)")
     if _vapid_claims is None:
         _vapid_claims = {"sub": os.environ.get("VAPID_CLAIMS_EMAIL", "mailto:push@bidvex.ca")}
     return _vapid_private_key, _vapid_claims
