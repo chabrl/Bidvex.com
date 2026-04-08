@@ -186,9 +186,16 @@ const FlattenedMarketplace = ({
     
     setPlacingBid(true);
     try {
-      const response = await axios.post(
-        `${API}/multi-item-listings/${selectedItem.auction_id}/lots/${selectedItem.lot_number}/bid`,
-        { amount: parseFloat(bidAmount) },
+      // Detect single-item vs multi-item listing
+      const isMultiItem = selectedItem.auction_id && selectedItem.lot_number != null;
+      const url = isMultiItem
+        ? `${API}/multi-item-listings/${selectedItem.auction_id}/lots/${selectedItem.lot_number}/bid`
+        : `${API}/bids`;
+      const body = isMultiItem
+        ? { amount: parseFloat(bidAmount) }
+        : { listing_id: selectedItem.id, amount: parseFloat(bidAmount) };
+
+      const response = await axios.post(url, body, 
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
