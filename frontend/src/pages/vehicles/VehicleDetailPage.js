@@ -175,6 +175,7 @@ const ImageGallery = ({ media = [] }) => {
 // Bidding Panel Component
 const BiddingPanel = ({ vehicle, onBidPlaced }) => {
   const { user, token } = useAuth();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [bidAmount, setBidAmount] = useState('');
   const [bidding, setBidding] = useState(false);
@@ -511,6 +512,7 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
 const VehicleDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [vehicle, setVehicle] = useState(null);
   const [seller, setSeller] = useState(null);
   const [loading, setLoading] = useState(true);

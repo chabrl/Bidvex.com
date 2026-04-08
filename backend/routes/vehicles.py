@@ -872,11 +872,35 @@ async def list_vehicles(
     
     # Normalize general listings to match vehicle_listings shape
     for gv in general_vehicles:
+        # Parse title to extract year/make/model
+        title = gv.get("title_en") or gv.get("title", "")
+        parts = title.split(" ", 2)
+        parsed_year = 0
+        parsed_make = ""
+        parsed_model = title
+        if len(parts) >= 3 and parts[0].isdigit() and len(parts[0]) == 4:
+            parsed_year = int(parts[0])
+            parsed_make = parts[1]
+            parsed_model = parts[2].split(" — ")[0]
+        elif len(parts) >= 2:
+            parsed_make = parts[0]
+            parsed_model = " ".join(parts[1:])
+        
         gv.setdefault("end_time", gv.get("auction_end_date"))
         gv.setdefault("current_bid", gv.get("current_price", gv.get("starting_price", 0)))
-        gv.setdefault("make", "")
-        gv.setdefault("model", "")
-        gv.setdefault("year", 0)
+        gv.setdefault("make", parsed_make)
+        gv.setdefault("model", parsed_model)
+        gv.setdefault("year", parsed_year)
+        gv.setdefault("mileage", 0)
+        gv.setdefault("body_type", "sedan")
+        gv.setdefault("transmission", "")
+        gv.setdefault("fuel_type", "")
+        gv.setdefault("exterior_color", "")
+        gv.setdefault("drivetrain", "")
+        gv.setdefault("engine", "")
+        gv.setdefault("location_province", gv.get("region", "QC"))
+        gv.setdefault("condition_status", gv.get("condition", "like_new"))
+        gv.setdefault("views_count", gv.get("views", 0))
         gv.setdefault("source", "listings")
     
     # Merge and re-sort
@@ -895,6 +919,64 @@ async def list_vehicles(
 async def get_vehicle_detail(vehicle_id: str, request: Request):
     """Get detailed vehicle listing"""
     listing = await db.vehicle_listings.find_one({"id": vehicle_id}, {"_id": 0})
+    
+    # Fallback: check general listings collection for vehicle-category items
+    if not listing:
+        listing = await db.listings.find_one(
+            {"id": vehicle_id, "category": {"$in": ["vehicles", "vehicle", "car", "auto"]}},
+            {"_id": 0}
+        )
+        if listing:
+            # Parse title to extract year/make/model (e.g. "2024 BMW M3 Competition xDrive")
+            title = listing.get("title_en") or listing.get("title", "")
+            parts = title.split(" ", 2)
+            parsed_year = 0
+            parsed_make = ""
+            parsed_model = title
+            if len(parts) >= 3 and parts[0].isdigit() and len(parts[0]) == 4:
+                parsed_year = int(parts[0])
+                parsed_make = parts[1]
+                parsed_model = parts[2].split(" — ")[0]  # Remove subtitle after dash
+            elif len(parts) >= 2:
+                parsed_make = parts[0]
+                parsed_model = " ".join(parts[1:])
+            
+            # Normalize to vehicle detail shape
+            listing.setdefault("end_time", listing.get("auction_end_date"))
+            listing.setdefault("current_bid", listing.get("current_price", listing.get("starting_price", 0)))
+            listing.setdefault("make", parsed_make)
+            listing.setdefault("model", parsed_model)
+            listing.setdefault("year", parsed_year)
+            listing.setdefault("mileage", 0)
+            listing.setdefault("vin", "")
+            listing.setdefault("body_type", "")
+            listing.setdefault("transmission", "")
+            listing.setdefault("fuel_type", "")
+            listing.setdefault("exterior_color", "")
+            listing.setdefault("interior_color", "")
+            listing.setdefault("drivetrain", "")
+            listing.setdefault("engine", "")
+            listing.setdefault("source", "listings")
+            listing.setdefault("views_count", listing.get("views", 0))
+            listing.setdefault("condition_report", {})
+            listing.setdefault("media", [])
+            listing.setdefault("recent_bids", [])
+            # Fetch bid history from bids collection
+            bids = await db.bids.find(
+                {"listing_id": vehicle_id},
+                {"_id": 0, "id": 1, "bidder_id": 1, "amount": 1, "created_at": 1, "bid_type": 1}
+            ).sort("created_at", -1).limit(20).to_list(20)
+            listing["recent_bids"] = bids
+            # Get seller info from users
+            seller = await db.users.find_one(
+                {"id": listing.get("seller_id")},
+                {"_id": 0, "id": 1, "name": 1, "account_type": 1}
+            )
+            listing["seller"] = seller
+            # Increment view count in listings collection
+            await db.listings.update_one({"id": vehicle_id}, {"$inc": {"views": 1}})
+            return listing
+    
     if not listing:
         raise HTTPException(status_code=404, detail="Vehicle not found")
     
