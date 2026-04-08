@@ -147,7 +147,8 @@ export const PricingCalculator = ({
   bidAmount: initialBidAmount, 
   province = 'ON',
   showInput = true,
-  expanded: initialExpanded = false 
+  expanded: initialExpanded = false,
+  listing = null
 }) => {
   const { user, token } = useAuth();
   const { t } = useTranslation();
@@ -157,13 +158,19 @@ export const PricingCalculator = ({
   const [loading, setLoading] = useState(false);
 
   const subscriptionTier = user?.subscription_tier || 'free';
+  
+  // Dynamic BP: use listing-specific buyers_premium_percent if set (OPC certified), else tier default
+  const listingBpPercent = listing?.buyers_premium_percent;
+  const isOpcListing = listing?.is_opc_certified === true;
 
   // Calculate breakdown locally for instant updates
   const calculateLocalBreakdown = useCallback((amount) => {
     const tier = FEE_TIERS.buyer[subscriptionTier] || FEE_TIERS.buyer.free;
     const taxConfig = TAX_RATES[province] || TAX_RATES.ON;
 
-    const buyerPremium = (amount * tier.rate) / 100;
+    // Use listing-defined BP if available, otherwise tier default
+    const bpRate = (listingBpPercent !== null && listingBpPercent !== undefined) ? listingBpPercent : tier.rate;
+    const buyerPremium = (amount * bpRate) / 100;
     const platformFee = (amount * PLATFORM_FEE_RATE) / 100;
     const subtotal = amount + buyerPremium + platformFee;
     
@@ -195,7 +202,7 @@ export const PricingCalculator = ({
     return {
       hammer_price: amount,
       buyer_premium: {
-        rate: `${tier.rate}%`,
+        rate: `${bpRate}%`,
         amount: buyerPremium
       },
       platform_fee: {
@@ -258,6 +265,11 @@ export const PricingCalculator = ({
             <Receipt className="h-5 w-5 text-blue-600" />
             Total Cost Breakdown
           </CardTitle>
+          {isOpcListing && listingBpPercent === 0 && (
+            <span className="text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full font-semibold" data-testid="opc-zero-fee-badge">
+              Vendeur Certifie OPC : 0 $ de frais d'achat
+            </span>
+          )}
           <Button 
             variant="ghost" 
             size="sm" 

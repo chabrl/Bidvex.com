@@ -97,9 +97,18 @@ const ListingDetailPage = () => {
   const fetchListing = async (retryCount = 0) => {
     try {
       const response = await axios.get(`${API}/listings/${id}`);
-      setListing(response.data);
+      const data = response.data;
       
-      const sellerResponse = await axios.get(`${API}/users/${response.data.seller_id}`);
+      // Identity Guard: redirect vehicles to the proper VehicleDetailView
+      const cat = (data.category || '').toLowerCase();
+      if (cat === 'vehicle' || cat === 'vehicles' || cat === 'car' || cat === 'auto') {
+        navigate(`/vehicle-auctions/${id}`, { replace: true });
+        return;
+      }
+      
+      setListing(data);
+      
+      const sellerResponse = await axios.get(`${API}/users/${data.seller_id}`);
       setSeller(sellerResponse.data);
     } catch (error) {
       if (retryCount < 1) {

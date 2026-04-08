@@ -16,6 +16,15 @@ import SEO from '../components/SEO';
 import SwipeableCardRow from '../components/SwipeableCardRow';
 import { useTopSellers, useHotItems, useEndingSoon, useFeatured, useNewListings, useRecentlySold } from '../hooks/useHomePageData';
 
+// Smart routing: vehicles go to /vehicle-auctions/:id, everything else to /listing/:id
+const getItemDetailPath = (item) => {
+  const cat = (item.category || '').toLowerCase();
+  if (cat === 'vehicle' || cat === 'vehicles' || cat === 'car' || cat === 'auto') {
+    return `/vehicle-auctions/${item.id}`;
+  }
+  return item.auction_id ? `/lots/${item.auction_id}` : `/listing/${item.id}`;
+};
+
 // Custom hook for scroll-triggered animations with fallback visibility
 const useScrollReveal = (threshold = 0.1) => {
   const [isVisible, setIsVisible] = useState(false);
@@ -336,7 +345,7 @@ const LiveAuctionCard = ({ item, index, isVisible, navigate }) => {
     <Card 
       className={`card-hover-pop cursor-pointer overflow-hidden border-0 shadow-lg bg-white dark:bg-slate-800/50 dark:backdrop-blur-sm transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
       style={{ transitionDelay: `${index * 100}ms` }}
-      onClick={() => navigate(`/listing/${item.id}`)}
+      onClick={() => navigate(getItemDetailPath(item))}
     >
       <div className="relative h-40 sm:h-48 overflow-hidden bg-slate-100 dark:bg-slate-700">
         {item.images?.[0] ? (
@@ -430,8 +439,7 @@ const HotItemsSection = ({ items, navigate }) => {
               key={item.id}
               className={`hover-glow-cyan cursor-pointer overflow-hidden border shadow-lg hover:shadow-xl transition-all duration-700 bg-white dark:bg-white/5 dark:backdrop-blur-md border-slate-200 dark:border-white/20 h-full ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
               style={{ transitionDelay: `${index * 150}ms` }}
-              onClick={() => navigate(`/listing/${item.id}`)}
-              data-testid="hot-item-card"
+              onClick={() => navigate(getItemDetailPath(item))}              data-testid="hot-item-card"
             >
               <div className="relative h-44 sm:h-52 overflow-hidden">
                 {item.images?.[0] ? (
@@ -520,8 +528,7 @@ const FeaturedSection = ({ items, navigate }) => {
               key={item.id}
               className={`card-hover-pop cursor-pointer overflow-hidden border-0 shadow-md dark:bg-slate-800/50 dark:backdrop-blur-sm transition-all duration-700 h-full ${isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
               style={{ transitionDelay: `${index * 50}ms` }}
-              onClick={() => navigate(`/listing/${item.id}`)}
-            >
+              onClick={() => navigate(getItemDetailPath(item))}            >
               <div className="relative aspect-square overflow-hidden bg-slate-100 dark:bg-slate-700">
                 {item.images?.[0] ? (
                   <img src={item.images[0]} alt={item.title} className="w-full h-full object-cover" />
@@ -573,8 +580,7 @@ const NewListingsSection = ({ items, navigate }) => {
               key={item.id}
               className={`card-hover-pop cursor-pointer overflow-hidden border-0 shadow-md dark:bg-slate-800/50 dark:backdrop-blur-sm transition-all duration-700 h-full ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
               style={{ transitionDelay: `${index * 80}ms` }}
-              onClick={() => navigate(`/listing/${item.id}`)}
-            >
+              onClick={() => navigate(getItemDetailPath(item))}            >
               <div className="relative aspect-square overflow-hidden bg-slate-100 dark:bg-slate-700">
                 {item.images?.[0] ? (
                   <img src={item.images[0]} alt={item.title} className="w-full h-full object-cover" />

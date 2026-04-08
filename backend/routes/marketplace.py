@@ -305,6 +305,7 @@ async def get_marketplace_items(
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
     condition: Optional[str] = None,
+    zero_fee_only: Optional[str] = None,
     sort: str = "ending_soon",
     limit: int = 20,
     skip: int = 0,
@@ -365,6 +366,8 @@ async def get_marketplace_items(
     if seller_id:
         seller_ids = [s.strip() for s in seller_id.split(",") if s.strip()]
         items = [i for i in items if i.get("seller_id") in seller_ids]
+    if zero_fee_only and zero_fee_only.lower() == 'true':
+        items = [i for i in items if i.get("is_opc_certified") and i.get("buyers_premium_percent", 99) == 0]
     if min_price is not None:
         items = [i for i in items if (i.get("current_price") or 0) >= min_price]
     if max_price is not None:

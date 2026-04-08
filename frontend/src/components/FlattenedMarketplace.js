@@ -76,7 +76,8 @@ const FlattenedMarketplace = ({
     max_price: '',
     condition: '',
     sort: 'ending_soon',
-    private_sales_only: false // New filter for tax savings
+    private_sales_only: false,
+    zero_fee_only: false
   });
   
   // Quick Bid Modal State
@@ -109,6 +110,7 @@ const FlattenedMarketplace = ({
     ...(externalFilters.cities?.length ? { cities: externalFilters.cities.join(',') } : {}),
     ...(externalFilters.auctioneers?.length ? { seller_id: externalFilters.auctioneers.join(',') } : {}),
     ...(externalFilters.search ? { search: externalFilters.search } : {}),
+    ...(filters.zero_fee_only ? { zero_fee_only: 'true' } : {}),
   };
 
   // Debounce filter changes by 300ms
@@ -274,6 +276,17 @@ const FlattenedMarketplace = ({
             >
               <User className="h-3.5 w-3.5" />
               {filters.private_sales_only ? t('marketplace.privateSales') : t('marketplace.privateSales')}
+            </Button>
+
+            {/* 0% Buyer Fee Toggle */}
+            <Button
+              variant={filters.zero_fee_only ? 'default' : 'outline'}
+              onClick={() => handleFilterChange('zero_fee_only', !filters.zero_fee_only)}
+              className={`gap-1.5 flex-shrink-0 text-xs h-9 ${filters.zero_fee_only ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white' : ''}`}
+              size="sm"
+              data-testid="zero-fee-toggle"
+            >
+              0% Buyer Fee
             </Button>
 
             {/* Search */}
@@ -593,8 +606,15 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
   };
 
   const isPrivateSale = !item.seller_is_business;
-  // Smart routing: standalone listings go to /listing/:id, multi-lot items go to /lots/:auctionId
-  const detailLink = item.auction_id ? `/lots/${item.auction_id}` : `/listing/${item.id}`;
+  // Smart routing: vehicles -> /vehicle-auctions/:id, lots -> /lots/:id, default -> /listing/:id
+  const getDetailLink = (item) => {
+    const cat = (item.category || '').toLowerCase();
+    if (cat === 'vehicle' || cat === 'vehicles' || cat === 'car' || cat === 'auto') {
+      return `/vehicle-auctions/${item.id}`;
+    }
+    return item.auction_id ? `/lots/${item.auction_id}` : `/listing/${item.id}`;
+  };
+  const detailLink = getDetailLink(item);
 
   return (
     <Card className="group hover:shadow-xl transition-all duration-300 overflow-hidden border-0 shadow-md flex flex-col" data-testid="marketplace-item-card">

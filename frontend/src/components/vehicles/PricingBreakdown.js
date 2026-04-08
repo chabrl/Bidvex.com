@@ -49,7 +49,7 @@ const TierBadge = ({ tier }) => {
 };
 
 // Pricing breakdown component for before bidding
-export const PricingEstimate = ({ vehicleId, bidAmount, province }) => {
+export const PricingEstimate = ({ vehicleId, bidAmount, province, listing = null }) => {
   const { token } = useAuth();
   const { t } = useTranslation();
   const [breakdown, setBreakdown] = useState(null);
@@ -180,6 +180,18 @@ export const PricingEstimate = ({ vehicleId, bidAmount, province }) => {
               <span className="text-green-600 font-medium">
                 -{formatPrice(breakdown.subscription_discount)}
               </span>
+            </div>
+          )}
+
+          {/* Payment Method Disclaimer */}
+          {listing?.payment_method && listing.payment_method !== 'stripe' && (
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 rounded p-3 text-sm" data-testid="payment-method-disclaimer">
+              <p className="font-medium text-amber-800 dark:text-amber-200">
+                Seller accepts: {listing.payment_method === 'cash' ? 'Cash' : 'E-Transfer (Interac)'}
+              </p>
+              <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                BidVex facilitates the contract; payment is settled directly between buyer and seller.
+              </p>
             </div>
           )}
         </div>

@@ -996,6 +996,7 @@ const VehicleDetailPage = () => {
                   province={vehicle.location_province}
                   showInput={true}
                   expanded={true}
+                  listing={vehicle}
                 />
                 
                 {/* Fee Transparency */}

@@ -175,11 +175,25 @@ const SellerDashboard = () => {
             <BarChart3 className="h-4 w-4 inline mr-2" />
             {t('dashboard.seller.analytics', 'Analytics')}
           </button>
+          <button
+            onClick={() => setActiveTab('ratings')}
+            className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 -mb-px ${
+              activeTab === 'ratings'
+                ? 'border-[#06B6D4] text-[#06B6D4]'
+                : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+            }`}
+            data-testid="ratings-tab"
+          >
+            <TrendingUp className="h-4 w-4 inline mr-2" />
+            Ratings & Reviews
+          </button>
         </div>
 
         {/* Tab Content */}
         {activeTab === 'analytics' ? (
           <SellerAnalyticsDashboard />
+        ) : activeTab === 'ratings' ? (
+          <SellerRatingsPanel userId={user?.id} token={token} />
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
@@ -634,3 +648,105 @@ const NetPayoutCard = ({ totalSales = 0, subscriptionTier = 'free', taxVerified 
 };
 
 export default SellerDashboard;
+
+// ========== Seller Ratings Panel ==========
+const SellerRatingsPanel = ({ userId, token }) => {
+  const [ratings, setRatings] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!userId) return;
+    const fetchRatings = async () => {
+      try {
+        const res = await axios.get(`${API}/users/${userId}/ratings`);
+        setRatings(res.data);
+      } catch (err) {
+        console.error('Failed to load ratings', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRatings();
+  }, [userId]);
+
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-slate-400" /></div>;
+
+  if (!ratings || ratings.total_ratings === 0) {
+    return (
+      <Card data-testid="ratings-empty">
+        <CardContent className="py-12 text-center">
+          <TrendingUp className="h-10 w-10 mx-auto text-slate-300 mb-3" />
+          <p className="text-slate-500">No ratings yet. Complete transactions to build your reputation.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const stars = [5, 4, 3, 2, 1];
+
+  return (
+    <div className="space-y-6" data-testid="ratings-panel">
+      {/* Summary Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Seller Performance</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-6">
+            <div className="text-center">
+              <p className="text-4xl font-bold text-amber-500">{ratings.average_rating}</p>
+              <div className="flex gap-0.5 mt-1">
+                {[1,2,3,4,5].map(s => (
+                  <span key={s} className={`text-lg ${s <= Math.round(ratings.average_rating) ? 'text-amber-400' : 'text-slate-200'}`}>&#9733;</span>
+                ))}
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">{ratings.total_ratings} reviews</p>
+            </div>
+            <div className="flex-1 space-y-1.5">
+              {stars.map(star => {
+                const count = ratings.ratings_breakdown?.[String(star)] || 0;
+                const pct = ratings.total_ratings > 0 ? (count / ratings.total_ratings) * 100 : 0;
+                return (
+                  <div key={star} className="flex items-center gap-2 text-sm">
+                    <span className="w-8 text-right text-muted-foreground">{star}&#9733;</span>
+                    <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-amber-400 rounded-full" style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="w-8 text-xs text-muted-foreground">{count}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Individual Reviews */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Recent Reviews</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {(ratings.recent_ratings || []).map((review, idx) => (
+            <div key={idx} className="border-b border-slate-100 pb-4 last:border-0">
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex gap-0.5">
+                  {[1,2,3,4,5].map(s => (
+                    <span key={s} className={`text-sm ${s <= review.rating ? 'text-amber-400' : 'text-slate-200'}`}>&#9733;</span>
+                  ))}
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {review.timestamp ? new Date(review.timestamp).toLocaleDateString() : ''}
+                </span>
+              </div>
+              {review.comment && <p className="text-sm text-slate-600">{review.comment}</p>}
+              <p className="text-xs text-muted-foreground mt-1">
+                Auction: {review.auction_id?.slice(0, 8)}... ({review.auction_type})
+              </p>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};

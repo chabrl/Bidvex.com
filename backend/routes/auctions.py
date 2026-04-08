@@ -160,6 +160,33 @@ async def process_ended_auctions():
                         "read": False,
                         "created_at": now_str
                     })
+
+                    # Offline Payment Invoice: if seller chose Cash/E-Transfer, create admin invoice
+                    payment_method = listing.get("payment_method", "stripe")
+                    if payment_method in ("cash", "e-transfer"):
+                        bp_rate = listing.get("buyers_premium_percent", 15) / 100
+                        sale_price = listing.get("current_price", 0)
+                        platform_fee = sale_price * 0.025  # 2.5% platform fee
+                        bp_amount = sale_price * bp_rate
+                        tax_rate = 0.13  # HST default
+                        taxes = (platform_fee + bp_amount) * tax_rate
+                        total_invoice = platform_fee + bp_amount + taxes
+                        
+                        await db.seller_invoices.insert_one({
+                            "id": str(_uuid.uuid4()),
+                            "seller_id": seller_id,
+                            "listing_id": listing_id,
+                            "listing_title": listing.get("title", ""),
+                            "sale_price": sale_price,
+                            "payment_method": payment_method,
+                            "platform_fee": round(platform_fee, 2),
+                            "buyers_premium": round(bp_amount, 2),
+                            "taxes": round(taxes, 2),
+                            "total_due": round(total_invoice, 2),
+                            "status": "pending",
+                            "created_at": now_str
+                        })
+                        logger.info(f"Offline sale invoice created: seller={seller_id}, total=${total_invoice:.2f}")
                     
                     # Send SMS notifications
                     try:

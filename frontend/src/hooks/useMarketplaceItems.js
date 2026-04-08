@@ -16,6 +16,7 @@ const fetchMarketplaceItems = async ({ pageParam, filters, limit }) => {
   if (filters.min_price) params.append('min_price', filters.min_price);
   if (filters.max_price) params.append('max_price', filters.max_price);
   if (filters.condition) params.append('condition', filters.condition);
+  if (filters.zero_fee_only === 'true' || filters.zero_fee_only === true) params.append('zero_fee_only', 'true');
   params.append('sort', filters.sort || 'ending_soon');
   params.append('limit', String(limit));
   params.append('track_impression', 'true');
