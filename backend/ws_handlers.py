@@ -16,8 +16,34 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def register_ws_handlers(app, db, manager, message_manager):
+def register_ws_handlers(app, db, manager, message_manager, marketplace_ws=None):
     """Register all WebSocket endpoint handlers on the FastAPI app instance."""
+
+    @app.websocket("/api/ws/marketplace")
+    async def websocket_marketplace(websocket: WebSocket):
+        """Global marketplace feed — broadcasts bid/time updates for all listings."""
+        if not marketplace_ws:
+            await websocket.close(code=4000, reason="Marketplace WS not initialized")
+            return
+        await marketplace_ws.connect(websocket)
+        try:
+            while True:
+                try:
+                    msg = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
+                    data = json.loads(msg) if msg else {}
+                    if data.get('type') == 'PING':
+                        await websocket.send_json({'type': 'PONG', 'timestamp': datetime.now(timezone.utc).isoformat()})
+                except asyncio.TimeoutError:
+                    try:
+                        await websocket.send_json({'type': 'HEARTBEAT', 'timestamp': datetime.now(timezone.utc).isoformat()})
+                    except Exception:
+                        break
+        except WebSocketDisconnect:
+            pass
+        except Exception as e:
+            logger.error(f"Marketplace WS error: {e}")
+        finally:
+            marketplace_ws.disconnect(websocket)
 
     @app.websocket("/api/ws/listings/{listing_id}")
     async def websocket_endpoint(

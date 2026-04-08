@@ -675,9 +675,12 @@ const CreateMultiItemListing = () => {
             className="w-full px-3 py-2 border border-input rounded-md bg-background"
           >
             <option value="">{t('createListing.selectCategory')}</option>
-            {categories.map(cat => (
-              <option key={cat.id} value={cat.name_en}>{cat.name_en}</option>
-            ))}
+            {categories.map(cat => {
+              const isVehicleCat = cat.name_en?.toLowerCase() === 'vehicle' || cat.name_en?.toLowerCase() === 'vehicles';
+              const isPartnerOrAdmin = user?.role === 'partner' || user?.role === 'admin';
+              if (isVehicleCat && !isPartnerOrAdmin) return null;
+              return <option key={cat.id} value={cat.name_en}>{cat.name_en}</option>;
+            })}
           </select>
         </div>
         <div className="space-y-2">

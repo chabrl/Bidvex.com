@@ -21,15 +21,17 @@ bids_router = APIRouter(tags=["Bids"])
 # Shared state — injected from auctions.py
 _db = None
 _ws_manager = None
+_marketplace_ws = None
 _sms_service_getter = None
 
 
-def _init_bids(db, ws_manager, sms_getter):
+def _init_bids(db, ws_manager, sms_getter, marketplace_ws=None):
     """Initialize shared state from parent module."""
-    global _db, _ws_manager, _sms_service_getter
+    global _db, _ws_manager, _sms_service_getter, _marketplace_ws
     _db = db
     _ws_manager = ws_manager
     _sms_service_getter = sms_getter
+    _marketplace_ws = marketplace_ws
 
 
 def get_db():
@@ -181,6 +183,21 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
             },
             broadcast_data
         )
+
+    # Broadcast to global marketplace for real-time card updates
+    if _marketplace_ws:
+        mp_msg = {
+            'type': 'LISTING_UPDATE',
+            'listing_id': bid_data.listing_id,
+            'current_price': bid_data.amount,
+            'bid_count': (listing.get('bid_count', 0) or 0) + 1,
+            'currency': listing.get('currency', 'CAD'),
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+        }
+        if extension_applied and new_auction_end:
+            mp_msg['time_extended'] = True
+            mp_msg['new_auction_end'] = new_auction_end.isoformat()
+        await _marketplace_ws.broadcast(mp_msg)
 
     # ========== OUTBID NOTIFICATION ==========
     previous_highest_bidder = listing.get("highest_bidder_id")
@@ -669,6 +686,15 @@ async def bid_on_lot(listing_id: str, lot_number: int, data: Dict[str, Any], cur
             'reason': 'anti_sniping',
             'timestamp': now.isoformat()
         })
+        # Also broadcast to marketplace for real-time card timer sync
+        if _marketplace_ws:
+            await _marketplace_ws.broadcast({
+                'type': 'LISTING_UPDATE',
+                'listing_id': listing_id,
+                'time_extended': True,
+                'new_auction_end': new_end_time.isoformat(),
+                'timestamp': now.isoformat(),
+            })
 
     bid = {
         "id": str(uuid_mod.uuid4()),

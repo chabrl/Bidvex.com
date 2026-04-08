@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { Badge } from './ui/badge';
 import { Card, CardContent } from './ui/card';
@@ -41,6 +42,7 @@ import { useCategories } from '../hooks/useCategories';
 import { useMarketplaceItems } from '../hooks/useMarketplaceItems';
 import { SellerRatingInline } from './SellerReputation';
 import { useInsightsTracker } from '../hooks/useInsightsTracker';
+import useMarketplaceSync from '../hooks/useMarketplaceSync';
 
 const API = API_BASE;
 
@@ -67,6 +69,31 @@ const FlattenedMarketplace = ({
   const { user, token } = useAuth();
   const navigate = useNavigate();
   const { trackView: insightView, trackClick: insightClick, trackSearch: insightSearch } = useInsightsTracker();
+  const queryClient = useQueryClient();
+
+  // Real-time marketplace sync — update cached cards on bid/extension events
+  const handleMarketplaceUpdate = useCallback((msg) => {
+    const { listing_id, current_price, bid_count, new_auction_end } = msg;
+    queryClient.setQueriesData({ queryKey: ['marketplace-items'] }, (old) => {
+      if (!old?.pages) return old;
+      return {
+        ...old,
+        pages: old.pages.map(page => ({
+          ...page,
+          items: (page.items || []).map(item => {
+            if (item.id !== listing_id) return item;
+            const updated = { ...item };
+            if (current_price != null) updated.current_price = current_price;
+            if (bid_count != null) updated.bid_count = bid_count;
+            if (new_auction_end) updated.auction_end_date = new_auction_end;
+            return updated;
+          })
+        }))
+      };
+    });
+  }, [queryClient]);
+
+  useMarketplaceSync(handleMarketplaceUpdate);
   
   // Filters
   const [filters, setFilters] = useState({

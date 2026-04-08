@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="6" skipped="0" tests="25" time="6.460" timestamp="2026-04-08T05:41:37.239553+00:00" hostname="agent-env-c75ae3b4-0836-48ac-857c-c6a46c32e016"><testcase classname="backend.tests.test_phase3_integration_119.TestAPIHealth" name="test_api_health" time="0.154" /><testcase classname="backend.tests.test_phase3_integration_119.TestAuthentication" name="test_admin_login" time="0.446" /><testcase classname="backend.tests.test_phase3_integration_119.TestAuthentication" name="test_starter_login" time="0.395" /><testcase classname="backend.tests.test_phase3_integration_119.TestAuthentication" name="test_partner_login" time="0.404" /><testcase classname="backend.tests.test_phase3_integration_119.TestVehicleIdentityRouting" name="test_vehicle_listing_has_vehicle_category" time="0.235" /><testcase classname="backend.tests.test_phase3_integration_119.TestVehicleIdentityRouting" name="test_vehicle_detail_endpoint" time="0.270" /><testcase classname="backend.tests.test_phase3_integration_119.TestVehicleIdentityRouting" name="test_listing_detail_returns_category" time="0.179" /><testcase classname="backend.tests.test_phase3_integration_119.TestMarketplaceWebSocket" name="test_marketplace_ws_connection" time="0.186" /><testcase classname="backend.tests.test_phase3_integration_119.TestAcceptTermsEndpoint" name="test_accept_terms_endpoint_exists" time="0.655" /><testcase classname="backend.tests.test_phase3_integration_119.TestSellerRatingsAPI" name="test_user_ratings_endpoint" time="0.128"><failure message="AttributeError: 'list' object has no attribute 'get'">backend/tests/test_phase3_integration_119.py:246: in test_user_ratings_endpoint
+    listings = response.json().get("listings", [])
+               ^^^^^^^^^^^^^^^^^^^
+E   AttributeError: 'list' object has no attribute 'get'</failure></testcase><testcase classname="backend.tests.test_phase3_integration_119.TestMarketplaceFilters" name="test_marketplace_items_endpoint" time="0.093" /><testcase classname="backend.tests.test_phase3_integration_119.TestMarketplaceFilters" name="test_marketplace_filter_counts" time="0.112" /><testcase classname="backend.tests.test_phase3_integration_119.TestMarketplaceFilters" name="test_marketplace_category_filter" time="0.110" /><testcase classname="backend.tests.test_phase3_integration_119.TestMarketplaceFilters" name="test_marketplace_region_filter" time="0.109" /><testcase classname="backend.tests.test_phase3_integration_119.TestMarketplaceFilters" name="test_zero_fee_filter" time="0.098" /><testcase classname="backend.tests.test_phase3_integration_119.TestCategoryGuard" name="test_starter_cannot_list_vehicles" time="0.521" /><testcase classname="backend.tests.test_phase3_integration_119.TestCategoryGuard" name="test_starter_cannot_create_vehicle_multi_item" time="0.526" /><testcase classname="backend.tests.test_phase3_integration_119.TestOPCBadgeAndPricing" name="test_listing_has_opc_fields" time="0.132"><failure message="AttributeError: 'list' object has no attribute 'get'">backend/tests/test_phase3_integration_119.py:408: in test_listing_has_opc_fields
+    listings = response.json().get("listings", [])
+               ^^^^^^^^^^^^^^^^^^^
+E   AttributeError: 'list' object has no attribute 'get'</failure></testcase><testcase classname="backend.tests.test_phase3_integration_119.TestOPCBadgeAndPricing" name="test_vehicle_has_pricing_fields" time="0.280" /><testcase classname="backend.tests.test_phase3_integration_119.TestPaymentOrchestration" name="test_listing_accepts_payment_method" time="0.158"><failure message="AttributeError: 'list' object has no attribute 'get'">backend/tests/test_phase3_integration_119.py:441: in test_listing_accepts_payment_method
+    listings = response.json().get("listings", [])
+               ^^^^^^^^^^^^^^^^^^^
+E   AttributeError: 'list' object has no attribute 'get'</failure></testcase><testcase classname="backend.tests.test_phase3_integration_119.TestPaymentOrchestration" name="test_seller_invoices_collection_exists" time="0.583" /><testcase classname="backend.tests.test_phase3_integration_119.TestLotsPage" name="test_multi_item_listings_endpoint" time="0.143" /><testcase classname="backend.tests.test_phase3_integration_119.TestEndingSoonItems" name="test_ending_soon_endpoint" time="0.099"><failure message="requests.exceptions.JSONDecodeError: Expecting value: line 1 column 1 (char 0)">/root/.venv/lib/python3.11/site-packages/requests/models.py:978: in json
+    return complexjson.loads(self.text, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/json/__init__.py:346: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/json/decoder.py:337: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/json/decoder.py:355: in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+E   json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+backend/tests/test_phase3_integration_119.py:503: in test_ending_soon_endpoint
+    data = response.json()
+           ^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/models.py:982: in json
+    raise RequestsJSONDecodeError(e.msg, e.doc, e.pos)
+E   requests.exceptions.JSONDecodeError: Expecting value: line 1 column 1 (char 0)</failure></testcase><testcase classname="backend.tests.test_phase3_integration_119.TestHomepageData" name="test_hot_items_endpoint" time="0.130"><failure message="requests.exceptions.JSONDecodeError: Expecting value: line 1 column 1 (char 0)">/root/.venv/lib/python3.11/site-packages/requests/models.py:978: in json
+    return complexjson.loads(self.text, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/json/__init__.py:346: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/json/decoder.py:337: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/json/decoder.py:355: in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+E   json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+backend/tests/test_phase3_integration_119.py:523: in test_hot_items_endpoint
+    data = response.json()
+           ^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/models.py:982: in json
+    raise RequestsJSONDecodeError(e.msg, e.doc, e.pos)
+E   requests.exceptions.JSONDecodeError: Expecting value: line 1 column 1 (char 0)</failure></testcase><testcase classname="backend.tests.test_phase3_integration_119.TestHomepageData" name="test_featured_endpoint" time="0.118"><failure message="requests.exceptions.JSONDecodeError: Expecting value: line 1 column 1 (char 0)">/root/.venv/lib/python3.11/site-packages/requests/models.py:978: in json
+    return complexjson.loads(self.text, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/json/__init__.py:346: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/json/decoder.py:337: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/json/decoder.py:355: in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+E   json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+backend/tests/test_phase3_integration_119.py:531: in test_featured_endpoint
+    data = response.json()
+           ^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/models.py:982: in json
+    raise RequestsJSONDecodeError(e.msg, e.doc, e.pos)
+E   requests.exceptions.JSONDecodeError: Expecting value: line 1 column 1 (char 0)</failure></testcase></testsuite></testsuites>

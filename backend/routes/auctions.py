@@ -22,13 +22,14 @@ from routes.auctions_bids import bids_router, _init_bids  # noqa: E402, F401
 _db = None
 _notification_manager = None
 _ws_manager = None
+_marketplace_ws = None
 _sms_service_getter = None
 
 
 def set_db(db_instance):
     global _db
     _db = db_instance
-    _init_bids(db_instance, _ws_manager, _sms_service_getter)
+    _init_bids(db_instance, _ws_manager, _sms_service_getter, _marketplace_ws)
 
 
 def set_notification_manager(manager):
@@ -39,13 +40,19 @@ def set_notification_manager(manager):
 def set_ws_manager(manager):
     global _ws_manager
     _ws_manager = manager
-    _init_bids(_db, manager, _sms_service_getter)
+    _init_bids(_db, manager, _sms_service_getter, _marketplace_ws)
+
+
+def set_marketplace_ws(mws):
+    global _marketplace_ws
+    _marketplace_ws = mws
+    _init_bids(_db, _ws_manager, _sms_service_getter, mws)
 
 
 def set_sms_service_getter(getter_fn):
     global _sms_service_getter
     _sms_service_getter = getter_fn
-    _init_bids(_db, _ws_manager, getter_fn)
+    _init_bids(_db, _ws_manager, getter_fn, _marketplace_ws)
 
 
 def get_db():

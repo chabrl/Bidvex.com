@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSiteConfig } from '../contexts/SiteConfigContext';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -15,6 +16,7 @@ import { formatCurrency, formatListingPrice } from '../utils/currencyFormatter';
 import SEO from '../components/SEO';
 import SwipeableCardRow from '../components/SwipeableCardRow';
 import { useTopSellers, useHotItems, useEndingSoon, useFeatured, useNewListings, useRecentlySold } from '../hooks/useHomePageData';
+import useMarketplaceSync from '../hooks/useMarketplaceSync';
 
 // Smart routing: vehicles go to /vehicle-auctions/:id, everything else to /listing/:id
 const getItemDetailPath = (item) => {
@@ -75,6 +77,7 @@ const HomePage = () => {
   const { user } = useAuth();
   const { isSectionVisible } = useSiteConfig();
   const [heroLoaded, setHeroLoaded] = useState(false);
+  const queryClient = useQueryClient();
 
   // React Query hooks replace manual useState + useEffect fetching
   const { data: topSellers = [] } = useTopSellers(8);
@@ -83,6 +86,28 @@ const HomePage = () => {
   const { data: featured = [] } = useFeatured(12);
   const { data: newListings = [] } = useNewListings(12);
   const { data: recentlySold = [] } = useRecentlySold(12);
+
+  // Real-time marketplace sync — update cached cards on bid/extension events
+  const handleMarketplaceUpdate = useCallback((msg) => {
+    const { listing_id, current_price, bid_count, new_auction_end } = msg;
+    const patchItem = (old) => {
+      if (!Array.isArray(old)) return old;
+      return old.map(item => {
+        if (item.id !== listing_id) return item;
+        const updated = { ...item };
+        if (current_price != null) updated.current_price = current_price;
+        if (bid_count != null) updated.bid_count = bid_count;
+        if (new_auction_end) updated.auction_end_date = new_auction_end;
+        return updated;
+      });
+    };
+    // Patch all homepage query caches
+    for (const key of ['ending-soon', 'hot-items', 'featured', 'new-listings']) {
+      queryClient.setQueriesData({ queryKey: [key] }, patchItem);
+    }
+  }, [queryClient]);
+
+  useMarketplaceSync(handleMarketplaceUpdate);
 
   useEffect(() => {
     // Trigger hero animation after mount

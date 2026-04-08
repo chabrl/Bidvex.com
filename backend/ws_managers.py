@@ -109,7 +109,7 @@ class ConnectionManager:
                         }
                         await websocket.send_json(message)
                         sent_count += 1
-                    except Exception as e:
+                    except Exception:
                         error_count += 1
         logger.info(f"Bid broadcast complete: sent={sent_count}, errors={error_count}")
 
@@ -223,3 +223,33 @@ class MessageConnectionManager:
         if conversation_id not in self.conversation_rooms:
             return []
         return list(self.conversation_rooms[conversation_id].keys())
+
+
+class MarketplaceConnectionManager:
+    """Manages global marketplace WebSocket connections for real-time card updates."""
+
+    def __init__(self):
+        self.connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        try:
+            self.connections.remove(websocket)
+        except ValueError:
+            pass
+
+    async def broadcast(self, message: dict):
+        disconnected = []
+        for conn in self.connections:
+            try:
+                await conn.send_json(message)
+            except Exception:
+                disconnected.append(conn)
+        for conn in disconnected:
+            try:
+                self.connections.remove(conn)
+            except ValueError:
+                pass

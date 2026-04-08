@@ -189,10 +189,11 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # ─── WebSocket Managers ───
-from ws_managers import ConnectionManager, MessageConnectionManager
+from ws_managers import ConnectionManager, MessageConnectionManager, MarketplaceConnectionManager
 
 manager = ConnectionManager()
 message_manager = MessageConnectionManager()
+marketplace_ws = MarketplaceConnectionManager()
 
 # ─── Auth (shared by router injection) ───
 from deps import set_db as set_deps_db, get_current_user
@@ -246,7 +247,7 @@ async def get_cache_statistics():
 try:
     # Core routers (with dependency injection)
     from routes.analytics import analytics_router, set_db as set_analytics_db
-    from routes.auctions import auctions_router, bids_router, set_db as set_auctions_db, set_notification_manager, set_ws_manager, set_sms_service_getter
+    from routes.auctions import auctions_router, bids_router, set_db as set_auctions_db, set_notification_manager, set_ws_manager, set_sms_service_getter, set_marketplace_ws
     from routes.sms_verification import sms_router, set_db as set_sms_db
     from routes.users import users_router, set_users_db, set_users_auth
     from routes.marketing import marketing_router, set_marketing_db, set_marketing_auth, set_marketing_services
@@ -293,6 +294,7 @@ try:
     set_admin_email_service(get_email_service())
     set_notification_manager(message_manager)
     set_ws_manager(manager)
+    set_marketplace_ws(marketplace_ws)
     try:
         from services.sms_notifications import get_sms_notification_service
         set_sms_service_getter(get_sms_notification_service)
@@ -382,7 +384,7 @@ except ImportError:
 # ─── WebSocket Handlers ───
 try:
     from ws_handlers import register_ws_handlers
-    register_ws_handlers(app, db, manager, message_manager)
+    register_ws_handlers(app, db, manager, message_manager, marketplace_ws)
     logger.info("WebSocket handlers registered successfully")
 except Exception as e:
     logger.warning(f"WebSocket handlers unavailable at startup: {e}")
