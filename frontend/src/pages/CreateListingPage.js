@@ -45,6 +45,10 @@ const CreateListingPage = () => {
 
   // Buyer's Premium — default to org setting
   const [buyersPremiumPercent, setBuyersPremiumPercent] = useState('');
+  const isOpcCertified = user?.is_opc_certified === true;
+
+  // Seller Payment Method
+  const [paymentMethod, setPaymentMethod] = useState('stripe');
 
   // Shipping & Visit Options
   const [shippingInfo, setShippingInfo] = useState({
@@ -130,6 +134,7 @@ const CreateListingPage = () => {
         visit_availability: visitAvailability.offered ? visitAvailability : null,
         // Convert percent → rate (e.g. 15 → 0.15), null if blank (org default applies server-side)
         buyers_premium_rate: buyersPremiumPercent !== '' ? parseFloat(buyersPremiumPercent) / 100 : null,
+        payment_method: paymentMethod,
         // Mandatory Binding Agreement
         agreement_accepted: finalAgreementAccepted,
       };
@@ -240,11 +245,17 @@ const CreateListingPage = () => {
                     data-testid="category-select"
                   >
                     <option value="">{t('createListing.selectCategory', 'Select category')}</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.name_en}>
-                        {cat.name_en}
-                      </option>
-                    ))}
+                    {categories.map((cat) => {
+                      // Block standard users from selecting vehicle categories
+                      const isVehicleCat = cat.name_en?.toLowerCase() === 'vehicle' || cat.name_en?.toLowerCase() === 'vehicles';
+                      const isPartnerOrAdmin = user?.role === 'partner' || user?.role === 'admin';
+                      if (isVehicleCat && !isPartnerOrAdmin) return null;
+                      return (
+                        <option key={cat.id} value={cat.name_en}>
+                          {cat.name_en}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 
@@ -305,20 +316,66 @@ const CreateListingPage = () => {
 
               <div className="space-y-2">
                 <Label htmlFor="buyers_premium_percent">{t('createListing.buyersPremium', "Buyer's Premium (%)")}</Label>
-                <Input
-                  id="buyers_premium_percent"
-                  type="number"
-                  step="0.5"
-                  min="0"
-                  max="50"
-                  placeholder={user?.custom_premium_rate != null ? `Org default: ${(user.custom_premium_rate * 100).toFixed(1)}%` : t('createListing.buyersPremiumPlaceholder', 'e.g. 15')}
-                  value={buyersPremiumPercent}
-                  onChange={(e) => setBuyersPremiumPercent(e.target.value)}
-                  data-testid="buyers-premium-input"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {t('createListing.buyersPremiumHint', 'Percentage charged on top of the winning bid. Leave blank to use your organization default.')}
-                </p>
+                {isOpcCertified ? (
+                  <>
+                    <Input
+                      id="buyers_premium_percent"
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      max="25"
+                      placeholder="0"
+                      value={buyersPremiumPercent}
+                      onChange={(e) => setBuyersPremiumPercent(e.target.value)}
+                      data-testid="buyers-premium-input"
+                    />
+                    {(!buyersPremiumPercent || buyersPremiumPercent === '0') && (
+                      <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-md">
+                        <span className="text-emerald-700 text-sm font-medium" data-testid="opc-badge">
+                          Vendeur Certifie OPC : 0 $ de frais d'achat
+                        </span>
+                      </div>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      OPC-Certified: You may set Buyer's Premium from 0% to 25%.
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground bg-slate-50 px-3 py-2 rounded" data-testid="bp-locked-notice">
+                    Buyer's Premium is set by your organization. Contact support to become OPC-certified.
+                  </p>
+                )}
+              </div>
+
+              {/* Payment Method Selection */}
+              <div className="space-y-3" data-testid="payment-method-section">
+                <Label>Payment Method</Label>
+                <div className="grid grid-cols-1 gap-2">
+                  <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${paymentMethod === 'stripe' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                    <input type="radio" name="payment_method" value="stripe" checked={paymentMethod === 'stripe'} onChange={(e) => setPaymentMethod(e.target.value)} className="text-blue-600" data-testid="payment-stripe" />
+                    <div>
+                      <span className="font-medium text-sm">Stripe (BidVex)</span>
+                      <span className="ml-2 text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">Recommended</span>
+                      <p className="text-xs text-muted-foreground mt-0.5">More secure and automated for both parties.</p>
+                    </div>
+                  </label>
+                  <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${paymentMethod === 'cash' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                    <input type="radio" name="payment_method" value="cash" checked={paymentMethod === 'cash'} onChange={(e) => setPaymentMethod(e.target.value)} data-testid="payment-cash" />
+                    <span className="font-medium text-sm">Cash</span>
+                  </label>
+                  <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${paymentMethod === 'e-transfer' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                    <input type="radio" name="payment_method" value="e-transfer" checked={paymentMethod === 'e-transfer'} onChange={(e) => setPaymentMethod(e.target.value)} data-testid="payment-etransfer" />
+                    <span className="font-medium text-sm">E-Transfer (Interac)</span>
+                  </label>
+                </div>
+                {(paymentMethod === 'cash' || paymentMethod === 'e-transfer') && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-md" data-testid="payment-legal-notice">
+                    <p className="text-sm text-amber-800 font-medium">Legal Disclosure</p>
+                    <p className="text-xs text-amber-700 mt-1">
+                      BidVex will invoice the seller for the Platform Fee + Buyer's Premium + Applicable Taxes upon sale.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <LocationSelector

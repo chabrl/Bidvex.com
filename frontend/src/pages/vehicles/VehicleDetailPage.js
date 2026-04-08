@@ -191,7 +191,7 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
     timeRemaining, 
     reserveMet, 
     connected 
-  } = useVehicleBidding(vehicle?.id, !!vehicle);
+  } = useVehicleBidding(vehicle?.id, !!vehicle, vehicle);
   
   // Use real-time data or fallback to vehicle data
   const displayBid = currentBid || vehicle?.current_bid || vehicle?.starting_price || 0;

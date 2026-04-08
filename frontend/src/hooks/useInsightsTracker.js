@@ -62,5 +62,13 @@ export const useInsightsTracker = () => {
     track('search', { searchQuery: query });
   }, [track]);
 
-  return { track, trackView, trackClick, trackBid, trackSearch };
+  const trackPaymentPreference = useCallback((paymentMethod, listingId) => {
+    track('payment_preference', { listingId, metadata: { payment_method: paymentMethod } });
+  }, [track]);
+
+  const trackOpcInterest = useCallback((listingId, bpPercent) => {
+    track('opc_interest', { listingId, metadata: { bp_percent: bpPercent, zero_fee: bpPercent === 0 } });
+  }, [track]);
+
+  return { track, trackView, trackClick, trackBid, trackSearch, trackPaymentPreference, trackOpcInterest };
 };

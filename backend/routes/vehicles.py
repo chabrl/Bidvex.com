@@ -1244,6 +1244,8 @@ async def accept_bidding_terms(
     """Accept As-Is Where-Is and bidding terms before bidding"""
     listing = await db.vehicle_listings.find_one({"id": vehicle_id})
     if not listing:
+        listing = await db.listings.find_one({"id": vehicle_id})
+    if not listing:
         raise HTTPException(status_code=404, detail="Vehicle not found")
     
     # Record acceptance

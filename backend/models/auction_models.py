@@ -33,6 +33,8 @@ class ListingCreate(BaseModel):
     agreement_metadata: Optional[Dict[str, Any]] = None
     # Listing-level buyer's premium (rate, e.g. 0.15 for 15%). None = use org/tier default
     buyers_premium_rate: Optional[float] = None
+    # Seller payment method preference: "stripe", "cash", "e-transfer"
+    payment_method: Optional[str] = None
     currency: Optional[str] = None  # CAD or USD; auto-detected from location if omitted
     # i18n: manual overrides (auto-translated if omitted)
     title_en: Optional[str] = None
@@ -71,6 +73,9 @@ class Listing(BaseModel):
     visit_availability: Optional[Dict[str, Any]] = None
     custom_buyer_premium_rate: Optional[float] = None
     is_partner_listing: bool = False
+    is_opc_certified: bool = False
+    buyers_premium_percent: Optional[float] = None
+    payment_method: Optional[str] = None  # "stripe", "cash", "e-transfer"
     currency: str = "CAD"
     # i18n bilingual fields
     title_en: Optional[str] = None

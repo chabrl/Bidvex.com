@@ -151,6 +151,15 @@ async def create_listing(
 
     await validate_seller(db, current_user, listing_data.agreement_accepted)
 
+    # Category restriction: Only Partner role users can list vehicles
+    if listing_data.category and listing_data.category.lower() in ["vehicle", "vehicles"]:
+        user_role = getattr(current_user, 'role', 'starter')
+        if user_role not in ["partner", "admin"]:
+            raise HTTPException(
+                status_code=403,
+                detail="Only Partner-tier accounts can list vehicles. Upgrade your account to list vehicles."
+            )
+
     client_ip = request.client.host if request else "unknown"
     user_agent = request.headers.get("user-agent", "unknown") if request else "unknown"
     agreement_metadata = build_agreement_metadata(current_user, client_ip, user_agent)
@@ -175,6 +184,20 @@ async def create_listing(
         description_fr=listing_data.description_fr,
     )
     listing_dict = listing.model_dump()
+
+    # OPC certification: check seller and apply BP to listing
+    seller_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0, "is_opc_certified": 1})
+    if seller_doc and seller_doc.get("is_opc_certified"):
+        listing_dict["is_opc_certified"] = True
+        # OPC sellers can set BP rate (0-25%), stored as percent on listing
+        if listing_data.buyers_premium_rate is not None:
+            listing_dict["buyers_premium_percent"] = min(listing_data.buyers_premium_rate * 100, 25)
+        else:
+            listing_dict["buyers_premium_percent"] = 0
+    
+    # Seller payment method preference
+    if listing_data.payment_method:
+        listing_dict["payment_method"] = listing_data.payment_method
 
     await apply_partner_tags(db, current_user, listing_dict, listing_data.buyers_premium_rate)
     result = await persist_listing(db, listing_dict, agreement_metadata)
@@ -312,6 +335,15 @@ async def create_multi_item_listing(
     db = get_db()
 
     await validate_seller(db, current_user, listing_data.agreement_accepted)
+
+    # Category restriction: Only Partner role users can list vehicles in multi-item
+    if listing_data.category and listing_data.category.lower() in ["vehicle", "vehicles"]:
+        user_role = getattr(current_user, 'role', 'starter')
+        if user_role not in ["partner", "admin"]:
+            raise HTTPException(
+                status_code=403,
+                detail="Only Partner-tier accounts can list vehicles. Upgrade your account."
+            )
 
     client_ip = request.client.host if request else "unknown"
     user_agent = request.headers.get("user-agent", "unknown") if request else "unknown"
