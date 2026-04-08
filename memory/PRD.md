@@ -1,99 +1,73 @@
 # BidVex Auction Marketplace — PRD
 
-## Original Problem Statement
-Full-stack bilingual (EN/FR) auction marketplace for high-value vehicles and general items in Quebec, Canada. Built with React frontend, FastAPI backend, and MongoDB.
-
-## Core Requirements
-- Bilingual (EN/FR) UI with i18n toggle
-- High-value vehicle auctions with $1,000 pre-authorization deposit
-- Stripe payments with Connect for seller payouts
-- Quebec tax compliance (GST/QST)
-- Admin dashboard with monitoring
-- Mobile-first responsive design
-- Railway deployment ready
-
----
-
-## What's Been Implemented
-
-### Phase 1-5 — Core Platform + Production Hardening (Complete)
-- Full auction CRUD with real-time bidding via WebSockets
-- User auth (JWT + Google OAuth), Stripe checkout, subscription tiers
-- Admin panel with 15+ management tabs
-- Library migration: Removed `emergentintegrations` → `openai`, `boto3`, `stripe`
-- Railway deployment: `main.py` entry, lazy DB, ProxyHeadersMiddleware
-- Frontend SPA served by FastAPI backend
-
-### Phase 6 — Bilingual Content & Gemini Translation (Complete)
-- Automated Gemini 2.5 Flash translation for listings
-- `getLocalized()` helper, extended en.json/fr.json
-
-### Phase 7 — High-Velocity Sorting (Complete)
-- Active items sorted by ending soonest
-- Compound MongoDB indexes
-- "Ending Soon" badges with pulsing timers
-
-### Phase 8 — Race Conditions & Logic Fixes (Complete - April 8, 2026)
-- **Hard Stop Bidding**: Server-side timestamp validation rejects bids on ended auctions (403)
-- **WebSocket Timer Sync**: Fixed key mismatch in ws_managers.py — BID_UPDATE now sends time_extended, new_auction_end, new_auction_end_epoch, server_time_epoch
-- **Auto-Bid Bot**: Counter-bid processor triggers after every manual bid. Premium/VIP/Partner only. Exhaustion logic at max_bid.
-- **Vehicle Category Isolation**: Vehicles excluded from general marketplace ($nin filter). Vehicle Auctions page merges vehicle_listings + listings[category=vehicles].
-- **Quick Bid Fix**: FlattenedMarketplace.js detects single vs multi-item, calls correct endpoint
-- **Listing Model Fix**: Made city/region optional to prevent Pydantic validation errors
-- **Trust Status Fix**: Set trust_status="verified" on test users for bid eligibility
-- **Bulk Listings**: 20 bilingual EN/FR listings created (10 vehicles + 10 general)
-
----
+## Product Overview
+BidVex is a bilingual (EN/FR) production-ready auction marketplace with:
+- Real-time bidding (WebSocket), auto-bid bots, anti-sniping extensions
+- Vehicle and General marketplace with category isolation
+- AI user behavioral tracking for personalization
+- Admin dashboard with full moderation
+- Push notifications, email marketing (SendGrid), SMS (Twilio)
+- Stripe payments, Cloudflare R2 storage, Gemini AI assistant
 
 ## Architecture
+- Frontend: React (CRA) served as static build via `npx serve -s build`
+- Backend: FastAPI (Python) on port 8001
+- Database: MongoDB Atlas
+- Real-time: WebSocket for bidding + notifications
+- Deployment: Prepared for Railway / PaaS
 
-```
-/app
-├── backend/
-│   ├── main.py                     # Railway entrypoint
-│   ├── server.py                   # FastAPI setup, middleware, SPA mount
-│   ├── routes/
-│   │   ├── auctions.py             # Auction CRUD
-│   │   ├── auctions_bids.py        # Bid logic + Auto-bid processor
-│   │   ├── vehicles.py             # Vehicle auction flows + merged listing fetch
-│   │   ├── vehicles_admin.py       # Vehicle admin (extracted)
-│   │   ├── marketplace.py          # General marketplace (excludes vehicles)
-│   │   ├── payments.py             # Core checkout
-│   │   └── monitoring.py           # System monitoring
-│   ├── services/
-│   │   └── translation_service.py  # Gemini 2.5 Flash EN<->FR
-│   └── ws_managers.py              # WebSocket broadcast with extension sync
-├── frontend/
-│   ├── build/                      # Compiled React SPA
-│   └── src/
-│       ├── components/FlattenedMarketplace.js  # Quick Bid with single/multi detect
-│       ├── hooks/useRealtimeBidding.js         # Timer sync on BID_UPDATE
-│       └── utils/localization.js               # getLocalized() helper
-└── runtime.txt
-```
+## Completed Features
 
----
+### Core
+- Multi-user bidding with server-side timestamp validation (hard stop 403)
+- Auto-bid bot with recursive counter-bidding and personality toasts
+- Anti-sniping: 2-minute extensions when bid placed in final minutes
+- Zero-latency timer sync via WebSocket TIME_EXTENSION events
+- Vehicle category isolation from general marketplace
+- Bulk listings (20 items: 10 vehicles, 10 general)
 
-## Prioritized Backlog
+### Retention Phase (Apr 8, 2026)
+- **Task 1: Outbid Alert System** — Email (SendGrid) + WebSocket AUTO_BID_EXCEEDED notification when auto-bid max is exceeded. Bot personality toasts ("Beep boop! I'm still the boss here.").
+- **Task 2: Service Recovery** — Fixed sidebar filters (category, region, city pass to API), Lots page query, Vehicle timer text changed to white/high-visibility.
+- **Task 3: Zero-Latency Extension Sync** — BID_UPDATE.time_extended and TIME_EXTENSION events update timer instantly without page reload.
+- **Task 4: Winner's Circle** — "WINNER / GAGNANT" badge on ended auction items. persist_auction_winner() saves to won_auctions collection (30-day TTL). GET /winners/my-wins endpoint.
+- **Task 5: Gemini Insight User Profiling** — user_interests collection with event tracking (views, clicks, bids, searches). Batched frontend tracking via useInsightsTracker hook. GET /insights/profile/{user_id} for aggregated profiles.
+- **Task 6: Stealth Connection** — Silent WebSocket reconnection (no "Live Connection Lost" toast).
 
-### P0 (Launch Blockers) — None remaining
+### Bug Fixes (Apr 8, 2026)
+- **P0: Vehicle Detail Page blank screen** — Root cause: useTranslation() called inside non-component helper functions in AuctionRulesDisplay.js, PricingCalculator.js, PricingBreakdown.js, LegalDisclaimers.js, SellerDocumentManager.js. Fixed by adding useTranslation hook to actual component functions.
 
-### P1 (Post-Launch)
-- Cloudflare CDN DNS routing
-- Production monitoring alert notifications
+## Key API Endpoints
+- GET /api/health
+- GET /api/marketplace/items?categories=X&regions=Y&cities=Z
+- GET /api/marketplace/filter-counts
+- GET /api/vehicles, GET /api/vehicles/:id
+- POST /api/bids
+- POST /api/insights/track, POST /api/insights/track-batch
+- GET /api/insights/profile/:user_id
+- GET /api/winners/my-wins
+- GET /api/notifications
 
-### P2 (Enhancements)
+## DB Collections
+- listings, vehicle_listings, multi_item_listings
+- users, bids, auto_bids
+- user_interests (TTL: 90 days) — behavioral tracking
+- won_auctions (TTL: 30 days) — winner persistence
+- notifications
+
+## 3rd Party Integrations
+- OpenAI GPT-4o (EMERGENT_LLM_KEY / OPENAI_API_KEY)
+- Stripe (Payments)
+- SendGrid (Emails)
+- Twilio (SMS)
+- Cloudflare R2 / S3 (Storage via boto3)
+- Gemini 2.5 Flash (EMERGENT_LLM_KEY / GEMINI_API_KEY)
+
+## Backlog / Future
+- (P2) Cloudflare CDN setup per /app/memory/INFRASTRUCTURE_P2.md
+- Post-launch monitoring and alerting
 - Real-time performance dashboard
 - Automated weekly Lighthouse audits
-- Seller Dashboard translation editor UI
-
-### P3 (Technical Debt)
-- server.py decomposition into lifecycle, middleware, routing modules
-
----
-
-## Test Credentials
-- Admin: `charbeladmin@bidvex.com` / `Admin123!`
-- Starter: `starter@test.com` / `TestUser2026!` (free)
-- Premium: `premium@test.com` / `TestUser2026!` (premium)
-- Partner: `partner@test.com` / `TestUser2026!` (partner)
+- Server-side PageSpeed monitoring endpoint
+- i18n for EmailMarketingPricing page
+- Personalized "Picked for You" email campaigns using user_interests data
