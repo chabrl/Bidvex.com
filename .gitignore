@@ -46,10 +46,10 @@ dump.rdb
 # PEM keys
 *.pem
 
-# Environment files (secrets — set via Railway/platform dashboard)
-*.env
-*.env.*
-!*.env.example
+# Environment files
+.env
+.env.*
+!.env.example
 
 # Python
 __pycache__/
@@ -80,24 +80,3 @@ agenthub/agents/youtube/db
 
 # Build caches
 .cache/
-
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*

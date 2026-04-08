@@ -163,7 +163,7 @@ async def place_bid(listing_id: str, bid_data: BidCreate, current_user: dict):
 
 ```bash
 # Email Service (SendGrid) - ✅ Configured
-SENDGRID_API_KEY=SG.ddE3AcsFRyqLfuYqz-c7cQ...NMD8-Q
+SENDGRID_API_KEY=SG.your_sendgrid_api_key_here
 SENDGRID_FROM_EMAIL=support@bidvex.com
 SENDGRID_FROM_NAME=BidVex Support
 ADMIN_EMAIL=admin@bidvex.com

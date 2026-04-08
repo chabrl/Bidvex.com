@@ -138,7 +138,7 @@
 
 | Setting | Value | Status |
 |---------|-------|--------|
-| API Key | SG.ddE3AcsF...NMD8-Q (69 chars) | ✅ Valid |
+| API Key | SG.your_key_here (69 chars) | ✅ Valid |
 | From Email | support@bidvex.com | ✅ Verified |
 | From Name | BidVex Support | ✅ Set |
 | Admin Email | admin@bidvex.com | ✅ Set |
