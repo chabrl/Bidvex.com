@@ -42,8 +42,14 @@ dump.rdb
 
 # System files
 .DS_Store
-# PEM files (except VAPID keys)
-# *.pem
+
+# PEM keys
+*.pem
+
+# Environment files (secrets — set via Railway/platform dashboard)
+*.env
+*.env.*
+!*.env.example
 
 # Python
 __pycache__/
