@@ -168,11 +168,24 @@ export const useRealtimeBidding = (listingId) => {
               // User-facing notifications only
               if (data.bid_status === 'OUTBID' && user) {
                 toast.warning('You\'ve been outbid!', {
-                  description: `New bid: ${formatListingPrice(data.current_price, data.currency)}`,
+                  description: `New bid: ${formatListingPrice(data.current_price, data.currency)}. Get back in the game!`,
                   duration: 5000
                 });
               } else if (data.bid_status === 'LEADING' && user) {
                 toast.success('You\'re now the highest bidder!', { duration: 3000 });
+              }
+              
+              // Auto-bid bot personality toasts
+              if (data.bid_data?.bid_type === 'auto') {
+                const botMessages = [
+                  "Beep boop! I'm still the boss here.",
+                  "Nice try, but I've got deeper pockets!",
+                  "Auto-bid engaged. You'll have to try harder!",
+                  "My algorithm says: not today!",
+                  "Counter-bid deployed. Better luck next time!",
+                ];
+                const msg = botMessages[Math.floor(Math.random() * botMessages.length)];
+                toast.info(msg, { duration: 4000, id: 'bot-personality' });
               }
               break;
               
@@ -186,6 +199,14 @@ export const useRealtimeBidding = (listingId) => {
                   id: 'time-extension'
                 });
               }
+              break;
+              
+            case 'AUTO_BID_EXCEEDED':
+              toast.error("Someone just outbid your bot! Get back in the game.", {
+                description: `Your max auto-bid on this listing was exceeded. Current price: $${data.current_price?.toFixed(2) || '??'}`,
+                duration: 8000,
+                id: 'auto-bid-exceeded'
+              });
               break;
               
             case 'HEARTBEAT':
@@ -227,17 +248,11 @@ export const useRealtimeBidding = (listingId) => {
             if (connectRef.current) connectRef.current();
           }, delay);
           
-          // Only show user-facing toast for actual disconnections (not initial connect)
-          if (reconnectAttemptsRef.current > 0) {
-            toast.error('Live Connection Lost - Reconnecting...', {
-              duration: 3000,
-              id: 'ws-reconnect'
-            });
-          }
+          // Silent reconnection — no UI interrupts
+          console.log(`[Bidding] Reconnecting silently (attempt ${reconnectAttemptsRef.current + 1})...`);
         } else {
-          toast.error('Unable to establish real-time connection. Using polling mode.', {
-            duration: 5000
-          });
+          // Only after all retries exhausted, fall back to polling silently
+          console.log('[Bidding] Max reconnect attempts reached. Using polling mode.');
         }
       };
 

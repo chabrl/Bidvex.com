@@ -40,6 +40,7 @@ import { getLocalized } from '../utils/localization';
 import { useCategories } from '../hooks/useCategories';
 import { useMarketplaceItems } from '../hooks/useMarketplaceItems';
 import { SellerRatingInline } from './SellerReputation';
+import { useInsightsTracker } from '../hooks/useInsightsTracker';
 
 const API = API_BASE;
 
@@ -65,6 +66,7 @@ const FlattenedMarketplace = ({
   const { t } = useTranslation();
   const { user, token } = useAuth();
   const navigate = useNavigate();
+  const { trackView: insightView, trackClick: insightClick, trackSearch: insightSearch } = useInsightsTracker();
   
   // Filters
   const [filters, setFilters] = useState({
@@ -99,16 +101,26 @@ const FlattenedMarketplace = ({
   const [debouncedFilters, setDebouncedFilters] = useState(filters);
   const debounceTimerRef = useRef(null);
 
+  // Merge sidebar external filters with internal filters
+  const mergedFilters = {
+    ...filters,
+    ...(externalFilters.categories?.length ? { categories: externalFilters.categories.join(',') } : {}),
+    ...(externalFilters.regions?.length ? { regions: externalFilters.regions.join(',') } : {}),
+    ...(externalFilters.cities?.length ? { cities: externalFilters.cities.join(',') } : {}),
+    ...(externalFilters.auctioneers?.length ? { seller_id: externalFilters.auctioneers.join(',') } : {}),
+    ...(externalFilters.search ? { search: externalFilters.search } : {}),
+  };
+
   // Debounce filter changes by 300ms
   useEffect(() => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     debounceTimerRef.current = setTimeout(() => {
-      setDebouncedFilters(filters);
+      setDebouncedFilters(mergedFilters);
     }, 300);
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     };
-  }, [filters]);
+  }, [filters, externalFilters]);
 
   // React Query: infinite marketplace items with cursor pagination
   const {
@@ -141,6 +153,9 @@ const FlattenedMarketplace = ({
   const trackClick = async (itemId) => {
     try {
       await axios.post(`${API}/marketplace/items/${itemId}/track-click`);
+      // Also log to user insights for AI profiling
+      const item = allItems?.find(i => i.id === itemId);
+      insightClick(itemId, item?.category);
     } catch (error) {
       console.error('Error tracking click:', error);
     }
@@ -148,6 +163,7 @@ const FlattenedMarketplace = ({
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
+    if (key === 'search' && value) insightSearch(value);
   };
 
   const openQuickBid = (item, e) => {
@@ -606,6 +622,11 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
 
           {/* Top Left - Badges stack */}
           <div className="absolute top-3 left-3 z-10 flex flex-col gap-1.5">
+            {item.status === 'ended' && item.highest_bidder_id && (
+              <Badge className="bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-900 border-0 shadow-lg text-xs font-bold" data-testid="winner-badge">
+                WINNER / GAGNANT
+              </Badge>
+            )}
             {isPrivateSale ? (
               <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 shadow-lg text-xs">
                 <User className="h-3 w-3 mr-1" />

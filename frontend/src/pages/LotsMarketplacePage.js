@@ -38,9 +38,9 @@ const LotsMarketplacePage = () => {
 
         // Wire sidebar filters to API
         if (sidebarFilters.search) params.append('search', sidebarFilters.search);
-        if (sidebarFilters.categories?.length) params.append('category', sidebarFilters.categories[0]);
-        if (sidebarFilters.regions?.length) params.append('region', sidebarFilters.regions[0]);
-        if (sidebarFilters.cities?.length) params.append('city', sidebarFilters.cities[0]);
+        if (sidebarFilters.categories?.length) params.append('category', sidebarFilters.categories.join(','));
+        if (sidebarFilters.regions?.length) params.append('region', sidebarFilters.regions.join(','));
+        if (sidebarFilters.cities?.length) params.append('city', sidebarFilters.cities.join(','));
         if (sidebarFilters.auctioneers?.length) params.append('seller_id', sidebarFilters.auctioneers.join(','));
 
         const response = await axios.get(`${API}/multi-item-listings?${params.toString()}`, { timeout: 15000 });

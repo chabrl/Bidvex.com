@@ -142,6 +142,13 @@ async def process_ended_auctions():
                         "created_at": now_str
                     })
                     
+                    # Persist to Winner's Circle (30-day retention)
+                    try:
+                        from routes.user_insights import persist_auction_winner
+                        await persist_auction_winner(db, listing_id, winner_id, listing.get("current_price", 0), listing)
+                    except Exception as winner_err:
+                        logger.warning(f"Winner persistence failed: {winner_err}")
+                    
                     # Seller notification  
                     await db.notifications.insert_one({
                         "id": str(_uuid.uuid4()),

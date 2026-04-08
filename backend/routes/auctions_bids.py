@@ -290,9 +290,50 @@ async def _process_auto_bids(db, listing_id: str, current_price: float, manual_b
     for ab in auto_bids:
         counter_amount = current_price + min_increment
         if counter_amount > ab["max_bid"]:
-            # Auto-bid exhausted — deactivate
+            # Auto-bid exhausted — deactivate and notify user
             await db.auto_bids.update_one({"id": ab["id"]}, {"$set": {"is_active": False}})
             logger.info(f"Auto-bid {ab['id']} exhausted (max={ab['max_bid']}, needed={counter_amount})")
+            
+            # Notify user their auto-bid was exceeded
+            listing = await db.listings.find_one({"id": listing_id}, {"_id": 0, "title": 1, "auction_end_date": 1})
+            exhaustion_notification = {
+                "id": str(uuid_mod.uuid4()),
+                "user_id": ab["user_id"],
+                "type": "auto_bid_exceeded",
+                "title": "Your Auto-Bid has been exceeded!",
+                "message": f"Someone outbid your max auto-bid of ${ab['max_bid']:.2f} on '{listing.get('title', 'Item') if listing else 'Item'}'. Get back in the game!",
+                "data": {"listing_id": listing_id, "max_bid": ab["max_bid"], "current_price": current_price},
+                "read": False,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            await db.notifications.insert_one(exhaustion_notification)
+            
+            # Send outbid email for auto-bid exhaustion
+            try:
+                outbid_user = await db.users.find_one({"id": ab["user_id"]}, {"_id": 0, "email": 1, "name": 1})
+                if outbid_user and outbid_user.get("email"):
+                    from services.email_notifications import send_outbid_email
+                    await send_outbid_email(
+                        user_email=outbid_user["email"],
+                        user_name=outbid_user.get("name", "Bidder"),
+                        listing_title=listing.get("title", "Item") if listing else "Item",
+                        their_bid=ab["max_bid"],
+                        new_high_bid=current_price,
+                        listing_id=listing_id,
+                        auction_end_date=listing.get("auction_end_date", "") if listing else ""
+                    )
+            except Exception as email_err:
+                logger.warning(f"Auto-bid exhaustion email failed: {email_err}")
+            
+            # Send WebSocket notification to the user
+            if _ws_manager:
+                await _ws_manager.send_to_user(ab["user_id"], {
+                    "type": "AUTO_BID_EXCEEDED",
+                    "listing_id": listing_id,
+                    "max_bid": ab["max_bid"],
+                    "current_price": current_price,
+                    "message": "Someone just outbid your bot! Get back in the game."
+                })
             continue
 
         # Place the counter-bid

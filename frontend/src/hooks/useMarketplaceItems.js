@@ -9,6 +9,10 @@ const fetchMarketplaceItems = async ({ pageParam, filters, limit }) => {
 
   if (filters.search) params.append('search', filters.search);
   if (filters.category) params.append('category', filters.category);
+  if (filters.categories) params.append('categories', filters.categories);
+  if (filters.regions) params.append('regions', filters.regions);
+  if (filters.cities) params.append('cities', filters.cities);
+  if (filters.seller_id) params.append('seller_id', filters.seller_id);
   if (filters.min_price) params.append('min_price', filters.min_price);
   if (filters.max_price) params.append('max_price', filters.max_price);
   if (filters.condition) params.append('condition', filters.condition);

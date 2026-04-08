@@ -259,6 +259,7 @@ try:
     from routes.dashboard import dashboard_router, set_dashboard_db, set_dashboard_auth
     from routes.profiles import profiles_router, set_profiles_db, set_profiles_auth
     from routes.deposits import deposits_router, set_deposits_db, set_deposits_auth
+    from routes.user_insights import insights_router, set_insights_db, set_insights_auth
     from services.email_service import get_email_service
     from services.email_marketing import get_marketing_service, SEGMENT_FILTERS, CAMPAIGN_STATUS
     from services.user_email_marketing import get_user_marketing_service, SUBSCRIPTION_LIMITS
@@ -267,7 +268,7 @@ try:
     for setter in [set_analytics_db, set_auctions_db, set_sms_db, set_users_db,
                    set_marketing_db, set_admin_db, set_webhooks_db, set_payments_db,
                    set_marketplace_db, set_listings_db, set_auth_db, set_dashboard_db, set_profiles_db,
-                   set_deposits_db]:
+                   set_deposits_db, set_insights_db]:
         setter(db)
 
     # Inject fast-read DB (secondary-preferred) for read-heavy modules
@@ -283,7 +284,7 @@ try:
     # Inject auth
     for setter in [set_users_auth, set_marketing_auth, set_admin_auth,
                    set_payments_auth, set_dashboard_auth, set_profiles_auth,
-                   set_deposits_auth]:
+                   set_deposits_auth, set_insights_auth]:
         setter(get_current_user)
 
     # Inject services
@@ -302,7 +303,7 @@ try:
     for router in [analytics_router, auctions_router, bids_router, listings_router,
                    auth_router, sms_router, payments_router, webhooks_router,
                    marketplace_router, admin_router, dashboard_router, profiles_router,
-                   deposits_router]:
+                   deposits_router, insights_router]:
         api_router.include_router(router)
 
     # Self-contained routers (import from deps directly)

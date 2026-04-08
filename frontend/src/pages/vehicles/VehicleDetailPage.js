@@ -311,20 +311,20 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
               <div className="flex gap-4">
                 {timeRemaining.days > 0 && (
                   <div className="text-center">
-                    <p className="text-2xl font-bold">{timeRemaining.days}</p>
+                    <p className="text-2xl font-bold text-white">{timeRemaining.days}</p>
                     <p className="text-xs text-blue-200">Days</p>
                   </div>
                 )}
                 <div className="text-center">
-                  <p className="text-2xl font-bold">{timeRemaining.hours}</p>
+                  <p className="text-2xl font-bold text-white">{timeRemaining.hours}</p>
                   <p className="text-xs text-blue-200">Hours</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold">{timeRemaining.minutes}</p>
+                  <p className="text-2xl font-bold text-white">{timeRemaining.minutes}</p>
                   <p className="text-xs text-blue-200">Min</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold">{timeRemaining.seconds}</p>
+                  <p className="text-2xl font-bold text-white">{timeRemaining.seconds}</p>
                   <p className="text-xs text-blue-200">Sec</p>
                 </div>
               </div>

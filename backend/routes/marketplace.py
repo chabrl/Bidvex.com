@@ -296,6 +296,12 @@ async def _warm_marketplace_cache():
 async def get_marketplace_items(
     search: Optional[str] = None,
     category: Optional[str] = None,
+    categories: Optional[str] = None,
+    region: Optional[str] = None,
+    regions: Optional[str] = None,
+    city: Optional[str] = None,
+    cities: Optional[str] = None,
+    seller_id: Optional[str] = None,
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
     condition: Optional[str] = None,
@@ -336,6 +342,29 @@ async def get_marketplace_items(
                  or s_lower in (i.get("description") or "").lower()]
     if category:
         items = [i for i in items if i.get("category") == category]
+    if categories:
+        cat_list = [c.strip() for c in categories.split(",") if c.strip()]
+        if cat_list:
+            items = [i for i in items if i.get("category") in cat_list]
+    if region or regions:
+        region_list = []
+        if region:
+            region_list.append(region)
+        if regions:
+            region_list.extend([r.strip() for r in regions.split(",") if r.strip()])
+        if region_list:
+            items = [i for i in items if i.get("region") in region_list]
+    if city or cities:
+        city_list = []
+        if city:
+            city_list.append(city)
+        if cities:
+            city_list.extend([c.strip() for c in cities.split(",") if c.strip()])
+        if city_list:
+            items = [i for i in items if i.get("city") in city_list]
+    if seller_id:
+        seller_ids = [s.strip() for s in seller_id.split(",") if s.strip()]
+        items = [i for i in items if i.get("seller_id") in seller_ids]
     if min_price is not None:
         items = [i for i in items if (i.get("current_price") or 0) >= min_price]
     if max_price is not None:
