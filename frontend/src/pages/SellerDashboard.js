@@ -9,7 +9,7 @@ import axios from 'axios';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
-import { Plus, DollarSign, Package, FileText, ShoppingBag, Heart, Eye, TrendingUp, BarChart3, Wallet, Info, AlertTriangle, Clock, Shield, Mail, Loader2 } from 'lucide-react';
+import { Plus, DollarSign, Package, FileText, ShoppingBag, Heart, Eye, TrendingUp, BarChart3, Wallet, Info, AlertTriangle, Clock, Shield, Mail, Loader2, MapPin, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import SellerAnalyticsDashboard from '../components/SellerAnalyticsDashboard';
 import { formatCurrency, formatPercent } from '../utils/currencyFormatter';
@@ -187,6 +187,18 @@ const SellerDashboard = () => {
             <TrendingUp className="h-4 w-4 inline mr-2" />
             Ratings & Reviews
           </button>
+          <button
+            onClick={() => setActiveTab('trends')}
+            className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 -mb-px ${
+              activeTab === 'trends'
+                ? 'border-[#06B6D4] text-[#06B6D4]'
+                : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+            }`}
+            data-testid="trends-tab"
+          >
+            <MapPin className="h-4 w-4 inline mr-2" />
+            Market Trends
+          </button>
         </div>
 
         {/* Tab Content */}
@@ -194,6 +206,8 @@ const SellerDashboard = () => {
           <SellerAnalyticsDashboard />
         ) : activeTab === 'ratings' ? (
           <SellerRatingsPanel userId={user?.id} token={token} />
+        ) : activeTab === 'trends' ? (
+          <RegionalTrendsPanel token={token} />
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
@@ -747,6 +761,133 @@ const SellerRatingsPanel = ({ userId, token }) => {
           ))}
         </CardContent>
       </Card>
+    </div>
+  );
+};
+
+
+const RegionalTrendsPanel = ({ token }) => {
+  const [trends, setTrends] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTrends = async () => {
+      try {
+        const res = await axios.get(`${API}/insights/regional-trends`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setTrends(res.data);
+      } catch {
+        setTrends({ top_categories: [], top_regions: [], insights: [] });
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (token) fetchTrends();
+  }, [token]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-cyan-500" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 py-6" data-testid="regional-trends-panel">
+      {/* Insights Cards */}
+      {trends?.insights?.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-lg font-semibold flex items-center gap-2 text-slate-900 dark:text-white">
+            <Zap className="h-5 w-5 text-amber-500" /> Key Insights
+          </h3>
+          {trends.insights.map((insight, idx) => (
+            <Card key={idx} className="border-l-4 border-l-amber-400 bg-gradient-to-r from-amber-50/50 to-white dark:from-slate-800 dark:to-slate-800">
+              <CardContent className="py-4 px-5">
+                <p className="text-sm font-medium text-slate-800 dark:text-slate-200" data-testid={`insight-message-${idx}`}>
+                  {insight.message}
+                </p>
+                {insight.category && (
+                  <Badge className="mt-2 bg-amber-100 text-amber-800 text-xs">{insight.category}</Badge>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Top Categories */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-cyan-500" /> Top Performing Categories
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {trends?.top_categories?.length > 0 ? (
+              <div className="space-y-3">
+                {trends.top_categories.map((cat, idx) => {
+                  const maxCount = trends.top_categories[0]?.count || 1;
+                  const pct = Math.round((cat.count / maxCount) * 100);
+                  return (
+                    <div key={idx} data-testid={`top-category-${idx}`}>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="font-medium text-slate-700 dark:text-slate-300">{cat.category || 'General'}</span>
+                        <span className="text-muted-foreground">{cat.count} views</span>
+                      </div>
+                      <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all duration-500"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground py-4 text-center">No category data yet. Activity builds over time.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Top Regions */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-emerald-500" /> Active Regions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {trends?.top_regions?.length > 0 ? (
+              <div className="space-y-3">
+                {trends.top_regions.map((reg, idx) => {
+                  const maxCount = trends.top_regions[0]?.count || 1;
+                  const pct = Math.round((reg.count / maxCount) * 100);
+                  return (
+                    <div key={idx} data-testid={`top-region-${idx}`}>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="font-medium text-slate-700 dark:text-slate-300">{reg.region || 'Unknown'}</span>
+                        <span className="text-muted-foreground">{reg.count} interactions</span>
+                      </div>
+                      <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-500"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground py-4 text-center">No regional data yet.</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

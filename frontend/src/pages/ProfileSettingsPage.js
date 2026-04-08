@@ -16,6 +16,7 @@ import { Elements, CardElement, useStripe, useElements } from '@stripe/react-str
 import AvatarUpload from '../components/AvatarUpload';
 import SubscriptionBadge from '../components/SubscriptionBadge';
 import TrustBadge from '../components/TrustBadge';
+import PushNotificationToggle from '../components/PushNotificationToggle';
 import UserTierGrid from '../components/UserTierGrid';
 import PartnerLicenseCard from '../components/PartnerLicenseCard';
 import SubscriptionManagement from '../components/SubscriptionManagement';
@@ -469,6 +470,15 @@ const ProfileSettingsPage = () => {
                     </div>
                     <Switch defaultChecked className="data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-slate-300 dark:data-[state=unchecked]:bg-slate-600" />
                   </div>
+                </div>
+
+                {/* Push Notifications */}
+                <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">Browser Push Notifications</h3>
+                  <PushNotificationToggle variant="settings" />
+                  <p className="text-xs text-slate-500 dark:text-slate-500 mt-2 pl-1">
+                    Receive instant browser alerts for outbids, watchlist items ending, and auction wins.
+                  </p>
                 </div>
 
                 {/* Personalized Recommendations */}

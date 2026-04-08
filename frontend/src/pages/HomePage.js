@@ -82,7 +82,7 @@ const HomePage = () => {
   // React Query hooks replace manual useState + useEffect fetching
   const { data: topSellers = [] } = useTopSellers(8);
   const { data: hotItems = [] } = useHotItems(6);
-  const { data: endingSoon = [] } = useEndingSoon(12);
+  const { data: endingSoon = [] } = useEndingSoon(12, user?.id);
   const { data: featured = [] } = useFeatured(12);
   const { data: newListings = [] } = useNewListings(12);
   const { data: recentlySold = [] } = useRecentlySold(12);

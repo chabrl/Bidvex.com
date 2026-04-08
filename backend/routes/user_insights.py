@@ -200,3 +200,91 @@ async def persist_auction_winner(db, listing_id: str, winner_id: str, winning_bi
     await db.won_auctions.insert_one(doc)
     logger.info(f"Winner persisted: user={winner_id}, listing={listing_id}, bid={winning_bid}")
     return doc
+
+
+# ========== REGIONAL TRENDS (Seller Analytics) ==========
+
+@insights_router.get("/insights/regional-trends")
+async def get_regional_trends(current_user: User = Depends(get_current_user)):
+    """
+    Aggregate user_interests data to surface regional demand trends.
+    Returns top categories, regions, and notable demand shifts for seller dashboard.
+    """
+    db = get_db()
+    from datetime import timedelta
+
+    now = datetime.now(timezone.utc)
+    week_ago = (now - timedelta(days=7)).isoformat()
+    two_weeks_ago = (now - timedelta(days=14)).isoformat()
+
+    # Top categories searched/viewed this week
+    pipeline_categories = [
+        {"$match": {"created_at": {"$gte": week_ago}, "event_type": {"$in": ["view", "search", "click", "bid"]}}},
+        {"$group": {"_id": "$metadata.category", "count": {"$sum": 1}}},
+        {"$match": {"_id": {"$ne": None}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 8},
+    ]
+    cat_results = await db.user_interests.aggregate(pipeline_categories).to_list(8)
+
+    # Top regions with activity this week
+    pipeline_regions = [
+        {"$match": {"created_at": {"$gte": week_ago}, "event_type": {"$in": ["view", "click", "bid"]}}},
+        {"$group": {"_id": "$metadata.region", "count": {"$sum": 1}}},
+        {"$match": {"_id": {"$ne": None}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 5},
+    ]
+    region_results = await db.user_interests.aggregate(pipeline_regions).to_list(5)
+
+    # 0% BP interest (users clicking/viewing zero-fee items)
+    zero_bp_this_week = await db.user_interests.count_documents({
+        "created_at": {"$gte": week_ago},
+        "metadata.zero_fee": True,
+    })
+    zero_bp_prev_week = await db.user_interests.count_documents({
+        "created_at": {"$gte": two_weeks_ago, "$lt": week_ago},
+        "metadata.zero_fee": True,
+    })
+
+    # Category-region cross (top combo)
+    pipeline_cross = [
+        {"$match": {"created_at": {"$gte": week_ago}, "event_type": {"$in": ["view", "click", "bid"]}}},
+        {"$group": {"_id": {"category": "$metadata.category", "region": "$metadata.region"}, "count": {"$sum": 1}}},
+        {"$match": {"_id.category": {"$ne": None}, "_id.region": {"$ne": None}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 5},
+    ]
+    cross_results = await db.user_interests.aggregate(pipeline_cross).to_list(5)
+
+    # Build insights
+    insights = []
+    for cr in cross_results:
+        cat = cr["_id"]["category"]
+        reg = cr["_id"]["region"]
+        cnt = cr["count"]
+        insights.append({
+            "type": "regional_demand",
+            "message": f"High Demand in {reg}: Searches for '{cat}' — {cnt} interactions this week.",
+            "category": cat,
+            "region": reg,
+            "count": cnt,
+        })
+
+    if zero_bp_this_week > 0:
+        pct_change = round(((zero_bp_this_week - zero_bp_prev_week) / max(zero_bp_prev_week, 1)) * 100)
+        direction = "up" if pct_change > 0 else "down" if pct_change < 0 else "stable"
+        insights.append({
+            "type": "zero_bp_interest",
+            "message": f"Top Interest: Users prioritizing 0% BP Vehicles — {zero_bp_this_week} views ({'+' if pct_change > 0 else ''}{pct_change}% vs last week).",
+            "count": zero_bp_this_week,
+            "change_pct": pct_change,
+            "direction": direction,
+        })
+
+    return {
+        "period": "last_7_days",
+        "top_categories": [{"category": r["_id"], "count": r["count"]} for r in cat_results],
+        "top_regions": [{"region": r["_id"], "count": r["count"]} for r in region_results],
+        "insights": insights,
+    }

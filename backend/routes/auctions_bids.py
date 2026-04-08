@@ -251,6 +251,23 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
         except Exception as email_error:
             logger.warning(f"Outbid email notification failed: {email_error}")
 
+        # Send push notification
+        try:
+            from routes.push_notifications import send_push_to_user
+            cat = (listing.get("category") or "").lower()
+            is_vehicle = any(v in cat for v in ("vehicle", "car", "auto"))
+            push_url = f"/vehicle-auctions/{bid_data.listing_id}" if is_vehicle else f"/listing/{bid_data.listing_id}"
+            await send_push_to_user(_db, previous_highest_bidder, {
+                "title": "You've been outbid!",
+                "body": f"Someone bid ${bid_data.amount:,.2f} on '{listing.get('title', 'Item')}'. Tap to counter-bid.",
+                "type": "outbid",
+                "url": push_url,
+                "listing_id": bid_data.listing_id,
+                "category": listing.get("category", ""),
+            })
+        except Exception as push_err:
+            logger.warning(f"Push outbid notification failed: {push_err}")
+
     # Bid placed email confirmation
     try:
         from services.email_notifications import send_bid_placed_email

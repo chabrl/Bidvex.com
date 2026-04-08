@@ -1,159 +1,118 @@
 /**
- * BidVex Service Worker
- * Handles push notifications for:
- * - Auction won alerts ("You Won!")
- * - Outbid alerts
- * - New message notifications
- * - Auction ending soon reminders
+ * BidVex Service Worker — Push Notifications + Offline Caching
+ * Self-hosted VAPID Web Push — no Firebase dependency.
  */
+const CACHE_NAME = 'bidvex-v3';
+const STATIC_ASSETS = ['/offline.html'];
 
-const CACHE_NAME = 'bidvex-v1';
-const NOTIFICATION_ICONS = {
-  auction_won: '/android-chrome-192x192.png',
-  outbid: '/android-chrome-192x192.png',
-  new_message: '/android-chrome-192x192.png',
-  auction_ending: '/android-chrome-192x192.png',
-  default: '/android-chrome-192x192.png'
-};
-
-// Install event
+/* ─── Install ─── */
 self.addEventListener('install', (event) => {
-  console.log('[BidVex SW] Service Worker installing...');
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
+  );
   self.skipWaiting();
 });
 
-// Activate event
+/* ─── Activate ─── */
 self.addEventListener('activate', (event) => {
-  console.log('[BidVex SW] Service Worker activated');
-  event.waitUntil(clients.claim());
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+    )
+  );
+  self.clients.claim();
 });
 
-// Push notification received
+/* ─── Push Notification ─── */
 self.addEventListener('push', (event) => {
-  console.log('[BidVex SW] Push notification received');
-  
-  let data = {
-    title: 'BidVex Notification',
-    body: 'You have a new notification',
-    type: 'default',
-    url: '/'
-  };
-  
-  if (event.data) {
-    try {
-      data = { ...data, ...event.data.json() };
-    } catch (e) {
-      data.body = event.data.text();
-    }
+  if (!event.data) return;
+
+  let data;
+  try {
+    data = event.data.json();
+  } catch {
+    data = { title: 'BidVex', body: event.data.text() };
   }
-  
+
+  const title = data.title || 'BidVex';
   const options = {
-    body: data.body,
-    icon: NOTIFICATION_ICONS[data.type] || NOTIFICATION_ICONS.default,
-    badge: '/favicon.png',
-    vibrate: [200, 100, 200],
-    tag: data.type + '-' + (data.id || Date.now()),
+    body: data.body || '',
+    icon: '/logo192.png',
+    badge: '/logo192.png',
+    tag: data.type || 'default',
     renotify: true,
     data: {
       url: data.url || '/',
-      type: data.type,
       listing_id: data.listing_id,
-      conversation_id: data.conversation_id
+      category: data.category,
+      type: data.type,
     },
-    actions: getNotificationActions(data.type)
+    actions: [],
   };
-  
-  event.waitUntil(
-    self.registration.showNotification(data.title, options)
-  );
+
+  // Contextual actions based on notification type
+  if (data.type === 'outbid') {
+    options.actions = [
+      { action: 'counter-bid', title: 'Counter-Bid' },
+      { action: 'dismiss', title: 'Dismiss' },
+    ];
+    options.requireInteraction = true;
+  } else if (data.type === 'watchlist_expiry') {
+    options.actions = [
+      { action: 'view', title: 'View Auction' },
+      { action: 'dismiss', title: 'Dismiss' },
+    ];
+    options.requireInteraction = true;
+  }
+
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// Get contextual notification actions
-function getNotificationActions(type) {
-  switch (type) {
-    case 'auction_won':
-      return [
-        { action: 'view', title: '🎉 View Item' },
-        { action: 'message', title: '💬 Message Seller' }
-      ];
-    case 'outbid':
-      return [
-        { action: 'bid', title: '💰 Place Bid' },
-        { action: 'view', title: '👀 View Auction' }
-      ];
-    case 'new_message':
-      return [
-        { action: 'reply', title: '💬 Reply' },
-        { action: 'dismiss', title: '✕ Dismiss' }
-      ];
-    case 'auction_ending':
-      return [
-        { action: 'bid', title: '⚡ Quick Bid' },
-        { action: 'view', title: '👀 View' }
-      ];
-    default:
-      return [];
-  }
-}
-
-// Notification click handler
+/* ─── Notification Click ─── */
 self.addEventListener('notificationclick', (event) => {
-  console.log('[BidVex SW] Notification clicked:', event.action);
-  
   event.notification.close();
-  
-  const data = event.notification.data;
-  let targetUrl = '/';
-  
-  // Determine target URL based on action and notification type
-  switch (event.action) {
-    case 'view':
-    case 'bid':
-      if (data.listing_id) {
-        targetUrl = `/listing/${data.listing_id}`;
-      }
-      break;
-    case 'message':
-    case 'reply':
-      if (data.conversation_id) {
-        targetUrl = `/messages?conversation=${data.conversation_id}`;
-      } else {
-        targetUrl = '/messages';
-      }
-      break;
-    case 'dismiss':
-      return;
-    default:
-      targetUrl = data.url || '/';
+
+  const data = event.notification.data || {};
+  let targetUrl = data.url || '/';
+
+  // Smart routing: use the pre-computed URL from the push payload
+  // The backend already determines /vehicle-auctions/ vs /listing/ based on category
+  if (event.action === 'counter-bid' || event.action === 'view') {
+    targetUrl = data.url || '/';
+  } else if (event.action === 'dismiss') {
+    return;
   }
-  
+
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true })
-      .then((clientList) => {
-        // Focus existing window if available
-        for (const client of clientList) {
-          if (client.url.includes(targetUrl) && 'focus' in client) {
-            return client.focus();
-          }
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      // If there's already an open BidVex tab, navigate it
+      for (const client of clients) {
+        if (client.url.includes(self.location.origin) && 'navigate' in client) {
+          client.navigate(targetUrl);
+          return client.focus();
         }
-        // Open new window
-        if (clients.openWindow) {
-          return clients.openWindow(targetUrl);
-        }
-      })
+      }
+      // Otherwise open a new tab
+      return self.clients.openWindow(targetUrl);
+    })
   );
 });
 
-// Handle notification close
-self.addEventListener('notificationclose', (event) => {
-  console.log('[BidVex SW] Notification closed');
-});
-
-// Message handler for communication with main thread
+/* ─── Message Handler (skip waiting on demand) ─── */
 self.addEventListener('message', (event) => {
-  console.log('[BidVex SW] Message received:', event.data);
-  
-  if (event.data.type === 'SKIP_WAITING') {
+  if (event.data === 'SKIP_WAITING') {
     self.skipWaiting();
   }
+});
+
+/* ─── Fetch: Network-first, offline fallback ─── */
+self.addEventListener('fetch', (event) => {
+  // Skip non-GET and API requests
+  if (event.request.method !== 'GET' || event.request.url.includes('/api/')) return;
+
+  event.respondWith(
+    fetch(event.request).catch(() =>
+      caches.match(event.request).then((cached) => cached || caches.match('/offline.html'))
+    )
+  );
 });

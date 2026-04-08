@@ -2,9 +2,11 @@
 BidVex Carousel & Stats Router
 Homepage data endpoints: ending soon, featured, new listings,
 recently sold, top sellers, hot items.
+AI Personalization: ending-soon re-sorted by user interest affinity.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
+from typing import Optional
 from datetime import datetime, timezone, timedelta
 import logging
 
@@ -29,8 +31,8 @@ def get_db():
 
 
 @carousel_router.get("/carousel/ending-soon")
-async def get_ending_soon_listings(limit: int = 12):
-    """Get listings ending soon (within next 24 hours)"""
+async def get_ending_soon_listings(limit: int = 12, user_id: Optional[str] = Query(None)):
+    """Get listings ending soon. If user_id is provided, re-sort by interest affinity."""
     try:
         db = get_db()
         current_time = datetime.now(timezone.utc)
@@ -45,9 +47,34 @@ async def get_ending_soon_listings(limit: int = 12):
                 },
             },
             {"_id": 0},
-        ).sort("auction_end_date", 1).limit(limit).to_list(limit)
+        ).sort("auction_end_date", 1).limit(limit * 2).to_list(limit * 2)
 
-        return listings
+        # AI Personalization: boost categories the user has shown interest in
+        if user_id and listings:
+            try:
+                week_ago = (current_time - timedelta(days=7)).isoformat()
+                pipeline = [
+                    {"$match": {"user_id": user_id, "created_at": {"$gte": week_ago}}},
+                    {"$group": {"_id": "$metadata.category", "score": {"$sum": 1}}},
+                    {"$match": {"_id": {"$ne": None}}},
+                    {"$sort": {"score": -1}},
+                    {"$limit": 5},
+                ]
+                prefs = await db.user_interests.aggregate(pipeline).to_list(5)
+                pref_map = {p["_id"].lower(): p["score"] for p in prefs if p["_id"]}
+
+                if pref_map:
+                    for item in listings:
+                        cat = (item.get("category") or "").lower()
+                        item["_affinity"] = pref_map.get(cat, 0)
+                    # Stable sort: affinity DESC, then original order (end time ASC)
+                    listings.sort(key=lambda x: -x.get("_affinity", 0))
+                    for item in listings:
+                        item.pop("_affinity", None)
+            except Exception as e:
+                logger.warning(f"AI personalization skipped: {e}")
+
+        return listings[:limit]
 
     except Exception as e:
         logger.error(f"Error fetching ending soon listings: {str(e)}")

@@ -1,222 +1,154 @@
 /**
- * BidVex Push Notifications Utility
- * Handles Service Worker registration and push subscription management
+ * BidVex Push Notification Utilities
+ * Self-hosted VAPID Web Push — registers SW and manages subscriptions.
  */
 
-const PUBLIC_VAPID_KEY = process.env.REACT_APP_VAPID_PUBLIC_KEY || null;
+const VAPID_PUBLIC_KEY = process.env.REACT_APP_VAPID_PUBLIC_KEY || '';
 
 /**
- * Check if push notifications are supported
- */
-export const isPushSupported = () => {
-  return 'serviceWorker' in navigator && 'PushManager' in window;
-};
-
-/**
- * Register the service worker
- */
-export const registerServiceWorker = async () => {
-  if (!('serviceWorker' in navigator)) {
-    console.warn('[BidVex] Service workers not supported');
-    return null;
-  }
-  
-  try {
-    const registration = await navigator.serviceWorker.register('/sw.js', {
-      scope: '/'
-    });
-    
-    console.log('[BidVex] Service Worker registered:', registration.scope);
-    
-    // Check for updates
-    registration.addEventListener('updatefound', () => {
-      const newWorker = registration.installing;
-      console.log('[BidVex] Service Worker update found');
-      
-      newWorker.addEventListener('statechange', () => {
-        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-          console.log('[BidVex] New Service Worker ready');
-        }
-      });
-    });
-    
-    return registration;
-  } catch (error) {
-    console.error('[BidVex] Service Worker registration failed:', error);
-    return null;
-  }
-};
-
-/**
- * Request notification permission
- */
-export const requestNotificationPermission = async () => {
-  if (!('Notification' in window)) {
-    console.warn('[BidVex] Notifications not supported');
-    return 'unsupported';
-  }
-  
-  if (Notification.permission === 'granted') {
-    return 'granted';
-  }
-  
-  if (Notification.permission === 'denied') {
-    return 'denied';
-  }
-  
-  try {
-    const permission = await Notification.requestPermission();
-    return permission;
-  } catch (error) {
-    console.error('[BidVex] Permission request failed:', error);
-    return 'error';
-  }
-};
-
-/**
- * Subscribe to push notifications
- */
-export const subscribeToPush = async (registration) => {
-  if (!registration) {
-    console.warn('[BidVex] No service worker registration');
-    return null;
-  }
-  
-  try {
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      ...(PUBLIC_VAPID_KEY && {
-        applicationServerKey: urlBase64ToUint8Array(PUBLIC_VAPID_KEY)
-      })
-    });
-    
-    console.log('[BidVex] Push subscription created:', subscription.endpoint);
-    return subscription;
-  } catch (error) {
-    console.error('[BidVex] Push subscription failed:', error);
-    return null;
-  }
-};
-
-/**
- * Get current push subscription
- */
-export const getSubscription = async () => {
-  if (!('serviceWorker' in navigator)) return null;
-  
-  try {
-    const registration = await navigator.serviceWorker.ready;
-    const subscription = await registration.pushManager.getSubscription();
-    return subscription;
-  } catch (error) {
-    console.error('[BidVex] Failed to get subscription:', error);
-    return null;
-  }
-};
-
-/**
- * Unsubscribe from push notifications
- */
-export const unsubscribeFromPush = async () => {
-  try {
-    const subscription = await getSubscription();
-    if (subscription) {
-      await subscription.unsubscribe();
-      console.log('[BidVex] Unsubscribed from push');
-      return true;
-    }
-    return false;
-  } catch (error) {
-    console.error('[BidVex] Unsubscribe failed:', error);
-    return false;
-  }
-};
-
-/**
- * Show local notification (fallback when push not available)
- */
-export const showLocalNotification = async (title, options = {}) => {
-  if (!('Notification' in window)) return false;
-  
-  if (Notification.permission !== 'granted') {
-    const permission = await requestNotificationPermission();
-    if (permission !== 'granted') return false;
-  }
-  
-  try {
-    const registration = await navigator.serviceWorker.ready;
-    await registration.showNotification(title, {
-      icon: '/android-chrome-192x192.png',
-      badge: '/favicon.png',
-      vibrate: [200, 100, 200],
-      ...options
-    });
-    return true;
-  } catch (error) {
-    console.error('[BidVex] Show notification failed:', error);
-    return false;
-  }
-};
-
-/**
- * Convert VAPID key to Uint8Array
+ * Convert VAPID public key (base64url) to Uint8Array for the PushManager.
  */
 function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding)
-    .replace(/-/g, '+')
-    .replace(/_/g, '/');
-  
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  
-  return outputArray;
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const output = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; ++i) output[i] = raw.charCodeAt(i);
+  return output;
 }
 
 /**
- * Initialize push notifications for the app
+ * Register the service worker and return the registration.
  */
-export const initializePushNotifications = async () => {
-  if (!isPushSupported()) {
-    console.log('[BidVex] Push notifications not supported');
-    return { supported: false };
+export async function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return null;
+  try {
+    const reg = await navigator.serviceWorker.register('/sw.js');
+    return reg;
+  } catch (err) {
+    console.warn('[Push] SW registration failed:', err);
+    return null;
   }
-  
-  const registration = await registerServiceWorker();
-  if (!registration) {
-    return { supported: true, registered: false };
+}
+
+/**
+ * Check if push is supported and permission status.
+ */
+export function getPushPermission() {
+  if (!('Notification' in window)) return 'unsupported';
+  return Notification.permission; // 'default', 'granted', 'denied'
+}
+
+/**
+ * Request push permission and subscribe to VAPID push.
+ * Sends subscription to backend for storage.
+ * @param {string} token - JWT auth token
+ * @returns {boolean} success
+ */
+export async function subscribeToPush(token) {
+  if (!('PushManager' in window) || !VAPID_PUBLIC_KEY) return false;
+
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return false;
+
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+    }
+
+    const subJson = sub.toJSON();
+    const apiBase = process.env.REACT_APP_BACKEND_URL || '';
+
+    await fetch(`${apiBase}/api/push/subscribe`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        endpoint: subJson.endpoint,
+        keys: subJson.keys,
+      }),
+    });
+
+    return true;
+  } catch (err) {
+    console.warn('[Push] Subscribe failed:', err);
+    return false;
   }
-  
-  const permission = await requestNotificationPermission();
-  
-  if (permission === 'granted') {
-    const subscription = await subscribeToPush(registration);
-    return {
-      supported: true,
-      registered: true,
-      permission: 'granted',
-      subscription
-    };
+}
+
+/**
+ * Unsubscribe from push notifications.
+ * @param {string} token - JWT auth token
+ */
+export async function unsubscribeFromPush(token) {
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (!sub) return true;
+
+    const subJson = sub.toJSON();
+    const apiBase = process.env.REACT_APP_BACKEND_URL || '';
+
+    await fetch(`${apiBase}/api/push/unsubscribe`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        endpoint: subJson.endpoint,
+        keys: subJson.keys,
+      }),
+    });
+
+    await sub.unsubscribe();
+    return true;
+  } catch (err) {
+    console.warn('[Push] Unsubscribe failed:', err);
+    return false;
   }
-  
-  return {
-    supported: true,
-    registered: true,
-    permission
-  };
-};
+}
+
+/**
+ * Check if the user currently has an active push subscription.
+ */
+export async function isPushSubscribed() {
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    return !!sub;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Show a local notification (for testing / in-app fallback).
+ */
+export async function showLocalNotification(title, body, data = {}) {
+  if (Notification.permission !== 'granted') return;
+  const reg = await navigator.serviceWorker.ready;
+  reg.showNotification(title, {
+    body,
+    icon: '/logo192.png',
+    badge: '/logo192.png',
+    data,
+  });
+}
 
 export default {
-  isPushSupported,
   registerServiceWorker,
-  requestNotificationPermission,
+  getPushPermission,
   subscribeToPush,
-  getSubscription,
   unsubscribeFromPush,
+  isPushSubscribed,
   showLocalNotification,
-  initializePushNotifications
 };

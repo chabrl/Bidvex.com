@@ -115,6 +115,9 @@ async def response_time_middleware(request: Request, call_next):
     if not path.startswith("/health") and elapsed > 500:
         logger.warning(f"SLOW {request.method} {path} — {elapsed}ms")
     response.headers["X-Response-Time"] = f"{elapsed}ms"
+    # Security headers for CDN proxy
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
     # FIX 5: Cache-Control — static assets get 1yr, HTML must revalidate
     # Cloudflare CDN-specific headers for high-res image delivery
     if path.startswith("/static/") or any(path.endswith(ext) for ext in (".js", ".css", ".woff2", ".woff")):
@@ -233,6 +236,40 @@ scheduler.add_job(lambda: send_review_request_emails(db), trigger=IntervalTrigge
 scheduler.add_job(keepalive_ping, trigger=IntervalTrigger(minutes=4),
                   id='keepalive_ping', replace_existing=True)
 
+# Watchlist expiry push alerts — check every 2 minutes for items ending within 5 min
+async def run_watchlist_expiry_alerts():
+    from routes.push_notifications import send_push_to_user
+    try:
+        now = datetime.now(timezone.utc)
+        five_min = now + timedelta(minutes=5)
+        six_min = now + timedelta(minutes=6)
+        # Find listings ending in 5-6 min window (to only alert once per window)
+        expiring = await db.listings.find(
+            {"status": "active", "auction_end_date": {"$gte": five_min.isoformat(), "$lt": six_min.isoformat()}},
+            {"_id": 0, "id": 1, "title": 1, "category": 1}
+        ).to_list(50)
+        for listing in expiring:
+            lid = listing["id"]
+            cat = (listing.get("category") or "").lower()
+            is_vehicle = any(v in cat for v in ("vehicle", "car", "auto"))
+            url = f"/vehicle-auctions/{lid}" if is_vehicle else f"/listing/{lid}"
+            # Find users who have this in their watchlist
+            watchers = await db.watchlist.find({"listing_id": lid}, {"_id": 0, "user_id": 1}).to_list(200)
+            for w in watchers:
+                await send_push_to_user(db, w["user_id"], {
+                    "title": "Auction ending soon!",
+                    "body": f"'{listing.get('title', 'Item')}' ends in 5 minutes!",
+                    "type": "watchlist_expiry",
+                    "url": url,
+                    "listing_id": lid,
+                    "category": listing.get("category", ""),
+                })
+    except Exception as e:
+        logger.warning(f"Watchlist expiry alerts failed: {e}")
+
+scheduler.add_job(run_watchlist_expiry_alerts, trigger=IntervalTrigger(minutes=2),
+                  id='watchlist_expiry_alerts', replace_existing=True)
+
 # ─── Health Endpoints ───
 @api_router.get("/")
 async def root():
@@ -334,6 +371,7 @@ try:
         ("routes.partner_pro", "partner_pro_router", "set_partner_pro_db", False),
         ("routes.reviews", "reviews_router", "set_reviews_db", False),
         ("routes.monitoring", "monitoring_router", None, False),
+        ("routes.push_notifications", "push_router", "set_push_db", False),
     ]
 
     for module_path, router_name, db_setter_name, app_level in SELF_CONTAINED_ROUTERS:

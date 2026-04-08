@@ -20,10 +20,10 @@ export const useHotItems = (limit = 6) =>
     staleTime: 60 * 1000,
   });
 
-export const useEndingSoon = (limit = 12) =>
+export const useEndingSoon = (limit = 12, userId = null) =>
   useQuery({
-    queryKey: ['ending-soon', limit],
-    queryFn: () => fetcher(`${API}/carousel/ending-soon?limit=${limit}`),
+    queryKey: ['ending-soon', limit, userId],
+    queryFn: () => fetcher(`${API}/carousel/ending-soon?limit=${limit}${userId ? `&user_id=${userId}` : ''}`),
     staleTime: 30 * 1000,
   });
 

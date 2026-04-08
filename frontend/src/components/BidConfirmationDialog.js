@@ -8,6 +8,7 @@ import { Separator } from './ui/separator';
 import { DollarSign, CheckCircle2, Info, Sparkles, ShieldCheck, Receipt } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '../utils/currencyFormatter';
+import PushNotificationToggle from './PushNotificationToggle';
 
 const API = API_BASE;
 
@@ -266,6 +267,11 @@ const BidConfirmationDialog = ({
               {error}
             </div>
           ) : null}
+        </div>
+
+        {/* Push notification prompt — shown inside bid dialog */}
+        <div className="px-1 pb-2">
+          <PushNotificationToggle variant="prompt" />
         </div>
 
         <DialogFooter className="flex gap-2">
