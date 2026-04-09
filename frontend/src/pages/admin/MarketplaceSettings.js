@@ -10,7 +10,7 @@ import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
 import { 
   Settings, Save, RotateCcw, AlertTriangle, Check, Users, Package, 
-  DollarSign, Clock, ShoppingCart, Shield, Loader2, Info
+  DollarSign, Clock, ShoppingCart, Shield, Loader2, Info, Share2, ExternalLink
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/currencyFormatter';
 import { useTranslation } from 'react-i18next';
@@ -29,6 +29,14 @@ const SYSTEM_DEFAULTS = {
   enable_buy_now: true
 };
 
+const SOCIAL_PLATFORMS = [
+  { key: 'x', label: 'X (Twitter)', placeholder: 'https://x.com/yourbrand' },
+  { key: 'facebook', label: 'Facebook', placeholder: 'https://facebook.com/yourbrand' },
+  { key: 'instagram', label: 'Instagram', placeholder: 'https://instagram.com/yourbrand' },
+  { key: 'linkedin', label: 'LinkedIn', placeholder: 'https://linkedin.com/company/yourbrand' },
+  { key: 'tiktok', label: 'TikTok', placeholder: 'https://tiktok.com/@yourbrand' },
+];
+
 const MarketplaceSettings = () => {
   const { t } = useTranslation();
   const { token } = useAuth();
@@ -38,15 +46,24 @@ const MarketplaceSettings = () => {
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
+  const [socialLinks, setSocialLinks] = useState({ x: '', facebook: '', instagram: '', linkedin: '', tiktok: '' });
+  const [originalSocialLinks, setOriginalSocialLinks] = useState({ x: '', facebook: '', instagram: '', linkedin: '', tiktok: '' });
+  const [savingSocial, setSavingSocial] = useState(false);
 
   // Fetch settings on mount
   const fetchSettings = useCallback(async () => {
     try {
-      const response = await axios.get(`${API}/admin/marketplace-settings`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setSettings(response.data);
-      setOriginalSettings(response.data);
+      const [settingsRes, socialRes] = await Promise.all([
+        axios.get(`${API}/admin/marketplace-settings`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get(`${API}/site-config/social-links`)
+      ]);
+      setSettings(settingsRes.data);
+      setOriginalSettings(settingsRes.data);
+      const links = socialRes.data?.social_links || { x: '', facebook: '', instagram: '', linkedin: '', tiktok: '' };
+      setSocialLinks(links);
+      setOriginalSocialLinks(links);
     } catch (error) {
       toast.error('Failed to load marketplace settings');
       console.error('Error fetching settings:', error);
@@ -136,6 +153,29 @@ const MarketplaceSettings = () => {
       toast.error('Failed to restore defaults');
     } finally {
       setResetting(false);
+    }
+  };
+
+  // Social links dirty check
+  const isSocialDirty = useCallback(() => {
+    return SOCIAL_PLATFORMS.some(p => (socialLinks[p.key] || '') !== (originalSocialLinks[p.key] || ''));
+  }, [socialLinks, originalSocialLinks]);
+
+  // Save social links
+  const handleSaveSocial = async () => {
+    setSavingSocial(true);
+    try {
+      const response = await axios.put(`${API}/admin/site-config/social-links`, socialLinks, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const updated = response.data?.social_links || socialLinks;
+      setSocialLinks(updated);
+      setOriginalSocialLinks(updated);
+      toast.success('Social links saved!', { description: 'Footer icons updated across the platform.' });
+    } catch (error) {
+      toast.error('Failed to save social links', { description: error.response?.data?.detail || 'Unknown error' });
+    } finally {
+      setSavingSocial(false);
     }
   };
 
@@ -414,6 +454,54 @@ const MarketplaceSettings = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Social Media Links */}
+      <Card className="border-2 border-cyan-200" data-testid="social-links-card">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Share2 className="h-5 w-5 text-cyan-600" />
+                Social Media Links
+              </CardTitle>
+              <CardDescription>Manage social icons displayed in the platform footer. Leave empty to hide.</CardDescription>
+            </div>
+            <Button
+              onClick={handleSaveSocial}
+              disabled={!isSocialDirty() || savingSocial}
+              size="sm"
+              className={`flex items-center gap-2 ${isSocialDirty() ? 'bg-cyan-600 hover:bg-cyan-700' : 'bg-gray-300'}`}
+              data-testid="save-social-links-btn"
+            >
+              {savingSocial ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {savingSocial ? 'Saving...' : 'Save Social Links'}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {SOCIAL_PLATFORMS.map(({ key, label, placeholder }) => (
+              <div key={key} className="p-3 bg-gray-50 rounded-lg">
+                <label className="block text-sm font-medium mb-1.5">{label}</label>
+                <div className="relative">
+                  <ExternalLink className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="url"
+                    placeholder={placeholder}
+                    value={socialLinks[key] || ''}
+                    onChange={(e) => setSocialLinks(prev => ({ ...prev, [key]: e.target.value }))}
+                    className="pl-9"
+                    data-testid={`social-input-${key}`}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground mt-3">
+            Icons with empty URLs are automatically hidden from the footer.
+          </p>
+        </CardContent>
+      </Card>
 
       {/* Configuration Summary - Dark Background for High Contrast */}
       <Card className="border-2 border-slate-700 bg-gradient-to-br from-slate-800 to-slate-900 text-white">

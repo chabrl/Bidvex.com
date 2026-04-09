@@ -50,6 +50,13 @@ DEFAULT_SITE_CONFIG = {
         ]
     },
     "hero_banners": [],
+    "social_links": {
+        "x": "",
+        "facebook": "",
+        "instagram": "",
+        "linkedin": "",
+        "tiktok": "",
+    },
     "updated_at": None,
     "updated_by": None,
 }
@@ -110,6 +117,7 @@ async def get_public_site_config():
             "branding": config.get("branding", DEFAULT_SITE_CONFIG["branding"]),
             "homepage_layout": config.get("homepage_layout", DEFAULT_SITE_CONFIG["homepage_layout"]),
             "hero_banners": active_banners,
+            "social_links": config.get("social_links", DEFAULT_SITE_CONFIG["social_links"]),
         }
     except Exception as e:
         logger.error(f"site-config DB error, returning defaults: {e}")
@@ -117,6 +125,7 @@ async def get_public_site_config():
             "branding": DEFAULT_SITE_CONFIG["branding"],
             "homepage_layout": DEFAULT_SITE_CONFIG["homepage_layout"],
             "hero_banners": [],
+            "social_links": DEFAULT_SITE_CONFIG["social_links"],
         }
 
 
@@ -293,3 +302,58 @@ async def delete_hero_banner(banner_id: str, current_user: User = Depends(_requi
         "created_at": datetime.now(timezone.utc).isoformat(),
     })
     return {"message": "Banner deleted successfully"}
+
+
+# ========== SOCIAL LINKS ==========
+
+@site_config_router.get("/site-config/social-links")
+async def get_social_links():
+    """Public endpoint: Get social media links for the footer."""
+    try:
+        config = await _get_site_config()
+        return {"social_links": config.get("social_links", DEFAULT_SITE_CONFIG["social_links"])}
+    except Exception as e:
+        logger.error(f"social-links DB error, returning defaults: {e}")
+        return {"social_links": DEFAULT_SITE_CONFIG["social_links"]}
+
+
+@site_config_router.put("/admin/site-config/social-links")
+async def update_social_links(data: Dict, current_user: User = Depends(_require_admin)):
+    """Admin endpoint: Update social media links."""
+    db = get_db()
+    config = await _get_site_config()
+    old_links = config.get("social_links", DEFAULT_SITE_CONFIG["social_links"]).copy()
+
+    allowed_keys = {"x", "facebook", "instagram", "linkedin", "tiktok"}
+    new_links = {**old_links}
+    for key in allowed_keys:
+        if key in data:
+            val = data[key]
+            if not isinstance(val, str):
+                raise HTTPException(status_code=400, detail=f"{key} must be a string")
+            new_links[key] = val.strip()
+
+    await db.site_config.update_one(
+        {"id": "site_config"},
+        {"$set": {
+            "social_links": new_links,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_by": current_user.email,
+        }},
+        upsert=True,
+    )
+
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "action": "SOCIAL_LINKS_UPDATE",
+        "admin_id": current_user.id,
+        "admin_email": current_user.email,
+        "target_type": "site_config",
+        "target_id": "social_links",
+        "details": f"Updated social links: {list(data.keys())}",
+        "old_value": old_links,
+        "new_value": new_links,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+    return {"social_links": new_links, "updated_at": datetime.now(timezone.utc).isoformat()}
