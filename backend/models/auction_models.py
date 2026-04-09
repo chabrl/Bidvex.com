@@ -118,6 +118,7 @@ class BuyNowPurchase(BaseModel):
     auction_id: str
     lot_number: int
     quantity: int = 1
+    payment_method: str = "stripe"  # stripe, cash, etransfer
 
 
 class BuyNowTransaction(BaseModel):

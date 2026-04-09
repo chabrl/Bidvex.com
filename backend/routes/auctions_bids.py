@@ -485,6 +485,10 @@ async def purchase_buy_now(
     if result.modified_count == 0:
         raise HTTPException(status_code=500, detail="Failed to update inventory")
 
+    # Determine payment status based on method
+    is_offline = purchase.payment_method in ("cash", "etransfer")
+    payment_status = "waiting_for_offline_confirmation" if is_offline else "pending"
+
     transaction = BuyNowTransaction(
         auction_id=purchase.auction_id,
         lot_number=purchase.lot_number,
@@ -492,12 +496,84 @@ async def purchase_buy_now(
         quantity_purchased=purchase.quantity,
         price_per_unit=price_per_unit,
         total_amount=total_amount,
-        payment_status="pending"
+        payment_status=payment_status,
+        payment_method=purchase.payment_method
     )
 
     transaction_dict = transaction.model_dump()
     transaction_dict["transaction_date"] = transaction_dict["transaction_date"].isoformat()
     await db.buy_now_transactions.insert_one(transaction_dict)
+
+    # For offline methods, also create an offline order record
+    if is_offline:
+        seller = await db.users.find_one({"id": auction.get("seller_id")}, {"_id": 0, "email": 1, "name": 1, "interac_email": 1})
+        interac_email = seller.get("interac_email", seller.get("email", "")) if seller else ""
+
+        offline_order = {
+            "id": str(uuid_mod.uuid4()),
+            "listing_id": purchase.auction_id,
+            "lot_number": purchase.lot_number,
+            "buyer_id": current_user.id,
+            "seller_id": auction.get("seller_id"),
+            "payment_method": purchase.payment_method,
+            "order_status": "reserved",
+            "payment_status": "waiting_for_offline_confirmation",
+            "amount": total_amount,
+            "quantity": purchase.quantity,
+            "lot_title": target_lot.get("title", ""),
+            "interac_email": interac_email if purchase.payment_method == "etransfer" else None,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.offline_orders.insert_one(offline_order)
+
+        # Send offline payment instructions email
+        try:
+            buyer_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0, "email": 1, "name": 1})
+            buyer_email = buyer_doc.get("email", current_user.email) if buyer_doc else current_user.email
+            buyer_name = buyer_doc.get("name", "Buyer") if buyer_doc else "Buyer"
+
+            if purchase.payment_method == "etransfer":
+                email_subject = f"E-Transfer Instructions — Lot #{purchase.lot_number}: {target_lot.get('title', 'Item')}"
+                email_body = (
+                    f"<h2>E-Transfer Payment Instructions</h2>"
+                    f"<p>Hi {buyer_name},</p>"
+                    f"<p>Your order for <strong>Lot #{purchase.lot_number}: {target_lot.get('title', 'Item')}</strong> is confirmed.</p>"
+                    f"<p><strong>Amount:</strong> ${total_amount:.2f}</p>"
+                    f"<p><strong>Send Interac E-Transfer to:</strong> {interac_email}</p>"
+                    f"<p>Please include your order reference in the message field.</p>"
+                    f"<hr/>"
+                    f"<h3>Instructions de virement Interac</h3>"
+                    f"<p>Bonjour {buyer_name},</p>"
+                    f"<p>Votre commande pour <strong>Lot #{purchase.lot_number}: {target_lot.get('title', 'Item')}</strong> est confirmée.</p>"
+                    f"<p><strong>Montant:</strong> ${total_amount:.2f}</p>"
+                    f"<p><strong>Envoyer le virement Interac à:</strong> {interac_email}</p>"
+                )
+            else:
+                email_subject = f"Cash Payment — Lot #{purchase.lot_number}: {target_lot.get('title', 'Item')}"
+                email_body = (
+                    f"<h2>Cash Payment — Pickup Arrangement</h2>"
+                    f"<p>Hi {buyer_name},</p>"
+                    f"<p>Your order for <strong>Lot #{purchase.lot_number}: {target_lot.get('title', 'Item')}</strong> is confirmed.</p>"
+                    f"<p><strong>Amount Due:</strong> ${total_amount:.2f}</p>"
+                    f"<p>Please contact the seller to arrange local pickup and cash payment.</p>"
+                    f"<hr/>"
+                    f"<h3>Paiement comptant — Arrangement de cueillette</h3>"
+                    f"<p>Bonjour {buyer_name},</p>"
+                    f"<p>Votre commande pour <strong>Lot #{purchase.lot_number}: {target_lot.get('title', 'Item')}</strong> est confirmée.</p>"
+                    f"<p><strong>Montant dû:</strong> ${total_amount:.2f}</p>"
+                    f"<p>Veuillez contacter le vendeur pour organiser la cueillette locale et le paiement comptant.</p>"
+                )
+
+            from services.email_service import get_email_service
+            email_svc = get_email_service()
+            if email_svc.is_configured():
+                await email_svc.send_raw_html(buyer_email, email_subject, email_body)
+                logger.info(f"Offline payment email sent to {buyer_email} for lot #{purchase.lot_number}")
+            else:
+                logger.info(f"Email service not configured — offline payment instructions for lot #{purchase.lot_number} logged only")
+        except Exception as email_err:
+            logger.warning(f"Failed to send offline payment email: {email_err}")
 
     if _ws_manager:
         await _ws_manager.broadcast(
@@ -591,6 +667,8 @@ Please coordinate pickup/delivery directly. Thank you for using BidVex!
     except Exception as e:
         logger.error(f"Failed to create handshake for Buy Now: {e}")
 
+    payment_method_label = {"stripe": "Credit Card", "cash": "Cash", "etransfer": "E-Transfer"}.get(purchase.payment_method, purchase.payment_method)
+
     return {
         "success": True,
         "transaction_id": transaction.id,
@@ -598,7 +676,11 @@ Please coordinate pickup/delivery directly. Thank you for using BidVex!
         "available_quantity": new_available_qty,
         "lot_status": new_lot_status,
         "conversation_id": conversation_id,
-        "message": "Purchase successful! A chat with the seller has been created."
+        "payment_method": purchase.payment_method,
+        "payment_status": payment_status,
+        "message": f"Purchase confirmed via {payment_method_label}! A chat with the seller has been created."
+            if not is_offline else
+            f"Order confirmed via {payment_method_label}. {'E-Transfer instructions sent to your email.' if purchase.payment_method == 'etransfer' else 'Please arrange pickup with the seller.'}"
     }
 
 

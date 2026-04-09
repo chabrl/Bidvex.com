@@ -14,9 +14,11 @@ import {
   ArrowLeft, Gavel, AlertCircle, TrendingUp,
   Grid as GridIcon, List as ListIcon, Menu, X, Flame, Heart, Info,
   Zap, ShoppingCart, Loader2, Truck, Building2, Shield, DollarSign,
-  Scale, Wrench, HardHat, CheckCircle, XCircle, FileText
+  Scale, Wrench, HardHat, CheckCircle, XCircle, FileText,
+  CreditCard, Banknote, Send
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import Countdown from 'react-countdown';
 import Lightbox from 'react-image-lightbox';
 import 'react-image-lightbox/style.css';
@@ -64,6 +66,9 @@ const MultiItemListingDetailPage = () => {
   const [selectedLot, setSelectedLot] = useState(null);
   const [showFullTerms, setShowFullTerms] = useState(false);
   const [buyNowLoading, setBuyNowLoading] = useState({});
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [paymentModalLot, setPaymentModalLot] = useState(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('stripe');
   const [verificationModalOpen, setVerificationModalOpen] = useState(false);
   const [verificationAction, setVerificationAction] = useState('bid');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -290,8 +295,8 @@ const MultiItemListingDetailPage = () => {
     }
   };
 
-  // Buy Now Handler
-  const handleBuyNow = async (lot) => {
+  // Buy Now Handler — opens payment method selection modal
+  const handleBuyNow = (lot) => {
     if (!user) {
       toast.error('Please login to purchase');
       navigate('/auth');
@@ -305,6 +310,16 @@ const MultiItemListingDetailPage = () => {
       return;
     }
 
+    setPaymentModalLot(lot);
+    setSelectedPaymentMethod('stripe');
+    setPaymentModalOpen(true);
+  };
+
+  // Confirm Buy Now — executes the actual purchase
+  const confirmBuyNow = async () => {
+    if (!paymentModalLot) return;
+    const lot = paymentModalLot;
+    setPaymentModalOpen(false);
     setBuyNowLoading(prev => ({ ...prev, [lot.lot_number]: true }));
     
     try {
@@ -313,12 +328,24 @@ const MultiItemListingDetailPage = () => {
         {
           listing_id: id,
           lot_number: lot.lot_number,
-          quantity: 1
+          quantity: 1,
+          payment_method: selectedPaymentMethod
         },
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
       
-      toast.success(`Congratulations! You purchased "${getLocalized(lot, 'title')}" for ${formatCurrency(lot.buy_now_price)}!`);
+      const isOffline = selectedPaymentMethod === 'cash' || selectedPaymentMethod === 'etransfer';
+      
+      if (isOffline) {
+        toast.success(
+          selectedPaymentMethod === 'etransfer'
+            ? `Order confirmed! E-Transfer instructions sent to your email.`
+            : `Order confirmed! Please arrange pickup with the seller.`,
+          { duration: 6000 }
+        );
+      } else {
+        toast.success(`Congratulations! You purchased "${getLocalized(lot, 'title')}" for ${formatCurrency(lot.buy_now_price)}!`);
+      }
       
       // Refresh listing to update lot status
       fetchListing();
@@ -335,6 +362,7 @@ const MultiItemListingDetailPage = () => {
       toast.error(errorMessage || 'Failed to complete purchase');
     } finally {
       setBuyNowLoading(prev => ({ ...prev, [lot.lot_number]: false }));
+      setPaymentModalLot(null);
     }
   };
 
@@ -1637,6 +1665,99 @@ const MultiItemListingDetailPage = () => {
         onClose={() => setVerificationModalOpen(false)}
         action={verificationAction}
       />
+
+      {/* Payment Method Selection Dialog */}
+      <Dialog open={paymentModalOpen} onOpenChange={setPaymentModalOpen}>
+        <DialogContent className="sm:max-w-md" data-testid="payment-method-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-[#06B6D4]" />
+              {t('checkout.selectPayment', 'Select Payment Method')}
+            </DialogTitle>
+          </DialogHeader>
+
+          {paymentModalLot && (
+            <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3 mb-2">
+              <p className="font-medium text-sm">{getLocalized(paymentModalLot, 'title')}</p>
+              <p className="text-lg font-bold text-[#1E3A8A] dark:text-white" data-testid="payment-dialog-price">
+                {formatCurrency(paymentModalLot.buy_now_price)}
+              </p>
+            </div>
+          )}
+
+          <div className="space-y-2" data-testid="payment-method-options">
+            {/* Stripe */}
+            <label data-testid="lot-payment-method-stripe"
+              className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                selectedPaymentMethod === 'stripe' ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
+              }`}>
+              <input type="radio" name="lotPaymentMethod" value="stripe" checked={selectedPaymentMethod === 'stripe'}
+                onChange={() => setSelectedPaymentMethod('stripe')} className="mt-1 accent-blue-600" />
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-blue-600" />
+                  <span className="font-medium">{t('checkout.creditCard', 'Credit Card')}</span>
+                  <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded-full font-medium">{t('checkout.recommended', 'Recommended')}</span>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">{t('checkout.stripeDesc', 'Secure payment via Stripe. Visa, Mastercard, Amex.')}</p>
+              </div>
+            </label>
+            {/* Cash */}
+            <label data-testid="lot-payment-method-cash"
+              className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                selectedPaymentMethod === 'cash' ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
+              }`}>
+              <input type="radio" name="lotPaymentMethod" value="cash" checked={selectedPaymentMethod === 'cash'}
+                onChange={() => setSelectedPaymentMethod('cash')} className="mt-1 accent-emerald-600" />
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <Banknote className="h-4 w-4 text-emerald-600" />
+                  <span className="font-medium">{t('checkout.cash', 'Cash')}</span>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">{t('checkout.cashDesc', 'Pay in person at local pickup.')}</p>
+              </div>
+            </label>
+            {/* E-Transfer */}
+            <label data-testid="lot-payment-method-etransfer"
+              className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                selectedPaymentMethod === 'etransfer' ? 'border-purple-500 bg-purple-50/50 dark:bg-purple-950/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
+              }`}>
+              <input type="radio" name="lotPaymentMethod" value="etransfer" checked={selectedPaymentMethod === 'etransfer'}
+                onChange={() => setSelectedPaymentMethod('etransfer')} className="mt-1 accent-purple-600" />
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <Send className="h-4 w-4 text-purple-600" />
+                  <span className="font-medium">{t('checkout.etransfer', 'Interac E-Transfer')}</span>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">{t('checkout.etransferDesc', 'Instructions will be sent via email.')}</p>
+              </div>
+            </label>
+          </div>
+
+          <DialogFooter className="mt-2">
+            <Button variant="outline" onClick={() => setPaymentModalOpen(false)} data-testid="payment-dialog-cancel">
+              {t('common.cancel', 'Cancel')}
+            </Button>
+            <Button
+              onClick={confirmBuyNow}
+              data-testid="payment-dialog-confirm"
+              className={
+                selectedPaymentMethod === 'stripe' ? 'bg-blue-600 hover:bg-blue-700' :
+                selectedPaymentMethod === 'cash' ? 'bg-emerald-600 hover:bg-emerald-700' :
+                'bg-purple-600 hover:bg-purple-700'
+              }
+            >
+              {selectedPaymentMethod === 'stripe' ? (
+                <><CreditCard className="h-4 w-4 mr-1.5" />{t('checkout.payNow', 'Pay Now')}</>
+              ) : selectedPaymentMethod === 'cash' ? (
+                <><Banknote className="h-4 w-4 mr-1.5" />{t('checkout.confirmOrder', 'Confirm Order')}</>
+              ) : (
+                <><Send className="h-4 w-4 mr-1.5" />{t('checkout.confirmEtransfer', 'Confirm E-Transfer')}</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
