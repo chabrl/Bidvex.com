@@ -809,6 +809,8 @@ async def complete_auction_and_send_documents(
     if current_user.account_type != "admin":
         raise HTTPException(status_code=403, detail="Admin privileges required")
     
+    db = get_db()
+    
     # Fetch auction
     auction = await db.multi_item_listings.find_one({"id": auction_id})
     if not auction:
@@ -819,8 +821,8 @@ async def complete_auction_and_send_documents(
     if not seller:
         raise HTTPException(status_code=404, detail="Seller not found")
     
-    # Initialize mock email service
-    email_service = MockEmailService(db=db)
+    # Initialize real email service
+    email_service = get_email_service()
     
     results = {
         "auction_id": auction_id,
@@ -865,18 +867,25 @@ async def complete_auction_and_send_documents(
         except Exception as e:
             results['errors'].append(f"Commission Invoice: {str(e)}")
         
-        # Send seller email (mock)
+        # Send seller email via SendGrid
         if seller_pdf_paths:
-            email_sent = await email_service.send_seller_documents_email(
-                recipient_email=seller['email'],
-                recipient_name=seller['name'],
-                auction_title=auction['title'],
-                total_hammer=total_hammer,
-                lots_sold=lots_sold,
-                net_payout=net_payout,
-                pdf_paths=seller_pdf_paths,
-                lang=lang
-            )
+            subject = f"Vos résultats d'enchère - {auction['title']}" if lang == "fr" else f"Your Auction Results - {auction['title']}"
+            html_body = f"""
+            <html><body style="font-family: Arial, sans-serif; padding: 20px;">
+            <h2>{'Résultats de l\\'enchère' if lang == 'fr' else 'Auction Results'}</h2>
+            <p>{'Cher' if lang == 'fr' else 'Dear'} {seller['name'].split()[0]},</p>
+            <p>{'Votre enchère' if lang == 'fr' else 'Your auction'} "<strong>{auction['title']}</strong>" {'est maintenant terminée.' if lang == 'fr' else 'has now concluded.'}</p>
+            <table style="border-collapse: collapse; margin: 20px 0;">
+                <tr><td style="padding: 8px; border: 1px solid #ddd;">{'Lots vendus' if lang == 'fr' else 'Lots Sold'}</td><td style="padding: 8px; border: 1px solid #ddd;">{lots_sold}</td></tr>
+                <tr><td style="padding: 8px; border: 1px solid #ddd;">{'Valeur totale' if lang == 'fr' else 'Total Hammer Value'}</td><td style="padding: 8px; border: 1px solid #ddd;">${total_hammer:,.2f} CAD</td></tr>
+                <tr><td style="padding: 8px; border: 1px solid #ddd;">{'Paiement net' if lang == 'fr' else 'Net Payout'}</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>${net_payout:,.2f} CAD</strong></td></tr>
+            </table>
+            <p>{'Vos documents sont disponibles dans votre tableau de bord.' if lang == 'fr' else 'Your auction documents are available in your dashboard.'}</p>
+            <p>{'Cordialement,' if lang == 'fr' else 'Sincerely,'}<br>{'L\\'équipe BidVex' if lang == 'fr' else 'The BidVex Team'}</p>
+            </body></html>
+            """
+            result = await email_service.send_raw_html(seller['email'], subject, html_body)
+            email_sent = result.get("success", False)
             
             if email_sent:
                 results['emails_sent'].append({
@@ -938,18 +947,25 @@ async def complete_auction_and_send_documents(
             except Exception as e:
                 results['errors'].append(f"Payment Letter (Buyer {buyer_id[:8]}): {str(e)}")
             
-            # Send buyer email (mock)
+            # Send buyer email via SendGrid
             if buyer_pdf_paths:
-                email_sent = await email_service.send_buyer_invoice_email(
-                    recipient_email=buyer['email'],
-                    recipient_name=buyer['name'],
-                    auction_title=auction['title'],
-                    invoice_number=invoice_number,
-                    total_due=total_due,
-                    paddle_number=paddle_number,
-                    pdf_paths=buyer_pdf_paths,
-                    lang=lang
-                )
+                subject = f"Votre facture d'enchère #{invoice_number} - Paiement requis" if lang == "fr" else f"Your Auction Invoice #{invoice_number} - Payment Required"
+                html_body = f"""
+                <html><body style="font-family: Arial, sans-serif; padding: 20px;">
+                <h2>{'Facture d\\'enchère' if lang == 'fr' else 'Auction Invoice'}</h2>
+                <p>{'Cher' if lang == 'fr' else 'Dear'} {buyer['name'].split()[0]},</p>
+                <p>{'Félicitations pour vos enchères réussies!' if lang == 'fr' else 'Congratulations on your successful bids!'}</p>
+                <table style="border-collapse: collapse; margin: 20px 0;">
+                    <tr><td style="padding: 8px; border: 1px solid #ddd;">{'Numéro de facture' if lang == 'fr' else 'Invoice Number'}</td><td style="padding: 8px; border: 1px solid #ddd;">{invoice_number}</td></tr>
+                    <tr><td style="padding: 8px; border: 1px solid #ddd;">{'Numéro de palette' if lang == 'fr' else 'Paddle Number'}</td><td style="padding: 8px; border: 1px solid #ddd;">{paddle_number}</td></tr>
+                    <tr><td style="padding: 8px; border: 1px solid #ddd;">{'Montant total dû' if lang == 'fr' else 'Total Amount Due'}</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>${total_due:,.2f} CAD</strong></td></tr>
+                </table>
+                <p>{'Veuillez consulter votre tableau de bord pour les instructions de paiement.' if lang == 'fr' else 'Please refer to your dashboard for detailed payment instructions.'}</p>
+                <p>{'Cordialement,' if lang == 'fr' else 'Sincerely,'}<br>{'L\\'équipe BidVex' if lang == 'fr' else 'The BidVex Team'}</p>
+                </body></html>
+                """
+                result = await email_service.send_raw_html(buyer['email'], subject, html_body)
+                email_sent = result.get("success", False)
                 
                 if email_sent:
                     results['emails_sent'].append({
