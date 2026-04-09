@@ -483,15 +483,20 @@ class UserContactCreateRequest(BaseModel):
     email: EmailStr
     name: Optional[str] = None
     tags: Optional[List[str]] = None
+    consent_confirmed: bool = False
 
 class UserContactBulkRequest(BaseModel):
-    contacts: List[Dict]
+    emails: List[str]
+    consent_confirmed: bool = False
 
 class UserCampaignCreateRequest(BaseModel):
     name: str
     subject: str
+    html_content: Optional[str] = None
+    plain_text_content: Optional[str] = None
     content: Optional[str] = None
     template_id: Optional[str] = None
     contact_ids: Optional[List[str]] = None
+    auction_id: Optional[str] = None
     tags: Optional[List[str]] = None
     scheduled_at: Optional[str] = None
