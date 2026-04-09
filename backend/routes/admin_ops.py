@@ -288,7 +288,7 @@ async def admin_get_auctions(status: str = None, current_user: User = Depends(re
         query["status"] = status
     
     listings = await db.listings.find(query, {"_id": 0}).sort("created_at", -1).limit(100).to_list(100)
-    return [Listing(**listing) for listing in listings]
+    return listings
 
 
 
@@ -635,6 +635,7 @@ async def admin_transaction_logs(
     current_user: User = Depends(require_admin)
 ):
     """Admin: Searchable transaction history with partner/BidVex fee split."""
+    db = get_db()
     query = {}
     if partner_only:
         query["is_partner_transaction"] = True

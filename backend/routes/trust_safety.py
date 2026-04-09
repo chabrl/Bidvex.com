@@ -142,7 +142,16 @@ async def get_fraud_flags(current_user: User = Depends(get_current_user)):
     for bid in bids:
         user = await db.users.find_one({"id": bid.get("bidder_id")})
         if user:
-            account_age_days = (datetime.now(timezone.utc) - datetime.fromisoformat(user["created_at"])).days
+            created_at = user.get("created_at")
+            if isinstance(created_at, str):
+                created_dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+            elif isinstance(created_at, datetime):
+                created_dt = created_at if created_at.tzinfo else created_at.replace(tzinfo=timezone.utc)
+            else:
+                continue
+            if created_dt.tzinfo is None:
+                created_dt = created_dt.replace(tzinfo=timezone.utc)
+            account_age_days = (datetime.now(timezone.utc) - created_dt).days
             if account_age_days < 7 and bid.get("amount", 0) > 500:
                 flags.append({
                     "type": "new_account_high_bid",

@@ -1,0 +1,393 @@
+{
+  "total": 76,
+  "passed": 67,
+  "failed": 9,
+  "partial": 0,
+  "details": {
+    "passed": [
+      {
+        "s": "Auth",
+        "t": "Admin Login",
+        "d": "role=admin"
+      },
+      {
+        "s": "Auth",
+        "t": "Starter User Login",
+        "d": "id=f31a81ac-0ad4-4aa9-9f36-3ea0a9acc07c"
+      },
+      {
+        "s": "Auth",
+        "t": "Premium User Login",
+        "d": "id=9998dcba-047f-4581-9005-2530fbee8bfb"
+      },
+      {
+        "s": "Auth",
+        "t": "Invalid Login Rejection",
+        "d": "Status 401"
+      },
+      {
+        "s": "Auth",
+        "t": "Registration",
+        "d": "id=bf2cc408-fe13-4710-b908-098326695027"
+      },
+      {
+        "s": "Auth",
+        "t": "JWT Validation (/me)",
+        "d": "Status 200"
+      },
+      {
+        "s": "Auth",
+        "t": "Forgot Password",
+        "d": "Status 200"
+      },
+      {
+        "s": "Auth",
+        "t": "Invalid Token Rejection",
+        "d": "Status 401"
+      },
+      {
+        "s": "Health",
+        "t": "Health Check",
+        "d": "healthy"
+      },
+      {
+        "s": "Health",
+        "t": "HEAD Health",
+        "d": "Status 200"
+      },
+      {
+        "s": "Health",
+        "t": "Site Config",
+        "d": "Has branding"
+      },
+      {
+        "s": "Health",
+        "t": "Site Mode Live",
+        "d": "mode=live"
+      },
+      {
+        "s": "Health",
+        "t": "CORS",
+        "d": "ACAO=*"
+      },
+      {
+        "s": "Health",
+        "t": "Response Time",
+        "d": "127ms"
+      },
+      {
+        "s": "Buyer",
+        "t": "Listings",
+        "d": "count=9"
+      },
+      {
+        "s": "Buyer",
+        "t": "Listing Detail",
+        "d": "id=37e196bf-7d47-487e-85c5-7585108fe655"
+      },
+      {
+        "s": "Buyer",
+        "t": "Categories",
+        "d": "Status 200"
+      },
+      {
+        "s": "Buyer",
+        "t": "Search",
+        "d": "Status 200"
+      },
+      {
+        "s": "Buyer",
+        "t": "Ending Soon",
+        "d": "Status 200"
+      },
+      {
+        "s": "Buyer",
+        "t": "Watchlist",
+        "d": "Status 200"
+      },
+      {
+        "s": "Buyer",
+        "t": "Notifications",
+        "d": "Status 200"
+      },
+      {
+        "s": "Buyer",
+        "t": "Dashboard",
+        "d": "Status 200"
+      },
+      {
+        "s": "Buyer",
+        "t": "Bid History",
+        "d": "Status 200"
+      },
+      {
+        "s": "Buyer",
+        "t": "Fee Calculator",
+        "d": "Status 200"
+      },
+      {
+        "s": "Buyer",
+        "t": "Multi-Item Listings",
+        "d": "Status 200"
+      },
+      {
+        "s": "Seller",
+        "t": "Seller Listings",
+        "d": "count=6"
+      },
+      {
+        "s": "Seller",
+        "t": "Seller Dashboard",
+        "d": "Status 200"
+      },
+      {
+        "s": "Seller",
+        "t": "Regional Trends",
+        "d": "Status 200"
+      },
+      {
+        "s": "Seller",
+        "t": "Invoices",
+        "d": "Status 200"
+      },
+      {
+        "s": "Seller",
+        "t": "Profile",
+        "d": "Status 200"
+      },
+      {
+        "s": "Seller",
+        "t": "Reviews",
+        "d": "Status 200"
+      },
+      {
+        "s": "Admin",
+        "t": "User Management",
+        "d": "Status 200"
+      },
+      {
+        "s": "Admin",
+        "t": "Listings (all)",
+        "d": "Status 200"
+      },
+      {
+        "s": "Admin",
+        "t": "Multi-Item Listings",
+        "d": "Status 200"
+      },
+      {
+        "s": "Admin",
+        "t": "Analytics",
+        "d": "Status 200"
+      },
+      {
+        "s": "Admin",
+        "t": "Fraud Flags",
+        "d": "Status 200"
+      },
+      {
+        "s": "Admin",
+        "t": "Site Config",
+        "d": "Status 200"
+      },
+      {
+        "s": "Admin",
+        "t": "Email Templates",
+        "d": "Status 200"
+      },
+      {
+        "s": "Admin",
+        "t": "Subscribers",
+        "d": "Status 200"
+      },
+      {
+        "s": "Admin",
+        "t": "Partners",
+        "d": "Status 200"
+      },
+      {
+        "s": "Admin",
+        "t": "Auctions",
+        "d": "Status 200"
+      },
+      {
+        "s": "Admin",
+        "t": "Admin Logs",
+        "d": "Status 200"
+      },
+      {
+        "s": "Admin",
+        "t": "Transactions",
+        "d": "Status 200"
+      },
+      {
+        "s": "Admin",
+        "t": "Promotions",
+        "d": "Status 200"
+      },
+      {
+        "s": "Admin",
+        "t": "Reports",
+        "d": "Status 200"
+      },
+      {
+        "s": "Admin",
+        "t": "Affiliates",
+        "d": "Status 200"
+      },
+      {
+        "s": "Admin",
+        "t": "Pending Listings",
+        "d": "Status 200"
+      },
+      {
+        "s": "Admin",
+        "t": "Pending Lots",
+        "d": "Status 200"
+      },
+      {
+        "s": "Admin",
+        "t": "Revenue Analytics",
+        "d": "Status 200"
+      },
+      {
+        "s": "Admin",
+        "t": "User Analytics",
+        "d": "Status 200"
+      },
+      {
+        "s": "Admin",
+        "t": "Listing Analytics",
+        "d": "Status 200"
+      },
+      {
+        "s": "Admin",
+        "t": "Revenue Summary",
+        "d": "Status 200"
+      },
+      {
+        "s": "Admin",
+        "t": "Subscriber Stats",
+        "d": "Status 200"
+      },
+      {
+        "s": "Admin",
+        "t": "Deletion Requests",
+        "d": "Status 200"
+      },
+      {
+        "s": "Admin",
+        "t": "Collusion Patterns",
+        "d": "Status 200"
+      },
+      {
+        "s": "Notif",
+        "t": "VAPID Key",
+        "d": "len=87"
+      },
+      {
+        "s": "Notif",
+        "t": "Push Status",
+        "d": "Status 200"
+      },
+      {
+        "s": "Notif",
+        "t": "Email Templates",
+        "d": "Status 200"
+      },
+      {
+        "s": "Notif",
+        "t": "Notifications List",
+        "d": "Status 200"
+      },
+      {
+        "s": "Notif",
+        "t": "SendGrid Key in .env",
+        "d": "Present & formatted correctly"
+      },
+      {
+        "s": "Stripe",
+        "t": "API Key in .env",
+        "d": "Present"
+      },
+      {
+        "s": "Stripe",
+        "t": "Webhook Secret in .env",
+        "d": "Present"
+      },
+      {
+        "s": "Stripe",
+        "t": "Publishable Key in .env",
+        "d": "Present"
+      },
+      {
+        "s": "Stripe",
+        "t": "Payment Methods",
+        "d": "Status 200"
+      },
+      {
+        "s": "Stripe",
+        "t": "Subscription Status",
+        "d": "tier=vip"
+      },
+      {
+        "s": "Stripe",
+        "t": "Deposits",
+        "d": "Status 200"
+      },
+      {
+        "s": "Stripe",
+        "t": "Webhook Reachable",
+        "d": "Status 400 (rejects invalid)"
+      }
+    ],
+    "failed": [
+      {
+        "s": "Admin",
+        "t": "Payments",
+        "d": "Returns HTML (SPA fallthrough - no backend route)"
+      },
+      {
+        "s": "Admin",
+        "t": "Settings",
+        "d": "Returns HTML (SPA fallthrough - no backend route)"
+      },
+      {
+        "s": "Admin",
+        "t": "Trust Scores",
+        "d": "Returns HTML (SPA fallthrough - no backend route)"
+      },
+      {
+        "s": "Admin",
+        "t": "Vehicles",
+        "d": "Returns HTML (SPA fallthrough - no backend route)"
+      },
+      {
+        "s": "Admin",
+        "t": "Deposits",
+        "d": "Returns HTML (SPA fallthrough - no backend route)"
+      },
+      {
+        "s": "Admin",
+        "t": "Tax Dashboard",
+        "d": "Returns HTML (SPA fallthrough - no backend route)"
+      },
+      {
+        "s": "Admin",
+        "t": "Monitoring",
+        "d": "Returns HTML (SPA fallthrough - no backend route)"
+      },
+      {
+        "s": "Admin",
+        "t": "Team",
+        "d": "Returns HTML (SPA fallthrough - no backend route)"
+      },
+      {
+        "s": "Admin",
+        "t": "Finance Transactions",
+        "d": "Status 500 - Server Error"
+      }
+    ],
+    "partial": []
+  }
+}

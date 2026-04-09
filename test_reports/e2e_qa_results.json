@@ -1,0 +1,303 @@
+{
+  "passed": [
+    {
+      "section": "Auth",
+      "test": "Admin Login",
+      "details": "Status 200, token received, role=admin"
+    },
+    {
+      "section": "Auth",
+      "test": "Starter User Login",
+      "details": "Status 200, user_id=f31a81ac-0ad4-4aa9-9f36-3ea0a9acc07c"
+    },
+    {
+      "section": "Auth",
+      "test": "Premium User Login",
+      "details": "Status 200, user_id=9998dcba-047f-4581-9005-2530fbee8bfb"
+    },
+    {
+      "section": "Auth",
+      "test": "Invalid Login Rejection",
+      "details": "Status 401 correctly rejected"
+    },
+    {
+      "section": "Auth",
+      "test": "User Registration",
+      "details": "Registered qatest_1775697749@test.com, id=b9c12e84-9f8e-4325-95c8-7735a37794bc"
+    },
+    {
+      "section": "Auth",
+      "test": "JWT Token Validation (/auth/me)",
+      "details": "Status 200"
+    },
+    {
+      "section": "Auth",
+      "test": "Forgot Password Endpoint",
+      "details": "Status 200, endpoint reachable"
+    },
+    {
+      "section": "Auth",
+      "test": "Invalid Token Rejection",
+      "details": "Status 401 correctly rejected"
+    },
+    {
+      "section": "Health",
+      "test": "Health Check",
+      "details": "Status healthy"
+    },
+    {
+      "section": "Health",
+      "test": "HEAD Health Check",
+      "details": "Status 200"
+    },
+    {
+      "section": "Health",
+      "test": "Site Config",
+      "details": "Has branding, homepage_layout, hero_banners"
+    },
+    {
+      "section": "Health",
+      "test": "Site Mode is Live",
+      "details": "mode=live"
+    },
+    {
+      "section": "Health",
+      "test": "CORS Headers",
+      "details": "ACAO=*"
+    },
+    {
+      "section": "Health",
+      "test": "Response Time",
+      "details": "150ms (< 2000ms)"
+    },
+    {
+      "section": "Buyer",
+      "test": "Fetch Listings",
+      "details": "Status 200, count=9"
+    },
+    {
+      "section": "Buyer",
+      "test": "Listing Detail",
+      "details": "ID=37e196bf-7d47-487e-85c5-7585108fe655, status 200"
+    },
+    {
+      "section": "Buyer",
+      "test": "Categories",
+      "details": "Status 200, data received"
+    },
+    {
+      "section": "Buyer",
+      "test": "Search Listings",
+      "details": "Status 200"
+    },
+    {
+      "section": "Buyer",
+      "test": "Ending Soon Carousel",
+      "details": "Status 200, items=2"
+    },
+    {
+      "section": "Buyer",
+      "test": "Watchlist (Authenticated)",
+      "details": "Status 200"
+    },
+    {
+      "section": "Buyer",
+      "test": "Notifications",
+      "details": "Status 200"
+    },
+    {
+      "section": "Buyer",
+      "test": "User Dashboard",
+      "details": "Status 200"
+    },
+    {
+      "section": "Buyer",
+      "test": "Bid History",
+      "details": "Status 200"
+    },
+    {
+      "section": "Buyer",
+      "test": "Fee Calculator",
+      "details": "Status 200"
+    },
+    {
+      "section": "Seller",
+      "test": "Seller Dashboard",
+      "details": "Status 200"
+    },
+    {
+      "section": "Seller",
+      "test": "Regional Trends API",
+      "details": "Status 200, keys=['period', 'top_categories', 'top_regions', 'insights']"
+    },
+    {
+      "section": "Seller",
+      "test": "Invoices",
+      "details": "Status 200"
+    },
+    {
+      "section": "Seller",
+      "test": "Profile (me)",
+      "details": "Status 200"
+    },
+    {
+      "section": "Seller",
+      "test": "Seller Reviews",
+      "details": "Status 200"
+    },
+    {
+      "section": "Admin",
+      "test": "User List",
+      "details": "Status 200, count=20"
+    },
+    {
+      "section": "Admin",
+      "test": "Payments",
+      "details": "Status 200"
+    },
+    {
+      "section": "Admin",
+      "test": "Admin Settings",
+      "details": "Status 200"
+    },
+    {
+      "section": "Admin",
+      "test": "Analytics",
+      "details": "Status 200"
+    },
+    {
+      "section": "Admin",
+      "test": "Trust & Safety",
+      "details": "Status 200"
+    },
+    {
+      "section": "Admin",
+      "test": "Site Config Admin",
+      "details": "Status 200"
+    },
+    {
+      "section": "Admin",
+      "test": "Email Templates",
+      "details": "Status 200"
+    },
+    {
+      "section": "Admin",
+      "test": "Vehicles Admin",
+      "details": "Status 200"
+    },
+    {
+      "section": "Admin",
+      "test": "Subscribers",
+      "details": "Status 200, total=2"
+    },
+    {
+      "section": "Admin",
+      "test": "Deposits",
+      "details": "Status 200"
+    },
+    {
+      "section": "Admin",
+      "test": "Tax Dashboard",
+      "details": "Status 200"
+    },
+    {
+      "section": "Admin",
+      "test": "Monitoring",
+      "details": "Status 200"
+    },
+    {
+      "section": "Admin",
+      "test": "Partners",
+      "details": "Status 200"
+    },
+    {
+      "section": "Admin",
+      "test": "Team Management",
+      "details": "Status 200"
+    },
+    {
+      "section": "Admin",
+      "test": "Admin Logs",
+      "details": "Status 200"
+    },
+    {
+      "section": "Email/Notif",
+      "test": "VAPID Public Key",
+      "details": "Key present, len=87"
+    },
+    {
+      "section": "Email/Notif",
+      "test": "Push Status",
+      "details": "Status 200"
+    },
+    {
+      "section": "Email/Notif",
+      "test": "Email Templates",
+      "details": "Status 200"
+    },
+    {
+      "section": "Email/Notif",
+      "test": "Notifications List",
+      "details": "Status 200"
+    },
+    {
+      "section": "Stripe",
+      "test": "Stripe API Key Present",
+      "details": "Key starts with sk_*, len=16"
+    },
+    {
+      "section": "Stripe",
+      "test": "Payment Methods Endpoint",
+      "details": "Status 200"
+    },
+    {
+      "section": "Stripe",
+      "test": "Subscription Status",
+      "details": "Status 200, tier=vip"
+    },
+    {
+      "section": "Stripe",
+      "test": "Deposits Status",
+      "details": "Status 200"
+    },
+    {
+      "section": "Stripe",
+      "test": "Webhook Endpoint Reachable",
+      "details": "Status 400 (correctly rejects invalid payload)"
+    }
+  ],
+  "failed": [
+    {
+      "section": "Seller",
+      "test": "My Listings",
+      "details": "Status 404"
+    },
+    {
+      "section": "Admin",
+      "test": "Admin Listings",
+      "details": "Expecting value: line 1 column 1 (char 0)"
+    },
+    {
+      "section": "Admin",
+      "test": "Fraud Flags",
+      "details": "Expecting value: line 1 column 1 (char 0)"
+    },
+    {
+      "section": "Stripe",
+      "test": "Webhook Secret",
+      "details": "Missing or malformed"
+    }
+  ],
+  "partial": [
+    {
+      "section": "Admin",
+      "test": "Auctions",
+      "details": "Status 500"
+    },
+    {
+      "section": "Email/Notif",
+      "test": "SendGrid API Key",
+      "details": "Key missing or malformed"
+    }
+  ]
+}
