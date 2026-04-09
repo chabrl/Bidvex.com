@@ -75,6 +75,9 @@ const CreateMultiItemListing = () => {
   // Step 5: Promotion Selection
   const [promotionTier, setPromotionTier] = useState('standard'); // 'standard', 'premium', 'elite'
   const [promotionPaymentComplete, setPromotionPaymentComplete] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('stripe');
+  const [buyersPremiumPercent, setBuyersPremiumPercent] = useState('');
+  const isPartner = user?.is_partner === true || user?.role === 'partner' || user?.role === 'admin';
 
   const [uploadMethod, setUploadMethod] = useState('manual'); // 'manual', 'csv', 'images'
   const [csvData, setCsvData] = useState(null);
@@ -598,7 +601,10 @@ const CreateMultiItemListing = () => {
         agreement_accepted: finalAgreementAccepted,
         // Promotion tier
         promotion_tier: promotionTier !== 'standard' ? promotionTier : null,
-        is_promoted: promotionTier !== 'standard'
+        is_promoted: promotionTier !== 'standard',
+        // Payment method & Buyer's Premium
+        payment_method: paymentMethod,
+        buyers_premium_rate: isPartner && buyersPremiumPercent !== '' ? parseFloat(buyersPremiumPercent) / 100 : null,
       };
       const response = await axios.post(`${API}/multi-item-listings`, payload);
       toast.success(t('createListing.listingCreated'));
@@ -787,6 +793,64 @@ const CreateMultiItemListing = () => {
         <p className="text-xs text-muted-foreground">
           This determines the minimum bid increment buyers must follow. You can change this for each auction.
         </p>
+      </div>
+
+      {/* Buyer's Premium (Partner-Only) */}
+      <div className="space-y-2">
+        <Label htmlFor="buyers_premium_percent">Buyer's Premium (%)</Label>
+        {isPartner ? (
+          <>
+            <Input
+              id="buyers_premium_percent"
+              type="number"
+              step="0.5"
+              min="0"
+              max="25"
+              placeholder="0"
+              value={buyersPremiumPercent}
+              onChange={(e) => setBuyersPremiumPercent(e.target.value)}
+              data-testid="multi-buyers-premium-input"
+            />
+            <p className="text-xs text-muted-foreground">
+              Partner Exclusive: Set Buyer's Premium from 0% to 25%.
+            </p>
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground bg-slate-50 px-3 py-2 rounded" data-testid="multi-bp-locked-notice">
+            Buyer's Premium is a Partner-exclusive feature. Become a partner to set custom premiums.
+          </p>
+        )}
+      </div>
+
+      {/* Payment Method Selection */}
+      <div className="space-y-3" data-testid="multi-payment-method-section">
+        <Label>Payment Method</Label>
+        <div className="grid grid-cols-1 gap-2">
+          <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${paymentMethod === 'stripe' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
+            <input type="radio" name="multi_payment_method" value="stripe" checked={paymentMethod === 'stripe'} onChange={(e) => setPaymentMethod(e.target.value)} className="text-blue-600" data-testid="multi-payment-stripe" />
+            <div>
+              <span className="font-medium text-sm">Stripe (BidVex)</span>
+              <span className="ml-2 text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">Recommended</span>
+              <p className="text-xs text-muted-foreground mt-0.5">More secure and automated for both parties.</p>
+            </div>
+          </label>
+          <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${paymentMethod === 'cash' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
+            <input type="radio" name="multi_payment_method" value="cash" checked={paymentMethod === 'cash'} onChange={(e) => setPaymentMethod(e.target.value)} data-testid="multi-payment-cash" />
+            <span className="font-medium text-sm">Cash</span>
+          </label>
+          <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${paymentMethod === 'e-transfer' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
+            <input type="radio" name="multi_payment_method" value="e-transfer" checked={paymentMethod === 'e-transfer'} onChange={(e) => setPaymentMethod(e.target.value)} data-testid="multi-payment-etransfer" />
+            <span className="font-medium text-sm">E-Transfer (Interac)</span>
+          </label>
+        </div>
+        {(paymentMethod === 'cash' || paymentMethod === 'e-transfer') && (
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-md" data-testid="multi-payment-legal-notice">
+            <p className="text-sm text-amber-800 font-medium">Legal Disclosure</p>
+            <p className="text-xs text-amber-700 mt-1">
+              BidVex will invoice the seller for the Platform Fee + Buyer's Premium + Applicable Taxes upon sale.
+            </p>
+          </div>
+        )}
       </div>
       
       {/* Number of Lots */}

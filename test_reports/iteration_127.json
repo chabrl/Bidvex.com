@@ -1,0 +1,72 @@
+{
+  "summary": "Frontend testing complete for Payment Method selector and Buyer's Premium access control changes. All 8 test cases passed. Multi-Item and Single-Item listing forms correctly show Payment Method options (Stripe/Cash/E-Transfer) and Buyer's Premium is properly restricted to Partner users only.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_results": {
+    "multi_item_form_admin_user": {
+      "buyers_premium_input": {"status": "PASS", "details": "Buyer's Premium input visible with data-testid='multi-buyers-premium-input' and text 'Partner Exclusive: Set Buyer's Premium from 0% to 25%.'"},
+      "payment_method_section": {"status": "PASS", "details": "Payment Method section visible with data-testid='multi-payment-method-section'"},
+      "stripe_option": {"status": "PASS", "details": "Stripe option visible with data-testid='multi-payment-stripe', selected by default, shows 'Recommended' badge"},
+      "cash_option": {"status": "PASS", "details": "Cash option visible with data-testid='multi-payment-cash'"},
+      "etransfer_option": {"status": "PASS", "details": "E-Transfer option visible with data-testid='multi-payment-etransfer'"}
+    },
+    "multi_item_form_non_partner_user": {
+      "buyers_premium_locked": {"status": "PASS", "details": "Buyer's Premium shows locked notice with data-testid='multi-bp-locked-notice': 'Buyer's Premium is a Partner-exclusive feature. Become a partner to set custom premiums.'"},
+      "payment_method_visible": {"status": "PASS", "details": "Payment Method section still visible for non-partner users with all 3 options"}
+    },
+    "single_item_form_admin_user": {
+      "buyers_premium_input": {"status": "PASS", "details": "Buyer's Premium input visible with data-testid='buyers-premium-input' and text 'Partner Exclusive: Set Buyer's Premium from 0% to 25%.'"},
+      "payment_method_section": {"status": "PASS", "details": "Payment Method section visible with data-testid='payment-method-section'"},
+      "stripe_option": {"status": "PASS", "details": "Stripe option visible with data-testid='payment-stripe', selected by default"},
+      "cash_option": {"status": "PASS", "details": "Cash option visible with data-testid='payment-cash'"},
+      "etransfer_option": {"status": "PASS", "details": "E-Transfer option visible with data-testid='payment-etransfer'"}
+    },
+    "single_item_form_non_partner_user": {
+      "buyers_premium_locked": {"status": "PASS", "details": "Buyer's Premium shows locked notice with data-testid='bp-locked-notice': 'Buyer's Premium is a Partner-exclusive feature. Become a partner to set custom premiums.'"},
+      "message_mentions_partner": {"status": "PASS", "details": "Message correctly mentions 'partner' (not OPC) - this is the key change from isOpcCertified to isPartner"},
+      "payment_method_visible": {"status": "PASS", "details": "Payment Method section still visible for non-partner users with all 3 options"}
+    }
+  },
+  "code_review": {
+    "CreateMultiItemListing.js": {
+      "line_78_80": "paymentMethod state (default 'stripe'), buyersPremiumPercent state, isPartner check correctly implemented",
+      "line_606_607": "Payload includes payment_method and buyers_premium_rate (only if isPartner and value provided)"
+    },
+    "CreateListingPage.js": {
+      "line_48_49": "isOpcCertified still defined but isPartner is now used for Buyer's Premium access control",
+      "line_319_347": "Buyer's Premium UI correctly uses isPartner check instead of isOpcCertified"
+    }
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Both forms correctly implement isPartner check: user?.is_partner === true || user?.role === 'partner' || user?.role === 'admin'",
+    "Payment method defaults to 'stripe' which is the recommended option",
+    "Buyer's Premium rate is only included in payload when isPartner is true and a value is provided",
+    "The locked notice message correctly mentions 'partner' instead of 'OPC' for non-partner users"
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "N/A (frontend-only testing)",
+    "frontend": "100% (All 8 test cases passed)"
+  },
+  "test_credentials": {
+    "admin": "charbel911@gmail.com / Admin123!",
+    "non_partner": "starter@test.com / TestUser2026!"
+  },
+  "seed_data_creation": "",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Payment Method selector and Buyer's Premium access control changes verified. Multi-Item form at /create-multi-item-listing and Single-Item form at /create-listing both have: 1) Payment Method section with 3 options (Stripe/Cash/E-Transfer), 2) Buyer's Premium input for admin/partner users, 3) Locked notice for non-partner users. Key data-testids: multi-buyers-premium-input, multi-bp-locked-notice, multi-payment-method-section, multi-payment-stripe/cash/etransfer (multi-item form), buyers-premium-input, bp-locked-notice, payment-method-section, payment-stripe/cash/etransfer (single-item form).",
+  "mocked_apis": {
+    "has_mocked_apis": false,
+    "mocked_apis_list": []
+  }
+}

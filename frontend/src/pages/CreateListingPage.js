@@ -46,6 +46,7 @@ const CreateListingPage = () => {
   // Buyer's Premium — default to org setting
   const [buyersPremiumPercent, setBuyersPremiumPercent] = useState('');
   const isOpcCertified = user?.is_opc_certified === true;
+  const isPartner = user?.is_partner === true || user?.role === 'partner' || user?.role === 'admin';
 
   // Seller Payment Method
   const [paymentMethod, setPaymentMethod] = useState('stripe');
@@ -316,7 +317,7 @@ const CreateListingPage = () => {
 
               <div className="space-y-2">
                 <Label htmlFor="buyers_premium_percent">{t('createListing.buyersPremium', "Buyer's Premium (%)")}</Label>
-                {isOpcCertified ? (
+                {isPartner ? (
                   <>
                     <Input
                       id="buyers_premium_percent"
@@ -329,20 +330,13 @@ const CreateListingPage = () => {
                       onChange={(e) => setBuyersPremiumPercent(e.target.value)}
                       data-testid="buyers-premium-input"
                     />
-                    {(!buyersPremiumPercent || buyersPremiumPercent === '0') && (
-                      <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-md">
-                        <span className="text-emerald-700 text-sm font-medium" data-testid="opc-badge">
-                          Vendeur Certifie OPC : 0 $ de frais d'achat
-                        </span>
-                      </div>
-                    )}
                     <p className="text-xs text-muted-foreground">
-                      OPC-Certified: You may set Buyer's Premium from 0% to 25%.
+                      Partner Exclusive: Set Buyer's Premium from 0% to 25%.
                     </p>
                   </>
                 ) : (
                   <p className="text-sm text-muted-foreground bg-slate-50 px-3 py-2 rounded" data-testid="bp-locked-notice">
-                    Buyer's Premium is set by your organization. Contact support to become OPC-certified.
+                    Buyer's Premium is a Partner-exclusive feature. Become a partner to set custom premiums.
                   </p>
                 )}
               </div>
