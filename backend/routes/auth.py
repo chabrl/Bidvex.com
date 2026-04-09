@@ -74,6 +74,11 @@ class ResetPasswordRequest(BaseModel):
     new_password: str
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -579,6 +584,73 @@ async def verify_reset_token(token: str):
 
 # Export the router
 __all__ = ['auth_router', 'set_auth_db', 'get_current_user_from_token']
+
+
+@auth_router.post("/change-password")
+async def change_password(
+    request: ChangePasswordRequest,
+    current_user: dict = Depends(get_current_user_from_token)
+):
+    """
+    Authenticated password change.
+    Requires current password verification before updating.
+    """
+    try:
+        user_doc = await db.users.find_one({"id": current_user["id"]}, {"_id": 0})
+        if not user_doc:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Verify current password
+        if not verify_password(request.current_password, user_doc.get("password", "")):
+            raise HTTPException(status_code=400, detail="Current password is incorrect")
+
+        # Validate new password strength
+        new_pw = request.new_password
+        if len(new_pw) < 8:
+            raise HTTPException(status_code=400, detail="New password must be at least 8 characters")
+        if not any(c.isupper() for c in new_pw):
+            raise HTTPException(status_code=400, detail="New password must contain an uppercase letter")
+        if not any(c.isdigit() for c in new_pw):
+            raise HTTPException(status_code=400, detail="New password must contain a number")
+
+        if request.current_password == new_pw:
+            raise HTTPException(status_code=400, detail="New password must be different from the current one")
+
+        # Hash and save
+        hashed = hash_password(new_pw)
+        await db.users.update_one(
+            {"id": current_user["id"]},
+            {"$set": {
+                "password": hashed,
+                "password_changed_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }}
+        )
+
+        # Send confirmation email
+        try:
+            from services.email_service import get_email_service
+            email_service = get_email_service()
+            if email_service.is_configured():
+                from config.email_templates import EmailTemplates, EmailDataBuilder
+                lang = user_doc.get('preferred_language', 'en')
+                await email_service.send_email(
+                    to=user_doc["email"],
+                    template_id=EmailTemplates.get_id(EmailTemplates.PASSWORD_CHANGED, lang),
+                    dynamic_data=EmailDataBuilder.password_changed_email(user_doc),
+                    language=lang,
+                )
+        except Exception as e:
+            logger.error(f"Error sending password changed email: {e}")
+
+        logger.info(f"Password changed for user {current_user['id']}")
+        return {"success": True, "message": "Password updated successfully"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error in change_password: {e}")
+        raise HTTPException(status_code=500, detail="An error occurred while changing password")
 
 
 @auth_router.post("/force-reset-password")
