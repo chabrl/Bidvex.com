@@ -1592,3 +1592,204 @@ async def auction_winner_checkout(
         "late_penalty": late_penalty,
         "breakdown": breakdown,
     }
+
+
+
+# ── Offline Checkout (Cash / E-Transfer) ─────────────────────────
+class OfflineCheckoutRequest(BaseModel):
+    payment_method: str  # "cash" or "etransfer"
+    return_url: str = ""
+
+
+@payments_router.post("/offline-checkout/{listing_id}")
+async def offline_checkout(
+    listing_id: str,
+    data: OfflineCheckoutRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Process an offline (cash or e-transfer) checkout for an auction winner.
+    Skips Stripe — marks items reserved, sets pending_payment status,
+    and sends bilingual confirmation email with payment instructions.
+    """
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    current_user = await _auth(credentials)
+    db = get_db()
+
+    if data.payment_method not in ("cash", "etransfer"):
+        raise HTTPException(status_code=400, detail="Invalid payment method. Must be 'cash' or 'etransfer'.")
+
+    listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    if listing.get("winner_id") != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the auction winner can checkout")
+
+    if listing.get("status") not in ("ended", "won", "pending_payment"):
+        raise HTTPException(status_code=400, detail="Listing is not in a valid state for checkout")
+
+    if listing.get("payment_status") == "paid":
+        raise HTTPException(status_code=400, detail="Already paid")
+
+    # Calculate breakdown (same engine, no Stripe fee)
+    from services.connect_payment_engine import calculate_connect_checkout
+
+    hammer_price = listing.get("final_price", listing.get("current_price", 0))
+    user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
+    buyer_tier = user_doc.get("subscription_tier", "free") if user_doc else "free"
+
+    seller = await db.users.find_one({"id": listing.get("seller_id")}, {"_id": 0})
+    seller_tier = seller.get("subscription_tier", "free") if seller else "free"
+    seller_is_partner = bool(seller.get("is_partner") and seller.get("platform_fee_paid")) if seller else False
+
+    breakdown = calculate_connect_checkout(
+        hammer_price=hammer_price,
+        category=listing.get("category", "general"),
+        buyer_tier=buyer_tier,
+        seller_tier=seller_tier,
+        currency=listing.get("currency", "CAD"),
+        province=listing.get("region", "QC"),
+        include_stripe_fee=False,
+        seller_is_partner=seller_is_partner,
+    )
+
+    order_id = str(uuid.uuid4())
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    # Fetch interac email from site_settings for e-transfer instructions
+    interac_email = ""
+    if data.payment_method == "etransfer":
+        site_settings = await db.site_settings.find_one({}, {"_id": 0})
+        interac_email = (site_settings or {}).get("interac_email", "payments@bidvex.com")
+
+    # Create offline order record
+    order_record = {
+        "id": order_id,
+        "listing_id": listing_id,
+        "buyer_id": current_user.id,
+        "seller_id": listing.get("seller_id", ""),
+        "type": "auction_winner",
+        "payment_method": data.payment_method,
+        "order_status": "pending_payment",
+        "payment_status": "waiting_for_offline_confirmation",
+        "hammer_price": hammer_price,
+        "buyer_premium": breakdown.get("buyer_premium", 0),
+        "platform_fee": breakdown.get("platform_fee", 0),
+        "gst": breakdown.get("gst", 0),
+        "qst": breakdown.get("qst", 0),
+        "buyer_total": breakdown.get("buyer_total", hammer_price),
+        "breakdown": breakdown,
+        "interac_email": interac_email if data.payment_method == "etransfer" else None,
+        "created_at": now_iso,
+        "updated_at": now_iso,
+    }
+
+    await db.offline_orders.insert_one({**order_record, "_id": None})
+    # Remove the _id that MongoDB adds
+    await db.offline_orders.update_one({"id": order_id}, {"$unset": {"_id": ""}})
+
+    # Mark listing as reserved to prevent double-selling
+    await db.listings.update_one(
+        {"id": listing_id},
+        {"$set": {
+            "status": "reserved",
+            "payment_status": "waiting_for_offline_confirmation",
+            "payment_method": data.payment_method,
+            "offline_order_id": order_id,
+            "reserved_at": now_iso,
+            "updated_at": now_iso,
+        }}
+    )
+
+    # Send bilingual confirmation email
+    try:
+        from services.email_service import get_email_service
+        email_svc = get_email_service()
+        if email_svc.is_configured() and user_doc:
+            lang = user_doc.get("preferred_language", "en")
+            is_fr = lang == "fr"
+            item_title = listing.get("title", "Auction Item")
+
+            if data.payment_method == "etransfer":
+                subject = f"Instructions de paiement - Virement Interac #{order_id[:8]}" if is_fr else f"Payment Instructions - Interac E-Transfer #{order_id[:8]}"
+                html = f"""
+                <html><body style="font-family:Arial,sans-serif;padding:20px;max-width:600px;margin:auto">
+                <div style="background:#1e40af;padding:20px;border-radius:12px 12px 0 0;text-align:center">
+                    <h1 style="color:white;margin:0;font-size:22px">{'Confirmation de commande' if is_fr else 'Order Confirmation'}</h1>
+                </div>
+                <div style="border:1px solid #e2e8f0;border-top:none;padding:24px;border-radius:0 0 12px 12px">
+                    <p>{'Bonjour' if is_fr else 'Hello'} {user_doc.get('name','').split()[0]},</p>
+                    <p>{'Votre commande a été confirmée. Veuillez compléter le paiement par virement Interac.' if is_fr else 'Your order has been confirmed. Please complete payment via Interac E-Transfer.'}</p>
+                    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:16px;margin:16px 0">
+                        <h3 style="margin:0 0 8px 0;color:#1e40af">{'Instructions de virement Interac' if is_fr else 'Interac E-Transfer Instructions'}</h3>
+                        <table style="width:100%;border-collapse:collapse">
+                            <tr><td style="padding:6px 0;color:#64748b">{'Envoyer à' if is_fr else 'Send to'}:</td><td style="padding:6px 0;font-weight:bold">{interac_email}</td></tr>
+                            <tr><td style="padding:6px 0;color:#64748b">{'Montant' if is_fr else 'Amount'}:</td><td style="padding:6px 0;font-weight:bold">${breakdown.get('buyer_total', hammer_price):,.2f} CAD</td></tr>
+                            <tr><td style="padding:6px 0;color:#64748b">{'Référence' if is_fr else 'Reference'}:</td><td style="padding:6px 0;font-weight:bold">{order_id[:8].upper()}</td></tr>
+                            <tr><td style="padding:6px 0;color:#64748b">{'Article' if is_fr else 'Item'}:</td><td style="padding:6px 0">{item_title}</td></tr>
+                        </table>
+                    </div>
+                    <p style="color:#64748b;font-size:13px">{'Veuillez inclure le numéro de référence dans le message du virement. Le paiement sera confirmé dans les 24 heures.' if is_fr else 'Please include the reference number in the transfer message. Payment will be confirmed within 24 hours.'}</p>
+                    <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0">
+                    <p style="color:#94a3b8;font-size:12px;text-align:center">BidVex Inc. — {'Toutes taxes incluses' if is_fr else 'All taxes included'}</p>
+                </div></body></html>
+                """
+            else:
+                subject = f"Instructions de paiement - Comptant #{order_id[:8]}" if is_fr else f"Payment Instructions - Cash #{order_id[:8]}"
+                html = f"""
+                <html><body style="font-family:Arial,sans-serif;padding:20px;max-width:600px;margin:auto">
+                <div style="background:#1e40af;padding:20px;border-radius:12px 12px 0 0;text-align:center">
+                    <h1 style="color:white;margin:0;font-size:22px">{'Confirmation de commande' if is_fr else 'Order Confirmation'}</h1>
+                </div>
+                <div style="border:1px solid #e2e8f0;border-top:none;padding:24px;border-radius:0 0 12px 12px">
+                    <p>{'Bonjour' if is_fr else 'Hello'} {user_doc.get('name','').split()[0]},</p>
+                    <p>{'Votre commande a été confirmée avec paiement en comptant.' if is_fr else 'Your order has been confirmed with cash payment.'}</p>
+                    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;margin:16px 0">
+                        <h3 style="margin:0 0 8px 0;color:#166534">{'Instructions de paiement comptant' if is_fr else 'Cash Payment Instructions'}</h3>
+                        <table style="width:100%;border-collapse:collapse">
+                            <tr><td style="padding:6px 0;color:#64748b">{'Montant dû' if is_fr else 'Amount Due'}:</td><td style="padding:6px 0;font-weight:bold">${breakdown.get('buyer_total', hammer_price):,.2f} CAD</td></tr>
+                            <tr><td style="padding:6px 0;color:#64748b">{'Référence' if is_fr else 'Reference'}:</td><td style="padding:6px 0;font-weight:bold">{order_id[:8].upper()}</td></tr>
+                            <tr><td style="padding:6px 0;color:#64748b">{'Article' if is_fr else 'Item'}:</td><td style="padding:6px 0">{item_title}</td></tr>
+                        </table>
+                        <p style="margin:12px 0 0 0;color:#166534;font-weight:500">{'Veuillez contacter le vendeur pour organiser la cueillette et le paiement.' if is_fr else 'Please contact the seller to arrange local pickup and payment.'}</p>
+                    </div>
+                    <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0">
+                    <p style="color:#94a3b8;font-size:12px;text-align:center">BidVex Inc. — {'Toutes taxes incluses' if is_fr else 'All taxes included'}</p>
+                </div></body></html>
+                """
+            await email_svc.send_raw_html(user_doc["email"], subject, html)
+    except Exception as e:
+        logger.error(f"Failed to send offline checkout email: {e}")
+
+    return {
+        "success": True,
+        "order_id": order_id,
+        "payment_method": data.payment_method,
+        "order_status": "pending_payment",
+        "payment_status": "waiting_for_offline_confirmation",
+        "interac_email": interac_email if data.payment_method == "etransfer" else None,
+        "breakdown": breakdown,
+        "message": "Order confirmed. Follow payment instructions sent to your email." if data.payment_method == "etransfer"
+                   else "Order confirmed. Please arrange pickup and cash payment with the seller.",
+    }
+
+
+@payments_router.get("/offline-order/{order_id}")
+async def get_offline_order(
+    order_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Get offline order details."""
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    current_user = await _auth(credentials)
+    db = get_db()
+    order = await db.offline_orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if order.get("buyer_id") != current_user.id and order.get("seller_id") != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    return order

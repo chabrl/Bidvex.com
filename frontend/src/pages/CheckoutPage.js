@@ -21,6 +21,8 @@ import {
   Info,
   User,
   Clock,
+  Banknote,
+  Send,
 } from 'lucide-react';
 
 const API = API_BASE;
@@ -40,6 +42,7 @@ const CheckoutPage = () => {
   const [sellerIsTaxRegistered, setSellerIsTaxRegistered] = useState(false);
   const [isPartnerListing, setIsPartnerListing] = useState(false);
   const [partnerCompany, setPartnerCompany] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState('stripe');
 
   // Auction winner flow state
   const [isWinnerFlow, setIsWinnerFlow] = useState(false);
@@ -135,17 +138,28 @@ const CheckoutPage = () => {
       const token = localStorage.getItem('token');
       const returnUrl = `${window.location.origin}/checkout/${listingId}`;
 
-      let response;
+      // Offline payment (Cash or E-Transfer)
+      if (paymentMethod === 'cash' || paymentMethod === 'etransfer') {
+        const response = await axios.post(
+          `${API}/payments/offline-checkout/${listingId}`,
+          { payment_method: paymentMethod, return_url: returnUrl },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (response.data.success) {
+          navigate(`/checkout/${listingId}?status=success&method=${paymentMethod}&order=${response.data.order_id}`);
+        }
+        return;
+      }
 
+      // Stripe payment (default)
+      let response;
       if (isWinnerFlow) {
-        // Auction winner checkout endpoint
         response = await axios.post(
           `${API}/payments/auction-winner-checkout/${listingId}`,
           { return_url: returnUrl },
           { headers: { Authorization: `Bearer ${token}` } }
         );
       } else {
-        // Existing general checkout endpoint
         response = await axios.post(
           `${API}/payments/checkout/auction`,
           { listing_id: listingId, return_url: returnUrl },
@@ -170,6 +184,8 @@ const CheckoutPage = () => {
   
   // Success state
   if (status === 'success') {
+    const method = searchParams.get('method');
+    const isOffline = method === 'cash' || method === 'etransfer';
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 py-12">
         <div className="container max-w-2xl mx-auto px-4">
@@ -179,13 +195,34 @@ const CheckoutPage = () => {
                 <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
               </div>
               <h1 className="text-2xl font-bold text-green-700 dark:text-green-400 mb-2">
-                {isFrench ? 'Paiement réussi!' : 'Payment Successful!'}
+                {isOffline
+                  ? (isFrench ? 'Commande confirmée!' : 'Order Confirmed!')
+                  : (isFrench ? 'Paiement réussi!' : 'Payment Successful!')}
               </h1>
               <p className="text-slate-600 dark:text-slate-400 mb-6">
-                {isFrench 
-                  ? 'Votre paiement a été traité avec succès.'
-                  : 'Your payment has been processed successfully. You will receive a confirmation email shortly.'}
+                {isOffline
+                  ? method === 'etransfer'
+                    ? (isFrench
+                        ? 'Votre commande est confirmée. Les instructions de virement Interac ont été envoyées à votre courriel.'
+                        : 'Your order is confirmed. Interac E-Transfer instructions have been sent to your email.')
+                    : (isFrench
+                        ? 'Votre commande est confirmée. Veuillez contacter le vendeur pour organiser la cueillette et le paiement comptant.'
+                        : 'Your order is confirmed. Please contact the seller to arrange local pickup and cash payment.')
+                  : (isFrench 
+                    ? 'Votre paiement a été traité avec succès.'
+                    : 'Your payment has been processed successfully. You will receive a confirmation email shortly.')}
               </p>
+              {isOffline && method === 'etransfer' && (
+                <Alert className="mb-6 bg-blue-50 dark:bg-blue-950 border-blue-200 text-left">
+                  <Send className="h-4 w-4 text-blue-600" />
+                  <AlertDescription>
+                    <strong>{isFrench ? 'Rappel:' : 'Reminder:'}</strong>{' '}
+                    {isFrench
+                      ? "Veuillez vérifier votre courriel pour l'adresse de virement Interac et inclure le numéro de référence."
+                      : 'Please check your email for the Interac E-Transfer address and include the reference number.'}
+                  </AlertDescription>
+                </Alert>
+              )}
               <div className="flex gap-4 justify-center">
                 <Button onClick={() => navigate('/profile/purchases')} variant="outline">
                   <FileText className="mr-2 h-4 w-4" />
@@ -394,8 +431,66 @@ const CheckoutPage = () => {
                   </div>
                 </div>
                 
+                {/* ── Payment Method Selector ── */}
+                <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden" data-testid="payment-method-selector">
+                  <div className="bg-slate-100 dark:bg-slate-800 px-4 py-2.5">
+                    <h3 className="font-semibold text-sm flex items-center gap-2">
+                      <CreditCard className="h-4 w-4" />
+                      {isFrench ? 'Méthode de paiement' : 'Payment Method'}
+                    </h3>
+                  </div>
+                  <div className="p-3 space-y-2">
+                    {/* Stripe */}
+                    <label data-testid="payment-method-stripe"
+                      className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                        paymentMethod === 'stripe' ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                      }`}>
+                      <input type="radio" name="paymentMethod" value="stripe" checked={paymentMethod === 'stripe'}
+                        onChange={() => setPaymentMethod('stripe')} className="mt-1 accent-blue-600" />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="h-4 w-4 text-blue-600" />
+                          <span className="font-medium">{isFrench ? 'Carte de crédit' : 'Credit Card'}</span>
+                          <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded-full font-medium">{isFrench ? 'Recommandé' : 'Recommended'}</span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">{isFrench ? 'Paiement sécurisé par Stripe. Visa, Mastercard, Amex.' : 'Secure payment via Stripe. Visa, Mastercard, Amex.'}</p>
+                      </div>
+                    </label>
+                    {/* Cash */}
+                    <label data-testid="payment-method-cash"
+                      className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                        paymentMethod === 'cash' ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                      }`}>
+                      <input type="radio" name="paymentMethod" value="cash" checked={paymentMethod === 'cash'}
+                        onChange={() => setPaymentMethod('cash')} className="mt-1 accent-emerald-600" />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <Banknote className="h-4 w-4 text-emerald-600" />
+                          <span className="font-medium">{isFrench ? 'Comptant' : 'Cash'}</span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">{isFrench ? 'Paiement en personne lors de la cueillette.' : 'Pay in person at local pickup.'}</p>
+                      </div>
+                    </label>
+                    {/* E-Transfer */}
+                    <label data-testid="payment-method-etransfer"
+                      className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                        paymentMethod === 'etransfer' ? 'border-purple-500 bg-purple-50/50 dark:bg-purple-950/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                      }`}>
+                      <input type="radio" name="paymentMethod" value="etransfer" checked={paymentMethod === 'etransfer'}
+                        onChange={() => setPaymentMethod('etransfer')} className="mt-1 accent-purple-600" />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <Send className="h-4 w-4 text-purple-600" />
+                          <span className="font-medium">{isFrench ? 'Virement Interac' : 'Interac E-Transfer'}</span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">{isFrench ? 'Les instructions seront envoyées par courriel.' : 'Instructions will be sent via email.'}</p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
                 {/* Processing Fee Section (Standard flow only — Partners absorb this) */}
-                {breakdown?.flow_type !== 'PARTNER_FLOW' && (
+                {paymentMethod === 'stripe' && breakdown?.flow_type !== 'PARTNER_FLOW' && (
                 <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-4">
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-2">
@@ -474,12 +569,24 @@ const CheckoutPage = () => {
                   {processing ? (
                     <>
                       <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      {isFrench ? 'Redirection...' : 'Redirecting...'}
+                      {paymentMethod === 'stripe'
+                        ? (isFrench ? 'Redirection...' : 'Redirecting...')
+                        : (isFrench ? 'Confirmation...' : 'Confirming...')}
                     </>
-                  ) : (
+                  ) : paymentMethod === 'stripe' ? (
                     <>
                       <CreditCard className="mr-2 h-5 w-5" />
                       {isFrench ? 'Payer' : 'Pay'} {formatCurrency(buyerTotal)}
+                    </>
+                  ) : paymentMethod === 'cash' ? (
+                    <>
+                      <Banknote className="mr-2 h-5 w-5" />
+                      {isFrench ? 'Confirmer la commande' : 'Confirm Order'} — {formatCurrency(buyerTotal)}
+                    </>
+                  ) : (
+                    <>
+                      <Send className="mr-2 h-5 w-5" />
+                      {isFrench ? 'Confirmer le virement' : 'Confirm E-Transfer'} — {formatCurrency(buyerTotal)}
                     </>
                   )}
                 </Button>
