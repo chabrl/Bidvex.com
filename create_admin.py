@@ -29,7 +29,7 @@ async def create_admin_user():
     client = AsyncIOMotorClient(MONGO_URL)
     db = client[DB_NAME]
     
-    admin_email = "charbeladmin@bidvex.com"
+    admin_email = "charbel911@gmail.com"
     admin_password = "Admin123!"
     
     # Check if admin already exists

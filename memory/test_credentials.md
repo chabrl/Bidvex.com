@@ -1,7 +1,7 @@
 # BidVex Test Credentials
 
 ## Admin
-- Email: charbeladmin@bidvex.com
+- Email: charbel911@gmail.com
 - Password: Admin123!
 
 ## Starter Test User
