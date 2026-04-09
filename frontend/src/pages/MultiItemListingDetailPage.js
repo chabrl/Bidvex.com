@@ -45,7 +45,7 @@ const API = API_BASE;
 const MultiItemListingDetailPage = () => {
   const { id } = useParams();
   const { user } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { formatPrice, currency } = useCurrency();
   const [listing, setListing] = useState(null);
