@@ -302,13 +302,69 @@ async def send_password_reset_email(
     reset_token: str,
     language: str = "en",
 ):
-    """Send password reset email."""
-    return await email_service.send_email(
-        to=user["email"],
-        template_id=EmailTemplates.get_id(EmailTemplates.PASSWORD_RESET, language),
-        dynamic_data=EmailDataBuilder.password_reset_email(user, reset_token),
-        language=language,
-    )
+    """Send password reset email with inline HTML button (bypasses template variable issues)."""
+    data = EmailDataBuilder.password_reset_email(user, reset_token)
+    data["current_year"] = datetime.now().year
+    reset_url = data["reset_url"]
+    first_name = data["first_name"] or "there"
+    expiry_time = data["expiry_time"]
+
+    if language == "fr":
+        subject = "BidVex — Réinitialisation de votre mot de passe"
+        html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;">
+  <tr><td style="background:#1e3a8a;padding:24px 32px;text-align:center;">
+    <h1 style="color:#ffffff;margin:0;font-size:24px;">BidVex</h1>
+  </td></tr>
+  <tr><td style="padding:32px;">
+    <h2 style="color:#1e3a8a;margin:0 0 16px;">Réinitialisation du mot de passe</h2>
+    <p style="color:#374151;font-size:16px;line-height:1.6;">Bonjour {first_name},</p>
+    <p style="color:#374151;font-size:16px;line-height:1.6;">Nous avons reçu une demande de réinitialisation de votre mot de passe. Cliquez sur le bouton ci-dessous pour continuer :</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;"><tr><td align="center">
+      <a href="{reset_url}" target="_blank" style="display:inline-block;background:#1e3a8a;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:6px;font-size:16px;font-weight:bold;">Réinitialiser le mot de passe</a>
+    </td></tr></table>
+    <p style="color:#6b7280;font-size:14px;line-height:1.5;">Ce lien expire dans {expiry_time}. Si vous n'avez pas fait cette demande, ignorez ce courriel.</p>
+    <p style="color:#6b7280;font-size:12px;line-height:1.5;margin-top:16px;word-break:break-all;">Lien direct : <a href="{reset_url}" style="color:#1e3a8a;">{reset_url}</a></p>
+  </td></tr>
+  <tr><td style="background:#f9fafb;padding:16px 32px;text-align:center;">
+    <p style="color:#9ca3af;font-size:12px;margin:0;">&copy; BidVex {data['current_year']} — support@bidvex.com</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>"""
+    else:
+        subject = "BidVex — Reset Your Password"
+        html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;">
+  <tr><td style="background:#1e3a8a;padding:24px 32px;text-align:center;">
+    <h1 style="color:#ffffff;margin:0;font-size:24px;">BidVex</h1>
+  </td></tr>
+  <tr><td style="padding:32px;">
+    <h2 style="color:#1e3a8a;margin:0 0 16px;">Password Reset</h2>
+    <p style="color:#374151;font-size:16px;line-height:1.6;">Hi {first_name},</p>
+    <p style="color:#374151;font-size:16px;line-height:1.6;">We received a request to reset your password. Click the button below to continue:</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;"><tr><td align="center">
+      <a href="{reset_url}" target="_blank" style="display:inline-block;background:#1e3a8a;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:6px;font-size:16px;font-weight:bold;">Reset Password</a>
+    </td></tr></table>
+    <p style="color:#6b7280;font-size:14px;line-height:1.5;">This link expires in {expiry_time}. If you didn't request this, please ignore this email.</p>
+    <p style="color:#6b7280;font-size:12px;line-height:1.5;margin-top:16px;word-break:break-all;">Direct link: <a href="{reset_url}" style="color:#1e3a8a;">{reset_url}</a></p>
+  </td></tr>
+  <tr><td style="background:#f9fafb;padding:16px 32px;text-align:center;">
+    <p style="color:#9ca3af;font-size:12px;margin:0;">&copy; BidVex {data['current_year']} — support@bidvex.com</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>"""
+
+    return await email_service.send_raw_html(to=user["email"], subject=subject, html_content=html)
 
 
 async def send_bid_confirmation(
