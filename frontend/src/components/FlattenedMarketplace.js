@@ -548,7 +548,7 @@ const FlattenedMarketplace = ({
 
       {/* Floating Compare Bar */}
       {compareIds.length > 0 && (
-        <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900 dark:bg-slate-800 text-white rounded-full shadow-2xl px-5 py-3 flex items-center gap-3 border border-cyan-500/30" data-testid="compare-floating-bar">
+        <div className="fixed bottom-28 sm:bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-[60] bg-slate-900 dark:bg-slate-800 text-white rounded-full shadow-2xl px-5 py-3 flex items-center gap-3 border border-cyan-500/30" data-testid="compare-floating-bar">
           <Scale className="h-4 w-4 text-cyan-400 shrink-0" />
           <span className="text-sm font-medium whitespace-nowrap">{compareIds.length} selected</span>
           <Button
