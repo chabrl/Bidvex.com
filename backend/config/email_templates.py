@@ -364,7 +364,7 @@ async def send_password_reset_email(
 </td></tr></table>
 </body></html>"""
 
-    return await email_service.send_raw_html(to=user["email"], subject=subject, html_content=html)
+    return await email_service.send_raw_html(to=user["email"], subject=subject, html_content=html, disable_tracking=True)
 
 
 async def send_bid_confirmation(

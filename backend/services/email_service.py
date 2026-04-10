@@ -170,21 +170,26 @@ class EmailService:
                     }
                 await asyncio.sleep(2 ** attempt)
 
-    async def send_raw_html(self, to: str, subject: str, html_content: str) -> Dict[str, Any]:
+    async def send_raw_html(self, to: str, subject: str, html_content: str, disable_tracking: bool = False) -> Dict[str, Any]:
         """Send a raw HTML email (no template). Used for system notifications."""
         if not self.is_configured():
             logger.warning(f"Email not sent (not configured): {subject} -> {to}")
             return {"success": False, "error": "Not configured"}
         try:
-            from sendgrid.helpers.mail import Content
+            from sendgrid.helpers.mail import Content, TrackingSettings, ClickTracking, OpenTracking
             message = Mail(
                 from_email=Email(self.from_email, self.from_name),
                 to_emails=To(to),
                 subject=subject,
                 html_content=Content("text/html", html_content),
             )
+            if disable_tracking:
+                tracking = TrackingSettings()
+                tracking.click_tracking = ClickTracking(enable=False, enable_text=False)
+                tracking.open_tracking = OpenTracking(enable=False)
+                message.tracking_settings = tracking
             response = self.client.send(message)
-            logger.info(f"Raw email sent: to={to}, subject={subject}, status={response.status_code}")
+            logger.info(f"Raw email sent: to={to}, subject={subject}, status={response.status_code}, tracking={'off' if disable_tracking else 'on'}")
             return {"success": True, "status_code": response.status_code}
         except Exception as e:
             logger.error(f"Raw email failed: to={to}, error={e}")
