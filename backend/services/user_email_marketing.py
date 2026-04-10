@@ -24,7 +24,9 @@ logger = logging.getLogger(__name__)
 
 # Configuration
 MARKETING_API_KEY = os.environ.get("SENDGRID_MARKETING_API_KEY") or os.environ.get("SENDGRID_API_KEY")
-FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "noreply@bidvex.com")
+MARKETING_FROM_EMAIL = os.environ.get("SENDGRID_MARKETING_FROM_EMAIL", "noreply@bidvex.com")
+MARKETING_FROM_NAME = os.environ.get("SENDGRID_MARKETING_FROM_NAME", "BidVex")
+MARKETING_REPLY_TO = os.environ.get("SENDGRID_MARKETING_REPLY_TO", "info@bidvex.com")
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "https://www.bidvex.com")
 
 # Initialize client
@@ -780,28 +782,37 @@ class UserEmailMarketingService:
             plain_content = plain_content.replace("{{name}}", name or "")
             plain_content = plain_content.replace("{{email}}", email)
             
-            message = Mail(
-                from_email=Email(FROM_EMAIL, "BidVex Auctions"),
-                to_emails=To(email),
-                subject=campaign["subject"],
-                html_content=Content("text/html", html_content),
-                plain_text_content=Content("text/plain", plain_content) if plain_content else None
-            )
+            # Build message — single personalization only
+            message = Mail()
+            message.from_email = Email(MARKETING_FROM_EMAIL, MARKETING_FROM_NAME)
+            message.subject = campaign["subject"]
+            message.reply_to = Email(MARKETING_REPLY_TO)
+            
+            personalization = Personalization()
+            personalization.add_to(To(email, name))
+            personalization.add_custom_arg(CustomArg("user_campaign_id", campaign["id"]))
+            personalization.add_custom_arg(CustomArg("user_id", user_id))
+            personalization.add_custom_arg(CustomArg("contact_id", contact["id"]))
+            message.add_personalization(personalization)
+            
+            message.add_content(Content("text/plain", plain_content or "View this email in HTML."))
+            message.add_content(Content("text/html", html_content))
             
             tracking = TrackingSettings()
             tracking.click_tracking = ClickTracking(True, True)
             tracking.open_tracking = OpenTracking(True)
             message.tracking_settings = tracking
             
-            personalization = Personalization()
-            personalization.add_to(To(email))
-            personalization.add_custom_arg(CustomArg("user_campaign_id", campaign["id"]))
-            personalization.add_custom_arg(CustomArg("user_id", user_id))
-            personalization.add_custom_arg(CustomArg("contact_id", contact["id"]))
-            message.add_personalization(personalization)
-            
             response = marketing_client.send(message)
+            status_code = response.status_code
             message_id = response.headers.get("X-Message-Id")
+            response_body = response.body.decode("utf-8") if response.body else ""
+            
+            logger.info(
+                f"[MARKETING EMAIL] to={email}, status={status_code}, "
+                f"message_id={message_id}, from={MARKETING_FROM_EMAIL}, "
+                f"body={response_body[:200]}"
+            )
             
             await self.campaign_sends.insert_one({
                 "id": str(uuid.uuid4()),
@@ -817,7 +828,13 @@ class UserEmailMarketingService:
             return {"success": True, "message_id": message_id}
             
         except Exception as e:
-            logger.error(f"Send failed: {e}")
+            error_detail = str(e)
+            # Extract full SendGrid error body if available
+            if hasattr(e, 'body'):
+                error_detail = f"{e} | body={e.body}"
+            if hasattr(e, 'status_code'):
+                error_detail = f"HTTP {e.status_code}: {error_detail}"
+            logger.error(f"[MARKETING EMAIL FAILED] to={email}, from={MARKETING_FROM_EMAIL}, error={error_detail}")
             
             await self.campaign_sends.insert_one({
                 "id": str(uuid.uuid4()),
