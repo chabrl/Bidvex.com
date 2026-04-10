@@ -7,9 +7,9 @@ import os
 import json
 import logging
 import uuid
+import litellm
 from typing import Dict, Any, List, Optional
 from datetime import datetime
-from emergentintegrations.llm.chat import LlmChat, UserMessage
 
 logger = logging.getLogger(__name__)
 
@@ -141,12 +141,13 @@ Remember: You are not just an assistant - you are the Master Concierge, the face
 """
 
     def __init__(self, api_key: str, db):
-        """Initialize the AI Assistant with Gemini 2.5 Flash via Emergent LLM"""
+        """Initialize the AI Assistant with Gemini 2.5 Flash via Emergent LLM Proxy"""
         self.api_key = api_key
         self.db = db
-        self.model_provider = "gemini"
         self.model_name = os.environ.get("AI_MODEL_ID", "gemini-2.5-flash")
-        logger.info(f"BidVex Master Concierge initialized with {self.model_name} via Emergent LLM")
+        self.is_emergent_key = api_key.startswith("sk-emergent-")
+        self.proxy_url = os.environ.get("INTEGRATION_PROXY_URL", "https://integrations.emergentagent.com")
+        logger.info(f"BidVex Master Concierge initialized with {self.model_name} (emergent_proxy={self.is_emergent_key})")
 
         # Initialize knowledge base
         try:
@@ -192,27 +193,37 @@ Remember: You are not just an assistant - you are the Master Concierge, the face
 
 Please answer the user's question using the context provided above. If the context doesn't contain relevant information, use your general knowledge about auction platforms."""
 
-            # Build conversation context with chat history
-            history_context = ""
+            # Build messages array for litellm
+            messages = [{"role": "system", "content": self.SYSTEM_INSTRUCTIONS}]
+
+            # Add chat history for multi-turn context
             if chat_history:
                 for msg in chat_history[-10:]:
-                    role = "User" if msg.get("role") == "user" else "Assistant"
-                    history_context += f"{role}: {msg.get('content', '')}\n"
+                    role = "user" if msg.get("role") == "user" else "assistant"
+                    messages.append({"role": role, "content": msg.get("content", "")})
 
-            full_message = ""
-            if history_context:
-                full_message += f"Previous conversation:\n{history_context}\n"
-            full_message += enhanced_message
+            # Add current user message
+            messages.append({"role": "user", "content": enhanced_message})
 
-            # Create LlmChat instance per request
-            session_id = f"bidvex-{user_id or 'anon'}-{uuid.uuid4().hex[:8]}"
-            chat_client = LlmChat(
-                api_key=self.api_key,
-                session_id=session_id,
-                system_message=self.SYSTEM_INSTRUCTIONS
-            ).with_model(self.model_provider, self.model_name)
+            # Build litellm params — route through Emergent proxy if using Emergent key
+            params = {
+                "messages": messages,
+                "api_key": self.api_key,
+                "max_tokens": 1024,
+                "temperature": 0.7,
+            }
+            if self.is_emergent_key:
+                params["model"] = f"gemini/{self.model_name}"
+                params["api_base"] = self.proxy_url + "/llm"
+                params["custom_llm_provider"] = "openai"
+                app_url = os.environ.get("APP_URL") or os.environ.get("REACT_APP_BACKEND_URL", "")
+                if app_url:
+                    params["extra_headers"] = {"X-App-ID": app_url}
+            else:
+                params["model"] = f"gemini/{self.model_name}"
 
-            response_text = await chat_client.send_message(UserMessage(text=full_message))
+            response = litellm.completion(**params)
+            response_text = response.choices[0].message.content
 
             # Check if user needs verification
             needs_verification = False

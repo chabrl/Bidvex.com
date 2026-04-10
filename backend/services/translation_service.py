@@ -3,64 +3,53 @@ BidVex Translation Service — Gemini 2.5 Flash
 Provides automated EN<->FR translation for listing content.
 
 Strategy:
-- Preview environment: uses emergentintegrations + EMERGENT_LLM_KEY (if available)
-- Railway production: uses google-generativeai + GEMINI_API_KEY
+- Uses litellm with Emergent proxy (EMERGENT_LLM_KEY) or standard Gemini key (GEMINI_API_KEY)
 - Both missing: translation silently skipped (listing saves normally, just not translated)
 """
 
 import os
 import logging
 import asyncio
+import litellm
 from typing import Optional, Dict
 
 logger = logging.getLogger(__name__)
 
-# Resolve API key: prefer GEMINI_API_KEY (production), fallback to EMERGENT_LLM_KEY (preview)
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") or os.environ.get("EMERGENT_LLM_KEY", "")
+# Resolve API key: prefer EMERGENT_LLM_KEY, fallback to GEMINI_API_KEY
+LLM_KEY = os.environ.get("EMERGENT_LLM_KEY") or os.environ.get("GEMINI_API_KEY", "")
+_IS_EMERGENT = LLM_KEY.startswith("sk-emergent-") if LLM_KEY else False
+_PROXY_URL = os.environ.get("INTEGRATION_PROXY_URL", "https://integrations.emergentagent.com")
 
-# Detect which SDK is available
-_USE_EMERGENT = False
-_USE_GOOGLE = False
-
-try:
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
-    _USE_EMERGENT = True
-    logger.info("[i18n] Using emergentintegrations SDK for translations")
-except ImportError:
-    pass
-
-if not _USE_EMERGENT:
-    try:
-        import google.generativeai as genai
-        _USE_GOOGLE = True
-        logger.info("[i18n] Using google-generativeai SDK for translations")
-    except ImportError:
-        logger.warning("[i18n] No translation SDK available — translations will be skipped")
+if LLM_KEY:
+    logger.info(f"[i18n] Translation service initialized (emergent_proxy={_IS_EMERGENT})")
+else:
+    logger.warning("[i18n] No API key set — translations will be skipped")
 
 
-async def _translate_via_emergent(text: str, system_prompt: str) -> Optional[str]:
-    """Translate using emergentintegrations (Emergent preview environment)."""
-    chat = LlmChat(
-        api_key=GEMINI_API_KEY,
-        session_id=f"translate-{id(text)}",
-        system_message=system_prompt,
-    )
-    chat.with_model("gemini", "gemini-2.5-flash")
-    response = await chat.send_message(UserMessage(text=text))
-    return response.strip() if response else None
+async def _translate_via_litellm(text: str, system_prompt: str) -> Optional[str]:
+    """Translate using litellm routed through Emergent proxy or direct Gemini."""
+    params = {
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": text},
+        ],
+        "api_key": LLM_KEY,
+        "max_tokens": 2048,
+        "temperature": 0.3,
+    }
+    if _IS_EMERGENT:
+        params["model"] = "gemini/gemini-2.5-flash"
+        params["api_base"] = _PROXY_URL + "/llm"
+        params["custom_llm_provider"] = "openai"
+        app_url = os.environ.get("APP_URL") or os.environ.get("REACT_APP_BACKEND_URL", "")
+        if app_url:
+            params["extra_headers"] = {"X-App-ID": app_url}
+    else:
+        params["model"] = "gemini/gemini-2.5-flash"
 
-
-async def _translate_via_google(text: str, system_prompt: str) -> Optional[str]:
-    """Translate using standard google-generativeai SDK (Railway production)."""
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel(
-        model_name="gemini-2.5-flash",
-        system_instruction=system_prompt,
-    )
-    response = await asyncio.to_thread(
-        model.generate_content, text
-    )
-    return response.text.strip() if response and response.text else None
+    response = litellm.completion(**params)
+    content = response.choices[0].message.content
+    return content.strip() if content else None
 
 
 async def translate_text(text: str, source_lang: str = "en", target_lang: str = "fr") -> Optional[str]:
@@ -70,7 +59,7 @@ async def translate_text(text: str, source_lang: str = "en", target_lang: str = 
     """
     if not text or not text.strip():
         return text
-    if not GEMINI_API_KEY:
+    if not LLM_KEY:
         logger.warning("[i18n] No API key set — skipping translation")
         return None
 
@@ -87,12 +76,7 @@ async def translate_text(text: str, source_lang: str = "en", target_lang: str = 
     )
 
     try:
-        if _USE_EMERGENT:
-            translated = await _translate_via_emergent(text, system_prompt)
-        elif _USE_GOOGLE:
-            translated = await _translate_via_google(text, system_prompt)
-        else:
-            return None
+        translated = await _translate_via_litellm(text, system_prompt)
 
         if translated:
             logger.info(f"[i18n] Translated ({source_lang}->{target_lang}): '{text[:50]}...' -> '{translated[:50]}...'")

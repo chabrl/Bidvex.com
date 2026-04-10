@@ -15,79 +15,58 @@ Full-stack auction marketplace (React frontend, FastAPI backend, MongoDB) with v
 │   │   ├── payments.py                # Stripe checkout + offline checkout for single items
 │   │   ├── site_config.py             # Social links endpoints
 │   │   ├── email_marketing_ext.py     # Marketing campaigns: CRUD + Delete/Resend/Clone
-│   │   ├── ai_chat.py                 # Master Concierge chatbot (Emergent LLM Key)
+│   │   ├── ai_chat.py                 # Master Concierge chatbot (EMERGENT_LLM_KEY via litellm)
 │   │   └── webhooks.py               # Stripe + SendGrid
 │   └── services/
 │       ├── email_service.py           # Production SendGrid (click tracking disabled)
-│       └── ai_assistant_v2.py         # Gemini 2.5 Flash via emergentintegrations
+│       ├── ai_assistant_v2.py         # Gemini 2.5 Flash via litellm + Emergent proxy
+│       └── translation_service.py     # EN<->FR via litellm + Emergent proxy
 ├── frontend/
 │   ├── build/                         # Compiled React SPA
 │   └── src/
-│       ├── components/Footer.js       # Dynamic social media icons
+│       ├── config.js                  # API_BASE = REACT_APP_BACKEND_URL + /api
+│       ├── components/
+│       │   ├── AIAssistant.js         # Chatbot UI (HTTP POST, no WebSocket)
+│       │   └── Footer.js             # Dynamic social media icons
 │       └── pages/
 │           ├── CreateMultiItemListing.js    # + Payment Method + Buyer's Premium (partner-only)
-│           ├── CreateListingPage.js         # Buyer's Premium changed to partner-only
 │           ├── MultiItemListingDetailPage.js # Hybrid payment dialog for buyers
 │           └── admin/
 │               ├── EmailMarketingManager.js  # Campaign management + Delete/Resend/Clone
 │               └── MarketplaceSettings.js    # Social links admin editor
 ```
 
-## Completed Features (This Session — April 10, 2026)
+## Completed Features (April 10, 2026)
+
+### Master Concierge AI Chatbot — Full Fix
+- **Root Cause**: Gemini API key `AIzaSy...` was flagged as leaked by Google (403 PERMISSION_DENIED)
+- **Fix**: Replaced direct `google.genai` calls with `litellm.completion()` routed through Emergent proxy
+- **No emergentintegrations dependency** — uses litellm (already in requirements.txt)
+- **How it works**: EMERGENT_LLM_KEY → litellm → Emergent proxy (https://integrations.emergentagent.com/llm) → Gemini 2.5 Flash
+- **Frontend verification**: Multi-turn conversation tested via screenshot, chatbot responds with rich action buttons
+- **CORS**: bidvex.com, www.bidvex.com, api.bidvex.com all permitted
+- **Also fixed**: translation_service.py migrated from emergentintegrations to litellm
 
 ### Email Marketing Dashboard — Delete, Resend, Clone Campaigns
-- DELETE /api/admin/marketing/campaigns/{id} — deletes campaigns (blocks sending ones)
-- POST /api/admin/marketing/campaigns/{id}/clone — creates draft copy with "(Copy)" suffix
-- POST /api/admin/marketing/campaigns/{id}/resend — resets status & re-sends completed/failed campaigns
-- Frontend: Clone, Resend (conditional), Delete buttons on every campaign row + detail view
-- Fixed CampaignCreateRequest & CampaignUpdateRequest Pydantic models in shared.py
-- Fixed F811 lint error (duplicate get_email_templates definition)
-- All 9 backend tests + all frontend UI tests passed (iteration_128)
+- DELETE /api/admin/marketing/campaigns/{id}
+- POST /api/admin/marketing/campaigns/{id}/clone — creates draft copy
+- POST /api/admin/marketing/campaigns/{id}/resend — resets & re-sends completed/failed campaigns
+- Frontend: action buttons on campaign rows + detail view
+- Fixed CampaignCreateRequest & CampaignUpdateRequest Pydantic models
+- All 9 backend + all frontend UI tests passed (iteration_128)
 
-### Master Concierge AI Chatbot Fix
-- Replaced leaked Gemini API key with Emergent LLM Key via emergentintegrations library
-- ai_assistant_v2.py: Switched from google.genai to emergentintegrations.llm.chat.LlmChat
-- ai_chat.py: Changed GEMINI_API_KEY to EMERGENT_LLM_KEY
-- Chatbot now responds successfully to both EN and FR queries
-
-## Previous Session Completed Features (April 9, 2026)
-
-### Seller Payment Method + Buyer's Premium for Multi-Item Listings
-- Added 3-option Payment Method selector (Stripe/Cash/E-Transfer) to CreateMultiItemListing form
-- Added Buyer's Premium input (partner-only) to CreateMultiItemListing form
-
-### Multi-Item Auction — Hybrid Payment Integration (Buyer Side)
-- Buy Now dialog with 3 payment methods for lot purchases
-- Offline payments (Cash/E-Transfer) create offline_orders with reserved status
-
-### Marketing Contact 500 Error Fix
-- Fixed Pydantic model mismatch (UserContactCreateRequest, UserContactBulkRequest, UserCampaignCreateRequest)
-
-### Dynamic Social Media Icon Suite & Admin Editor
-- Social links endpoints + admin settings card + footer SVG icons
-
-### Email Deliverability & DNS
-- Disabled SendGrid Click Tracking globally (Chrome 'Unsafe Attempt' fix)
-- Raw HTML password reset template (bypasses broken SendGrid templates)
-- SPF/DKIM/DMARC advisory for GoDaddy DNS
-
-### Sitemap.xml
-- Static sitemap with priority routes, proper application/xml MIME type
-
-## Key DB Schema
-- `multi_item_listings.payment_method`: "stripe" | "cash" | "e-transfer"
-- `multi_item_listings.buyers_premium_rate`: float (0-0.25, partner-only)
-- `buy_now_transactions.payment_method`: "stripe" | "cash" | "etransfer"
-- `offline_orders`: order_status, payment_status, interac_email
-- `site_config.social_links`: { x, facebook, instagram, linkedin, tiktok }
-- `email_campaigns`: id, name, subject, status, html_content, audience_filters
+## Railway Production Deployment Checklist
+1. **Save to GitHub** (click "Save to GitHub" button)
+2. **Add Railway Env Var**: `EMERGENT_LLM_KEY=sk-emergent-45818088307Fa1bB23`
+3. **Verify**: `REACT_APP_BACKEND_URL` points to production domain
+4. **No new pip dependencies** — litellm is already in requirements.txt
 
 ## 3rd Party Integration Status
 - **Stripe** — Live key active
 - **SendGrid** — Live key active (Click Tracking disabled)
 - **VAPID Web Push** — Active
 - **Twilio** — Configured
-- **Emergent LLM (Gemini 2.5 Flash)** — Active via EMERGENT_LLM_KEY
+- **Gemini 2.5 Flash** — Active via litellm + EMERGENT_LLM_KEY (Emergent proxy)
 
 ## Backlog
 - (P2) Cloudflare CDN DNS migration
