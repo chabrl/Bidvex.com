@@ -1,17 +1,11 @@
-# BidVex Test Credentials
+# Test Credentials
 
-## Admin
+## Admin Account
 - Email: charbel911@gmail.com
 - Password: Admin123!
+- Role: admin
 
-## Starter Test User
-- Email: starter@test.com
-- Password: TestUser2026!
-
-## Premium Test User
-- Email: premium@test.com
-- Password: TestUser2026!
-
-## Partner Test User
+## Partner Test Account
 - Email: partner@test.com
 - Password: TestUser2026!
+- Role: partner
