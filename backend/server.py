@@ -482,6 +482,20 @@ if os.path.isdir(_frontend_build):
     from starlette.responses import FileResponse
     app.mount("/static", StaticFiles(directory=os.path.join(_frontend_build, "static")), name="static-assets")
 
+    @app.get("/sitemap.xml", include_in_schema=False)
+    async def serve_sitemap():
+        sitemap_path = os.path.join(_frontend_build, "sitemap.xml")
+        if os.path.isfile(sitemap_path):
+            return FileResponse(sitemap_path, media_type="application/xml")
+        return JSONResponse({"detail": "sitemap.xml not found"}, status_code=404)
+
+    @app.get("/robots.txt", include_in_schema=False)
+    async def serve_robots():
+        robots_path = os.path.join(_frontend_build, "robots.txt")
+        if os.path.isfile(robots_path):
+            return FileResponse(robots_path, media_type="text/plain")
+        return JSONResponse({"detail": "robots.txt not found"}, status_code=404)
+
     @app.api_route("/{path:path}", methods=["GET"], include_in_schema=False)
     async def spa_catch_all(path: str):
         """Serve React SPA for all non-API routes"""
