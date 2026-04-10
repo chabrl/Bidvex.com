@@ -799,8 +799,8 @@ class UserEmailMarketingService:
             message.add_content(Content("text/html", html_content))
             
             tracking = TrackingSettings()
-            tracking.click_tracking = ClickTracking(True, True)
-            tracking.open_tracking = OpenTracking(True)
+            tracking.click_tracking = ClickTracking(False, False)
+            tracking.open_tracking = OpenTracking(False)
             message.tracking_settings = tracking
             
             response = marketing_client.send(message)

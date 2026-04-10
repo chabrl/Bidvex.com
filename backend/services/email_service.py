@@ -124,6 +124,12 @@ class EmailService:
         if reply_to:
             message.reply_to = Email(reply_to)
         
+        # Disable click tracking globally — prevents SendGrid URL wrapping
+        from sendgrid.helpers.mail import TrackingSettings, ClickTracking
+        tracking = TrackingSettings()
+        tracking.click_tracking = ClickTracking(enable=False, enable_text=False)
+        message.tracking_settings = tracking
+        
         # Retry logic with exponential backoff
         for attempt in range(max_retries):
             try:
@@ -170,7 +176,7 @@ class EmailService:
                     }
                 await asyncio.sleep(2 ** attempt)
 
-    async def send_raw_html(self, to: str, subject: str, html_content: str, disable_tracking: bool = False) -> Dict[str, Any]:
+    async def send_raw_html(self, to: str, subject: str, html_content: str, disable_tracking: bool = True) -> Dict[str, Any]:
         """Send a raw HTML email (no template). Used for system notifications."""
         if not self.is_configured():
             logger.warning(f"Email not sent (not configured): {subject} -> {to}")
