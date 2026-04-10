@@ -603,6 +603,50 @@ const EmailMarketingManager = () => {
     }
   };
 
+  // Campaign management actions
+  const [deletingId, setDeletingId] = useState(null);
+  const [cloningId, setCloningId] = useState(null);
+  const [resendingId, setResendingId] = useState(null);
+
+  const deleteCampaign = async (campaignId, e) => {
+    e?.stopPropagation();
+    if (!window.confirm('Delete this campaign permanently?')) return;
+    setDeletingId(campaignId);
+    try {
+      await axios.delete(`${API}/admin/marketing/campaigns/${campaignId}`, { headers });
+      toast.success('Campaign deleted');
+      if (selectedCampaign?.id === campaignId) setSelectedCampaign(null);
+      fetchCampaigns();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to delete');
+    } finally { setDeletingId(null); }
+  };
+
+  const cloneCampaign = async (campaignId, e) => {
+    e?.stopPropagation();
+    setCloningId(campaignId);
+    try {
+      const res = await axios.post(`${API}/admin/marketing/campaigns/${campaignId}/clone`, {}, { headers });
+      toast.success(`Cloned as "${res.data.name}"`);
+      fetchCampaigns();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to clone');
+    } finally { setCloningId(null); }
+  };
+
+  const resendCampaign = async (campaignId, e) => {
+    e?.stopPropagation();
+    if (!window.confirm('Resend this campaign to all original recipients?')) return;
+    setResendingId(campaignId);
+    try {
+      const res = await axios.post(`${API}/admin/marketing/campaigns/${campaignId}/resend`, {}, { headers });
+      toast.success(`Resent: ${res.data.sent || 0} delivered`);
+      fetchCampaigns();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to resend');
+    } finally { setResendingId(null); }
+  };
+
   const formatDate = (dateStr) => {
     if (!dateStr) return 'N/A';
     return new Date(dateStr).toLocaleString('en-CA', {
@@ -634,9 +678,29 @@ const EmailMarketingManager = () => {
                 <CardTitle className="text-xl">{selectedCampaign.name}</CardTitle>
                 <CardDescription>Subject: {selectedCampaign.subject}</CardDescription>
               </div>
-              <Badge className={`${STATUS_COLORS[selectedCampaign.status]} text-white`}>
-                {selectedCampaign.status}
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge className={`${STATUS_COLORS[selectedCampaign.status]} text-white`}>
+                  {selectedCampaign.status}
+                </Badge>
+                {selectedCampaign.status === 'failed' && selectedCampaign.error_message && (
+                  <span title={selectedCampaign.error_message} className="cursor-help text-red-500 text-xs flex items-center gap-1">
+                    <AlertTriangle className="h-3.5 w-3.5" /> hover for error
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-2 mt-2">
+              <Button size="sm" variant="outline" onClick={(e) => cloneCampaign(selectedCampaign.id, e)} disabled={cloningId === selectedCampaign.id} data-testid="detail-clone-btn">
+                {cloningId === selectedCampaign.id ? <RefreshCw className="h-4 w-4 animate-spin mr-1" /> : <Copy className="h-4 w-4 mr-1" />} Clone
+              </Button>
+              {(selectedCampaign.status === 'sent' || selectedCampaign.status === 'completed' || selectedCampaign.status === 'failed') && (
+                <Button size="sm" variant="outline" onClick={(e) => resendCampaign(selectedCampaign.id, e)} disabled={resendingId === selectedCampaign.id} data-testid="detail-resend-btn">
+                  {resendingId === selectedCampaign.id ? <RefreshCw className="h-4 w-4 animate-spin mr-1" /> : <RefreshCw className="h-4 w-4 mr-1 text-blue-600" />} Resend
+                </Button>
+              )}
+              <Button size="sm" variant="outline" className="text-red-500 hover:bg-red-50" onClick={(e) => deleteCampaign(selectedCampaign.id, e)} disabled={deletingId === selectedCampaign.id} data-testid="detail-delete-btn">
+                {deletingId === selectedCampaign.id ? <RefreshCw className="h-4 w-4 animate-spin mr-1" /> : <Trash2 className="h-4 w-4 mr-1" />} Delete
+              </Button>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -1000,12 +1064,22 @@ const EmailMarketingManager = () => {
                       <Badge className={`${STATUS_COLORS[campaign.status]} text-white text-xs`}>
                         {campaign.status}
                       </Badge>
+                      {campaign.status === 'failed' && campaign.error_message && (
+                        <span title={campaign.error_message} className="cursor-help">
+                          <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm text-muted-foreground truncate">{campaign.subject}</p>
                     <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Users className="h-3 w-3" /> {campaign.audience_count || 0}
                       </span>
+                      {campaign.sent_count > 0 && (
+                        <span className="flex items-center gap-1">
+                          <Send className="h-3 w-3" /> {campaign.sent_count} sent
+                        </span>
+                      )}
                       {campaign.scheduled_at && (
                         <span className="flex items-center gap-1">
                           <Clock className="h-3 w-3" /> {formatDate(campaign.scheduled_at)}
@@ -1013,9 +1087,22 @@ const EmailMarketingManager = () => {
                       )}
                     </div>
                   </div>
-                  <Button variant="ghost" size="sm">
-                    <Eye className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                    <Button variant="ghost" size="sm" onClick={() => selectCampaign(campaign)} title="View details" data-testid={`view-campaign-${campaign.id}`}>
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={(e) => cloneCampaign(campaign.id, e)} disabled={cloningId === campaign.id} title="Clone as draft" data-testid={`clone-campaign-${campaign.id}`}>
+                      {cloningId === campaign.id ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
+                    </Button>
+                    {(campaign.status === 'sent' || campaign.status === 'completed' || campaign.status === 'failed') && (
+                      <Button variant="ghost" size="sm" onClick={(e) => resendCampaign(campaign.id, e)} disabled={resendingId === campaign.id} title="Resend campaign" data-testid={`resend-campaign-${campaign.id}`}>
+                        {resendingId === campaign.id ? <RefreshCw className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4 text-blue-600" />}
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="sm" onClick={(e) => deleteCampaign(campaign.id, e)} disabled={deletingId === campaign.id} title="Delete campaign" className="text-red-500 hover:text-red-700 hover:bg-red-50" data-testid={`delete-campaign-${campaign.id}`}>
+                      {deletingId === campaign.id ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    </Button>
+                  </div>
                 </div>
               ))
             )}

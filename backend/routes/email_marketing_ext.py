@@ -519,6 +519,101 @@ async def get_marketing_audit_logs(
     return {"logs": logs, "count": len(logs)}
 
 
+# ========== CAMPAIGN MANAGEMENT ACTIONS ==========
+
+@email_marketing_ext_router.delete("/admin/marketing/campaigns/{campaign_id}")
+async def delete_campaign(campaign_id: str, current_user: User = Depends(get_current_user)):
+    """Delete a campaign by ID."""
+    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    db = get_db()
+    campaign = await db.email_campaigns.find_one({"id": campaign_id}, {"_id": 0, "status": 1})
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    if campaign.get("status") == "sending":
+        raise HTTPException(status_code=400, detail="Cannot delete a campaign that is currently sending")
+
+    await db.email_campaigns.delete_one({"id": campaign_id})
+    await db.marketing_audit_logs.insert_one({
+        "action": "campaign_deleted",
+        "campaign_id": campaign_id,
+        "admin_email": current_user.email,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"success": True, "message": "Campaign deleted"}
+
+
+@email_marketing_ext_router.post("/admin/marketing/campaigns/{campaign_id}/resend")
+async def resend_campaign(campaign_id: str, current_user: User = Depends(get_current_user)):
+    """Re-send a completed or failed campaign."""
+    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    db = get_db()
+    campaign = await db.email_campaigns.find_one({"id": campaign_id}, {"_id": 0})
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    if campaign.get("status") not in ("sent", "completed", "failed"):
+        raise HTTPException(status_code=400, detail="Only completed or failed campaigns can be resent")
+
+    marketing = get_marketing_service(db)
+    result = await marketing.send_campaign(campaign_id)
+
+    await db.marketing_audit_logs.insert_one({
+        "action": "campaign_resent",
+        "campaign_id": campaign_id,
+        "admin_email": current_user.email,
+        "result": str(result)[:200],
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+    return result
+
+
+@email_marketing_ext_router.post("/admin/marketing/campaigns/{campaign_id}/clone")
+async def clone_campaign(campaign_id: str, current_user: User = Depends(get_current_user)):
+    """Clone a campaign as a new draft."""
+    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    db = get_db()
+    original = await db.email_campaigns.find_one({"id": campaign_id}, {"_id": 0})
+    if not original:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    new_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+    clone = {
+        **original,
+        "id": new_id,
+        "name": f"{original.get('name', 'Campaign')} (Copy)",
+        "status": "draft",
+        "sent_count": 0,
+        "failed_count": 0,
+        "open_count": 0,
+        "click_count": 0,
+        "error_message": None,
+        "sent_at": None,
+        "scheduled_at": None,
+        "created_at": now,
+        "updated_at": now,
+        "created_by": current_user.email,
+    }
+    await db.email_campaigns.insert_one(clone)
+
+    await db.marketing_audit_logs.insert_one({
+        "action": "campaign_cloned",
+        "campaign_id": campaign_id,
+        "new_campaign_id": new_id,
+        "admin_email": current_user.email,
+        "timestamp": now,
+    })
+    clone.pop("_id", None)
+    return clone
+
+
+
+
 
 
 @email_marketing_ext_router.get("/admin/marketing/config")
