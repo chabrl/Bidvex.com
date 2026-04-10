@@ -465,19 +465,37 @@ class AdvancedAudiencePreviewRequest(BaseModel):
 class CampaignCreateRequest(BaseModel):
     name: str
     subject: str
+    html_content: Optional[str] = None
+    plain_text_content: Optional[str] = None
+    audience_filters: Optional[Dict[str, Any]] = None
+    manual_emails: Optional[List[str]] = None
+    exclude_emails: Optional[List[str]] = None
+    scheduled_at: Optional[str] = None
+    from_email: Optional[str] = None
+    from_name: Optional[str] = None
+    reply_to: Optional[str] = None
+    # Legacy fields for backward compatibility
     content: Optional[str] = None
     template_id: Optional[str] = None
     segment_type: Optional[str] = "all"
-    scheduled_at: Optional[str] = None
 
 class CampaignUpdateRequest(BaseModel):
     name: Optional[str] = None
     subject: Optional[str] = None
+    html_content: Optional[str] = None
+    plain_text_content: Optional[str] = None
+    audience_filters: Optional[Dict[str, Any]] = None
+    manual_emails: Optional[List[str]] = None
+    exclude_emails: Optional[List[str]] = None
+    scheduled_at: Optional[str] = None
+    from_email: Optional[str] = None
+    from_name: Optional[str] = None
+    reply_to: Optional[str] = None
+    status: Optional[str] = None
+    # Legacy fields for backward compatibility
     content: Optional[str] = None
     template_id: Optional[str] = None
     segment_type: Optional[str] = None
-    scheduled_at: Optional[str] = None
-    status: Optional[str] = None
 
 class UserContactCreateRequest(BaseModel):
     email: EmailStr

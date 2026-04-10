@@ -557,8 +557,18 @@ async def resend_campaign(campaign_id: str, current_user: User = Depends(get_cur
     if campaign.get("status") not in ("sent", "completed", "failed"):
         raise HTTPException(status_code=400, detail="Only completed or failed campaigns can be resent")
 
+    # Reset campaign status to draft so send_campaign_now can process it
+    await db.email_campaigns.update_one(
+        {"id": campaign_id},
+        {"$set": {"status": "draft", "sent_count": 0, "failed_count": 0, "error_message": None}}
+    )
+
     marketing = get_marketing_service(db)
-    result = await marketing.send_campaign(campaign_id)
+    try:
+        result = await marketing.send_campaign_now(campaign_id, current_user.id, current_user.email)
+    except Exception as e:
+        logger.error(f"Resend failed for campaign {campaign_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Resend failed: {str(e)}")
 
     await db.marketing_audit_logs.insert_one({
         "action": "campaign_resent",
@@ -1116,7 +1126,7 @@ async def unsubscribe_user_contact(
 
 
 @email_marketing_ext_router.get("/user/marketing/templates")
-async def get_email_templates(current_user: User = Depends(get_current_user)):
+async def get_user_email_templates_route(current_user: User = Depends(get_current_user)):
     """Get pre-built email templates"""
     user_marketing = get_user_marketing_service(get_db())
     templates = user_marketing.get_email_templates()

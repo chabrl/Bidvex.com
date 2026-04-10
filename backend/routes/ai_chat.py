@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 ai_chat_router = APIRouter(tags=["AI Chat"])
 security = HTTPBearer(auto_error=False)
 jwt_secret = os.environ.get('JWT_SECRET', 'dev-secret-key-change-in-production')
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
 
 db = None
 
@@ -55,11 +55,11 @@ async def ai_chat_message(
             try:
                 payload = jwt.decode(credentials.credentials, jwt_secret, algorithms=["HS256"])
                 user_id = payload.get("sub")
-            except:
+            except Exception:
                 pass
 
         from services.ai_assistant_v2 import get_assistant
-        assistant = get_assistant(GEMINI_API_KEY, db)
+        assistant = get_assistant(EMERGENT_LLM_KEY, db)
 
         response = await assistant.chat(
             user_message=request.message,

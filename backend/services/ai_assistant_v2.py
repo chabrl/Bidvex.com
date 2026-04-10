@@ -6,9 +6,10 @@ RAG-based luxury auction specialist powered by Gemini 2.5 Flash
 import os
 import json
 import logging
+import uuid
 from typing import Dict, Any, List, Optional
 from datetime import datetime
-from google import genai
+from emergentintegrations.llm.chat import LlmChat, UserMessage
 
 logger = logging.getLogger(__name__)
 
@@ -140,12 +141,12 @@ Remember: You are not just an assistant - you are the Master Concierge, the face
 """
 
     def __init__(self, api_key: str, db):
-        """Initialize the AI Assistant with Gemini 2.5 Flash"""
+        """Initialize the AI Assistant with Gemini 2.5 Flash via Emergent LLM"""
         self.api_key = api_key
         self.db = db
-        self.client = genai.Client(api_key=api_key)
-        self.model = os.environ.get("AI_MODEL_ID", "gemini-2.5-flash")
-        logger.info("BidVex Master Concierge initialized with Gemini 2.5 Flash")
+        self.model_provider = "gemini"
+        self.model_name = os.environ.get("AI_MODEL_ID", "gemini-2.5-flash")
+        logger.info(f"BidVex Master Concierge initialized with {self.model_name} via Emergent LLM")
 
         # Initialize knowledge base
         try:
@@ -191,29 +192,27 @@ Remember: You are not just an assistant - you are the Master Concierge, the face
 
 Please answer the user's question using the context provided above. If the context doesn't contain relevant information, use your general knowledge about auction platforms."""
 
-            # Build Gemini contents with chat history
-            contents = []
-
-            # Add chat history for multi-turn context
+            # Build conversation context with chat history
+            history_context = ""
             if chat_history:
                 for msg in chat_history[-10:]:
-                    role = "user" if msg.get("role") == "user" else "model"
-                    contents.append({"role": role, "parts": [{"text": msg.get("content", "")}]})
+                    role = "User" if msg.get("role") == "user" else "Assistant"
+                    history_context += f"{role}: {msg.get('content', '')}\n"
 
-            # Add current user message
-            contents.append({"role": "user", "parts": [{"text": enhanced_message}]})
+            full_message = ""
+            if history_context:
+                full_message += f"Previous conversation:\n{history_context}\n"
+            full_message += enhanced_message
 
-            # Call Gemini 2.5 Flash
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=contents,
-                config={
-                    "system_instruction": self.SYSTEM_INSTRUCTIONS,
-                    "temperature": 0.7,
-                    "max_output_tokens": 1024,
-                }
-            )
-            response_text = response.text
+            # Create LlmChat instance per request
+            session_id = f"bidvex-{user_id or 'anon'}-{uuid.uuid4().hex[:8]}"
+            chat_client = LlmChat(
+                api_key=self.api_key,
+                session_id=session_id,
+                system_message=self.SYSTEM_INSTRUCTIONS
+            ).with_model(self.model_provider, self.model_name)
+
+            response_text = await chat_client.send_message(UserMessage(text=full_message))
 
             # Check if user needs verification
             needs_verification = False
