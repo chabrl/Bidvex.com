@@ -1,66 +1,67 @@
 # BidVex — Auction Marketplace PRD
 
-## Original Problem Statement
-Full-stack auction marketplace (React frontend, FastAPI backend, MongoDB) with vehicle-specific identity routing, real-time WebSocket bidding, self-hosted Web Push notifications (VAPID), predictive AI analytics, and 18 active background schedulers.
-
 ## Architecture
 ```
 /app
 ├── backend/
 │   ├── server.py                      # FastAPI, CORS, CDN headers, SPA mount
-│   ├── shared.py                      # Pydantic models
-│   ├── deps.py                        # Shared auth dependencies (JWT, get_current_user)
 │   ├── routes/
-│   │   ├── auth.py                    # Auth: login, register, reset, change-password
-│   │   ├── email_marketing_ext.py     # Marketing campaigns: CRUD + Delete/Resend/Clone
-│   │   ├── ai_chat.py                 # Master Concierge chatbot (EMERGENT_LLM_KEY)
+│   │   ├── admin_ops.py               # Admin operations (marketplace, suspend, categories, affiliates)
+│   │   ├── admin.py                   # Admin users, team management
+│   │   ├── subscriptions.py           # Subscription plans + Coupon CRUD
+│   │   ├── auth.py                    # Auth (login block for suspended users)
+│   │   ├── email_marketing_ext.py     # Campaign CRUD + Delete/Resend/Clone
+│   │   ├── ai_chat.py                 # Master Concierge chatbot
 │   │   └── ...
 │   └── services/
 │       ├── ai_assistant_v2.py         # Gemini 2.5 Flash via litellm + Emergent proxy
-│       ├── translation_service.py     # EN<->FR via litellm + Emergent proxy
-│       └── email_service.py           # Production SendGrid (click tracking disabled)
-├── frontend/
-│   └── src/
-│       ├── contexts/AuthContext.js     # Auth state management (fixed: 401-only logout)
-│       └── components/
-│           └── FlattenedMarketplace.js # Compare bar (fixed: z-index above mobile nav)
+│       └── email_service.py           # SendGrid (click tracking disabled)
+├── frontend/src/pages/admin/
+│   ├── ManageAllAuctions.js           # Marketplace: Delete/Archive/Pause/Resume (auth'd)
+│   ├── EnhancedUserManager.js         # User Mgmt: Verify + Suspend Account (auth'd)
+│   ├── DeletionRequestsManager.js     # Approve/Reject with notification (auth'd)
+│   ├── CategoryManager.js             # CRUD + Subcategories with parent_id (auth'd)
+│   ├── CouponManager.js              # Coupon CRUD (already auth'd)
+│   ├── PromotionManager.js           # Feature listings (auth'd)
+│   ├── AffiliateManager.js           # Affiliate payouts (auth'd)
+│   └── EmailMarketingManager.js      # Campaign Delete/Resend/Clone
 ```
 
-## Completed (April 10-11, 2026)
+## Completed (April 11, 2026)
 
-### Critical Auth Fix — "Daily Password Reset" Bug
-- **Root causes identified**: JWT expired after 24h + frontend logout() on ANY error (not just 401)
-- **JWT expiration**: Extended from 24h to 7 days (168h), configurable via `JWT_EXPIRATION_HOURS` env var
-- **Email normalization**: All auth paths (login, register, forgot-password) now use `.lower().strip()`
-- **Frontend resilience**: `AuthContext.js` only calls `logout()` on HTTP 401, not on network timeouts/500s
-- **Diagnostic logging**: Every login attempt logged with `[AUTH]` prefix, IP, email, and failure reason
-- **NameError fix**: `force_reset_password` endpoint referenced undefined `jwt_secret` → fixed to use `JWT_SECRET`
-- **Password field fallback**: Login now checks both `password` and `password_hash` fields (admin-created accounts)
-- **All 8 backend + all frontend tests passed** (iteration_129)
+### Admin Panel Full Audit & Repair — 8 Sections
+**Backend endpoints created:**
+- `PUT /admin/listings/{id}/status` — pause, archive, cancel, activate
+- `DELETE /admin/listings/{id}` — permanent deletion
+- `PUT /admin/multi-item-listings/{id}/status` — same for multi-item
+- `DELETE /admin/multi-item-listings/{id}` — cascade delete with lots
+- `PUT /admin/users/{id}/suspend` — suspend/reactivate + session revocation
+- `GET /admin/affiliate/payouts` + `PUT /admin/affiliate/payouts/{id}/approve`
+- `GET /admin/categories` — includes subcategory support
+- Deletion reject notification (creates in-app notification for user)
 
-### Master Concierge AI Chatbot Fix
-- Replaced leaked Gemini API key → litellm + Emergent proxy (no emergentintegrations dependency)
-- Also migrated translation_service.py to same approach
+**Frontend fixes:**
+- Added `useAuth` + auth headers to ALL 6 admin components (ManageAllAuctions, EnhancedUserManager, DeletionRequestsManager, PromotionManager, AffiliateManager, CategoryManager)
+- Added Suspend Account button with Ban icon to EnhancedUserManager
+- Rewrote CategoryManager with subcategory UI (nested display, parent_id dropdown)
+- Toast error messages show backend error details
 
-### Email Marketing Dashboard — Delete, Resend, Clone
-- 3 new endpoints + frontend action buttons
-- All tests passed (iteration_128)
+**Auth hardening:**
+- Suspended users blocked at login (403)
+- User sessions revoked on suspend
+- JWT extended to 7 days (configurable)
+- Email normalization on all auth paths
 
-### Compare Button Position Fix
-- `z-[60]` + `bottom-28` on mobile — above MobileBottomNav
+**Testing:** 21/21 backend + all frontend UI tests passed (iteration_130)
 
-## Railway Deployment Checklist
-1. Save to GitHub
-2. Add `EMERGENT_LLM_KEY` to Railway env vars
-3. Add `JWT_EXPIRATION_HOURS=168` (optional, defaults to 168)
-4. Verify `JWT_SECRET` is set (required for production)
+## Previous Session Completed
+- Master Concierge chatbot fix (litellm + Emergent proxy)
+- Email Marketing Dashboard: Delete/Resend/Clone
+- Password Changed email: raw HTML with "Contact Support" button
+- Compare button z-index fix for mobile
 
 ## 3rd Party Integrations
-- Stripe — Live
-- SendGrid — Live (Click Tracking disabled)
-- Gemini 2.5 Flash — via litellm + EMERGENT_LLM_KEY
-- VAPID Web Push — Active
-- Twilio — Configured
+- Stripe — Live | SendGrid — Live | Gemini 2.5 Flash — litellm + EMERGENT_LLM_KEY | VAPID Push — Active
 
 ## Backlog
 - (P2) Cloudflare CDN DNS migration
