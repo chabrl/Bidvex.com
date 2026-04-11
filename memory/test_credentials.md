@@ -2,10 +2,6 @@
 
 ## Admin Account
 - Email: charbel911@gmail.com
-- Password: Admin123!
+- Password: Anderosli123!@#
 - Role: admin
-
-## Partner Test Account
-- Email: partner@test.com
-- Password: TestUser2026!
-- Role: partner
+- Last synced: 2026-04-12 (via /api/auth/admin-force-sync)
