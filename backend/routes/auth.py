@@ -29,7 +29,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # JWT Configuration
 JWT_SECRET = os.environ.get('JWT_SECRET', 'dev-secret-key-change-in-production')
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRATION_HOURS = 24
+JWT_EXPIRATION_HOURS = int(os.environ.get('JWT_EXPIRATION_HOURS', '168'))  # Default 7 days
 
 # Database connection (will be set from main app)
 db = None
@@ -153,8 +153,9 @@ async def register(user_data: UserCreate, request: Request):
     if not user_data.terms_agreed:
         raise HTTPException(status_code=400, detail="You must agree to the Terms of Service and Privacy Policy to create an account.")
     
-    # Check existing user
-    existing = await db.users.find_one({"email": user_data.email})
+    # Check existing user (email normalized to lowercase)
+    normalized_email = user_data.email.strip().lower()
+    existing = await db.users.find_one({"email": normalized_email})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
     
@@ -204,7 +205,7 @@ async def register(user_data: UserCreate, request: Request):
     # Create user document
     user_doc = {
         "id": user_id,
-        "email": user_data.email,
+        "email": normalized_email,
         "password": hashed_pwd,
         "name": user_data.name,
         "account_type": user_data.account_type,
@@ -260,21 +261,32 @@ async def login(credentials: UserLogin, request: Request):
     from services.brute_force import check_blocked, record_failure, reset_failures
 
     client_ip = get_client_ip(request)
+    normalized_email = credentials.email.strip().lower()
+    logger.info(f"[AUTH] Login attempt for '{normalized_email}' from IP {client_ip}")
 
     # ── Check if IP is blocked ──
     block_info = await check_blocked(client_ip)
     if block_info:
+        logger.warning(f"[AUTH] BLOCKED IP {client_ip} attempted login for '{normalized_email}'")
         raise HTTPException(status_code=429, detail=block_info["reason"])
 
-    user_doc = await db.users.find_one({"email": credentials.email})
+    user_doc = await db.users.find_one({"email": normalized_email})
 
     if not user_doc:
+        logger.warning(f"[AUTH] LOGIN FAILED — user not found: '{normalized_email}'")
         await record_failure(client_ip)
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    if not verify_password(credentials.password, user_doc.get("password", "")):
+    stored_password = user_doc.get("password") or user_doc.get("password_hash", "")
+    if not stored_password:
+        logger.error(f"[AUTH] LOGIN FAILED — no password field in DB for '{normalized_email}'")
+        await record_failure(client_ip)
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    if not verify_password(credentials.password, stored_password):
         result = await record_failure(client_ip)
         remaining = MAX_LOGIN_ATTEMPTS - result["attempts"]
+        logger.warning(f"[AUTH] LOGIN FAILED — password mismatch for '{normalized_email}' (attempts: {result['attempts']}/{MAX_LOGIN_ATTEMPTS})")
         detail = "Invalid credentials"
         if 0 < remaining <= 2:
             detail = f"Invalid credentials. {remaining} attempt{'s' if remaining != 1 else ''} remaining before your IP is blocked."
@@ -290,11 +302,12 @@ async def login(credentials: UserLogin, request: Request):
 
     # ── Success: clear failure counter ──
     await reset_failures(client_ip)
+    logger.info(f"[AUTH] LOGIN SUCCESS for '{normalized_email}' (user_id={user_doc['id']}, role={user_doc.get('role')})")
 
     # Track last login
     user_agent = request.headers.get("user-agent", "unknown") if request else "unknown"
     await db.users.update_one(
-        {"email": credentials.email},
+        {"email": normalized_email},
         {"$set": {
             "last_login": datetime.now(timezone.utc).isoformat(),
             "last_login_ip": client_ip,
@@ -407,7 +420,8 @@ async def forgot_password(request: ForgotPasswordRequest):
     Always returns success to prevent email enumeration
     """
     try:
-        user_doc = await db.users.find_one({"email": request.email}, {"_id": 0})
+        normalized_email = request.email.strip().lower()
+        user_doc = await db.users.find_one({"email": normalized_email}, {"_id": 0})
         
         if user_doc:
             # Generate secure reset token
@@ -659,18 +673,17 @@ async def force_reset_password(request: Request):
     Complete forced password reset for admin-created accounts.
     Used when password_reset_required = true.
     """
-    from jose import JWTError
     body = await request.json()
     reset_token = body.get("reset_token", "")
     new_password = body.get("new_password", "")
 
     try:
-        payload = jwt.decode(reset_token, jwt_secret, algorithms=["HS256"])
+        payload = jwt.decode(reset_token, JWT_SECRET, algorithms=["HS256"])
         user_id = payload.get("sub")
         purpose = payload.get("purpose")
         if purpose != "password_reset":
             raise HTTPException(status_code=400, detail="Invalid token purpose")
-    except (JWTError, jwt.PyJWTError) as e:
+    except JWTError as e:
         raise HTTPException(status_code=400, detail=f"Invalid or expired token: {str(e)}")
 
     user_doc = await db.users.find_one({"id": user_id})
