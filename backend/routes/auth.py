@@ -510,10 +510,13 @@ async def reset_password(request: ResetPasswordRequest):
         # Hash new password
         hashed_password = hash_password(request.new_password)
         
-        # Update user password
+        # Update user password permanently
         await db.users.update_one(
             {"id": user_doc["id"]},
-            {"$set": {"password": hashed_password}}
+            {"$set": {
+                "password": hashed_password,
+                "password_changed_at": datetime.now(timezone.utc).isoformat(),
+            }}
         )
         
         # Mark token as used
@@ -525,21 +528,16 @@ async def reset_password(request: ResetPasswordRequest):
         # Invalidate all sessions for security
         await db.sessions.delete_many({"user_id": user_doc["id"]})
         
-        # Try to send confirmation email
+        # Try to send confirmation email (raw HTML — bypasses broken SendGrid template)
         try:
             from services.email_service import get_email_service
             email_service = get_email_service()
             
             if email_service.is_configured():
-                from config.email_templates import EmailTemplates, EmailDataBuilder
+                from config.email_templates import send_password_changed_email
                 
                 lang = user_doc.get('preferred_language', 'en')
-                result = await email_service.send_email(
-                    to=user_doc["email"],
-                    template_id=EmailTemplates.get_id(EmailTemplates.PASSWORD_CHANGED, lang),
-                    dynamic_data=EmailDataBuilder.password_changed_email(user_doc),
-                    language=lang
-                )
+                result = await send_password_changed_email(email_service, user_doc, language=lang)
                 
                 if result['success']:
                     logger.info(f"Password changed confirmation sent to {user_doc['email']}")
@@ -641,19 +639,14 @@ async def change_password(
             }}
         )
 
-        # Send confirmation email
+        # Send confirmation email (raw HTML — bypasses broken SendGrid template)
         try:
             from services.email_service import get_email_service
             email_service = get_email_service()
             if email_service.is_configured():
-                from config.email_templates import EmailTemplates, EmailDataBuilder
+                from config.email_templates import send_password_changed_email
                 lang = user_doc.get('preferred_language', 'en')
-                await email_service.send_email(
-                    to=user_doc["email"],
-                    template_id=EmailTemplates.get_id(EmailTemplates.PASSWORD_CHANGED, lang),
-                    dynamic_data=EmailDataBuilder.password_changed_email(user_doc),
-                    language=lang,
-                )
+                await send_password_changed_email(email_service, user_doc, language=lang)
         except Exception as e:
             logger.error(f"Error sending password changed email: {e}")
 

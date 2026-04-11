@@ -367,6 +367,76 @@ async def send_password_reset_email(
     return await email_service.send_raw_html(to=user["email"], subject=subject, html_content=html, disable_tracking=True)
 
 
+async def send_password_changed_email(
+    email_service,
+    user: Dict[str, Any],
+    language: str = "en",
+):
+    """Send password changed confirmation with inline HTML (bypasses broken SendGrid template)."""
+    first_name = (user.get("name", "").split()[0] if user.get("name") else "") or "there"
+    change_time = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    user_email = user.get("email", "")
+    current_year = datetime.now().year
+
+    if language == "fr":
+        subject = "BidVex — Votre mot de passe a été modifié"
+        html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;">
+  <tr><td style="background:#1e3a8a;padding:24px 32px;text-align:center;">
+    <h1 style="color:#ffffff;margin:0;font-size:24px;">BidVex</h1>
+  </td></tr>
+  <tr><td style="padding:32px;">
+    <h2 style="color:#1e3a8a;margin:0 0 16px;">Mot de passe modifié</h2>
+    <p style="color:#374151;font-size:16px;line-height:1.6;">Bonjour {first_name},</p>
+    <p style="color:#374151;font-size:16px;line-height:1.6;">Votre mot de passe BidVex a été modifié avec succès le <strong>{change_time}</strong>.</p>
+    <p style="color:#374151;font-size:16px;line-height:1.6;">Si vous n'avez <strong>pas</strong> effectué ce changement, veuillez contacter immédiatement notre équipe de support :</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;"><tr><td align="center">
+      <a href="mailto:support@bidvex.com?subject=Changement%20de%20mot%20de%20passe%20non%20autoris%C3%A9%20-%20{user_email}" target="_blank" style="display:inline-block;background:#dc2626;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:6px;font-size:16px;font-weight:bold;">Contacter le support</a>
+    </td></tr></table>
+    <p style="color:#6b7280;font-size:14px;line-height:1.5;">Courriel : <a href="mailto:support@bidvex.com" style="color:#1e3a8a;">support@bidvex.com</a></p>
+  </td></tr>
+  <tr><td style="background:#f9fafb;padding:16px 32px;text-align:center;">
+    <p style="color:#9ca3af;font-size:12px;margin:0;">&copy; BidVex {current_year} — support@bidvex.com</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>"""
+    else:
+        subject = "BidVex — Your Password Has Been Changed"
+        html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;">
+  <tr><td style="background:#1e3a8a;padding:24px 32px;text-align:center;">
+    <h1 style="color:#ffffff;margin:0;font-size:24px;">BidVex</h1>
+  </td></tr>
+  <tr><td style="padding:32px;">
+    <h2 style="color:#1e3a8a;margin:0 0 16px;">Password Changed</h2>
+    <p style="color:#374151;font-size:16px;line-height:1.6;">Hi {first_name},</p>
+    <p style="color:#374151;font-size:16px;line-height:1.6;">Your BidVex password was successfully changed on <strong>{change_time}</strong>.</p>
+    <p style="color:#374151;font-size:16px;line-height:1.6;">If you did <strong>not</strong> make this change, please contact our support team immediately:</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;"><tr><td align="center">
+      <a href="mailto:support@bidvex.com?subject=Unauthorized%20Password%20Change%20-%20{user_email}" target="_blank" style="display:inline-block;background:#dc2626;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:6px;font-size:16px;font-weight:bold;">Contact Support</a>
+    </td></tr></table>
+    <p style="color:#6b7280;font-size:14px;line-height:1.5;">Email: <a href="mailto:support@bidvex.com" style="color:#1e3a8a;">support@bidvex.com</a></p>
+  </td></tr>
+  <tr><td style="background:#f9fafb;padding:16px 32px;text-align:center;">
+    <p style="color:#9ca3af;font-size:12px;margin:0;">&copy; BidVex {current_year} — support@bidvex.com</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>"""
+
+    return await email_service.send_raw_html(to=user["email"], subject=subject, html_content=html, disable_tracking=True)
+
+
+
 async def send_bid_confirmation(
     email_service,
     user: Dict[str, Any],
