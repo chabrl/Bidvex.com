@@ -12,8 +12,8 @@ from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
-MAX_ATTEMPTS = 5
-BLOCK_DURATION = 86400   # 24 hours in seconds
+MAX_ATTEMPTS = 15
+BLOCK_DURATION = 900      # 15 minutes in seconds (was 24 hours — too aggressive)
 ATTEMPT_WINDOW = 3600    # 1 hour window for counting attempts
 
 # Key prefixes

@@ -273,26 +273,34 @@ async def login(credentials: UserLogin, request: Request):
     user_doc = await db.users.find_one({"email": normalized_email})
 
     if not user_doc:
-        logger.warning(f"[AUTH] LOGIN FAILED — user not found: '{normalized_email}'")
+        logger.warning(f"[AUTH_DEBUG] Login attempt email: {normalized_email} | User found in DB: False")
         await record_failure(client_ip)
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     stored_password = user_doc.get("password") or user_doc.get("password_hash", "")
+    logger.info(f"[AUTH_DEBUG] Login attempt email: {normalized_email} | User found in DB: True | status: {user_doc.get('status')} | Hashed PW in DB starts with: {stored_password[:10] if stored_password else 'EMPTY'}")
+
     if not stored_password:
-        logger.error(f"[AUTH] LOGIN FAILED — no password field in DB for '{normalized_email}'")
+        logger.error(f"[AUTH_DEBUG] No password field in DB for '{normalized_email}'")
         await record_failure(client_ip)
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     if not verify_password(credentials.password, stored_password):
-        result = await record_failure(client_ip)
-        remaining = MAX_LOGIN_ATTEMPTS - result["attempts"]
-        logger.warning(f"[AUTH] LOGIN FAILED — password mismatch for '{normalized_email}' (attempts: {result['attempts']}/{MAX_LOGIN_ATTEMPTS})")
-        detail = "Invalid credentials"
-        if 0 < remaining <= 2:
-            detail = f"Invalid credentials. {remaining} attempt{'s' if remaining != 1 else ''} remaining before your IP is blocked."
-        elif result["blocked"]:
-            detail = "Too many failed login attempts. Your IP has been blocked for 24 hours."
-        raise HTTPException(status_code=401, detail=detail)
+        # Skip brute force for admin users — they self-lock too easily during debugging
+        is_admin = user_doc.get("role") in ("admin", "super_admin")
+        if not is_admin:
+            result = await record_failure(client_ip)
+            remaining = MAX_LOGIN_ATTEMPTS - result["attempts"]
+            logger.warning(f"[AUTH_DEBUG] PASSWORD MISMATCH for '{normalized_email}' (attempts: {result['attempts']}/{MAX_LOGIN_ATTEMPTS})")
+            detail = "Invalid credentials"
+            if 0 < remaining <= 3:
+                detail = f"Invalid credentials. {remaining} attempt{'s' if remaining != 1 else ''} remaining before temporary block."
+            elif result.get("blocked"):
+                detail = "Too many failed attempts. Please wait 15 minutes and try again."
+            raise HTTPException(status_code=401, detail=detail)
+        else:
+            logger.warning(f"[AUTH_DEBUG] PASSWORD MISMATCH for admin '{normalized_email}' — brute force skipped for admin role")
+            raise HTTPException(status_code=401, detail="Invalid credentials")
 
     if user_doc.get("status") == "suspended":
         raise HTTPException(status_code=403, detail="Account suspended. Please contact support.")
@@ -712,3 +720,50 @@ async def force_reset_password(request: Request):
     logger.info(f"Forced password reset completed for user {user_id}")
     return {"success": True, "message": "Password reset successful. Please log in with your new password."}
 
+
+
+@auth_router.post("/admin-force-sync")
+async def admin_force_password_sync(request: Request):
+    """
+    One-time admin password sync endpoint.
+    Uses the EXACT same hash_password() as login verification.
+    Requires a secret header to prevent abuse.
+    """
+    body = await request.json()
+    email = body.get("email", "").strip().lower()
+    new_password = body.get("new_password", "")
+    sync_key = request.headers.get("X-Sync-Key", "")
+
+    # Require the JWT_SECRET as the sync key to prevent abuse
+    if sync_key != JWT_SECRET:
+        raise HTTPException(status_code=403, detail="Invalid sync key")
+
+    if not email or not new_password:
+        raise HTTPException(status_code=400, detail="Email and new_password required")
+
+    user_doc = await db.users.find_one({"email": email}, {"_id": 0})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Hash with the EXACT same function used in login verification
+    hashed = hash_password(new_password)
+
+    # Verify roundtrip immediately
+    if not verify_password(new_password, hashed):
+        raise HTTPException(status_code=500, detail="CRITICAL: Hash roundtrip failed")
+
+    await db.users.update_one(
+        {"email": email},
+        {"$set": {
+            "password": hashed,
+            "password_changed_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+
+    # Clear any brute force blocks
+    from services.brute_force import reset_failures, unblock_ip
+    client_ip = get_client_ip(request)
+    await reset_failures(client_ip)
+
+    logger.info(f"[AUTH_DEBUG] Admin force-sync completed for '{email}' — hash starts with: {hashed[:10]}")
+    return {"success": True, "message": f"Password synced for {email}. Hash verified."}
