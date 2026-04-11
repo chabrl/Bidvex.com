@@ -1,5 +1,6 @@
 import API_BASE from '../../config';
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 import axios from 'axios';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -12,6 +13,8 @@ import { useTranslation } from 'react-i18next';
 const API = API_BASE;
 
 const AffiliateManager = () => {
+  const { token } = useAuth();
+  const headers = { Authorization: `Bearer ${token}` };
   const { t } = useTranslation();
   const [affiliates, setAffiliates] = useState([]);
   const [payouts, setPayouts] = useState([]);
@@ -25,9 +28,9 @@ const AffiliateManager = () => {
   const fetchData = async () => {
     try {
       const [affiliatesRes, payoutsRes, usersRes] = await Promise.all([
-        axios.get(`${API}/admin/affiliates`),
-        axios.get(`${API}/admin/affiliate/payouts`),
-        axios.get(`${API}/admin/users`)
+        axios.get(`${API}/admin/affiliates`, { headers }),
+        axios.get(`${API}/admin/affiliate/payouts`, { headers }),
+        axios.get(`${API}/admin/users`, { headers })
       ]);
       setAffiliates(affiliatesRes.data);
       setPayouts(payoutsRes.data);
@@ -41,7 +44,7 @@ const AffiliateManager = () => {
 
   const handleSetAffiliateStatus = async (userId, isAffiliate) => {
     try {
-      await axios.put(`${API}/admin/users/${userId}/affiliate`, { is_affiliate: !isAffiliate });
+      await axios.put(`${API}/admin/users/${userId}/affiliate`, { is_affiliate: !isAffiliate }, { headers });
       toast.success(`Affiliate status ${!isAffiliate ? 'enabled' : 'disabled'}`);
       fetchData();
     } catch (error) {
@@ -52,7 +55,7 @@ const AffiliateManager = () => {
   const handleApprovePayout = async (payoutId) => {
     if (window.confirm('Approve this payout request?')) {
       try {
-        await axios.put(`${API}/admin/affiliate/payouts/${payoutId}/approve`);
+        await axios.put(`${API}/admin/affiliate/payouts/${payoutId}/approve`, {}, { headers });
         toast.success('Payout approved');
         fetchData();
       } catch (error) {

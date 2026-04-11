@@ -85,6 +85,7 @@ async def approve_deletion_request(
     current_user: User = Depends(require_admin)
 ):
     """Admin: Approve and execute deletion request"""
+    db = get_db()
     request_doc = await db.deletion_requests.find_one({"id": request_id})
     if not request_doc:
         raise HTTPException(status_code=404, detail="Request not found")
@@ -115,7 +116,8 @@ async def reject_deletion_request(
     request_id: str,
     current_user: User = Depends(require_admin)
 ):
-    """Admin: Reject deletion request"""
+    """Admin: Reject deletion request and notify the user."""
+    db = get_db()
     request_doc = await db.deletion_requests.find_one({"id": request_id})
     if not request_doc:
         raise HTTPException(status_code=404, detail="Request not found")
@@ -142,6 +144,19 @@ async def reject_deletion_request(
             "reviewed_by_email": current_user.email
         }}
     )
+
+    # Notify the user via in-app notification
+    user_id = request_doc.get("user_id") or request_doc.get("seller_id")
+    if user_id:
+        await db.notifications.insert_one({
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "type": "deletion_rejected",
+            "title": "Deletion Request Rejected",
+            "message": "Your request to delete listing has been reviewed and rejected by an administrator.",
+            "read": False,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
     
     return {"success": True, "message": "Deletion request rejected"}
 
@@ -154,7 +169,7 @@ async def reject_deletion_request(
 async def admin_get_pending_listings(current_user: User = Depends(require_admin)):
     db = get_db()
     listings = await db.listings.find({"status": "pending"}, {"_id": 0}).sort("created_at", -1).to_list(100)
-    return [Listing(**listing) for listing in listings]
+    return [dict(**listing) for listing in listings]
 
 
 
@@ -254,11 +269,13 @@ async def admin_create_category(data: Dict[str, Any], current_user: User = Depen
         "id": str(uuid.uuid4()),
         "name_en": data.get("name_en"),
         "name_fr": data.get("name_fr"),
-        "icon": data.get("icon", "📦"),
+        "icon": data.get("icon", ""),
         "order": data.get("order", 0),
+        "parent_id": data.get("parent_id"),  # null = top-level, id = subcategory
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.categories.insert_one(category)
+    category.pop("_id", None)
     return category
 
 
@@ -504,9 +521,9 @@ async def export_transactions_csv(
             {"partner_company": {"$regex": search, "$options": "i"}},
         ]
     
+    db = get_db()
     transactions = await db.transactions.find(query, {"_id": 0}).sort("created_at", -1).to_list(10000)
     
-    import csv, io
     output = io.StringIO()
     writer = csv.writer(output)
     
@@ -820,3 +837,176 @@ async def get_admin_user_detail(user_id: str, current_user: User = Depends(requi
 
 
 
+
+
+# ============================================================
+# MARKETPLACE LISTING MANAGEMENT (Delete, Archive, Status)
+# ============================================================
+
+@admin_ops_router.delete("/admin/listings/{listing_id}")
+async def admin_delete_listing(listing_id: str, current_user: User = Depends(require_admin)):
+    """Admin: Permanently delete a single listing."""
+    db = get_db()
+    result = await db.listings.delete_one({"id": listing_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()), "action": "listing_deleted",
+        "admin_id": current_user.id, "target_id": listing_id,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"success": True, "message": "Listing deleted permanently"}
+
+
+@admin_ops_router.delete("/admin/multi-item-listings/{listing_id}")
+async def admin_delete_multi_item_listing(listing_id: str, current_user: User = Depends(require_admin)):
+    """Admin: Permanently delete a multi-item listing and its lots."""
+    db = get_db()
+    result = await db.multi_item_listings.delete_one({"id": listing_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Multi-item listing not found")
+    await db.lots.delete_many({"listing_id": listing_id})
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()), "action": "multi_item_listing_deleted",
+        "admin_id": current_user.id, "target_id": listing_id,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"success": True, "message": "Multi-item listing and lots deleted permanently"}
+
+
+@admin_ops_router.put("/admin/listings/{listing_id}/status")
+async def admin_update_listing_status(listing_id: str, data: Dict[str, Any], current_user: User = Depends(require_admin)):
+    """Admin: Update single listing status (active, paused, archived, cancelled)."""
+    db = get_db()
+    new_status = data.get("status")
+    if new_status not in ("active", "paused", "archived", "cancelled", "ended"):
+        raise HTTPException(status_code=400, detail=f"Invalid status: {new_status}")
+    result = await db.listings.update_one(
+        {"id": listing_id},
+        {"$set": {"status": new_status, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()), "action": f"listing_status_{new_status}",
+        "admin_id": current_user.id, "target_id": listing_id,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"success": True, "message": f"Listing status updated to {new_status}"}
+
+
+@admin_ops_router.put("/admin/multi-item-listings/{listing_id}/status")
+async def admin_update_multi_listing_status(listing_id: str, data: Dict[str, Any], current_user: User = Depends(require_admin)):
+    """Admin: Update multi-item listing status."""
+    db = get_db()
+    new_status = data.get("status")
+    if new_status not in ("active", "paused", "archived", "cancelled", "ended", "upcoming"):
+        raise HTTPException(status_code=400, detail=f"Invalid status: {new_status}")
+    result = await db.multi_item_listings.update_one(
+        {"id": listing_id},
+        {"$set": {"status": new_status, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Multi-item listing not found")
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()), "action": f"multi_listing_status_{new_status}",
+        "admin_id": current_user.id, "target_id": listing_id,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"success": True, "message": f"Multi-item listing status updated to {new_status}"}
+
+
+# ============================================================
+# USER SUSPEND (with JWT revocation + login block)
+# ============================================================
+
+@admin_ops_router.put("/admin/users/{user_id}/suspend")
+async def admin_suspend_user(user_id: str, data: Dict[str, Any], current_user: User = Depends(require_admin)):
+    """Admin: Suspend or unsuspend a user account. Revokes active sessions on suspend."""
+    db = get_db()
+    if user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot suspend your own account")
+    user_doc = await db.users.find_one({"id": user_id})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    suspend = data.get("suspended", True)
+    new_status = "suspended" if suspend else "active"
+    update_fields = {
+        "status": new_status,
+        "suspended_at": datetime.now(timezone.utc).isoformat() if suspend else None,
+        "suspended_by": current_user.id if suspend else None,
+        "suspension_reason": data.get("reason", "Admin action") if suspend else None,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.users.update_one({"id": user_id}, {"$set": update_fields})
+
+    if suspend:
+        # Revoke all active sessions to force immediate logout
+        await db.sessions.delete_many({"user_id": user_id})
+        # Add to suspended tokens set for JWT validation
+        await db.suspended_users.update_one(
+            {"user_id": user_id},
+            {"$set": {"user_id": user_id, "suspended_at": datetime.now(timezone.utc).isoformat()}},
+            upsert=True
+        )
+    else:
+        await db.suspended_users.delete_one({"user_id": user_id})
+
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()), "action": f"user_{new_status}",
+        "admin_id": current_user.id, "target_user_id": user_id,
+        "reason": data.get("reason", ""),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"success": True, "new_status": new_status, "message": f"User {'suspended' if suspend else 'reactivated'} successfully"}
+
+
+# ============================================================
+# AFFILIATE PAYOUTS
+# ============================================================
+
+@admin_ops_router.get("/admin/affiliate/payouts")
+async def admin_get_affiliate_payouts(current_user: User = Depends(require_admin)):
+    """Admin: Get all affiliate payout requests."""
+    db = get_db()
+    payouts = await db.affiliate_payouts.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    # Enrich with user info
+    for payout in payouts:
+        user = await db.users.find_one({"id": payout.get("user_id")}, {"_id": 0, "name": 1, "email": 1})
+        payout["user_name"] = user.get("name") if user else "Unknown"
+        payout["user_email"] = user.get("email") if user else "N/A"
+    return payouts
+
+
+@admin_ops_router.put("/admin/affiliate/payouts/{payout_id}/approve")
+async def admin_approve_affiliate_payout(payout_id: str, current_user: User = Depends(require_admin)):
+    """Admin: Approve an affiliate payout request."""
+    db = get_db()
+    payout = await db.affiliate_payouts.find_one({"id": payout_id})
+    if not payout:
+        raise HTTPException(status_code=404, detail="Payout request not found")
+    if payout.get("status") == "approved":
+        raise HTTPException(status_code=400, detail="Payout already approved")
+
+    await db.affiliate_payouts.update_one(
+        {"id": payout_id},
+        {"$set": {
+            "status": "approved",
+            "approved_by": current_user.id,
+            "approved_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    return {"success": True, "message": "Payout approved"}
+
+
+# ============================================================
+# SUBCATEGORY SUPPORT
+# ============================================================
+
+@admin_ops_router.get("/admin/categories")
+async def admin_get_categories(current_user: User = Depends(require_admin)):
+    """Admin: Get all categories including subcategories."""
+    db = get_db()
+    categories = await db.categories.find({}, {"_id": 0}).sort("order", 1).to_list(200)
+    return categories

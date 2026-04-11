@@ -1,6 +1,7 @@
 import API_BASE from '../../config';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 import axios from 'axios';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -12,6 +13,8 @@ const API = API_BASE;
 
 const DeletionRequestsManager = () => {
   const navigate = useNavigate();
+  const { token } = useAuth();
+  const headers = { Authorization: `Bearer ${token}` };
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [confirmModal, setConfirmModal] = useState({ open: false, request: null, action: null });
@@ -22,7 +25,7 @@ const DeletionRequestsManager = () => {
 
   const fetchRequests = async () => {
     try {
-      const response = await axios.get(`${API}/admin/deletion-requests`);
+      const response = await axios.get(`${API}/admin/deletion-requests`, { headers });
       const d = response.data;
       setRequests(Array.isArray(d) ? d : d.requests || []);
     } catch (error) {
@@ -35,23 +38,23 @@ const DeletionRequestsManager = () => {
 
   const handleApprove = async (requestId) => {
     try {
-      await axios.post(`${API}/admin/deletion-requests/${requestId}/approve`);
-      toast.success('Deletion request approved. Listing deleted.');
+      await axios.post(`${API}/admin/deletion-requests/${requestId}/approve`, {}, { headers });
+      toast.success('Deletion request approved. Listing permanently deleted.');
       fetchRequests();
       setConfirmModal({ open: false, request: null, action: null });
     } catch (error) {
-      toast.error('Failed to approve deletion');
+      toast.error(error.response?.data?.detail || 'Failed to approve deletion');
     }
   };
 
   const handleReject = async (requestId) => {
     try {
-      await axios.post(`${API}/admin/deletion-requests/${requestId}/reject`);
-      toast.success('Deletion request rejected. Listing remains active.');
+      await axios.post(`${API}/admin/deletion-requests/${requestId}/reject`, {}, { headers });
+      toast.success('Deletion request rejected. User notified.');
       fetchRequests();
       setConfirmModal({ open: false, request: null, action: null });
     } catch (error) {
-      toast.error('Failed to reject deletion');
+      toast.error(error.response?.data?.detail || 'Failed to reject deletion');
     }
   };
 

@@ -2,6 +2,7 @@ import API_BASE from '../../config';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
@@ -14,6 +15,8 @@ const API = API_BASE;
 
 const ManageAllAuctions = () => {
   const navigate = useNavigate();
+  const { token } = useAuth();
+  const headers = { Authorization: `Bearer ${token}` };
   const [singleListings, setSingleListings] = useState([]);
   const [multiListings, setMultiListings] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -29,8 +32,8 @@ const ManageAllAuctions = () => {
   const fetchAllListings = async () => {
     try {
       const [singleRes, multiRes] = await Promise.all([
-        axios.get(`${API}/admin/listings/all`),
-        axios.get(`${API}/admin/multi-item-listings/all`)
+        axios.get(`${API}/admin/listings/all`, { headers }),
+        axios.get(`${API}/admin/multi-item-listings/all`, { headers })
       ]);
       const singleData = singleRes.data;
       setSingleListings(Array.isArray(singleData) ? singleData : singleData.listings || []);
@@ -55,23 +58,23 @@ const ManageAllAuctions = () => {
     try {
       const isMultiItem = listing.type === 'multi';
       const endpoint = isMultiItem ? `multi-item-listings/${listing.id}` : `listings/${listing.id}`;
-      await axios.delete(`${API}/admin/${endpoint}`);
+      await axios.delete(`${API}/admin/${endpoint}`, { headers });
       toast.success('Auction deleted successfully');
       setDeleteModal({ open: false, listing: null });
       fetchAllListings();
     } catch (error) {
-      toast.error('Failed to delete auction');
+      toast.error(error.response?.data?.detail || 'Failed to delete auction');
     }
   };
 
   const handleStatusChange = async (id, newStatus, isMultiItem) => {
     try {
       const endpoint = isMultiItem ? `multi-item-listings/${id}` : `listings/${id}`;
-      await axios.put(`${API}/admin/${endpoint}/status`, { status: newStatus });
+      await axios.put(`${API}/admin/${endpoint}/status`, { status: newStatus }, { headers });
       toast.success(`Auction status updated to ${newStatus}`);
       fetchAllListings();
     } catch (error) {
-      toast.error('Failed to update status');
+      toast.error(error.response?.data?.detail || 'Failed to update status');
     }
   };
 

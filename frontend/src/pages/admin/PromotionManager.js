@@ -1,5 +1,6 @@
 import API_BASE from '../../config';
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 import axios from 'axios';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -12,6 +13,8 @@ import { useTranslation } from 'react-i18next';
 const API = API_BASE;
 
 const PromotionManager = () => {
+  const { token } = useAuth();
+  const headers = { Authorization: `Bearer ${token}` };
   const { t } = useTranslation();
   const [promotions, setPromotions] = useState([]);
   const [listings, setListings] = useState([]);
@@ -30,8 +33,8 @@ const PromotionManager = () => {
   const fetchData = async () => {
     try {
       const [promotionsRes, listingsRes] = await Promise.all([
-        axios.get(`${API}/admin/promotions`),
-        axios.get(`${API}/admin/auctions?status=active`)
+        axios.get(`${API}/admin/promotions`, { headers }),
+        axios.get(`${API}/admin/auctions?status=active`, { headers })
       ]);
       setPromotions(promotionsRes.data);
       setListings(listingsRes.data);
@@ -44,7 +47,7 @@ const PromotionManager = () => {
 
   const handleCreatePromotion = async () => {
     try {
-      await axios.post(`${API}/admin/promotions/create`, newPromotion);
+      await axios.post(`${API}/admin/promotions/create`, newPromotion, { headers });
       toast.success('Promotion created successfully');
       setShowCreate(false);
       setNewPromotion({ listing_id: '', promotion_type: 'featured', end_date: '' });
@@ -57,7 +60,7 @@ const PromotionManager = () => {
   const handleDeletePromotion = async (promotionId) => {
     if (window.confirm('Delete this promotion?')) {
       try {
-        await axios.delete(`${API}/admin/promotions/${promotionId}`);
+        await axios.delete(`${API}/admin/promotions/${promotionId}`, { headers });
         toast.success('Promotion deleted');
         fetchData();
       } catch (error) {
@@ -68,7 +71,7 @@ const PromotionManager = () => {
 
   const handleFeatureListing = async (listingId, isFeatured) => {
     try {
-      await axios.put(`${API}/admin/listings/${listingId}/feature`, { is_featured: !isFeatured });
+      await axios.put(`${API}/admin/listings/${listingId}/feature`, { is_featured: !isFeatured }, { headers });
       toast.success(`Listing ${!isFeatured ? 'featured' : 'unfeatured'}`);
       fetchData();
     } catch (error) {

@@ -27,7 +27,7 @@ import { toast } from 'sonner';
 import { 
   Users, CheckCircle, MessageCircleOff, Search, UserPlus, 
   Copy, Check, Eye, EyeOff, Building2, User, Shield, Mail,
-  Phone, AlertTriangle, X
+  Phone, AlertTriangle, X, Ban
 } from 'lucide-react';
 
 const API = API_BASE;
@@ -131,6 +131,23 @@ const EnhancedUserManager = () => {
       fetchData();
     } catch (error) {
       toast.error('Failed to update messaging status');
+    }
+  };
+
+  const handleSuspendAccount = async (userId, currentStatus) => {
+    const isSuspended = currentStatus === 'suspended';
+    const action = isSuspended ? 'reactivate' : 'suspend';
+    if (!window.confirm(`Are you sure you want to ${action} this account?`)) return;
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      await axios.put(`${API}/admin/users/${userId}/suspend`, {
+        suspended: !isSuspended,
+        reason: isSuspended ? '' : 'Admin action'
+      }, { headers });
+      toast.success(`Account ${isSuspended ? 'reactivated' : 'suspended'} successfully`);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || `Failed to ${action} account`);
     }
   };
 
@@ -419,6 +436,16 @@ const EnhancedUserManager = () => {
                     title="Suspend/restore messaging"
                   >
                     <MessageCircleOff className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant={user.status === 'suspended' ? 'destructive' : 'outline'} 
+                    onClick={() => handleSuspendAccount(user.id, user.status)}
+                    title={user.status === 'suspended' ? 'Reactivate account' : 'Suspend account'}
+                    data-testid={`suspend-user-${user.id}`}
+                  >
+                    <Ban className="h-3.5 w-3.5 mr-1" />
+                    {user.status === 'suspended' ? 'Suspended' : 'Suspend'}
                   </Button>
                 </div>
               </div>
