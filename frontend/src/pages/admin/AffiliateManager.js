@@ -32,9 +32,12 @@ const AffiliateManager = () => {
         axios.get(`${API}/admin/affiliate/payouts`, { headers }),
         axios.get(`${API}/admin/users`, { headers })
       ]);
-      setAffiliates(affiliatesRes.data);
-      setPayouts(payoutsRes.data);
-      setUsers(usersRes.data);
+      const affData = affiliatesRes.data;
+      setAffiliates(Array.isArray(affData) ? affData : affData.affiliates || []);
+      const payData = payoutsRes.data;
+      setPayouts(Array.isArray(payData) ? payData : payData.payouts || []);
+      const userData = usersRes.data;
+      setUsers(Array.isArray(userData) ? userData : userData.users || []);
     } catch (error) {
       toast.error('Failed to load affiliate data');
     } finally {
