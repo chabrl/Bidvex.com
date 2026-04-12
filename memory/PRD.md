@@ -114,12 +114,40 @@
 
 **Testing:** iteration_132 — backend 100%, frontend 90%+ (fixed CFIA trigger categories, footer nesting)
 
+## Completed (April 12, 2026) — Phase 5: Stripe Intermediary Handshake & Fee Passing
+
+### Dynamic Fee Calculation
+- Formula: `net_commission = hammer * 0.025`, `total_charge = (net + 0.30) / (1 - 0.029)` — ensures BidVex receives exactly 2.5% net of Stripe fees.
+- `GET /api/vehicle-settlement/fee-preview/{hammer_price}` — public, bilingual breakdown (breakdown_en, breakdown_fr).
+
+### Information Gate (Seller Contact)
+- `GET /api/auctions/{id}/seller-contact` — returns 402 with bilingual message if `contact_revealed=false`. Returns seller name/email/phone only after `FEE_PAID`.
+- `GET /api/vehicle-settlement/{auction_id}/status` — returns settlement status for buyer.
+
+### Stripe Webhook & Auto-Charge
+- On auction close: `create_vehicle_fee_charge()` creates PaymentIntent for total charge amount.
+- Webhook: `payment_intent.succeeded` → sets `contact_revealed=true`, sends bilingual email with seller contact.
+- Webhook: `payment_intent.payment_failed` → sets `settlement_status=FEE_FAILED`.
+- Metadata: `bidvex_role: platform_intermediary`, `vehicle_price_collected_by_bidvex: false`.
+
+### Database Schema
+- `vehicle_settlements` collection: `auction_id`, `buyer_id`, `hammer_price`, `net_commission_amount`, `total_processed_amount`, `stripe_payment_intent_id`, `settlement_status` (PENDING_CLOSE/FEE_PROCESSING/FEE_PAID/FEE_FAILED), `contact_revealed`.
+- Migration: `migrations/add_vehicle_settlement_fields.py` — adds OPC, AI consent, CFIA fields to existing docs.
+
+### Frontend Components
+- `VehicleFeeBreakdown` — bilingual fee table showing Platform Fee + Processing = Total
+- `SellerContactGate` — locked/unlocked UI based on settlement status
+
+**Testing:** iteration_133 — 21/21 backend tests passed (100%)
+
 ## 3rd Party Integrations
 - Stripe — Live | SendGrid — Live | Gemini 2.5 Flash — litellm + EMERGENT_LLM_KEY | VAPID Push — Active
 
 ## Backlog
-- (P1) Section 1.3: Vehicle payment flow — 2.5% platform fee via Stripe (charge buyer, not hammer price)
-- (P1) Section 5: Wire CrossBorderAdvisoryPanel into listing detail pages and CrossBorderBidModal into bid flow
+- (P1) Wire VehicleFeeBreakdown + SellerContactGate into vehicle detail/won-auction pages
+- (P1) Wire CrossBorderAdvisoryPanel into listing detail pages for US-origin items
+- (P1) Wire CrossBorderBidModal into bid flow (first-bid intercept)
+- (P1) Pre-bid SetupIntent card verification (3D Secure)
 - (P2) Cloudflare CDN DNS migration
 - (P2) Post-launch monitoring & alerting
 - (Enhancement) Admin offline order management
