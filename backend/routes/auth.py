@@ -59,6 +59,7 @@ class UserCreate(BaseModel):
     tax_number: Optional[str] = ""
     bank_details: Optional[str] = ""
     terms_agreed: bool = False
+    ai_disclosure_consent: bool = False
 
 
 class SessionCreate(BaseModel):
@@ -153,6 +154,10 @@ async def register(user_data: UserCreate, request: Request):
     if not user_data.terms_agreed:
         raise HTTPException(status_code=400, detail="You must agree to the Terms of Service and Privacy Policy to create an account.")
     
+    # Validate AI disclosure consent (Law 25 requirement)
+    if not user_data.ai_disclosure_consent:
+        raise HTTPException(status_code=400, detail="You must acknowledge the AI disclosure to create an account. / Vous devez accepter la divulgation sur l'IA pour créer un compte.")
+    
     # Check existing user (email normalized to lowercase)
     normalized_email = user_data.email.strip().lower()
     existing = await db.users.find_one({"email": normalized_email})
@@ -224,6 +229,11 @@ async def register(user_data: UserCreate, request: Request):
         "phone_verified": False,
         "email_verified": False,
         "terms_agreed_at": now.isoformat(),
+        "ai_disclosure_consent": True,
+        "ai_consent_timestamp": now.isoformat(),
+        "ai_consent_ip": client_ip,
+        "opc_permit_number": None,
+        "opc_permit_verified": False,
         "created_at": now.isoformat(),
         "updated_at": None
     }

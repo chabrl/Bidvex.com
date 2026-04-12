@@ -5,6 +5,7 @@ import {
   CreditCard, Database, Cookie, Cpu, Clock, CheckCircle,
   FileText, Globe, UserCheck, Server, AlertTriangle
 } from 'lucide-react';
+import { AIDisclosureLegalSection, VehicleAuctionLegalSection } from './LegalComplianceSections';
 
 export const PrivacyEN = () => {
   return (
@@ -458,6 +459,12 @@ export const PrivacyEN = () => {
               </div>
             </div>
           </section>
+
+          {/* Law 25: AI Disclosure Section (Bilingual) */}
+          <AIDisclosureLegalSection />
+
+          {/* Vehicle Auctions: OPC Compliance (Bilingual) */}
+          <VehicleAuctionLegalSection />
 
           {/* Footer */}
           <div className="text-center text-sm text-muted-foreground pt-6 border-t">

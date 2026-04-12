@@ -5,6 +5,7 @@ import {
   Users, DollarSign, Scale, Lock, Ban, Clock, CheckCircle,
   XCircle, CreditCard, Building2
 } from 'lucide-react';
+import { CrossBorderLegalSection, VehicleAuctionLegalSection } from './LegalComplianceSections';
 
 export const TermsEN = () => {
   return (
@@ -500,6 +501,15 @@ export const TermsEN = () => {
           </section>
 
           {/* Footer */}
+          <div className="text-center text-sm text-muted-foreground pt-6 border-t">
+
+          {/* Cross-Border Compliance (Bilingual) */}
+          <CrossBorderLegalSection />
+
+          {/* Vehicle Auctions: OPC Compliance (Bilingual) */}
+          <VehicleAuctionLegalSection />
+
+          </div>
           <div className="text-center text-sm text-muted-foreground pt-6 border-t">
             <p>&copy; 2026 BidVex Inc. All rights reserved.</p>
           </div>

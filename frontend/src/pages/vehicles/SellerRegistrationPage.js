@@ -27,30 +27,21 @@ const API = API_BASE;
 
 const SELLER_TYPES = [
   {
-    id: 'private',
-    title: 'Private Seller',
-    description: 'Individual selling personal vehicles',
-    icon: User,
-    limit: '1 vehicle per month',
-    requirements: ['Valid ID', 'Proof of address'],
-    color: 'blue',
-  },
-  {
     id: 'dealer',
-    title: 'Licensed Dealer',
-    description: 'Registered automotive dealership',
+    title: 'Licensed Dealer / Concessionnaire licencié',
+    description: 'OPC-licensed road vehicle dealer / Concessionnaire de véhicules routiers licencié OPC',
     icon: Building2,
-    limit: 'Up to 500 vehicles per month',
-    requirements: ['Business registration', 'Dealer license', 'Tax ID'],
+    limit: 'Unlimited / Illimitées',
+    requirements: ['OPC Permit / Permis OPC', 'Business registration / Inscription d\'entreprise', 'Tax ID / Numéro de taxe'],
     color: 'green',
   },
   {
     id: 'auctioneer',
-    title: 'Verified Auctioneer',
-    description: 'Professional auction house',
+    title: 'Verified Auctioneer / Encanteur vérifié',
+    description: 'Professional auction house / Maison d\'enchères professionnelle',
     icon: Gavel,
-    limit: 'Up to 500 vehicles per month',
-    requirements: ['Auctioneer license', 'Business registration', 'Insurance'],
+    limit: 'Unlimited / Illimitées',
+    requirements: ['Auctioneer license / Licence d\'encanteur', 'Business registration / Inscription d\'entreprise', 'Insurance / Assurance'],
     color: 'purple',
   },
 ];
@@ -258,14 +249,41 @@ const SellerRegistrationPage = () => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 py-12" data-testid="seller-registration-page">
       <div className="max-w-4xl mx-auto px-4">
-        {/* Header */}
-        <div className="text-center mb-8">
+        {/* Bilingual Header — EN */}
+        <div className="text-center mb-6">
           <Badge className="mb-4">Vehicle Auctions</Badge>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
-            Become a Vehicle Seller
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white mb-2">
+            List Your Vehicles on BidVex — Licensed Dealers Only
           </h1>
-          <p className="text-slate-500 max-w-xl mx-auto">
-            Join BidVex&apos;s trusted network of vehicle sellers. Choose your seller type to get started.
+          <p className="text-sm text-slate-600 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed">
+            BidVex accepts vehicle listings exclusively from OPC-licensed road vehicle dealers (commerçants de véhicules routiers) holding a valid permit issued by the Office de la protection du consommateur du Québec. Individual private sellers are not eligible to list road vehicles on this platform.
+          </p>
+          <p className="text-sm text-green-700 dark:text-green-400 mt-2 font-medium">
+            Unlimited vehicle listings included with your verified dealer account. No per-listing fees for dealers.
+          </p>
+        </div>
+        <hr className="border-slate-200 dark:border-slate-700 mb-4" />
+        {/* Bilingual Header — FR */}
+        <div className="text-center mb-8">
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white mb-2">
+            Listez vos véhicules sur BidVex — Concessionnaires licenciés seulement
+          </h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed">
+            BidVex accepte les annonces de véhicules exclusivement des concessionnaires de véhicules routiers licenciés par l'OPC (commerçants de véhicules routiers) détenant un permis valide délivré par l'Office de la protection du consommateur du Québec. Les vendeurs privés individuels ne sont pas admissibles à lister des véhicules routiers sur cette plateforme.
+          </p>
+          <p className="text-sm text-green-700 dark:text-green-400 mt-2 font-medium">
+            Annonces de véhicules illimitées incluses avec votre compte concessionnaire vérifié. Aucun frais par annonce pour les concessionnaires.
+          </p>
+        </div>
+
+        {/* Non-Dismissible Disclaimer Box (Bilingual) */}
+        <div className="border-2 border-red-300 bg-red-50 dark:bg-red-900/15 rounded-lg p-5 mb-8 space-y-3" data-testid="vehicle-platform-disclaimer">
+          <p className="text-sm text-red-800 dark:text-red-200 leading-relaxed">
+            <strong>EN:</strong> BidVex is a technology platform only. We do not buy, sell, or take possession of vehicles. All vehicle sales are contracts formed directly between the licensed dealer and the winning bidder. BidVex does not hold title to any vehicle at any time.
+          </p>
+          <hr className="border-red-200 dark:border-red-700" />
+          <p className="text-sm text-red-800 dark:text-red-200 leading-relaxed">
+            <strong>FR:</strong> BidVex est une plateforme technologique uniquement. Nous n'achetons pas, ne vendons pas et ne prenons pas possession de véhicules. Toutes les ventes de véhicules sont des contrats formés directement entre le concessionnaire licencié et l'enchérisseur gagnant. BidVex ne détient le titre d'aucun véhicule en aucun moment.
           </p>
         </div>
 
@@ -417,6 +435,20 @@ const SellerRegistrationPage = () => {
                   </>
                 )}
                 
+                {/* OPC Permit Field (Bilingual) */}
+                <div className="space-y-2 border-2 border-amber-200 rounded-lg p-4 bg-amber-50/50 dark:bg-amber-900/10">
+                  <Label className="font-semibold">OPC Permit Number / Numéro de permis OPC *</Label>
+                  <Input
+                    value={formData.license_number}
+                    onChange={(e) => updateField('license_number', e.target.value)}
+                    placeholder="XXXXXXX"
+                    data-testid="opc-permit-input"
+                  />
+                  <p className="text-xs text-slate-500">Your permit number as issued by the OPC. Example format: XXXXXXX. This will be verified before your account is activated.</p>
+                  <hr className="border-slate-200 dark:border-slate-700" />
+                  <p className="text-xs text-slate-500">Votre numéro de permis tel que délivré par l'OPC. Format exemple : XXXXXXX. Ce numéro sera vérifié avant l'activation de votre compte.</p>
+                </div>
+                
                 <div className="space-y-2">
                   <Label>Website</Label>
                   <Input
@@ -452,12 +484,13 @@ const SellerRegistrationPage = () => {
                   </div>
                 </div>
                 
-                {/* Agreement */}
-                <div className="bg-slate-50 rounded-lg p-4">
-                  <p className="text-sm text-slate-600">
-                    By submitting this application, you agree to BidVex&apos;s seller terms and conditions, 
-                    including compliance with all applicable vehicle sales regulations.
-                  </p>
+                {/* Dealer Onboarding Agreement (Bilingual — Section 6.2) */}
+                <div className="border-2 border-slate-300 dark:border-slate-600 rounded-lg p-4 space-y-3" data-testid="dealer-agreement-block">
+                  <div className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed space-y-2">
+                    <p>I represent and warrant that: (1) I hold a valid, current OPC permit (permis de commerçant de véhicules routiers) issued by the Office de la protection du consommateur du Québec; (2) I will comply with all obligations under the Consumer Protection Act including written contracts of sale, legal warranties (garantie légale de bon fonctionnement), and disclosure of my permit number to buyers; (3) I acknowledge that BidVex is a technology platform only and is not a co-vendor, guarantor, or party to any vehicle sale contract; (4) I will not list any vehicle for which I do not hold clear title free of undisclosed encumbrances.</p>
+                    <hr className="border-slate-200 dark:border-slate-700" />
+                    <p>Je déclare et garantis que : (1) je détiens un permis OPC valide et en vigueur (permis de commerçant de véhicules routiers) délivré par l'Office de la protection du consommateur du Québec ; (2) je me conformerai à toutes les obligations en vertu de la Loi sur la protection du consommateur, notamment les contrats de vente écrits, les garanties légales (garantie légale de bon fonctionnement) et la divulgation de mon numéro de permis aux acheteurs ; (3) je reconnais que BidVex est une plateforme technologique uniquement et n'est pas un co-vendeur, garant ou partie à tout contrat de vente de véhicule ; (4) je ne listerai aucun véhicule pour lequel je ne détiens pas un titre clair exempt de charges non divulguées.</p>
+                  </div>
                 </div>
               </CardContent>
             </Card>

@@ -15,10 +15,18 @@ import { toast } from 'sonner';
 import { Loader2, Upload, AlertTriangle } from 'lucide-react';
 import LocationSelector from '../components/LocationSelector';
 import CategorySelector from '../components/CategorySelector';
+import { CFIASoilBanner, CFIASoilCheckbox } from '../components/legal/LegalComplianceSections';
 import useGeoLocation from '../hooks/useGeoLocation';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
 
 const API = API_BASE;
+
+const CFIA_TRIGGER_CATEGORIES = [
+  "farm equipment", "tractors", "excavators", "heavy_construction", "bulldozers",
+  "skid_steers", "combines", "industrial_machinery", "construction & excavation",
+  "material handling (forklifts)", "tillage & seeding", "harvesting (combines)",
+  "livestock & dairy",
+];
 
 const CreateListingPage = () => {
   const { t } = useTranslation();
@@ -27,6 +35,7 @@ const CreateListingPage = () => {
   const geo = useGeoLocation();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [cfiaDeclaration, setCfiaDeclaration] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -264,6 +273,14 @@ const CreateListingPage = () => {
                   </select>
                 </div>
               </div>
+
+              {/* CFIA Soil Rule Banner — Section 4 */}
+              {formData.category && CFIA_TRIGGER_CATEGORIES.some(c => formData.category.toLowerCase().includes(c.toLowerCase())) && (
+                <div className="space-y-3">
+                  <CFIASoilBanner />
+                  <CFIASoilCheckbox checked={cfiaDeclaration} onChange={(e) => setCfiaDeclaration(e.target.checked)} />
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">

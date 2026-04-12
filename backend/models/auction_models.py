@@ -42,6 +42,7 @@ class ListingCreate(BaseModel):
     description_en: Optional[str] = None
     description_fr: Optional[str] = None
     content_language: Optional[str] = "en"  # source language of title/description
+    cfia_soil_declaration: Optional[bool] = None  # CFIA biosecurity: seller confirms equipment is soil-free
 
 
 class Listing(BaseModel):
@@ -89,6 +90,7 @@ class Listing(BaseModel):
 class BidCreate(BaseModel):
     listing_id: str
     amount: float
+    cross_border_disclosure_accepted: Optional[bool] = None  # Required for US-origin listings
 
 
 class Bid(BaseModel):

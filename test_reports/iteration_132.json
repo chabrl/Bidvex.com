@@ -1,0 +1,89 @@
+{
+  "summary": "Legal Compliance Sprint Testing - Iteration 132. Tested AI disclosure consent on registration, OPC verification admin endpoint, bilingual legal sections on Privacy/Terms pages, Vehicle Seller Registration page, and CFIA banner implementation.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [],
+    "fixed": [
+      {
+        "endpoint": "/api/auth/register",
+        "issue": "UserCreate model in auth.py was missing ai_disclosure_consent field causing 500 error",
+        "fix": "Added ai_disclosure_consent: bool = False to UserCreate model in /app/backend/routes/auth.py line 62",
+        "priority": "HIGH"
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "CFIA Soil Banner on Create Listing",
+        "issue": "CFIA banner trigger categories are in English but dropdown shows French category names. Banner may not trigger for French UI users.",
+        "affected_selectors": ["[data-testid='cfia-soil-banner']"],
+        "file": "/app/frontend/src/pages/CreateListingPage.js",
+        "line": "24-29",
+        "priority": "MEDIUM"
+      }
+    ],
+    "design_issues": []
+  },
+  "test_results": {
+    "registration_ai_disclosure": {
+      "status": "PASS",
+      "details": "AI disclosure checkbox present, bilingual EN/FR text visible, submit button requires both terms_agreed AND ai_disclosure_consent"
+    },
+    "backend_ai_consent_validation": {
+      "status": "PASS",
+      "details": "POST /api/auth/register rejects requests without ai_disclosure_consent=true (returns 400)"
+    },
+    "backend_ai_consent_storage": {
+      "status": "PASS",
+      "details": "User document stores ai_disclosure_consent, ai_consent_timestamp, ai_consent_ip"
+    },
+    "privacy_policy_ai_section": {
+      "status": "PASS",
+      "details": "AI Disclosure section (#ai-disclosure) found with bilingual EN/FR content"
+    },
+    "privacy_policy_opc_section": {
+      "status": "PASS",
+      "details": "Vehicle Auctions OPC section (#vehicle-auctions-opc) found with bilingual content"
+    },
+    "terms_cross_border_section": {
+      "status": "PARTIAL",
+      "details": "CrossBorderLegalSection and VehicleAuctionLegalSection components are imported and rendered in TermsEN.jsx but placed inside footer div styling"
+    },
+    "opc_verify_endpoint": {
+      "status": "PASS",
+      "details": "PUT /api/admin/users/{id}/opc-verify endpoint exists and requires admin auth"
+    },
+    "vehicle_seller_registration": {
+      "status": "PASS",
+      "details": "Page has bilingual header, disclaimer box, OPC permit field. Admin user already approved so shows status page."
+    },
+    "cfia_banner": {
+      "status": "PARTIAL",
+      "details": "CFIASoilBanner component exists with bilingual content but trigger categories need French equivalents"
+    }
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_legal_compliance_132.py",
+    "/app/test_reports/pytest/pytest_results_legal_132.xml"
+  ],
+  "action_items": [
+    "Add French category equivalents to CFIA_TRIGGER_CATEGORIES in CreateListingPage.js (e.g., 'équipement agricole', 'tracteurs', 'excavateurs')"
+  ],
+  "critical_code_review_comments": [
+    "CFIA_TRIGGER_CATEGORIES array at line 24-29 in CreateListingPage.js only contains English category names but the UI shows French categories when language is FR"
+  ],
+  "updated_files": [
+    "/app/backend/routes/auth.py"
+  ],
+  "success_rate": {
+    "backend": "100% (12 passed, 2 skipped due to rate limiting)",
+    "frontend": "90%"
+  },
+  "test_credentials": "Admin: charbel911@gmail.com / Anderosli123!@#",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Legal compliance features are working. AI disclosure consent on registration is fully functional. OPC verification admin endpoint works. Privacy Policy and Terms pages have bilingual legal sections. CFIA banner component exists but needs French category triggers added to CreateListingPage.js CFIA_TRIGGER_CATEGORIES array."
+}

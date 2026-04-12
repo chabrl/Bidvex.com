@@ -31,6 +31,7 @@ const AuthPage = () => {
     company_name: '',
     tax_number: '',
     terms_agreed: false,
+    ai_disclosure_consent: false,
   });
 
   // Forced Password Reset State
@@ -394,13 +395,33 @@ const AuthPage = () => {
                     </a>
                   </label>
                 </div>
+
+                {/* AI Disclosure Consent — Law 25 / Loi 25 (Mandatory, standalone) */}
+                <div className="flex items-start gap-3 p-3 border-2 border-purple-200 dark:border-purple-500/30 rounded-lg bg-purple-50/40 dark:bg-purple-500/5" data-testid="ai-disclosure-block">
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, ai_disclosure_consent: !prev.ai_disclosure_consent }))}
+                    className="mt-0.5 flex-shrink-0"
+                    data-testid="ai-disclosure-checkbox"
+                  >
+                    {formData.ai_disclosure_consent
+                      ? <CheckSquare className="h-5 w-5 text-purple-600" />
+                      : <Square className="h-5 w-5 text-muted-foreground" />
+                    }
+                  </button>
+                  <div className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed space-y-2">
+                    <p>I understand that BidVex uses automated processing and artificial intelligence (AI) to assist with customer support, listing categorization, and fraud detection. I understand that I have the right to request human review of any AI-assisted decision that affects me.</p>
+                    <hr className="border-slate-200 dark:border-slate-700" />
+                    <p>Je comprends que BidVex utilise des traitements automatisés et l'intelligence artificielle (IA) pour le support client, la catégorisation des annonces et la détection de fraude. Je comprends que j'ai le droit de demander une révision humaine de toute décision assistée par IA me concernant.</p>
+                  </div>
+                </div>
               </>
             )}
             
             <Button
               type="submit"
               className="w-full gradient-button text-white border-0"
-              disabled={loading || (!isLogin && !formData.terms_agreed)}
+              disabled={loading || (!isLogin && (!formData.terms_agreed || !formData.ai_disclosure_consent))}
               data-testid="submit-auth-btn"
             >
               {loading ? (

@@ -1010,3 +1010,50 @@ async def admin_get_categories(current_user: User = Depends(require_admin)):
     db = get_db()
     categories = await db.categories.find({}, {"_id": 0}).sort("order", 1).to_list(200)
     return categories
+
+
+
+# ============= OPC PERMIT VERIFICATION (Admin) ========================
+
+class OPCVerificationUpdate(BaseModel):
+    opc_permit_number: Optional[str] = None
+    opc_permit_verified: bool
+
+@admin_ops_router.put("/admin/users/{user_id}/opc-verify")
+async def admin_opc_verify(user_id: str, data: OPCVerificationUpdate, current_user: User = Depends(require_admin)):
+    """Admin: Toggle OPC permit verification for a seller."""
+    db = get_db()
+    user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "email": 1, "name": 1})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    update_fields = {
+        "opc_permit_verified": data.opc_permit_verified,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if data.opc_permit_number is not None:
+        update_fields["opc_permit_number"] = data.opc_permit_number
+    
+    await db.users.update_one({"id": user_id}, {"$set": update_fields})
+    
+    await db.audit_logs.insert_one({
+        "action": "opc_permit_verification",
+        "admin_id": current_user.id,
+        "target_user_id": user_id,
+        "target_email": user_doc.get("email"),
+        "opc_permit_verified": data.opc_permit_verified,
+        "opc_permit_number": data.opc_permit_number,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+    
+    return {"success": True, "message": f"OPC verification {'enabled' if data.opc_permit_verified else 'disabled'} for {user_doc.get('email', user_id)}"}
+
+
+# ============= CFIA SOIL DECLARATION CATEGORIES ========================
+
+CFIA_TRIGGER_CATEGORIES = [
+    "farm equipment", "farm_equipment", "tractors", "excavators",
+    "heavy_construction", "bulldozers", "skid_steers", "combines",
+    "industrial_machinery", "construction & excavation", "material handling (forklifts)",
+    "tillage & seeding", "harvesting (combines)", "livestock & dairy",
+]

@@ -151,13 +151,29 @@ async def create_listing(
 
     await validate_seller(db, current_user, listing_data.agreement_accepted)
 
-    # Category restriction: Only Partner role users can list vehicles
-    if listing_data.category and listing_data.category.lower() in ["vehicle", "vehicles"]:
-        user_role = getattr(current_user, 'role', 'starter')
-        if user_role not in ["partner", "admin"]:
+    # Category restriction: OPC-verified dealers only for vehicle listings
+    if listing_data.category and listing_data.category.lower() in ["vehicle", "vehicles", "vehicle parts", "road_vehicles"]:
+        user_id = getattr(current_user, 'id', None)
+        user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "seller_type": 1, "opc_permit_verified": 1})
+        seller_type = (user_doc or {}).get("seller_type", "individual")
+        opc_verified = (user_doc or {}).get("opc_permit_verified", False)
+        
+        if seller_type == "individual" or not opc_verified:
+            # Log blocked attempt
+            await db.audit_logs.insert_one({
+                "action": "vehicle_listing_blocked",
+                "user_id": user_id,
+                "category": listing_data.category,
+                "seller_type": seller_type,
+                "opc_permit_verified": opc_verified,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            })
             raise HTTPException(
                 status_code=403,
-                detail="Only Partner-tier accounts can list vehicles. Upgrade your account to list vehicles."
+                detail=(
+                    "Vehicle listings require a verified OPC permit. Individual sellers are not permitted to list road vehicles on BidVex. "
+                    "/ Les annonces de véhicules nécessitent un permis OPC vérifié. Les vendeurs individuels ne sont pas autorisés à lister des véhicules routiers sur BidVex."
+                )
             )
 
     client_ip = request.client.host if request else "unknown"

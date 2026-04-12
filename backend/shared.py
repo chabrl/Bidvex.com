@@ -290,6 +290,7 @@ class UserCreate(BaseModel):
     tax_number: Optional[str] = None
     bank_details: Optional[Dict[str, str]] = None
     terms_agreed: bool = False
+    ai_disclosure_consent: bool = False
 
 class UserLogin(BaseModel):
     email: EmailStr

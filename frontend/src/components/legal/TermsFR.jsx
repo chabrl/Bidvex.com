@@ -5,6 +5,7 @@ import {
   Users, DollarSign, Scale, Lock, Ban, Clock, CheckCircle,
   XCircle, CreditCard, Building2
 } from 'lucide-react';
+import { CrossBorderLegalSection, VehicleAuctionLegalSection } from './LegalComplianceSections';
 
 export const TermsFR = () => {
   return (
@@ -460,6 +461,12 @@ export const TermsFR = () => {
               </div>
             </div>
           </section>
+
+          {/* Transactions transfrontalières (Bilingue) */}
+          <CrossBorderLegalSection />
+
+          {/* Enchères de véhicules : Conformité OPC (Bilingue) */}
+          <VehicleAuctionLegalSection />
 
           {/* Pied de page */}
           <div className="text-center text-sm text-muted-foreground pt-6 border-t">
