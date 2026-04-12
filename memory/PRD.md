@@ -64,10 +64,25 @@
 - **Root cause of Upstash 0 activity**: `REDIS_URL` env var was empty. On Railway, set `REDIS_URL=rediss://...` from Upstash dashboard.
 
 ## Previous Session Completed
+
+## Previous Session Completed
 - Master Concierge chatbot fix (litellm + Emergent proxy)
 - Email Marketing Dashboard: Delete/Resend/Clone
 - Password Changed email: raw HTML with "Contact Support" button
 - Compare button z-index fix for mobile
+
+## Completed (April 12, 2026) — Category Hierarchy UX Refactor
+
+### Task 1: Buyer Marketplace Sidebar
+- **`useCategoryTree.js`** hook: Builds parent→children tree from flat `/api/categories` response. Bilingual `getName()` helper (name_en/name_fr based on i18n language).
+- **`MarketplaceSidebar.js`** rewrite: Desktop uses collapsible accordion tree — parent categories bold with icons, children indented with tree-line. Mobile uses drill-down Sheet (tap parent → slide to children → back button). Parents with 0 children render as leaf checkboxes (no expand arrow). Parent checkbox toggles all children (with indeterminate state).
+- **`MarketplacePage.js` + `LotsMarketplacePage.js`**: Fixed duplicate sidebar rendering (was 2 instances, now 1).
+
+### Task 2: Seller "Create Listing" Flow
+- **`CategorySelector.js`** component: Two-step selection — Parent Category dropdown → Subcategory dropdown (enabled after parent). Breadcrumb shows path (e.g., "Industrial Equipment > Machining & Welding") with icons. Leaf parents auto-select without subcategory step. Vehicle category filtering for non-partner users.
+- Integrated into `CreateListingPage.js` and `CreateMultiItemListing.js`, replacing flat `<select>`.
+
+**Testing:** 14/14 frontend features verified (iteration_131)
 
 ## 3rd Party Integrations
 - Stripe — Live | SendGrid — Live | Gemini 2.5 Flash — litellm + EMERGENT_LLM_KEY | VAPID Push — Active
