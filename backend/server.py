@@ -453,6 +453,7 @@ async def favicon():
 from lifecycle import (
     log_db_status, prewarm_caches, init_cloud_storage,
     seed_categories, create_database_indexes,
+    check_redis_connection,
 )
 
 @app.on_event("startup")
@@ -462,6 +463,7 @@ async def on_startup():
         logger.info("APScheduler started")
     except Exception as e:
         logger.warning(f"APScheduler unavailable at startup: {e}")
+    await check_redis_connection()
     await log_db_status(db)
     await prewarm_caches(db)
     await init_cloud_storage()

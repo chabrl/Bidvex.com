@@ -54,6 +54,15 @@
 
 **Testing:** 21/21 backend + all frontend UI tests passed (iteration_130)
 
+## Completed (April 12, 2026)
+
+### Redis Integration Audit & Hardening
+- **`api_cache.py`**: Added `rediss://` TLS validation (Upstash requires it), upgraded failure logs to `CRITICAL`, added `startup_redis_check()` ping, added `ChatCache` class for Redis-backed chat session storage
+- **`lifecycle.py` + `server.py`**: Wired `check_redis_connection()` into app startup — runs `redis.ping()` first, logs CRITICAL and falls back to local memory on failure
+- **`ai_chat.py`**: Chat message endpoint now loads/stores conversation history via `ChatCache` (Redis → memory fallback). Clear-history endpoint also clears Redis session.
+- **`brute_force.py`**: Verified — already delegates to `api_cache._get_redis()` which reads `REDIS_URL`. No changes needed.
+- **Root cause of Upstash 0 activity**: `REDIS_URL` env var was empty. On Railway, set `REDIS_URL=rediss://...` from Upstash dashboard.
+
 ## Previous Session Completed
 - Master Concierge chatbot fix (litellm + Emergent proxy)
 - Email Marketing Dashboard: Delete/Resend/Clone

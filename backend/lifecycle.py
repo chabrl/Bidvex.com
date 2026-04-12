@@ -12,6 +12,13 @@ import httpx
 logger = logging.getLogger(__name__)
 
 
+async def check_redis_connection():
+    """Startup: ping Redis and log CRITICAL if unreachable."""
+    from services.api_cache import startup_redis_check
+    result = await startup_redis_check()
+    logger.info(f"Redis startup result: {result}")
+
+
 async def log_db_status(db):
     """Log DB connectivity and document counts (non-blocking)."""
     async def _check():

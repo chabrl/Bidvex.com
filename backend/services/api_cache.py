@@ -20,11 +20,13 @@ MARKETPLACE_NS = "marketplace:"
 CATEGORIES_NS = "categories:"
 FILTER_COUNTS_NS = "filter_counts:"
 MARKETPLACE_ITEMS_NS = "mp_items:"
+CHAT_SESSION_NS = "chat:"
 
 # ─── Default TTLs (seconds) ─────────────────────────────────────────
 DEFAULT_TTL = 300       # 5 min for general keys
 ITEMS_TTL = 30          # 30s for marketplace items
 FILTER_TTL = 300        # 5 min for filter counts
+CHAT_SESSION_TTL = 3600  # 1 hour for chat sessions
 
 
 # ─── Redis Client Singleton ─────────────────────────────────────────
@@ -43,7 +45,12 @@ async def _get_redis():
 
     redis_url = os.environ.get("REDIS_URL", "")
     if not redis_url:
-        logger.info("[cache] REDIS_URL not set — using in-memory fallback")
+        logger.critical("[REDIS] REDIS_URL not set — falling back to LOCAL MEMORY. Set REDIS_URL (rediss://...) for Upstash.")
+        _redis_available = False
+        return None
+
+    if not redis_url.startswith("rediss://"):
+        logger.critical(f"[REDIS] REDIS_URL must start with rediss:// (TLS) for Upstash. Got: {redis_url[:20]}... — falling back to LOCAL MEMORY.")
         _redis_available = False
         return None
 
@@ -58,13 +65,29 @@ async def _get_redis():
         )
         await _redis_client.ping()
         _redis_available = True
-        logger.info("[cache] Redis connected successfully")
+        logger.info("[REDIS] Connected successfully to Upstash Redis (TLS)")
         return _redis_client
     except Exception as e:
-        logger.warning(f"[cache] Redis connection failed ({e}) — using in-memory fallback")
+        logger.critical(f"[REDIS] Connection FAILED ({e}) — falling back to LOCAL MEMORY. Brute-force & chat cache will NOT persist across restarts.")
         _redis_available = False
         _redis_client = None
         return None
+
+
+async def startup_redis_check():
+    """Run on app startup. Pings Redis and logs CRITICAL if unreachable."""
+    r = await _get_redis()
+    if r:
+        try:
+            pong = await r.ping()
+            logger.info(f"[REDIS] Startup ping: {'PONG' if pong else 'FAILED'} — backend=redis")
+            return {"connected": True, "backend": "redis"}
+        except Exception as e:
+            logger.critical(f"[REDIS] Startup ping FAILED: {e} — falling back to LOCAL MEMORY")
+            return {"connected": False, "backend": "memory", "error": str(e)}
+    else:
+        logger.critical("[REDIS] Startup check: NO Redis connection — using LOCAL MEMORY fallback. Upstash will show 0 activity.")
+        return {"connected": False, "backend": "memory"}
 
 
 # ─── In-Memory Fallback ─────────────────────────────────────────────
@@ -223,3 +246,64 @@ async def get_cache_stats() -> dict:
         "connected": False,
         "keys": len(_memory_store),
     }
+
+
+# ─── ChatCache: Redis-backed chat session store for Master Concierge ─
+class ChatCache:
+    """Stores/retrieves chat history per user session in Redis.
+    Falls back to in-memory dict when Redis is unavailable."""
+
+    _mem_sessions: dict[str, str] = {}
+
+    @staticmethod
+    def _key(user_id: str) -> str:
+        return f"{CHAT_SESSION_NS}{user_id}"
+
+    @staticmethod
+    async def get_history(user_id: str, max_turns: int = 20) -> list[dict]:
+        """Retrieve chat history for a user from Redis (or memory)."""
+        key = ChatCache._key(user_id)
+        r = await _get_redis()
+        if r:
+            try:
+                raw = await r.get(key)
+                if raw:
+                    history = json.loads(raw)
+                    return history[-max_turns:]
+                return []
+            except Exception as e:
+                logger.debug(f"[ChatCache] Redis GET error: {e}")
+        raw = _mem_get(key)
+        if raw:
+            return json.loads(raw)[-max_turns:]
+        return []
+
+    @staticmethod
+    async def append_turn(user_id: str, user_msg: str, assistant_msg: str):
+        """Append a user+assistant turn to session history."""
+        history = await ChatCache.get_history(user_id, max_turns=50)
+        history.append({"role": "user", "content": user_msg})
+        history.append({"role": "assistant", "content": assistant_msg})
+        history = history[-40:]  # keep last 20 turns (40 messages)
+        serialized = json.dumps(history, default=str)
+        key = ChatCache._key(user_id)
+        r = await _get_redis()
+        if r:
+            try:
+                await r.set(key, serialized, ex=CHAT_SESSION_TTL)
+                return
+            except Exception as e:
+                logger.debug(f"[ChatCache] Redis SET error: {e}")
+        _mem_set(key, serialized, CHAT_SESSION_TTL)
+
+    @staticmethod
+    async def clear(user_id: str):
+        """Clear chat session for a user."""
+        key = ChatCache._key(user_id)
+        r = await _get_redis()
+        if r:
+            try:
+                await r.delete(key)
+            except Exception:
+                pass
+        _memory_store.pop(key, None)

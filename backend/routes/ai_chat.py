@@ -59,12 +59,18 @@ async def ai_chat_message(
                 pass
 
         from services.ai_assistant_v2 import get_assistant
+        from services.api_cache import ChatCache
         assistant = get_assistant(EMERGENT_LLM_KEY, db)
+
+        # Load chat history from Redis cache (or memory fallback) if user is authenticated
+        chat_history = request.chat_history or []
+        if user_id and not chat_history:
+            chat_history = await ChatCache.get_history(user_id)
 
         response = await assistant.chat(
             user_message=request.message,
             user_id=user_id,
-            chat_history=request.chat_history,
+            chat_history=chat_history,
             language=request.language,
             lot_id=request.lot_number,
             listing_id=request.listing_id
@@ -73,7 +79,9 @@ async def ai_chat_message(
         latency_ms = round((time.time() - start_time) * 1000)
         logger.info(f"[Gemini 2.5 Flash] Chat response — {latency_ms}ms | lang={response.get('language','?')} | user={user_id or 'anon'}")
 
+        # Persist turn to Redis ChatCache and MongoDB
         if user_id:
+            await ChatCache.append_turn(user_id, request.message, response["message"])
             await db.ai_chat_history.insert_one({
                 "user_id": user_id,
                 "message": request.message,
@@ -138,6 +146,10 @@ async def clear_ai_chat_history(
     try:
         payload = jwt.decode(credentials.credentials, jwt_secret, algorithms=["HS256"])
         user_id = payload.get("sub")
+        # Clear Redis/memory chat session cache
+        from services.api_cache import ChatCache
+        await ChatCache.clear(user_id)
+        # Clear MongoDB persistent history
         result = await db.ai_chat_history.delete_many({"user_id": user_id})
         return {"success": True, "message": f"Deleted {result.deleted_count} chat messages"}
     except Exception as e:
