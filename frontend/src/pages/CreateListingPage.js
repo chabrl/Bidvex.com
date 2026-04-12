@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { toast } from 'sonner';
 import { Loader2, Upload, AlertTriangle } from 'lucide-react';
 import LocationSelector from '../components/LocationSelector';
+import CategorySelector from '../components/CategorySelector';
 import useGeoLocation from '../hooks/useGeoLocation';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
 
@@ -235,29 +236,13 @@ const CreateListingPage = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="category">{t('createListing.category', 'Category')} *</Label>
-                  <select
-                    id="category"
-                    name="category"
+                  <CategorySelector
                     value={formData.category}
-                    onChange={handleChange}
+                    onChange={(val) => setFormData(prev => ({ ...prev, category: val }))}
                     required
-                    className="w-full px-3 py-2 border border-input rounded-md bg-background"
-                    data-testid="category-select"
-                  >
-                    <option value="">{t('createListing.selectCategory', 'Select category')}</option>
-                    {categories.map((cat) => {
-                      // Block standard users from selecting vehicle categories
-                      const isVehicleCat = cat.name_en?.toLowerCase() === 'vehicle' || cat.name_en?.toLowerCase() === 'vehicles';
-                      const isPartnerOrAdmin = user?.role === 'partner' || user?.role === 'admin';
-                      if (isVehicleCat && !isPartnerOrAdmin) return null;
-                      return (
-                        <option key={cat.id} value={cat.name_en}>
-                          {cat.name_en}
-                        </option>
-                      );
-                    })}
-                  </select>
+                    filterVehicles
+                    userRole={user?.role}
+                  />
                 </div>
 
                 <div className="space-y-2">

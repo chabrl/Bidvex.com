@@ -22,6 +22,7 @@ import Papa from 'papaparse';
 import { useDropzone } from 'react-dropzone';
 import RichTextEditor from '../components/RichTextEditor';
 import LocationSelector from '../components/LocationSelector';
+import CategorySelector from '../components/CategorySelector';
 import useGeoLocation from '../hooks/useGeoLocation';
 import { formatCurrency } from '../utils/currencyFormatter';
 
@@ -671,23 +672,13 @@ const CreateMultiItemListing = () => {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="category">{t('createListing.category')} *</Label>
-          <select 
-            id="category" 
-            name="category" 
-            value={formData.category} 
-            onChange={handleChange} 
-            required 
-            className="w-full px-3 py-2 border border-input rounded-md bg-background"
-          >
-            <option value="">{t('createListing.selectCategory')}</option>
-            {categories.map(cat => {
-              const isVehicleCat = cat.name_en?.toLowerCase() === 'vehicle' || cat.name_en?.toLowerCase() === 'vehicles';
-              const isPartnerOrAdmin = user?.role === 'partner' || user?.role === 'admin';
-              if (isVehicleCat && !isPartnerOrAdmin) return null;
-              return <option key={cat.id} value={cat.name_en}>{cat.name_en}</option>;
-            })}
-          </select>
+          <CategorySelector
+            value={formData.category}
+            onChange={(val) => setFormData(prev => ({ ...prev, category: val }))}
+            required
+            filterVehicles
+            userRole={user?.role}
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="auction_end_date">{t('createListing.auctionEndDate')} *</Label>

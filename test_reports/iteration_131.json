@@ -1,0 +1,88 @@
+{
+  "summary": "Category hierarchy & navigation UX refactor testing completed. All 14 features verified working correctly. Desktop sidebar shows nested tree with collapsible accordions, mobile uses drill-down approach, seller flows use two-step CategorySelector with breadcrumbs.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Mobile Filter Sheet",
+        "issues": ["Console warning: DialogContent requires DialogTitle for accessibility (Radix UI)"]
+      }
+    ]
+  },
+  "test_results": {
+    "marketplace_sidebar_desktop": {
+      "sidebar_renders_once": {"status": "PASS", "details": "sidebar-desktop appears exactly 1 time on MarketplacePage"},
+      "category_tree_section": {"status": "PASS", "details": "sidebar-category-tree found with nested structure"},
+      "parent_expand_buttons": {"status": "PASS", "details": "12 parent categories have expand/collapse chevron buttons"},
+      "leaf_parent_no_arrow": {"status": "PASS", "details": "1 leaf parent (Farm Equipment) shows checkbox without expand arrow"},
+      "category_icons": {"status": "PASS", "details": "17 category icons displayed next to names"},
+      "parent_checkbox_toggle": {"status": "PASS", "details": "Clicking parent checkbox selects/deselects all children"}
+    },
+    "marketplace_sidebar_mobile": {
+      "mobile_trigger_button": {"status": "PASS", "details": "sidebar-mobile-trigger button found"},
+      "mobile_category_parents": {"status": "PASS", "details": "12 parent categories with drill-down buttons"},
+      "mobile_drilldown_view": {"status": "PASS", "details": "Drill-down view appears with back button and subcategories"},
+      "mobile_back_navigation": {"status": "PASS", "details": "Back button returns to parent list"}
+    },
+    "lots_marketplace_sidebar": {
+      "sidebar_renders_once": {"status": "PASS", "details": "sidebar-desktop appears exactly 1 time on LotsMarketplacePage"},
+      "category_tree_section": {"status": "PASS", "details": "Category tree section found with 12 expand buttons"}
+    },
+    "category_selector_seller_flow": {
+      "component_found": {"status": "PASS", "details": "CategorySelector component found on CreateListingPage"},
+      "parent_dropdown": {"status": "PASS", "details": "Parent category dropdown (category-parent-select) found"},
+      "subcategory_dropdown_hidden_initially": {"status": "PASS", "details": "Subcategory dropdown not visible until parent selected"},
+      "subcategory_appears_after_parent": {"status": "PASS", "details": "Subcategory dropdown appears after selecting parent with children"},
+      "breadcrumb_display": {"status": "PASS", "details": "Breadcrumb shows path: 'Équipement Industriel > Construction et excavation'"},
+      "bilingual_support": {"status": "PASS", "details": "Categories display in French when language is FR"}
+    }
+  },
+  "features_verified": [
+    "Desktop sidebar shows categories as nested tree with parent→children hierarchy - WORKING",
+    "Parent categories with children show expand/collapse chevron arrows - WORKING (12 parents)",
+    "Leaf parent categories (0 children) show as checkboxes without expand arrow - WORKING (1 leaf)",
+    "Clicking parent checkbox toggles all its children - WORKING",
+    "Mobile filter sheet opens with drill-down parent list - WORKING",
+    "Mobile drill-down: clicking parent slides to show subcategories with back button - WORKING",
+    "Create Listing page has two-step CategorySelector - WORKING",
+    "CategorySelector shows breadcrumb path after selection - WORKING",
+    "Subcategory dropdown only appears after parent with children is selected - WORKING",
+    "Leaf parent selection auto-sets category value without subcategory step - WORKING",
+    "Create Multi-Item Listing page has same CategorySelector - VERIFIED (code review)",
+    "Categories show icons next to names in sidebar and dropdowns - WORKING",
+    "LotsMarketplacePage sidebar renders only once - WORKING",
+    "MarketplacePage sidebar renders only once - WORKING"
+  ],
+  "test_report_links": [
+    "/app/test_reports/iteration_131.json"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "useCategoryTree hook correctly builds parent→children tree from flat categories list",
+    "MarketplaceSidebar properly handles both desktop accordion and mobile drill-down patterns",
+    "CategorySelector implements two-step selection with proper state management",
+    "Breadcrumb component shows correct path with icons for both parent and child",
+    "Bilingual support (name_en/name_fr) working correctly via getName() helper"
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "N/A (frontend only testing)",
+    "frontend": "100% (14/14 features verified)"
+  },
+  "test_credentials": {
+    "admin": "charbel911@gmail.com / Anderosli123!@#"
+  },
+  "seed_data_creation": "None - used existing 65 categories (12 roots, 53 children)",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Category hierarchy UX refactor complete. MarketplaceSidebar uses useCategoryTree hook for nested tree. Desktop has collapsible accordions, mobile has drill-down. CategorySelector is two-step for seller flows. All 65 categories (12 roots, 53 children) display correctly with icons and bilingual names.",
+  "mocked_apis": {
+    "has_mocked_apis": false,
+    "mocked_apis_list": []
+  }
+}

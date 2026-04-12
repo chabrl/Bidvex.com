@@ -209,19 +209,14 @@ const LotsMarketplacePage = () => {
       {/* Two-Column Layout: Sidebar + Content */}
       <div className="container mx-auto max-w-7xl px-4 py-6">
         <div className="flex gap-6">
-          {/* Desktop Sidebar only */}
-          <div className="hidden lg:block">
-            <MarketplaceSidebar onFiltersChange={setSidebarFilters} />
-          </div>
+          {/* Sidebar handles its own desktop/mobile rendering */}
+          <MarketplaceSidebar onFiltersChange={setSidebarFilters} />
 
           {/* Main Content */}
           <div className="flex-1 min-w-0">
             {/* Filter + stats bar — sticky on scroll */}
             <div className="sticky top-0 z-10 bg-white/95 dark:bg-slate-900/95 backdrop-blur -mx-4 px-4 py-3 mb-4 border-b border-slate-200 dark:border-slate-700">
               <div className="flex items-center justify-between gap-3">
-                <div className="lg:hidden flex-shrink-0">
-                  <MarketplaceSidebar onFiltersChange={setSidebarFilters} />
-                </div>
                 <div className="hidden lg:flex items-center gap-4 text-sm" style={{ color: '#374151' }}>
                   <span>
                     <strong style={{ color: '#2563eb' }}>{listings.length}</strong> auctions
