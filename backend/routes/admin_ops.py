@@ -1057,3 +1057,30 @@ CFIA_TRIGGER_CATEGORIES = [
     "industrial_machinery", "construction & excavation", "material handling (forklifts)",
     "tillage & seeding", "harvesting (combines)", "livestock & dairy",
 ]
+
+
+
+# ============= RESEND WELCOME EMAIL (Admin) ========================
+
+class ResendWelcomeRequest(BaseModel):
+    email: str
+
+@admin_ops_router.post("/admin/resend-welcome-email")
+async def admin_resend_welcome_email(data: ResendWelcomeRequest, current_user: User = Depends(require_admin)):
+    """Admin: Resend bilingual welcome email to any user."""
+    db = get_db()
+    user_doc = await db.users.find_one(
+        {"email": data.email.lower().strip()},
+        {"_id": 0, "name": 1, "email": 1}
+    )
+    if not user_doc:
+        raise HTTPException(status_code=404, detail=f"No user found with email: {data.email}")
+    
+    from services.email_notifications import send_welcome_email
+    result = await send_welcome_email(user_doc["email"], user_doc.get("name", "User"))
+    
+    return {
+        "success": result.get("status") == "sent",
+        "email_result": result,
+        "message": f"Welcome email {'sent' if result.get('status') == 'sent' else 'failed'} for {user_doc['email']}"
+    }

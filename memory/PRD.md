@@ -152,6 +152,19 @@
 
 **Testing:** iteration_134 — 26/26 backend tests passed (100%)
 
+## Completed (April 12, 2026) — Email Heartbeat Recovery
+
+### Root Cause
+- **No welcome email was ever triggered from registration.** The `auth.py` registration route inserted the user document and returned the token, but never called any email function. No welcome email template existed in either email service module.
+
+### Fixes Applied
+- **`email_notifications.py`**: Created `send_welcome_email()` — bilingual HTML template (EN first, FR below with divider). Enhanced `send_email()` with `[EMAIL_DEBUG]` logging before and after SendGrid API call, capturing status codes.
+- **`auth.py`**: Wired `send_welcome_email()` into registration flow, right after `insert_one`. Logs trigger and result.
+- **`admin_ops.py`**: Added `POST /api/admin/resend-welcome-email` endpoint for manual resend by admin.
+- **Verified**: Sent test email to `charbel911@gmail.com` — SendGrid returned `202 Accepted`. Sender: `info@bidvex.com` (authenticated domain).
+
+**Testing:** Manual verification — SendGrid 202 confirmed via curl + backend logs
+
 ## 3rd Party Integrations
 - Stripe — Live | SendGrid — Live | Gemini 2.5 Flash — litellm + EMERGENT_LLM_KEY | VAPID Push — Active
 

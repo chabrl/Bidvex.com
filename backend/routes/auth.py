@@ -240,6 +240,15 @@ async def register(user_data: UserCreate, request: Request):
     
     await db.users.insert_one(user_doc)
     
+    # Send Welcome Email (bilingual)
+    try:
+        from services.email_notifications import send_welcome_email
+        logger.info(f"[EMAIL_DEBUG] Triggering Welcome Email for: {user_data.email}")
+        email_result = await send_welcome_email(user_data.email, user_data.name)
+        logger.info(f"[EMAIL_DEBUG] Welcome Email result: {email_result}")
+    except Exception as email_err:
+        logger.error(f"[EMAIL_DEBUG] Welcome Email FAILED for {user_data.email}: {email_err}")
+    
     # Audit log for currency
     await db.currency_audit_logs.insert_one({
         "user_id": user_id,

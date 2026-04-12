@@ -80,9 +80,10 @@ async def send_email(
                 )
                 message.add_attachment(attachment)
         
+        logger.info(f"[EMAIL_DEBUG] Sending email to: {to_email} | Subject: {subject} | From: {FROM_EMAIL}")
         response = sg.send(message)
         
-        logger.info(f"Email sent to {to_email}: {subject} (status: {response.status_code})")
+        logger.info(f"[EMAIL_DEBUG] SendGrid response for {to_email}: status_code={response.status_code}")
         
         return {
             "status": "sent",
@@ -91,7 +92,7 @@ async def send_email(
             "subject": subject
         }
     except Exception as e:
-        logger.error(f"Failed to send email to {to_email}: {e}")
+        logger.error(f"[EMAIL_DEBUG] FAILED to send email to {to_email}: {e}")
         return {"status": "error", "message": str(e)}
 
 
@@ -146,6 +147,70 @@ def _base_template(content: str, title: str = "BidVex Notification") -> str:
 
 
 # ===== INVOICE EMAILS =====
+
+
+async def send_welcome_email(user_email: str, user_name: str) -> Dict[str, Any]:
+    """
+    Send bilingual welcome email to new registrations.
+    EN first, FR immediately below with divider (Bill 96 compliant).
+    """
+    logger.info(f"[EMAIL_DEBUG] Triggering Welcome Email for: {user_email} | User: {user_name}")
+    
+    content = f"""
+    <h2 style="color: #1e293b; margin: 0 0 15px;">Welcome to BidVex, {user_name}!</h2>
+    <p style="color: #475569; line-height: 1.6;">
+        Thank you for creating your BidVex account. You now have access to Quebec's premier online auction marketplace for vehicles, heavy equipment, and industrial assets.
+    </p>
+    <p style="color: #475569; line-height: 1.6;">
+        <strong>What you can do now:</strong>
+    </p>
+    <ul style="color: #475569; line-height: 1.8;">
+        <li>Browse live auctions and place bids</li>
+        <li>Set up watchlists and price alerts</li>
+        <li>Create listings to sell your items</li>
+        <li>Chat with our AI concierge for assistance</li>
+    </ul>
+    <p style="color: #475569; line-height: 1.6;">
+        If you need help getting started, our support team is available at 
+        <a href="mailto:support@bidvex.com" style="color: #2563eb;">support@bidvex.com</a>.
+    </p>
+
+    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
+
+    <h2 style="color: #1e293b; margin: 0 0 15px;">Bienvenue sur BidVex, {user_name} !</h2>
+    <p style="color: #475569; line-height: 1.6;">
+        Merci d'avoir créé votre compte BidVex. Vous avez maintenant accès à la première plateforme d'enchères en ligne au Québec pour les véhicules, l'équipement lourd et les actifs industriels.
+    </p>
+    <p style="color: #475569; line-height: 1.6;">
+        <strong>Ce que vous pouvez faire maintenant :</strong>
+    </p>
+    <ul style="color: #475569; line-height: 1.8;">
+        <li>Parcourir les enchères en direct et placer des offres</li>
+        <li>Configurer des listes de surveillance et des alertes de prix</li>
+        <li>Créer des annonces pour vendre vos articles</li>
+        <li>Discuter avec notre concierge IA pour obtenir de l'aide</li>
+    </ul>
+    <p style="color: #475569; line-height: 1.6;">
+        Si vous avez besoin d'aide pour commencer, notre équipe de support est disponible à 
+        <a href="mailto:support@bidvex.com" style="color: #2563eb;">support@bidvex.com</a>.
+    </p>
+
+    <div style="text-align: center; margin: 30px 0;">
+        <a href="{FRONTEND_URL}/marketplace" 
+           style="display: inline-block; background-color: #2563eb; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
+            Browse Auctions / Parcourir les enchères
+        </a>
+    </div>
+    """
+    
+    result = await send_email(
+        to_email=user_email,
+        subject="Welcome to BidVex! / Bienvenue sur BidVex !",
+        html_content=_base_template(content, "Welcome to BidVex / Bienvenue sur BidVex")
+    )
+    
+    logger.info(f"[EMAIL_DEBUG] Welcome Email result for {user_email}: {result}")
+    return result
 
 async def send_invoice_created_email(invoice: Dict[str, Any]) -> Dict[str, Any]:
     """Send email when a new invoice is generated"""
