@@ -140,14 +140,22 @@
 
 **Testing:** iteration_133 — 21/21 backend tests passed (100%)
 
+## Completed (April 12, 2026) — Phase 6: Final Wiring & Production Readiness
+
+### Frontend Wiring
+- **ListingDetailPage.js**: `CrossBorderAdvisoryPanel` auto-renders when `listing.country !== 'CA'`. `SellerContactGate` + `VehicleFeeBreakdown` render for won auctions. Vehicle fee notice above Place Bid button. Cross-border badge for non-Canadian listings.
+- **Cross-Border Bid Intercept**: `CrossBorderBidModal` intercepts first bid on non-Canadian listings. Must click "I Understand / Je comprends" before bid proceeds. `cross_border_disclosure_accepted` sent in bid payload.
+
+### SetupIntent Card Verification
+- `POST /api/vehicle-settlement/verify-card` — creates Stripe SetupIntent for 3DS verification. Returns bilingual messages.
+- `POST /api/vehicle-settlement/confirm-card-verification` — marks card as verified after frontend confirms.
+
+**Testing:** iteration_134 — 26/26 backend tests passed (100%)
+
 ## 3rd Party Integrations
 - Stripe — Live | SendGrid — Live | Gemini 2.5 Flash — litellm + EMERGENT_LLM_KEY | VAPID Push — Active
 
 ## Backlog
-- (P1) Wire VehicleFeeBreakdown + SellerContactGate into vehicle detail/won-auction pages
-- (P1) Wire CrossBorderAdvisoryPanel into listing detail pages for US-origin items
-- (P1) Wire CrossBorderBidModal into bid flow (first-bid intercept)
-- (P1) Pre-bid SetupIntent card verification (3D Secure)
 - (P2) Cloudflare CDN DNS migration
 - (P2) Post-launch monitoring & alerting
 - (Enhancement) Admin offline order management

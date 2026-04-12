@@ -47,7 +47,20 @@
 | 5 | CrossBorderAdvisoryPanel component | `frontend/src/components/legal/LegalComplianceSections.js` | DONE | DONE | DONE |
 | 5 | CrossBorderBidModal component | `frontend/src/components/legal/LegalComplianceSections.js` | DONE | DONE | DONE |
 | 5 | cross_border_disclosure_accepted field | `backend/models/auction_models.py:92` | N/A | N/A | DONE |
-| 5 | Wire modal into bid flow | — | — | — | BACKLOG |
+| 5 | Wire modal into bid flow | `frontend/src/pages/ListingDetailPage.js` | EN+FR | EN+FR | DONE |
+
+## SECTION 6.5: Phase 6 — Final Wiring & Production Readiness
+
+| # | Item | File(s) | EN | FR | Status |
+|---|------|---------|----|----|--------|
+| 6.5.1 | CrossBorderAdvisoryPanel on listing detail | `frontend/src/pages/ListingDetailPage.js` | DONE | DONE | DONE |
+| 6.5.2 | SellerContactGate on won auction | `frontend/src/pages/ListingDetailPage.js` | DONE | DONE | DONE |
+| 6.5.3 | VehicleFeeBreakdown on won auction | `frontend/src/pages/ListingDetailPage.js` | DONE | DONE | DONE |
+| 6.5.4 | Vehicle fee notice above Place Bid | `frontend/src/pages/ListingDetailPage.js` | DONE | DONE | DONE |
+| 6.5.5 | CrossBorderBidModal first-bid intercept | `frontend/src/pages/ListingDetailPage.js` | DONE | DONE | DONE |
+| 6.5.6 | SetupIntent card verification endpoint | `backend/routes/vehicle_settlement.py` | DONE | DONE | DONE |
+| 6.5.7 | Confirm card verification endpoint | `backend/routes/vehicle_settlement.py` | N/A | N/A | DONE |
+| 6.5.8 | Cross-border disclosure in bid payload | `frontend/src/pages/ListingDetailPage.js` | N/A | N/A | DONE |
 
 ## SECTION 6: Intermediary Language Audit
 
