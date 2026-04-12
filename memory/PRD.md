@@ -165,6 +165,15 @@
 
 **Testing:** Manual verification — SendGrid 202 confirmed via curl + backend logs
 
+## Completed (April 12, 2026) — Welcome Email Premium Redesign
+- Replaced plain-text welcome email with high-end branded HTML template
+- **Design**: BidVex Tech Blue gradient header, hero image (Unsplash fleet), two-column advantage grid, bilingual FR→EN flow with divider
+- **Content**: "BidVex Ecosystem" positioning — all-in-one marketplace, AI tools, bilingual & cross-border
+- **Subject**: "Welcome to the BidVex Ecosystem! / Bienvenue dans l'écosystème BidVex !"
+- **CTA**: "Explorer le marché / Explore the Marketplace" → links to `/marketplace`
+- **Footer**: © 2026 BidVex Inc. Based in Sherbrooke, QC. | Privacy Policy | Terms of Service
+- Verified: SendGrid 202 Accepted for charbel911@gmail.com
+
 ## 3rd Party Integrations
 - Stripe — Live | SendGrid — Live | Gemini 2.5 Flash — litellm + EMERGENT_LLM_KEY | VAPID Push — Active
 

@@ -151,64 +151,225 @@ def _base_template(content: str, title: str = "BidVex Notification") -> str:
 
 async def send_welcome_email(user_email: str, user_name: str) -> Dict[str, Any]:
     """
-    Send bilingual welcome email to new registrations.
-    EN first, FR immediately below with divider (Bill 96 compliant).
+    Send premium bilingual welcome email — BidVex Ecosystem.
+    French (top) → English (bottom), separated by grey divider.
+    High-end branded HTML with hero image, two-column advantage grid, CTA.
     """
     logger.info(f"[EMAIL_DEBUG] Triggering Welcome Email for: {user_email} | User: {user_name}")
-    
-    content = f"""
-    <h2 style="color: #1e293b; margin: 0 0 15px;">Welcome to BidVex, {user_name}!</h2>
-    <p style="color: #475569; line-height: 1.6;">
-        Thank you for creating your BidVex account. You now have access to Quebec's premier online auction marketplace for vehicles, heavy equipment, and industrial assets.
-    </p>
-    <p style="color: #475569; line-height: 1.6;">
-        <strong>What you can do now:</strong>
-    </p>
-    <ul style="color: #475569; line-height: 1.8;">
-        <li>Browse live auctions and place bids</li>
-        <li>Set up watchlists and price alerts</li>
-        <li>Create listings to sell your items</li>
-        <li>Chat with our AI concierge for assistance</li>
-    </ul>
-    <p style="color: #475569; line-height: 1.6;">
-        If you need help getting started, our support team is available at 
-        <a href="mailto:support@bidvex.com" style="color: #2563eb;">support@bidvex.com</a>.
-    </p>
 
-    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
+    HERO_IMG = "https://images.unsplash.com/photo-1774867559682-e856ab83a7db?w=1200&q=80&auto=format"
+    MARKETPLACE_URL = f"{FRONTEND_URL}/marketplace"
+    PRIVACY_URL = f"{FRONTEND_URL}/legal"
+    TERMS_URL = f"{FRONTEND_URL}/legal"
 
-    <h2 style="color: #1e293b; margin: 0 0 15px;">Bienvenue sur BidVex, {user_name} !</h2>
-    <p style="color: #475569; line-height: 1.6;">
-        Merci d'avoir créé votre compte BidVex. Vous avez maintenant accès à la première plateforme d'enchères en ligne au Québec pour les véhicules, l'équipement lourd et les actifs industriels.
-    </p>
-    <p style="color: #475569; line-height: 1.6;">
-        <strong>Ce que vous pouvez faire maintenant :</strong>
-    </p>
-    <ul style="color: #475569; line-height: 1.8;">
-        <li>Parcourir les enchères en direct et placer des offres</li>
-        <li>Configurer des listes de surveillance et des alertes de prix</li>
-        <li>Créer des annonces pour vendre vos articles</li>
-        <li>Discuter avec notre concierge IA pour obtenir de l'aide</li>
-    </ul>
-    <p style="color: #475569; line-height: 1.6;">
-        Si vous avez besoin d'aide pour commencer, notre équipe de support est disponible à 
-        <a href="mailto:support@bidvex.com" style="color: #2563eb;">support@bidvex.com</a>.
-    </p>
+    html = f"""<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bienvenue chez BidVex / Welcome to BidVex</title>
+</head>
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:#f0f4f8;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0f4f8;padding:32px 16px;">
+<tr><td align="center">
+<table width="640" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,0.08);">
 
-    <div style="text-align: center; margin: 30px 0;">
-        <a href="{FRONTEND_URL}/marketplace" 
-           style="display: inline-block; background-color: #2563eb; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
-            Browse Auctions / Parcourir les enchères
-        </a>
-    </div>
-    """
-    
+  <!-- Logo Header -->
+  <tr>
+    <td style="background:linear-gradient(135deg,#1e40af 0%,#2563eb 100%);padding:28px 32px;text-align:center;">
+      <h1 style="margin:0;color:#ffffff;font-size:28px;font-weight:800;letter-spacing:-0.5px;">
+        BidVex
+      </h1>
+      <p style="margin:6px 0 0;color:#93c5fd;font-size:12px;text-transform:uppercase;letter-spacing:2px;font-weight:600;">
+        Auction Ecosystem / Écosystème d'enchères
+      </p>
+    </td>
+  </tr>
+
+  <!-- Hero Image -->
+  <tr>
+    <td>
+      <img src="{HERO_IMG}" alt="BidVex All-in-One Marketplace — Heavy equipment, vehicles, and industrial assets / Marché tout-en-un BidVex — Équipement lourd, véhicules et actifs industriels" width="640" style="display:block;width:100%;height:auto;max-height:260px;object-fit:cover;" />
+    </td>
+  </tr>
+
+  <!-- ═══════ FRENCH SECTION ═══════ -->
+  <tr>
+    <td style="padding:36px 32px 24px;">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="border-left:4px solid #2563eb;padding-left:16px;">
+            <p style="margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:#2563eb;font-weight:700;">Français</p>
+            <h2 style="margin:0;color:#0f172a;font-size:24px;font-weight:700;">Bienvenue chez BidVex, {user_name} !</h2>
+          </td>
+        </tr>
+      </table>
+      <p style="color:#475569;font-size:15px;line-height:1.7;margin:18px 0;">
+        Vous venez de rejoindre la plateforme &laquo; tout-en-un &raquo; la plus avancée en Amérique du Nord. Que vous cherchiez une flotte de camions, une pièce de collection unique ou que vous souhaitiez liquider un entrepôt complet d'équipement industriel, BidVex est conçu pour tout gérer.
+      </p>
+
+      <!-- Advantage Grid FR -->
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 0;">
+        <tr>
+          <td width="50%" valign="top" style="padding:8px 12px 8px 0;">
+            <table cellpadding="0" cellspacing="0" style="background:#eff6ff;border-radius:10px;padding:16px;width:100%;">
+              <tr>
+                <td style="padding:0 0 8px;font-size:22px;">&#128722;</td>
+              </tr>
+              <tr>
+                <td style="font-size:13px;font-weight:700;color:#1e3a5f;">Marché tout-en-un</td>
+              </tr>
+              <tr>
+                <td style="font-size:12px;color:#475569;line-height:1.5;padding-top:4px;">Des véhicules et de la machinerie lourde aux lots d'articles multiples.</td>
+              </tr>
+            </table>
+          </td>
+          <td width="50%" valign="top" style="padding:8px 0 8px 12px;">
+            <table cellpadding="0" cellspacing="0" style="background:#eff6ff;border-radius:10px;padding:16px;width:100%;">
+              <tr>
+                <td style="padding:0 0 8px;font-size:22px;">&#129302;</td>
+              </tr>
+              <tr>
+                <td style="font-size:13px;font-weight:700;color:#1e3a5f;">Outils propulsés par l'IA</td>
+              </tr>
+              <tr>
+                <td style="font-size:12px;color:#475569;line-height:1.5;padding-top:4px;">Notre concierge intelligent est prêt à vous aider 24/7.</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="2" valign="top" style="padding:8px 0 0;">
+            <table cellpadding="0" cellspacing="0" style="background:#eff6ff;border-radius:10px;padding:16px;width:100%;">
+              <tr>
+                <td style="padding:0 0 8px;font-size:22px;">&#127760;</td>
+              </tr>
+              <tr>
+                <td style="font-size:13px;font-weight:700;color:#1e3a5f;">Bilingue et transfrontalier</td>
+              </tr>
+              <tr>
+                <td style="font-size:12px;color:#475569;line-height:1.5;padding-top:4px;">Achetez ou vendez partout au Canada et aux États-Unis.</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- ═══════ DIVIDER ═══════ -->
+  <tr>
+    <td style="padding:0 32px;">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="border-top:2px solid #e2e8f0;height:1px;font-size:0;line-height:0;">&nbsp;</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- ═══════ ENGLISH SECTION ═══════ -->
+  <tr>
+    <td style="padding:24px 32px 36px;">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="border-left:4px solid #2563eb;padding-left:16px;">
+            <p style="margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:#2563eb;font-weight:700;">English</p>
+            <h2 style="margin:0;color:#0f172a;font-size:24px;font-weight:700;">Welcome to BidVex, {user_name}!</h2>
+          </td>
+        </tr>
+      </table>
+      <p style="color:#475569;font-size:15px;line-height:1.7;margin:18px 0;">
+        You've just joined North America's most advanced all-in-one marketplace. Whether you are looking for a fleet of trucks, a single rare collectible, or liquidating an entire warehouse of industrial equipment, BidVex is built to handle it all.
+      </p>
+
+      <!-- Advantage Grid EN -->
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 0;">
+        <tr>
+          <td width="50%" valign="top" style="padding:8px 12px 8px 0;">
+            <table cellpadding="0" cellspacing="0" style="background:#eff6ff;border-radius:10px;padding:16px;width:100%;">
+              <tr>
+                <td style="padding:0 0 8px;font-size:22px;">&#128722;</td>
+              </tr>
+              <tr>
+                <td style="font-size:13px;font-weight:700;color:#1e3a5f;">All-In-One Marketplace</td>
+              </tr>
+              <tr>
+                <td style="font-size:12px;color:#475569;line-height:1.5;padding-top:4px;">From vehicles and heavy machinery to multi-item lots.</td>
+              </tr>
+            </table>
+          </td>
+          <td width="50%" valign="top" style="padding:8px 0 8px 12px;">
+            <table cellpadding="0" cellspacing="0" style="background:#eff6ff;border-radius:10px;padding:16px;width:100%;">
+              <tr>
+                <td style="padding:0 0 8px;font-size:22px;">&#129302;</td>
+              </tr>
+              <tr>
+                <td style="font-size:13px;font-weight:700;color:#1e3a5f;">AI-Powered Tools</td>
+              </tr>
+              <tr>
+                <td style="font-size:12px;color:#475569;line-height:1.5;padding-top:4px;">Our intelligent concierge is ready to help you 24/7.</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="2" valign="top" style="padding:8px 0 0;">
+            <table cellpadding="0" cellspacing="0" style="background:#eff6ff;border-radius:10px;padding:16px;width:100%;">
+              <tr>
+                <td style="padding:0 0 8px;font-size:22px;">&#127760;</td>
+              </tr>
+              <tr>
+                <td style="font-size:13px;font-weight:700;color:#1e3a5f;">Bilingual &amp; Cross-Border</td>
+              </tr>
+              <tr>
+                <td style="font-size:12px;color:#475569;line-height:1.5;padding-top:4px;">Seamlessly buy or sell across Canada and the US.</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- ═══════ CTA BUTTON ═══════ -->
+  <tr>
+    <td style="padding:0 32px 40px;text-align:center;">
+      <table cellpadding="0" cellspacing="0" align="center">
+        <tr>
+          <td style="background:linear-gradient(135deg,#1e40af 0%,#2563eb 100%);border-radius:12px;padding:18px 48px;">
+            <a href="{MARKETPLACE_URL}" style="color:#ffffff;text-decoration:none;font-size:16px;font-weight:700;display:inline-block;letter-spacing:0.3px;">
+              Explorer le marché / Explore the Marketplace
+            </a>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- ═══════ FOOTER ═══════ -->
+  <tr>
+    <td style="background-color:#f8fafc;padding:24px 32px;border-top:1px solid #e2e8f0;border-radius:0 0 16px 16px;">
+      <p style="margin:0;font-size:12px;color:#94a3b8;text-align:center;line-height:1.6;">
+        &copy; 2026 BidVex Inc. Based in Sherbrooke, QC.<br/>
+        <a href="{PRIVACY_URL}" style="color:#2563eb;text-decoration:none;">Privacy Policy</a> &nbsp;|&nbsp;
+        <a href="{TERMS_URL}" style="color:#2563eb;text-decoration:none;">Terms of Service</a>
+      </p>
+    </td>
+  </tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>"""
+
     result = await send_email(
         to_email=user_email,
-        subject="Welcome to BidVex! / Bienvenue sur BidVex !",
-        html_content=_base_template(content, "Welcome to BidVex / Bienvenue sur BidVex")
+        subject="Welcome to the BidVex Ecosystem! / Bienvenue dans l'écosystème BidVex !",
+        html_content=html
     )
-    
+
     logger.info(f"[EMAIL_DEBUG] Welcome Email result for {user_email}: {result}")
     return result
 
