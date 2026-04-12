@@ -215,6 +215,22 @@ async def process_ended_auction(db, vehicle_listing: dict) -> AuctionEndResult:
         
         logger.info(f"Auction {vehicle_listing['id']} SOLD to {winner_id} for ${final_price}")
         
+        # ── AUTO-CHARGE: Platform Fee (2.5% + Stripe recovery) ──
+        try:
+            from services.vehicle_fee_service import create_vehicle_fee_charge
+            fee_result = await create_vehicle_fee_charge(
+                db,
+                auction_id=vehicle_listing["id"],
+                buyer_id=winner_id,
+                hammer_price=final_price,
+            )
+            if fee_result.get("success"):
+                logger.info(f"Platform fee charged for auction {vehicle_listing['id']}: PI={fee_result['payment_intent_id']}")
+            else:
+                logger.error(f"Platform fee charge FAILED for auction {vehicle_listing['id']}: {fee_result.get('error')}")
+        except Exception as fee_err:
+            logger.error(f"Platform fee charge exception for auction {vehicle_listing['id']}: {fee_err}")
+        
         # Log audit
         await db.vehicle_audit_logs.insert_one({
             "id": str(uuid.uuid4()),

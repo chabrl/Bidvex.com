@@ -410,6 +410,10 @@ try:
     app.include_router(vehicle_router)
     app.include_router(vehicle_admin_router)
 
+    # Vehicle Settlement routes (fee-to-unlock, seller contact gate)
+    from routes.vehicle_settlement import vehicle_settlement_router
+    api_router.include_router(vehicle_settlement_router)
+
     @app.on_event("startup")
     async def start_vehicle_auction_scheduler():
         try:

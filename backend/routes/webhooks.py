@@ -278,6 +278,22 @@ async def handle_stripe_webhook(request: Request):
                 )
                 logger.info(f"Bidding deposit authorized: {pi_id}")
 
+        elif event_type == "payment_intent.succeeded":
+            pi_id = data.get("id")
+            pi_meta = data.get("metadata", {})
+            if pi_meta.get("transaction_type") == "vehicle_platform_fee":
+                from services.vehicle_fee_service import handle_vehicle_fee_succeeded
+                await handle_vehicle_fee_succeeded(db, pi_id)
+                logger.info(f"Vehicle platform fee paid: {pi_id}")
+
+        elif event_type == "payment_intent.payment_failed":
+            pi_id = data.get("id")
+            pi_meta = data.get("metadata", {})
+            if pi_meta.get("transaction_type") == "vehicle_platform_fee":
+                from services.vehicle_fee_service import handle_vehicle_fee_failed
+                await handle_vehicle_fee_failed(db, pi_id)
+                logger.warning(f"Vehicle platform fee failed: {pi_id}")
+
         elif event_type == "payment_intent.canceled":
             pi_id = data.get("id")
             pi_meta = data.get("metadata", {})
