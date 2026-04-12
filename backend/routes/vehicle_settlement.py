@@ -112,3 +112,68 @@ async def get_settlement_status(auction_id: str, current_user: User = Depends(ge
     if not settlement:
         return {"settlement_status": "PENDING_CLOSE", "contact_revealed": False}
     return settlement
+
+
+
+@vehicle_settlement_router.post("/vehicle-settlement/verify-card")
+async def verify_card_for_bidding(current_user: User = Depends(get_current_user)):
+    """
+    Pre-bid safety gate: Create a Stripe SetupIntent to verify the buyer's card
+    supports 3D Secure before allowing bids on vehicle auctions.
+    Returns the client_secret for the frontend to confirm.
+    """
+    import os
+    import stripe
+    stripe.api_key = os.environ.get("STRIPE_API_KEY", "")
+    db = get_db()
+
+    user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0, "stripe_customer_id": 1})
+    if not user_doc or not user_doc.get("stripe_customer_id"):
+        raise HTTPException(status_code=400, detail="No payment method on file. Please add a card first.")
+
+    # Check if already verified recently
+    existing = await db.card_verifications.find_one({
+        "user_id": current_user.id,
+        "status": "succeeded",
+    })
+    if existing:
+        return {"verified": True, "message": "Card already verified."}
+
+    try:
+        si = stripe.SetupIntent.create(
+            customer=user_doc["stripe_customer_id"],
+            usage="off_session",
+            metadata={
+                "user_id": current_user.id,
+                "purpose": "vehicle_bid_verification",
+            },
+        )
+
+        await db.card_verifications.insert_one({
+            "user_id": current_user.id,
+            "setup_intent_id": si.id,
+            "status": "pending",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+
+        return {
+            "verified": False,
+            "client_secret": si.client_secret,
+            "setup_intent_id": si.id,
+            "message_en": "To ensure auction integrity, please verify your card. This is a temporary authorization only.",
+            "message_fr": "Pour garantir l'intégrité de l'enchère, veuillez vérifier votre carte. Il s'agit d'une autorisation temporaire uniquement.",
+        }
+    except Exception as e:
+        logger.error(f"SetupIntent creation failed: {e}")
+        raise HTTPException(status_code=500, detail="Card verification failed. Please try again.")
+
+
+@vehicle_settlement_router.post("/vehicle-settlement/confirm-card-verification")
+async def confirm_card_verification(current_user: User = Depends(get_current_user)):
+    """Mark card as verified after frontend confirms the SetupIntent."""
+    db = get_db()
+    await db.card_verifications.update_one(
+        {"user_id": current_user.id, "status": "pending"},
+        {"$set": {"status": "succeeded", "verified_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    return {"verified": True, "message": "Card verified successfully."}

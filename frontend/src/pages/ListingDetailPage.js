@@ -33,6 +33,8 @@ import SecurityDepositBanner from '../components/SecurityDepositBanner';
 import ListingPromotionModal from '../components/ListingPromotionModal';
 import { useTrustStatus, BidBlocker } from '../components/TrustVerification';
 import { SellerReputationCard, SellerReviewsList } from '../components/SellerReputation';
+import { CrossBorderAdvisoryPanel, CrossBorderBidModal } from '../components/legal/LegalComplianceSections';
+import { VehicleFeeBreakdown, SellerContactGate } from '../components/vehicles/VehicleFeeBreakdown';
 import Lightbox from 'yet-another-react-lightbox';
 import 'yet-another-react-lightbox/styles.css';
 import { useRealtimeBidding } from '../hooks/useRealtimeBidding';
@@ -61,6 +63,13 @@ const ListingDetailPage = () => {
   const [showVerificationPrompt, setShowVerificationPrompt] = useState(false);
   const [depositAuthorized, setDepositAuthorized] = useState(false);
   const [showPromoModal, setShowPromoModal] = useState(false);
+  
+  // Cross-border & settlement state
+  const [crossBorderModalOpen, setCrossBorderModalOpen] = useState(false);
+  const [crossBorderAccepted, setCrossBorderAccepted] = useState(false);
+  const [settlementData, setSettlementData] = useState(null);
+  const [sellerContactData, setSellerContactData] = useState(null);
+  const [feePreview, setFeePreview] = useState(null);
   
   // Trust status for bid blocking
   const { isVerified, canBid, loading: trustLoading, refresh: refreshTrustStatus } = useTrustStatus();
@@ -133,6 +142,45 @@ const ListingDetailPage = () => {
     }
   };
 
+  // Fetch settlement status for won auctions
+  const fetchSettlement = async () => {
+    if (!token || !id) return;
+    try {
+      const res = await axios.get(`${API}/vehicle-settlement/${id}/status`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSettlementData(res.data);
+      if (res.data?.contact_revealed) {
+        const contactRes = await axios.get(`${API}/auctions/${id}/seller-contact`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setSellerContactData(contactRes.data?.seller);
+      }
+    } catch { /* no settlement yet */ }
+  };
+
+  // Fetch fee preview for vehicle-category listings
+  const fetchFeePreview = async (price) => {
+    if (!price || price <= 0) return;
+    try {
+      const res = await axios.get(`${API}/vehicle-settlement/fee-preview/${price}`);
+      setFeePreview(res.data);
+    } catch { /* silent */ }
+  };
+
+  // Check if listing is cross-border (non-Canadian)
+  const isCrossBorder = listing && listing.country && listing.country !== 'CA' && listing.country !== 'Canada';
+  const isVehicleCategory = listing && ['vehicle', 'vehicles', 'vehicle parts'].includes((listing.category || '').toLowerCase());
+  const isAuctionWon = listing && listing.status === 'sold' && listing.winner_id === user?.id;
+
+  // Fetch settlement when auction is won
+  useEffect(() => {
+    if (isAuctionWon) {
+      fetchSettlement();
+      if (listing?.current_price) fetchFeePreview(listing.current_price);
+    }
+  }, [isAuctionWon, listing?.current_price]);
+
   const handlePlaceBid = async (e) => {
     e.preventDefault();
     if (!token) {
@@ -157,6 +205,13 @@ const ListingDetailPage = () => {
       return;
     }
 
+    // Cross-border bid intercept — require disclosure acceptance
+    if (isCrossBorder && !crossBorderAccepted) {
+      setCrossBorderModalOpen(true);
+      setPendingBidAmount(amount);
+      return;
+    }
+
     // Show bid confirmation dialog with cost breakdown
     setPendingBidAmount(amount);
     setBidConfirmDialogOpen(true);
@@ -165,10 +220,14 @@ const ListingDetailPage = () => {
   const confirmPlaceBid = async () => {
     setPlacingBid(true);
     try {
-      const response = await axios.post(`${API}/bids`, {
+      const bidPayload = {
         listing_id: id,
         amount: pendingBidAmount,
-      });
+      };
+      if (isCrossBorder && crossBorderAccepted) {
+        bidPayload.cross_border_disclosure_accepted = true;
+      }
+      const response = await axios.post(`${API}/bids`, bidPayload);
       
       setBidConfirmDialogOpen(false);
       toast.success('Bid placed successfully!');
@@ -378,6 +437,29 @@ const ListingDetailPage = () => {
                 <div className="mb-4"><PartnerBadge sellerId={listing.seller_id} size="md" /></div>
               )}
 
+              {/* Cross-Border Advisory Panel — for non-Canadian listings */}
+              {isCrossBorder && (
+                <div className="mb-4">
+                  <CrossBorderAdvisoryPanel />
+                </div>
+              )}
+
+              {/* Auction Won: Settlement Gate + Fee Breakdown */}
+              {isAuctionWon && (
+                <div className="mb-4 space-y-3" data-testid="auction-won-settlement">
+                  <SellerContactGate
+                    settlementStatus={settlementData?.settlement_status || 'PENDING_CLOSE'}
+                    sellerData={sellerContactData}
+                  />
+                  {feePreview && (
+                    <VehicleFeeBreakdown
+                      hammerPrice={listing.current_price}
+                      feeData={feePreview}
+                    />
+                  )}
+                </div>
+              )}
+
               <Separator className="my-4" />
 
               <div className="space-y-4">
@@ -556,6 +638,20 @@ const ListingDetailPage = () => {
                       compact={true}
                       buyersPremiumRate={listing.custom_buyer_premium_rate}
                     />
+                    
+                    {/* Vehicle Fee Notice — bilingual */}
+                    {isVehicleCategory && parseFloat(bidAmount) > 0 && (
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 p-2 bg-slate-50 dark:bg-slate-800/50 rounded border border-slate-200 dark:border-slate-700" data-testid="vehicle-fee-notice">
+                        <p>Platform Fee: ${(parseFloat(bidAmount) * 0.025).toFixed(2)} + Processing / Frais de plateforme : {(parseFloat(bidAmount) * 0.025).toFixed(2)} $ + Traitement</p>
+                      </div>
+                    )}
+                    
+                    {/* Cross-border warning badge */}
+                    {isCrossBorder && (
+                      <div className="text-[10px] font-medium text-blue-600 dark:text-blue-400 flex items-center gap-1" data-testid="cross-border-badge">
+                        Cross-border listing / Annonce transfrontalière
+                      </div>
+                    )}
                     
                     <Button 
                       type="submit" 
@@ -862,6 +958,21 @@ const ListingDetailPage = () => {
         region={listing?.region || 'QC'}
         loading={placingBid}
         buyersPremiumRate={listing?.custom_buyer_premium_rate}
+      />
+
+      {/* Cross-Border Bid Intercept Modal */}
+      <CrossBorderBidModal
+        isOpen={crossBorderModalOpen}
+        onAccept={() => {
+          setCrossBorderAccepted(true);
+          setCrossBorderModalOpen(false);
+          // Resume bid flow
+          setBidConfirmDialogOpen(true);
+        }}
+        onCancel={() => {
+          setCrossBorderModalOpen(false);
+          setPendingBidAmount(0);
+        }}
       />
     </div>
   );
