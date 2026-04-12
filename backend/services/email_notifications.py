@@ -158,9 +158,9 @@ async def send_welcome_email(user_email: str, user_name: str) -> Dict[str, Any]:
     logger.info(f"[EMAIL_DEBUG] Triggering Welcome Email for: {user_email} | User: {user_name}")
 
     HERO_IMG = "https://images.unsplash.com/photo-1774867559682-e856ab83a7db?w=1200&q=80&auto=format"
-    MARKETPLACE_URL = f"{FRONTEND_URL}/marketplace"
-    PRIVACY_URL = f"{FRONTEND_URL}/legal"
-    TERMS_URL = f"{FRONTEND_URL}/legal"
+    MARKETPLACE_URL = "https://bidvex.com/marketplace"
+    PRIVACY_URL = "https://bidvex.com/legal"
+    TERMS_URL = "https://bidvex.com/legal"
 
     html = f"""<!DOCTYPE html>
 <html lang="fr">
