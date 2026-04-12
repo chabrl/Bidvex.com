@@ -3,6 +3,7 @@ import { Card, CardContent } from '../components/ui/card';
 import { ScrollText, Shield, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { AIDisclosureLegalSection, VehicleAuctionLegalSection, CrossBorderLegalSection } from '../components/legal/LegalComplianceSections';
 
 const LegalPage = () => {
   const { t } = useTranslation();
@@ -215,6 +216,13 @@ const LegalPage = () => {
               <h3 className="text-lg font-semibold">17. Contact Information</h3>
               <p>BidVex Legal &amp; Data Protection Officer</p>
               <p><strong>Email:</strong> <a href="mailto:support@bidvex.com" className="text-primary hover:underline">support@bidvex.com</a></p>
+
+              {/* Cross-Border Compliance (Bilingual - Bill 96) */}
+              <CrossBorderLegalSection />
+
+              {/* Vehicle Auctions: OPC Compliance (Bilingual - Bill 96) */}
+              <VehicleAuctionLegalSection />
+
               <p className="text-xs text-muted-foreground mt-4">&copy; 2026 BidVex Inc. All rights reserved.</p>
             </div>
           </CardContent>
@@ -333,6 +341,13 @@ const LegalPage = () => {
               <p>For questions regarding this policy or our data practices, please contact:</p>
               <p>BidVex Data Protection Officer</p>
               <p><strong>Email:</strong> <a href="mailto:support@bidvex.com" className="text-primary hover:underline">support@bidvex.com</a></p>
+
+              {/* Law 25: AI Disclosure (Bilingual - Bill 96) */}
+              <AIDisclosureLegalSection />
+
+              {/* Vehicle Auctions: OPC Compliance (Bilingual - Bill 96) */}
+              <VehicleAuctionLegalSection />
+
               <p className="text-xs text-muted-foreground mt-4">&copy; 2026 BidVex Inc. All rights reserved.</p>
             </div>
           </CardContent>

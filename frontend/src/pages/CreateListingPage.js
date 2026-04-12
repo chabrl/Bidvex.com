@@ -26,6 +26,11 @@ const CFIA_TRIGGER_CATEGORIES = [
   "skid_steers", "combines", "industrial_machinery", "construction & excavation",
   "material handling (forklifts)", "tillage & seeding", "harvesting (combines)",
   "livestock & dairy",
+  // French equivalents
+  "équipement agricole", "tracteurs", "excavatrices", "construction lourde",
+  "bouteurs", "chargeurs compacts", "moissonneuses", "machinerie industrielle",
+  "construction et excavation", "manutention", "travail du sol et semis",
+  "récolte (moissonneuses-batteuses)", "élevage et produits laitiers",
 ];
 
 const CreateListingPage = () => {

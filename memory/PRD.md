@@ -84,10 +84,42 @@
 
 **Testing:** 14/14 frontend features verified (iteration_131)
 
+## Completed (April 12, 2026) — Legal Compliance Sprint (Bill 96 / Law 25 / OPC)
+
+### Section 1: Vehicle Auctions — OPC Intermediary Model
+- **Backend**: `opc_permit_number`, `opc_permit_verified` fields added to user schema. Vehicle listing creation blocked (403) for non-OPC-verified sellers. Audit logging for blocked attempts.
+- **Admin**: `PUT /api/admin/users/{id}/opc-verify` endpoint for manual OPC verification toggle.
+- **Frontend**: `SellerRegistrationPage.js` rewritten with bilingual header, non-dismissible disclaimer box, OPC permit field, and dealer onboarding agreement (Section 6.2). Private seller type removed.
+
+### Section 2: Law 25 — AI Disclosure
+- **Registration**: Standalone `ai_disclosure_consent` checkbox (unchecked by default, mandatory, separate from T&C). Both EN and FR text visible simultaneously. Backend validates and stores `ai_consent_timestamp`, `ai_consent_ip`.
+- **Privacy Policy**: "Automated Decision-Making and AI Processing" bilingual section added.
+
+### Section 3: Cross-Border Compliance
+- Full bilingual "Cross-Border Transactions — Buyer & Seller Responsibility" section with CBSA, RIV, CFIA, CBP, SAAQ, RDPRM requirements added to Terms pages.
+
+### Section 4: CFIA Soil Rule Banner
+- `CFIASoilBanner` and `CFIASoilCheckbox` components in `LegalComplianceSections.js`. Triggers on heavy equipment categories (EN + FR names). `cfia_soil_declaration` field added to `ListingCreate` model.
+
+### Section 5: Cross-Border Advisory
+- `CrossBorderAdvisoryPanel` and `CrossBorderBidModal` components created. `cross_border_disclosure_accepted` field added to `BidCreate` model.
+
+### Section 6: Intermediary Language Audit
+- Searched all codebase for prohibited terms ("BidVex sells", "sold by BidVex", etc.) — none found. Codebase already clean.
+
+### Bilingual Legal Sections Added To:
+- `/legal` page (LegalPage.js) — main user-facing page
+- PrivacyEN.jsx, PrivacyFR.jsx — AI Disclosure + Vehicle Auctions OPC
+- TermsEN.jsx, TermsFR.jsx — Cross-Border + Vehicle Auctions OPC
+
+**Testing:** iteration_132 — backend 100%, frontend 90%+ (fixed CFIA trigger categories, footer nesting)
+
 ## 3rd Party Integrations
 - Stripe — Live | SendGrid — Live | Gemini 2.5 Flash — litellm + EMERGENT_LLM_KEY | VAPID Push — Active
 
 ## Backlog
+- (P1) Section 1.3: Vehicle payment flow — 2.5% platform fee via Stripe (charge buyer, not hammer price)
+- (P1) Section 5: Wire CrossBorderAdvisoryPanel into listing detail pages and CrossBorderBidModal into bid flow
 - (P2) Cloudflare CDN DNS migration
 - (P2) Post-launch monitoring & alerting
 - (Enhancement) Admin offline order management
