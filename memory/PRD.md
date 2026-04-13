@@ -178,6 +178,10 @@
 - Stripe — Live | SendGrid — Live | Gemini 2.5 Flash — litellm + EMERGENT_LLM_KEY | VAPID Push — Active
 
 ## Backlog
+- (P0) Step 2: Refactor email_service.py with send_template_email() + wire all 45+20 template IDs
+- (P0) Step 3: Build email_automation.py — lifecycle sequences (onboarding, re-engagement, subscription expiry)
+- (P0) Step 4: Build geo_email_service.py — Haversine + FSA centroid lookup + daily geo alerts
+- (P0) Step 5: Retrieve 2 missing Financial template IDs via SendGrid API
 - (P2) Cloudflare CDN DNS migration
 - (P2) Post-launch monitoring & alerting
 - (Enhancement) Admin offline order management

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    @media (max-width: 600px) {
+      .outer-table { width: 100% !important; }
+      .body-cell { padding: 24px 16px !important; }
+      .two-col td { display: block !important; width: 100% !important; padding: 8px 0 !important; }
+      h1 { font-size: 20px !important; }
+      .cta-btn { padding: 16px 24px !important; font-size: 16px !important; }
+    }
+  </style>
+</head>
+<body style="margin:0;padding:0;background-color:#F0F4F8;font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F0F4F8;padding:24px 12px;">
+<tr><td align="center">
+<table class="outer-table" width="600" cellpadding="0" cellspacing="0" style="background-color:#FFFFFF;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.06);">
+
+    <!-- ZONE 1 — Header -->
+    <tr>
+      <td style="background-color:#0B2545;padding:24px 0;text-align:center;border-bottom:3px solid #3FB4CB;">
+        <img src="http://cdn.mcauto-images-production.sendgrid.net/4fbf02710175d39f/9dc6a7c3-8237-4a66-b82b-0d9abc165b44/4500x1080.png" alt="BidVex" width="150" style="display:inline-block;width:150px;height:auto;" />
+      </td>
+    </tr>
+    <!-- ZONE 2 — Hero -->
+    <tr>
+      <td style="background-color:#059669;padding:32px 30px;text-align:center;">
+        <p style="margin:0 0 8px;font-size:48px;line-height:1;">&#128275;</p>
+        <h1 style="margin:0;font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:24px;font-weight:bold;color:#FFFFFF;">Welcome Back — Here's a Gift</h1>
+      </td>
+    </tr>
+    <!-- ZONE 3 — Body -->
+    <tr>
+      <td class="body-cell" style="padding:32px 30px;">
+        <p style="margin:0 0 14px;font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:15px;line-height:1.6;color:#1E293B;">Hi {{first_name}},</p><p style="margin:0 0 14px;font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:15px;line-height:1.6;color:#1E293B;">Your subscription has ended, but we'd love to have you back. As a special offer, here's a <strong>discount to reactivate</strong> your plan today.</p>
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;"><tr>
+          <td style="background-color:#F0F8FF;border:1px solid #3FB4CB;border-radius:8px;padding:16px;">
+            <p style="font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:12px;color:#64748B;margin:0 0 4px;text-transform:uppercase;letter-spacing:1px;">Reactivation Code</p><p style="font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:28px;font-weight:bold;color:#059669;margin:0;letter-spacing:2px;">{{coupon_code}}</p>
+          </td>
+        </tr></table><p style="margin:0 0 14px;font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:15px;line-height:1.6;color:#1E293B;">All your listings, bid history, and watchlists are still here — waiting for you. Reactivate and pick up right where you left off.</p>
+      </td>
+    </tr>
+    <!-- ZONE 4 — CTA -->
+    <tr>
+      <td style="padding:8px 30px 32px;text-align:center;">
+        <table cellpadding="0" cellspacing="0" align="center"><tr>
+          <td style="background-color:#2186C6;border-radius:8px;padding:14px 32px;">
+            <a href="https://bidvex.com/pricing" style="color:#FFFFFF;font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:15px;font-weight:bold;text-decoration:none;display:inline-block;" target="_blank">Reactivate My Account</a>
+          </td>
+        </tr></table>
+      </td>
+    </tr>
+    <!-- ZONE 5 — Footer -->
+    <tr>
+      <td style="background-color:#0B2545;padding:28px 30px;text-align:center;">
+        <img src="http://cdn.mcauto-images-production.sendgrid.net/4fbf02710175d39f/9dc6a7c3-8237-4a66-b82b-0d9abc165b44/4500x1080.png" alt="BidVex" width="80" style="display:inline-block;width:80px;height:auto;opacity:0.7;margin-bottom:12px;" /><br/>
+        <p style="margin:0 0 6px;font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:12px;color:rgba(255,255,255,0.6);">BidVex Canada | Sherbrooke, QC</p>
+        <p style="margin:0 0 6px;font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:12px;color:rgba(255,255,255,0.5);">
+          <a href="mailto:support@bidvex.com" style="color:#3FB4CB;text-decoration:none;">support@bidvex.com</a>
+        </p>
+        <p style="margin:0;font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:11px;color:rgba(255,255,255,0.35);">
+          <a href="https://bidvex.com/legal" style="color:rgba(255,255,255,0.45);text-decoration:underline;">Privacy</a> &nbsp;|&nbsp;
+          <a href="https://bidvex.com/legal" style="color:rgba(255,255,255,0.45);text-decoration:underline;">Terms</a> &nbsp;|&nbsp;
+          <a href="{{unsubscribe_url}}" style="color:rgba(255,255,255,0.45);text-decoration:underline;">Unsubscribe</a>
+        </p>
+        <p style="margin:8px 0 0;font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:11px;color:rgba(255,255,255,0.3);">&copy; {{current_year}} BidVex Inc.</p>
+      </td>
+    </tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>
