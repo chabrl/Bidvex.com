@@ -40,7 +40,7 @@ TEMPLATE_IDS = {
     "payment_receipt":         {"en": "d-5f88411aa2584e63afccbbe6603b3b3a", "fr": "d-110c93dfaea74c439488cdbe89985bf3"},
     "payout_sent":             {"en": "d-36b5f93ff1064b8c815253aa60c02829", "fr": "d-73eae4ffc4e9404f9aa931493a4f2724"},
     "invoice_created":         {"en": "d-d25445886edb4cc08cc8107b07cb343f", "fr": "d-780daa32909e438aad5ee459cb21703a"},
-    "invoice_overdue":         {"en": "d-FIXME_INVOICE_OVERDUE_EN", "fr": "d-FIXME_INVOICE_OVERDUE_FR"},  # FIXME_MISSING_ID — no overdue templates found in SendGrid; create and swap before going live
+    "invoice_overdue":         {"en": "d-4636a9fb390d4bb995c339f257ad2f0e", "fr": "d-bab623f50c80456ba5b456b3b5392718"},
 
     # ── SELLER ──
     "new_bid_notification":    {"en": "d-da5049e2aac143aa937c4dd113d9fb96", "fr": "d-5e45290634c648d5aa818a733a94f13d"},
