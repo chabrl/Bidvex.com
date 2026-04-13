@@ -467,6 +467,16 @@ async def on_startup():
         logger.info("APScheduler started")
     except Exception as e:
         logger.warning(f"APScheduler unavailable at startup: {e}")
+    
+    # Register lifecycle & geo email automation jobs
+    try:
+        from services.email_automation import register_lifecycle_jobs
+        from services.geo_email_service import register_geo_jobs
+        register_lifecycle_jobs(scheduler, db)
+        register_geo_jobs(scheduler, db)
+    except Exception as e:
+        logger.warning(f"Email automation registration failed (non-fatal): {e}")
+    
     await check_redis_connection()
     await log_db_status(db)
     await prewarm_caches(db)

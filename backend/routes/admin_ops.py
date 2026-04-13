@@ -1071,16 +1071,15 @@ async def admin_resend_welcome_email(data: ResendWelcomeRequest, current_user: U
     db = get_db()
     user_doc = await db.users.find_one(
         {"email": data.email.lower().strip()},
-        {"_id": 0, "name": 1, "email": 1}
+        {"_id": 0, "name": 1, "email": 1, "preferred_language": 1, "language_preference": 1}
     )
     if not user_doc:
         raise HTTPException(status_code=404, detail=f"No user found with email: {data.email}")
     
-    from services.email_notifications import send_welcome_email
-    result = await send_welcome_email(user_doc["email"], user_doc.get("name", "User"))
+    from services.email_service import send_welcome_email as send_welcome_template
+    success = await send_welcome_template(user_doc)
     
     return {
-        "success": result.get("status") == "sent",
-        "email_result": result,
-        "message": f"Welcome email {'sent' if result.get('status') == 'sent' else 'failed'} for {user_doc['email']}"
+        "success": success,
+        "message": f"Welcome email {'sent' if success else 'failed'} for {user_doc['email']}"
     }

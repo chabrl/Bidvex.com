@@ -165,14 +165,33 @@
 
 **Testing:** Manual verification — SendGrid 202 confirmed via curl + backend logs
 
-## Completed (April 12, 2026) — Welcome Email Premium Redesign
-- Replaced plain-text welcome email with high-end branded HTML template
-- **Design**: BidVex Tech Blue gradient header, hero image (Unsplash fleet), two-column advantage grid, bilingual FR→EN flow with divider
-- **Content**: "BidVex Ecosystem" positioning — all-in-one marketplace, AI tools, bilingual & cross-border
-- **Subject**: "Welcome to the BidVex Ecosystem! / Bienvenue dans l'écosystème BidVex !"
-- **CTA**: "Explorer le marché / Explore the Marketplace" → links to `/marketplace`
-- **Footer**: © 2026 BidVex Inc. Based in Sherbrooke, QC. | Privacy Policy | Terms of Service
-- Verified: SendGrid 202 Accepted for charbel911@gmail.com
+## Completed (April 13, 2026) — Complete Email System Rebuild (Steps 2-4)
+
+### Step 2: email_service.py Refactored
+- New `send_template_email()` core function with retry logic (3 attempts, exponential backoff), SendGrid Dynamic Template support
+- Complete **65-template ID registry** (45 existing + 20 new lifecycle/geo) with EN/FR language routing via `user.language_preference`
+- `resolve_template(name, lang)` helper for template lookup
+- 15+ typed email functions: `send_welcome_email()`, `send_bid_confirmed_email()`, `send_outbid_notification_email()`, `send_winning_bid_email()`, etc.
+- Backward-compatible `EmailService` class + `get_email_service()` for existing code that references the old API
+- Retrieved 2 missing Financial template IDs via SendGrid API: invoice_created EN/FR (`d-d25445886edb4cc08cc8107b07cb343f`, `d-780daa32909e438aad5ee459cb21703a`)
+- 1 FIXME remaining: `invoice_overdue` EN/FR — templates not found in SendGrid, need to be created
+
+### Step 3: email_automation.py — Lifecycle Sequences
+- **Onboarding**: Day 3 (first bid nudge), Day 7 (guide), Day 14 (subscription pitch + Stripe coupon `BIENVENUE20`)
+- **Re-engagement**: Day 30 (we miss you), Day 45 (final + coupon `RETOUR15`)
+- **Subscription Expiry**: -14d, -7d, -1d reminders, +3d reactivation offer with coupon
+- All jobs registered with APScheduler (9:00, 9:15, 9:30 AM UTC)
+- Stripe coupon generation wired into Day 14 and reactivation flows
+- `lifecycle_email_log` collection tracks sent emails per user (prevents duplicates)
+
+### Step 4: geo_email_service.py — Geo-Targeted Alerts
+- Haversine distance calculation + static FSA centroid lookup (120+ postal codes: QC, ON, Atlantic, Prairies)
+- Daily job at 14:00 UTC (9:00 AM ET): finds auctions starting in 48h or ending in 24h
+- Filters to 50km radius, excludes bidders and recently-alerted users
+- Batch sending (100/batch, 1s delay) for SendGrid rate limit protection
+- `geo_email_log` collection prevents duplicate alerts (7-day cooldown)
+
+**Testing:** Backend started successfully, all 4 APScheduler jobs registered, Dynamic Template welcome email sent (d-256f... FR, 202 Accepted)
 
 ## 3rd Party Integrations
 - Stripe — Live | SendGrid — Live | Gemini 2.5 Flash — litellm + EMERGENT_LLM_KEY | VAPID Push — Active
