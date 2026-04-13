@@ -580,6 +580,21 @@ def init_scheduler(database):
         replace_existing=True
     )
     
+    # Job 8: Auction ending soon notifications - every 5 minutes
+    async def ending_soon_job():
+        if db_instance is None:
+            return
+        from services.scheduled_jobs import send_auction_ending_soon_notifications
+        await send_auction_ending_soon_notifications(db_instance)
+    
+    scheduler.add_job(
+        ending_soon_job,
+        IntervalTrigger(minutes=5),
+        id="auction_ending_soon_notifications",
+        name="Auction Ending Soon Notifications",
+        replace_existing=True
+    )
+    
     # Job 8: Send subscription reminders - daily at 01:00 UTC
     scheduler.add_job(
         send_subscription_reminders_job,

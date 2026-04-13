@@ -253,3 +253,106 @@ async def keepalive_ping():
                 logger.debug(f"[keepalive] GET {ep} -> {r.status_code} ({r.elapsed.total_seconds():.2f}s)")
             except Exception as e:
                 logger.debug(f"[keepalive] GET {ep} -> error: {e}")
+
+
+
+async def send_auction_ending_soon_notifications(db):
+    """
+    Trigger: Runs every 5 minutes.
+    Sends 'Ending Soon' emails to all bidders + watchers for auctions ending within 1 hour.
+    Deduplicates via ending_soon_email_log collection.
+    """
+    try:
+        now = datetime.now(timezone.utc)
+        one_hour = (now + timedelta(hours=1)).isoformat()
+        now_str = now.isoformat()
+
+        # Find active auctions ending within 1 hour (both vehicle and regular)
+        ending_auctions = []
+        for coll_name in ["vehicle_listings", "listings"]:
+            coll = db[coll_name]
+            auctions = await coll.find({
+                "status": "active",
+                "end_time": {"$lte": one_hour, "$gte": now_str},
+            }, {"_id": 0, "id": 1, "title": 1, "current_price": 1, "end_time": 1}).to_list(100)
+            ending_auctions.extend(auctions)
+
+        if not ending_auctions:
+            return
+
+        from services.email_service import send_auction_ending_soon_email
+
+        sent_count = 0
+        for auction in ending_auctions:
+            auction_id = auction["id"]
+
+            # Calculate time remaining
+            try:
+                end_dt = datetime.fromisoformat(auction["end_time"].replace("Z", "+00:00"))
+                mins_left = max(1, int((end_dt - now).total_seconds() / 60))
+                time_remaining = f"{mins_left} min" if mins_left < 60 else f"{mins_left // 60}h {mins_left % 60}m"
+            except Exception:
+                time_remaining = "< 1 hour"
+
+            current_highest = auction.get("current_price", 0)
+
+            # Get all bidders for this auction
+            bids = await db.bids.find(
+                {"listing_id": auction_id},
+                {"_id": 0, "user_id": 1, "amount": 1}
+            ).to_list(500)
+            # Also get watchers
+            watchers = await db.watchlists.find(
+                {"listing_id": auction_id},
+                {"_id": 0, "user_id": 1}
+            ).to_list(500)
+
+            # Merge unique user IDs
+            user_bids = {}
+            for b in bids:
+                uid = b.get("user_id")
+                if uid:
+                    user_bids[uid] = max(user_bids.get(uid, 0), b.get("amount", 0))
+            watcher_ids = {w.get("user_id") for w in watchers if w.get("user_id")}
+            all_user_ids = set(user_bids.keys()) | watcher_ids
+
+            for uid in all_user_ids:
+                # Deduplicate: don't send twice for same auction
+                already_sent = await db.ending_soon_email_log.find_one({
+                    "user_id": uid, "auction_id": auction_id
+                })
+                if already_sent:
+                    continue
+
+                user = await db.users.find_one(
+                    {"id": uid},
+                    {"_id": 0, "email": 1, "name": 1, "preferred_language": 1, "language_preference": 1}
+                )
+                if not user or not user.get("email"):
+                    continue
+
+                user_last_bid = user_bids.get(uid, 0)
+
+                try:
+                    success = await send_auction_ending_soon_email(
+                        user=user,
+                        auction_id=auction_id,
+                        item_name=auction.get("title", "Item"),
+                        current_highest_bid=current_highest,
+                        user_last_bid=user_last_bid,
+                        time_remaining=time_remaining,
+                    )
+                    if success:
+                        await db.ending_soon_email_log.insert_one({
+                            "user_id": uid,
+                            "auction_id": auction_id,
+                            "sent_at": now_str,
+                        })
+                        sent_count += 1
+                except Exception as e:
+                    logger.error(f"Failed ending-soon email to {user.get('email')}: {e}")
+
+        if sent_count > 0:
+            logger.info(f"[ENDING_SOON] Sent {sent_count} ending-soon notifications for {len(ending_auctions)} auctions")
+    except Exception as e:
+        logger.error(f"Error in send_auction_ending_soon_notifications: {e}")

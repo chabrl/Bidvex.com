@@ -231,6 +231,31 @@ async def process_ended_auction(db, vehicle_listing: dict) -> AuctionEndResult:
         except Exception as fee_err:
             logger.error(f"Platform fee charge exception for auction {vehicle_listing['id']}: {fee_err}")
         
+        # ── CROSS-BORDER PURCHASE NOTICE ──
+        # Fires when winning bid confirmed AND listing is cross-border
+        try:
+            is_cross_border = (
+                vehicle_listing.get("is_cross_border") or
+                vehicle_listing.get("cross_border_availability") or
+                (vehicle_listing.get("country", "CA") not in ("CA", "Canada"))
+            )
+            if is_cross_border:
+                winner_doc = await db.users.find_one(
+                    {"id": winner_id},
+                    {"_id": 0, "email": 1, "name": 1, "preferred_language": 1, "language_preference": 1}
+                )
+                if winner_doc and winner_doc.get("email"):
+                    from services.email_service import send_cross_border_purchase_notice_email
+                    await send_cross_border_purchase_notice_email(
+                        user=winner_doc,
+                        auction_id=vehicle_listing["id"],
+                        item_name=vehicle_listing.get("title", "Vehicle"),
+                        hammer_price=final_price,
+                    )
+                    logger.info(f"Cross-border purchase notice sent for auction {vehicle_listing['id']}")
+        except Exception as cb_err:
+            logger.error(f"Cross-border notice error for auction {vehicle_listing['id']}: {cb_err}")
+        
         # Log audit
         await db.vehicle_audit_logs.insert_one({
             "id": str(uuid.uuid4()),
