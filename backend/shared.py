@@ -107,9 +107,9 @@ EMAIL_TEMPLATE_CATEGORIES = {
     },
     "financial": {
         "name": "Financial",
-        "description": "Invoices, receipts, and payout notifications",
+        "description": "Invoices, receipts, payout and overdue notifications",
         "icon": "dollar",
-        "keys": ["fin_invoice_issued", "fin_payment_receipt", "fin_payout_sent"]
+        "keys": ["fin_invoice_issued", "fin_payment_receipt", "fin_payout_sent", "fin_invoice_overdue"]
     },
     "bidding": {
         "name": "Bidding & Auction",
@@ -133,10 +133,30 @@ EMAIL_TEMPLATE_CATEGORIES = {
     },
     "affiliate": {
         "name": "Affiliate Program",
-        "description": "Commission and referral notifications",
+        "description": "Commission, referral, and program summary notifications",
         "icon": "handshake",
         "keys": ["affiliate_monthly_earnings", "affiliate_commission_earned",
-                 "affiliate_referral_notification"]
+                 "affiliate_referral_notification", "affiliate_program_summary"]
+    },
+    "lifecycle": {
+        "name": "Lifecycle & Onboarding",
+        "description": "Onboarding sequences, re-engagement, and subscription reminders",
+        "icon": "rocket",
+        "keys": ["lifecycle_welcome", "lifecycle_onboarding_day3", "lifecycle_onboarding_week1",
+                 "lifecycle_subscription_pitch", "lifecycle_reengagement", "lifecycle_reengagement_final",
+                 "lifecycle_sub_final_reminder", "lifecycle_reactivation"]
+    },
+    "geo": {
+        "name": "Geo-Targeted Alerts",
+        "description": "Location-based auction notifications",
+        "icon": "map-pin",
+        "keys": ["geo_new_auction_near", "geo_ending_soon_near"]
+    },
+    "triggers": {
+        "name": "Event Triggers",
+        "description": "Real-time event-driven emails (ending soon, cross-border)",
+        "icon": "zap",
+        "keys": ["trigger_auction_ending_soon", "trigger_cross_border_notice"]
     }
 }
 
@@ -271,11 +291,20 @@ async def get_email_templates(db):
     if not templates:
         templates = {
             "id": "email_templates",
-            "templates": DEFAULT_EMAIL_TEMPLATES,
+            "templates": DEFAULT_EMAIL_TEMPLATES.copy(),
             "updated_at": datetime.now(timezone.utc).isoformat(),
             "updated_by": "system"
         }
         await db.email_settings.insert_one(templates)
+    else:
+        stored = templates.get("templates", {})
+        merged = {**DEFAULT_EMAIL_TEMPLATES, **stored}
+        if len(merged) > len(stored):
+            templates["templates"] = merged
+            await db.email_settings.update_one(
+                {"id": "email_templates"},
+                {"$set": {"templates": merged}}
+            )
     return templates
 
 async def get_email_template_id(db, template_key: str, language: str = "en") -> str:

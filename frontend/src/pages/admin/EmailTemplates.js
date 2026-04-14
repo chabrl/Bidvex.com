@@ -12,7 +12,8 @@ import { toast } from 'sonner';
 import { 
   Mail, Save, Search, AlertCircle, CheckCircle, 
   Clock, Shield, DollarSign, Gavel, ShoppingBag,
-  Megaphone, Users, RefreshCw, History
+  Megaphone, Users, RefreshCw, History, Eye, EyeOff,
+  Rocket, MapPin, Zap, X, Code, Globe
 } from 'lucide-react';
 
 const API = API_BASE;
@@ -24,7 +25,10 @@ const CATEGORY_ICONS = {
   bidding: Gavel,
   seller: ShoppingBag,
   communication: Megaphone,
-  affiliate: Users
+  affiliate: Users,
+  lifecycle: Rocket,
+  geo: MapPin,
+  triggers: Zap
 };
 
 // Validation helper for SendGrid template IDs
@@ -45,6 +49,10 @@ const EmailTemplates = () => {
   const [showAuditLog, setShowAuditLog] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
   const [hasChanges, setHasChanges] = useState(false);
+  const [previewKey, setPreviewKey] = useState(null);
+  const [previewHtml, setPreviewHtml] = useState('');
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [showCode, setShowCode] = useState(false);
 
   const fetchTemplates = useCallback(async () => {
     try {
@@ -80,6 +88,28 @@ const EmailTemplates = () => {
     fetchTemplates();
     fetchAuditLog();
   }, [fetchTemplates, fetchAuditLog]);
+
+  const loadPreview = async (templateKey) => {
+    if (previewKey === templateKey) {
+      setPreviewKey(null);
+      setPreviewHtml('');
+      return;
+    }
+    try {
+      setPreviewLoading(true);
+      setPreviewKey(templateKey);
+      const response = await axios.get(`${API}/admin/email-templates/${templateKey}/preview`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setPreviewHtml(response.data.html_content || '');
+      setShowCode(false);
+    } catch {
+      setPreviewHtml('');
+      toast.error('No HTML preview available for this template');
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
 
   const handleTemplateChange = (key, lang, value) => {
     const fullKey = `${key}_${lang}`;
@@ -313,65 +343,157 @@ const EmailTemplates = () => {
                             <Label className="font-semibold">{template.name}</Label>
                             <p className="text-xs text-muted-foreground mt-0.5">
                               Key: <code className="bg-muted px-1 rounded">{template.key}</code>
+                              {template.is_bilingual && (
+                                <Badge variant="outline" className="ml-2 text-[10px] py-0" data-testid={`bilingual-badge-${template.key}`}>
+                                  <Globe className="h-3 w-3 mr-1" /> Bilingual
+                                </Badge>
+                              )}
                             </p>
                           </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => loadPreview(template.key)}
+                            className="gap-1.5"
+                            data-testid={`preview-btn-${template.key}`}
+                          >
+                            {previewKey === template.key ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                            {previewKey === template.key ? 'Hide' : 'Preview'}
+                          </Button>
                         </div>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {/* English Template ID */}
+                        {template.is_bilingual ? (
                           <div className="space-y-1.5">
                             <Label className="text-xs flex items-center gap-1">
-                              🇬🇧 English Template ID
-                              {validationErrors[`${template.key}_en`] && (
-                                <AlertCircle className="h-3 w-3 text-destructive" />
-                              )}
+                              <Globe className="h-3 w-3" /> Bilingual Template ID (EN+FR)
                             </Label>
                             <Input
                               value={getCurrentValue(template.key, 'en') || ''}
-                              onChange={(e) => handleTemplateChange(template.key, 'en', e.target.value)}
+                              onChange={(e) => {
+                                handleTemplateChange(template.key, 'en', e.target.value);
+                                handleTemplateChange(template.key, 'fr', e.target.value);
+                              }}
                               placeholder="d-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                               className={`font-mono text-sm ${
-                                validationErrors[`${template.key}_en`] 
-                                  ? 'border-destructive' 
-                                  : editedTemplates[`${template.key}_en`] !== undefined 
-                                    ? 'border-primary' 
-                                    : ''
+                                editedTemplates[`${template.key}_en`] !== undefined ? 'border-primary' : ''
                               }`}
+                              data-testid={`template-id-bl-${template.key}`}
                             />
-                            {validationErrors[`${template.key}_en`] && (
-                              <p className="text-xs text-destructive">
-                                {validationErrors[`${template.key}_en`]}
-                              </p>
-                            )}
                           </div>
-                          
-                          {/* French Template ID */}
-                          <div className="space-y-1.5">
-                            <Label className="text-xs flex items-center gap-1">
-                              🇫🇷 French Template ID
-                              {validationErrors[`${template.key}_fr`] && (
-                                <AlertCircle className="h-3 w-3 text-destructive" />
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                              <Label className="text-xs flex items-center gap-1">
+                                EN English Template ID
+                                {validationErrors[`${template.key}_en`] && (
+                                  <AlertCircle className="h-3 w-3 text-destructive" />
+                                )}
+                              </Label>
+                              <Input
+                                value={getCurrentValue(template.key, 'en') || ''}
+                                onChange={(e) => handleTemplateChange(template.key, 'en', e.target.value)}
+                                placeholder="d-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                                className={`font-mono text-sm ${
+                                  validationErrors[`${template.key}_en`] 
+                                    ? 'border-destructive' 
+                                    : editedTemplates[`${template.key}_en`] !== undefined 
+                                      ? 'border-primary' 
+                                      : ''
+                                }`}
+                                data-testid={`template-id-en-${template.key}`}
+                              />
+                              {validationErrors[`${template.key}_en`] && (
+                                <p className="text-xs text-destructive">
+                                  {validationErrors[`${template.key}_en`]}
+                                </p>
                               )}
-                            </Label>
-                            <Input
-                              value={getCurrentValue(template.key, 'fr') || ''}
-                              onChange={(e) => handleTemplateChange(template.key, 'fr', e.target.value)}
-                              placeholder="d-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                              className={`font-mono text-sm ${
-                                validationErrors[`${template.key}_fr`] 
-                                  ? 'border-destructive' 
-                                  : editedTemplates[`${template.key}_fr`] !== undefined 
-                                    ? 'border-primary' 
-                                    : ''
-                              }`}
-                            />
-                            {validationErrors[`${template.key}_fr`] && (
-                              <p className="text-xs text-destructive">
-                                {validationErrors[`${template.key}_fr`]}
-                              </p>
+                            </div>
+                            
+                            <div className="space-y-1.5">
+                              <Label className="text-xs flex items-center gap-1">
+                                FR French Template ID
+                                {validationErrors[`${template.key}_fr`] && (
+                                  <AlertCircle className="h-3 w-3 text-destructive" />
+                                )}
+                              </Label>
+                              <Input
+                                value={getCurrentValue(template.key, 'fr') || ''}
+                                onChange={(e) => handleTemplateChange(template.key, 'fr', e.target.value)}
+                                placeholder="d-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                                className={`font-mono text-sm ${
+                                  validationErrors[`${template.key}_fr`] 
+                                    ? 'border-destructive' 
+                                    : editedTemplates[`${template.key}_fr`] !== undefined 
+                                      ? 'border-primary' 
+                                      : ''
+                                }`}
+                                data-testid={`template-id-fr-${template.key}`}
+                              />
+                              {validationErrors[`${template.key}_fr`] && (
+                                <p className="text-xs text-destructive">
+                                  {validationErrors[`${template.key}_fr`]}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* HTML Preview Panel */}
+                        {previewKey === template.key && (
+                          <div className="mt-2 border border-border rounded-lg overflow-hidden" data-testid={`preview-panel-${template.key}`}>
+                            <div className="flex items-center justify-between bg-accent/40 px-4 py-2 border-b border-border">
+                              <span className="text-xs font-semibold flex items-center gap-1.5">
+                                <Eye className="h-3.5 w-3.5" /> Template Preview
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setShowCode(!showCode)}
+                                  className="h-7 text-xs gap-1"
+                                  data-testid={`toggle-code-${template.key}`}
+                                >
+                                  <Code className="h-3 w-3" />
+                                  {showCode ? 'Visual' : 'HTML Code'}
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => { setPreviewKey(null); setPreviewHtml(''); }}
+                                  className="h-7 w-7 p-0"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+                            {previewLoading ? (
+                              <div className="flex items-center justify-center h-48">
+                                <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
+                              </div>
+                            ) : previewHtml ? (
+                              showCode ? (
+                                <ScrollArea className="h-[400px]">
+                                  <pre className="p-4 text-xs font-mono whitespace-pre-wrap break-all bg-muted/30">{previewHtml}</pre>
+                                </ScrollArea>
+                              ) : (
+                                <div className="bg-white">
+                                  <iframe
+                                    srcDoc={previewHtml}
+                                    title={`Preview: ${template.key}`}
+                                    className="w-full border-0"
+                                    style={{ height: '600px' }}
+                                    sandbox="allow-same-origin"
+                                    data-testid={`preview-iframe-${template.key}`}
+                                  />
+                                </div>
+                              )
+                            ) : (
+                              <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
+                                No HTML preview available for this template
+                              </div>
                             )}
                           </div>
-                        </div>
+                        )}
                       </div>
                     </div>
                   ))}

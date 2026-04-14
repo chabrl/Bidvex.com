@@ -228,12 +228,20 @@ async def get_admin_email_templates(current_user: User = Depends(require_admin))
         for base_key in cat_info["keys"]:
             en_key = f"{base_key}_en"
             fr_key = f"{base_key}_fr"
-            if en_key in template_dict or fr_key in template_dict:
+            bl_key = f"{base_key}_bl"
+            has_en_fr = en_key in template_dict or fr_key in template_dict
+            has_bl = bl_key in template_dict
+            if has_en_fr or has_bl:
+                en_id = template_dict.get(en_key, "")
+                fr_id = template_dict.get(fr_key, "")
+                bl_id = template_dict.get(bl_key, "")
                 cat_templates.append({
                     "key": base_key,
                     "name": base_key.replace("_", " ").title(),
-                    "en_id": template_dict.get(en_key, ""),
-                    "fr_id": template_dict.get(fr_key, ""),
+                    "en_id": en_id or bl_id,
+                    "fr_id": fr_id or bl_id,
+                    "bl_id": bl_id,
+                    "is_bilingual": bool(bl_id),
                 })
         
         categorized[cat_key] = {
@@ -364,6 +372,88 @@ async def get_email_template_audit_log(
     ).sort("created_at", -1).limit(limit).to_list(limit)
     
     return logs
+
+
+
+TEMPLATE_FILE_MAP = {
+    "auth_password_reset": "auth_password_reset_bilingual.html",
+    "auth_password_changed": "auth_password_changed_bilingual.html",
+    "auth_email_verification": "auth_email_verification_bilingual.html",
+    "auth_welcome": "welcome_bilingual.html",
+    "auth_two_factor": "auth_two_factor_bilingual.html",
+    "auth_login_alert": "auth_login_alert_bilingual.html",
+    "admin_account_suspended": "admin_account_suspended_bilingual.html",
+    "admin_report_received": "admin_report_received_bilingual.html",
+    "comm_announcement": "comm_announcement_bilingual.html",
+    "comm_support_ack": "comm_support_ack_bilingual.html",
+    "comm_platform_updates": "comm_platform_updates_bilingual.html",
+    "fin_invoice_issued": "fin_invoice_issued_bilingual.html",
+    "fin_payment_receipt": "fin_payment_receipt_bilingual.html",
+    "fin_payout_sent": "fin_payout_sent_bilingual.html",
+    "fin_invoice_overdue": "fin_invoice_overdue_bilingual.html",
+    "seller_new_bid": "seller_new_bid_bilingual.html",
+    "seller_listing_approved": "seller_listing_approved_bilingual.html",
+    "seller_listing_rejected": "seller_listing_rejected_bilingual.html",
+    "auction_announcement": "auction_announcement_bilingual.html",
+    "auction_reminder": "auction_reminder_bilingual.html",
+    "auction_results": "auction_results_bilingual.html",
+    "bid_outbid": "bid_outbid_bilingual.html",
+    "bid_confirmed": "bid_confirmed_bilingual.html",
+    "bid_winning": "bid_winning_bilingual.html",
+    "affiliate_monthly_earnings": "affiliate_monthly_earnings_bilingual.html",
+    "affiliate_commission_earned": "affiliate_commission_earned_bilingual.html",
+    "affiliate_referral_notification": "affiliate_referral_notification_bilingual.html",
+    "affiliate_program_summary": "affiliate_program_summary_bilingual.html",
+    "lifecycle_welcome": "welcome_bilingual.html",
+    "lifecycle_onboarding_day3": "onboarding_day3_bilingual.html",
+    "lifecycle_onboarding_week1": "onboarding_week1_bilingual.html",
+    "lifecycle_subscription_pitch": "subscription_pitch_bilingual.html",
+    "lifecycle_reengagement": "reengagement_bilingual.html",
+    "lifecycle_reengagement_final": "reengagement_final_bilingual.html",
+    "lifecycle_sub_final_reminder": "subscription_final_reminder_bilingual.html",
+    "lifecycle_reactivation": "reactivation_offer_bilingual.html",
+    "geo_new_auction_near": "new_auction_near_you_bilingual.html",
+    "geo_ending_soon_near": "ending_soon_near_you_bilingual.html",
+    "trigger_auction_ending_soon": "trigger_auction_ending_soon_bilingual.html",
+    "trigger_cross_border_notice": "trigger_cross_border_notice_bilingual.html",
+}
+
+
+@admin_config_router.get("/admin/email-templates/{template_key}/preview")
+async def get_email_template_preview(
+    template_key: str,
+    current_user: User = Depends(require_admin)
+):
+    """Get bilingual HTML preview for a template (admin only)."""
+    import os
+    filename = TEMPLATE_FILE_MAP.get(template_key)
+    if not filename:
+        raise HTTPException(status_code=404, detail=f"No HTML preview available for '{template_key}'")
+
+    templates_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "sendgrid_templates")
+    filepath = os.path.join(templates_dir, filename)
+
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail=f"Template file not found: {filename}")
+
+    with open(filepath, "r", encoding="utf-8") as f:
+        html_content = f.read()
+
+    return {
+        "key": template_key,
+        "filename": filename,
+        "html_content": html_content,
+        "has_preview": True
+    }
+
+
+@admin_config_router.get("/admin/email-templates/previews/list")
+async def list_template_previews(current_user: User = Depends(require_admin)):
+    """List all templates that have HTML previews available."""
+    return {
+        "templates": list(TEMPLATE_FILE_MAP.keys()),
+        "total": len(TEMPLATE_FILE_MAP)
+    }
 
 
 
