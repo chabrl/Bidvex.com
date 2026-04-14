@@ -77,6 +77,24 @@ DEFAULT_EMAIL_TEMPLATES = {
     "affiliate_referral_notification_fr": "d-32a08f1a11a7441186944747602cfd53",
     "affiliate_program_summary_en": "d-ea4ab5b49ce9448fa552303fa5e9e2cd",
     "affiliate_program_summary_fr": "d-b7e970f39ce748c0bc3773a5a5606a91",
+    # Lifecycle & Onboarding
+    "lifecycle_welcome_bl": "d-db7d296ad54247138f3f210a1fb52e0a",
+    "lifecycle_onboarding_day3_bl": "d-884f427a37684e0d937cadf73faffd44",
+    "lifecycle_onboarding_week1_bl": "d-f23e557e8af440cda87298f0beee80d0",
+    "lifecycle_subscription_pitch_bl": "d-afed7ddf42524c409c2f58b85a545253",
+    "lifecycle_reengagement_bl": "d-09455f0d3ef94a92a37aa564a189c825",
+    "lifecycle_reengagement_final_bl": "d-6764b5d0529948f9ad6d09f451f11b95",
+    "lifecycle_sub_final_reminder_bl": "d-be41f17f144e46828fd5a2d1b9dab866",
+    "lifecycle_reactivation_bl": "d-359b30aa432a4f92835f03ecde03e251",
+    # Geo-Targeted
+    "geo_new_auction_near_bl": "d-e725583ae735418782928b68851f7aec",
+    "geo_ending_soon_near_bl": "d-759c6bd49cb7496ca51ea85ac9052174",
+    # Triggers
+    "trigger_auction_ending_soon_bl": "d-6c9af5c96cda400bb76e29420002b4fe",
+    "trigger_cross_border_notice_bl": "d-3f74a299f00c4047b202c9330e21c6f4",
+    # Financial (missing)
+    "fin_invoice_overdue_en": "d-4636a9fb390d4bb995c339f257ad2f0e",
+    "fin_invoice_overdue_fr": "d-bab623f50c80456ba5b456b3b5392718",
 }
 
 EMAIL_TEMPLATE_CATEGORIES = {
