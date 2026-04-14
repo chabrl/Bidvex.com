@@ -470,11 +470,11 @@ async def send_test_draft_invoice_email(
       - buyer_province: str ("QC", "ON", etc.)
       - buyer_tier: str ("free", "premium", "vip")
       - seller_tier: str ("free", "premium", "vip")
-      - category: str ("vehicle")
+      - category: str ("vehicle", "non_vehicle_stripe", "non_vehicle_cash")
+      - base_price: float (for subscription/promo)
     """
     from services.pricing_manager import PricingManager
     from sendgrid_templates.draft_invoice_template import build_draft_invoice_html
-    from services.email_service import send_template_email
     import os
     from sendgrid import SendGridAPIClient
     from sendgrid.helpers.mail import Mail, Email, To, Content
@@ -486,20 +486,18 @@ async def send_test_draft_invoice_email(
     seller_tier = payload.get("seller_tier", "free")
     category = payload.get("category", "vehicle")
 
-    # Calculate using PricingManager
-    pm = PricingManager()
-    invoice = pm.calculate(
-        hammer_price=hammer_price,
-        category=category,
-        buyer_province=buyer_province,
-        buyer_tier=buyer_tier,
-        seller_tier=seller_tier,
-    )
+    # Route to correct PricingManager method
+    if category == "vehicle":
+        result = PricingManager.vehicle_auction(hammer_price, buyer_province, buyer_tier)
+    elif category in ("non_vehicle_cash", "cash", "e-transfer"):
+        result = PricingManager.non_vehicle_cash(hammer_price, buyer_province, buyer_tier, seller_tier)
+    elif category == "subscription":
+        result = PricingManager.flat_purchase(hammer_price, buyer_province, "Subscription")
+    else:
+        result = PricingManager.non_vehicle_stripe(hammer_price, buyer_province, buyer_tier, seller_tier)
 
-    # Build HTML
-    html_content = build_draft_invoice_html(invoice)
+    html_content = build_draft_invoice_html(result)
 
-    # Send via SendGrid raw HTML (not dynamic template)
     sg_key = os.environ.get("SENDGRID_API_KEY")
     if not sg_key:
         raise HTTPException(status_code=503, detail="SENDGRID_API_KEY not configured")
@@ -527,7 +525,7 @@ async def send_test_draft_invoice_email(
         "to_email": to_email,
         "subject": f"[TEST] Draft Invoice — ${hammer_price:,.2f} CAD | {buyer_province}",
         "status_code": response.status_code,
-        "invoice_summary": invoice.to_dict(),
+        "invoice_summary": result.to_dict(),
     }
 
 
@@ -549,21 +547,20 @@ async def preview_draft_invoice(
     seller_tier = payload.get("seller_tier", "free")
     category = payload.get("category", "vehicle")
 
-    pm = PricingManager()
-    invoice = pm.calculate(
-        hammer_price=hammer_price,
-        category=category,
-        buyer_province=buyer_province,
-        buyer_tier=buyer_tier,
-        seller_tier=seller_tier,
-    )
+    if category == "vehicle":
+        result = PricingManager.vehicle_auction(hammer_price, buyer_province, buyer_tier)
+    elif category in ("non_vehicle_cash", "cash", "e-transfer"):
+        result = PricingManager.non_vehicle_cash(hammer_price, buyer_province, buyer_tier, seller_tier)
+    elif category == "subscription":
+        result = PricingManager.flat_purchase(hammer_price, buyer_province, "Subscription")
+    else:
+        result = PricingManager.non_vehicle_stripe(hammer_price, buyer_province, buyer_tier, seller_tier)
 
-    html_content = build_draft_invoice_html(invoice)
+    html_content = build_draft_invoice_html(result)
 
     return {
         "html_content": html_content,
-        "invoice": invoice.to_dict(),
-        "template_data": invoice.to_template_data(),
+        "invoice": result.to_dict(),
     }
 
 

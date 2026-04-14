@@ -1,0 +1,141 @@
+{
+  "summary": "Master Pricing Structure Audit - Iteration 138. All 33 tests PASSED. Verified all 7 pricing rules: tier rates, vehicle pricing, non-vehicle Stripe/Cash, Stripe recovery formula, provincial tax rates, subscriptions, and split invoices. PricingManager class with 4 methods (vehicle_auction, non_vehicle_stripe, non_vehicle_cash, flat_purchase) fully functional.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_results": {
+    "backend_api_tests": {
+      "status": "PASS",
+      "total": 33,
+      "passed": 33,
+      "failed": 0
+    },
+    "pricing_manager_methods": {
+      "vehicle_auction": "EXISTS - Returns PricingResult",
+      "non_vehicle_stripe": "EXISTS - Returns PricingResult",
+      "non_vehicle_cash": "EXISTS - Returns PricingResult",
+      "flat_purchase": "EXISTS - Returns PricingResult"
+    },
+    "tier_rates_rule_1": {
+      "standard": "5% BP / 4% SC - VERIFIED",
+      "premium": "3.5% BP / 2.5% SC - VERIFIED",
+      "vip": "3% BP / 2% SC - VERIFIED",
+      "partner": "0% BP / 3% SC - VERIFIED"
+    },
+    "vehicle_pricing_rule_2": {
+      "buyer_pays": "2.5% platform fee + stripe + tax - VERIFIED",
+      "seller_pays": "$0 (seller_invoice is None) - VERIFIED"
+    },
+    "non_vehicle_pricing_rule_3": {
+      "stripe_path": "buyer=hammer+BP+stripe+tax, seller=hammer-SC-stripe-tax - VERIFIED",
+      "cash_path": "split invoices (buyer fees only, seller fees only) - VERIFIED"
+    },
+    "stripe_recovery_rule_4": {
+      "formula": "(fees × 0.029) + 0.30 - VERIFIED"
+    },
+    "provincial_tax_rates_rule_5": {
+      "QC": "GST+QST 14.975% - VERIFIED",
+      "ON": "HST 13% - VERIFIED",
+      "AB": "GST 5% - VERIFIED",
+      "BC": "GST 5% (NOT GST+PST) - VERIFIED",
+      "MB": "GST 5% (NOT GST+RST) - VERIFIED",
+      "SK": "GST 5% (NOT GST+PST) - VERIFIED",
+      "NS_NB_NL_PE": "HST 15% - VERIFIED"
+    },
+    "subscription_pricing_rule_6": {
+      "formula": "base + stripe_recovery + tax - VERIFIED"
+    },
+    "code_path_imports": {
+      "vehicle_invoice.py": "Imports PricingManager.vehicle_auction - VERIFIED",
+      "routes/auctions.py": "Imports PricingManager.non_vehicle_cash for Path B - VERIFIED"
+    },
+    "api_proof_calculations": {
+      "proof_1_vehicle_qc_1000": {
+        "expected": "$29.93",
+        "actual": "$29.93",
+        "status": "PASS"
+      },
+      "proof_2_non_vehicle_stripe_qc_1000": {
+        "buyer_expected": "$1059.50",
+        "buyer_actual": "$1059.50",
+        "seller_expected": "$952.33",
+        "seller_actual": "$952.33",
+        "status": "PASS"
+      },
+      "proof_3_subscription_on_300": {
+        "expected": "$349.17",
+        "actual": "$349.17",
+        "status": "PASS"
+      },
+      "proof_4_non_vehicle_cash_ab_500": {
+        "buyer_expected": "$27.33",
+        "buyer_actual": "$27.33",
+        "seller_expected": "$21.92",
+        "seller_actual": "$21.92",
+        "status": "PASS"
+      }
+    }
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_pricing_manager_audit_138.py",
+    "/app/test_reports/pytest/pytest_results_pricing_audit_138.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_pricing_manager_audit_138.py"
+  ],
+  "success_rate": {
+    "backend": "100% (33/33 passed)",
+    "frontend": "N/A (backend only testing)"
+  },
+  "test_credentials": "Admin: charbel911@gmail.com / Anderosli123!@#",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Master Pricing Structure audit complete. All 7 rules verified: (1) Tier rates match exactly, (2) Vehicle auctions charge buyer 2.5% platform fee only with seller $0, (3) Non-vehicle Stripe/Cash paths work correctly, (4) Stripe recovery formula (fees×0.029)+0.30 verified, (5) Provincial tax rates correct including BC/MB/SK at GST 5% only, (6) Subscriptions use same formula, (7) Split invoices work for cash transactions. PricingManager class is the canonical pricing engine with 4 methods. Code paths in vehicle_invoice.py and routes/auctions.py correctly import PricingManager.",
+  "verified_calculations": {
+    "vehicle_qc_1000": {
+      "platform_fee_2_5_percent": 25.00,
+      "stripe_recovery": 1.03,
+      "taxable": 26.03,
+      "tax_14_975_percent": 3.90,
+      "buyer_total": 29.93,
+      "seller_total": 0.00
+    },
+    "non_vehicle_stripe_qc_1000": {
+      "hammer": 1000.00,
+      "buyer_premium_5_percent": 50.00,
+      "buyer_stripe": 1.75,
+      "buyer_tax": 7.75,
+      "buyer_total": 1059.50,
+      "seller_commission_4_percent": 40.00,
+      "seller_stripe": 1.46,
+      "seller_tax": 6.21,
+      "seller_payout": 952.33
+    },
+    "subscription_on_300": {
+      "base": 300.00,
+      "stripe_recovery": 9.00,
+      "taxable": 309.00,
+      "tax_13_percent_hst": 40.17,
+      "total": 349.17
+    },
+    "non_vehicle_cash_ab_500": {
+      "buyer_premium_5_percent": 25.00,
+      "buyer_stripe": 1.03,
+      "buyer_tax_5_percent_gst": 1.30,
+      "buyer_total": 27.33,
+      "seller_commission_4_percent": 20.00,
+      "seller_stripe": 0.88,
+      "seller_tax_5_percent_gst": 1.04,
+      "seller_total": 21.92
+    }
+  }
+}

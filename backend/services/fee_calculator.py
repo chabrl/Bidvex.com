@@ -34,34 +34,31 @@ SUBSCRIPTION_FEES = {
     }
 }
 
-# Tax rates by region
+# Tax rates by region — Master Pricing Structure Rule 5
 TAX_RATES = {
     "QC": {
         "gst": Decimal("0.05"),  # 5% GST
         "qst": Decimal("0.09975"),  # 9.975% QST
-        "name": "Quebec (GST + QST)"
+        "combined": Decimal("0.14975"),
+        "name": "GST + QST (14.975%)"
     },
     "ON": {
         "hst": Decimal("0.13"),  # 13% HST
-        "name": "Ontario (HST)"
+        "combined": Decimal("0.13"),
+        "name": "HST (13%)"
     },
-    "BC": {
-        "gst": Decimal("0.05"),  # 5% GST
-        "pst": Decimal("0.07"),  # 7% PST
-        "name": "British Columbia (GST + PST)"
-    },
-    "AB": {
-        "gst": Decimal("0.05"),  # 5% GST only
-        "name": "Alberta (GST)"
-    },
-    "EU": {
-        "vat": Decimal("0.20"),  # 20% VAT (varies by country)
-        "name": "European Union (VAT)"
-    },
-    "US": {
-        "sales_tax": Decimal("0.00"),  # Varies by state
-        "name": "United States"
-    }
+    "NB": {"hst": Decimal("0.15"), "combined": Decimal("0.15"), "name": "HST (15%)"},
+    "NL": {"hst": Decimal("0.15"), "combined": Decimal("0.15"), "name": "HST (15%)"},
+    "NS": {"hst": Decimal("0.15"), "combined": Decimal("0.15"), "name": "HST (15%)"},
+    "PE": {"hst": Decimal("0.15"), "combined": Decimal("0.15"), "name": "HST (15%)"},
+    "AB": {"gst": Decimal("0.05"), "combined": Decimal("0.05"), "name": "GST (5%)"},
+    "BC": {"gst": Decimal("0.05"), "combined": Decimal("0.05"), "name": "GST (5%)"},
+    "MB": {"gst": Decimal("0.05"), "combined": Decimal("0.05"), "name": "GST (5%)"},
+    "SK": {"gst": Decimal("0.05"), "combined": Decimal("0.05"), "name": "GST (5%)"},
+    "YT": {"gst": Decimal("0.05"), "combined": Decimal("0.05"), "name": "GST (5%)"},
+    "NT": {"gst": Decimal("0.05"), "combined": Decimal("0.05"), "name": "GST (5%)"},
+    "NU": {"gst": Decimal("0.05"), "combined": Decimal("0.05"), "name": "GST (5%)"},
+    "US": {"sales_tax": Decimal("0.00"), "combined": Decimal("0"), "name": "Exported Service"},
 }
 
 

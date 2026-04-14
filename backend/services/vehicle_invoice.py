@@ -37,234 +37,119 @@ async def generate_vehicle_invoice(
     final_price: float
 ) -> dict:
     """
-    Generate complete invoice for a won vehicle auction
-    
-    Creates both buyer and seller invoices with:
-    - Full pricing breakdown
-    - Tax calculations
-    - Subscription-based discounts
-    - Payment deadline (14 days)
+    Generate invoice for a won VEHICLE auction (Rule 2 — Non-custodial).
+    Buyer pays: 2.5% platform fee + stripe recovery + tax on fees.
+    Seller pays: $0. Hammer settled directly buyer↔seller.
     """
+    from services.pricing_manager import PricingManager
+
     now = datetime.now(timezone.utc)
     deadline = now + timedelta(days=PAYMENT_DEADLINE_DAYS)
-    
-    # Get subscription tiers
-    buyer_tier = get_subscription_tier(winner_user)
-    seller_tier = get_subscription_tier(seller_user)
-    
-    # Get buyer's province from their profile or listing location
+
     buyer_province = winner_user.get("province") or vehicle_listing.get("location_province", "ON")
-    
-    # Calculate buyer pricing
-    buyer_pricing = calculate_buyer_pricing(final_price, buyer_province, buyer_tier)
-    
-    # Calculate seller pricing
-    seller_pricing = calculate_seller_pricing(final_price, seller_tier)
-    
-    # Generate invoice number
+    buyer_tier_raw = winner_user.get("subscription_tier", "free")
+
+    # Use PricingManager for correct vehicle pricing
+    pricing = PricingManager.vehicle_auction(
+        hammer_price=final_price,
+        buyer_province=buyer_province,
+        buyer_tier=buyer_tier_raw,
+    )
+    bi = pricing.buyer_invoice
     invoice_number = f"VEH-{now.strftime('%Y%m%d')}-{str(uuid.uuid4())[:8].upper()}"
-    
-    # Build line items for buyer invoice
-    buyer_line_items = [
-        {
-            "description": f"Winning Bid - {vehicle_listing['year']} {vehicle_listing['make']} {vehicle_listing['model']}",
-            "type": "hammer_price",
-            "amount": float(buyer_pricing.hammer_price),
-            "taxable": True
-        },
-        {
-            "description": f"Buyer Premium ({float(buyer_pricing.buyer_premium_rate) * 100:.1f}%)",
-            "type": "buyer_premium",
-            "rate": float(buyer_pricing.buyer_premium_rate),
-            "amount": float(buyer_pricing.buyer_premium),
-            "taxable": True
-        },
-        {
-            "description": "Platform Fee (2.5%)",
-            "type": "platform_fee",
-            "rate": 0.025,
-            "amount": float(buyer_pricing.platform_fee),
-            "taxable": True
-        }
-    ]
-    
-    # Add tax line items
-    tax_breakdown = buyer_pricing.tax_breakdown
-    if tax_breakdown.tax_type == "HST":
-        buyer_line_items.append({
-            "description": f"HST ({float(tax_breakdown.hst_rate) * 100:.2f}%)",
-            "type": "tax_hst",
-            "rate": float(tax_breakdown.hst_rate),
-            "amount": float(tax_breakdown.hst_amount),
-            "taxable": False
-        })
-    else:
-        if tax_breakdown.gst_amount > 0:
-            buyer_line_items.append({
-                "description": f"GST ({float(tax_breakdown.gst_rate) * 100:.1f}%)",
-                "type": "tax_gst",
-                "rate": float(tax_breakdown.gst_rate),
-                "amount": float(tax_breakdown.gst_amount),
-                "taxable": False
-            })
-        if tax_breakdown.pst_amount > 0:
-            buyer_line_items.append({
-                "description": f"PST ({float(tax_breakdown.pst_rate) * 100:.1f}%)",
-                "type": "tax_pst",
-                "rate": float(tax_breakdown.pst_rate),
-                "amount": float(tax_breakdown.pst_amount),
-                "taxable": False
-            })
-        if tax_breakdown.qst_amount > 0:
-            buyer_line_items.append({
-                "description": f"QST ({float(tax_breakdown.qst_rate) * 100:.3f}%)",
-                "type": "tax_qst",
-                "rate": float(tax_breakdown.qst_rate),
-                "amount": float(tax_breakdown.qst_amount),
-                "taxable": False
-            })
-    
-    # Add subscription discount note if applicable
-    if buyer_pricing.discount_applied > 0:
-        buyer_line_items.append({
-            "description": f"{buyer_tier.value.replace('_', ' ').title()} Member Discount",
-            "type": "discount",
-            "amount": 0,  # Already reflected in premium rate
-            "savings": float(buyer_pricing.discount_applied),
-            "taxable": False
-        })
-    
-    # Create buyer invoice document
+
+    buyer_line_items = [{"description": ln.description, "type": ln.line_type,
+                         "amount": ln.amount, "rate": ln.rate} for ln in bi.lines]
+
     buyer_invoice = {
         "id": str(uuid.uuid4()),
         "invoice_number": invoice_number,
-        "invoice_type": "buyer",
-        
-        # References
+        "invoice_type": "buyer_vehicle_fee",
+
         "vehicle_id": vehicle_listing["id"],
-        "vehicle_vin": vehicle_listing["vin"],
-        "vehicle_title": f"{vehicle_listing['year']} {vehicle_listing['make']} {vehicle_listing['model']}",
+        "vehicle_vin": vehicle_listing.get("vin", ""),
+        "vehicle_title": f"{vehicle_listing.get('year','')} {vehicle_listing.get('make','')} {vehicle_listing.get('model','')}",
         "auction_id": vehicle_listing["id"],
-        
-        # Parties
+
         "buyer_id": winner_user["id"],
         "buyer_email": winner_user.get("email"),
-        "buyer_name": winner_user.get("full_name", winner_user.get("email")),
+        "buyer_name": winner_user.get("full_name", winner_user.get("name", winner_user.get("email"))),
         "buyer_province": buyer_province,
-        "seller_id": vehicle_listing["seller_user_id"],
-        
-        # Amounts
-        "hammer_price": float(buyer_pricing.hammer_price),
-        "buyer_premium": float(buyer_pricing.buyer_premium),
-        "buyer_premium_rate": float(buyer_pricing.buyer_premium_rate),
-        "platform_fee": float(buyer_pricing.platform_fee),
-        
-        # Taxes
-        "tax_type": tax_breakdown.tax_type,
-        "tax_gst": float(tax_breakdown.gst_amount),
-        "tax_pst": float(tax_breakdown.pst_amount),
-        "tax_qst": float(tax_breakdown.qst_amount),
-        "tax_hst": float(tax_breakdown.hst_amount),
-        "tax_total": float(tax_breakdown.total_tax),
-        "tax_rate": float(tax_breakdown.total_rate),
-        
-        # Subtotals
-        "subtotal_before_tax": float(buyer_pricing.subtotal_before_tax),
-        "total_amount": float(buyer_pricing.total_payable),
-        
-        # Subscription
-        "subscription_tier": buyer_tier.value,
-        "subscription_discount": float(buyer_pricing.discount_applied),
-        
-        # Line Items
+        "seller_id": vehicle_listing.get("seller_user_id"),
+
+        "hammer_price": final_price,
+        "platform_fee": bi.fees_subtotal,
+        "stripe_recovery": bi.stripe_recovery,
+
+        "tax_type": bi.tax_type,
+        "tax_label": bi.tax_label,
+        "tax_rate": bi.tax_rate,
+        "tax_total": bi.tax_amount,
+        # Granular tax fields for receipt display
+        "tax_gst": next((ln.amount for ln in bi.lines if "GST" in ln.description and "QST" not in ln.description), 0.0),
+        "tax_qst": next((ln.amount for ln in bi.lines if "QST" in ln.description), 0.0),
+        "tax_hst": next((ln.amount for ln in bi.lines if "HST" in ln.description), 0.0),
+
+        "subtotal_before_tax": bi.fees_subtotal + bi.stripe_recovery,
+        "total_amount": bi.total,
+
+        "subscription_tier": buyer_tier_raw,
         "line_items": buyer_line_items,
-        
-        # Payment
+
         "payment_status": InvoiceStatus.PENDING,
         "payment_deadline": deadline,
-        "payment_method": None,
         "paid_at": None,
         "paid_amount": 0.0,
-        
-        # Deposit credit (if applicable)
         "deposit_credited": 0.0,
-        "deposit_id": None,
-        
-        # Late payment
         "penalty_amount": 0.0,
-        "penalty_applied_at": None,
-        
-        # Timestamps
         "created_at": now,
         "updated_at": None,
-        "sent_at": None,
-        "due_at": deadline
+        "due_at": deadline,
+
+        "note_en": "BidVex charges a 2.5% platform fee only. The vehicle hammer price is settled directly between buyer and seller.",
+        "note_fr": "BidVex facture uniquement des frais de plateforme de 2,5 %. Le prix d'adjudication du véhicule est réglé directement entre l'acheteur et le vendeur.",
     }
-    
-    # Create seller invoice/settlement document
+
+    # Seller invoice — $0 for vehicles (Rule 2)
     seller_invoice = {
         "id": str(uuid.uuid4()),
         "invoice_number": f"SET-{now.strftime('%Y%m%d')}-{str(uuid.uuid4())[:8].upper()}",
-        "invoice_type": "seller_settlement",
-        
-        # References
+        "invoice_type": "seller_vehicle_settlement",
+
         "vehicle_id": vehicle_listing["id"],
-        "vehicle_vin": vehicle_listing["vin"],
-        "vehicle_title": f"{vehicle_listing['year']} {vehicle_listing['make']} {vehicle_listing['model']}",
+        "vehicle_vin": vehicle_listing.get("vin", ""),
+        "vehicle_title": buyer_invoice["vehicle_title"],
         "auction_id": vehicle_listing["id"],
         "buyer_invoice_id": buyer_invoice["id"],
-        
-        # Parties
-        "seller_id": vehicle_listing["seller_user_id"],
+
+        "seller_id": vehicle_listing.get("seller_user_id"),
         "seller_email": seller_user.get("email"),
         "seller_name": seller_user.get("full_name", seller_user.get("business_name", seller_user.get("email"))),
         "buyer_id": winner_user["id"],
-        
-        # Amounts
-        "hammer_price": float(seller_pricing.hammer_price),
-        "seller_commission": float(seller_pricing.seller_commission),
-        "seller_commission_rate": float(seller_pricing.seller_commission_rate),
-        "net_payout": float(seller_pricing.net_payout),
-        
-        # Subscription
-        "subscription_tier": seller_tier.value,
-        "subscription_discount": float(seller_pricing.discount_applied),
-        
-        # Line Items
+
+        "hammer_price": final_price,
+        "seller_commission": 0.0,
+        "seller_commission_rate": 0.0,
+        "net_payout": final_price,  # seller receives full hammer from buyer directly
+
         "line_items": [
-            {
-                "description": f"Sale - {vehicle_listing['year']} {vehicle_listing['make']} {vehicle_listing['model']}",
-                "type": "hammer_price",
-                "amount": float(seller_pricing.hammer_price)
-            },
-            {
-                "description": f"BidVex Commission ({float(seller_pricing.seller_commission_rate) * 100:.1f}%)",
-                "type": "seller_commission",
-                "rate": float(seller_pricing.seller_commission_rate),
-                "amount": -float(seller_pricing.seller_commission)  # Negative for deduction
-            }
+            {"description": "Vehicle hammer price — settled directly with buyer", "type": "info", "amount": final_price},
+            {"description": "BidVex commission on vehicles", "type": "deduction", "amount": 0.0},
         ],
-        
-        # Settlement
-        "settlement_status": "pending_buyer_payment",  # pending_buyer_payment -> ready -> paid -> completed
-        "settlement_deadline": deadline + timedelta(days=3),  # 3 days after buyer payment deadline
+
+        "settlement_status": "pending_buyer_payment",
+        "settlement_deadline": deadline + timedelta(days=3),
         "settled_at": None,
-        "settlement_method": None,
-        
-        # Late penalty (if seller fees owed)
-        "penalty_amount": 0.0,
-        "penalty_applied_at": None,
-        
-        # Timestamps
         "created_at": now,
-        "updated_at": None
+        "updated_at": None,
+
+        "note_en": "Vehicle sales: seller receives full hammer price directly from buyer. BidVex does not collect or hold vehicle sale funds.",
+        "note_fr": "Ventes de véhicules : le vendeur reçoit le prix d'adjudication complet directement de l'acheteur. BidVex ne collecte ni ne détient les fonds de vente de véhicules.",
     }
-    
-    # Insert invoices
+
     await db.vehicle_invoices.insert_one(buyer_invoice)
     await db.vehicle_invoices.insert_one(seller_invoice)
-    
-    # Log audit
+
     await db.vehicle_audit_logs.insert_one({
         "id": str(uuid.uuid4()),
         "entity_type": "invoice",
@@ -275,14 +160,16 @@ async def generate_vehicle_invoice(
         "new_value": {
             "buyer_invoice": buyer_invoice["invoice_number"],
             "seller_invoice": seller_invoice["invoice_number"],
-            "total_amount": float(buyer_pricing.total_payable)
+            "buyer_total": bi.total,
+            "seller_charge": 0.0,
+            "transaction_type": "vehicle",
         },
-        "created_at": now
+        "created_at": now,
     })
-    
-    logger.info(f"Generated invoices for vehicle {vehicle_listing['id']}: "
-                f"Buyer={buyer_invoice['invoice_number']}, Seller={seller_invoice['invoice_number']}")
-    
+
+    logger.info(f"Vehicle invoices generated: buyer={buyer_invoice['invoice_number']} "
+                f"total=${bi.total:.2f}, seller={seller_invoice['invoice_number']} charge=$0.00")
+
     # Send email notifications
     try:
         from services.email_notifications import (
@@ -299,9 +186,9 @@ async def generate_vehicle_invoice(
             buyer_email=winner_user.get("email"),
             buyer_name=winner_user.get("full_name", winner_user.get("email")),
             vehicle_title=buyer_invoice["vehicle_title"],
-            final_price=float(buyer_pricing.hammer_price),
+            final_price=final_price,
             invoice_id=buyer_invoice["id"],
-            buyers_premium_rate=float(vehicle_listing.get("custom_buyer_premium_rate") or 0.05)
+            buyers_premium_rate=0.0  # Vehicle: no buyer premium, only platform fee
         )
         
         # Send auction sold email to seller
@@ -309,9 +196,9 @@ async def generate_vehicle_invoice(
             seller_email=seller_user.get("email"),
             seller_name=seller_user.get("full_name", seller_user.get("business_name", seller_user.get("email"))),
             vehicle_title=seller_invoice["vehicle_title"],
-            final_price=float(seller_pricing.hammer_price),
-            commission=float(seller_pricing.seller_commission),
-            net_payout=float(seller_pricing.net_payout)
+            final_price=final_price,
+            commission=0.0,  # Vehicle: seller pays $0
+            net_payout=final_price  # Seller receives full hammer directly
         )
         
         logger.info(f"Sent invoice and auction notification emails for vehicle {vehicle_listing['id']}")

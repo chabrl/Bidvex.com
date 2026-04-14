@@ -67,7 +67,7 @@ PLATFORM_FEE_RATE = Decimal("0.025")  # 2.5%
 # Federal GST — imported from central tax engine
 from services.tax_engine import GST_RATE
 
-# Provincial taxes
+# Provincial taxes — SOURCE OF TRUTH per Master Pricing Structure
 PROVINCIAL_TAX_RATES = {
     # HST Provinces (combined federal + provincial)
     Province.ONTARIO: {"type": "HST", "rate": Decimal("0.13")},
@@ -75,16 +75,14 @@ PROVINCIAL_TAX_RATES = {
     Province.NEW_BRUNSWICK: {"type": "HST", "rate": Decimal("0.15")},
     Province.NEWFOUNDLAND: {"type": "HST", "rate": Decimal("0.15")},
     Province.PEI: {"type": "HST", "rate": Decimal("0.15")},
-    
-    # GST + PST Provinces
-    Province.BRITISH_COLUMBIA: {"type": "GST+PST", "gst": GST_RATE, "pst": Decimal("0.07")},
-    Province.SASKATCHEWAN: {"type": "GST+PST", "gst": GST_RATE, "pst": Decimal("0.06")},
-    Province.MANITOBA: {"type": "GST+PST", "gst": GST_RATE, "pst": Decimal("0.07")},  # RST 7%
-    
+
     # GST + QST Province
     Province.QUEBEC: {"type": "GST+QST", "gst": GST_RATE, "qst": Decimal("0.09975")},
-    
-    # GST Only
+
+    # GST Only — All remaining provinces and territories
+    Province.BRITISH_COLUMBIA: {"type": "GST", "gst": GST_RATE},
+    Province.SASKATCHEWAN: {"type": "GST", "gst": GST_RATE},
+    Province.MANITOBA: {"type": "GST", "gst": GST_RATE},
     Province.ALBERTA: {"type": "GST", "gst": GST_RATE},
     Province.YUKON: {"type": "GST", "gst": GST_RATE},
     Province.NORTHWEST_TERRITORIES: {"type": "GST", "gst": GST_RATE},
@@ -156,54 +154,47 @@ def get_subscription_tier(user: dict) -> SubscriptionTier:
 
 def calculate_taxes(taxable_amount: Decimal, province_code: str) -> TaxBreakdown:
     """
-    Calculate taxes based on buyer's province
-    Applies to: Hammer Price + Buyer Premium + Platform Fee
+    Calculate taxes based on buyer's province.
+    Per Master Pricing Structure Rule 5: Tax on BidVex fees + Stripe recovery ONLY.
+    Caller must pass the correct taxable_amount (fees only, never hammer price).
     """
+    code = province_code.upper().strip() if province_code else ""
+
+    # USA / International → 0% (Exported Service)
+    if code in ("US", "USA", "EU", "") or len(code) > 2:
+        return TaxBreakdown(province=code, tax_type="Exported Service",
+                            total_tax=Decimal("0"), total_rate=Decimal("0"))
+
     try:
-        province = Province(province_code.upper())
+        province = Province(code)
     except ValueError:
-        # Default to Alberta (GST only) for unknown provinces
-        province = Province.ALBERTA
-    
+        province = Province.ALBERTA  # default to GST only
+
     tax_info = PROVINCIAL_TAX_RATES.get(province, PROVINCIAL_TAX_RATES[Province.ALBERTA])
     tax_type = tax_info["type"]
-    
-    breakdown = TaxBreakdown(
-        province=province_code.upper(),
-        tax_type=tax_type
-    )
-    
+
+    breakdown = TaxBreakdown(province=code, tax_type=tax_type)
+
     if tax_type == "HST":
-        # Combined HST
         breakdown.hst_rate = tax_info["rate"]
         breakdown.hst_amount = _round_currency(taxable_amount * breakdown.hst_rate)
         breakdown.total_tax = breakdown.hst_amount
         breakdown.total_rate = breakdown.hst_rate
-        
-    elif tax_type == "GST+PST":
-        # Separate GST and PST
-        breakdown.gst_rate = tax_info["gst"]
-        breakdown.pst_rate = tax_info["pst"]
-        breakdown.gst_amount = _round_currency(taxable_amount * breakdown.gst_rate)
-        breakdown.pst_amount = _round_currency(taxable_amount * breakdown.pst_rate)
-        breakdown.total_tax = breakdown.gst_amount + breakdown.pst_amount
-        breakdown.total_rate = breakdown.gst_rate + breakdown.pst_rate
-        
+
     elif tax_type == "GST+QST":
-        # Quebec: GST + QST (QST calculated on pre-tax amount)
         breakdown.gst_rate = tax_info["gst"]
         breakdown.qst_rate = tax_info["qst"]
         breakdown.gst_amount = _round_currency(taxable_amount * breakdown.gst_rate)
         breakdown.qst_amount = _round_currency(taxable_amount * breakdown.qst_rate)
         breakdown.total_tax = breakdown.gst_amount + breakdown.qst_amount
         breakdown.total_rate = breakdown.gst_rate + breakdown.qst_rate
-        
-    else:  # GST only
+
+    else:  # GST only (AB, BC, MB, SK, YT, NT, NU)
         breakdown.gst_rate = tax_info["gst"]
         breakdown.gst_amount = _round_currency(taxable_amount * breakdown.gst_rate)
         breakdown.total_tax = breakdown.gst_amount
         breakdown.total_rate = breakdown.gst_rate
-    
+
     return breakdown
 
 

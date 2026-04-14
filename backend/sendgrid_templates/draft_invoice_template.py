@@ -1,5 +1,6 @@
 """
-Generate Draft Invoice bilingual email template for admin test emails.
+BidVex — Draft Invoice bilingual HTML builder.
+Accepts a PricingResult and renders a complete email-ready invoice.
 """
 
 LOGO_URL = "https://cdn.mcauto-images-production.sendgrid.net/4fbf02710175d39f/9dc6a7c3-8237-4a66-b82b-0d9abc165b44/4500x1080.png"
@@ -34,72 +35,85 @@ def _section_header(en, fr, color):
     )
 
 
-def build_draft_invoice_html(inv) -> str:
-    """Build complete bilingual draft invoice HTML from a DraftInvoice dataclass."""
-    d = inv.to_template_data()
-
-    # Build buyer tax rows
-    buyer_tax_rows = ""
-    if inv.buyer_tax_type == "HST":
-        buyer_tax_rows = _row(f"HST ({d['buyer_tax_rate']})", d["buyer_hst"])
-    elif inv.buyer_tax_type == "GST+QST":
-        buyer_tax_rows = _row("GST (5.00%)", d["buyer_gst"]) + _row("QST (9.975%)", d["buyer_qst"])
-    elif inv.buyer_tax_type == "GST+PST":
-        buyer_tax_rows = _row("GST (5.00%)", d["buyer_gst"]) + _row("PST", d["buyer_pst"])
+def _build_side(side, is_buyer=True):
+    """Build HTML table from a SideInvoice."""
+    rows = ""
+    for ln in side.lines:
+        if ln.line_type == "hammer":
+            rows += _row(ln.description, f"${ln.amount:,.2f}")
+        elif ln.line_type == "deduction":
+            rows += _row(ln.description, f"-${abs(ln.amount):,.2f}", color=C["red"])
+        elif ln.line_type == "fee":
+            rows += _row(ln.description, f"${ln.amount:,.2f}")
+        elif ln.line_type == "stripe":
+            rows += _row(ln.description, f"${ln.amount:,.2f}" if is_buyer else f"-${abs(ln.amount):,.2f}",
+                         color=None if is_buyer else C["red"])
+        elif ln.line_type == "tax":
+            rows += _row(ln.description, f"${ln.amount:,.2f}" if is_buyer else f"-${abs(ln.amount):,.2f}",
+                         color=C["amber"])
+    rows += _sep()
+    if is_buyer:
+        rows += _row("TOTAL BUYER CHARGE / TOTAL ACHETEUR", f"${side.total:,.2f}", bold=True, color=C["navy"])
     else:
-        buyer_tax_rows = _row("GST (5.00%)", d["buyer_gst"])
+        rows += _row("NET SELLER PAYOUT / VERSEMENT NET VENDEUR", f"${side.total:,.2f}", bold=True, color=C["green"])
 
-    # Build seller tax rows
-    seller_tax_rows = ""
-    if inv.seller_tax_type == "HST":
-        seller_tax_rows = _row(f"HST ({d['seller_tax_rate']})", d["seller_hst"])
-    elif inv.seller_tax_type == "GST+QST":
-        seller_tax_rows = _row("GST (5.00%)", d["seller_gst"]) + _row("QST (9.975%)", d["seller_qst"])
-    elif inv.seller_tax_type == "GST+PST":
-        seller_tax_rows = _row("GST (5.00%)", d["seller_gst"]) + _row("PST", d["seller_pst"])
-    else:
-        seller_tax_rows = _row("GST (5.00%)", d["seller_gst"])
+    return f'<table width="100%" cellpadding="0" cellspacing="0">{rows}</table>'
 
-    buyer_table = (
+
+def build_draft_invoice_html(result) -> str:
+    """Build complete bilingual draft invoice HTML from a PricingResult."""
+
+    tx_type_en = {
+        "vehicle": "Vehicle Auction",
+        "non_vehicle_stripe": "Non-Vehicle Auction (Stripe)",
+        "non_vehicle_cash": "Non-Vehicle Auction (Cash/E-Transfer)",
+        "flat_purchase": "Subscription / Promotion",
+    }.get(result.transaction_type, result.transaction_type)
+
+    bi = result.buyer_invoice
+
+    # Buyer card
+    buyer_html = _build_side(bi, is_buyer=True)
+    buyer_card = (
+        f'<table width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;">'
+        f'<tr><td style="background-color:{C["light_bg"]};border:1px solid {C["sky"]};border-radius:8px;padding:16px;">'
+        + _section_header("BUYER CHARGES", "FRAIS ACHETEUR", C["blue"])[0:-1]
+        + buyer_html
+        + f'</td></tr></table>'
+    )
+
+    # Seller card (optional)
+    seller_card = ""
+    if result.seller_invoice:
+        si = result.seller_invoice
+        seller_html = _build_side(si, is_buyer=False)
+        seller_card = (
+            f'<table width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;">'
+            f'<tr><td style="background-color:#FFF7ED;border:1px solid {C["amber"]};border-radius:8px;padding:16px;">'
+            + _section_header("SELLER DEDUCTIONS", "D&Eacute;DUCTIONS VENDEUR", C["red"])[0:-1]
+            + seller_html
+            + f'</td></tr></table>'
+        )
+    elif result.transaction_type == "vehicle":
+        seller_card = (
+            f'<table width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;">'
+            f'<tr><td style="background-color:#F0FDF4;border:1px solid {C["green"]};border-radius:8px;padding:16px;">'
+            f'<p style="font-family:{FONT};font-size:14px;font-weight:bold;color:{C["green"]};margin:0 0 8px;">SELLER / VENDEUR</p>'
+            f'<p style="font-family:{FONT};font-size:13px;color:{C["text_dark"]};margin:0;">Seller receives full hammer price (${result.hammer_price:,.2f}) directly from buyer. BidVex charges $0 to the seller for vehicle sales.</p>'
+            f'<p style="font-family:{FONT};font-size:13px;color:{C["text_med"]};margin:8px 0 0;">Le vendeur re&ccedil;oit le prix d\'adjudication complet directement de l\'acheteur. BidVex ne facture rien au vendeur pour les ventes de v&eacute;hicules.</p>'
+            f'</td></tr></table>'
+        )
+
+    # BidVex revenue
+    rev_card = (
+        f'<table width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;">'
+        f'<tr><td style="background-color:#F0FDF4;border:1px solid {C["green"]};border-radius:8px;padding:16px;">'
         f'<table width="100%" cellpadding="0" cellspacing="0">'
-        + _section_header("BUYER CHARGES", "FRAIS ACHETEUR", C["blue"])
-        + _row("Hammer Price / Prix d'adjudication", d["hammer_price"])
-        + _row(f"Buyer Premium / Prime acheteur ({d['buyer_premium_rate']})", d["buyer_premium"])
-        + _row(f"Platform Fee / Frais plateforme ({d['buyer_platform_fee']})", d["buyer_platform_fee"])
-        + _row("Stripe Processing / Traitement Stripe", d["buyer_stripe_fee"])
-        + _sep()
-        + _row("Subtotal / Sous-total", d["buyer_subtotal"], bold=True)
-        + _section_header(f"TAXES ({inv.buyer_tax_label})", f"TAXES ({inv.buyer_tax_label})", C["amber"])
-        + buyer_tax_rows
-        + _row("Total Tax / Total taxes", d["buyer_total_tax"], bold=True, color=C["amber"])
-        + _sep()
-        + _row("TOTAL BUYER PAYS / TOTAL ACHETEUR", d["buyer_total"], bold=True, color=C["navy"])
-        + f'</table>'
+        + _row("BidVex Gross Revenue / Revenu brut BidVex", f"${result.bidvex_revenue:,.2f}", bold=True, color=C["green"])
+        + f'</table></td></tr></table>'
     )
 
-    seller_table = (
-        f'<table width="100%" cellpadding="0" cellspacing="0">'
-        + _section_header("SELLER DEDUCTIONS", "D&Eacute;DUCTIONS VENDEUR", C["red"])
-        + _row("Hammer Price / Prix d'adjudication", d["hammer_price"])
-        + _row(f"Seller Commission ({d['seller_commission_rate']})", f"-{d['seller_commission']}", color=C["red"])
-        + _row("Platform Fee / Frais plateforme (2.50%)", f"-{d['seller_platform_fee']}", color=C["red"])
-        + _row("Stripe Processing / Traitement Stripe", f"-{d['seller_stripe_fee']}", color=C["red"])
-        + _sep()
-        + _row("Total Deductions / Total d&eacute;ductions", f"-{d['seller_subtotal_deductions']}", bold=True, color=C["red"])
-        + _section_header(f"TAXES ON FEES ({inv.seller_tax_label})", f"TAXES SUR FRAIS ({inv.seller_tax_label})", C["amber"])
-        + seller_tax_rows
-        + _row("Total Tax / Total taxes", f"-{d['seller_total_tax']}", bold=True, color=C["amber"])
-        + _sep()
-        + _row("NET SELLER PAYOUT / VERSEMENT NET VENDEUR", d["seller_net_payout"], bold=True, color=C["green"])
-        + f'</table>'
-    )
-
-    bidvex_summary = (
-        f'<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;">'
-        + _section_header("BIDVEX REVENUE SUMMARY", "SOMMAIRE REVENUS BIDVEX", C["navy"])
-        + _row("BidVex Gross Revenue / Revenu brut", d["bidvex_revenue"], bold=True, color=C["green"])
-        + f'</table>'
-    )
+    hp_display = f"${result.hammer_price:,.2f} CAD" if result.hammer_price else "N/A"
 
     html = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -109,57 +123,34 @@ def build_draft_invoice_html(inv) -> str:
 <tr><td align="center">
 <table class="outer-table" width="600" cellpadding="0" cellspacing="0" style="background-color:{C['white']};border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.06);">
 
-<!-- Header -->
 <tr><td style="background-color:{C['navy']};padding:24px 0;text-align:center;border-bottom:3px solid {C['sky']};">
 <img src="{LOGO_URL}" alt="BidVex" width="150" style="display:inline-block;width:150px;height:auto;" />
 </td></tr>
 
-<!-- Hero -->
 <tr><td style="background-color:{C['navy']};padding:32px 30px;text-align:center;">
 <p style="margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:2px;color:{C['sky']};font-family:{FONT};">DRAFT INVOICE / FACTURE PROVISOIRE</p>
-<h1 style="margin:0;font-family:{FONT};font-size:24px;font-weight:bold;color:{C['white']};">Vehicle Auction — ${inv.hammer_price:,.2f} CAD</h1>
-<p style="margin:8px 0 0;font-family:{FONT};font-size:16px;color:rgba(255,255,255,0.7);">Ench&egrave;re v&eacute;hicule — {inv.hammer_price:,.2f} $ CAD</p>
-<p style="margin:12px 0 0;font-family:{FONT};font-size:12px;color:rgba(255,255,255,0.5);">Province: {inv.buyer_province} | Buyer Tier: {inv.buyer_tier} | Seller Tier: {inv.seller_tier}</p>
+<h1 style="margin:0;font-family:{FONT};font-size:24px;font-weight:bold;color:{C['white']};">{tx_type_en} — {hp_display}</h1>
+<p style="margin:12px 0 0;font-family:{FONT};font-size:12px;color:rgba(255,255,255,0.5);">Province: {result.province} | Buyer Tier: {result.buyer_tier} | Seller Tier: {result.seller_tier} | Tax: {bi.tax_label}</p>
 </td></tr>
 
-<!-- Body -->
 <tr><td class="body-cell" style="padding:32px 30px;">
 
-<!-- EN label -->
 <p style="margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:{C['blue']};font-weight:700;font-family:{FONT};">ENGLISH</p>
-<p style="margin:0 0 14px;font-family:{FONT};font-size:15px;line-height:1.6;color:{C['text_dark']};">This is a <strong>draft invoice preview</strong> generated by the BidVex Admin Panel. It reflects the current Master Pricing Structure for a Vehicle category auction.</p>
+<p style="margin:0 0 14px;font-family:{FONT};font-size:15px;line-height:1.6;color:{C['text_dark']};">This is a <strong>draft invoice preview</strong> generated by the BidVex Admin Panel using the Master Pricing Structure. Tax is applied only on BidVex fees, never on the hammer price.</p>
 
-<!-- Buyer Card -->
-<table width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;">
-<tr><td style="background-color:{C['light_bg']};border:1px solid {C['sky']};border-radius:8px;padding:16px;">
-{buyer_table}
-</td></tr></table>
+{buyer_card}
+{seller_card}
+{rev_card}
 
-<!-- Seller Card -->
-<table width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;">
-<tr><td style="background-color:#FFF7ED;border:1px solid {C['amber']};border-radius:8px;padding:16px;">
-{seller_table}
-</td></tr></table>
-
-<!-- BidVex Revenue -->
-<table width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;">
-<tr><td style="background-color:#F0FDF4;border:1px solid {C['green']};border-radius:8px;padding:16px;">
-{bidvex_summary}
-</td></tr></table>
-
-<!-- Divider -->
 <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;"><tr><td style="border-top:2px solid {C['border']};height:1px;font-size:0;line-height:0;">&nbsp;</td></tr></table>
 
-<!-- FR label -->
 <p style="margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:{C['blue']};font-weight:700;font-family:{FONT};">FRAN&Ccedil;AIS</p>
-<p style="margin:0 0 14px;font-family:{FONT};font-size:15px;line-height:1.6;color:{C['text_dark']};">Ceci est un <strong>aper&ccedil;u de facture provisoire</strong> g&eacute;n&eacute;r&eacute; par le panneau d'administration BidVex. Il refl&egrave;te la structure tarifaire ma&icirc;tresse actuelle pour une ench&egrave;re de cat&eacute;gorie V&eacute;hicule.</p>
+<p style="margin:0 0 14px;font-family:{FONT};font-size:15px;line-height:1.6;color:{C['text_dark']};">Ceci est un <strong>aper&ccedil;u de facture provisoire</strong> g&eacute;n&eacute;r&eacute; par le panneau d'administration BidVex. La taxe est appliqu&eacute;e uniquement sur les frais BidVex, jamais sur le prix d'adjudication.</p>
 
 <p style="margin:12px 0 0;font-family:{FONT};font-size:12px;color:{C['text_med']};">BidVex Inc. | GST: 706766367RT0001 | QST: 1233530880TQ0001</p>
-<p style="margin:4px 0 0;font-family:{FONT};font-size:12px;color:{C['text_med']};">BidVex uses AI for support, categorization, and fraud detection. You may request human review at <a href="mailto:privacy@bidvex.com" style="color:{C['blue']};">privacy@bidvex.com</a> (Law 25).</p>
 
 </td></tr>
 
-<!-- Footer -->
 <tr><td style="background-color:{C['navy']};padding:28px 30px;text-align:center;">
 <img src="{LOGO_URL}" alt="BidVex" width="80" style="display:inline-block;width:80px;height:auto;opacity:0.7;margin-bottom:12px;" /><br/>
 <p style="margin:0 0 6px;font-family:{FONT};font-size:12px;color:rgba(255,255,255,0.6);">BidVex Canada | Sherbrooke, QC</p>

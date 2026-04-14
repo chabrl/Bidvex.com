@@ -168,32 +168,67 @@ async def process_ended_auctions():
                         "created_at": now_str
                     })
 
-                    # Offline Payment Invoice: if seller chose Cash/E-Transfer, create admin invoice
+                    # Offline Payment Invoice: if seller chose Cash/E-Transfer, create split invoices
                     payment_method = listing.get("payment_method", "stripe")
                     if payment_method in ("cash", "e-transfer"):
-                        bp_rate = listing.get("buyers_premium_percent", 15) / 100
+                        from services.pricing_manager import PricingManager
                         sale_price = listing.get("current_price", 0)
-                        platform_fee = sale_price * 0.025  # 2.5% platform fee
-                        bp_amount = sale_price * bp_rate
-                        tax_rate = 0.13  # HST default
-                        taxes = (platform_fee + bp_amount) * tax_rate
-                        total_invoice = platform_fee + bp_amount + taxes
-                        
-                        await db.seller_invoices.insert_one({
+
+                        # Resolve tiers from user profiles
+                        buyer_user = await db.users.find_one({"id": winner_id}, {"_id": 0, "subscription_tier": 1, "province": 1})
+                        seller_user_doc = await db.users.find_one({"id": seller_id}, {"_id": 0, "subscription_tier": 1})
+                        buyer_tier = (buyer_user or {}).get("subscription_tier", "free")
+                        seller_tier_val = (seller_user_doc or {}).get("subscription_tier", "free")
+                        buyer_province = (buyer_user or {}).get("province", "ON")
+
+                        result = PricingManager.non_vehicle_cash(
+                            hammer_price=sale_price,
+                            buyer_province=buyer_province,
+                            buyer_tier=buyer_tier,
+                            seller_tier=seller_tier_val,
+                        )
+
+                        bi = result.buyer_invoice
+                        si = result.seller_invoice
+
+                        await db.buyer_invoices.insert_one({
                             "id": str(_uuid.uuid4()),
-                            "seller_id": seller_id,
+                            "buyer_id": winner_id,
                             "listing_id": listing_id,
                             "listing_title": listing.get("title", ""),
-                            "sale_price": sale_price,
+                            "hammer_price": sale_price,
                             "payment_method": payment_method,
-                            "platform_fee": round(platform_fee, 2),
-                            "buyers_premium": round(bp_amount, 2),
-                            "taxes": round(taxes, 2),
-                            "total_due": round(total_invoice, 2),
+                            "fees_subtotal": bi.fees_subtotal,
+                            "stripe_recovery": bi.stripe_recovery,
+                            "tax_amount": bi.tax_amount,
+                            "tax_rate": bi.tax_rate,
+                            "tax_type": bi.tax_type,
+                            "tax_label": bi.tax_label,
+                            "total_due": bi.total,
+                            "line_items": [ln.description + f": ${ln.amount:,.2f}" for ln in bi.lines],
                             "status": "pending",
-                            "created_at": now_str
+                            "created_at": now_str,
                         })
-                        logger.info(f"Offline sale invoice created: seller={seller_id}, total=${total_invoice:.2f}")
+                        if si:
+                            await db.seller_invoices.insert_one({
+                                "id": str(_uuid.uuid4()),
+                                "seller_id": seller_id,
+                                "listing_id": listing_id,
+                                "listing_title": listing.get("title", ""),
+                                "hammer_price": sale_price,
+                                "payment_method": payment_method,
+                                "fees_subtotal": si.fees_subtotal,
+                                "stripe_recovery": si.stripe_recovery,
+                                "tax_amount": si.tax_amount,
+                                "tax_rate": si.tax_rate,
+                                "tax_type": si.tax_type,
+                                "tax_label": si.tax_label,
+                                "total_due": si.total,
+                                "line_items": [ln.description + f": ${ln.amount:,.2f}" for ln in si.lines],
+                                "status": "pending",
+                                "created_at": now_str,
+                            })
+                        logger.info(f"Offline sale invoices created: buyer=${bi.total:.2f}, seller=${si.total if si else 0:.2f}")
                     
                     # Send SMS notifications
                     try:
