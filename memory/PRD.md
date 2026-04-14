@@ -70,10 +70,33 @@
   - Live pricing breakdown (Buyer Charges + Seller Deductions cards)
   - Inline iframe preview of the bilingual email
 
-### Testing
-- Backend: 34/34 tests passed (iterations 135-137)
-- Frontend: 100% — all Preview buttons, Bilingual badges, Draft Invoice panel working
-- Tax verification: QC 14.975% vs ON 13% confirmed via automated tests
+## Completed (April 14, 2026) — Master Pricing Structure Audit (P0)
+
+### Audit Results — All 7 Rules
+- **Rule 1 (Tiers)**: Standard 5%/4%, Premium 3.5%/2.5%, VIP 3%/2%, Partner 0%/3% — VERIFIED
+- **Rule 2 (Vehicle)**: Buyer pays 2.5% platform fee + stripe + tax only. Seller $0. — FIXED & VERIFIED
+- **Rule 3 (Non-Vehicle)**: Path A (Stripe) hammer+BP+stripe+tax / Path B (Cash) split invoices — FIXED & VERIFIED
+- **Rule 4 (Stripe Recovery)**: (fees×0.029)+0.30 on all invoices — VERIFIED
+- **Rule 5 (Tax Jurisdiction)**: QC=14.975%, ON=13%, NB/NL/NS/PE=15%, AB/BC/MB/SK=5%, US=0% — FIXED & VERIFIED
+- **Rule 6 (Subscriptions)**: price + stripe + tax — VERIFIED
+- **Rule 7 (Invoice Splitting)**: Two charges per transaction type — VERIFIED
+
+### Bug Fixes Applied
+- `vehicle_pricing.py`: BC/MB/SK changed from GST+PST (12%/11%) to GST 5% only
+- `vehicle_invoice.py`: Rewrote to use PricingManager.vehicle_auction (was charging hammer+BP+platformfee+tax)
+- `routes/auctions.py` Path B: Replaced hardcoded 15% BP / 0.13 HST with PricingManager.non_vehicle_cash
+- `fee_calculator.py`: Tax table synced to match Master Structure
+- `pricing_manager.py`: Complete rewrite with 4 canonical methods
+- All invoice records now store `tax_type` and `tax_label` strings
+
+### Files Modified
+- `/app/backend/services/pricing_manager.py` — Complete rewrite (canonical engine)
+- `/app/backend/services/vehicle_pricing.py` — Tax table fix, calculate_taxes US/intl
+- `/app/backend/services/vehicle_invoice.py` — Vehicle invoice uses PricingManager
+- `/app/backend/routes/auctions.py` — Path B uses PricingManager
+- `/app/backend/services/fee_calculator.py` — Tax table sync
+
+### Testing: 33/33 passed (iteration_138)
 
 ## Completed (April 13, 2026) — Complete Email System Rebuild
 
