@@ -107,7 +107,6 @@ const MarketplaceSidebar = ({ onFiltersChange, className = '' }) => {
         {expandedSections.categories ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
       </button>
       {expandedSections.categories && (
-        <ScrollArea className="max-h-[420px]">
           <div className="px-2 pb-2 space-y-0.5">
             {catTreeLoading ? (
               <div className="flex justify-center py-3"><Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" /></div>
@@ -182,7 +181,6 @@ const MarketplaceSidebar = ({ onFiltersChange, className = '' }) => {
               })
             )}
           </div>
-        </ScrollArea>
       )}
     </div>
   );
@@ -312,7 +310,7 @@ const MarketplaceSidebar = ({ onFiltersChange, className = '' }) => {
         {expandedSections.locations ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
       </button>
       {expandedSections.locations && (
-        <div className="px-3 pb-2 space-y-1 max-h-[300px] overflow-y-auto">
+        <div className="px-3 pb-2 space-y-1">
           {(filterData?.locations || []).map(loc => (
             <div key={loc.region}>
               <label className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 text-xs font-medium transition-colors" data-testid={`filter-region-${loc.region}`}>
@@ -425,8 +423,8 @@ const MarketplaceSidebar = ({ onFiltersChange, className = '' }) => {
     <>
       {/* Desktop Sidebar */}
       <div className={`hidden lg:block w-[240px] flex-shrink-0 ${className}`}>
-        <div className="sticky top-20 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm" data-testid="sidebar-desktop">
-          <div className="px-3 py-2.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30">
+        <div className="sticky top-20 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm" data-testid="sidebar-desktop">
+          <div className="px-3 py-2.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30 rounded-t-xl">
             <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
               <Filter className="w-3.5 h-3.5" /> {t('filters.title', 'Filters')}
             </span>
@@ -434,7 +432,9 @@ const MarketplaceSidebar = ({ onFiltersChange, className = '' }) => {
               <span className="text-[10px] text-slate-400">{filterData.total_active_items} {t('filters.items', 'items')}</span>
             )}
           </div>
-          <DesktopSidebarContent />
+          <ScrollArea className="max-h-[calc(100vh-140px)]">
+            <DesktopSidebarContent />
+          </ScrollArea>
         </div>
       </div>
 
