@@ -57,16 +57,23 @@
 - **Frontend**: "HTML Code" toggle switches between visual preview and raw source
 - **Frontend**: Bilingual templates (lifecycle/geo/triggers) show "Bilingual" badge and single ID input
 
-### Zero-Mistake Quality Checklist
-- All 39 bilingual HTMLs contain `Sherbrooke, QC` footer
-- All contain `© {{current_year}} BidVex Inc.` copyright
-- All have `ENGLISH` label → content → divider → `FRANÇAIS` label → content
-- All dynamic variables match backend `email_service.py` function signatures
+### Send Test Email — Draft Invoice
+- **`PricingManager`** class (`/app/backend/services/pricing_manager.py`):
+  - Wraps `vehicle_pricing.py` tax engine + Stripe fee recovery
+  - Calculates dual-sided DraftInvoice: Buyer charges + Seller deductions
+  - Province-aware tax: QC (GST 5% + QST 9.975%), ON (HST 13%), BC (GST+PST 12%), AB (GST 5%)
+  - Tier-aware fees: Free (5%/4%), Premium (3.5%/2.5%), VIP (3%/2%)
+- **Backend**: `POST /api/admin/email-templates/preview-invoice` — generates HTML + pricing breakdown
+- **Backend**: `POST /api/admin/email-templates/send-test` — sends bilingual draft invoice via SendGrid
+- **Frontend**: "Send Test Email" button in Admin Panel with configurable:
+  - Recipient email, hammer price, category, province, buyer tier, seller tier
+  - Live pricing breakdown (Buyer Charges + Seller Deductions cards)
+  - Inline iframe preview of the bilingual email
 
 ### Testing
-- Backend: 20/20 tests passed (iteration 135 + 136)
-- Frontend: 100% — all 40 Preview buttons render, 12 Bilingual badges show, iframe preview works
-- Combined: iteration_136 — full pass
+- Backend: 34/34 tests passed (iterations 135-137)
+- Frontend: 100% — all Preview buttons, Bilingual badges, Draft Invoice panel working
+- Tax verification: QC 14.975% vs ON 13% confirmed via automated tests
 
 ## Completed (April 13, 2026) — Complete Email System Rebuild
 

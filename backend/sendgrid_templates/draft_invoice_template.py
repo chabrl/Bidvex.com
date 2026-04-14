@@ -2,7 +2,7 @@
 Generate Draft Invoice bilingual email template for admin test emails.
 """
 
-LOGO_URL = "http://cdn.mcauto-images-production.sendgrid.net/4fbf02710175d39f/9dc6a7c3-8237-4a66-b82b-0d9abc165b44/4500x1080.png"
+LOGO_URL = "https://cdn.mcauto-images-production.sendgrid.net/4fbf02710175d39f/9dc6a7c3-8237-4a66-b82b-0d9abc165b44/4500x1080.png"
 CTA_BASE = "https://bidvex.com"
 C = {
     "navy": "#0B2545", "blue": "#2186C6", "sky": "#3FB4CB", "white": "#FFFFFF",
