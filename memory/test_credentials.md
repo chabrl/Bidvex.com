@@ -3,5 +3,11 @@
 ## Admin Account
 - Email: charbel911@gmail.com
 - Password: Anderosli123!@#
-- Role: admin
-- Last synced: 2026-04-12 (via /api/auth/admin-force-sync)
+- Role: Admin (personal account type with admin privileges)
+
+## Navigation to Email Templates
+1. Login with admin credentials
+2. Navigate to /admin
+3. Click "Settings" in the primary tab bar
+4. Scroll right in the sub-tab bar
+5. Click "Email Templates"
