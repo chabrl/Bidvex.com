@@ -107,7 +107,7 @@ const MarketplaceSidebar = ({ onFiltersChange, className = '' }) => {
         {expandedSections.categories ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
       </button>
       {expandedSections.categories && (
-        <ScrollArea className="max-h-[340px]">
+        <ScrollArea className="max-h-[420px]">
           <div className="px-2 pb-2 space-y-0.5">
             {catTreeLoading ? (
               <div className="flex justify-center py-3"><Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" /></div>
@@ -125,42 +125,35 @@ const MarketplaceSidebar = ({ onFiltersChange, className = '' }) => {
                   <div key={parent.id} data-testid={`cat-parent-${parent.id}`}>
                     {/* Parent row */}
                     <div className="flex items-center gap-1 group">
-                      {hasChildren ? (
-                        <button
-                          onClick={() => toggleParent(parent.id)}
-                          className="p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex-shrink-0"
-                          data-testid={`cat-expand-${parent.id}`}
-                          aria-label={isExpanded ? 'Collapse' : 'Expand'}
-                        >
-                          {isExpanded
-                            ? <ChevronDown className="w-3 h-3 text-slate-500" />
-                            : <ChevronRight className="w-3 h-3 text-slate-400" />
-                          }
-                        </button>
-                      ) : (
-                        <span className="w-4" /> /* spacer for leaf parents */
-                      )}
-                      <label
-                        className="flex items-center gap-1.5 flex-1 px-1.5 py-1.5 rounded cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                        data-testid={`cat-filter-${parent.nameEn}`}
+                      <input
+                        type="checkbox"
+                        checked={hasChildren ? (parentSelected && allChildrenSelected) : parentSelected}
+                        ref={el => {
+                          if (el && hasChildren) el.indeterminate = childrenSelected > 0 && !allChildrenSelected;
+                        }}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          hasChildren ? toggleParentCategory(parent) : toggleChildCategory(parent.nameEn);
+                        }}
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 flex-shrink-0 cursor-pointer"
+                        data-testid={`cat-checkbox-${parent.nameEn}`}
+                      />
+                      <button
+                        onClick={() => hasChildren && toggleParent(parent.id)}
+                        className={`flex items-center gap-1.5 flex-1 px-1.5 py-1.5 rounded text-left ${hasChildren ? 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''} transition-colors`}
+                        data-testid={`cat-expand-${parent.id}`}
                       >
-                        <input
-                          type="checkbox"
-                          checked={hasChildren ? (parentSelected && allChildrenSelected) : parentSelected}
-                          ref={el => {
-                            if (el && hasChildren) el.indeterminate = childrenSelected > 0 && !allChildrenSelected;
-                          }}
-                          onChange={() => hasChildren ? toggleParentCategory(parent) : toggleChildCategory(parent.nameEn)}
-                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 flex-shrink-0"
-                        />
                         <span className="text-sm flex-shrink-0" role="img" aria-hidden="true">{parent.icon}</span>
-                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">{getName(parent)}</span>
+                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate flex-1">{getName(parent)}</span>
                         {hasChildren && childrenSelected > 0 && (
-                          <Badge variant="secondary" className="ml-auto h-4 min-w-[16px] px-1 text-[9px] font-medium bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                          <Badge variant="secondary" className="h-4 min-w-[16px] px-1 text-[9px] font-medium bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
                             {childrenSelected}
                           </Badge>
                         )}
-                      </label>
+                        {hasChildren && (
+                          <ChevronRight className={`w-3 h-3 text-slate-400 flex-shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
+                        )}
+                      </button>
                     </div>
 
                     {/* Children (indented) */}

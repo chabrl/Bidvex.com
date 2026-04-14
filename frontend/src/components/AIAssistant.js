@@ -114,7 +114,8 @@ const AIAssistant = () => {
       {!isOpen && (
         <Button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-20 right-4 sm:bottom-24 sm:right-6 lg:bottom-8 lg:right-8 rounded-full w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-[#1E3A8A] to-[#06B6D4] hover:from-[#1E3A8A]/90 hover:to-[#06B6D4]/90 text-white border-2 border-white/20 shadow-2xl z-[100] transition-all hover:scale-110 hover:shadow-cyan-500/50 hover:border-white/40"
+          className="fixed bottom-6 right-6 rounded-full w-14 h-14 sm:w-16 sm:h-16 text-white border border-white/20 shadow-2xl z-[1000] transition-all hover:scale-110 hover:shadow-cyan-500/50 hover:border-white/40 animate-pulse hover:animate-none"
+          style={{ backdropFilter: 'blur(8px)', background: 'rgba(37, 99, 235, 0.9)' }}
           data-testid="ai-assistant-btn"
           aria-label="Open BidVex Master Concierge"
         >
@@ -125,10 +126,10 @@ const AIAssistant = () => {
       {isOpen && (
         <>
           {/* Mobile Bottom Sheet Backdrop */}
-          <div className="md:hidden fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" onClick={() => setIsOpen(false)} />
+          <div className="md:hidden fixed inset-0 bg-black/50 z-[999] backdrop-blur-sm" onClick={() => setIsOpen(false)} />
           
           {/* Chatbot Card - Optimized for Mobile and Desktop */}
-          <div className="fixed bottom-16 sm:bottom-20 lg:bottom-8 lg:right-8 left-3 right-3 sm:left-4 sm:right-4 lg:left-auto lg:w-[400px] z-[100] flex flex-col rounded-2xl overflow-hidden shadow-2xl border-2 border-white/10 bg-white dark:bg-slate-900 max-h-[calc(100vh-140px)] sm:max-h-[calc(100vh-180px)] lg:max-h-[600px]">
+          <div className="fixed bottom-20 sm:bottom-24 lg:bottom-6 lg:right-6 left-3 right-3 sm:left-4 sm:right-4 lg:left-auto lg:w-[400px] z-[1000] flex flex-col rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-white dark:bg-slate-900 max-h-[calc(100vh-140px)] sm:max-h-[calc(100vh-180px)] lg:max-h-[600px]">
             {/* Header with BidVex branding */}
             <div className="p-4 flex justify-between items-center bg-gradient-to-br from-[#1E3A8A] to-[#06B6D4] text-white flex-shrink-0">
               <div>
