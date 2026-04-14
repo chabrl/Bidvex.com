@@ -1,12 +1,11 @@
 import API_BASE from '../config';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
 import { useCategoryTree } from '../hooks/useCategoryTree';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
-import { ScrollArea } from '../components/ui/scroll-area';
 import { Sheet, SheetContent, SheetTrigger } from '../components/ui/sheet';
 import {
   Building2, ChevronDown, ChevronRight, ChevronLeft, MapPin, Tag,
@@ -21,18 +20,14 @@ const MarketplaceSidebar = ({ onFiltersChange, className = '' }) => {
   const [filterData, setFilterData] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Selected filters
   const [selectedAuctioneers, setSelectedAuctioneers] = useState([]);
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [selectedRegions, setSelectedRegions] = useState([]);
   const [selectedCities, setSelectedCities] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [categorySearch, setCategorySearch] = useState('');
 
-  // Accordion state — which parent categories are expanded (desktop)
-  const [expandedSections, setExpandedSections] = useState({ auctioneers: true, categories: true, locations: true });
   const [expandedParents, setExpandedParents] = useState({});
-
-  // Mobile drill-down state
   const [mobileDrillParent, setMobileDrillParent] = useState(null);
 
   const fetchFilters = useCallback(async () => {
@@ -57,10 +52,6 @@ const MarketplaceSidebar = ({ onFiltersChange, className = '' }) => {
     }
   }, [selectedAuctioneers, selectedCategories, selectedRegions, selectedCities, searchQuery]);
 
-  const toggleSection = (section) => {
-    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
-  };
-
   const toggleParent = (parentId) => {
     setExpandedParents(prev => ({ ...prev, [parentId]: !prev[parentId] }));
   };
@@ -69,7 +60,6 @@ const MarketplaceSidebar = ({ onFiltersChange, className = '' }) => {
     setList(prev => prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value]);
   };
 
-  // When a parent category is toggled: select/deselect parent + all children
   const toggleParentCategory = (parentNode) => {
     const allNames = [parentNode.nameEn, ...parentNode.children.map(c => c.nameEn)];
     const allSelected = allNames.every(n => selectedCategories.includes(n));
@@ -80,7 +70,6 @@ const MarketplaceSidebar = ({ onFiltersChange, className = '' }) => {
     }
   };
 
-  // When a child category is toggled
   const toggleChildCategory = (childNameEn) => {
     toggleFilter(selectedCategories, setSelectedCategories, childNameEn);
   };
@@ -91,112 +80,95 @@ const MarketplaceSidebar = ({ onFiltersChange, className = '' }) => {
     setSelectedRegions([]);
     setSelectedCities([]);
     setSearchQuery('');
+    setCategorySearch('');
   };
 
   const activeCount = selectedAuctioneers.length + selectedCategories.length + selectedRegions.length + selectedCities.length;
 
-  // ─── Desktop Tree Category Section ──────────────────────
-  const DesktopCategoryTree = () => (
-    <div className="border-b border-slate-100 dark:border-slate-800" data-testid="sidebar-category-tree">
-      <button
-        onClick={() => toggleSection('categories')}
-        className="w-full flex items-center justify-between px-3 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-        data-testid="sidebar-section-categories"
-      >
-        <span className="flex items-center gap-1.5"><Tag className="w-3.5 h-3.5" /> {t('filters.category', 'Category')}</span>
-        {expandedSections.categories ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-      </button>
-      {expandedSections.categories && (
-          <div className="px-2 pb-2 space-y-0.5">
-            {catTreeLoading ? (
-              <div className="flex justify-center py-3"><Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" /></div>
-            ) : categoryTree.length === 0 ? (
-              <p className="text-[11px] text-slate-400 px-2 py-1">{t('filters.noCategories', 'No categories yet')}</p>
-            ) : (
-              categoryTree.map(parent => {
-                const hasChildren = parent.children.length > 0;
-                const isExpanded = expandedParents[parent.id];
-                const parentSelected = selectedCategories.includes(parent.nameEn);
-                const childrenSelected = parent.children.filter(c => selectedCategories.includes(c.nameEn)).length;
-                const allChildrenSelected = hasChildren && childrenSelected === parent.children.length;
+  // Filter categories by search
+  const filteredTree = useMemo(() => {
+    if (!categorySearch.trim()) return categoryTree;
+    const q = categorySearch.toLowerCase();
+    return categoryTree.map(parent => {
+      const parentMatch = getName(parent).toLowerCase().includes(q);
+      const matchingChildren = parent.children.filter(c => getName(c).toLowerCase().includes(q));
+      if (parentMatch || matchingChildren.length > 0) {
+        return { ...parent, children: parentMatch ? parent.children : matchingChildren };
+      }
+      return null;
+    }).filter(Boolean);
+  }, [categoryTree, categorySearch, getName]);
 
-                return (
-                  <div key={parent.id} data-testid={`cat-parent-${parent.id}`}>
-                    {/* Parent row */}
-                    <div className="flex items-center gap-1 group">
-                      <input
-                        type="checkbox"
-                        checked={hasChildren ? (parentSelected && allChildrenSelected) : parentSelected}
-                        ref={el => {
-                          if (el && hasChildren) el.indeterminate = childrenSelected > 0 && !allChildrenSelected;
-                        }}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          hasChildren ? toggleParentCategory(parent) : toggleChildCategory(parent.nameEn);
-                        }}
-                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 flex-shrink-0 cursor-pointer"
-                        data-testid={`cat-checkbox-${parent.nameEn}`}
-                      />
-                      <button
-                        onClick={() => hasChildren && toggleParent(parent.id)}
-                        className={`flex items-center gap-1.5 flex-1 px-1.5 py-1.5 rounded text-left ${hasChildren ? 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''} transition-colors`}
-                        data-testid={`cat-expand-${parent.id}`}
-                      >
-                        <span className="text-sm flex-shrink-0" role="img" aria-hidden="true">{parent.icon}</span>
-                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate flex-1">{getName(parent)}</span>
-                        {hasChildren && childrenSelected > 0 && (
-                          <Badge variant="secondary" className="h-4 min-w-[16px] px-1 text-[9px] font-medium bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
-                            {childrenSelected}
-                          </Badge>
-                        )}
-                        {hasChildren && (
-                          <ChevronRight className={`w-3 h-3 text-slate-400 flex-shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
-                        )}
-                      </button>
-                    </div>
+  // ─── Category Tree Item (recursive-ready) ───────────────
+  const CategoryItem = ({ parent }) => {
+    const hasChildren = parent.children.length > 0;
+    const isExpanded = expandedParents[parent.id];
+    const parentSelected = selectedCategories.includes(parent.nameEn);
+    const childrenSelected = parent.children.filter(c => selectedCategories.includes(c.nameEn)).length;
+    const allChildrenSelected = hasChildren && childrenSelected === parent.children.length;
 
-                    {/* Children (indented) */}
-                    {hasChildren && isExpanded && (
-                      <div className="ml-5 border-l border-slate-100 dark:border-slate-700/50 pl-1 space-y-0.5 mt-0.5">
-                        {parent.children.map(child => (
-                          <label
-                            key={child.id}
-                            className="flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                            data-testid={`cat-filter-${child.nameEn}`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selectedCategories.includes(child.nameEn)}
-                              onChange={() => toggleChildCategory(child.nameEn)}
-                              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3 w-3 flex-shrink-0"
-                            />
-                            <span className="text-xs flex-shrink-0" role="img" aria-hidden="true">{child.icon}</span>
-                            <span className="text-[11px] text-slate-600 dark:text-slate-400 truncate">{getName(child)}</span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })
+    return (
+      <div data-testid={`cat-parent-${parent.id}`}>
+        <div className="flex items-center gap-1 group">
+          <input
+            type="checkbox"
+            checked={hasChildren ? (parentSelected && allChildrenSelected) : parentSelected}
+            ref={el => { if (el && hasChildren) el.indeterminate = childrenSelected > 0 && !allChildrenSelected; }}
+            onChange={(e) => { e.stopPropagation(); hasChildren ? toggleParentCategory(parent) : toggleChildCategory(parent.nameEn); }}
+            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 flex-shrink-0 cursor-pointer"
+            data-testid={`cat-checkbox-${parent.nameEn}`}
+          />
+          <button
+            onClick={() => hasChildren && toggleParent(parent.id)}
+            className={`flex items-center gap-1.5 flex-1 px-1.5 py-1.5 rounded text-left ${hasChildren ? 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''} transition-colors`}
+            data-testid={`cat-expand-${parent.id}`}
+          >
+            <span className="text-sm flex-shrink-0" role="img" aria-hidden="true">{parent.icon}</span>
+            <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate flex-1">{getName(parent)}</span>
+            {hasChildren && childrenSelected > 0 && (
+              <Badge variant="secondary" className="h-4 min-w-[16px] px-1 text-[9px] font-medium bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                {childrenSelected}
+              </Badge>
             )}
+            {hasChildren && (
+              <ChevronRight className={`w-3 h-3 text-slate-400 flex-shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
+            )}
+          </button>
+        </div>
+        {hasChildren && isExpanded && (
+          <div className="ml-5 border-l border-slate-100 dark:border-slate-700/50 pl-1 space-y-0.5 mt-0.5">
+            {parent.children.map(child => (
+              <label
+                key={child.id}
+                className="flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                data-testid={`cat-filter-${child.nameEn}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedCategories.includes(child.nameEn)}
+                  onChange={() => toggleChildCategory(child.nameEn)}
+                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3 w-3 flex-shrink-0"
+                />
+                <span className="text-xs flex-shrink-0" role="img" aria-hidden="true">{child.icon}</span>
+                <span className="text-[11px] text-slate-600 dark:text-slate-400 truncate">{getName(child)}</span>
+              </label>
+            ))}
           </div>
-      )}
-    </div>
-  );
+        )}
+      </div>
+    );
+  };
 
-  // ─── Mobile Drill-Down Category Panel ──────────────────────
+  // ─── Mobile Drill-Down ──────────────────────────────────
   const MobileCategoryDrillDown = () => {
     if (mobileDrillParent) {
       const parent = categoryTree.find(p => p.id === mobileDrillParent);
       if (!parent) return null;
       return (
         <div className="px-3 pb-2" data-testid="mobile-category-drilldown">
-          <button
-            onClick={() => setMobileDrillParent(null)}
+          <button onClick={() => setMobileDrillParent(null)}
             className="flex items-center gap-1 text-xs text-blue-600 font-medium mb-2 hover:text-blue-700 transition-colors"
-            data-testid="mobile-cat-back"
-          >
+            data-testid="mobile-cat-back">
             <ChevronLeft className="w-3.5 h-3.5" /> {t('filters.allCategories', 'All Categories')}
           </button>
           <div className="flex items-center gap-2 px-2 py-2 mb-2 bg-slate-50 dark:bg-slate-800 rounded-lg">
@@ -205,226 +177,60 @@ const MarketplaceSidebar = ({ onFiltersChange, className = '' }) => {
           </div>
           <div className="space-y-0.5">
             {parent.children.map(child => (
-              <label
-                key={child.id}
+              <label key={child.id}
                 className="flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                data-testid={`mobile-cat-child-${child.nameEn}`}
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedCategories.includes(child.nameEn)}
-                  onChange={() => toggleChildCategory(child.nameEn)}
-                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 flex-shrink-0"
-                />
+                data-testid={`mobile-cat-child-${child.nameEn}`}>
+                <input type="checkbox" checked={selectedCategories.includes(child.nameEn)} onChange={() => toggleChildCategory(child.nameEn)}
+                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 flex-shrink-0" />
                 <span className="text-sm flex-shrink-0">{child.icon}</span>
                 <span className="text-sm text-slate-600 dark:text-slate-400">{getName(child)}</span>
-                {selectedCategories.includes(child.nameEn) && (
-                  <Check className="w-3.5 h-3.5 text-blue-600 ml-auto" />
-                )}
+                {selectedCategories.includes(child.nameEn) && <Check className="w-3.5 h-3.5 text-blue-600 ml-auto" />}
               </label>
             ))}
           </div>
         </div>
       );
     }
-
-    // Parent list
     return (
       <div className="px-3 pb-2 space-y-0.5" data-testid="mobile-category-parents">
         {catTreeLoading ? (
           <div className="flex justify-center py-4"><Loader2 className="w-4 h-4 animate-spin text-slate-400" /></div>
-        ) : categoryTree.length === 0 ? (
-          <p className="text-sm text-slate-400 px-2 py-2">{t('filters.noCategories', 'No categories yet')}</p>
-        ) : (
-          categoryTree.map(parent => {
-            const hasChildren = parent.children.length > 0;
-            const childrenSelected = parent.children.filter(c => selectedCategories.includes(c.nameEn)).length;
-            return (
-              <div key={parent.id}>
-                {hasChildren ? (
-                  <button
-                    onClick={() => setMobileDrillParent(parent.id)}
-                    className="w-full flex items-center gap-2.5 px-3 py-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors text-left"
-                    data-testid={`mobile-cat-parent-${parent.id}`}
-                  >
-                    <span className="text-lg flex-shrink-0">{parent.icon}</span>
-                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200 flex-1">{getName(parent)}</span>
-                    {childrenSelected > 0 && (
-                      <Badge className="h-5 min-w-[20px] px-1.5 text-[10px] bg-blue-600 text-white">{childrenSelected}</Badge>
-                    )}
-                    <ChevronRight className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                  </button>
-                ) : (
-                  <label className="flex items-center gap-2.5 px-3 py-3 rounded-lg cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={selectedCategories.includes(parent.nameEn)}
-                      onChange={() => toggleChildCategory(parent.nameEn)}
-                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 flex-shrink-0"
-                    />
-                    <span className="text-lg flex-shrink-0">{parent.icon}</span>
-                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{getName(parent)}</span>
-                  </label>
-                )}
-              </div>
-            );
-          })
-        )}
+        ) : categoryTree.map(parent => {
+          const hasChildren = parent.children.length > 0;
+          const childrenSelected = parent.children.filter(c => selectedCategories.includes(c.nameEn)).length;
+          return hasChildren ? (
+            <button key={parent.id} onClick={() => setMobileDrillParent(parent.id)}
+              className="w-full flex items-center gap-2.5 px-3 py-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors text-left"
+              data-testid={`mobile-cat-parent-${parent.id}`}>
+              <span className="text-lg flex-shrink-0">{parent.icon}</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-200 flex-1">{getName(parent)}</span>
+              {childrenSelected > 0 && <Badge className="h-5 min-w-[20px] px-1.5 text-[10px] bg-blue-600 text-white">{childrenSelected}</Badge>}
+              <ChevronRight className="w-4 h-4 text-slate-400 flex-shrink-0" />
+            </button>
+          ) : (
+            <label key={parent.id} className="flex items-center gap-2.5 px-3 py-3 rounded-lg cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+              <input type="checkbox" checked={selectedCategories.includes(parent.nameEn)} onChange={() => toggleChildCategory(parent.nameEn)}
+                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 flex-shrink-0" />
+              <span className="text-lg flex-shrink-0">{parent.icon}</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{getName(parent)}</span>
+            </label>
+          );
+        })}
       </div>
     );
   };
 
-  // ─── Shared sections (Auctioneers, Locations) ──────────────
-  const AuctioneersSection = () => (
-    filterData?.auctioneers?.length > 0 && (
-      <div className="border-b border-slate-100 dark:border-slate-800">
-        <button onClick={() => toggleSection('auctioneers')}
-          className="w-full flex items-center justify-between px-3 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-          data-testid="sidebar-section-auctioneers">
-          <span className="flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5" /> {t('filters.auctioneer', 'Auctioneer')}</span>
-          {expandedSections.auctioneers ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-        </button>
-        {expandedSections.auctioneers && (
-          <div className="px-3 pb-2 space-y-0.5">
-            {filterData.auctioneers.map(a => (
-              <label key={a.id} className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 text-xs transition-colors" data-testid={`filter-auctioneer-${a.id}`}>
-                <input type="checkbox" checked={selectedAuctioneers.includes(a.id)}
-                  onChange={() => toggleFilter(selectedAuctioneers, setSelectedAuctioneers, a.id)}
-                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5" />
-                <span className="flex-1 truncate text-slate-600 dark:text-slate-400">{a.name}</span>
-                <span className="text-[10px] text-slate-400 tabular-nums">({a.count})</span>
-              </label>
-            ))}
-          </div>
-        )}
-      </div>
-    )
-  );
-
-  const LocationsSection = () => (
-    <div>
-      <button onClick={() => toggleSection('locations')}
-        className="w-full flex items-center justify-between px-3 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-        data-testid="sidebar-section-locations">
-        <span className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" /> {t('filters.location', 'Location')}</span>
-        {expandedSections.locations ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-      </button>
-      {expandedSections.locations && (
-        <div className="px-3 pb-2 space-y-1">
-          {(filterData?.locations || []).map(loc => (
-            <div key={loc.region}>
-              <label className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 text-xs font-medium transition-colors" data-testid={`filter-region-${loc.region}`}>
-                <input type="checkbox" checked={selectedRegions.includes(loc.region)}
-                  onChange={() => toggleFilter(selectedRegions, setSelectedRegions, loc.region)}
-                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5" />
-                <span className="flex-1 text-slate-700 dark:text-slate-300">{loc.region}</span>
-                <span className="text-[10px] text-slate-400 tabular-nums">({loc.count})</span>
-              </label>
-              {selectedRegions.includes(loc.region) && loc.cities?.length > 0 && (
-                <div className="ml-5 space-y-0.5">
-                  {loc.cities.map(city => (
-                    <label key={city.name} className="flex items-center gap-2 px-2 py-1 rounded cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 text-[11px] transition-colors" data-testid={`filter-city-${city.name}`}>
-                      <input type="checkbox" checked={selectedCities.includes(city.name)}
-                        onChange={() => toggleFilter(selectedCities, setSelectedCities, city.name)}
-                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3 w-3" />
-                      <span className="flex-1 text-slate-500 dark:text-slate-400">{city.name}</span>
-                      <span className="text-[10px] text-slate-400">({city.count})</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-          {(!filterData?.locations || filterData.locations.length === 0) && (
-            <p className="text-[11px] text-slate-400 px-2 py-1">{t('filters.noLocations', 'No locations yet')}</p>
-          )}
-        </div>
-      )}
-    </div>
-  );
-
-  // ─── Desktop Sidebar Content ──────────────────────────────
-  const DesktopSidebarContent = () => (
-    <div className="space-y-0" data-testid="marketplace-sidebar">
-      {/* Search */}
-      <div className="px-3 py-2">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-          <Input
-            value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-            placeholder={t('filters.searchItems', 'Search items...')}
-            className="pl-8 h-8 text-xs bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
-            data-testid="sidebar-search"
-          />
-        </div>
-      </div>
-
-      {/* Active Filters */}
-      {activeCount > 0 && (
-        <div className="px-3 pb-2">
-          <button onClick={clearAll} className="text-[11px] text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 transition-colors" data-testid="sidebar-clear-all">
-            <X className="w-3 h-3" /> {t('filters.clearAll', 'Clear all filters')} ({activeCount})
-          </button>
-        </div>
-      )}
-
-      {loading && !filterData ? (
-        <div className="flex justify-center py-6"><Loader2 className="w-4 h-4 animate-spin text-slate-400" /></div>
-      ) : (
-        <>
-          <AuctioneersSection />
-          <DesktopCategoryTree />
-          <LocationsSection />
-        </>
-      )}
-    </div>
-  );
-
-  // ─── Mobile Sidebar Content (Drill-down categories) ───────
-  const MobileSidebarContent = () => (
-    <div className="space-y-0" data-testid="marketplace-sidebar-mobile">
-      {/* Search */}
-      <div className="px-3 py-2.5">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <Input
-            value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-            placeholder={t('filters.searchItems', 'Search items...')}
-            className="pl-9 h-10 text-sm bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
-            data-testid="sidebar-search-mobile"
-          />
-        </div>
-      </div>
-
-      {/* Active Filters */}
-      {activeCount > 0 && (
-        <div className="px-3 pb-2">
-          <button onClick={clearAll} className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1" data-testid="sidebar-clear-all-mobile">
-            <X className="w-3.5 h-3.5" /> {t('filters.clearAll', 'Clear all filters')} ({activeCount})
-          </button>
-        </div>
-      )}
-
-      {/* Category section header */}
-      <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800">
-        <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-          <Tag className="w-3.5 h-3.5" /> {t('filters.category', 'Category')}
-        </span>
-      </div>
-      <MobileCategoryDrillDown />
-
-      {/* Auctioneers & Locations below categories on mobile */}
-      <AuctioneersSection />
-      <LocationsSection />
-    </div>
-  );
-
   return (
     <>
-      {/* Desktop Sidebar */}
+      {/* ═══ DESKTOP SIDEBAR ═══ */}
       <div className={`hidden lg:block w-[240px] flex-shrink-0 ${className}`}>
-        <div className="sticky top-20 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm" data-testid="sidebar-desktop">
-          <div className="px-3 py-2.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30 rounded-t-xl">
+        <div
+          className="sticky top-20 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm flex flex-col"
+          style={{ maxHeight: 'calc(100vh - 100px)' }}
+          data-testid="sidebar-desktop"
+        >
+          {/* Filters header — always visible */}
+          <div className="px-3 py-2.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30 rounded-t-xl flex-shrink-0">
             <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
               <Filter className="w-3.5 h-3.5" /> {t('filters.title', 'Filters')}
             </span>
@@ -432,13 +238,124 @@ const MarketplaceSidebar = ({ onFiltersChange, className = '' }) => {
               <span className="text-[10px] text-slate-400">{filterData.total_active_items} {t('filters.items', 'items')}</span>
             )}
           </div>
-          <ScrollArea className="max-h-[calc(100vh-140px)]">
-            <DesktopSidebarContent />
-          </ScrollArea>
+
+          {/* Search — pinned below header */}
+          <div className="px-3 py-2 flex-shrink-0">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              <Input
+                value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                placeholder={t('filters.searchItems', 'Search items...')}
+                className="pl-8 h-8 text-xs bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                data-testid="sidebar-search"
+              />
+            </div>
+          </div>
+
+          {activeCount > 0 && (
+            <div className="px-3 pb-2 flex-shrink-0">
+              <button onClick={clearAll} className="text-[11px] text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 transition-colors" data-testid="sidebar-clear-all">
+                <X className="w-3 h-3" /> {t('filters.clearAll', 'Clear all filters')} ({activeCount})
+              </button>
+            </div>
+          )}
+
+          {/* ONE scrollable area for ALL sections — no inner scrollbars */}
+          <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain" style={{ scrollbarWidth: 'thin' }}>
+
+            {/* Auctioneers */}
+            {filterData?.auctioneers?.length > 0 && (
+              <div className="border-b border-slate-100 dark:border-slate-800">
+                <div className="sticky top-0 z-10 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 border-b border-slate-50 dark:border-slate-800/50">
+                  <Building2 className="w-3.5 h-3.5" /> {t('filters.auctioneer', 'Auctioneer')}
+                </div>
+                <div className="px-3 py-1.5 space-y-0.5">
+                  {filterData.auctioneers.map(a => (
+                    <label key={a.id} className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 text-xs transition-colors" data-testid={`filter-auctioneer-${a.id}`}>
+                      <input type="checkbox" checked={selectedAuctioneers.includes(a.id)}
+                        onChange={() => toggleFilter(selectedAuctioneers, setSelectedAuctioneers, a.id)}
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5" />
+                      <span className="flex-1 truncate text-slate-600 dark:text-slate-400">{a.name}</span>
+                      <span className="text-[10px] text-slate-400 tabular-nums">({a.count})</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Category — sticky header + search + unlimited-height tree */}
+            <div className="border-b border-slate-100 dark:border-slate-800" data-testid="sidebar-category-tree">
+              <div className="sticky top-0 z-10 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 border-b border-slate-50 dark:border-slate-800/50">
+                <Tag className="w-3.5 h-3.5" /> {t('filters.category', 'Category')}
+              </div>
+
+              {/* Category search (pinned within section) */}
+              <div className="px-2 pt-1.5 pb-1">
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                  <input
+                    value={categorySearch}
+                    onChange={e => setCategorySearch(e.target.value)}
+                    placeholder={t('filters.searchCategories', 'Search categories...')}
+                    className="w-full pl-6 pr-2 py-1 text-[11px] border border-slate-200 dark:border-slate-700 rounded bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    data-testid="category-search-input"
+                  />
+                </div>
+              </div>
+
+              {/* Unlimited category list — NO max-height, NO inner scroll */}
+              <div className="px-2 pb-2 space-y-0.5">
+                {catTreeLoading ? (
+                  <div className="flex justify-center py-3"><Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" /></div>
+                ) : filteredTree.length === 0 ? (
+                  <p className="text-[11px] text-slate-400 px-2 py-1">{categorySearch ? t('filters.noMatch', 'No matching categories') : t('filters.noCategories', 'No categories yet')}</p>
+                ) : (
+                  filteredTree.map(parent => <CategoryItem key={parent.id} parent={parent} />)
+                )}
+              </div>
+            </div>
+
+            {/* Location — sticky header, flows below categories naturally */}
+            <div>
+              <div className="sticky top-0 z-10 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 border-b border-slate-50 dark:border-slate-800/50">
+                <MapPin className="w-3.5 h-3.5" /> {t('filters.location', 'Location')}
+              </div>
+              <div className="px-3 pb-2 space-y-1">
+                {(filterData?.locations || []).map(loc => (
+                  <div key={loc.region}>
+                    <label className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 text-xs font-medium transition-colors" data-testid={`filter-region-${loc.region}`}>
+                      <input type="checkbox" checked={selectedRegions.includes(loc.region)}
+                        onChange={() => toggleFilter(selectedRegions, setSelectedRegions, loc.region)}
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5" />
+                      <span className="flex-1 text-slate-700 dark:text-slate-300">{loc.region}</span>
+                      <span className="text-[10px] text-slate-400 tabular-nums">({loc.count})</span>
+                    </label>
+                    {selectedRegions.includes(loc.region) && loc.cities?.length > 0 && (
+                      <div className="ml-5 space-y-0.5">
+                        {loc.cities.map(city => (
+                          <label key={city.name} className="flex items-center gap-2 px-2 py-1 rounded cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 text-[11px] transition-colors" data-testid={`filter-city-${city.name}`}>
+                            <input type="checkbox" checked={selectedCities.includes(city.name)}
+                              onChange={() => toggleFilter(selectedCities, setSelectedCities, city.name)}
+                              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3 w-3" />
+                            <span className="flex-1 text-slate-500 dark:text-slate-400">{city.name}</span>
+                            <span className="text-[10px] text-slate-400">({city.count})</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {(!filterData?.locations || filterData.locations.length === 0) && (
+                  <p className="text-[11px] text-slate-400 px-2 py-1">{t('filters.noLocations', 'No locations yet')}</p>
+                )}
+              </div>
+            </div>
+
+          </div>
         </div>
       </div>
 
-      {/* Mobile Filter Button + Sheet */}
+      {/* ═══ MOBILE FILTER BUTTON + SHEET ═══ */}
       <div className="lg:hidden">
         <Sheet onOpenChange={() => setMobileDrillParent(null)}>
           <SheetTrigger asChild>
@@ -455,13 +372,49 @@ const MarketplaceSidebar = ({ onFiltersChange, className = '' }) => {
               <span className="text-sm font-semibold flex items-center gap-1.5">
                 <Filter className="w-4 h-4" /> {t('filters.title', 'Filters')}
               </span>
-              {filterData && (
-                <span className="text-[10px] text-slate-400">{filterData.total_active_items} {t('filters.items', 'items')}</span>
-              )}
             </div>
-            <ScrollArea className="h-[calc(100vh-100px)]">
-              <MobileSidebarContent />
-            </ScrollArea>
+            <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 100px)' }}>
+              {/* Mobile search */}
+              <div className="px-3 py-2.5">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                    placeholder={t('filters.searchItems', 'Search items...')}
+                    className="pl-9 h-10 text-sm bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                    data-testid="sidebar-search-mobile" />
+                </div>
+              </div>
+              {activeCount > 0 && (
+                <div className="px-3 pb-2">
+                  <button onClick={clearAll} className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1" data-testid="sidebar-clear-all-mobile">
+                    <X className="w-3.5 h-3.5" /> {t('filters.clearAll', 'Clear all filters')} ({activeCount})
+                  </button>
+                </div>
+              )}
+              <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800">
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <Tag className="w-3.5 h-3.5" /> {t('filters.category', 'Category')}
+                </span>
+              </div>
+              <MobileCategoryDrillDown />
+              {/* Location on mobile */}
+              <div className="px-3 py-2 border-t border-slate-100 dark:border-slate-800">
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5" /> {t('filters.location', 'Location')}
+                </span>
+              </div>
+              <div className="px-3 pb-4 space-y-1">
+                {(filterData?.locations || []).map(loc => (
+                  <label key={loc.region} className="flex items-center gap-2 px-2 py-2 rounded cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 text-sm transition-colors">
+                    <input type="checkbox" checked={selectedRegions.includes(loc.region)}
+                      onChange={() => toggleFilter(selectedRegions, setSelectedRegions, loc.region)}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4" />
+                    <span className="flex-1 text-slate-700 dark:text-slate-300">{loc.region}</span>
+                    <span className="text-xs text-slate-400">({loc.count})</span>
+                  </label>
+                ))}
+              </div>
+            </div>
           </SheetContent>
         </Sheet>
       </div>
