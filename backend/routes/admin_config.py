@@ -457,6 +457,117 @@ async def list_template_previews(current_user: User = Depends(require_admin)):
 
 
 
+@admin_config_router.post("/admin/email-templates/send-test")
+async def send_test_draft_invoice_email(
+    payload: Dict[str, Any],
+    current_user: User = Depends(require_admin)
+):
+    """
+    Send a test Draft Invoice email using PricingManager.
+    Payload:
+      - to_email: str (recipient)
+      - hammer_price: float (e.g. 25000)
+      - buyer_province: str ("QC", "ON", etc.)
+      - buyer_tier: str ("free", "premium", "vip")
+      - seller_tier: str ("free", "premium", "vip")
+      - category: str ("vehicle")
+    """
+    from services.pricing_manager import PricingManager
+    from sendgrid_templates.draft_invoice_template import build_draft_invoice_html
+    from services.email_service import send_template_email
+    import os
+    from sendgrid import SendGridAPIClient
+    from sendgrid.helpers.mail import Mail, Email, To, Content
+
+    to_email = payload.get("to_email", current_user.email)
+    hammer_price = float(payload.get("hammer_price", 25000))
+    buyer_province = payload.get("buyer_province", "QC")
+    buyer_tier = payload.get("buyer_tier", "free")
+    seller_tier = payload.get("seller_tier", "free")
+    category = payload.get("category", "vehicle")
+
+    # Calculate using PricingManager
+    pm = PricingManager()
+    invoice = pm.calculate(
+        hammer_price=hammer_price,
+        category=category,
+        buyer_province=buyer_province,
+        buyer_tier=buyer_tier,
+        seller_tier=seller_tier,
+    )
+
+    # Build HTML
+    html_content = build_draft_invoice_html(invoice)
+
+    # Send via SendGrid raw HTML (not dynamic template)
+    sg_key = os.environ.get("SENDGRID_API_KEY")
+    if not sg_key:
+        raise HTTPException(status_code=503, detail="SENDGRID_API_KEY not configured")
+
+    from_email = os.environ.get("SENDGRID_FROM_EMAIL", "info@bidvex.com")
+    from_name = os.environ.get("SENDGRID_FROM_NAME", "BidVex")
+
+    message = Mail(
+        from_email=Email(from_email, from_name),
+        to_emails=To(to_email),
+        subject=f"[TEST] Draft Invoice — ${hammer_price:,.2f} CAD | {buyer_province} | {category.title()}",
+    )
+    message.content = [Content("text/html", html_content)]
+
+    try:
+        sg = SendGridAPIClient(sg_key)
+        response = sg.send(message)
+        logger.info(f"[TEST_EMAIL] Sent draft invoice to {to_email} — status={response.status_code}")
+    except Exception as e:
+        logger.error(f"[TEST_EMAIL] Failed to send: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to send test email: {str(e)}")
+
+    return {
+        "success": True,
+        "to_email": to_email,
+        "subject": f"[TEST] Draft Invoice — ${hammer_price:,.2f} CAD | {buyer_province}",
+        "status_code": response.status_code,
+        "invoice_summary": invoice.to_dict(),
+    }
+
+
+@admin_config_router.post("/admin/email-templates/preview-invoice")
+async def preview_draft_invoice(
+    payload: Dict[str, Any],
+    current_user: User = Depends(require_admin)
+):
+    """
+    Generate Draft Invoice HTML preview without sending.
+    Same payload as send-test but returns HTML + pricing breakdown.
+    """
+    from services.pricing_manager import PricingManager
+    from sendgrid_templates.draft_invoice_template import build_draft_invoice_html
+
+    hammer_price = float(payload.get("hammer_price", 25000))
+    buyer_province = payload.get("buyer_province", "QC")
+    buyer_tier = payload.get("buyer_tier", "free")
+    seller_tier = payload.get("seller_tier", "free")
+    category = payload.get("category", "vehicle")
+
+    pm = PricingManager()
+    invoice = pm.calculate(
+        hammer_price=hammer_price,
+        category=category,
+        buyer_province=buyer_province,
+        buyer_tier=buyer_tier,
+        seller_tier=seller_tier,
+    )
+
+    html_content = build_draft_invoice_html(invoice)
+
+    return {
+        "html_content": html_content,
+        "invoice": invoice.to_dict(),
+        "template_data": invoice.to_template_data(),
+    }
+
+
+
 @admin_config_router.post("/admin/logs")
 async def admin_create_log(data: Dict[str, Any], current_user: User = Depends(require_admin)):
     db = get_db()

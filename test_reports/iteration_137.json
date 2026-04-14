@@ -1,0 +1,96 @@
+{
+  "summary": "Draft Invoice Test Email Feature - Iteration 137. All tests PASSED. Backend: 14/14 pytest tests passed for preview-invoice endpoint. Frontend: All UI elements working correctly - Send Test Email button opens panel, Preview Invoice generates pricing breakdown with Buyer Charges and Seller Deductions, bilingual HTML renders in iframe.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "N/A",
+        "issue": "Mixed Content warning in browser console - logo URL uses http:// instead of https:// in draft_invoice_template.py",
+        "priority": "LOW"
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_results": {
+    "backend_api_tests": {
+      "status": "PASS",
+      "total": 14,
+      "passed": 14,
+      "failed": 0,
+      "details": "All preview-invoice endpoint tests passed"
+    },
+    "tax_calculations": {
+      "status": "PASS",
+      "qc_test": "GST+QST tax type with 14.975% combined rate - VERIFIED",
+      "on_test": "HST tax type with 13% rate - VERIFIED"
+    },
+    "buyer_premium_rates": {
+      "status": "PASS",
+      "free_tier": "5% - VERIFIED",
+      "premium_tier": "3.5% - VERIFIED",
+      "vip_tier": "3% - VERIFIED"
+    },
+    "seller_commission_rates": {
+      "status": "PASS",
+      "free_tier": "4% - VERIFIED",
+      "premium_tier": "2.5% - VERIFIED",
+      "vip_tier": "2% - VERIFIED"
+    },
+    "html_content": {
+      "status": "PASS",
+      "bilingual": "Contains ENGLISH/FRANÇAIS labels - VERIFIED",
+      "buyer_charges": "Contains BUYER CHARGES / FRAIS ACHETEUR - VERIFIED",
+      "seller_deductions": "Contains SELLER DEDUCTIONS / DÉDUCTIONS VENDEUR - VERIFIED",
+      "tax_breakdown": "Contains GST 5.00% and QST 9.975% for QC - VERIFIED"
+    },
+    "send_test_endpoint": {
+      "status": "PASS",
+      "details": "Returns 200 with valid SENDGRID_API_KEY configured"
+    },
+    "frontend_ui_tests": {
+      "status": "PASS",
+      "login": "Admin login successful",
+      "navigation": "Admin > Settings > Email Templates accessible",
+      "send_test_button": "Opens Draft Invoice Test Email panel",
+      "form_fields": "All inputs and selects present with data-testid attributes",
+      "preview_invoice": "Generates pricing breakdown with Buyer Charges and Seller Deductions",
+      "invoice_iframe": "Renders bilingual HTML content correctly"
+    }
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_draft_invoice_preview_137.py",
+    "/app/test_reports/pytest/pytest_results_draft_invoice_137.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Minor: LOGO_URL in draft_invoice_template.py uses http:// which triggers Mixed Content warning in browser. Consider changing to https:// or protocol-relative URL."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_draft_invoice_preview_137.py"
+  ],
+  "success_rate": {
+    "backend": "100% (14/14 passed)",
+    "frontend": "100% (all features working)"
+  },
+  "test_credentials": "Admin: charbel911@gmail.com / Anderosli123!@#",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Draft Invoice Test Email feature is fully functional. Backend preview-invoice endpoint correctly calculates taxes (QC: GST+QST 14.975%, ON: HST 13%), buyer premiums (5%/3.5%/3% by tier), and seller commissions (4%/2.5%/2% by tier). Frontend panel opens via 'Send Test Email' button in Admin > Settings > Email Templates. All form fields have data-testid attributes. Preview Invoice button generates pricing breakdown and bilingual HTML iframe. SendGrid send-test endpoint works with configured API key.",
+  "verified_calculations": {
+    "qc_example_25000": {
+      "buyer_premium_5_percent": 1250.00,
+      "platform_fee_2_5_percent": 625.00,
+      "buyer_subtotal": 27677.96,
+      "buyer_tax_gst_qst": 4144.78,
+      "buyer_total": 31822.74,
+      "seller_commission_4_percent": 1000.00,
+      "seller_total_deductions": 1673.84,
+      "seller_net_payout": 23075.50
+    }
+  }
+}
