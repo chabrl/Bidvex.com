@@ -32,7 +32,8 @@ import {
   Trash2, Eye, Play, Pause, Clock, CheckCircle, XCircle,
   AlertTriangle, RefreshCw, Filter, Search, MousePointer,
   TrendingUp, ArrowLeft, Copy, FileText, Settings, Upload,
-  UserPlus, UserMinus, Download, ListFilter, Target
+  UserPlus, UserMinus, Download, ListFilter, Target,
+  MailOpen, MousePointerClick, AlertCircle, Loader2
 } from 'lucide-react';
 
 const API = API_BASE;
@@ -153,10 +154,37 @@ const EmailMarketingManager = () => {
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
 
+  const [dashboardStats, setDashboardStats] = useState(null);
+  const [syncingContacts, setSyncingContacts] = useState(false);
+
   useEffect(() => {
     fetchCampaigns();
     fetchConfig();
+    fetchDashboardStats();
   }, [statusFilter]);
+
+  const fetchDashboardStats = async () => {
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const response = await axios.get(`${API}/admin/marketing/dashboard-stats`, { headers });
+      setDashboardStats(response.data);
+    } catch (error) {
+      console.error('Failed to fetch dashboard stats:', error);
+    }
+  };
+
+  const handleSyncContacts = async () => {
+    setSyncingContacts(true);
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const response = await axios.post(`${API}/admin/marketing/sync-contacts`, {}, { headers });
+      toast.success(`Synced ${response.data.synced} contacts from ${response.data.total_users} users`);
+    } catch (error) {
+      toast.error('Failed to sync contacts');
+    } finally {
+      setSyncingContacts(false);
+    }
+  };
 
   const fetchCampaigns = async () => {
     try {
@@ -959,7 +987,7 @@ const EmailMarketingManager = () => {
       </div>
 
       {/* Stats Summary */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4" data-testid="marketing-dashboard-stats">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -967,7 +995,7 @@ const EmailMarketingManager = () => {
                 <FileText className="h-5 w-5 text-slate-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{campaigns.length}</p>
+                <p className="text-2xl font-bold">{dashboardStats?.total_campaigns || campaigns.length}</p>
                 <p className="text-xs text-muted-foreground">Total Campaigns</p>
               </div>
             </div>
@@ -977,11 +1005,11 @@ const EmailMarketingManager = () => {
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-                <Clock className="h-5 w-5 text-blue-600" />
+                <Send className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{campaigns.filter(c => c.status === 'scheduled').length}</p>
-                <p className="text-xs text-muted-foreground">Scheduled</p>
+                <p className="text-2xl font-bold">{dashboardStats?.total_sent || 0}</p>
+                <p className="text-xs text-muted-foreground">Emails Sent</p>
               </div>
             </div>
           </CardContent>
@@ -990,11 +1018,11 @@ const EmailMarketingManager = () => {
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
-                <CheckCircle className="h-5 w-5 text-green-600" />
+                <MailOpen className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{campaigns.filter(c => c.status === 'sent').length}</p>
-                <p className="text-xs text-muted-foreground">Sent</p>
+                <p className="text-2xl font-bold text-green-600">{dashboardStats?.open_rate || 0}%</p>
+                <p className="text-xs text-muted-foreground">Open Rate</p>
               </div>
             </div>
           </CardContent>
@@ -1002,12 +1030,38 @@ const EmailMarketingManager = () => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-                <Edit3 className="h-5 w-5 text-gray-600" />
+              <div className="w-10 h-10 bg-cyan-100 dark:bg-cyan-900 rounded-full flex items-center justify-center">
+                <MousePointerClick className="h-5 w-5 text-cyan-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{campaigns.filter(c => c.status === 'draft').length}</p>
-                <p className="text-xs text-muted-foreground">Drafts</p>
+                <p className="text-2xl font-bold text-cyan-600">{dashboardStats?.click_rate || 0}%</p>
+                <p className="text-xs text-muted-foreground">Click Rate</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center">
+                <AlertCircle className="h-5 w-5 text-red-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-red-600">{dashboardStats?.total_bounced || 0}</p>
+                <p className="text-xs text-muted-foreground">Bounced</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="cursor-pointer hover:border-primary/40 transition-colors" onClick={handleSyncContacts}>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
+                {syncingContacts ? <Loader2 className="h-5 w-5 text-purple-600 animate-spin" /> : <Users className="h-5 w-5 text-purple-600" />}
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-purple-600">{syncingContacts ? 'Syncing...' : 'Sync Contacts'}</p>
+                <p className="text-xs text-muted-foreground">Auto-import users</p>
               </div>
             </div>
           </CardContent>
@@ -1233,6 +1287,25 @@ const EmailMarketingManager = () => {
                       {ACTIVITY_STATUS.map(s => (
                         <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                       ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* User Role Segment */}
+                <div className="space-y-2">
+                  <Label className="text-sm">User Role</Label>
+                  <Select
+                    value={campaignData.audience_filters.user_role || 'all'}
+                    onValueChange={(v) => handleFilterChange('user_role', v === 'all' ? '' : v, true)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Any" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Users</SelectItem>
+                      <SelectItem value="buyers">Buyers (placed bids)</SelectItem>
+                      <SelectItem value="sellers">Sellers (created listings)</SelectItem>
+                      <SelectItem value="partners">Partners</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

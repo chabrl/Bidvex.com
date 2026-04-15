@@ -274,6 +274,98 @@ async def process_subscription_expiry_sequence(db: AsyncIOMotorDatabase):
 
 
 # ═══════════════════════════════════════════════════════════════
+# SEQUENCE 4 — Abandoned Bid Recovery
+# Trigger: User placed a bid 24+ hours ago but hasn't returned
+# Sends a single reminder to re-engage
+# ═══════════════════════════════════════════════════════════════
+
+async def process_abandoned_bid_recovery(db: AsyncIOMotorDatabase):
+    """
+    Find users who placed a bid 24-72h ago on an active auction but haven't
+    returned (no bids in last 24h). Send them a recovery email once.
+    """
+    from services.email_service import send_template_email, resolve_template
+
+    now = datetime.now(timezone.utc)
+    cutoff_start = now - timedelta(hours=72)
+    cutoff_end = now - timedelta(hours=24)
+
+    # Find bids placed 24-72h ago
+    recent_bids = await db.bids.find(
+        {"created_at": {"$gte": cutoff_start.isoformat(), "$lte": cutoff_end.isoformat()}},
+        {"_id": 0, "user_id": 1, "listing_id": 1, "amount": 1, "created_at": 1}
+    ).to_list(5000)
+
+    if not recent_bids:
+        return
+
+    # Group by user
+    user_bids = {}
+    for bid in recent_bids:
+        uid = bid.get("user_id")
+        if uid and uid not in user_bids:
+            user_bids[uid] = bid
+
+    sent_count = 0
+    for uid, bid in user_bids.items():
+        # Check if they already got a recovery email
+        already_sent = await db.lifecycle_email_log.find_one(
+            {"user_id": uid, "sent": {"$elemMatch": {"$regex": "^abandoned_bid_"}}}
+        )
+        if already_sent:
+            continue
+
+        # Check if user has placed any bid in the last 24h (still active)
+        recent_activity = await db.bids.find_one(
+            {"user_id": uid, "created_at": {"$gte": cutoff_end.isoformat()}}
+        )
+        if recent_activity:
+            continue  # User is still active, no need
+
+        # Get user info
+        user = await db.users.find_one({"id": uid}, {"_id": 0, "email": 1, "name": 1, "preferred_language": 1, "language_preference": 1})
+        if not user or not user.get("email"):
+            continue
+
+        # Get listing info
+        listing = await db.listings.find_one(
+            {"id": bid.get("listing_id"), "status": "active"},
+            {"_id": 0, "title": 1, "current_price": 1, "id": 1}
+        )
+        if not listing:
+            continue
+
+        lang = user.get("preferred_language", user.get("language_preference", "en"))
+        tid = resolve_template("auction_reminder", lang)
+        if not tid:
+            continue
+
+        try:
+            success = await send_template_email(
+                to_email=user["email"],
+                template_id=tid,
+                dynamic_data={
+                    "first_name": _first_name(user),
+                    "item_name": listing.get("title", ""),
+                    "current_bid": f"${bid.get('amount', 0):,.2f}",
+                    "auction_url": f"{os.environ.get('FRONTEND_URL', 'https://www.bidvex.com')}/listing/{listing.get('id', '')}",
+                    "subject": "Don't miss out!" if lang == "en" else "Ne manquez pas cette opportunité!",
+                },
+            )
+            if success:
+                await db.lifecycle_email_log.update_one(
+                    {"user_id": uid},
+                    {"$push": {"sent": f"abandoned_bid_{now.strftime('%Y%m%d')}"}},
+                    upsert=True,
+                )
+                sent_count += 1
+        except Exception as e:
+            logger.error(f"[ABANDONED_BID] Failed for {uid}: {e}")
+
+    logger.info(f"[ABANDONED_BID] Sent {sent_count} recovery emails")
+
+
+# ═══════════════════════════════════════════════════════════════
 # SCHEDULER REGISTRATION
 # ═══════════════════════════════════════════════════════════════
 
@@ -290,8 +382,12 @@ def register_lifecycle_jobs(scheduler, db: AsyncIOMotorDatabase):
     def _run_subscription_expiry():
         asyncio.get_event_loop().create_task(process_subscription_expiry_sequence(db))
 
+    def _run_abandoned_bid():
+        asyncio.get_event_loop().create_task(process_abandoned_bid_recovery(db))
+
     scheduler.add_job(_run_onboarding, "cron", hour=9, minute=0, id="lifecycle_onboarding", replace_existing=True)
     scheduler.add_job(_run_reengagement, "cron", hour=9, minute=15, id="lifecycle_reengagement", replace_existing=True)
     scheduler.add_job(_run_subscription_expiry, "cron", hour=9, minute=30, id="lifecycle_subscription", replace_existing=True)
+    scheduler.add_job(_run_abandoned_bid, "cron", hour=10, minute=0, id="lifecycle_abandoned_bid", replace_existing=True)
 
-    logger.info("[LIFECYCLE] Registered 3 lifecycle email jobs (9:00, 9:15, 9:30 AM UTC)")
+    logger.info("[LIFECYCLE] Registered 4 lifecycle email jobs (9:00, 9:15, 9:30, 10:00 AM UTC)")

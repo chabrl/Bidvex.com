@@ -62,7 +62,8 @@ SEGMENT_FILTERS = {
     "region": ["ON", "QC", "BC", "AB", "SK", "MB", "NS", "NB", "NL", "PE", "NT", "YT", "NU"],
     "activity_status": ["active", "inactive", "new"],
     "email_engagement": ["engaged", "unengaged", "never_opened"],
-    "seller_status": ["verified", "pending", "none"]
+    "seller_status": ["verified", "pending", "none"],
+    "user_role": ["buyers", "sellers", "partners"],
 }
 
 
@@ -440,7 +441,28 @@ class EmailMarketingService:
             conditions.append({"created_at": {"$gte": filters["min_created_date"]}})
         if filters.get("max_created_date"):
             conditions.append({"created_at": {"$lte": filters["max_created_date"]}})
-        
+
+        # User role (buyers/sellers/partners) — dynamic based on activity
+        if filters.get("user_role"):
+            role = filters["user_role"]
+            if role == "buyers":
+                # Users who have placed at least one bid
+                buyer_ids = await self.db.bids.distinct("user_id")
+                if buyer_ids:
+                    conditions.append({"id": {"$in": buyer_ids}})
+                else:
+                    conditions.append({"id": "__no_match__"})
+            elif role == "sellers":
+                # Users who have created at least one listing
+                seller_ids = await self.db.listings.distinct("seller_id")
+                multi_seller_ids = await self.db.multi_item_listings.distinct("seller_id")
+                all_seller_ids = list(set(seller_ids + multi_seller_ids))
+                if all_seller_ids:
+                    conditions.append({"id": {"$in": all_seller_ids}})
+                else:
+                    conditions.append({"id": "__no_match__"})
+            elif role == "partners":
+                conditions.append({"is_partner": True})        
         # Combine all conditions
         if conditions:
             query["$and"] = conditions
@@ -1112,6 +1134,90 @@ class EmailMarketingService:
             "details": details,
             "timestamp": datetime.now(timezone.utc).isoformat()
         })
+
+
+    async def get_global_dashboard_stats(self) -> Dict[str, Any]:
+        """Aggregate stats across all campaigns for the marketing dashboard."""
+        pipeline = [
+            {"$match": {"status": {"$in": ["sent", "sending"]}}},
+            {"$group": {
+                "_id": None,
+                "total_campaigns": {"$sum": 1},
+                "total_sent": {"$sum": "$stats.sent"},
+                "total_opened": {"$sum": "$stats.opened"},
+                "total_clicked": {"$sum": "$stats.clicked"},
+                "total_bounced": {"$sum": "$stats.bounced"},
+                "total_unsubscribed": {"$sum": "$stats.unsubscribed"},
+            }},
+        ]
+        result = await self.campaigns.aggregate(pipeline).to_list(1)
+        if not result:
+            total_campaigns = await self.campaigns.count_documents({})
+            return {
+                "total_campaigns": total_campaigns,
+                "total_sent": 0, "total_opened": 0, "total_clicked": 0,
+                "total_bounced": 0, "total_unsubscribed": 0,
+                "open_rate": 0, "click_rate": 0,
+            }
+
+        r = result[0]
+        sent = r.get("total_sent", 0) or 1
+        return {
+            "total_campaigns": r.get("total_campaigns", 0),
+            "total_sent": r.get("total_sent", 0),
+            "total_opened": r.get("total_opened", 0),
+            "total_clicked": r.get("total_clicked", 0),
+            "total_bounced": r.get("total_bounced", 0),
+            "total_unsubscribed": r.get("total_unsubscribed", 0),
+            "open_rate": round((r.get("total_opened", 0) / sent) * 100, 1),
+            "click_rate": round((r.get("total_clicked", 0) / sent) * 100, 1),
+        }
+
+    async def sync_registered_contacts(self) -> Dict[str, Any]:
+        """Auto-sync all registered users into the contacts pool with role tags."""
+        users = await self.db.users.find(
+            {"email": {"$exists": True, "$ne": ""}},
+            {"_id": 0, "id": 1, "email": 1, "name": 1,
+             "preferred_language": 1, "language_preference": 1,
+             "is_partner": 1, "subscription_tier": 1, "province": 1}
+        ).to_list(None)
+
+        # Determine buyer/seller/partner roles
+        buyer_ids = set(await self.db.bids.distinct("user_id"))
+        seller_ids = set(await self.db.listings.distinct("seller_id"))
+        multi_seller_ids = set(await self.db.multi_item_listings.distinct("seller_id"))
+        all_seller_ids = seller_ids | multi_seller_ids
+
+        synced = 0
+        for u in users:
+            uid = u.get("id", "")
+            roles = []
+            if uid in buyer_ids:
+                roles.append("buyer")
+            if uid in all_seller_ids:
+                roles.append("seller")
+            if u.get("is_partner"):
+                roles.append("partner")
+            if not roles:
+                roles.append("user")
+
+            lang = u.get("preferred_language", u.get("language_preference", "en"))
+            await self.db.marketing_contacts.update_one(
+                {"email": u["email"].lower()},
+                {"$set": {
+                    "email": u["email"].lower(),
+                    "name": u.get("name", ""),
+                    "language": lang[:2] if lang else "en",
+                    "user_id": uid,
+                    "user_roles": roles,
+                    "source": "registered",
+                    "synced_at": datetime.now(timezone.utc).isoformat(),
+                }},
+                upsert=True,
+            )
+            synced += 1
+
+        return {"synced": synced, "total_users": len(users)}
 
 
 # Singleton instance

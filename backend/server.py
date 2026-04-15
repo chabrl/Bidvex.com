@@ -395,6 +395,13 @@ try:
 
     logger.info("All routers registered")
 
+    # ─── Marketing Router (separate import) ───
+    try:
+        api_router.include_router(marketing_router)
+        logger.info("Marketing router registered")
+    except Exception as e:
+        logger.error(f"Failed to register marketing router: {e}")
+
 except Exception as e:
     logger.error(f"CRITICAL: Could not load modular routers: {e}")
     import traceback
