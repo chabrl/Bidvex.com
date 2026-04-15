@@ -61,100 +61,94 @@ def calculate_connect_checkout(
     seller_is_partner: bool = False,
 ) -> Dict[str, Any]:
     """
-    Calculate payment breakdown using the Two-Tier marketplace economy.
+    Calculate payment breakdown using PricingManager (Master Pricing Structure).
 
-    Partner sellers: BidVex takes only platform commission (2.5%/3%).
-                     Buyer Premium flows to Partner. Stripe fees from Partner payout.
-    Standard sellers: BidVex takes both Buyer Premium + Seller Commission.
-                      Stripe fee passed to buyer.
-    Taxes: GST+QST on (Hammer + Buyer Premium) regardless of seller type.
+    Routes to the correct PricingManager method based on category and seller type.
+    Returns a backward-compatible dict consumed by create_connect_checkout_session
+    and build_itemized_line_items.
     """
+    from services.pricing_manager import PricingManager, stripe_recovery as _sr
+    from decimal import Decimal
+
     hp = Decimal(str(hammer_price))
     cur = currency.upper()
     cat = category.lower() if category else "general"
     is_vehicle = any(kw in cat for kw in ("vehicle", "car", "auto", "truck", "motorcycle"))
 
+    # ── Route to correct PricingManager method ──
+    if seller_is_partner:
+        result = PricingManager.partner_auction(hammer_price, province)
+    elif is_vehicle:
+        result = PricingManager.vehicle_auction(hammer_price, province, buyer_tier)
+    else:
+        result = PricingManager.non_vehicle_stripe(hammer_price, province, buyer_tier, seller_tier)
+
+    bi = result.buyer_invoice
+    si = result.seller_invoice
+
+    # ── Build backward-compatible return dict ──
     flow_type = "PARTNER_FLOW" if seller_is_partner else "STANDARD_FLOW"
 
-    # Rates
-    platform_rate = get_platform_fee_rate(category)
-    buyer_premium_rate = get_buyer_premium_rate(buyer_tier)
+    # Extract individual tax components for Stripe line items
+    gst = 0.0
+    qst = 0.0
+    hst = 0.0
+    for ln in bi.lines:
+        if ln.line_type == "tax":
+            if "GST + QST" in ln.description or "GST" in ln.description:
+                # For QC, split into GST and QST from the tax breakdown
+                if bi.tax_type == "GST+QST":
+                    # Recalculate from the taxable amount
+                    taxable_d = Decimal(str(bi.fees_subtotal + bi.stripe_recovery))
+                    gst = float((taxable_d * Decimal("0.05")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+                    qst = float((taxable_d * Decimal("0.09975")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+                elif bi.tax_type == "HST":
+                    hst = ln.amount
+                else:
+                    gst = ln.amount
 
-    # Buyer premium (always charged on top of hammer)
-    buyer_premium = (hp * buyer_premium_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    total_tax = bi.tax_amount
 
-    # Platform commission (BidVex's cut from the transaction)
-    platform_fee = (hp * platform_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
-    if seller_is_partner:
-        # PARTNER FLOW: BidVex takes only platform commission (2.5%/3%)
-        # Seller commission = platform fee rate (not tier-based)
-        seller_commission = platform_fee
-        seller_commission_rate = platform_rate
-    else:
-        # STANDARD FLOW: Tier-based seller commission
-        seller_commission_rate_val = get_seller_commission_rate(seller_tier)
-        seller_commission = (hp * seller_commission_rate_val).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        seller_commission_rate = seller_commission_rate_val
-
-    # ── TAXES: GST + QST on (Hammer + Buyer Premium) ──
-    taxable = hp + buyer_premium
-    gst = (taxable * GST_RATE).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    qst = (taxable * QST_RATE).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    total_tax = gst + qst
-
-    # ── Stripe charge computation ──
+    # For vehicles: hammer is NOT in the Stripe charge (settled offline)
+    # For non-vehicles: hammer IS in the Stripe charge
     if is_vehicle:
-        # Vehicle: only fees go through Stripe (hammer paid offline)
-        if seller_is_partner:
-            pre_stripe_total = buyer_premium + platform_fee + total_tax
-        else:
-            pre_stripe_total = buyer_premium + platform_fee + total_tax
+        stripe_charge = Decimal(str(bi.total))  # Only fees + stripe + tax
+        buyer_total_full = hp + stripe_charge  # Full buyer cost incl offline hammer
     else:
-        # General: hammer + premium + tax go through Stripe
-        pre_stripe_total = hp + buyer_premium + total_tax
+        stripe_charge = Decimal(str(bi.total))  # hammer + BP + stripe + tax
+        buyer_total_full = stripe_charge
 
-    # Stripe processing fee
-    if include_stripe_fee and not seller_is_partner:
-        # STANDARD: Stripe fee passed to buyer
-        stripe_fee = ((pre_stripe_total * STRIPE_PROCESSING_RATE) + STRIPE_PROCESSING_FIXED).quantize(
-            Decimal("0.01"), rounding=ROUND_HALF_UP
-        )
-    else:
-        # PARTNER: Stripe fee deducted from Partner's payout, NOT charged to buyer
-        stripe_fee = Decimal("0")
+    # Seller payout and commission
+    seller_commission = 0.0
+    seller_commission_rate = 0.0
+    seller_payout = float(hp)  # default: seller keeps hammer
+    buyer_premium = bi.fees_subtotal if not is_vehicle else 0.0
+    platform_fee = bi.fees_subtotal if is_vehicle else 0.0
+    partner_premium_retained = 0.0
 
-    # Total Stripe charge
-    stripe_charge = pre_stripe_total + stripe_fee
+    if si:
+        seller_commission = si.fees_subtotal
+        # Find commission rate from line items
+        for ln in si.lines:
+            if ln.rate and ln.line_type in ("fee", "deduction"):
+                seller_commission_rate = ln.rate
+                break
+        seller_payout = si.total  # For non_vehicle_stripe, this is net payout
+        if not is_vehicle and not seller_is_partner:
+            # Standard non-vehicle: seller payout = hammer - SC - stripe - tax
+            pass  # si.total already correct
 
-    # Full buyer cost (for display; includes offline hammer for vehicles)
-    if is_vehicle:
-        buyer_total_full = hp + buyer_premium + platform_fee + total_tax + stripe_fee
-    else:
-        buyer_total_full = hp + buyer_premium + total_tax + stripe_fee
-
-    # ── Application fee (what BidVex keeps via Stripe) ──
     if seller_is_partner:
-        # PARTNER: BidVex keeps ONLY the seller commission (platform fee)
-        if is_vehicle:
-            application_fee = stripe_charge  # No Connect for vehicles; BidVex collects all
-        else:
-            application_fee = seller_commission  # Only platform commission
-    else:
-        # STANDARD: BidVex keeps buyer premium + seller commission + taxes
-        if is_vehicle:
-            application_fee = stripe_charge  # BidVex collects all vehicle Stripe fees
-        else:
-            application_fee = buyer_premium + seller_commission + total_tax
+        seller_commission_rate = 0.03
+        platform_fee = seller_commission  # For partners, platform fee = commission
 
-    # Seller payout
+    # Application fee (what BidVex keeps via Stripe)
     if seller_is_partner:
-        # Partner keeps: total - BidVex commission - Stripe fee (deducted by Stripe)
-        seller_payout = hp - seller_commission  # Plus they keep the buyer premium
-        partner_premium_retained = buyer_premium
+        application_fee = Decimal(str(seller_commission)) if not is_vehicle else stripe_charge
+    elif is_vehicle:
+        application_fee = stripe_charge
     else:
-        seller_payout = hp - seller_commission
-        partner_premium_retained = Decimal("0")
+        application_fee = Decimal(str(buyer_premium + seller_commission + total_tax))
 
     return {
         "hammer_price": float(hp),
@@ -165,22 +159,26 @@ def calculate_connect_checkout(
         "seller_is_partner": seller_is_partner,
         "buyer_tier": buyer_tier,
         "seller_tier": seller_tier,
+        "province": province,
         # Rates
-        "platform_fee_rate": float(platform_rate),
-        "buyer_premium_rate": float(buyer_premium_rate),
+        "platform_fee_rate": 0.025 if is_vehicle else 0.0,
+        "buyer_premium_rate": 0.0 if (is_vehicle or seller_is_partner) else (bi.fees_subtotal / hammer_price if hammer_price else 0),
         "seller_commission_rate": float(seller_commission_rate),
         # Amounts
-        "buyer_premium": float(buyer_premium),
-        "platform_fee": float(platform_fee),
-        "seller_commission": float(seller_commission),
-        "partner_premium_retained": float(partner_premium_retained),
-        # Tax (on Hammer + Premium)
-        "taxable_amount": float(taxable),
-        "gst": float(gst),
-        "qst": float(qst),
-        "total_tax": float(total_tax),
+        "buyer_premium": buyer_premium,
+        "platform_fee": platform_fee,
+        "seller_commission": seller_commission,
+        "partner_premium_retained": partner_premium_retained,
+        # Tax (on fees only — Rule 5)
+        "tax_type": bi.tax_type,
+        "tax_label": bi.tax_label,
+        "taxable_amount": bi.fees_subtotal + bi.stripe_recovery,
+        "gst": gst,
+        "qst": qst,
+        "hst": hst,
+        "total_tax": total_tax,
         # Stripe
-        "stripe_processing_fee": float(stripe_fee),
+        "stripe_processing_fee": bi.stripe_recovery,
         # Totals
         "buyer_total": float(buyer_total_full),
         "stripe_charge": float(stripe_charge),
@@ -189,7 +187,7 @@ def calculate_connect_checkout(
         # Cents (for Stripe API)
         "buyer_total_cents": _to_cents(stripe_charge),
         "application_fee_cents": _to_cents(application_fee),
-        "seller_payout_cents": _to_cents(seller_payout),
+        "seller_payout_cents": _to_cents(Decimal(str(seller_payout))),
     }
 
 
@@ -583,18 +581,23 @@ def create_promotion_checkout(
     tier: str,
     success_url: str,
     cancel_url: str,
+    buyer_province: str = "QC",
 ) -> Dict[str, Any]:
-    """Create a Stripe Checkout for listing promotion purchase with GST/QST."""
+    """Create a Stripe Checkout for listing promotion purchase with jurisdiction-aware tax."""
+    from services.pricing_manager import PricingManager
+
     promo = PROMOTION_TIERS.get(tier)
     if not promo:
         raise ValueError(f"Invalid promotion tier: {tier}")
 
     base_cents = promo["price_cents"]
     base_dollars = Decimal(str(base_cents)) / 100
-    gst = (base_dollars * GST_RATE).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    qst = (base_dollars * QST_RATE).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    gst_cents = _to_cents(gst)
-    qst_cents = _to_cents(qst)
+
+    pricing = PricingManager.flat_purchase(float(base_dollars), buyer_province, f"BidVex {promo['label']}")
+    pi = pricing.buyer_invoice
+
+    stripe_cents = _to_cents(Decimal(str(pi.stripe_recovery)))
+    tax_cents = _to_cents(Decimal(str(pi.tax_amount)))
 
     line_items = [
         {
@@ -609,21 +612,21 @@ def create_promotion_checkout(
             "quantity": 1,
         },
     ]
-    if gst_cents > 0:
+    if stripe_cents > 0:
         line_items.append({
             "price_data": {
                 "currency": "cad",
-                "unit_amount": gst_cents,
-                "product_data": {"name": "GST (TPS 5%)", "description": f"Federal GST — GST# {os.environ.get('PLATFORM_GST_NUMBER', '')}"},
+                "unit_amount": stripe_cents,
+                "product_data": {"name": "Stripe Processing Fee", "description": "Payment processing fee recovery"},
             },
             "quantity": 1,
         })
-    if qst_cents > 0:
+    if tax_cents > 0:
         line_items.append({
             "price_data": {
                 "currency": "cad",
-                "unit_amount": qst_cents,
-                "product_data": {"name": "QST (TVQ 9.975%)", "description": f"Quebec QST — QST# {os.environ.get('PLATFORM_QST_NUMBER', '')}"},
+                "unit_amount": tax_cents,
+                "product_data": {"name": f"Tax — {pi.tax_label}", "description": f"{pi.tax_type} — GST# {os.environ.get('PLATFORM_GST_NUMBER', '')}"},
             },
             "quantity": 1,
         })
@@ -642,17 +645,21 @@ def create_promotion_checkout(
             "promotion_tier": tier,
             "duration_days": str(promo["duration_days"]),
             "transaction_type": "promotion",
+            "tax_type": pi.tax_type,
+            "tax_label": pi.tax_label,
+            "buyer_province": buyer_province,
         },
     )
-    total_cents = base_cents + gst_cents + qst_cents
     return {
         "session_id": session.id,
         "checkout_url": session.url,
         "tier": tier,
         "price": base_cents / 100,
-        "gst": float(gst),
-        "qst": float(qst),
-        "total": total_cents / 100,
+        "stripe_recovery": float(pi.stripe_recovery),
+        "tax": float(pi.tax_amount),
+        "tax_type": pi.tax_type,
+        "tax_label": pi.tax_label,
+        "total": float(pi.total),
     }
 
 
@@ -662,15 +669,20 @@ def create_email_credits_checkout(
     quantity: int,
     success_url: str,
     cancel_url: str,
+    buyer_province: str = "QC",
 ) -> Dict[str, Any]:
-    """Create a Stripe Checkout for email marketing credits with GST/QST."""
+    """Create a Stripe Checkout for email marketing credits with jurisdiction-aware tax."""
+    from services.pricing_manager import PricingManager
+
     total_cents = calculate_email_credit_cost(quantity)
     per_email = total_cents / quantity if quantity > 0 else 0
     base_dollars = Decimal(str(total_cents)) / 100
-    gst = (base_dollars * GST_RATE).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    qst = (base_dollars * QST_RATE).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    gst_cents = _to_cents(gst)
-    qst_cents = _to_cents(qst)
+
+    pricing = PricingManager.flat_purchase(float(base_dollars), buyer_province, f"BidVex Email Credits ({quantity:,})")
+    pi = pricing.buyer_invoice
+
+    stripe_cents = _to_cents(Decimal(str(pi.stripe_recovery)))
+    tax_cents = _to_cents(Decimal(str(pi.tax_amount)))
 
     line_items = [
         {
@@ -685,21 +697,21 @@ def create_email_credits_checkout(
             "quantity": 1,
         },
     ]
-    if gst_cents > 0:
+    if stripe_cents > 0:
         line_items.append({
             "price_data": {
                 "currency": "cad",
-                "unit_amount": gst_cents,
-                "product_data": {"name": "GST (TPS 5%)", "description": f"Federal GST — GST# {os.environ.get('PLATFORM_GST_NUMBER', '')}"},
+                "unit_amount": stripe_cents,
+                "product_data": {"name": "Stripe Processing Fee", "description": "Payment processing fee recovery"},
             },
             "quantity": 1,
         })
-    if qst_cents > 0:
+    if tax_cents > 0:
         line_items.append({
             "price_data": {
                 "currency": "cad",
-                "unit_amount": qst_cents,
-                "product_data": {"name": "QST (TVQ 9.975%)", "description": f"Quebec QST — QST# {os.environ.get('PLATFORM_QST_NUMBER', '')}"},
+                "unit_amount": tax_cents,
+                "product_data": {"name": f"Tax — {pi.tax_label}", "description": f"{pi.tax_type} — GST# {os.environ.get('PLATFORM_GST_NUMBER', '')}"},
             },
             "quantity": 1,
         })
@@ -716,17 +728,22 @@ def create_email_credits_checkout(
             "user_id": user_id,
             "credit_quantity": str(quantity),
             "transaction_type": "email_credits",
+            "tax_type": pi.tax_type,
+            "tax_label": pi.tax_label,
+            "buyer_province": buyer_province,
         },
     )
-    grand_total_cents = total_cents + gst_cents + qst_cents
+    grand_total_cents = total_cents + stripe_cents + tax_cents
     return {
         "session_id": session.id,
         "checkout_url": session.url,
         "quantity": quantity,
         "total_cents": grand_total_cents,
         "subtotal_cents": total_cents,
-        "gst": float(gst),
-        "qst": float(qst),
+        "stripe_recovery": float(pi.stripe_recovery),
+        "tax": float(pi.tax_amount),
+        "tax_type": pi.tax_type,
+        "tax_label": pi.tax_label,
     }
 
 

@@ -47,7 +47,9 @@ def _f(v) -> float:
 
 
 def stripe_recovery(fees_subtotal: Decimal) -> Decimal:
-    """Rule 4 — (fees_subtotal × 0.029) + 0.30"""
+    """Rule 4 — (fees_subtotal × 0.029) + 0.30. Returns $0 if no fees."""
+    if fees_subtotal <= 0:
+        return Decimal("0")
     return _r(fees_subtotal * STRIPE_PCT + STRIPE_FIXED)
 
 
@@ -372,4 +374,66 @@ class PricingManager:
             seller_invoice=None,
             province=buyer_province.upper(),
             bidvex_revenue=_f(price),
+        )
+
+
+    # ── Partner Auction ──────────────────────────────────────
+    @staticmethod
+    def partner_auction(
+        hammer_price: float,
+        buyer_province: str,
+    ) -> PricingResult:
+        """
+        Partner-tier seller listing.
+        Buyer pays: $0 BP from BidVex. Partner sets and keeps their own BP.
+        Seller (Partner) pays: 3% flat commission + stripe recovery + tax.
+        BidVex has no visibility or claim on the Partner's own buyer premium.
+        """
+        hp = Decimal(str(hammer_price))
+
+        # BUYER INVOICE — BidVex charges buyer nothing
+        buyer = SideInvoice(
+            lines=[
+                InvoiceLine("Buyer Premium (Partner listing — $0 BidVex fee)", 0.0, "fee", 0.0),
+            ],
+            fees_subtotal=0.0,
+            stripe_recovery=0.0,
+            tax_amount=0.0,
+            tax_rate=0.0,
+            tax_type="N/A",
+            tax_label="N/A",
+            total=0.0,
+        )
+
+        # SELLER (PARTNER) INVOICE — 3% flat commission
+        sc = _r(hp * PARTNER_SELLER_COMMISSION_RATE)
+        sr = stripe_recovery(sc)
+        taxable = sc + sr
+        tax = calculate_taxes(taxable, buyer_province)
+        s_total = _r(sc + sr + tax.total_tax)
+
+        seller = SideInvoice(
+            lines=[
+                InvoiceLine("Seller Commission (3.0% flat — Partner)", _f(sc), "fee", 0.03),
+                InvoiceLine("Stripe Processing Fee", _f(sr), "stripe"),
+                InvoiceLine(f"Tax — {_tax_label(tax)}", _f(tax.total_tax), "tax", _f(tax.total_rate)),
+            ],
+            fees_subtotal=_f(sc),
+            stripe_recovery=_f(sr),
+            tax_amount=_f(tax.total_tax),
+            tax_rate=_f(tax.total_rate),
+            tax_type=tax.tax_type,
+            tax_label=_tax_label(tax),
+            total=_f(s_total),
+        )
+
+        return PricingResult(
+            transaction_type="partner_auction",
+            hammer_price=hammer_price,
+            buyer_invoice=buyer,
+            seller_invoice=seller,
+            buyer_tier="partner",
+            seller_tier="partner",
+            province=buyer_province.upper(),
+            bidvex_revenue=_f(sc),
         )

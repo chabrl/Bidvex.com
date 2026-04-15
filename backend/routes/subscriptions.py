@@ -664,15 +664,22 @@ async def create_subscription_checkout(
                 "quantity": 1
             }]
         else:
-            # Create one-time payment with GST/QST as separate line items (Quebec compliance)
+            # One-time payment with jurisdiction-aware tax (Rule 5 + Rule 6)
             import os
             from decimal import Decimal, ROUND_HALF_UP
+            from services.pricing_manager import PricingManager
+
+            # Get buyer's province from profile
+            db = get_db()
+            buyer_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0, "province": 1})
+            buyer_province = (buyer_doc or {}).get("province", "QC")
+
+            pricing_result = PricingManager.flat_purchase(final_price, buyer_province, f"BidVex {plan.get('name')} Subscription")
+            pi = pricing_result.buyer_invoice
+
             base_cents = int(final_price * 100)
-            base_dec = Decimal(str(final_price))
-            gst = (base_dec * Decimal("0.05")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-            qst = (base_dec * Decimal("0.09975")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-            gst_cents = int(gst * 100)
-            qst_cents = int(qst * 100)
+            stripe_cents = int(Decimal(str(pi.stripe_recovery)) * 100)
+            tax_cents = int(Decimal(str(pi.tax_amount)) * 100)
 
             checkout_params["line_items"] = [
                 {
@@ -690,10 +697,10 @@ async def create_subscription_checkout(
                     "price_data": {
                         "currency": "cad",
                         "product_data": {
-                            "name": "GST (TPS 5%)",
-                            "description": f"Federal GST — GST# {os.environ.get('PLATFORM_GST_NUMBER', '')}",
+                            "name": "Stripe Processing Fee",
+                            "description": "Payment processing fee recovery",
                         },
-                        "unit_amount": gst_cents,
+                        "unit_amount": stripe_cents,
                     },
                     "quantity": 1
                 },
@@ -701,15 +708,18 @@ async def create_subscription_checkout(
                     "price_data": {
                         "currency": "cad",
                         "product_data": {
-                            "name": "QST (TVQ 9.975%)",
-                            "description": f"Quebec QST — QST# {os.environ.get('PLATFORM_QST_NUMBER', '')}",
+                            "name": f"Tax — {pi.tax_label}",
+                            "description": f"{pi.tax_type} — GST# {os.environ.get('PLATFORM_GST_NUMBER', '')}",
                         },
-                        "unit_amount": qst_cents,
+                        "unit_amount": tax_cents,
                     },
                     "quantity": 1
                 },
             ]
             checkout_params["mode"] = "payment"
+            checkout_params["metadata"]["tax_type"] = pi.tax_type
+            checkout_params["metadata"]["tax_label"] = pi.tax_label
+            checkout_params["metadata"]["buyer_province"] = buyer_province
         
         # Apply coupon if we have a Stripe coupon ID
         if stripe_coupon_id:

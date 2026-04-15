@@ -54,6 +54,9 @@ async def create_promotion(
 
     from services.connect_payment_engine import create_promotion_checkout
 
+    # Get buyer's province for jurisdiction-aware tax
+    buyer_province = user.get("province", "QC") if user else "QC"
+
     result = create_promotion_checkout(
         customer_id=customer_id,
         listing_id=listing_id,
@@ -61,6 +64,7 @@ async def create_promotion(
         tier=tier,
         success_url=f"{origin_url}/payment/success?type=promotion&session_id={{CHECKOUT_SESSION_ID}}",
         cancel_url=f"{origin_url}/listing/{listing_id}",
+        buyer_province=buyer_province,
     )
 
     from services.pricing_config import PROMOTION_TIERS
@@ -134,12 +138,16 @@ async def purchase_email_credits(
 
     from services.connect_payment_engine import create_email_credits_checkout
 
+    # Get buyer's province for jurisdiction-aware tax
+    buyer_province = user.get("province", "QC") if user else "QC"
+
     result = create_email_credits_checkout(
         customer_id=customer_id,
         user_id=current_user.id,
         quantity=data.quantity,
         success_url=f"{data.origin_url}/payment/success?type=email_credits&session_id={{CHECKOUT_SESSION_ID}}",
         cancel_url=f"{data.origin_url}/email-marketing",
+        buyer_province=buyer_province,
     )
 
     return {
