@@ -144,6 +144,8 @@ const Footer = () => {
         <div className="flex flex-wrap justify-center items-center gap-6 mb-6">
           {renderLink('how_it_works', 'How It Works', '/how-it-works')}
           <span className="text-gray-600">|</span>
+          {renderLink('community', 'Community', '/community')}
+          <span className="text-gray-600">|</span>
           {renderLink('privacy_policy', 'Privacy Policy', '/privacy-policy')}
           <span className="text-gray-600">|</span>
           {renderLink('terms_of_service', 'Terms of Service', '/terms-of-service')}
