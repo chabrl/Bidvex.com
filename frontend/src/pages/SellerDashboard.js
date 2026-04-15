@@ -9,10 +9,11 @@ import axios from 'axios';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
-import { Plus, DollarSign, Package, FileText, ShoppingBag, Heart, Eye, TrendingUp, BarChart3, Wallet, Info, AlertTriangle, Clock, Shield, Mail, Loader2, MapPin, Zap } from 'lucide-react';
+import { Plus, DollarSign, Package, FileText, ShoppingBag, Heart, Eye, TrendingUp, BarChart3, Wallet, Info, AlertTriangle, Clock, Shield, Mail, Loader2, MapPin, Zap, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import SellerAnalyticsDashboard from '../components/SellerAnalyticsDashboard';
 import SellerEarningsDashboard from '../components/SellerEarningsDashboard';
+import { SellerEscrowPanel } from '../components/EscrowPickupPanel';
 import { formatCurrency, formatPercent } from '../utils/currencyFormatter';
 import { LoadingTimeout } from '../components/LoadingTimeout';
 import InfoTip from '../components/InfoTip';
@@ -213,6 +214,18 @@ const SellerDashboard = () => {
             <MapPin className="h-4 w-4 inline mr-2" />
             Market Trends
           </button>
+          <button
+            onClick={() => setActiveTab('escrow')}
+            className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 -mb-px ${
+              activeTab === 'escrow'
+                ? 'border-[#06B6D4] text-[#06B6D4]'
+                : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+            }`}
+            data-testid="escrow-tab"
+          >
+            <Lock className="h-4 w-4 inline mr-2" />
+            {t('dashboard.seller.escrow', 'Escrow & Pickup')}
+          </button>
         </div>
 
         {/* Tab Content */}
@@ -224,6 +237,8 @@ const SellerDashboard = () => {
           <SellerRatingsPanel userId={user?.id} token={token} />
         ) : activeTab === 'trends' ? (
           <RegionalTrendsPanel token={token} />
+        ) : activeTab === 'escrow' ? (
+          <SellerEscrowPanel />
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">

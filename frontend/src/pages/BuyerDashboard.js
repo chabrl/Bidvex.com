@@ -7,11 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '../compone
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { DollarSign, Gavel, Trophy, Heart, TrendingUp, TrendingDown, Eye, AlertTriangle, Clock } from 'lucide-react';
+import { DollarSign, Gavel, Trophy, Heart, TrendingUp, TrendingDown, Eye, AlertTriangle, Clock, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import Countdown from 'react-countdown';
 import { formatCurrency } from '../utils/currencyFormatter';
 import { LoadingTimeout } from '../components/LoadingTimeout';
+import { BuyerEscrowPanel } from '../components/EscrowPickupPanel';
 
 const API = API_BASE;
 
@@ -87,6 +88,9 @@ const BuyerDashboard = () => {
                 <TabsTrigger value="winning" className="flex-shrink-0 min-w-[80px] bg-transparent text-green-600">{t('dashboard.buyer.winning')}</TabsTrigger>
                 <TabsTrigger value="losing" className="flex-shrink-0 min-w-[80px] bg-transparent text-red-600">{t('dashboard.buyer.outbid')}</TabsTrigger>
                 <TabsTrigger value="watching" className="flex-shrink-0 min-w-[80px] bg-transparent">{t('watchlist.title', 'Watching')}</TabsTrigger>
+                <TabsTrigger value="escrow" className="flex-shrink-0 min-w-[80px] bg-transparent" data-testid="buyer-escrow-tab">
+                  <Lock className="h-3 w-3 mr-1 inline" /> {t('dashboard.buyer.escrow', 'Escrow')}
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="all">
@@ -396,6 +400,10 @@ const BuyerDashboard = () => {
                     </div>
                   </div>
                 </Card>
+              </TabsContent>
+
+              <TabsContent value="escrow" data-testid="buyer-escrow-content">
+                <BuyerEscrowPanel />
               </TabsContent>
 
              </Tabs>
