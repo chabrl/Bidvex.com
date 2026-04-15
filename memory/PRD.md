@@ -90,7 +90,7 @@
 - All invoice records now store `tax_type` and `tax_label` strings
 
 ### Files Modified
-- `/app/backend/services/pricing_manager.py` — Complete rewrite (canonical engine) + partner_auction method + stripe_recovery $0 guard
+- `/app/backend/services/pricing_manager.py` — Complete rewrite (canonical engine) + partner_auction method + stripe_recovery $0 guard + non_vehicle_stripe SR on (hammer+BP)
 - `/app/backend/services/vehicle_pricing.py` — Tax table fix, calculate_taxes US/intl
 - `/app/backend/services/vehicle_invoice.py` — Vehicle invoice uses PricingManager
 - `/app/backend/routes/auctions.py` — Path B uses PricingManager
@@ -99,7 +99,7 @@
 - `/app/backend/routes/subscriptions.py` — create_subscription_checkout uses PricingManager.flat_purchase with buyer province
 - `/app/backend/routes/payments_promotions.py` — Passes buyer_province to promotions + email credits
 
-### Testing: 34/34 passed (iteration_138), 34/34 (iteration_139)
+### Testing: 34/34 (iteration_138), 34/34 (iteration_139), 58/58 (iteration_140)
 
 ## Completed (April 13, 2026) — Complete Email System Rebuild
 
