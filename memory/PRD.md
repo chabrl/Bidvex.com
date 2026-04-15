@@ -1,63 +1,52 @@
 # BidVex — Auction Marketplace PRD
 
-## Architecture
+## Completed (April 15, 2026) — Escrow Pickup Code Full UI Flow
+
+### Seller Dashboard — "Escrow & Pickup" Tab
+- New tab with Lock icon in Seller Dashboard tab bar
+- **SellerEscrowPanel** component: Shows all escrow transactions for the seller
+- **Pickup Code Entry UI**: 6-character monospace input (uppercase, filtered A-Z0-9), Confirm button with loading state
+- **Status states**: Held (with countdown timer), Released (green confirmation), Auto-Released (blue info), Disputed (red warning)
+- **Empty state**: Shield icon + explanatory message
+
+### Buyer Dashboard — "Escrow" Tab
+- New tab with Lock icon in Buyer Dashboard tabs
+- **BuyerEscrowPanel** component: Shows all escrow transactions for the buyer
+- **Pickup Instructions**: Amber-highlighted card telling buyer to check email for pickup code
+- **Status states**: Held (with instructions), Released, Auto-Released, Disputed
+- **Empty state**: Shield icon + explanatory message
+
+### Legal Page Preservation + Addendum
+- **Existing /legal page content**: 100% preserved (all 17+ sections untouched)
+- **Addendum appended** at bottom with EN + FR sections:
+  - A1. Sticky Card Policy, A2. Cancellation Penalty
+  - B1. Escrow & Pickup Code, B2. 48h Auto-Release, B3. Disputes, B4. Data & Privacy
+- /terms-of-service → redirects to /legal#terms
+- /privacy-policy → redirects to /legal#privacy
+- /policies → Seller, Buyer, Partner, Community policies (bilingual)
+
+### Architecture
 ```
-/app
-├── backend/
-│   ├── services/
-│   │   ├── stripe_customer_service.py  # NEW: Sticky Card enforcement, penalty charges, audit
-│   │   ├── escrow_service.py           # NEW: Escrow hold, pickup code, auto-release, disputes
-│   │   ├── pricing_manager.py          # CORE: All fee calculations
-│   │   ├── email_automation.py         # 6 scheduled jobs including escrow auto-release
-│   │   └── email_marketing.py          # Campaign CRUD, segments, dashboard stats
-│   ├── routes/
-│   │   ├── escrow.py                   # NEW: confirm-pickup, status, dispute, admin penalty
-│   │   ├── payments.py                 # UPDATED: Card deletion guard (409 with active listings)
-│   │   ├── listings.py                 # UPDATED: Payment method validation (402)
-│   │   ├── webhooks.py                 # UPDATED: Escrow hold for non-vehicle payments
-│   │   └── community.py               # Q&A CRUD
-│   ├── lifecycle.py                    # UPDATED: 6 escrow indexes
-├── frontend/src/
-│   ├── components/legal/
-│   │   ├── TermsEN.jsx                 # REWRITTEN: Sticky Card, Escrow, Pickup Code, Penalties
-│   │   ├── TermsFR.jsx                 # REWRITTEN: French ToS
-│   │   ├── PrivacyEN.jsx               # REWRITTEN: Escrow data, Stripe tokens, retention
-│   │   ├── PrivacyFR.jsx               # REWRITTEN: French Privacy
-│   ├── pages/
-│   │   ├── PlatformPoliciesPage.js     # NEW: Seller/Buyer/Partner/Community policies (FR+EN)
+/app/frontend/src/
+├── components/
+│   ├── EscrowPickupPanel.js         # SellerEscrowPanel + BuyerEscrowPanel
+├── pages/
+│   ├── SellerDashboard.js           # + Escrow & Pickup tab
+│   ├── BuyerDashboard.js            # + Escrow tab
+│   ├── LegalPage.js                 # + Addendum (EN+FR) appended
+│   ├── PlatformPoliciesPage.js      # Seller/Buyer/Partner/Community
+/app/backend/
+├── services/
+│   ├── stripe_customer_service.py   # Sticky Card, penalty, audit
+│   ├── escrow_service.py            # Escrow hold, confirm, auto-release, dispute
+├── routes/
+│   ├── escrow.py                    # 5 endpoints
+│   ├── payments.py                  # Card deletion guard (409)
+│   ├── listings.py                  # Payment method guard (402)
+│   ├── webhooks.py                  # Escrow hold for non-vehicle payments
 ```
 
-## Completed (April 15, 2026) — Sticky Card + Escrow + Legal Rewrite
-
-### System A — Sticky Card Enforcement
-- `validate_payment_method_for_listing()`: Blocks listing creation (402) if no valid card on file
-- Card Deletion Guard: Blocks DELETE (409) while any active/live/ending_soon listings exist
-- `charge_cancellation_penalty()`: $50 CAD flat fee to seller's card for non-delivery
-- `audit_stripe_customers()`: Daily cron job flags sellers with missing/expired cards
-- Stripe Customer creation already existed in payments.py — reused
-
-### System B — Escrow + Pickup Code (Non-Vehicle Only)
-- `create_escrow_hold()`: Creates escrow on payment_intent.succeeded, generates 6-char pickup code
-- `confirm_pickup()`: Seller enters code → validates → Stripe Transfer → funds released
-- `auto_release_expired_escrows()`: 15-min interval job, releases funds after 48h
-- `initiate_dispute()`: Stub for dispute flow (escrow_status = "disputed")
-- Failed attempt logging: 5 failures = admin escalation flag
-- Pickup code: collision-safe, excludes ambiguous chars (0/O/I/1/L)
-- MongoDB: escrow_transactions collection with 6 indexes
-- Vehicles excluded (separate settlement flow)
-
-### Legal Documents (All Bilingual FR+EN)
-- **Terms of Service**: Sticky Card policy, Cancellation Penalty clause, Escrow system, Vehicle licensing, Marketplace conduct, Stripe Connect authorization
-- **Privacy Policy**: Stripe Customer objects, payment tokens, escrow data, pickup code logs, data retention schedules, PIPEDA/Law 25 compliance
-- **Platform Policies**: Seller (delivery, penalties, vehicle licensing), Buyer (pickup code, disputes, refunds, timelines), Partner (privileges, restrictions, compliance), Community Q&A (allowed/prohibited content, moderation)
-
-### Testing: iteration_147 — 100% backend (14/14), 100% frontend
-
-## Previous Completions
-- (Apr 15) Phase 3: Email Marketing + Automation Engine
-- (Apr 15) Final Correction Sprint: Tooltips, CTA routes, Community Q&A
-- (Apr 15) 5 Critical UX Gaps
-- (Apr 14) Email templates, pricing audit, Stripe Connect, affiliate system
+## Testing: iterations 147 (14/14 backend) + 148 (100% frontend)
 
 ## 3rd Party Integrations
 - Stripe — Live | SendGrid — Live | Gemini 2.5 Flash — litellm | VAPID Push — Active
@@ -65,6 +54,6 @@
 ## Backlog
 - (P2) Cloudflare CDN DNS migration
 - (P2) Post-launch monitoring & alerting
+- (Enhancement) Full dispute resolution workflow
 - (Enhancement) Admin offline order management
 - (Enhancement) 2FA for high-value bidders
-- (Enhancement) Full dispute resolution workflow
