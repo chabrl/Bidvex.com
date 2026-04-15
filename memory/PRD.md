@@ -13,125 +13,100 @@
 │   │   ├── auth.py                    # Auth (login block for suspended users)
 │   │   ├── email_marketing_ext.py     # Campaign CRUD + Delete/Resend/Clone
 │   │   ├── ai_chat.py                 # Master Concierge chatbot
+│   │   ├── analytics.py              # CTA tracking + seller analytics
+│   │   ├── listings.py               # CRUD + multi-lot deduplication
 │   │   └── vehicle_settlement.py      # Stripe fee charges and seller contact gating
 │   ├── services/
 │   │   ├── email_service.py           # SendGrid Dynamic Template sender (78 template IDs)
 │   │   ├── email_automation.py        # APScheduler lifecycle jobs
-│   │   ├── geo_email_service.py       # Haversine distance-based auction alerts
-│   │   ├── vehicle_fee_service.py     # 2.5% net fee calculation
+│   │   ├── pricing_manager.py         # CORE: Source of truth for 100% of fee calculations
+│   │   ├── connect_payment_engine.py  # Stripe intent & checkout creation
 │   │   └── ai_assistant_v2.py         # Gemini 2.5 Flash via litellm + Emergent proxy
 │   ├── sendgrid_templates/            # 39 bilingual HTML files + generation scripts
-│   │   ├── generate_all_bilingual_templates.py  # Generates 29 new bilingual templates
-│   │   ├── generate_bilingual_templates.py      # Generates 10 lifecycle/geo templates
-│   │   └── *.html                     # All bilingual template HTML files
 │   └── shared.py                      # Central config: DEFAULT_EMAIL_TEMPLATES, EMAIL_TEMPLATE_CATEGORIES
 ├── frontend/src/
-│   ├── pages/admin/
-│   │   ├── EmailTemplates.js          # Admin: Template IDs + HTML Preview (iframe/code toggle)
-│   │   └── ...
+│   ├── pages/
+│   │   ├── CreateListingPage.js       # Sell flow with 10 InfoTip tooltips
+│   │   ├── ListingDetailPage.js       # Buy flow with bid/premium tooltips
+│   │   ├── CheckoutPage.js            # Payment confirmation with total tooltip
+│   │   ├── HowItWorks.js             # Trust signals + CTA tracking
+│   │   └── admin/EmailTemplates.js    # Admin: Template IDs + HTML Preview
 │   ├── components/
-│   │   ├── MarketplaceSidebar.js      # Nested category tree
-│   │   ├── CategorySelector.js        # 2-step seller category selection
-│   │   └── legal/LegalComplianceSections.js # Bilingual legal blocks
+│   │   ├── InfoTip.js                 # Bilingual tooltip (FR/EN, hover + tap)
+│   │   ├── AutoBidModal.js            # Max bid tooltip
+│   │   ├── BidConfirmationDialog.js   # Buyer premium tooltip
+│   │   ├── CategorySelector.js        # 2-step category with vehicle gate
+│   │   └── ui/tooltip.jsx             # Radix tooltip with data-bidvex-tooltip
+│   └── index.css                      # Tooltip CSS with html.dark selector
 ```
 
+## Completed (April 15, 2026) — 5 Critical UX/Feature Gaps (P0)
+
+### Gap 1: Multi-lot Deduplication (Backend)
+- `GET /api/listings` correctly deduplicates parent auctions from individual lots
+- Lots extracted from multi_item_listings with proper filter/sort/pagination
+- Price, condition, and currency filters applied to individual lots
+- Fixed E741 lint warning: variable `l` renamed to `lot_item`/`item`
+
+### Gap 2: Vehicle Restriction Verification
+- Already verified: 403 always returned for individual sellers on vehicle categories
+- OPC permit check chain: phone validation → seller_type → opc_permit_verified
+
+### Gap 3: Tooltip System — 100% Coverage
+- **Tooltip Visibility Fix (P0 BLOCKER)**:
+  - Root cause: CSS minification merged `.dark .bidvex-tooltip-content` with base selector
+  - Fix: `html.dark [data-bidvex-tooltip]` selector survives minification (verified in build)
+  - Light mode: dark slate bg (#0f172a) + white text
+  - Dark mode: light gray bg (#f9fafb) + dark text (#111827)
+- **Sell Flow** (CreateListingPage.js): 10 InfoTip triggers
+  - Auction Title, Description, Category, Starting Price, Buy Now Price
+  - Buyer's Premium, Payment Method, Auction End Date, Images, Shipping
+- **Buy Flow**: 
+  - ListingDetailPage.js: Your Bid field, Buyer Premium banner
+  - AutoBidModal.js: Max Bid Amount field
+  - BidConfirmationDialog.js: Buyer Premium rate line (replaced raw Info icon)
+  - CheckoutPage.js: Total Due amount
+
+### Gap 4: Trust Signals on How It Works
+- Already present in banner below hero:
+  - Secure Payments via Stripe (Lock icon)
+  - Verified Sellers (Shield icon)
+  - AI Fraud Detection (Zap icon)
+  - OPC / Law 25 Compliant (CheckCircle icon)
+
+### Gap 5: CTA Click Tracking
+- Backend: `POST /api/analytics/cta-click` stores events in `cta_analytics` collection
+- Frontend: All CTA buttons on HowItWorks fire async tracking:
+  - Hero CTAs: hero_signup, hero_browse
+  - Section CTAs: section_cta_click (sell, bid, account, partner, vehicle-seller, buy-vehicle)
+  - Final CTAs: final_sell, final_bid, final_partner
+
+### Testing: iteration_143 (backend 100%, frontend 50%), iteration_144 (100% all pass)
+
 ## Completed (April 14, 2026) — Bulk Migration of Bilingual Email Templates
-
-### 29 New Bilingual HTML Templates Generated
-- **Auth (5)**: password_reset, password_changed, email_verification, two_factor, login_alert
-- **Admin (2)**: account_suspended, report_received
-- **Communication (3)**: announcement, support_ack, platform_updates
-- **Financial (4)**: invoice_issued, payment_receipt, payout_sent, invoice_overdue
-- **Seller (3)**: new_bid, listing_approved, listing_rejected
-- **Auction (3)**: auction_announcement, auction_reminder, auction_results
-- **Bid (3)**: outbid, confirmed, winning
-- **Affiliate (4)**: monthly_earnings, commission_earned, referral_notification, program_summary
-- **Triggers (2)**: auction_ending_soon, cross_border_notice
-
-### Admin Panel Synchronization
-- **`EMAIL_TEMPLATE_CATEGORIES`** expanded from 6 to 9 categories: added Lifecycle (8), Geo (2), Triggers (2)
-- **`get_email_templates()`** now auto-merges new `DEFAULT_EMAIL_TEMPLATES` keys into MongoDB on load
-- **Backend**: `GET /api/admin/email-templates/{key}/preview` returns HTML content for all 39 templates
-- **Backend**: `GET /api/admin/email-templates/previews/list` returns all previewable template keys
-- **Frontend**: Each template row has a "Preview" button showing rendered HTML in an iframe
-- **Frontend**: "HTML Code" toggle switches between visual preview and raw source
-- **Frontend**: Bilingual templates (lifecycle/geo/triggers) show "Bilingual" badge and single ID input
-
-### Send Test Email — Draft Invoice
-- **`PricingManager`** class (`/app/backend/services/pricing_manager.py`):
-  - Wraps `vehicle_pricing.py` tax engine + Stripe fee recovery
-  - Calculates dual-sided DraftInvoice: Buyer charges + Seller deductions
-  - Province-aware tax: QC (GST 5% + QST 9.975%), ON (HST 13%), BC (GST+PST 12%), AB (GST 5%)
-  - Tier-aware fees: Free (5%/4%), Premium (3.5%/2.5%), VIP (3%/2%)
-- **Backend**: `POST /api/admin/email-templates/preview-invoice` — generates HTML + pricing breakdown
-- **Backend**: `POST /api/admin/email-templates/send-test` — sends bilingual draft invoice via SendGrid
-- **Frontend**: "Send Test Email" button in Admin Panel with configurable:
-  - Recipient email, hammer price, category, province, buyer tier, seller tier
-  - Live pricing breakdown (Buyer Charges + Seller Deductions cards)
-  - Inline iframe preview of the bilingual email
+- 29 New Bilingual HTML Templates Generated (Auth, Admin, Financial, Seller, Auction, Bid, Affiliate, Triggers)
+- Admin Panel Synchronization with preview/code toggle
 
 ## Completed (April 14, 2026) — Master Pricing Structure Audit (P0)
+- All 7 pricing rules verified: Tiers, Vehicle, Non-Vehicle, Stripe Recovery, Tax, Subscriptions, Invoice Splitting
+- PricingManager: 4 canonical methods with dual-sided DraftInvoice
 
-### Audit Results — All 7 Rules
-- **Rule 1 (Tiers)**: Standard 5%/4%, Premium 3.5%/2.5%, VIP 3%/2%, Partner 0%/3% — VERIFIED
-- **Rule 2 (Vehicle)**: Buyer pays 2.5% platform fee + stripe + tax only. Seller $0. — FIXED & VERIFIED
-- **Rule 3 (Non-Vehicle)**: Path A (Stripe) hammer+BP+stripe+tax / Path B (Cash) split invoices — FIXED & VERIFIED
-- **Rule 4 (Stripe Recovery)**: (fees×0.029)+0.30 on all invoices — VERIFIED
-- **Rule 5 (Tax Jurisdiction)**: QC=14.975%, ON=13%, NB/NL/NS/PE=15%, AB/BC/MB/SK=5%, US=0% — FIXED & VERIFIED
-- **Rule 6 (Subscriptions)**: price + stripe + tax — VERIFIED
-- **Rule 7 (Invoice Splitting)**: Two charges per transaction type — VERIFIED
+## Completed (April 14, 2026) — Stripe Connect & Payouts
+- Stripe Connect Express with eventually_due
+- Automated seller payouts in payment_intent.succeeded webhook
+- Automated affiliate 10% commission transfers
 
-### Bug Fixes Applied
-- `vehicle_pricing.py`: BC/MB/SK changed from GST+PST (12%/11%) to GST 5% only
-- `vehicle_invoice.py`: Rewrote to use PricingManager.vehicle_auction (was charging hammer+BP+platformfee+tax)
-- `routes/auctions.py` Path B: Replaced hardcoded 15% BP / 0.13 HST with PricingManager.non_vehicle_cash
-- `fee_calculator.py`: Tax table synced to match Master Structure
-- `pricing_manager.py`: Complete rewrite with 4 canonical methods
-- All invoice records now store `tax_type` and `tax_label` strings
-
-### Files Modified
-- `/app/backend/services/pricing_manager.py` — Complete rewrite (canonical engine) + partner_auction method + stripe_recovery $0 guard + non_vehicle_stripe SR on (hammer+BP)
-- `/app/backend/services/vehicle_pricing.py` — Tax table fix, calculate_taxes US/intl
-- `/app/backend/services/vehicle_invoice.py` — Vehicle invoice uses PricingManager
-- `/app/backend/routes/auctions.py` — Path B uses PricingManager
-- `/app/backend/services/fee_calculator.py` — Tax table sync
-- `/app/backend/services/connect_payment_engine.py` — calculate_connect_checkout, create_promotion_checkout, create_email_credits_checkout all rewired through PricingManager
-- `/app/backend/routes/subscriptions.py` — create_subscription_checkout uses PricingManager.flat_purchase with buyer province
-- `/app/backend/routes/payments_promotions.py` — Passes buyer_province to promotions + email credits
-
-### Testing: 34/34 (iter_138), 34/34 (iter_139), 58/58 (iter_140), 8/8 Stripe E2E, 18/18 payout, 15/15 affiliate (iter_141), 8/8 UX sprint (iter_142)
-
-## Completed (April 13, 2026) — Complete Email System Rebuild
-
-### email_service.py Refactored
-- `send_template_email()` core with retry logic (3 attempts, exponential backoff)
-- 65+ template ID registry with EN/FR language routing
-- 15+ typed email functions (welcome, bid_confirmed, outbid, winning, etc.)
-
-### email_automation.py — Lifecycle Sequences
-- Onboarding: Day 3, Day 7, Day 14 (subscription pitch + BIENVENUE20 coupon)
-- Re-engagement: Day 30, Day 45 (final + RETOUR15 coupon)
-- Subscription Expiry: -14d, -7d, -1d reminders, +3d reactivation
-
-### geo_email_service.py — Geo-Targeted Alerts
-- Haversine distance + 120+ FSA centroids (QC, ON, Atlantic, Prairies)
-- Daily batch sending with 7-day cooldown per user/auction
-
-## Completed (April 12, 2026) — Previous Features
-- Admin Panel Full Audit & Repair (8 sections)
-- Redis Integration Audit & Hardening
-- Category Hierarchy UX Refactor
-- Legal Compliance Sprint (Bill 96 / Law 25 / OPC)
-- Stripe Intermediary Handshake & Fee Passing (2.5% buyer fee)
-- SetupIntent Card Verification
-- Email Heartbeat Recovery
+## Completed (April 13, 2026) — Email System Rebuild
+- email_service.py with 65+ template IDs
+- email_automation.py lifecycle sequences
+- geo_email_service.py with Haversine distance
 
 ## 3rd Party Integrations
 - Stripe — Live | SendGrid — Live | Gemini 2.5 Flash — litellm + EMERGENT_LLM_KEY | VAPID Push — Active
 
 ## Backlog
+- (P1) Phase 3: Email Marketing System — Real campaigns, segmentation, auction alerts, abandoned bid emails
 - (P2) Cloudflare CDN DNS migration
 - (P2) Post-launch monitoring & alerting
 - (Enhancement) Admin offline order management
 - (Enhancement) 2FA for high-value bidders
-- (Enhancement) Automated Lighthouse audits
