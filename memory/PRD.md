@@ -4,76 +4,60 @@
 ```
 /app
 ├── backend/
-│   ├── server.py                      # FastAPI, scheduler, SPA mount
-│   ├── routes/
-│   │   ├── email_marketing_ext.py     # Admin + User marketing: campaigns, contacts, dashboard-stats, sync
-│   │   ├── marketing.py               # Legacy marketing router (audience preview, parse, etc.)
-│   │   ├── community.py               # Community Q&A CRUD + upvotes + best answer
-│   │   ├── analytics.py               # CTA tracking + seller analytics
-│   │   ├── listings.py                # CRUD + multi-lot deduplication
-│   │   └── ...
 │   ├── services/
-│   │   ├── email_marketing.py         # EmailMarketingService: campaigns, segments, dashboard stats, contact sync
-│   │   ├── email_automation.py        # APScheduler: onboarding, re-engagement, subscription expiry, abandoned bid recovery
-│   │   ├── email_service.py           # SendGrid template sender (78 template IDs)
-│   │   ├── pricing_manager.py         # CORE: All fee calculations
-│   │   └── ...
+│   │   ├── stripe_customer_service.py  # NEW: Sticky Card enforcement, penalty charges, audit
+│   │   ├── escrow_service.py           # NEW: Escrow hold, pickup code, auto-release, disputes
+│   │   ├── pricing_manager.py          # CORE: All fee calculations
+│   │   ├── email_automation.py         # 6 scheduled jobs including escrow auto-release
+│   │   └── email_marketing.py          # Campaign CRUD, segments, dashboard stats
+│   ├── routes/
+│   │   ├── escrow.py                   # NEW: confirm-pickup, status, dispute, admin penalty
+│   │   ├── payments.py                 # UPDATED: Card deletion guard (409 with active listings)
+│   │   ├── listings.py                 # UPDATED: Payment method validation (402)
+│   │   ├── webhooks.py                 # UPDATED: Escrow hold for non-vehicle payments
+│   │   └── community.py               # Q&A CRUD
+│   ├── lifecycle.py                    # UPDATED: 6 escrow indexes
 ├── frontend/src/
-│   ├── pages/admin/
-│   │   ├── EmailMarketingManager.js   # 6-card dashboard stats + campaign CRUD + user_role segment
+│   ├── components/legal/
+│   │   ├── TermsEN.jsx                 # REWRITTEN: Sticky Card, Escrow, Pickup Code, Penalties
+│   │   ├── TermsFR.jsx                 # REWRITTEN: French ToS
+│   │   ├── PrivacyEN.jsx               # REWRITTEN: Escrow data, Stripe tokens, retention
+│   │   ├── PrivacyFR.jsx               # REWRITTEN: French Privacy
 │   ├── pages/
-│   │   ├── CommunityPage.js           # Q&A forum
-│   │   ├── HowItWorks.js             # Fixed CTA routes + tracking
-│   │   └── ...
-│   ├── components/
-│   │   ├── InfoTip.js                 # Bilingual tooltip system
-│   │   └── ...
+│   │   ├── PlatformPoliciesPage.js     # NEW: Seller/Buyer/Partner/Community policies (FR+EN)
 ```
 
-## Completed (April 15, 2026) — Phase 3: Email Marketing + Automation Engine
+## Completed (April 15, 2026) — Sticky Card + Escrow + Legal Rewrite
 
-### System Audit
-- Verified: Campaign CRUD (38 campaigns), email sending (SendGrid), CSV import, contact storage all working
-- Verified: 12 campaigns sent with 111 total emails delivered
+### System A — Sticky Card Enforcement
+- `validate_payment_method_for_listing()`: Blocks listing creation (402) if no valid card on file
+- Card Deletion Guard: Blocks DELETE (409) while any active/live/ending_soon listings exist
+- `charge_cancellation_penalty()`: $50 CAD flat fee to seller's card for non-delivery
+- `audit_stripe_customers()`: Daily cron job flags sellers with missing/expired cards
+- Stripe Customer creation already existed in payments.py — reused
 
-### Contact Management
-- **Auto-sync**: `POST /api/admin/marketing/sync-contacts` — Syncs all registered users into marketing_contacts pool with roles (buyer/seller/partner/user)
-- **CSV Import**: Existing — supports bulk upload with encoding handling
-- **Manual Entry**: Existing — admin can add individual contacts
-- **Fields**: email, name, language (EN/FR), user_roles, source, synced_at
+### System B — Escrow + Pickup Code (Non-Vehicle Only)
+- `create_escrow_hold()`: Creates escrow on payment_intent.succeeded, generates 6-char pickup code
+- `confirm_pickup()`: Seller enters code → validates → Stripe Transfer → funds released
+- `auto_release_expired_escrows()`: 15-min interval job, releases funds after 48h
+- `initiate_dispute()`: Stub for dispute flow (escrow_status = "disputed")
+- Failed attempt logging: 5 failures = admin escalation flag
+- Pickup code: collision-safe, excludes ambiguous chars (0/O/I/1/L)
+- MongoDB: escrow_transactions collection with 6 indexes
+- Vehicles excluded (separate settlement flow)
 
-### Dynamic Segmentation
-- **User Role** filter added: `buyers` (placed bids), `sellers` (created listings), `partners` (is_partner flag)
-- Existing: subscription_tier, account_type, region, activity_status, email_engagement, seller_status
-- Segments auto-update via live DB queries (not cached)
+### Legal Documents (All Bilingual FR+EN)
+- **Terms of Service**: Sticky Card policy, Cancellation Penalty clause, Escrow system, Vehicle licensing, Marketplace conduct, Stripe Connect authorization
+- **Privacy Policy**: Stripe Customer objects, payment tokens, escrow data, pickup code logs, data retention schedules, PIPEDA/Law 25 compliance
+- **Platform Policies**: Seller (delivery, penalties, vehicle licensing), Buyer (pickup code, disputes, refunds, timelines), Partner (privileges, restrictions, compliance), Community Q&A (allowed/prohibited content, moderation)
 
-### Automated Email Flows (APScheduler)
-- **Welcome Sequence** (Day 0/3/7/14): ✅ Existing
-- **Re-engagement** (Day 30/45): ✅ Existing
-- **Ending Soon Alerts** (24h/1h): ✅ Existing
-- **Abandoned Bid Recovery** (NEW): Runs daily at 10:00 UTC, finds users who bid 24-72h ago but stopped, sends recovery email once per user
-- **Subscription Expiry**: ✅ Existing
-
-### Admin Dashboard Stats
-- **`GET /api/admin/marketing/dashboard-stats`**: Returns total_campaigns, total_sent, total_opened, total_clicked, total_bounced, open_rate%, click_rate%, recent_campaigns (5)
-- **Frontend**: 6-card stats grid (Total Campaigns, Emails Sent, Open Rate%, Click Rate%, Bounced, Sync Contacts)
-
-### Campaign System
-- Create, edit, schedule, send, cancel campaigns ✅
-- Select segments (user role, tier, region, activity) ✅
-- Test send before blast ✅
-
-### Analytics
-- Open/click/bounce tracking via SendGrid webhooks ✅
-- Per-campaign stats view ✅
-- Aggregate dashboard stats ✅
-
-### Testing: iteration_146 — 100% backend (13/13), 100% frontend
+### Testing: iteration_147 — 100% backend (14/14), 100% frontend
 
 ## Previous Completions
-- (Apr 15) Final Correction Sprint: Tooltip coverage, HowItWorks CTA fix, Community Q&A
-- (Apr 15) 5 Critical UX Gaps: Tooltip visibility, multi-lot dedup, trust signals, CTA tracking
-- (Apr 14) Bilingual email templates, pricing audit, Stripe Connect, affiliate system
+- (Apr 15) Phase 3: Email Marketing + Automation Engine
+- (Apr 15) Final Correction Sprint: Tooltips, CTA routes, Community Q&A
+- (Apr 15) 5 Critical UX Gaps
+- (Apr 14) Email templates, pricing audit, Stripe Connect, affiliate system
 
 ## 3rd Party Integrations
 - Stripe — Live | SendGrid — Live | Gemini 2.5 Flash — litellm | VAPID Push — Active
@@ -83,3 +67,4 @@
 - (P2) Post-launch monitoring & alerting
 - (Enhancement) Admin offline order management
 - (Enhancement) 2FA for high-value bidders
+- (Enhancement) Full dispute resolution workflow
