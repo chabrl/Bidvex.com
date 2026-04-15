@@ -10,10 +10,7 @@ import stripe
 import pytest
 import asyncio
 
-STRIPE_TEST_KEY = os.environ.get(
-    "STRIPE_TEST_SECRET_KEY",
-    "REMOVED_SECRET"
-)
+STRIPE_TEST_KEY = os.environ.get("STRIPE_TEST_SECRET_KEY") or os.environ.get("STRIPE_SECRET_KEY", "")
 stripe.api_key = STRIPE_TEST_KEY
 
 
