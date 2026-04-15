@@ -1,481 +1,102 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { 
-  FileText, Mail, Shield, AlertTriangle, Gavel, 
-  Users, DollarSign, Scale, Lock, Ban, Clock, CheckCircle,
-  XCircle, CreditCard, Building2
-} from 'lucide-react';
-import { CrossBorderLegalSection, VehicleAuctionLegalSection } from './LegalComplianceSections';
 
-export const TermsFR = () => {
-  return (
-    <div className="min-h-screen py-12 px-4 max-w-4xl mx-auto">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-3 mb-4">
-            <FileText className="h-8 w-8 text-primary" />
-            <CardTitle className="text-3xl">Conditions générales d'utilisation de BidVex</CardTitle>
-          </div>
-          <p className="text-muted-foreground">Dernière mise à jour : Mars 2026</p>
-        </CardHeader>
-        <CardContent className="prose prose-sm max-w-none space-y-8">
-          
-          {/* Table des matières */}
-          <section className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">Table des matières</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              <ol className="list-decimal pl-6 space-y-1 text-blue-600 dark:text-blue-400">
-                <li><a href="#introduction" className="hover:underline">Introduction et acceptation</a></li>
-                <li><a href="#platform-role" className="hover:underline">Rôle de la plateforme et avertissements</a></li>
-                <li><a href="#user-accounts" className="hover:underline">Comptes d'utilisateur</a></li>
-                <li><a href="#seller" className="hover:underline">Responsabilités du vendeur</a></li>
-                <li><a href="#buyer" className="hover:underline">Responsabilités de l'acheteur</a></li>
-                <li><a href="#bidding" className="hover:underline">Règles d'enchères</a></li>
-                <li><a href="#fees" className="hover:underline">Frais, taxes et paiements</a></li>
-                <li><a href="#as-is" className="hover:underline">Clause « TEL QUEL / LÀ OÙ IL SE TROUVE »</a></li>
-              </ol>
-              <ol className="list-decimal pl-6 space-y-1 text-blue-600 dark:text-blue-400" start={9}>
-                <li><a href="#disputes" className="hover:underline">Résolution des litiges</a></li>
-                <li><a href="#ip" className="hover:underline">Propriété intellectuelle</a></li>
-                <li><a href="#prohibited" className="hover:underline">Conduites interdites</a></li>
-                <li><a href="#liability" className="hover:underline">Limitation de responsabilité</a></li>
-                <li><a href="#termination" className="hover:underline">Suspension et résiliation</a></li>
-                <li><a href="#changes" className="hover:underline">Modifications des conditions</a></li>
-                <li><a href="#governing" className="hover:underline">Droit applicable</a></li>
-                <li><a href="#contact" className="hover:underline">Coordonnées</a></li>
-              </ol>
-            </div>
-          </section>
+export const TermsFR = () => (
+  <div className="min-h-screen bg-background py-12 px-4">
+    <div className="max-w-4xl mx-auto prose prose-sm dark:prose-invert">
+      <h1>BidVex Inc. — Conditions d'utilisation</h1>
+      <p className="text-muted-foreground">Dernière mise à jour : 15 avril 2026 | Date d'entrée en vigueur : 15 avril 2026</p>
 
-          {/* 1. Introduction */}
-          <section id="introduction">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">1</span>
-              Introduction et acceptation des conditions
-            </h2>
-            <p className="mb-3">
-              Bienvenue sur BidVex. Les présentes conditions générales d'utilisation (« Conditions ») constituent un accord juridiquement contraignant entre vous (« Utilisateur », « vous » ou « votre ») et BidVex Inc. (« BidVex », « nous », « notre »). Ces Conditions régissent votre accès et votre utilisation de notre plateforme d'enchères en ligne, de notre site Web et de nos services connexes (collectivement, « la Plateforme »).
-            </p>
-            <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 my-4">
-              <p className="text-blue-800 dark:text-blue-200">
-                <strong>En créant un compte, en naviguant sur la Plateforme ou en participant à une enchère,</strong> vous reconnaissez avoir lu, compris et accepté d'être lié par les présentes Conditions ainsi que par notre Politique de confidentialité. Si vous n'acceptez pas ces Conditions, vous ne devez pas accéder à la Plateforme ni l'utiliser.
-              </p>
-            </div>
-            <p>BidVex facilite les enchères en ligne pour divers articles, y compris, mais sans s'y limiter, les véhicules, les biens de consommation et les services commerciaux.</p>
-          </section>
+      <h2>1. Introduction et acceptation</h2>
+      <p>Bienvenue sur BidVex. Les présentes conditions d'utilisation (« Conditions ») constituent un accord juridiquement contraignant entre vous (« Utilisateur ») et BidVex Inc. (« BidVex », « nous »). En vous inscrivant, en naviguant ou en participant à une enchère, vous acceptez ces Conditions et notre Politique de confidentialité.</p>
 
-          {/* 2. Rôle de la plateforme */}
-          <section id="platform-role">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">2</span>
-              Rôle de la plateforme et avertissements
-            </h2>
-            
-            <div className="space-y-4">
-              <div className="border-l-4 border-blue-500 pl-4">
-                <h3 className="font-semibold text-lg">2.1 Marché indépendant</h3>
-                <p>BidVex est un marché numérique et n'est pas un vendeur, un concessionnaire, un courtier, un propriétaire, un dépositaire ou un mandataire des articles mis en vente. BidVex n'a pas la possession, le titre ou les droits de propriété sur les articles mis en vente.</p>
-              </div>
-              
-              <div className="border-l-4 border-blue-500 pl-4">
-                <h3 className="font-semibold text-lg">2.2 Parties à la transaction</h3>
-                <p>Toutes les ventes sont conclues directement entre l'acheteur et le vendeur. BidVex n'est pas partie à la transaction réelle entre les acheteurs et les vendeurs. Nous ne transférons pas la propriété légale des articles du vendeur à l'acheteur.</p>
-              </div>
-              
-              <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
-                <h3 className="font-semibold text-lg text-amber-800 dark:text-amber-200 mb-2">2.3 Avertissements de BidVex</h3>
-                <p className="text-amber-700 dark:text-amber-300 mb-2">BidVex ne peut pas et ne fait pas ce qui suit :</p>
-                <ul className="list-disc pl-6 space-y-1 text-amber-700 dark:text-amber-300">
-                  <li>Inspecter, certifier, garantir ou vérifier l'état, la sécurité, la légalité, l'exactitude ou la qualité des articles mis en vente;</li>
-                  <li>Gérer ou coordonner la livraison, le transport, l'entreposage ou la logistique des articles;</li>
-                  <li>Fournir des garanties, expresses ou implicites, concernant les articles; ou</li>
-                  <li>Accepter la responsabilité ou garantir la résolution des litiges entre acheteurs et vendeurs.</li>
-                </ul>
-              </div>
-            </div>
-          </section>
+      <h2>2. Définitions</h2>
+      <ul>
+        <li><strong>Plateforme</strong> : Le site Web BidVex et tous les services associés.</li>
+        <li><strong>Vendeur</strong> : Un Utilisateur qui met des articles aux enchères.</li>
+        <li><strong>Acheteur</strong> : Un Utilisateur qui place des enchères ou achète des articles.</li>
+        <li><strong>Partenaire</strong> : Un compte entreprise vérifié avec des privilèges de mise en vente améliorés.</li>
+        <li><strong>Prix marteau</strong> : Le montant de l'enchère gagnante à la clôture.</li>
+        <li><strong>Prime acheteur</strong> : Des frais supplémentaires facturés à l'Acheteur en plus du prix marteau.</li>
+        <li><strong>Dépôt fiduciaire (Escrow)</strong> : La détention des fonds de l'Acheteur par BidVex jusqu'à confirmation du retrait.</li>
+        <li><strong>Code de retrait</strong> : Un code alphanumérique de 6 caractères envoyé à l'Acheteur pour confirmer la remise.</li>
+        <li><strong>Carte obligatoire (Sticky Card)</strong> : L'obligation pour les Vendeurs de maintenir un moyen de paiement valide pendant que des annonces sont actives.</li>
+      </ul>
 
-          {/* 3. Comptes d'utilisateur */}
-          <section id="user-accounts">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">3</span>
-              <Users className="h-5 w-5" /> Comptes d'utilisateur
-            </h2>
-            
-            <div className="grid gap-4">
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-                <h3 className="font-semibold text-lg mb-2">3.1 Inscription</h3>
-                <p>Pour participer aux enchères, vous devez vous inscrire et maintenir un compte d'utilisateur.</p>
-              </div>
-              
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-                <h3 className="font-semibold text-lg mb-2">3.2 Responsabilités de l'utilisateur</h3>
-                <p className="mb-2">En créant un compte, vous acceptez de :</p>
-                <ul className="list-disc pl-6 space-y-1">
-                  <li>Fournir des informations exactes, actuelles et complètes lors du processus d'inscription;</li>
-                  <li>Maintenir la sécurité de votre compte en protégeant votre mot de passe et en limitant l'accès;</li>
-                  <li>Assumer l'entière responsabilité de toutes les activités qui se produisent sous votre compte; et</li>
-                  <li>Signaler immédiatement tout accès ou utilisation non autorisé de votre compte à BidVex.</li>
-                </ul>
-              </div>
-              
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-                <h3 className="font-semibold text-lg mb-2">3.3 Admissibilité</h3>
-                <p>Vous devez avoir au moins <strong>dix-huit (18) ans</strong> et posséder la capacité juridique de conclure des contrats contraignants pour vous inscrire et utiliser la Plateforme.</p>
-              </div>
-            </div>
-          </section>
+      <h2>3. Inscription</h2>
+      <p>Vous devez avoir au moins 18 ans et résider au Canada pour créer un compte. Vous vous engagez à fournir des informations exactes et complètes. Vous êtes responsable de toute activité sous votre compte.</p>
 
-          {/* 4. Responsabilités du vendeur */}
-          <section id="seller">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-emerald-100 dark:bg-emerald-900 rounded-full flex items-center justify-center text-emerald-600 text-sm font-bold">4</span>
-              <Building2 className="h-5 w-5 text-emerald-600" /> Responsabilités du vendeur
-            </h2>
-            
-            <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg p-4 mb-4">
-              <h3 className="font-semibold text-lg text-emerald-800 dark:text-emerald-200 mb-2">4.1 Engagements du vendeur</h3>
-              <p className="text-emerald-700 dark:text-emerald-300 mb-2">Les vendeurs doivent respecter les obligations suivantes :</p>
-              <ul className="list-disc pl-6 space-y-1 text-emerald-700 dark:text-emerald-300">
-                <li>Fournir des descriptions, des spécifications et des images de haute qualité exactes, complètes et détaillées des articles mis en vente;</li>
-                <li>Confirmer et garantir la propriété légale ou le droit légal spécifique de vendre les articles mis en vente;</li>
-                <li>Divulguer entièrement tout défaut, privilège, charge ou restriction connu sur les articles;</li>
-                <li>Se conformer à toutes les lois et réglementations applicables concernant la vente des articles;</li>
-                <li>Compléter la vente d'un article avec l'enchérisseur gagnant en temps opportun; et</li>
-                <li>Répondre rapidement et professionnellement aux demandes des acheteurs.</li>
-              </ul>
-            </div>
-            
-            <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
-              <h3 className="font-semibold text-lg text-red-800 dark:text-red-200 mb-2 flex items-center gap-2">
-                <Ban className="h-5 w-5" /> 4.2 Annonces interdites
-              </h3>
-              <p className="text-red-700 dark:text-red-300">
-                Il est strictement interdit aux vendeurs de mettre en vente des articles illégaux, contrefaits, volés, dangereux, rappelés ou autrement restreints par la loi ou la politique de BidVex.
-              </p>
-            </div>
-          </section>
+      <h2>4. Moyen de paiement obligatoire (Politique Sticky Card)</h2>
+      <h3>4.1 Exigence</h3>
+      <p>Pour créer une annonce, chaque Vendeur doit avoir un moyen de paiement valide (carte de crédit ou débit) enregistré, rattaché à son profil Stripe.</p>
+      <h3>4.2 Conservation de la carte</h3>
+      <p>Les Vendeurs <strong>ne peuvent pas supprimer</strong> leur moyen de paiement tant que l'une de leurs annonces est active. Le système bloque toute tentative de suppression.</p>
+      <h3>4.3 Vérification</h3>
+      <p>BidVex vérifie que le moyen de paiement est valide et non expiré avant de permettre la création d'annonces.</p>
+      <h3>4.4 Conservation du jeton Stripe</h3>
+      <p>BidVex conserve un jeton de méthode de paiement Stripe (jamais les données brutes de carte). Ce jeton peut être utilisé pour traiter des frais autorisés, y compris les pénalités d'annulation.</p>
 
-          {/* 5. Responsabilités de l'acheteur */}
-          <section id="buyer">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">5</span>
-              Responsabilités de l'acheteur
-            </h2>
-            
-            <div className="grid gap-4">
-              <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                <h3 className="font-semibold text-lg text-blue-800 dark:text-blue-200 mb-2">5.1 Diligence raisonnable</h3>
-                <p className="text-blue-700 dark:text-blue-300">
-                  Les acheteurs reconnaissent qu'il est de leur seule responsabilité d'inspecter les articles, de poser des questions au vendeur ou d'organiser des inspections par des tiers avant de placer une enchère, au besoin.
-                </p>
-              </div>
-              
-              <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
-                <h3 className="font-semibold text-lg text-purple-800 dark:text-purple-200 mb-2 flex items-center gap-2">
-                  <Gavel className="h-5 w-5" /> 5.2 Enchères juridiquement contraignantes
-                </h3>
-                <p className="text-purple-700 dark:text-purple-300">
-                  En plaçant une enchère, vous faites une <strong>offre juridiquement contraignante</strong> d'acheter l'article si votre enchère est la plus élevée à la clôture de l'enchère, sous réserve de tout prix de réserve.
-                </p>
-              </div>
-              
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-                <h3 className="font-semibold text-lg mb-2">5.3 Conclusion de la transaction</h3>
-                <p>Si vous êtes l'enchérisseur gagnant, vous acceptez de compléter le paiement dans les délais spécifiés et d'organiser la livraison ou le ramassage de l'article directement avec le vendeur.</p>
-              </div>
-              
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-                <h3 className="font-semibold text-lg mb-2">5.4 Informations exactes</h3>
-                <p>Les acheteurs doivent fournir des informations d'expédition et de contact exactes pour assurer une communication et une conclusion de transaction réussies.</p>
-              </div>
-            </div>
-          </section>
+      <h2>5. Pénalité d'annulation</h2>
+      <h3>5.1 Déclencheur</h3>
+      <p>Une pénalité est déclenchée lorsqu'un Vendeur signale l'impossibilité de livrer après la clôture d'une enchère avec un gagnant, ou lorsqu'un administrateur signale une non-livraison.</p>
+      <h3>5.2 Montant</h3>
+      <p>La pénalité est un montant forfaitaire de <strong>50,00 $ CAD</strong>, automatiquement prélevé sur le moyen de paiement du Vendeur.</p>
+      <h3>5.3 Échec du paiement</h3>
+      <p>Si le prélèvement échoue, le compte du Vendeur sera signalé pour examen administratif et pourra être suspendu.</p>
+      <h3>5.4 Autorisation</h3>
+      <p>En créant une annonce sur BidVex, vous autorisez BidVex à prélever votre moyen de paiement pour toute pénalité d'annulation applicable.</p>
 
-          {/* 6. Règles d'enchères */}
-          <section id="bidding">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">6</span>
-              <Gavel className="h-5 w-5" /> Règles d'enchères
-            </h2>
-            
-            <div className="grid gap-4">
-              <div className="flex items-start gap-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                <CheckCircle className="h-6 w-6 text-green-500 mt-0.5 flex-shrink-0" />
-                <div>
-                  <h3 className="font-semibold">6.1 Enchères contraignantes</h3>
-                  <p>Toutes les enchères placées sur la Plateforme constituent des obligations contractuelles juridiquement contraignantes.</p>
-                </div>
-              </div>
-              
-              <div className="flex items-start gap-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                <XCircle className="h-6 w-6 text-red-500 mt-0.5 flex-shrink-0" />
-                <div>
-                  <h3 className="font-semibold">6.2 Rétractation d'enchère</h3>
-                  <p>Les rétractations d'enchères ne sont pas autorisées, sauf dans des circonstances exceptionnelles et limitées, comme une erreur typographique importante, et uniquement si elles sont demandées dans l'heure <strong>(1) heure</strong> suivant le placement de l'enchère.</p>
-                </div>
-              </div>
-              
-              <div className="flex items-start gap-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                <Shield className="h-6 w-6 text-blue-500 mt-0.5 flex-shrink-0" />
-                <div>
-                  <h3 className="font-semibold">6.3 Prix de réserve</h3>
-                  <p>Les vendeurs peuvent fixer un « Prix de réserve » (le prix minimum confidentiel que le vendeur est prêt à accepter). L'article ne sera pas vendu si le Prix de réserve n'est pas atteint.</p>
-                </div>
-              </div>
-              
-              <div className="flex items-start gap-3 p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
-                <Clock className="h-6 w-6 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <h3 className="font-semibold text-blue-800 dark:text-blue-200">6.4 Politique anti-sniping</h3>
-                  <p className="text-blue-700 dark:text-blue-300">Si une enchère est placée dans les <strong>deux (2) dernières minutes</strong> de l'heure de fin prévue d'une enchère, la durée de l'enchère sera prolongée de deux (2) minutes supplémentaires. Cela garantit un processus d'enchères équitable.</p>
-                </div>
-              </div>
-            </div>
-          </section>
+      <h2>6. Système de dépôt fiduciaire et code de retrait (articles non véhiculaires)</h2>
+      <h3>6.1 Fonctionnement</h3>
+      <p>Pour les articles non véhiculaires, lorsqu'un Acheteur remporte une enchère, les fonds sont détenus en fiducie par BidVex. Un code de retrait unique de 6 caractères est généré et envoyé à l'Acheteur. Le Vendeur doit entrer ce code pour confirmer la remise et libérer les fonds.</p>
+      <h3>6.2 Livraison du code</h3>
+      <p>Le code est envoyé à l'adresse courriel de l'Acheteur. L'Acheteur est responsable de présenter ce code au Vendeur.</p>
+      <h3>6.3 Libération des fonds</h3>
+      <p>Les fonds sont transférés au compte Stripe Connect du Vendeur uniquement après la saisie du code correct.</p>
+      <h3>6.4 Libération automatique après 48 heures</h3>
+      <p>Si l'Acheteur ne présente pas le code dans les 48 heures, les fonds sont <strong>automatiquement libérés</strong> au Vendeur. Les deux parties sont notifiées par courriel.</p>
+      <h3>6.5 Litige</h3>
+      <p>Chaque partie peut ouvrir un litige sur un dépôt actif. Les litiges sont examinés par l'équipe BidVex. Les fonds restent détenus pendant la résolution.</p>
+      <h3>6.6 Exclusion des véhicules</h3>
+      <p>Les transactions de véhicules sont exclues du système de dépôt fiduciaire. Les véhicules utilisent un flux de paiement séparé.</p>
 
-          {/* 7. Frais */}
-          <section id="fees">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center text-green-600 text-sm font-bold">7</span>
-              <DollarSign className="h-5 w-5 text-green-600" /> Frais, taxes et structure de paiement
-            </h2>
-            
-            <div className="space-y-4">
-              <div>
-                <h3 className="font-semibold text-lg mb-3">7.1 Niveaux d'utilisateur</h3>
-                <p className="mb-3">Lors de l'inscription, les utilisateurs sont assignés à un niveau spécifique. Ce niveau détermine les frais d'encanteur et la commission du vendeur applicables.</p>
-                
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="bg-slate-100 dark:bg-slate-800">
-                        <th className="border border-slate-300 dark:border-slate-600 px-4 py-3 text-left font-semibold">Niveau</th>
-                        <th className="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center font-semibold">Frais d'encanteur</th>
-                        <th className="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center font-semibold">Commission du vendeur</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="bg-slate-50 dark:bg-slate-800/50">
-                        <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 font-medium">Standard</td>
-                        <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center">5,0 %</td>
-                        <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center">4,0 %</td>
-                      </tr>
-                      <tr className="bg-blue-50 dark:bg-blue-950/30">
-                        <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 font-medium text-blue-700 dark:text-blue-300">Premium</td>
-                        <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center text-blue-700 dark:text-blue-300">3,5 %</td>
-                        <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center text-blue-700 dark:text-blue-300">2,5 %</td>
-                      </tr>
-                      <tr className="bg-amber-50 dark:bg-amber-950/30">
-                        <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 font-medium text-amber-700 dark:text-amber-300">VIP Élite</td>
-                        <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center text-amber-700 dark:text-amber-300">3,0 %</td>
-                        <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center text-amber-700 dark:text-amber-300">2,0 %</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-                <h3 className="font-semibold text-lg mb-2">7.2 Frais supplémentaires</h3>
-                <p>Des <strong>frais de plateforme obligatoires de 2,5 %</strong> sont appliqués à toutes les transactions complétées pour les véhicules uniquement.</p>
-              </div>
-              
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-                <h3 className="font-semibold text-lg mb-2">7.3 Taxes</h3>
-                <p>Les taxes (y compris la TPS, la TVP, la TVH et la TVQ, selon le cas) sont ajoutées à la facture finale. Les calculs de taxes sont basés sur le prix de vente final et la juridiction de la transaction.</p>
-              </div>
-              
-              <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
-                <h3 className="font-semibold text-lg mb-2 text-amber-800 dark:text-amber-200">7.4 Conditions de paiement</h3>
-                <p className="text-amber-700 dark:text-amber-300 mb-2">Le paiement complet pour toutes les enchères gagnantes est dû dans les <strong>quatorze (14) jours</strong> suivant la clôture de l'enchère.</p>
-                <p className="text-amber-700 dark:text-amber-300"><strong>Paiements en retard :</strong> Les paiements non reçus à la date d'échéance peuvent entraîner une pénalité de retard de <strong>2 % par mois</strong> (24 % par an) sur le solde impayé.</p>
-              </div>
-              
-              <div className="flex items-start gap-3 p-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
-                <CreditCard className="h-6 w-6 text-green-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <h3 className="font-semibold text-green-800 dark:text-green-200">7.5 Traitement des paiements</h3>
-                  <p className="text-green-700 dark:text-green-300">Tous les paiements sont traités via <strong>Stripe</strong>, un processeur de paiement tiers sécurisé. BidVex ne stocke, ne possède ni n'a accès à aucune information complète de carte de crédit ou de compte bancaire.</p>
-                </div>
-              </div>
-            </div>
-          </section>
+      <h2>7. Licence de vendeur de véhicules</h2>
+      <p>Seuls les vendeurs de véhicules licenciés avec un permis OPC vérifié peuvent lister des véhicules routiers. Les vendeurs individuels (non licenciés) sont interdits. Les tentatives frauduleuses entraîneront la suspension immédiate du compte.</p>
 
-          {/* 8. Clause TEL QUEL */}
-          <section id="as-is">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center text-red-600 text-sm font-bold">8</span>
-              <AlertTriangle className="h-5 w-5 text-red-600" /> Clause « TEL QUEL / LÀ OÙ IL SE TROUVE »
-            </h2>
-            
-            <div className="bg-red-50 dark:bg-red-950/30 border-2 border-red-300 dark:border-red-700 rounded-lg p-6">
-              <p className="text-red-800 dark:text-red-200 font-medium uppercase text-sm leading-relaxed">
-                VOUS ACCEPTEZ EXPRESSÉMENT QUE TOUS LES ARTICLES MIS EN VENTE SUR LA PLATEFORME SONT VENDUS « TEL QUEL, LÀ OÙ ILS SE TROUVENT », AVEC TOUS LES DÉFAUTS ET SANS AUCUNE GARANTIE DE QUELQUE NATURE QUE CE SOIT, EXPRESSE OU IMPLICITE, Y COMPRIS TOUTE GARANTIE DE QUALITÉ MARCHANDE OU D'ADÉQUATION À UN USAGE PARTICULIER. BIDVEX N'EST PAS RESPONSABLE DE L'ÉTAT, DE LA SÉCURITÉ, DE LA LÉGALITÉ OU DE L'EXACTITUDE DE TOUT ARTICLE OU DE TOUT LITIGE ENTRE UTILISATEURS.
-              </p>
-            </div>
-          </section>
+      <h2>8. Frais et tarification</h2>
+      <p>BidVex facture des primes acheteur, des commissions vendeur et des frais de plateforme calculés par notre système de tarification. Les barèmes varient selon le niveau d'abonnement. Tous les frais sont affichés de manière transparente avant la confirmation.</p>
 
-          {/* 9. Litiges */}
-          <section id="disputes">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">9</span>
-              <Scale className="h-5 w-5" /> Résolution des litiges
-            </h2>
-            
-            <div className="space-y-4">
-              <div className="border-l-4 border-blue-500 pl-4">
-                <h3 className="font-semibold">9.1 Résolution directe</h3>
-                <p>En cas de litige entre un acheteur et un vendeur, les parties conviennent de tenter d'abord de résoudre le problème directement et de bonne foi.</p>
-              </div>
-              
-              <div className="border-l-4 border-blue-500 pl-4">
-                <h3 className="font-semibold">9.2 Médiation par le support</h3>
-                <p>Si les parties ne parviennent pas à résoudre le litige, elles peuvent contacter le support BidVex dans les <strong>sept (7) jours</strong> suivant la clôture de la transaction. BidVex peut, à sa seule discrétion, tenter de médier le litige, mais BidVex n'est pas obligé de le faire.</p>
-              </div>
-              
-              <div className="border-l-4 border-blue-500 pl-4">
-                <h3 className="font-semibold">9.3 Remboursements</h3>
-                <p>Les remboursements, retours ou ajustements sont à la seule discrétion du vendeur, sauf si BidVex détermine qu'un article a été significativement mal représenté dans l'annonce.</p>
-              </div>
-            </div>
-          </section>
+      <h2>9. Conduite sur la plateforme</h2>
+      <h3>9.1 Comportements interdits</h3>
+      <ul>
+        <li>Enchères fictives sur vos propres articles</li>
+        <li>Mise en vente d'articles contrefaits, volés ou illégaux</li>
+        <li>Descriptions trompeuses</li>
+        <li>Harcèlement via messages ou la communauté Q&amp;R</li>
+        <li>Manipulation des résultats d'enchères</li>
+        <li>Contournement des systèmes de paiement ou de dépôt fiduciaire</li>
+      </ul>
+      <h3>9.2 Obligations du vendeur</h3>
+      <p>Les Vendeurs doivent livrer les articles tels que décrits. La non-livraison déclenche la pénalité d'annulation.</p>
+      <h3>9.3 Obligations de l'acheteur</h3>
+      <p>Les Acheteurs doivent compléter le paiement rapidement. Ils doivent présenter leur code de retrait lors de la collecte.</p>
 
-          {/* 10. Propriété intellectuelle */}
-          <section id="ip">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">10</span>
-              Propriété intellectuelle
-            </h2>
-            
-            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 mb-4">
-              <h3 className="font-semibold mb-2">10.1 Propriété</h3>
-              <p>Tout le contenu et les matériaux sur la Plateforme, y compris le logo BidVex, le texte, les graphiques, les images, les vidéos, le code et les logiciels sont la propriété de BidVex Inc. ou de ses concédants de licence et sont protégés par le droit d'auteur, les marques de commerce et d'autres lois sur la propriété intellectuelle.</p>
-            </div>
-            
-            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-              <h3 className="font-semibold mb-2">10.2 Restrictions d'utilisation</h3>
-              <ul className="list-disc pl-6 space-y-1">
-                <li>Il est interdit aux utilisateurs de copier, reproduire, modifier, distribuer ou vendre tout contenu sans autorisation écrite préalable.</li>
-                <li>L'utilisation de nos marques de commerce, logos ou image de marque sans autorisation expresse est interdite.</li>
-                <li>Vous n'êtes pas autorisé à utiliser le « scraping », l'« exploration de données » ou des agents automatisés pour collecter des informations de la Plateforme.</li>
-              </ul>
-            </div>
-          </section>
+      <h2>10. Communauté Q&amp;R</h2>
+      <p>La communauté Q&amp;R est fournie à titre informatif. Les utilisateurs ne doivent pas publier de spam, contenu offensant, informations personnelles d'autrui ou sollicitations commerciales. BidVex se réserve le droit de modérer le contenu.</p>
 
-          {/* 11. Conduites interdites */}
-          <section id="prohibited">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center text-red-600 text-sm font-bold">11</span>
-              <Ban className="h-5 w-5 text-red-600" /> Conduites interdites
-            </h2>
-            
-            <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
-              <p className="text-red-800 dark:text-red-200 mb-3">Il est strictement interdit aux utilisateurs de s'engager dans les conduites suivantes :</p>
-              <ul className="list-disc pl-6 space-y-1 text-red-700 dark:text-red-300">
-                <li>S'engager dans la fraude, les enchères fictives ou toute forme de manipulation ou d'inflation artificielle des enchères;</li>
-                <li>Harceler, menacer ou frauder d'autres utilisateurs ou employés de BidVex;</li>
-                <li>Publier du pourriel, des virus ou du code malveillant qui pourrait nuire à la Plateforme ou aux utilisateurs;</li>
-                <li>Contourner les frais de BidVex ou manipuler le processus d'enchères;</li>
-                <li>Créer plusieurs comptes pour contourner les restrictions ou manipuler les enchères; ou</li>
-                <li>S'engager dans toute conduite qui viole les lois ou réglementations applicables.</li>
-              </ul>
-              <p className="mt-3 text-red-800 dark:text-red-200 font-semibold">
-                Les violations de cette section peuvent entraîner la suspension ou la résiliation immédiate de votre compte et peuvent entraîner des poursuites judiciaires.
-              </p>
-            </div>
-          </section>
+      <h2>11. Stripe Connect et traitement des paiements</h2>
+      <p>BidVex utilise Stripe comme processeur de paiement. En utilisant la Plateforme, vous acceptez les conditions de Stripe et autorisez BidVex à créer des charges, des retenues, des transferts et des pénalités en votre nom.</p>
 
-          {/* 12. Limitation de responsabilité */}
-          <section id="liability">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">12</span>
-              Limitation de responsabilité
-            </h2>
-            
-            <div className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-4">
-              <p className="text-sm uppercase leading-relaxed mb-3">
-                DANS TOUTE LA MESURE PERMISE PAR LA LOI, BIDVEX FOURNIT LA PLATEFORME « TEL QUEL » ET « TEL QUE DISPONIBLE ». BIDVEX NE SERA PAS RESPONSABLE DE :
-              </p>
-              <ul className="list-disc pl-6 space-y-1 text-sm">
-                <li>L'EXACTITUDE, L'EXHAUSTIVITÉ OU LA FIABILITÉ DES DESCRIPTIONS D'ARTICLES;</li>
-                <li>LES ACTIONS, OMISSIONS OU CONDUITES DES ACHETEURS OU DES VENDEURS;</li>
-                <li>TOUTE PERTE, DOMMAGE OU PRÉJUDICE DÉCOULANT DE TEMPS D'ARRÊT, D'ERREURS OU D'INTERRUPTIONS TECHNIQUES; OU</li>
-                <li>TOUT DOMMAGE DIRECT, INDIRECT, ACCESSOIRE, CONSÉCUTIF, SPÉCIAL OU PUNITIF.</li>
-              </ul>
-              <p className="mt-3 text-sm font-semibold">
-                NOTRE RESPONSABILITÉ GLOBALE MAXIMALE NE DÉPASSERA PAS LE TOTAL DES FRAIS QUE VOUS AVEZ PAYÉS À BIDVEX AU COURS DES DOUZE (12) MOIS PRÉCÉDANT LA RÉCLAMATION.
-              </p>
-            </div>
-          </section>
+      <h2>12. Limitation de responsabilité</h2>
+      <p>BidVex agit comme facilitateur de marché et n'est pas partie à la vente. BidVex n'est pas responsable de la qualité, sécurité ou légalité des articles listés. Notre responsabilité est limitée aux frais perçus.</p>
 
-          {/* 13. Résiliation */}
-          <section id="termination">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">13</span>
-              Suspension et résiliation
-            </h2>
-            
-            <div className="grid gap-4">
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-                <h3 className="font-semibold mb-2">13.1 Droit de BidVex</h3>
-                <p>BidVex se réserve le droit, à sa seule discrétion, de suspendre, de résilier ou de restreindre votre compte et votre accès à la Plateforme si vous violez ces Conditions ou si vous vous engagez dans une conduite préjudiciable à BidVex ou à ses utilisateurs.</p>
-              </div>
-              
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-                <h3 className="font-semibold mb-2">13.2 Fermeture de compte par l'utilisateur</h3>
-                <p>Vous pouvez fermer votre compte BidVex à tout moment. Cependant, la fermeture de votre compte ne vous libère pas des obligations en cours, y compris les enchères juridiquement contraignantes et les exigences de paiement.</p>
-              </div>
-            </div>
-          </section>
+      <h2>13. Loi applicable</h2>
+      <p>Ces Conditions sont régies par les lois de la province de Québec et les lois fédérales du Canada. Tout litige sera résolu devant les tribunaux du Québec.</p>
 
-          {/* 14. Modifications */}
-          <section id="changes">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">14</span>
-              Modifications des conditions générales
-            </h2>
-            <p>BidVex se réserve le droit de mettre à jour ou de modifier ces Conditions à tout moment. Les changements importants seront communiqués aux utilisateurs inscrits par courriel et par notifications sur la plateforme. Votre utilisation continue de la Plateforme après la date d'entrée en vigueur de tout changement constitue votre acceptation des nouvelles Conditions.</p>
-          </section>
+      <h2>14. Modifications</h2>
+      <p>BidVex se réserve le droit de modifier ces Conditions. Les changements importants seront communiqués par courriel. L'utilisation continue après les modifications constitue une acceptation.</p>
 
-          {/* 15. Droit applicable */}
-          <section id="governing">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">15</span>
-              <Scale className="h-5 w-5" /> Droit applicable et juridiction
-            </h2>
-            <p>Les présentes Conditions et votre utilisation de la Plateforme sont régies et interprétées conformément aux lois de la <strong>province de Québec</strong> et aux lois fédérales du Canada qui s'y appliquent. Tout litige découlant de ces Conditions ou s'y rapportant sera résolu exclusivement devant les tribunaux de <strong>Montréal, Québec</strong>.</p>
-          </section>
-
-          {/* 16. Coordonnées */}
-          <section id="contact" className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-6">
-            <h2 className="text-2xl font-semibold mb-4 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">16</span>
-              Coordonnées
-            </h2>
-            <p className="font-semibold text-lg mb-4">BidVex — Service juridique et responsable de la protection des données</p>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <Mail className="h-5 w-5 text-blue-600" />
-                <span><strong>Courriel :</strong> support@bidvex.com</span>
-              </div>
-            </div>
-          </section>
-
-          {/* Transactions transfrontalières (Bilingue) */}
-          <CrossBorderLegalSection />
-
-          {/* Enchères de véhicules : Conformité OPC (Bilingue) */}
-          <VehicleAuctionLegalSection />
-
-          {/* Pied de page */}
-          <div className="text-center text-sm text-muted-foreground pt-6 border-t">
-            <p>&copy; 2026 BidVex Inc. Tous droits réservés.</p>
-          </div>
-        </CardContent>
-      </Card>
+      <h2>15. Contact</h2>
+      <p>Pour toute question, contactez-nous à <strong>legal@bidvex.com</strong>.</p>
     </div>
-  );
-};
-
-export default TermsFR;
+  </div>
+);

@@ -299,6 +299,7 @@ try:
     from routes.deposits import deposits_router, set_deposits_db, set_deposits_auth
     from routes.user_insights import insights_router, set_insights_db, set_insights_auth
     from routes.community import community_router, set_db as set_community_db
+    from routes.escrow import escrow_router
     from services.email_service import get_email_service
     from services.email_marketing import get_marketing_service, SEGMENT_FILTERS, CAMPAIGN_STATUS
     from services.user_email_marketing import get_user_marketing_service, SUBSCRIPTION_LIMITS
@@ -343,7 +344,7 @@ try:
     for router in [analytics_router, auctions_router, bids_router, listings_router,
                    auth_router, sms_router, payments_router, webhooks_router,
                    marketplace_router, admin_router, dashboard_router, profiles_router,
-                   deposits_router, insights_router, community_router]:
+                   deposits_router, insights_router, community_router, escrow_router]:
         api_router.include_router(router)
 
     # Self-contained routers (import from deps directly)

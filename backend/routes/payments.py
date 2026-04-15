@@ -530,14 +530,28 @@ async def delete_payment_method(
     method_id: str,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
-    """Delete a payment method from Stripe and DB."""
+    """Delete a payment method — BLOCKED if seller has active listings."""
     import stripe
+    from services.stripe_customer_service import check_card_deletion_allowed
 
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentication required")
 
     current_user = await _auth(credentials)
     db = get_db()
+
+    # Sticky Card Guard: block deletion with active listings
+    active_count = await check_card_deletion_allowed(db, current_user.id)
+    if active_count > 0:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "payment_method_locked",
+                "message_en": f"You have {active_count} active listing(s). Your payment method cannot be removed while auctions are live. Please wait for your auctions to end or cancel them first.",
+                "message_fr": f"Vous avez {active_count} annonce(s) active(s). Votre moyen de paiement ne peut pas être supprimé pendant que des enchères sont en cours. Veuillez attendre la fin de vos enchères ou les annuler d'abord.",
+                "active_listing_count": active_count,
+            },
+        )
 
     method = await db.payment_methods.find_one(
         {"id": method_id, "user_id": current_user.id}
@@ -551,6 +565,14 @@ async def delete_payment_method(
         pass
 
     await db.payment_methods.delete_one({"id": method_id})
+
+    # Clear user's default payment method
+    await db.users.update_one(
+        {"id": current_user.id},
+        {"$set": {"has_payment_method": False, "updated_at": datetime.now(timezone.utc).isoformat()},
+         "$unset": {"default_payment_method_id": ""}},
+    )
+
     return {"message": "Payment method deleted"}
 
 

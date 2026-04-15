@@ -390,4 +390,15 @@ def register_lifecycle_jobs(scheduler, db: AsyncIOMotorDatabase):
     scheduler.add_job(_run_subscription_expiry, "cron", hour=9, minute=30, id="lifecycle_subscription", replace_existing=True)
     scheduler.add_job(_run_abandoned_bid, "cron", hour=10, minute=0, id="lifecycle_abandoned_bid", replace_existing=True)
 
-    logger.info("[LIFECYCLE] Registered 4 lifecycle email jobs (9:00, 9:15, 9:30, 10:00 AM UTC)")
+    def _run_stripe_audit():
+        from services.stripe_customer_service import audit_stripe_customers
+        asyncio.get_event_loop().create_task(audit_stripe_customers(db))
+
+    def _run_escrow_auto_release():
+        from services.escrow_service import auto_release_expired_escrows
+        asyncio.get_event_loop().create_task(auto_release_expired_escrows(db))
+
+    scheduler.add_job(_run_stripe_audit, "cron", hour=6, minute=0, id="stripe_customer_audit", replace_existing=True)
+    scheduler.add_job(_run_escrow_auto_release, "interval", minutes=15, id="escrow_auto_release", replace_existing=True)
+
+    logger.info("[LIFECYCLE] Registered 6 lifecycle email jobs (9:00, 9:15, 9:30, 10:00, 6:00 AM UTC + 15min escrow)")

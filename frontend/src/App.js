@@ -57,6 +57,7 @@ const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const BecomePartnerPage = lazy(() => import('./pages/BecomePartnerPage'));
 const PartnerDashboard = lazy(() => import('./pages/PartnerDashboard'));
 const LegalPage = lazy(() => import('./pages/LegalPage'));
+const PlatformPoliciesPage = lazy(() => import('./pages/PlatformPoliciesPage'));
 const InviteAcceptPage = lazy(() => import('./pages/InviteAcceptPage'));
 const CompareListingsPage = lazy(() => import('./pages/CompareListingsPage'));
 const StorefrontPage = lazy(() => import('./pages/StorefrontPage'));
@@ -328,6 +329,7 @@ const App = () => {
           <Route path="/terms-of-service" element={<TermsOfServicePage />} />
           <Route path="/terms" element={<Navigate to="/terms-of-service" replace />} />
           <Route path="/legal" element={<LegalPage />} />
+          <Route path="/policies" element={<PlatformPoliciesPage />} />
           <Route path="/invite/:token" element={<InviteAcceptPage />} />
           <Route path="/become-a-partner" element={<BecomePartnerPage />} />
           <Route path="/partner/dashboard" element={

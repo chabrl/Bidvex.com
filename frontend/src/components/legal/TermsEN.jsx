@@ -1,519 +1,102 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { 
-  FileText, Mail, Shield, AlertTriangle, Gavel, 
-  Users, DollarSign, Scale, Lock, Ban, Clock, CheckCircle,
-  XCircle, CreditCard, Building2
-} from 'lucide-react';
-import { CrossBorderLegalSection, VehicleAuctionLegalSection } from './LegalComplianceSections';
 
-export const TermsEN = () => {
-  return (
-    <div className="min-h-screen py-12 px-4 max-w-4xl mx-auto">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-3 mb-4">
-            <FileText className="h-8 w-8 text-primary" />
-            <CardTitle className="text-3xl">BidVex Terms & Conditions</CardTitle>
-          </div>
-          <p className="text-muted-foreground">Last Updated: March 2026</p>
-        </CardHeader>
-        <CardContent className="prose prose-sm max-w-none space-y-8">
-          
-          {/* Table of Contents */}
-          <section className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">Table of Contents</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              <ol className="list-decimal pl-6 space-y-1 text-blue-600 dark:text-blue-400">
-                <li><a href="#introduction" className="hover:underline">Introduction & Acceptance</a></li>
-                <li><a href="#platform-role" className="hover:underline">Platform Role & Disclaimers</a></li>
-                <li><a href="#user-accounts" className="hover:underline">User Accounts</a></li>
-                <li><a href="#seller" className="hover:underline">Seller Responsibilities</a></li>
-                <li><a href="#buyer" className="hover:underline">Buyer Responsibilities</a></li>
-                <li><a href="#bidding" className="hover:underline">Bidding & Auction Rules</a></li>
-                <li><a href="#fees" className="hover:underline">Fees, Taxes & Payments</a></li>
-                <li><a href="#as-is" className="hover:underline">AS-IS / WHERE-IS Clause</a></li>
-              </ol>
-              <ol className="list-decimal pl-6 space-y-1 text-blue-600 dark:text-blue-400" start={9}>
-                <li><a href="#promotions" className="hover:underline">Listing Promotions & Marketing</a></li>
-                <li><a href="#disputes" className="hover:underline">Dispute Resolution</a></li>
-                <li><a href="#ip" className="hover:underline">Intellectual Property</a></li>
-                <li><a href="#prohibited" className="hover:underline">Prohibited Conduct</a></li>
-                <li><a href="#liability" className="hover:underline">Limitation of Liability</a></li>
-                <li><a href="#termination" className="hover:underline">Suspension & Termination</a></li>
-                <li><a href="#changes" className="hover:underline">Changes to Terms</a></li>
-                <li><a href="#governing" className="hover:underline">Governing Law</a></li>
-                <li><a href="#contact" className="hover:underline">Contact Information</a></li>
-              </ol>
-            </div>
-          </section>
+export const TermsEN = () => (
+  <div className="min-h-screen bg-background py-12 px-4">
+    <div className="max-w-4xl mx-auto prose prose-sm dark:prose-invert">
+      <h1>BidVex Inc. — Terms of Service</h1>
+      <p className="text-muted-foreground">Last Updated: April 15, 2026 | Effective Date: April 15, 2026</p>
 
-          {/* 1. Introduction */}
-          <section id="introduction">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">1</span>
-              Introduction & Acceptance of Terms
-            </h2>
-            <p className="mb-3">
-              Welcome to BidVex. These Terms & Conditions ("Terms") form a legally binding agreement between you ("User," "you," or "your") and BidVex Inc. ("BidVex," "we," "us," or "our"). These Terms govern your access to and use of our online auction platform, website, and related services (collectively, "the Platform").
-            </p>
-            <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 my-4">
-              <p className="text-blue-800 dark:text-blue-200">
-                <strong>By registering for an account, browsing the Platform, or participating in an auction,</strong> you acknowledge that you have read, understood, and agree to be bound by these Terms, as well as our Privacy Policy. If you do not agree to these Terms, you must not access or use the Platform.
-              </p>
-            </div>
-            <p>BidVex facilitates online auctions for various items, including but not limited to vehicles, consumer goods, and commercial services.</p>
-          </section>
+      <h2>1. Introduction &amp; Acceptance</h2>
+      <p>Welcome to BidVex. These Terms of Service ("Terms") form a legally binding agreement between you ("User") and BidVex Inc. ("BidVex," "we," "us"). By registering, browsing, or participating in any auction, you agree to these Terms and our Privacy Policy. If you do not agree, do not use the Platform.</p>
 
-          {/* 2. Platform Role */}
-          <section id="platform-role">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">2</span>
-              Platform Role & Disclaimers
-            </h2>
-            
-            <div className="space-y-4">
-              <div className="border-l-4 border-blue-500 pl-4">
-                <h3 className="font-semibold text-lg">2.1 Independent Marketplace</h3>
-                <p>BidVex is a digital marketplace and is not a seller, dealer, broker, owner, bailee, or agent of any listed items. BidVex does not have possession of, title to, or ownership rights in any item listed for sale.</p>
-              </div>
-              
-              <div className="border-l-4 border-blue-500 pl-4">
-                <h3 className="font-semibold text-lg">2.2 Transaction Parties</h3>
-                <p>All sales are completed directly between the buyer and the seller. BidVex is not a party to the actual transaction between buyers and sellers. We do not transfer legal ownership of items from the seller to the buyer.</p>
-              </div>
-              
-              <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
-                <h3 className="font-semibold text-lg text-amber-800 dark:text-amber-200 mb-2">2.3 BidVex Disclaimers</h3>
-                <p className="text-amber-700 dark:text-amber-300 mb-2">BidVex does not and cannot:</p>
-                <ul className="list-disc pl-6 space-y-1 text-amber-700 dark:text-amber-300">
-                  <li>Inspect, certify, guarantee, or verify the condition, safety, legality, accuracy, or quality of listed items;</li>
-                  <li>Handle or coordinate delivery, transport, storage, or logistics for any items;</li>
-                  <li>Provide any warranties, express or implied, regarding the items; or</li>
-                  <li>Accept responsibility for, or guarantee the resolution of, any disputes between buyers and sellers.</li>
-                </ul>
-              </div>
-            </div>
-          </section>
+      <h2>2. Definitions</h2>
+      <ul>
+        <li><strong>Platform</strong>: The BidVex website, mobile site, and all associated services.</li>
+        <li><strong>Seller</strong>: A User who lists items for auction.</li>
+        <li><strong>Buyer</strong>: A User who places bids or purchases items.</li>
+        <li><strong>Partner</strong>: A verified business account with enhanced listing privileges.</li>
+        <li><strong>Hammer Price</strong>: The winning bid amount at auction close.</li>
+        <li><strong>Buyer's Premium</strong>: An additional fee charged to the Buyer on top of the Hammer Price.</li>
+        <li><strong>Escrow</strong>: The holding of Buyer funds by BidVex until pickup/delivery is confirmed.</li>
+        <li><strong>Pickup Code</strong>: A 6-character alphanumeric code sent to the Buyer to confirm item handoff.</li>
+        <li><strong>Sticky Card</strong>: The requirement that Sellers maintain a valid payment method on file while listings are active.</li>
+      </ul>
 
-          {/* 3. User Accounts */}
-          <section id="user-accounts">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">3</span>
-              <Users className="h-5 w-5" /> User Accounts
-            </h2>
-            
-            <div className="grid gap-4">
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-                <h3 className="font-semibold text-lg mb-2">3.1 Registration</h3>
-                <p>To participate in auctions, you are required to register and maintain a user account.</p>
-              </div>
-              
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-                <h3 className="font-semibold text-lg mb-2">3.2 User Responsibilities</h3>
-                <p className="mb-2">By creating an account, you agree to:</p>
-                <ul className="list-disc pl-6 space-y-1">
-                  <li>Provide accurate, current, and complete information during the registration process;</li>
-                  <li>Maintain the security of your account by protecting your password and restricting access;</li>
-                  <li>Assume all responsibility for all activities that occur under your account; and</li>
-                  <li>Immediately report any unauthorized access or use of your account to BidVex.</li>
-                </ul>
-              </div>
-              
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-                <h3 className="font-semibold text-lg mb-2">3.3 Eligibility</h3>
-                <p>You must be at least <strong>eighteen (18) years of age</strong> and possess the legal capacity to enter into binding contracts to register for an account and use the Platform.</p>
-              </div>
-            </div>
-          </section>
+      <h2>3. Account Registration</h2>
+      <p>You must be at least 18 years old and a resident of Canada to create an account. You agree to provide accurate, current, and complete information. You are responsible for all activity under your account. BidVex reserves the right to suspend or terminate accounts that violate these Terms.</p>
 
-          {/* 4. Seller Responsibilities */}
-          <section id="seller">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-emerald-100 dark:bg-emerald-900 rounded-full flex items-center justify-center text-emerald-600 text-sm font-bold">4</span>
-              <Building2 className="h-5 w-5 text-emerald-600" /> Seller Responsibilities
-            </h2>
-            
-            <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg p-4 mb-4">
-              <h3 className="font-semibold text-lg text-emerald-800 dark:text-emerald-200 mb-2">4.1 Seller Covenants</h3>
-              <p className="text-emerald-700 dark:text-emerald-300 mb-2">Sellers must adhere to the following obligations:</p>
-              <ul className="list-disc pl-6 space-y-1 text-emerald-700 dark:text-emerald-300">
-                <li>Provide accurate, complete, and detailed descriptions, specifications, and high-quality images of listed items;</li>
-                <li>Confirm and guarantee legal ownership or the specific legal right to sell the listed items;</li>
-                <li>Fully disclose any known defects, liens, encumbrances, or restrictions on the items;</li>
-                <li>Comply with all applicable laws and regulations regarding the sale of the items;</li>
-                <li>Complete the sale of an item with the winning bidder in a timely manner; and</li>
-                <li>Respond promptly and professionally to buyer inquiries.</li>
-              </ul>
-            </div>
-            
-            <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
-              <h3 className="font-semibold text-lg text-red-800 dark:text-red-200 mb-2 flex items-center gap-2">
-                <Ban className="h-5 w-5" /> 4.2 Prohibited Listings
-              </h3>
-              <p className="text-red-700 dark:text-red-300">
-                Sellers are strictly prohibited from listing items that are illegal, counterfeit, stolen, hazardous, recallable, or otherwise restricted by law or BidVex policy.
-              </p>
-            </div>
-          </section>
+      <h2>4. Mandatory Payment Method (Sticky Card Policy)</h2>
+      <h3>4.1 Requirement</h3>
+      <p>To create a listing, every Seller must have a valid payment method (credit or debit card) on file, attached to their Stripe Customer profile. This requirement ensures accountability and protects Buyers.</p>
+      <h3>4.2 Card Retention During Active Listings</h3>
+      <p>Sellers <strong>cannot remove</strong> their payment method while any of their listings are in an active, live, or ending-soon status. Attempting to remove a payment method during this period will be blocked by the system.</p>
+      <h3>4.3 Card Verification</h3>
+      <p>BidVex verifies that the payment method on file is valid and not expired before allowing listing creation. If your card expires, you must update it before creating new listings.</p>
+      <h3>4.4 Stripe Token Retention</h3>
+      <p>BidVex stores a Stripe payment method token (not raw card data) on your account. This token may be used to process authorized charges, including cancellation penalties under Section 5.</p>
 
-          {/* 5. Buyer Responsibilities */}
-          <section id="buyer">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">5</span>
-              Buyer Responsibilities
-            </h2>
-            
-            <div className="grid gap-4">
-              <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                <h3 className="font-semibold text-lg text-blue-800 dark:text-blue-200 mb-2">5.1 Due Diligence</h3>
-                <p className="text-blue-700 dark:text-blue-300">
-                  Buyers acknowledge that it is their sole responsibility to inspect items, ask questions of the seller, or arrange third-party inspections before placing a bid, as needed.
-                </p>
-              </div>
-              
-              <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
-                <h3 className="font-semibold text-lg text-purple-800 dark:text-purple-200 mb-2 flex items-center gap-2">
-                  <Gavel className="h-5 w-5" /> 5.2 Legally Binding Bids
-                </h3>
-                <p className="text-purple-700 dark:text-purple-300">
-                  By placing a bid, you are making a <strong>legally binding offer</strong> to purchase the item if your bid is the highest at the close of the auction, subject to any reserve price.
-                </p>
-              </div>
-              
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-                <h3 className="font-semibold text-lg mb-2">5.3 Completion of Transaction</h3>
-                <p>If you are the winning bidder, you agree to complete the payment within the specified deadlines and arrange for the delivery or pickup of the item directly with the seller.</p>
-              </div>
-              
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-                <h3 className="font-semibold text-lg mb-2">5.4 Accurate Information</h3>
-                <p>Buyers must provide accurate shipping and contact information to ensure successful communication and transaction completion.</p>
-              </div>
-            </div>
-          </section>
+      <h2>5. Cancellation Penalty</h2>
+      <h3>5.1 Trigger</h3>
+      <p>A cancellation penalty is triggered when a Seller marks an item as "unable to deliver" after an auction has closed with a winning bid, or when an administrator flags a Seller for non-delivery.</p>
+      <h3>5.2 Amount</h3>
+      <p>The penalty is a flat fee of <strong>$50.00 CAD</strong>. This amount is automatically charged to the Seller's payment method on file.</p>
+      <h3>5.3 Card Failure</h3>
+      <p>If the penalty charge fails (e.g., card declined), the Seller's account will be flagged for administrative review and may be suspended until the penalty is resolved.</p>
+      <h3>5.4 Authorization</h3>
+      <p>By creating a listing on BidVex, you authorize BidVex to charge your payment method on file for any applicable cancellation penalties without further notice.</p>
 
-          {/* 6. Bidding Rules */}
-          <section id="bidding">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">6</span>
-              <Gavel className="h-5 w-5" /> Bidding & Auction Rules
-            </h2>
-            
-            <div className="grid gap-4">
-              <div className="flex items-start gap-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                <CheckCircle className="h-6 w-6 text-green-500 mt-0.5 flex-shrink-0" />
-                <div>
-                  <h3 className="font-semibold">6.1 Binding Bids</h3>
-                  <p>All bids placed on the Platform are legally binding contractual obligations.</p>
-                </div>
-              </div>
-              
-              <div className="flex items-start gap-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                <XCircle className="h-6 w-6 text-red-500 mt-0.5 flex-shrink-0" />
-                <div>
-                  <h3 className="font-semibold">6.2 Bid Retraction</h3>
-                  <p>Bid retractions are not permitted except in exceptional and limited circumstances, such as a material typographical error, and only if requested within <strong>one (1) hour</strong> of placing the bid.</p>
-                </div>
-              </div>
-              
-              <div className="flex items-start gap-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                <Shield className="h-6 w-6 text-blue-500 mt-0.5 flex-shrink-0" />
-                <div>
-                  <h3 className="font-semibold">6.3 Reserve Prices</h3>
-                  <p>Sellers may set a "Reserve Price" (the confidential minimum price the seller is willing to accept). The item will not be sold unless the Reserve Price is met.</p>
-                </div>
-              </div>
-              
-              <div className="flex items-start gap-3 p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
-                <Clock className="h-6 w-6 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <h3 className="font-semibold text-blue-800 dark:text-blue-200">6.4 Anti-Sniping Policy</h3>
-                  <p className="text-blue-700 dark:text-blue-300">If a bid is placed within the final <strong>two (2) minutes</strong> of an auction's scheduled end time, the auction duration will be extended by an additional two (2) minutes. This ensures a fair bidding process.</p>
-                </div>
-              </div>
-            </div>
-          </section>
+      <h2>6. Escrow &amp; Pickup Code System (Non-Vehicle Items)</h2>
+      <h3>6.1 How It Works</h3>
+      <p>For non-vehicle items, when a Buyer wins an auction and payment is captured, the funds are held in escrow by BidVex. A unique 6-character Pickup Code is generated and emailed to the Buyer. The Seller must enter this code on their dashboard to confirm the item handoff and release the funds.</p>
+      <h3>6.2 Pickup Code Delivery</h3>
+      <p>The Pickup Code is sent to the Buyer's registered email address. Buyers are responsible for presenting this code to the Seller at the time of pickup or delivery.</p>
+      <h3>6.3 Funds Release</h3>
+      <p>Funds are released to the Seller's Stripe Connect account only after the correct Pickup Code is entered by the Seller.</p>
+      <h3>6.4 48-Hour Auto-Release</h3>
+      <p>If the Buyer does not present the Pickup Code within 48 hours of the escrow creation, funds are <strong>automatically released</strong> to the Seller. Both parties are notified by email when an auto-release occurs.</p>
+      <h3>6.5 Dispute</h3>
+      <p>Either party may open a dispute on an active escrow. Disputed escrows are reviewed by the BidVex team. During a dispute, funds remain held until resolution.</p>
+      <h3>6.6 Vehicle Exclusion</h3>
+      <p>Vehicle transactions are excluded from the escrow/pickup code system. Vehicles use a separate payment and settlement flow governed by the Vehicle Seller Licensing requirements.</p>
 
-          {/* 7. Fees */}
-          <section id="fees">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center text-green-600 text-sm font-bold">7</span>
-              <DollarSign className="h-5 w-5 text-green-600" /> Fees, Taxes, and Payment Structure
-            </h2>
-            
-            <div className="space-y-4">
-              <div>
-                <h3 className="font-semibold text-lg mb-3">7.1 User Tiers</h3>
-                <p className="mb-3">Upon registration, users are assigned to a specific tier. This tier dictates the applicable Buyer Premium and Seller Commission. All amounts are in Canadian Dollars (CAD). Subscriptions are billed annually (yearly).</p>
-                
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="bg-slate-100 dark:bg-slate-800">
-                        <th className="border border-slate-300 dark:border-slate-600 px-4 py-3 text-left font-semibold">Tier</th>
-                        <th className="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center font-semibold">Buyer Premium</th>
-                        <th className="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center font-semibold">Seller Commission</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="bg-slate-50 dark:bg-slate-800/50">
-                        <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 font-medium">Standard</td>
-                        <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center">5.0%</td>
-                        <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center">4.0%</td>
-                      </tr>
-                      <tr className="bg-blue-50 dark:bg-blue-950/30">
-                        <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 font-medium text-blue-700 dark:text-blue-300">Premium ($180 CAD/yr + taxes)</td>
-                        <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center text-blue-700 dark:text-blue-300">3.5%</td>
-                        <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center text-blue-700 dark:text-blue-300">2.5%</td>
-                      </tr>
-                      <tr className="bg-amber-50 dark:bg-amber-950/30">
-                        <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 font-medium text-amber-700 dark:text-amber-300">VIP Elite ($300 CAD/yr + taxes)</td>
-                        <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center text-amber-700 dark:text-amber-300">3.0%</td>
-                        <td className="border border-slate-300 dark:border-slate-600 px-4 py-3 text-center text-amber-700 dark:text-amber-300">2.0%</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">GST/QST will be calculated and added at checkout based on the user's jurisdiction.</p>
-              </div>
-              
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-                <h3 className="font-semibold text-lg mb-2">7.2 Partner Account Fees</h3>
-                <p className="mb-2">Verified Partner accounts (licensed auctioneers, bankruptcy trustees, liquidators) are subject to the following fee structure. All amounts are in Canadian Dollars (CAD):</p>
-                <ul className="list-disc pl-6 space-y-1">
-                  <li><strong>Annual Platform Access Fee:</strong> A flat fee of <strong>$100.00 CAD per year</strong> is charged for access to Partner-level platform features.</li>
-                  <li><strong>Hammer Price Commission:</strong> A <strong>3% platform fee</strong> is charged on the final "hammer price" (winning bid amount) of every item listed by a Partner.</li>
-                  <li><strong>Buyer's Premium Flexibility:</strong> Partners retain the full right to set their own Buyer's Premium (BP) independently of the platform fee. The BP is collected by the Partner and is not subject to the 3% commission.</li>
-                </ul>
-                <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">Partner accounts are subject to manual verification of business registration (NEQ) before they may list items on the Platform.</p>
-              </div>
-              
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-                <h3 className="font-semibold text-lg mb-2">7.3 Additional Fees</h3>
-                <p>A mandatory <strong>Platform Fee of 2.5%</strong> is applied to all completed transactions for vehicles only.</p>
-              </div>
-              
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-                <h3 className="font-semibold text-lg mb-2">7.4 Taxes</h3>
-                <p>All prices and fees quoted on this page are exclusive of taxes. <strong>GST (Goods and Services Tax) and QST (Quebec Sales Tax)</strong> are applied on top of all platform fees, commissions, and subscription charges in accordance with Canadian and Quebec tax law. Tax calculations are based on the final sale price and the jurisdiction of the transaction.</p>
-              </div>
-              
-              <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
-                <h3 className="font-semibold text-lg mb-2 text-amber-800 dark:text-amber-200">7.5 Payment Terms</h3>
-                <p className="text-amber-700 dark:text-amber-300 mb-2">Full payment for all winning bids is due within <strong>fourteen (14) days</strong> of the auction close.</p>
-                <p className="text-amber-700 dark:text-amber-300"><strong>Late Payments:</strong> Payments not received by the due date may incur a late payment penalty of <strong>2% per month</strong> (24% per annum) on the outstanding balance.</p>
-              </div>
-              
-              <div className="flex items-start gap-3 p-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
-                <CreditCard className="h-6 w-6 text-green-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <h3 className="font-semibold text-green-800 dark:text-green-200">7.6 Payment Processing</h3>
-                  <p className="text-green-700 dark:text-green-300">All payments are handled via <strong>Stripe</strong>, a secure third-party payment processor. BidVex does not store, possess, or have access to any full credit card or bank account payment information.</p>
-                </div>
-              </div>
-            </div>
-          </section>
+      <h2>7. Vehicle Seller Licensing</h2>
+      <p>Only licensed vehicle sellers with a verified OPC (Office de la protection du consommateur) permit may list road vehicles on BidVex. Individual (unlicensed) sellers are prohibited from listing vehicles. Fraudulent attempts to list vehicles without proper licensing will result in immediate account suspension.</p>
 
-          {/* 8. AS-IS Clause */}
-          <section id="as-is">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center text-red-600 text-sm font-bold">8</span>
-              <AlertTriangle className="h-5 w-5 text-red-600" /> "AS-IS / WHERE-IS" Clause
-            </h2>
-            
-            <div className="bg-red-50 dark:bg-red-950/30 border-2 border-red-300 dark:border-red-700 rounded-lg p-6">
-              <p className="text-red-800 dark:text-red-200 font-medium uppercase text-sm leading-relaxed">
-                YOU EXPRESSLY AGREE THAT ALL ITEMS LISTED ON THE PLATFORM ARE SOLD "AS-IS, WHERE-IS," WITH ALL FAULTS AND DEFECTS, AND WITHOUT ANY WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING ANY WARRANTY OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE. BIDVEX IS NOT RESPONSIBLE FOR THE CONDITION, SAFETY, LEGALITY, OR ACCURACY OF ANY ITEM OR FOR ANY DISPUTES BETWEEN USERS.
-              </p>
-            </div>
-          </section>
+      <h2>8. Fees &amp; Pricing</h2>
+      <p>BidVex charges Buyer's Premiums, Seller Commissions, and platform fees as calculated by our PricingManager. Fee schedules vary by subscription tier (Free, Premium, VIP, Partner). All fees are transparently displayed before bid confirmation and at checkout. Stripe processing fees are recovered dynamically.</p>
 
-          {/* 9. Listing Promotions */}
-          <section id="promotions">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center text-green-600 text-sm font-bold">9</span>
-              Listing Promotions &amp; Marketing
-            </h2>
-            
-            <div className="space-y-4">
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-                <h3 className="font-semibold">9.1 Promotional Services</h3>
-                <p>BidVex offers optional paid listing promotions (e.g., Featured Listing, Highlighted Listing, Homepage Spotlight) to increase visibility for sellers. Promotional fees are quoted in Canadian Dollars (CAD) and are subject to GST/QST.</p>
-              </div>
-              
-              <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                <h3 className="font-semibold text-red-800 dark:text-red-200">9.2 Non-Refundable</h3>
-                <p className="text-red-700 dark:text-red-300"><strong>All listing promotions are non-refundable once activated.</strong> Once a promotion is applied to a listing, no refund, credit, or cancellation will be issued regardless of the auction outcome.</p>
-              </div>
-              
-              <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                <h3 className="font-semibold text-red-800 dark:text-red-200">9.3 Pay-As-You-Go Marketing Emails</h3>
-                <p className="text-red-700 dark:text-red-300"><strong>Pay-as-you-go marketing email campaigns are billed immediately upon purchase and are final.</strong> No refunds or credits will be issued for unused email quota or campaign performance.</p>
-              </div>
-            </div>
-          </section>
+      <h2>9. Marketplace Conduct</h2>
+      <h3>9.1 Prohibited Behavior</h3>
+      <ul>
+        <li>Shill bidding (bidding on your own items to inflate prices)</li>
+        <li>Listing counterfeit, stolen, or illegal items</li>
+        <li>Providing false or misleading item descriptions</li>
+        <li>Harassment of other users via messages or the Community Q&amp;A</li>
+        <li>Manipulating auction outcomes through multiple accounts</li>
+        <li>Attempting to circumvent the escrow or payment systems</li>
+      </ul>
+      <h3>9.2 Seller Obligations</h3>
+      <p>Sellers must deliver items as described. Non-delivery after auction close triggers the cancellation penalty. Sellers must respond to Buyer inquiries within a reasonable timeframe.</p>
+      <h3>9.3 Buyer Obligations</h3>
+      <p>Buyers must complete payment promptly upon winning an auction. Buyers must present their Pickup Code at the time of item collection. Failure to collect within the escrow window does not entitle the Buyer to a refund (funds auto-release to the Seller).</p>
 
-          {/* 10. Disputes */}
-          <section id="disputes">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">10</span>
-              <Scale className="h-5 w-5" /> Dispute Resolution
-            </h2>
-            
-            <div className="space-y-4">
-              <div className="border-l-4 border-blue-500 pl-4">
-                <h3 className="font-semibold">10.1 Direct Resolution</h3>
-                <p>In the event of a dispute between a buyer and a seller, the parties agree to first attempt to resolve the issue directly and in good faith.</p>
-              </div>
-              
-              <div className="border-l-4 border-blue-500 pl-4">
-                <h3 className="font-semibold">10.2 Mediation by Support</h3>
-                <p>If the parties are unable to resolve the dispute, they may contact BidVex Support within <strong>seven (7) days</strong> of the transaction close. BidVex may, at its sole discretion, attempt to mediate the dispute, but BidVex is not obligated to do so.</p>
-              </div>
-              
-              <div className="border-l-4 border-blue-500 pl-4">
-                <h3 className="font-semibold">10.3 Refunds</h3>
-                <p>Refunds, returns, or adjustments are at the sole discretion of the seller unless BidVex determines that an item was significantly misrepresented in the listing. <strong>Subscription fees and platform service fees are non-refundable.</strong></p>
-              </div>
-            </div>
-          </section>
+      <h2>10. Community Q&amp;A</h2>
+      <p>The Community Q&amp;A is provided for informational purposes. Users must not post spam, offensive content, personal information of others, or commercial solicitations. BidVex reserves the right to moderate, edit, or remove content. Repeated violations may result in account restrictions.</p>
 
-          {/* 11. IP */}
-          <section id="ip">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">11</span>
-              Intellectual Property
-            </h2>
-            
-            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 mb-4">
-              <h3 className="font-semibold mb-2">11.1 Ownership</h3>
-              <p>All content and materials on the Platform, including the BidVex logo, text, graphics, images, video, code, and software are the property of BidVex Inc. or its licensors and are protected by copyright, trademark, and other intellectual property laws.</p>
-            </div>
-            
-            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-              <h3 className="font-semibold mb-2">11.2 Use Restrictions</h3>
-              <ul className="list-disc pl-6 space-y-1">
-                <li>Users are prohibited from copying, reproducing, modifying, distributing, or selling any Content without prior written permission.</li>
-                <li>The use of our trademarks, logos, or branding without express authorization is prohibited.</li>
-                <li>You are not permitted to use "scraping," "data mining," or automated agents to collect information from the Platform.</li>
-              </ul>
-            </div>
-          </section>
+      <h2>11. Stripe Connect &amp; Payment Processing</h2>
+      <p>BidVex uses Stripe as its payment processor. By using the Platform, you agree to Stripe's Connected Account Agreement and Stripe's Terms of Service. You authorize BidVex to create charges, holds, transfers, and penalties on your behalf through Stripe.</p>
 
-          {/* 12. Prohibited */}
-          <section id="prohibited">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center text-red-600 text-sm font-bold">12</span>
-              <Ban className="h-5 w-5 text-red-600" /> Prohibited Conduct
-            </h2>
-            
-            <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
-              <p className="text-red-800 dark:text-red-200 mb-3">Users are strictly prohibited from engaging in the following conduct:</p>
-              <ul className="list-disc pl-6 space-y-1 text-red-700 dark:text-red-300">
-                <li>Engaging in fraud, shill bidding, or any form of bid manipulation or artificial inflation;</li>
-                <li>Harassing, threatening, or defrauding other users or BidVex employees;</li>
-                <li>Posting spam, viruses, or malicious code that may harm the Platform or users;</li>
-                <li>Circumventing BidVex fees or manipulating the auction process;</li>
-                <li>Creating multiple accounts to bypass restrictions or manipulate auctions; or</li>
-                <li>Engaging in any conduct that violates applicable laws or regulations.</li>
-              </ul>
-              <p className="mt-3 text-red-800 dark:text-red-200 font-semibold">
-                Violations of this section may result in immediate suspension or termination of your account, and may result in legal action.
-              </p>
-            </div>
-          </section>
+      <h2>12. Limitation of Liability</h2>
+      <p>BidVex acts as a marketplace facilitator and is not a party to the sale between Buyer and Seller. BidVex is not responsible for the quality, safety, legality, or accuracy of items listed. Our liability is limited to the fees collected by BidVex on any given transaction.</p>
 
-          {/* 13. Liability */}
-          <section id="liability">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">13</span>
-              Limitation of Liability
-            </h2>
-            
-            <div className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-4">
-              <p className="text-sm uppercase leading-relaxed mb-3">
-                TO THE FULLEST EXTENT PERMITTED BY LAW, BIDVEX PROVIDES THE PLATFORM "AS IS" AND "AS AVAILABLE." BIDVEX SHALL NOT BE LIABLE FOR:
-              </p>
-              <ul className="list-disc pl-6 space-y-1 text-sm">
-                <li>THE ACCURACY, COMPLETENESS, OR RELIABILITY OF ITEM DESCRIPTIONS;</li>
-                <li>THE ACTIONS, OMISSIONS, OR CONDUCT OF BUYERS OR SELLERS;</li>
-                <li>ANY LOSSES, DAMAGES, OR HARM ARISING FROM DOWNTIME, ERRORS, OR TECHNICAL INTERRUPTIONS; OR</li>
-                <li>ANY DIRECT, INDIRECT, INCIDENTAL, CONSEQUENTIAL, SPECIAL, OR PUNITIVE DAMAGES.</li>
-              </ul>
-              <p className="mt-3 text-sm font-semibold">
-                OUR MAXIMUM AGGREGATE LIABILITY SHALL NOT EXCEED THE TOTAL FEES PAID BY YOU TO BIDVEX IN THE TWELVE (12) MONTHS PRIOR TO THE CLAIM.
-              </p>
-            </div>
-          </section>
+      <h2>13. Governing Law</h2>
+      <p>These Terms are governed by the laws of the Province of Quebec and the federal laws of Canada applicable therein. Any disputes shall be resolved in the courts of Quebec.</p>
 
-          {/* 14. Termination */}
-          <section id="termination">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">14</span>
-              Suspension & Termination
-            </h2>
-            
-            <div className="grid gap-4">
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-                <h3 className="font-semibold mb-2">14.1 BidVex's Right</h3>
-                <p>BidVex reserves the right, at its sole discretion, to suspend, terminate, or restrict your account and access to the Platform if you violate these Terms or engage in conduct harmful to BidVex or its users.</p>
-              </div>
-              
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-                <h3 className="font-semibold mb-2">14.2 User Closing Account</h3>
-                <p>You may close your BidVex account at any time. However, closing your account does not release you from any outstanding obligations, including legally binding bids and payment requirements.</p>
-              </div>
-            </div>
-          </section>
+      <h2>14. Changes to Terms</h2>
+      <p>BidVex reserves the right to modify these Terms at any time. Material changes will be communicated via email or platform notification. Continued use after changes constitutes acceptance.</p>
 
-          {/* 15. Changes */}
-          <section id="changes">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">15</span>
-              Changes to Terms & Conditions
-            </h2>
-            <p>BidVex reserves the right to update or modify these Terms at any time. Significant changes will be communicated to registered users via email and platform notifications. Your continued use of the Platform after the effective date of any changes constitutes your acceptance of the new Terms.</p>
-          </section>
-
-          {/* 16. Governing Law */}
-          <section id="governing">
-            <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">16</span>
-              <Scale className="h-5 w-5" /> Governing Law & Jurisdiction
-            </h2>
-            <p>These Terms and your use of the Platform are governed by and construed in accordance with the laws of the <strong>Province of Quebec</strong> and the federal laws of Canada applicable therein. Any disputes arising out of or related to these Terms shall be resolved exclusively in the courts of <strong>Montreal, Quebec</strong>.</p>
-          </section>
-
-          {/* 17. Contact */}
-          <section id="contact" className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-6">
-            <h2 className="text-2xl font-semibold mb-4 flex items-center gap-2">
-              <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">17</span>
-              Contact Information
-            </h2>
-            <p className="font-semibold text-lg mb-4">BidVex Legal & Data Protection Officer</p>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <Mail className="h-5 w-5 text-blue-600" />
-                <span><strong>Email:</strong> support@bidvex.com</span>
-              </div>
-            </div>
-          </section>
-
-          {/* Cross-Border Compliance (Bilingual) */}
-          <CrossBorderLegalSection />
-
-          {/* Vehicle Auctions: OPC Compliance (Bilingual) */}
-          <VehicleAuctionLegalSection />
-
-          {/* Footer */}
-          <div className="text-center text-sm text-muted-foreground pt-6 border-t">
-            <p>&copy; 2026 BidVex Inc. All rights reserved.</p>
-          </div>
-        </CardContent>
-      </Card>
+      <h2>15. Contact</h2>
+      <p>For questions about these Terms, contact us at <strong>legal@bidvex.com</strong>.</p>
     </div>
-  );
-};
-
-export default TermsEN;
+  </div>
+);

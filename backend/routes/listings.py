@@ -147,7 +147,11 @@ async def create_listing(
     from services.listings_service import (
         validate_seller, build_agreement_metadata, apply_partner_tags, persist_listing,
     )
+    from services.stripe_customer_service import validate_payment_method_for_listing
     db = get_db()
+
+    # Sticky Card Guard: require valid payment method
+    await validate_payment_method_for_listing(db, current_user)
 
     await validate_seller(db, current_user, listing_data.agreement_accepted)
 
@@ -414,7 +418,11 @@ async def create_multi_item_listing(
         resolve_multi_item_status, compute_promotion,
         build_lots_with_end_time, serialise_datetimes,
     )
+    from services.stripe_customer_service import validate_payment_method_for_listing
     db = get_db()
+
+    # Sticky Card Guard
+    await validate_payment_method_for_listing(db, current_user)
 
     await validate_seller(db, current_user, listing_data.agreement_accepted)
 

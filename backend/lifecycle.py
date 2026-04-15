@@ -124,6 +124,13 @@ async def create_database_indexes(db):
                 ("messages", [("conversation_id", ASCENDING), ("created_at", ASCENDING)], "idx_messages_conversation_date", False),
                 ("multi_item_listings", [("status", ASCENDING), ("created_at", ASCENDING)], "idx_multi_listings_status_created", False),
                 ("multi_item_listings", [("id", ASCENDING)], "idx_multi_listings_id_unique", True),
+                # Escrow system indexes
+                ("escrow_transactions", [("auction_id", ASCENDING)], "idx_escrow_auction_unique", True),
+                ("escrow_transactions", [("pickup_code", ASCENDING)], "idx_escrow_pickup_code", False),
+                ("escrow_transactions", [("escrow_status", ASCENDING)], "idx_escrow_status", False),
+                ("escrow_transactions", [("auto_release_scheduled_at", ASCENDING)], "idx_escrow_auto_release", False),
+                ("escrow_transactions", [("buyer_id", ASCENDING)], "idx_escrow_buyer", False),
+                ("escrow_transactions", [("seller_id", ASCENDING)], "idx_escrow_seller", False),
             ]
             for coll, keys, name, unique in indexes:
                 await db[coll].create_index(keys, background=True, unique=unique, name=name)

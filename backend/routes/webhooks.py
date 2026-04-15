@@ -624,8 +624,39 @@ async def _handle_auction_payment_succeeded(db, pi_data: dict, meta: dict):
     auto_transferred = bool(transfer_data.get("destination"))
     transfer_id = None
 
-    if not auto_transferred and seller_id:
-        # Manual transfer needed — seller didn't have Connect at checkout time
+    # ── ESCROW SYSTEM: For non-vehicle items, hold funds instead of transferring ──
+    is_vehicle_flow = flow_type in ("VEHICLE_FLOW", "VEHICLE_PLATFORM_FEE")
+    escrow_created = False
+
+    if not is_vehicle_flow and not auto_transferred and seller_id:
+        # Create escrow hold — funds stay on platform until pickup code confirmed
+        try:
+            from services.escrow_service import create_escrow_hold
+            buyer_id = meta.get("user_id", "")
+            province = meta.get("province", "ON")
+            application_fee_cents = amount - seller_payout_cents
+
+            await create_escrow_hold(
+                db=db,
+                auction_id=listing_id,
+                listing_id=listing_id,
+                buyer_id=buyer_id,
+                seller_id=seller_id,
+                hammer_price_cents=int(round(hammer_price * 100)),
+                total_charged_cents=amount,
+                application_fee_cents=application_fee_cents,
+                stripe_payment_intent_id=pi_id,
+                province=province,
+            )
+            escrow_created = True
+            logger.info(f"[AuctionPayout] Escrow hold created for PI {pi_id} — transfer deferred until pickup code")
+        except Exception as e:
+            logger.error(f"[AuctionPayout] Escrow creation failed, falling back to direct transfer: {e}")
+            # Fallback: do direct transfer if escrow fails
+            escrow_created = False
+
+    if not escrow_created and not auto_transferred and seller_id:
+        # Direct transfer (fallback or vehicle items)
         seller = await db.users.find_one({"id": seller_id}, {"_id": 0, "stripe_connect_account_id": 1})
         connect_id = (seller or {}).get("stripe_connect_account_id")
 
@@ -679,7 +710,8 @@ async def _handle_auction_payment_succeeded(db, pi_data: dict, meta: dict):
 
         "auto_transferred": auto_transferred,
         "manual_transfer_id": transfer_id,
-        "status": "transferred" if (auto_transferred or transfer_id) else "pending_connect",
+        "escrow_held": escrow_created,
+        "status": "escrow_held" if escrow_created else ("transferred" if (auto_transferred or transfer_id) else "pending_connect"),
         "created_at": now,
     }
 
