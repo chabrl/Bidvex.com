@@ -2737,63 +2737,49 @@ a > span {
 
 
 /* ============================================
-   BIDVEX TOOLTIP SYSTEM - Bulletproof Visibility
-   Overrides ALL brute-force CSS rules above
+   BIDVEX TOOLTIP SYSTEM
+   Colors enforced via data-attribute to survive build minification
    ============================================ */
 
-/* Light mode tooltip */
-.bidvex-tooltip-content,
-[data-bidvex-tooltip="true"] {
+/* Base tooltip: dark bg, white text — uses attribute selector (not class)
+   which won't be corrupted by CSS minification */
+[data-bidvex-tooltip] {
   background-color: #0f172a !important;
   color: #ffffff !important;
   border: 1px solid #334155 !important;
   border-radius: 8px !important;
-  padding: 8px 12px !important;
   font-size: 12px !important;
   line-height: 1.5 !important;
   max-width: 280px !important;
   z-index: 9999 !important;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25) !important;
-  pointer-events: none !important;
 }
 
-/* All children inside tooltip must inherit white text */
-.bidvex-tooltip-content *,
-[data-bidvex-tooltip="true"] *,
-[data-bidvex-tooltip="true"] p,
-[data-bidvex-tooltip="true"] span {
+/* All tooltip children must be white text */
+[data-bidvex-tooltip] *,
+[data-bidvex-tooltip] p,
+[data-bidvex-tooltip] span {
   color: #ffffff !important;
 }
 
-/* Dark mode tooltip - inverted */
-.dark .bidvex-tooltip-content,
-.dark [data-bidvex-tooltip="true"] {
+/* Dark mode: invert to light bg + dark text
+   Using html.dark selector which is MORE specific and won't be merged */
+html.dark [data-bidvex-tooltip] {
   background-color: #f9fafb !important;
   color: #111827 !important;
   border: 1px solid #d1d5db !important;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
 }
 
-.dark .bidvex-tooltip-content *,
-.dark [data-bidvex-tooltip="true"] *,
-.dark [data-bidvex-tooltip="true"] p,
-.dark [data-bidvex-tooltip="true"] span {
+html.dark [data-bidvex-tooltip] *,
+html.dark [data-bidvex-tooltip] p,
+html.dark [data-bidvex-tooltip] span {
   color: #111827 !important;
 }
 
-/* Tooltip arrow (Radix injects this) */
-.bidvex-tooltip-content [data-radix-tooltip-arrow],
-[data-bidvex-tooltip="true"] [data-radix-tooltip-arrow] {
-  fill: #0f172a !important;
-}
-
-.dark .bidvex-tooltip-content [data-radix-tooltip-arrow],
-.dark [data-bidvex-tooltip="true"] [data-radix-tooltip-arrow] {
-  fill: #f9fafb !important;
-}
-
 /* InfoTip trigger button - ensure it's not clipped */
-button[aria-label="Info"] {
+button[aria-label="Info"],
+span[aria-label="Info"] {
   position: relative !important;
   z-index: 1 !important;
 }
