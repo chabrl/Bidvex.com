@@ -12,6 +12,7 @@ import { Badge } from '../components/ui/badge';
 import { Plus, DollarSign, Package, FileText, ShoppingBag, Heart, Eye, TrendingUp, BarChart3, Wallet, Info, AlertTriangle, Clock, Shield, Mail, Loader2, MapPin, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import SellerAnalyticsDashboard from '../components/SellerAnalyticsDashboard';
+import SellerEarningsDashboard from '../components/SellerEarningsDashboard';
 import { formatCurrency, formatPercent } from '../utils/currencyFormatter';
 import { LoadingTimeout } from '../components/LoadingTimeout';
 
@@ -165,6 +166,18 @@ const SellerDashboard = () => {
             {t('dashboard.seller.listings', 'Listings')}
           </button>
           <button
+            onClick={() => setActiveTab('earnings')}
+            className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 -mb-px ${
+              activeTab === 'earnings'
+                ? 'border-[#06B6D4] text-[#06B6D4]'
+                : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+            }`}
+            data-testid="earnings-tab"
+          >
+            <Wallet className="h-4 w-4 inline mr-2" />
+            {t('dashboard.seller.earnings', 'Earnings & Payouts')}
+          </button>
+          <button
             onClick={() => setActiveTab('analytics')}
             className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 -mb-px ${
               activeTab === 'analytics'
@@ -202,7 +215,9 @@ const SellerDashboard = () => {
         </div>
 
         {/* Tab Content */}
-        {activeTab === 'analytics' ? (
+        {activeTab === 'earnings' ? (
+          <SellerEarningsDashboard />
+        ) : activeTab === 'analytics' ? (
           <SellerAnalyticsDashboard />
         ) : activeTab === 'ratings' ? (
           <SellerRatingsPanel userId={user?.id} token={token} />
