@@ -224,12 +224,17 @@ async def handle_stripe_webhook(request: Request):
         db = get_db()
 
         # Log the event
-        await db.stripe_events.insert_one({
-            "id": event.get("id"),
-            "type": event_type,
-            "data": data,
-            "created_at": datetime.now(timezone.utc).isoformat()
-        })
+        logger.info(f"[Webhook] DB name: {db.name}, client address: {db.client.address}, inserting event {event.get('id')}")
+        try:
+            insert_result = await db.stripe_events.insert_one({
+                "id": event.get("id"),
+                "type": event_type,
+                "data": data,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            })
+            logger.info(f"[Webhook] Event inserted: {insert_result.inserted_id}")
+        except Exception as insert_err:
+            logger.error(f"[Webhook] stripe_events insert FAILED: {insert_err}")
 
         logger.info(f"Processing Stripe webhook: {event_type}")
 
@@ -282,10 +287,16 @@ async def handle_stripe_webhook(request: Request):
         elif event_type == "payment_intent.succeeded":
             pi_id = data.get("id")
             pi_meta = data.get("metadata", {})
-            if pi_meta.get("transaction_type") == "vehicle_platform_fee":
+            tx_type = pi_meta.get("transaction_type", "")
+
+            if tx_type == "vehicle_platform_fee":
                 from services.vehicle_fee_service import handle_vehicle_fee_succeeded
                 await handle_vehicle_fee_succeeded(db, pi_id)
                 logger.info(f"Vehicle platform fee paid: {pi_id}")
+
+            elif tx_type in ("auction_purchase", "listing_purchase"):
+                # Non-vehicle Stripe sale succeeded — record payout
+                await _handle_auction_payment_succeeded(db, data, pi_meta)
 
         elif event_type == "payment_intent.payment_failed":
             pi_id = data.get("id")
@@ -556,6 +567,128 @@ async def _handle_payment_failed(db, invoice):
 def _map_price_to_tier(price_id: str) -> str:
     """Map Stripe price ID to subscription tier using centralized mapping"""
     return get_tier_from_price_id(price_id)
+
+
+
+async def _handle_auction_payment_succeeded(db, pi_data: dict, meta: dict):
+    """
+    Handle a successful non-vehicle auction/listing payment.
+    
+    Two paths:
+    1. If transfer_data.destination was set in the PaymentIntent (standard Connect flow),
+       Stripe auto-transfers to the seller. We just record the payout.
+    2. If no transfer_data (seller without Connect), create a manual Transfer using
+       PricingManager to calculate the exact seller payout.
+    """
+    import stripe
+    import os
+    import uuid as _uuid
+    import traceback
+
+    stripe.api_key = os.environ.get("STRIPE_API_KEY")
+    pi_id = pi_data.get("id")
+    amount = pi_data.get("amount", 0)
+    transfer_data = pi_data.get("transfer_data") or {}
+    transfer_group = meta.get("transfer_group", "")
+    seller_id = meta.get("seller_id", "")
+    listing_id = meta.get("listing_id", "")
+    flow_type = meta.get("flow_type", "STANDARD_FLOW")
+
+    now = datetime.now(timezone.utc).isoformat()
+    logger.info(f"[AuctionPayout] PI {pi_id} succeeded — amount={amount}, seller={seller_id}, flow={flow_type}")
+
+    # Calculate seller payout using PricingManager
+    try:
+        from services.pricing_manager import PricingManager
+
+        hammer_price = float(meta.get("hammer_price", 0)) / 100 if meta.get("hammer_price") else amount / 100
+        province = meta.get("province", "ON")
+        seller_tier = meta.get("seller_tier", "free")
+        buyer_tier = meta.get("buyer_tier", "free")
+
+        # Use PricingManager for exact payout calculation
+        if flow_type == "PARTNER_FLOW":
+            result = PricingManager.partner_auction(hammer_price, province)
+        else:
+            result = PricingManager.non_vehicle_stripe(hammer_price, province, buyer_tier, seller_tier)
+
+        si = result.seller_invoice
+        seller_payout_amount = si.total if si else hammer_price
+        seller_payout_cents = int(round(seller_payout_amount * 100))
+        logger.info(f"[AuctionPayout] PricingManager calculated: payout=${seller_payout_amount}")
+    except Exception as e:
+        logger.error(f"[AuctionPayout] PricingManager FAILED: {e}\n{traceback.format_exc()}")
+        return
+
+    # Check if auto-transfer happened (transfer_data.destination was set)
+    auto_transferred = bool(transfer_data.get("destination"))
+    transfer_id = None
+
+    if not auto_transferred and seller_id:
+        # Manual transfer needed — seller didn't have Connect at checkout time
+        seller = await db.users.find_one({"id": seller_id}, {"_id": 0, "stripe_connect_account_id": 1})
+        connect_id = (seller or {}).get("stripe_connect_account_id")
+
+        if connect_id:
+            try:
+                transfer = stripe.Transfer.create(
+                    amount=seller_payout_cents,
+                    currency="cad",
+                    destination=connect_id,
+                    transfer_group=transfer_group,
+                    metadata={
+                        "payment_intent": pi_id,
+                        "listing_id": listing_id,
+                        "seller_id": seller_id,
+                        "payout_type": "manual_post_payment",
+                    },
+                )
+                transfer_id = transfer.id
+                logger.info(f"[AuctionPayout] Manual transfer created: {transfer_id} → {connect_id} for ${seller_payout_cents / 100:.2f}")
+            except Exception as e:
+                logger.error(f"[AuctionPayout] Transfer failed for PI {pi_id}: {e}")
+        else:
+            logger.warning(f"[AuctionPayout] Seller {seller_id} has no Connect account — payout pending")
+    elif auto_transferred:
+        logger.info(f"[AuctionPayout] Auto-transfer via Connect for PI {pi_id}")
+
+    # Record the payout in MongoDB
+    payout_record = {
+        "id": str(_uuid.uuid4()),
+        "payment_intent_id": pi_id,
+        "listing_id": listing_id,
+        "seller_id": seller_id,
+        "buyer_id": meta.get("user_id", ""),
+        "transfer_group": transfer_group,
+        "flow_type": flow_type,
+
+        "amount_charged_cents": amount,
+        "seller_payout_cents": seller_payout_cents,
+        "application_fee_cents": amount - seller_payout_cents,
+        "seller_payout_amount": seller_payout_amount,
+
+        "pricing_breakdown": {
+            "hammer_price": hammer_price,
+            "buyer_premium": result.buyer_invoice.fees_subtotal,
+            "seller_commission": si.fees_subtotal if si else 0,
+            "seller_stripe_fee": si.stripe_recovery if si else 0,
+            "seller_tax": si.tax_amount if si else 0,
+            "seller_tax_type": si.tax_type if si else "",
+            "seller_tax_label": si.tax_label if si else "",
+        },
+
+        "auto_transferred": auto_transferred,
+        "manual_transfer_id": transfer_id,
+        "status": "transferred" if (auto_transferred or transfer_id) else "pending_connect",
+        "created_at": now,
+    }
+
+    try:
+        result = await db.seller_payouts.insert_one(payout_record)
+        logger.info(f"[AuctionPayout] Payout record saved: seller=${seller_payout_cents / 100:.2f}, status={payout_record['status']}, inserted_id={result.inserted_id}")
+    except Exception as e:
+        logger.error(f"[AuctionPayout] DB insert FAILED: {e}\n{traceback.format_exc()}")
+
 
 
 async def _handle_checkout_completed(db, session):

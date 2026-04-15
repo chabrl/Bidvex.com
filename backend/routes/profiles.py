@@ -601,6 +601,14 @@ async def create_stripe_connect_account(
             capabilities={"card_payments": {"requested": True}, "transfers": {"requested": True}},
             business_type="individual",
             metadata={"user_id": current_user.id, "platform": "bidvex"},
+            settings={
+                "payouts": {
+                    "schedule": {
+                        "interval": "daily",
+                        "delay_days": 2,
+                    }
+                }
+            },
         )
         connect_id = account.id
         await _db.users.update_one(
