@@ -23,6 +23,7 @@ import { useDropzone } from 'react-dropzone';
 import RichTextEditor from '../components/RichTextEditor';
 import LocationSelector from '../components/LocationSelector';
 import CategorySelector from '../components/CategorySelector';
+import InfoTip from '../components/InfoTip';
 import useGeoLocation from '../hooks/useGeoLocation';
 import { formatCurrency } from '../utils/currencyFormatter';
 
@@ -648,7 +649,9 @@ const CreateMultiItemListing = () => {
     <div className="space-y-4">
       <h3 className="text-xl font-semibold mb-4">{t('createListing.stepLabels.basic')}</h3>
       <div className="space-y-2">
-        <Label htmlFor="title">{t('createListing.auctionTitle')} *</Label>
+        <Label htmlFor="title">{t('createListing.auctionTitle')} *
+          <InfoTip en="A clear title helps buyers find your multi-lot auction faster." fr="Un titre clair aide les acheteurs à trouver votre enchère multi-lots plus rapidement." />
+        </Label>
         <Input 
           id="title" 
           name="title" 
@@ -659,7 +662,9 @@ const CreateMultiItemListing = () => {
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="description">{t('createListing.description')} *</Label>
+        <Label htmlFor="description">{t('createListing.description')} *
+          <InfoTip en="Describe your auction lot collection. Include overall condition and highlights." fr="Décrivez votre collection de lots. Incluez l'état général et les points saillants." />
+        </Label>
         <Textarea 
           id="description" 
           name="description" 
@@ -681,7 +686,9 @@ const CreateMultiItemListing = () => {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="auction_end_date">{t('createListing.auctionEndDate')} *</Label>
+          <Label htmlFor="auction_end_date">{t('createListing.auctionEndDate')} *
+            <InfoTip en="When the auction ends. Lots close in sequence based on the schedule you set." fr="Quand l'enchère se termine. Les lots ferment en séquence selon le calendrier que vous définissez." />
+          </Label>
           <Input 
             id="auction_end_date" 
             name="auction_end_date" 
@@ -745,6 +752,7 @@ const CreateMultiItemListing = () => {
       <div className="space-y-2">
         <Label htmlFor="increment_option" className="flex items-center gap-2">
           📊 {t('createListing.incrementSchedule')}
+          <InfoTip en="Controls how bid amounts increase. Tiered adjusts automatically based on price level." fr="Contrôle comment les montants d'enchères augmentent. L'échelonné s'ajuste automatiquement selon le niveau de prix." />
         </Label>
         <select
           id="increment_option"
@@ -788,7 +796,9 @@ const CreateMultiItemListing = () => {
 
       {/* Buyer's Premium (Partner-Only) */}
       <div className="space-y-2">
-        <Label htmlFor="buyers_premium_percent">Buyer's Premium (%)</Label>
+        <Label htmlFor="buyers_premium_percent">Buyer's Premium (%)
+          <InfoTip en="A fee added to the winning bid, paid by the buyer. Partners can set 0-25%." fr="Des frais ajoutés à l'enchère gagnante, payés par l'acheteur. Les partenaires peuvent définir 0-25%." />
+        </Label>
         {isPartner ? (
           <>
             <Input
@@ -815,7 +825,9 @@ const CreateMultiItemListing = () => {
 
       {/* Payment Method Selection */}
       <div className="space-y-3" data-testid="multi-payment-method-section">
-        <Label>Payment Method</Label>
+        <Label>Payment Method
+          <InfoTip en="Choose how buyers will pay. Stripe is the most secure and automated option." fr="Choisissez comment les acheteurs paieront. Stripe est l'option la plus sécurisée et automatisée." />
+        </Label>
         <div className="grid grid-cols-1 gap-2">
           <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${paymentMethod === 'stripe' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
             <input type="radio" name="multi_payment_method" value="stripe" checked={paymentMethod === 'stripe'} onChange={(e) => setPaymentMethod(e.target.value)} className="text-blue-600" data-testid="multi-payment-stripe" />
@@ -848,6 +860,7 @@ const CreateMultiItemListing = () => {
       <div className="space-y-2 p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <Label htmlFor="numLots" className="flex items-center gap-2 text-lg font-semibold">
           🧩 {t('createListing.numberOfLots')}
+          <InfoTip en="Each lot is a separate item that bidders can bid on individually within your auction." fr="Chaque lot est un article distinct sur lequel les enchérisseurs peuvent miser individuellement dans votre enchère." />
         </Label>
         <p className="text-sm text-muted-foreground mb-2">
           Specify how many lots you want in this auction. Lot rows will be auto-generated as you type.

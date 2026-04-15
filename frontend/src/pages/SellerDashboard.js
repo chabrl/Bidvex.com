@@ -15,6 +15,7 @@ import SellerAnalyticsDashboard from '../components/SellerAnalyticsDashboard';
 import SellerEarningsDashboard from '../components/SellerEarningsDashboard';
 import { formatCurrency, formatPercent } from '../utils/currencyFormatter';
 import { LoadingTimeout } from '../components/LoadingTimeout';
+import InfoTip from '../components/InfoTip';
 
 const API = API_BASE;
 
@@ -231,24 +232,28 @@ const SellerDashboard = () => {
             title={t('dashboard.seller.activeListings')}
             value={dashboard?.active_listings || 0}
             color="blue"
+            tip={{ en: "Items currently live and accepting bids.", fr: "Articles actuellement en ligne et acceptant des enchères." }}
           />
           <StatCard
             icon={<ShoppingBag className="h-6 w-6" />}
             title={t('dashboard.seller.soldItems')}
             value={dashboard?.sold_listings || 0}
             color="green"
+            tip={{ en: "Total items successfully sold through auctions.", fr: "Total des articles vendus avec succès via les enchères." }}
           />
           <StatCard
             icon={<FileText className="h-6 w-6" />}
             title={t('dashboard.seller.draftListings')}
             value={dashboard?.draft_listings || 0}
             color="orange"
+            tip={{ en: "Listings saved but not yet published.", fr: "Annonces enregistrées mais pas encore publiées." }}
           />
           <StatCard
             icon={<DollarSign className="h-6 w-6" />}
             title={t('dashboard.seller.totalSales')}
             value={formatCurrency(dashboard?.total_sales || 0)}
             color="purple"
+            tip={{ en: "Gross revenue from all completed sales before fees.", fr: "Revenus bruts de toutes les ventes complétées avant les frais." }}
           />
           {/* Net Payout Card - Shows what seller will receive after commission */}
           <NetPayoutCard 
@@ -601,13 +606,14 @@ const SellerDashboard = () => {
   );
 };
 
-const StatCard = ({ icon, title, value, color }) => (
+const StatCard = ({ icon, title, value, color, tip }) => (
   <Card className="glassmorphism">
     <CardContent className="p-6">
       <div className="flex items-center justify-between mb-4">
         <div className={`p-3 rounded-xl bg-${color}-100 dark:bg-${color}-900/20 text-${color}-600`}>
           {icon}
         </div>
+        {tip && <InfoTip en={tip.en} fr={tip.fr} />}
       </div>
       <p className="text-2xl font-bold mb-1">{value}</p>
       <p className="text-sm text-muted-foreground">{title}</p>

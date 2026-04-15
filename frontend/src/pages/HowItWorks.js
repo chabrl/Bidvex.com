@@ -45,7 +45,7 @@ const HowItWorks = () => {
         { icon: <Gavel className="h-5 w-5" />, en: 'Set your auction duration, reserve price, and payment preferences.', fr: 'Définissez la durée, le prix de réserve et vos préférences de paiement.' },
         { icon: <DollarSign className="h-5 w-5" />, en: 'Get paid automatically via Stripe when your item sells.', fr: 'Recevez votre paiement automatiquement via Stripe après la vente.' },
       ],
-      cta: { label: fr ? 'Commencer à vendre' : 'Start Selling', href: '/sell' },
+      cta: { label: fr ? 'Commencer à vendre' : 'Start Selling', href: '/create-listing' },
     },
     {
       id: 'bid',
@@ -76,7 +76,7 @@ const HowItWorks = () => {
         { icon: <Shield className="h-5 w-5" />, en: 'Accept terms and acknowledge our AI disclosure (Law 25 compliance).', fr: 'Acceptez les conditions et notre divulgation IA (conformité Loi 25).' },
         { icon: <CreditCard className="h-5 w-5" />, en: 'Add a payment method to start bidding. Sellers connect Stripe for payouts.', fr: 'Ajoutez un mode de paiement pour enchérir. Les vendeurs connectent Stripe pour les versements.' },
       ],
-      cta: { label: fr ? 'S\'inscrire gratuitement' : 'Sign Up Free', href: '/register' },
+      cta: { label: fr ? 'S\'inscrire gratuitement' : 'Sign Up Free', href: '/auth' },
     },
     {
       id: 'partner',
@@ -91,7 +91,7 @@ const HowItWorks = () => {
         { icon: <TrendingUp className="h-5 w-5" />, en: 'Partners pay only 3% flat commission. Set your own buyer premiums.', fr: 'Les partenaires paient seulement 3% de commission. Définissez vos propres primes acheteurs.' },
         { icon: <Star className="h-5 w-5" />, en: 'Get featured placement, priority support, and analytics dashboard.', fr: 'Obtenez un placement vedette, un support prioritaire et un tableau de bord analytique.' },
       ],
-      cta: { label: fr ? 'Postuler comme partenaire' : 'Apply as Partner', href: '/partner' },
+      cta: { label: fr ? 'Postuler comme partenaire' : 'Apply as Partner', href: '/become-a-partner' },
     },
     {
       id: 'vehicle-seller',
@@ -107,7 +107,7 @@ const HowItWorks = () => {
         { icon: <Car className="h-5 w-5" />, en: 'Once verified, list vehicles with VIN, condition, and inspection reports.', fr: 'Une fois vérifié, publiez des véhicules avec NIV, condition et rapports d\'inspection.' },
         { icon: <DollarSign className="h-5 w-5" />, en: 'Buyers pay a 2.5% platform fee. Seller pays $0 — the hammer price is settled directly.', fr: 'Les acheteurs paient 2,5% de frais de plateforme. Le vendeur ne paie rien — le prix marteau est réglé directement.' },
       ],
-      cta: { label: fr ? 'Devenir vendeur véhicules' : 'Apply as Vehicle Seller', href: '/become-vehicle-seller' },
+      cta: { label: fr ? 'Devenir vendeur véhicules' : 'Apply as Vehicle Seller', href: '/vehicle-auctions/seller/register' },
     },
     {
       id: 'buy-vehicle',
@@ -123,7 +123,7 @@ const HowItWorks = () => {
         { icon: <Gavel className="h-5 w-5" />, en: 'Win the auction. Pay only the 2.5% platform fee through BidVex.', fr: 'Remportez l\'enchère. Payez seulement 2,5% de frais de plateforme via BidVex.' },
         { icon: <Truck className="h-5 w-5" />, en: 'Settle the hammer price directly with the seller. Arrange inspection and delivery.', fr: 'Réglez le prix marteau directement avec le vendeur. Organisez l\'inspection et la livraison.' },
       ],
-      cta: { label: fr ? 'Voir les véhicules' : 'Browse Vehicles', href: '/marketplace?category=vehicles' },
+      cta: { label: fr ? 'Voir les véhicules' : 'Browse Vehicles', href: '/vehicle-auctions' },
     },
     {
       id: 'tips',
@@ -171,7 +171,7 @@ const HowItWorks = () => {
               : 'Buy, sell, and bid with confidence. Secure payments, verified sellers, and full regulatory compliance.'}
           </p>
           <div className="flex flex-wrap justify-center gap-3">
-            <Link to="/register" onClick={() => trackCTA('hero_signup', 'hero', 'Create Free Account')}>
+            <Link to="/auth" onClick={() => trackCTA('hero_signup', 'hero', 'Create Free Account')}>
               <Button size="lg" className="bg-cyan-500 hover:bg-cyan-600 text-white font-semibold gap-2" data-testid="hero-signup-cta">
                 {fr ? 'Créer un compte gratuit' : 'Create Free Account'}
                 <ArrowRight className="h-4 w-4" />
@@ -288,7 +288,7 @@ const HowItWorks = () => {
           <h2 className="text-2xl font-bold mb-3">{fr ? 'Prêt à commencer?' : 'Ready to Get Started?'}</h2>
           <p className="text-slate-300 mb-8">{fr ? 'Rejoignez des milliers d\'acheteurs et vendeurs au Canada.' : 'Join thousands of buyers and sellers across Canada.'}</p>
           <div className="flex flex-wrap justify-center gap-3">
-            <Link to="/register" onClick={() => trackCTA('final_sell', 'final_cta', 'Start Selling')}>
+            <Link to="/create-listing" onClick={() => trackCTA('final_sell', 'final_cta', 'Start Selling')}>
               <Button size="lg" className="bg-cyan-500 hover:bg-cyan-600 text-white font-semibold gap-2" data-testid="final-cta-sell">
                 {fr ? 'Commencer à vendre' : 'Start Selling'}
                 <ArrowRight className="h-4 w-4" />
@@ -299,7 +299,7 @@ const HowItWorks = () => {
                 {fr ? 'Commencer à enchérir' : 'Start Bidding'}
               </Button>
             </Link>
-            <Link to="/partner" onClick={() => trackCTA('final_partner', 'final_cta', 'Apply as Partner')}>
+            <Link to="/become-a-partner" onClick={() => trackCTA('final_partner', 'final_cta', 'Apply as Partner')}>
               <Button size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10 gap-2" data-testid="final-cta-partner">
                 {fr ? 'Devenir partenaire' : 'Apply as Partner'}
               </Button>

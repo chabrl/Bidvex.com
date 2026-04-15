@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import axios from 'axios';
 import EmailCreditPurchase from '../components/EmailCreditPurchase';
 import PartnerLicenseCard from '../components/PartnerLicenseCard';
+import InfoTip from '../components/InfoTip';
 
 const API = API_BASE;
 
@@ -264,6 +265,7 @@ export default function PartnerDashboard() {
               <div className="absolute -top-4 -right-4 h-20 w-20 rounded-full" style={{ backgroundColor: 'rgba(37,99,235,0.06)' }} />
               <dt className="text-xs font-medium uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-1">
                 {t('partnerDashboard.activeListings', 'Active Listings')}
+                <InfoTip en="Your currently live listings accepting bids." fr="Vos annonces actuellement en ligne acceptant des enchères." />
               </dt>
               <dd className="text-3xl font-bold text-slate-900 dark:text-white" data-testid="stat-active-listings">
                 {partnerStats.my_active_listings}
@@ -277,6 +279,7 @@ export default function PartnerDashboard() {
               <div className="absolute -top-4 -right-4 h-20 w-20 rounded-full" style={{ backgroundColor: 'rgba(16,185,129,0.06)' }} />
               <dt className="text-xs font-medium uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-1">
                 {t('partnerDashboard.bidsReceived', 'Bids Received')}
+                <InfoTip en="Total bids placed across all your partner listings." fr="Total des enchères placées sur toutes vos annonces partenaires." />
               </dt>
               <dd className="text-3xl font-bold text-slate-900 dark:text-white" data-testid="stat-bids-received">
                 {partnerStats.my_total_bids_received}
@@ -290,6 +293,7 @@ export default function PartnerDashboard() {
               <div className="absolute -top-4 -right-4 h-20 w-20 rounded-full" style={{ backgroundColor: 'rgba(245,158,11,0.06)' }} />
               <dt className="text-xs font-medium uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-1">
                 {t('partnerDashboard.projectedRevenue', 'Projected Revenue')}
+                <InfoTip en="Estimated revenue based on current highest bids. Final amount may vary." fr="Revenus estimés basés sur les enchères les plus élevées actuelles. Le montant final peut varier." />
               </dt>
               <dd className="text-3xl font-bold text-slate-900 dark:text-white" data-testid="stat-projected-revenue">
                 ${partnerStats.my_projected_revenue?.toLocaleString('en-CA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
