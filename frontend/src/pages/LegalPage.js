@@ -5,10 +5,25 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AIDisclosureLegalSection, VehicleAuctionLegalSection, CrossBorderLegalSection } from '../components/legal/LegalComplianceSections';
 
-const LegalPage = () => {
+const LegalPage = ({ documentType = 'both' }) => {
   const { t, i18n } = useTranslation();
   const [lang, setLang] = useState(i18n.language?.startsWith('fr') ? 'fr' : 'en');
   const fr = lang === 'fr';
+
+  const showTerms = documentType === 'both' || documentType === 'terms';
+  const showPrivacy = documentType === 'both' || documentType === 'privacy';
+
+  const pageTitle = documentType === 'terms'
+    ? (fr ? 'Conditions d\'utilisation' : 'Terms of Service')
+    : documentType === 'privacy'
+    ? (fr ? 'Politique de confidentialité' : 'Privacy Policy')
+    : (fr ? 'Juridique' : 'Legal');
+
+  const pageSubtitle = documentType === 'terms'
+    ? (fr ? 'Conditions d\'utilisation pour BidVex Inc.' : 'Terms & Conditions for BidVex Inc.')
+    : documentType === 'privacy'
+    ? (fr ? 'Politique de confidentialité pour BidVex Inc.' : 'Privacy Policy for BidVex Inc.')
+    : (fr ? 'Conditions d\'utilisation et Politique de confidentialité pour BidVex Inc.' : 'Terms & Conditions and Privacy Policy for BidVex Inc.');
 
   return (
     <div className="min-h-screen bg-background py-12 px-4">
@@ -18,8 +33,8 @@ const LegalPage = () => {
           <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary mb-4" data-testid="legal-back-link">
             <ArrowLeft className="h-4 w-4" /> {fr ? 'Retour à l\'accueil' : 'Back to Home'}
           </Link>
-          <h1 className="text-4xl font-bold tracking-tight" data-testid="legal-page-title">{fr ? 'Juridique' : 'Legal'}</h1>
-          <p className="text-muted-foreground">{fr ? 'Conditions d\'utilisation et Politique de confidentialité pour BidVex Inc.' : 'Terms & Conditions and Privacy Policy for BidVex Inc.'}</p>
+          <h1 className="text-4xl font-bold tracking-tight" data-testid="legal-page-title">{pageTitle}</h1>
+          <p className="text-muted-foreground">{pageSubtitle}</p>
 
           {/* Language Toggle */}
           <div className="flex justify-center gap-2 pt-2" data-testid="legal-lang-toggle">
@@ -41,7 +56,7 @@ const LegalPage = () => {
         </div>
 
         {/* ──────────────────── TERMS & CONDITIONS ──────────────────── */}
-        {!fr ? (
+        {showTerms && (!fr ? (
         <Card id="terms" data-testid="terms-section">
           <CardContent className="pt-6 space-y-6">
             <div className="flex items-center gap-3 mb-4">
@@ -318,10 +333,10 @@ const LegalPage = () => {
             </div>
           </CardContent>
         </Card>
-        )}
+        ))}
 
         {/* ──────────────────── PRIVACY POLICY ──────────────────── */}
-        {!fr ? (
+        {showPrivacy && (!fr ? (
         <Card id="privacy" data-testid="privacy-section">
           <CardContent className="pt-6 space-y-6">
             <div className="flex items-center gap-3 mb-4">
@@ -621,7 +636,7 @@ const LegalPage = () => {
             </div>
           </CardContent>
         </Card>
-        )}
+        ))}
       </div>
     </div>
   );
