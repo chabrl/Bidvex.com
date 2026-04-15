@@ -271,6 +271,10 @@ async def get_listings(
 
     multi_listings = await db.multi_item_listings.find(multi_query, {"_id": 0}).sort(sort_field, sort_order).limit(limit).to_list(limit)
 
+    # Deduplicate: collect parent auction IDs to exclude from standard listings
+    multi_parent_ids = {ml["id"] for ml in multi_listings}
+    listings = [l for l in listings if l.get("id") not in multi_parent_ids]
+
     for ml in multi_listings:
         for lot in ml.get("lots", []):
             lot_listing = {
@@ -309,9 +313,14 @@ async def get_listings(
                 continue
             listings.append(lot_listing)
 
-    # Sort combined results
+    # Sort combined results with safe key extraction
     reverse = sort_order == -1
-    listings.sort(key=lambda x: x.get(sort_field, ""), reverse=reverse)
+    def _sort_key(x):
+        v = x.get(sort_field)
+        if v is None:
+            return "" if isinstance(sort_field, str) and sort_field != "current_price" else 0
+        return v
+    listings.sort(key=_sort_key, reverse=reverse)
     listings = listings[:limit]
 
     for listing in listings:

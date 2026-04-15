@@ -39,7 +39,7 @@ class User(BaseModel):
     address: Optional[str] = None
     company_name: Optional[str] = None
     tax_number: Optional[str] = None
-    bank_details: Optional[Dict[str, str]] = None
+    bank_details: Optional[Any] = None
     subscription_tier: str = "free"
     subscription_status: Optional[str] = None
     subscription_expiry: Optional[str] = None

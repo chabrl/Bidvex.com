@@ -219,7 +219,7 @@ async def register(user_data: UserCreate, request: Request):
         "address": user_data.address or "",
         "company_name": user_data.company_name or "",
         "tax_number": user_data.tax_number or "",
-        "bank_details": user_data.bank_details or "",
+        "bank_details": user_data.bank_details if isinstance(user_data.bank_details, dict) else None,
         "role": "user",
         "preferred_language": "en",
         "preferred_currency": preferred_currency,
