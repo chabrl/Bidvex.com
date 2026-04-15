@@ -338,6 +338,7 @@ class UserCreate(BaseModel):
     bank_details: Optional[Dict[str, str]] = None
     terms_agreed: bool = False
     ai_disclosure_consent: bool = False
+    ref_code: Optional[str] = None
 
 class UserLogin(BaseModel):
     email: EmailStr

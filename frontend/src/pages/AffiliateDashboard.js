@@ -1,262 +1,398 @@
 import API_BASE from '../config';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
+import { Badge } from '../components/ui/badge';
+import { Alert, AlertDescription } from '../components/ui/alert';
 import { toast } from 'sonner';
-import { DollarSign, Users, TrendingUp, Copy, ExternalLink, Download } from 'lucide-react';
+import {
+  DollarSign, Users, TrendingUp, Copy, ExternalLink, Link2,
+  Wallet, CreditCard, CheckCircle2, AlertTriangle, Clock,
+  RefreshCw, Building2, Loader2
+} from 'lucide-react';
 import { formatCurrency } from '../utils/currencyFormatter';
 
 const API = API_BASE;
 
 const AffiliateDashboard = () => {
-  const { t, i18n, ready } = useTranslation();
-  const { user } = useAuth();
+  const { t, i18n } = useTranslation();
+  const { user, token } = useAuth();
+  const isFrench = i18n.language?.startsWith('fr');
+
   const [stats, setStats] = useState(null);
+  const [connectStatus, setConnectStatus] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
 
-  // CRITICAL FIX: Force i18n language sync on component mount
-  useEffect(() => {
-    const savedLang = localStorage.getItem('bidvex_language') || localStorage.getItem('i18nextLng') || 'en';
-    console.log('[AffiliateDashboard] Mounting - Saved Lang:', savedLang, 'Current Lang:', i18n.language);
-    
-    // ALWAYS force language change to reload resources
-    console.log('[AffiliateDashboard] Forcing language reload to:', savedLang);
-    i18n.changeLanguage(savedLang).then(() => {
-      console.log('[AffiliateDashboard] Language changed successfully. Testing translation:', t('affiliate.dashboard'));
-    });
-  }, []); // Run only on mount
-
-  useEffect(() => {
-    fetchAffiliateStats();
-  }, []);
-
-  const fetchAffiliateStats = async () => {
+  const fetchData = useCallback(async () => {
     try {
-      const response = await axios.get(`${API}/affiliate/stats`);
-      setStats(response.data);
-    } catch (error) {
-      console.error('Failed to fetch affiliate stats:', error);
-      toast.error(t('affiliate.loadFailed', 'Failed to load affiliate data'));
+      setError('');
+      const headers = { Authorization: `Bearer ${token}` };
+      const [statsRes, connectRes] = await Promise.all([
+        axios.get(`${API}/affiliate/stats`, { headers }),
+        axios.get(`${API}/users/me/stripe-connect/status`, { headers }).catch(() => ({ data: { has_account: false } })),
+      ]);
+      setStats(statsRes.data);
+      setConnectStatus(connectRes.data);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to load affiliate data');
     } finally {
       setLoading(false);
     }
+  }, [token]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchData();
+    setRefreshing(false);
   };
 
   const copyReferralLink = () => {
     if (stats?.referral_link) {
       navigator.clipboard.writeText(stats.referral_link);
-      toast.success(t('affiliate.linkCopied'));
+      toast.success(isFrench ? 'Lien copié!' : 'Referral link copied!');
     }
   };
 
-  const handleWithdraw = async () => {
-    if (!withdrawAmount || parseFloat(withdrawAmount) <= 0) {
-      toast.error(t('affiliate.enterValidAmount', 'Please enter a valid amount'));
-      return;
-    }
-
-    if (parseFloat(withdrawAmount) > stats?.pending_earnings) {
-      toast.error(t('affiliate.insufficientBalance', 'Insufficient balance'));
-      return;
-    }
-
+  const handleManageBankInfo = async () => {
     try {
-      await axios.post(`${API}/affiliate/withdraw`, {
-        amount: parseFloat(withdrawAmount),
-        method: 'bank_transfer'
+      const response = await axios.post(`${API}/users/me/stripe-connect/dashboard-link`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
       });
-      toast.success(t('affiliate.withdrawalSubmitted', 'Withdrawal request submitted!'));
-      setWithdrawAmount('');
-      fetchAffiliateStats();
-    } catch (error) {
-      toast.error(t('affiliate.withdrawalFailed', 'Failed to submit withdrawal request'));
+      if (response.data.type === 'onboarding') {
+        window.location.href = response.data.url;
+      } else {
+        window.open(response.data.url, '_blank');
+      }
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to open Stripe Dashboard');
+    }
+  };
+
+  const handleStartOnboarding = async () => {
+    try {
+      const response = await axios.post(`${API}/users/me/stripe-connect/onboard`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      window.location.href = response.data.onboarding_url;
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to start onboarding');
     }
   };
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
-  if (!ready) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-muted-foreground">{t('common.loading', 'Loading...')}</div>
-      </div>
-    );
-  }
+  const hasConnect = connectStatus?.has_account;
+  const payoutsEnabled = connectStatus?.payouts_enabled;
 
   return (
     <div className="min-h-screen py-8 px-4" data-testid="affiliate-dashboard">
-      <div className="max-w-7xl mx-auto space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">{t('affiliate.dashboard')}</h1>
-          <p className="text-muted-foreground">{t('affiliate.description', 'Earn 1.5% commission on every sale from your referrals')}</p>
+      <div className="max-w-7xl mx-auto space-y-6">
+
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <Users className="h-6 w-6 text-primary" />
+              {isFrench ? 'Centre d\'affiliation' : 'Affiliate Center'}
+            </h1>
+            <p className="text-slate-600 dark:text-slate-400">
+              {isFrench ? 'Partagez, référez et gagnez des commissions' : 'Share, refer, and earn commissions'}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleRefresh} disabled={refreshing} data-testid="affiliate-refresh-btn">
+              <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              {isFrench ? 'Actualiser' : 'Refresh'}
+            </Button>
+            {hasConnect && (
+              <Button onClick={handleManageBankInfo} data-testid="affiliate-bank-info-btn">
+                <CreditCard className="mr-2 h-4 w-4" />
+                {payoutsEnabled
+                  ? (isFrench ? 'Gérer les infos bancaires' : 'Manage Bank Info')
+                  : (isFrench ? 'Compléter le profil Stripe' : 'Complete Stripe Setup')}
+                <ExternalLink className="ml-2 h-3 w-3" />
+              </Button>
+            )}
+          </div>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{t('affiliate.totalClicks')}</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats?.total_clicks || 0}</div>
-            </CardContent>
-          </Card>
+        {/* Payout Setup Alert */}
+        {!hasConnect && (
+          <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950">
+            <Building2 className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-700 dark:text-blue-400">
+              <strong>{isFrench ? 'Configuration requise:' : 'Setup Required:'}</strong>{' '}
+              {isFrench
+                ? 'Connectez votre compte bancaire pour recevoir vos commissions automatiquement.'
+                : 'Connect your bank account to receive affiliate commissions automatically.'}
+              <Button variant="link" className="p-0 h-auto ml-2 text-blue-700 underline" onClick={handleStartOnboarding}>
+                {isFrench ? 'Configurer maintenant' : 'Set up now'}
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{t('affiliate.conversions')}</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats?.total_referrals || 0}</div>
-              <p className="text-xs text-muted-foreground">
-                {stats?.conversion_rate || 0}% {t('affiliate.conversionRate')}
-              </p>
-            </CardContent>
-          </Card>
+        {hasConnect && !payoutsEnabled && (
+          <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950">
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-amber-700 dark:text-amber-400">
+              <strong>{isFrench ? 'Action requise:' : 'Action Required:'}</strong>{' '}
+              {isFrench
+                ? 'Complétez votre profil Stripe pour activer les paiements.'
+                : 'Complete your Stripe profile to enable payouts.'}
+              <Button variant="link" className="p-0 h-auto ml-2 text-amber-700 underline" onClick={handleManageBankInfo}>
+                {isFrench ? 'Compléter maintenant' : 'Complete now'}
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{t('affiliate.pendingCommission')}</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(stats?.pending_earnings || 0)}</div>
-            </CardContent>
-          </Card>
+        {error && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{t('affiliate.paidCommission')}</CardTitle>
-              <DollarSign className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{formatCurrency(stats?.paid_earnings || 0)}</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Referral Link */}
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('affiliate.referralLink')}</CardTitle>
-            <CardDescription>{t('affiliate.shareDesc', 'Share this link to earn commission')}</CardDescription>
+        {/* Referral Link Card */}
+        <Card className="border-primary/30" data-testid="referral-link-card">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Link2 className="h-5 w-5 text-primary" />
+              {isFrench ? 'Votre lien de référence' : 'Your Referral Link'}
+            </CardTitle>
+            <CardDescription>
+              {isFrench
+                ? 'Partagez ce lien — vous gagnez 10% des frais BidVex sur chaque vente d\'un utilisateur référé.'
+                : 'Share this link — you earn 10% of BidVex platform fees on every sale from a referred user.'}
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-2">
-              <Input
-                value={stats?.referral_link || ''}
-                readOnly
-                className="font-mono text-sm"
-              />
-              <Button onClick={copyReferralLink} variant="outline">
-                <Copy className="h-4 w-4 mr-2" />
-                {t('affiliate.copyLink')}
+          <CardContent>
+            <div className="flex items-center gap-3">
+              <div className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-lg px-4 py-3 font-mono text-sm truncate" data-testid="referral-link-display">
+                {stats?.referral_link || '...'}
+              </div>
+              <Button onClick={copyReferralLink} className="shrink-0 gap-2" data-testid="copy-referral-link-btn">
+                <Copy className="h-4 w-4" />
+                {isFrench ? 'Copier' : 'Copy'}
               </Button>
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(stats?.referral_link || '')}`, '_blank')}
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                {t('affiliate.shareOn')} Twitter
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(stats?.referral_link || '')}`, '_blank')}
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                {t('affiliate.shareOn')} Facebook
-              </Button>
+            <p className="text-xs text-muted-foreground mt-2">
+              {isFrench ? 'Code:' : 'Code:'} <span className="font-mono font-bold">{stats?.affiliate_code || '—'}</span>
+              {' '}| {isFrench ? 'Cookie de suivi: 30 jours' : 'Tracking cookie: 30 days'}
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Metrics */}
+        <div className="grid sm:grid-cols-4 gap-4">
+          <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950 border-green-200 dark:border-green-800">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-green-700 dark:text-green-400">{isFrench ? 'Total gagné' : 'Total Earned'}</span>
+                <DollarSign className="h-5 w-5 text-green-600" />
+              </div>
+              <p className="text-2xl font-bold text-green-800 dark:text-green-300" data-testid="total-earnings">
+                {formatCurrency(stats?.total_earnings || 0)}
+              </p>
+              <p className="text-xs text-green-600 dark:text-green-500">{isFrench ? 'Depuis le début' : 'All time'}</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950 dark:to-yellow-950 border-amber-200 dark:border-amber-800">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-amber-700 dark:text-amber-400">{isFrench ? 'En attente' : 'Pending'}</span>
+                <Clock className="h-5 w-5 text-amber-600" />
+              </div>
+              <p className="text-2xl font-bold text-amber-800 dark:text-amber-300" data-testid="pending-earnings">
+                {formatCurrency(stats?.pending_earnings || 0)}
+              </p>
+              <p className="text-xs text-amber-600 dark:text-amber-500">{isFrench ? 'Versement dans 7 jours' : 'Paid out in 7 days'}</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950 dark:to-cyan-950 border-blue-200 dark:border-blue-800">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-blue-700 dark:text-blue-400">{isFrench ? 'Références' : 'Referrals'}</span>
+                <Users className="h-5 w-5 text-blue-600" />
+              </div>
+              <p className="text-2xl font-bold text-blue-800 dark:text-blue-300" data-testid="total-referrals">
+                {stats?.total_referrals || 0}
+              </p>
+              <p className="text-xs text-blue-600 dark:text-blue-500">{stats?.active_referrals || 0} {isFrench ? 'actives' : 'active'}</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-purple-50 to-fuchsia-50 dark:from-purple-950 dark:to-fuchsia-950 border-purple-200 dark:border-purple-800">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-purple-700 dark:text-purple-400">{isFrench ? 'Versé' : 'Paid Out'}</span>
+                <Wallet className="h-5 w-5 text-purple-600" />
+              </div>
+              <p className="text-2xl font-bold text-purple-800 dark:text-purple-300" data-testid="paid-earnings">
+                {formatCurrency(stats?.paid_earnings || 0)}
+              </p>
+              <p className="text-xs text-purple-600 dark:text-purple-500">{isFrench ? 'Transféré' : 'Transferred'}</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* How it works */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">{isFrench ? 'Comment ça fonctionne' : 'How It Works'}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid sm:grid-cols-3 gap-6">
+              <div className="text-center p-4">
+                <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center mx-auto mb-3">
+                  <Link2 className="h-5 w-5 text-blue-600" />
+                </div>
+                <h3 className="font-semibold mb-1">{isFrench ? '1. Partagez' : '1. Share'}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {isFrench ? 'Envoyez votre lien unique à vos contacts.' : 'Send your unique referral link to your contacts.'}
+                </p>
+              </div>
+              <div className="text-center p-4">
+                <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center mx-auto mb-3">
+                  <Users className="h-5 w-5 text-green-600" />
+                </div>
+                <h3 className="font-semibold mb-1">{isFrench ? '2. Ils achètent' : '2. They Buy'}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {isFrench ? 'Quand ils font un achat, vous gagnez une commission.' : 'When they make a purchase, you earn a commission.'}
+                </p>
+              </div>
+              <div className="text-center p-4">
+                <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center mx-auto mb-3">
+                  <DollarSign className="h-5 w-5 text-purple-600" />
+                </div>
+                <h3 className="font-semibold mb-1">{isFrench ? '3. Vous êtes payé' : '3. Get Paid'}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {isFrench ? '10% des frais BidVex, versé dans 7 jours.' : '10% of BidVex platform fees, paid out in 7 days.'}
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Referrals Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('affiliate.referrals')}</CardTitle>
-            <CardDescription>{t('affiliate.referralsDesc', 'Track your referred users and earnings')}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2">{t('affiliate.referralName')}</th>
-                    <th className="text-left py-2">{t('affiliate.signupDate')}</th>
-                    <th className="text-left py-2">{t('affiliate.status')}</th>
-                    <th className="text-left py-2">{t('affiliate.commission')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stats?.referrals && stats.referrals.length > 0 ? (
-                    stats.referrals.map((ref, idx) => (
-                      <tr key={idx} className="border-b">
-                        <td className="py-2">{ref.name}</td>
-                        <td className="py-2">{new Date(ref.signup_date).toLocaleDateString()}</td>
-                        <td className="py-2">
-                          <span className={`px-2 py-1 rounded text-xs ${
-                            ref.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {ref.status}
-                          </span>
-                        </td>
-                        <td className="py-2">{formatCurrency(ref.commission || 0)}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="4" className="text-center py-8 text-muted-foreground">
-                        {t('affiliate.noReferrals', 'No referrals yet. Start sharing your link!')}
-                      </td>
+        {stats?.referrals?.length > 0 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">{isFrench ? 'Vos références' : 'Your Referrals'}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left">
+                      <th className="pb-2 font-medium text-muted-foreground">{isFrench ? 'Utilisateur' : 'User'}</th>
+                      <th className="pb-2 font-medium text-muted-foreground">{isFrench ? 'Date' : 'Date'}</th>
+                      <th className="pb-2 font-medium text-muted-foreground">{isFrench ? 'Statut' : 'Status'}</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+                  </thead>
+                  <tbody>
+                    {stats.referrals.map((ref, i) => (
+                      <tr key={ref.id || i} className="border-b last:border-0">
+                        <td className="py-3 font-mono text-xs">{ref.referred_email ? `${ref.referred_email.slice(0, 3)}***` : '—'}</td>
+                        <td className="py-3 text-muted-foreground">{ref.created_at ? new Date(ref.created_at).toLocaleDateString() : '—'}</td>
+                        <td className="py-3">
+                          <Badge variant={ref.status === 'converted' ? 'default' : 'secondary'} data-testid={`referral-status-${i}`}>
+                            {ref.status === 'converted'
+                              ? (isFrench ? 'Converti' : 'Converted')
+                              : (isFrench ? 'En attente' : 'Pending')}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* Withdrawal */}
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('affiliate.requestPayout')}</CardTitle>
-            <CardDescription>{t('affiliate.payoutDesc', 'Request withdrawal of your pending commission')}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-2">
-              <Input
-                type="number"
-                placeholder={t('affiliate.enterAmount', 'Enter amount')}
-                value={withdrawAmount}
-                onChange={(e) => setWithdrawAmount(e.target.value)}
-                max={stats?.pending_earnings || 0}
-              />
-              <Button onClick={handleWithdraw} className="gradient-button text-white">
-                {t('affiliate.requestPayout')}
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {t('affiliate.availableBalance', 'Available balance')}: {formatCurrency(stats?.pending_earnings || 0)}
-            </p>
-          </CardContent>
-        </Card>
+        {/* Earnings History */}
+        {stats?.earnings_history?.length > 0 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">{isFrench ? 'Historique des commissions' : 'Commission History'}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left">
+                      <th className="pb-2 font-medium text-muted-foreground">{isFrench ? 'Date' : 'Date'}</th>
+                      <th className="pb-2 font-medium text-muted-foreground">{isFrench ? 'Montant' : 'Amount'}</th>
+                      <th className="pb-2 font-medium text-muted-foreground">{isFrench ? 'Statut' : 'Status'}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.earnings_history.map((e, i) => (
+                      <tr key={e.id || i} className="border-b last:border-0">
+                        <td className="py-3 text-muted-foreground">{e.created_at ? new Date(e.created_at).toLocaleDateString() : '—'}</td>
+                        <td className="py-3 font-semibold text-green-700 dark:text-green-400">{formatCurrency(e.commission_amount)}</td>
+                        <td className="py-3">
+                          <Badge variant={e.status === 'transferred' ? 'default' : e.status === 'pending' ? 'secondary' : 'outline'}>
+                            {e.status === 'transferred'
+                              ? (isFrench ? 'Transféré' : 'Transferred')
+                              : e.status === 'pending'
+                                ? (isFrench ? 'En attente' : 'Pending')
+                                : e.status}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Account Footer */}
+        {hasConnect && (
+          <Card className="bg-slate-50 dark:bg-slate-800">
+            <CardContent className="p-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  {payoutsEnabled ? (
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  ) : (
+                    <AlertTriangle className="h-5 w-5 text-amber-600" />
+                  )}
+                  <span className="text-sm">
+                    {isFrench ? 'Compte Stripe:' : 'Stripe Account:'}{' '}
+                    <span className="font-mono text-xs" title={isFrench ? 'Votre identifiant marchand unique pour les paiements sécurisés.' : 'This is your unique merchant identifier for secure payments.'}>
+                      {'••••'}{(connectStatus?.account_id || '').slice(-4)}
+                    </span>
+                  </span>
+                </div>
+                <Badge variant={payoutsEnabled ? 'default' : 'secondary'}>
+                  {payoutsEnabled
+                    ? (isFrench ? 'Paiements activés' : 'Payouts Enabled')
+                    : (isFrench ? 'Configuration requise' : 'Setup Required')}
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

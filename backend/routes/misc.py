@@ -73,27 +73,32 @@ async def get_google_maps_key():
 @misc_router.get("/affiliate/stats")
 async def get_affiliate_stats(current_user: User = Depends(get_current_user)):
     db = get_db()
-    referrals = await db.referrals.find({"affiliate_id": current_user.id}, {"_id": 0}).to_list(1000)
+    referrals = await db.affiliate_referrals.find({"affiliate_id": current_user.id}, {"_id": 0}).to_list(1000)
+    # Fallback to legacy referrals collection
+    if not referrals:
+        referrals = await db.referrals.find({"affiliate_id": current_user.id}, {"_id": 0}).to_list(1000)
     
     total_referrals = len(referrals)
-    active_referrals = len([r for r in referrals if r.get("status") == "active"])
+    active_referrals = len([r for r in referrals if r.get("status") in ("active", "converted")])
     
     earnings = await db.affiliate_earnings.find({"affiliate_id": current_user.id}, {"_id": 0}).to_list(1000)
     total_earnings = sum(e.get("commission_amount", 0) for e in earnings)
     pending_earnings = sum(e.get("commission_amount", 0) for e in earnings if e.get("status") == "pending")
-    paid_earnings = sum(e.get("commission_amount", 0) for e in earnings if e.get("status") == "paid")
+    paid_earnings = sum(e.get("commission_amount", 0) for e in earnings if e.get("status") in ("paid", "transferred"))
     
-    # Get frontend URL from environment
     frontend_url = os.environ.get('FRONTEND_URL', os.environ.get('REACT_APP_BACKEND_URL', 'http://localhost:3000'))
     
     return {
         "affiliate_code": current_user.affiliate_code,
-        "referral_link": f"{frontend_url}/auth?ref={current_user.affiliate_code}",
+        "referral_link": f"{frontend_url}/?ref={current_user.affiliate_code}",
         "total_referrals": total_referrals,
         "active_referrals": active_referrals,
         "total_earnings": total_earnings,
         "pending_earnings": pending_earnings,
         "paid_earnings": paid_earnings,
+        "commission_rate": "10%",
+        "commission_description": "10% of BidVex platform fees",
+        "payout_delay_days": 7,
         "earnings_history": earnings,
         "referrals": referrals
     }

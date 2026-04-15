@@ -60,6 +60,7 @@ class UserCreate(BaseModel):
     bank_details: Optional[str] = ""
     terms_agreed: bool = False
     ai_disclosure_consent: bool = False
+    ref_code: Optional[str] = None
 
 
 class SessionCreate(BaseModel):
@@ -226,6 +227,8 @@ async def register(user_data: UserCreate, request: Request):
         "currency_locked": currency_locked,
         "location_confidence_score": location_confidence,
         "affiliate_code": affiliate_code,
+        "referred_by": None,
+        "referred_by_code": None,
         "phone_verified": False,
         "email_verified": False,
         "terms_agreed_at": now.isoformat(),
@@ -239,6 +242,35 @@ async def register(user_data: UserCreate, request: Request):
     }
     
     await db.users.insert_one(user_doc)
+
+    # ── Affiliate Referral Tracking ──
+    ref_code = user_data.ref_code
+    if ref_code:
+        referrer = await db.users.find_one({"affiliate_code": ref_code}, {"_id": 0, "id": 1, "email": 1, "name": 1})
+        if referrer and referrer["id"] != user_id:
+            await db.users.update_one(
+                {"id": user_id},
+                {"$set": {"referred_by": referrer["id"], "referred_by_code": ref_code}}
+            )
+            # Update user_doc to reflect the referral for the response
+            user_doc["referred_by"] = referrer["id"]
+            user_doc["referred_by_code"] = ref_code
+            
+            await db.affiliate_referrals.insert_one({
+                "id": str(uuid.uuid4()),
+                "affiliate_id": referrer["id"],
+                "affiliate_code": ref_code,
+                "referred_user_id": user_id,
+                "referred_email": normalized_email,
+                "click_timestamp": now.isoformat(),
+                "signup_timestamp": now.isoformat(),
+                "status": "pending",
+                "converted": False,
+                "first_purchase_at": None,
+                "total_commission_earned": 0.0,
+                "created_at": now.isoformat(),
+            })
+            logger.info(f"[AFFILIATE] New referral: {ref_code} → {normalized_email} (affiliate={referrer['id']})")
     
     # Send Welcome Email (Dynamic Template)
     try:

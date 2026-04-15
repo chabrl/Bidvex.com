@@ -1,0 +1,110 @@
+{
+  "summary": "Affiliate Referral & Payout System - Iteration 141. All 15 backend tests PASSED. Frontend Affiliate Dashboard fully functional. Fixed bug where registration response didn't include referred_by fields.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_results": {
+    "backend_api_tests": {
+      "status": "PASS",
+      "total": 15,
+      "passed": 15,
+      "failed": 0,
+      "breakdown": {
+        "registration_with_ref_code": "PASS - creates affiliate_referrals record, returns referred_by in response",
+        "registration_without_ref_code": "PASS - works normally, no referral created",
+        "affiliate_stats_endpoint": "PASS - returns affiliate_code, referral_link, commission_rate=10%, total_referrals, total_earnings",
+        "affiliate_stats_additional_fields": "PASS - all expected fields present",
+        "pricing_manager_affiliate_commission_4.50": "PASS - returns 0.45 (10% of $4.50)",
+        "pricing_manager_affiliate_commission_0": "PASS - returns 0",
+        "pricing_manager_affiliate_commission_100": "PASS - returns 10.0",
+        "pricing_manager_affiliate_commission_0.50": "PASS - returns 0.05",
+        "affiliate_commission_rate_constant": "PASS - AFFILIATE_COMMISSION_RATE = 0.10 (10%)",
+        "referral_link_format": "PASS - uses ?ref= format (not /auth?ref=)",
+        "registration_requires_terms_agreed": "PASS - returns 400 without terms",
+        "registration_requires_ai_disclosure_consent": "PASS - returns 400 without consent",
+        "registration_with_invalid_ref_code": "PASS - works but no referral created",
+        "affiliate_stats_requires_auth": "PASS - returns 401 without auth",
+        "affiliate_stats_invalid_token": "PASS - returns 401 with invalid token"
+      }
+    },
+    "frontend_tests": {
+      "status": "PASS",
+      "affiliate_dashboard": {
+        "affiliate_center_header": "PASS - Found 'Affiliate Center'",
+        "referral_link_card": "PASS - Found with correct ?ref= format",
+        "referral_link_display": "PASS - Shows https://bidvex.com/?ref=BVX8940074DXKTU",
+        "copy_button": "PASS - Found copy referral link button",
+        "total_earnings_card": "PASS - Shows $0.00",
+        "pending_earnings_card": "PASS - Shows $0.00",
+        "total_referrals_card": "PASS - Shows 3",
+        "paid_earnings_card": "PASS - Shows $0.00",
+        "stripe_connect_status": "PASS - Shows masked Stripe Account ID (••••wEwf)",
+        "how_it_works_section": "PASS - Shows 3 steps: Share, They Buy, Get Paid",
+        "your_referrals_table": "PASS - Shows 3 referrals with masked emails"
+      }
+    }
+  },
+  "bug_fixed": {
+    "issue": "Registration response didn't include referred_by and referred_by_code fields",
+    "file": "/app/backend/routes/auth.py",
+    "fix": "Added user_doc update after affiliate referral tracking to include referred_by fields in response",
+    "lines_changed": "252-254"
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_affiliate_referral_141.py",
+    "/app/test_reports/pytest/pytest_results_affiliate_141.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/routes/auth.py",
+    "/app/backend/tests/test_affiliate_referral_141.py"
+  ],
+  "success_rate": {
+    "backend": "100% (15/15 passed)",
+    "frontend": "100% (all UI elements verified)"
+  },
+  "test_credentials": "Admin: charbel911@gmail.com / Anderosli123!@#",
+  "seed_data_creation": "Test users created during testing: TEST_affiliate_ref_*, TEST_no_ref_*, TEST_invalid_ref_*",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Affiliate Referral System fully tested. Key features verified: 1) ref_code on registration creates affiliate_referrals record and sets referred_by on user, 2) GET /api/affiliate/stats returns correct structure with commission_rate='10%', 3) PricingManager.affiliate_commission() returns 10% of BidVex revenue, 4) Frontend /affiliate page loads with all expected elements including referral link card, metrics cards, and Stripe Connect status. Admin affiliate_code is BVX8940074DXKTU.",
+  "verified_features": {
+    "registration_with_ref_code": {
+      "creates_affiliate_referrals_record": true,
+      "sets_referred_by_on_user": true,
+      "returns_referred_by_in_response": true
+    },
+    "affiliate_stats_endpoint": {
+      "returns_affiliate_code": true,
+      "returns_referral_link_with_ref_param": true,
+      "returns_commission_rate_10_percent": true,
+      "returns_total_referrals": true,
+      "returns_total_earnings": true,
+      "returns_pending_earnings": true,
+      "returns_paid_earnings": true,
+      "returns_earnings_history": true,
+      "returns_referrals_list": true
+    },
+    "pricing_manager_affiliate_commission": {
+      "10_percent_of_bidvex_revenue": true,
+      "handles_zero_correctly": true,
+      "rounds_to_2_decimal_places": true
+    },
+    "frontend_affiliate_dashboard": {
+      "loads_correctly": true,
+      "shows_referral_link": true,
+      "has_copy_button": true,
+      "shows_metrics_cards": true,
+      "shows_stripe_connect_status": true,
+      "shows_how_it_works": true,
+      "shows_referrals_table": true
+    }
+  }
+}

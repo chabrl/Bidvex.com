@@ -23,6 +23,7 @@ STRIPE_PCT = Decimal("0.029")
 STRIPE_FIXED = Decimal("0.30")
 VEHICLE_PLATFORM_FEE_RATE = Decimal("0.025")
 PARTNER_SELLER_COMMISSION_RATE = Decimal("0.03")
+AFFILIATE_COMMISSION_RATE = Decimal("0.10")  # 10% of BidVex platform fee
 
 BUYER_PREMIUM_RATES = {
     "free": Decimal("0.05"), "basic": Decimal("0.05"), "standard": Decimal("0.05"),
@@ -439,3 +440,14 @@ class PricingManager:
             province=buyer_province.upper(),
             bidvex_revenue=_f(sc),
         )
+
+
+    # ── Affiliate Commission Calculator ──────────────────────
+    @staticmethod
+    def affiliate_commission(bidvex_revenue: float) -> float:
+        """
+        Calculate affiliate payout: 10% of BidVex's platform fee revenue.
+        NOT 10% of the total auction price.
+        """
+        rev = Decimal(str(bidvex_revenue))
+        return _f(_r(rev * AFFILIATE_COMMISSION_RATE))

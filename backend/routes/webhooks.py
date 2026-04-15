@@ -690,6 +690,75 @@ async def _handle_auction_payment_succeeded(db, pi_data: dict, meta: dict):
         logger.error(f"[AuctionPayout] DB insert FAILED: {e}\n{traceback.format_exc()}")
 
 
+    # ── Affiliate Commission Payout ──
+    try:
+        buyer_id = meta.get("user_id", "")
+        if buyer_id:
+            buyer_doc = await db.users.find_one({"id": buyer_id}, {"_id": 0, "referred_by": 1})
+            affiliate_id = (buyer_doc or {}).get("referred_by")
+
+            if affiliate_id:
+                from services.pricing_manager import PricingManager
+                aff_commission = PricingManager.affiliate_commission(result.bidvex_revenue)
+                aff_commission_cents = int(round(aff_commission * 100))
+
+                if aff_commission_cents > 0:
+                    # Record affiliate earning
+                    earning_id = str(_uuid.uuid4())
+                    await db.affiliate_earnings.insert_one({
+                        "id": earning_id,
+                        "affiliate_id": affiliate_id,
+                        "referred_user_id": buyer_id,
+                        "payment_intent_id": pi_id,
+                        "listing_id": listing_id,
+                        "bidvex_revenue": result.bidvex_revenue,
+                        "commission_rate": 0.10,
+                        "commission_amount": aff_commission,
+                        "commission_cents": aff_commission_cents,
+                        "status": "pending",
+                        "payout_after": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+                        "stripe_transfer_id": None,
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                    })
+
+                    # Mark referral as converted if first purchase
+                    await db.affiliate_referrals.update_one(
+                        {"affiliate_id": affiliate_id, "referred_user_id": buyer_id, "converted": False},
+                        {"$set": {"converted": True, "status": "converted", "first_purchase_at": datetime.now(timezone.utc).isoformat()}}
+                    )
+
+                    # Try immediate Stripe Transfer to affiliate's Connect account
+                    affiliate_doc = await db.users.find_one({"id": affiliate_id}, {"_id": 0, "stripe_connect_account_id": 1})
+                    aff_connect_id = (affiliate_doc or {}).get("stripe_connect_account_id")
+
+                    if aff_connect_id:
+                        try:
+                            aff_transfer = stripe.Transfer.create(
+                                amount=aff_commission_cents,
+                                currency="cad",
+                                destination=aff_connect_id,
+                                metadata={
+                                    "type": "affiliate_commission",
+                                    "affiliate_id": affiliate_id,
+                                    "payment_intent": pi_id,
+                                    "listing_id": listing_id,
+                                    "description": f"Affiliate Commission for Order #{listing_id[:8]}",
+                                },
+                            )
+                            await db.affiliate_earnings.update_one(
+                                {"id": earning_id},
+                                {"$set": {"status": "transferred", "stripe_transfer_id": aff_transfer.id}}
+                            )
+                            logger.info(f"[AffiliatePayout] Transfer {aff_transfer.id} → {aff_connect_id} for ${aff_commission:.2f}")
+                        except Exception as te:
+                            logger.error(f"[AffiliatePayout] Transfer failed: {te}")
+                    else:
+                        logger.info(f"[AffiliatePayout] Affiliate {affiliate_id} has no Connect account — commission ${aff_commission:.2f} held as pending")
+
+    except Exception as aff_err:
+        logger.error(f"[AffiliatePayout] Error: {aff_err}")
+
+
 
 async def _handle_checkout_completed(db, session):
     """
