@@ -433,7 +433,9 @@ const SellerEarningsDashboard = () => {
               )}
               <span className="text-sm">
                 {isFrench ? 'Compte Stripe:' : 'Stripe Account:'}{' '}
-                <span className="font-mono text-xs">{earnings.account_id}</span>
+                <span className="font-mono text-xs" title={isFrench ? 'Votre identifiant marchand unique pour les paiements sécurisés.' : 'This is your unique merchant identifier for secure payments.'}>
+                  {'••••'}{(earnings.account_id || '').slice(-4)}
+                </span>
               </span>
             </div>
             <div className="flex gap-2">
