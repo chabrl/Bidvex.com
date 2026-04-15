@@ -1,25 +1,47 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent } from '../components/ui/card';
-import { ScrollText, Shield, ArrowLeft, CreditCard, Lock, Key, Clock, AlertTriangle, Database } from 'lucide-react';
+import { ScrollText, Shield, ArrowLeft, CreditCard, Lock, Key, Clock, AlertTriangle, Database, Globe } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AIDisclosureLegalSection, VehicleAuctionLegalSection, CrossBorderLegalSection } from '../components/legal/LegalComplianceSections';
 
 const LegalPage = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const [lang, setLang] = useState(i18n.language?.startsWith('fr') ? 'fr' : 'en');
+  const fr = lang === 'fr';
+
   return (
     <div className="min-h-screen bg-background py-12 px-4">
       <div className="max-w-4xl mx-auto space-y-10">
         {/* Header */}
         <div className="text-center space-y-3">
           <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary mb-4" data-testid="legal-back-link">
-            <ArrowLeft className="h-4 w-4" /> Back to Home
+            <ArrowLeft className="h-4 w-4" /> {fr ? 'Retour à l\'accueil' : 'Back to Home'}
           </Link>
-          <h1 className="text-4xl font-bold tracking-tight" data-testid="legal-page-title">Legal</h1>
-          <p className="text-muted-foreground">Terms &amp; Conditions and Privacy Policy for BidVex Inc.</p>
+          <h1 className="text-4xl font-bold tracking-tight" data-testid="legal-page-title">{fr ? 'Juridique' : 'Legal'}</h1>
+          <p className="text-muted-foreground">{fr ? 'Conditions d\'utilisation et Politique de confidentialité pour BidVex Inc.' : 'Terms & Conditions and Privacy Policy for BidVex Inc.'}</p>
+
+          {/* Language Toggle */}
+          <div className="flex justify-center gap-2 pt-2" data-testid="legal-lang-toggle">
+            <button
+              onClick={() => setLang('en')}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${lang === 'en' ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'}`}
+              data-testid="lang-en-btn"
+            >
+              <Globe className="h-4 w-4 inline mr-1" /> English
+            </button>
+            <button
+              onClick={() => setLang('fr')}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${lang === 'fr' ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'}`}
+              data-testid="lang-fr-btn"
+            >
+              <Globe className="h-4 w-4 inline mr-1" /> Français
+            </button>
+          </div>
         </div>
 
         {/* ──────────────────── TERMS & CONDITIONS ──────────────────── */}
+        {!fr ? (
         <Card id="terms" data-testid="terms-section">
           <CardContent className="pt-6 space-y-6">
             <div className="flex items-center gap-3 mb-4">
@@ -114,8 +136,8 @@ const LegalPage = () => {
                   <thead><tr className="bg-muted"><th className="border border-border p-2 text-left">Tier</th><th className="border border-border p-2 text-left">Buyer Premium</th><th className="border border-border p-2 text-left">Seller Commission</th></tr></thead>
                   <tbody>
                     <tr><td className="border border-border p-2">Standard</td><td className="border border-border p-2">5.0%</td><td className="border border-border p-2">4.0%</td></tr>
-                    <tr><td className="border border-border p-2">Premium ($180 CAD/yr + taxes)</td><td className="border border-border p-2">3.5%</td><td className="border border-border p-2">2.5%</td></tr>
-                    <tr><td className="border border-border p-2">VIP Elite ($300 CAD/yr + taxes)</td><td className="border border-border p-2">3.0%</td><td className="border border-border p-2">2.0%</td></tr>
+                    <tr><td className="border border-border p-2">Premium ($360 CAD/yr + taxes)</td><td className="border border-border p-2">3.5%</td><td className="border border-border p-2">2.5%</td></tr>
+                    <tr><td className="border border-border p-2">VIP Elite ($600 CAD/yr + taxes)</td><td className="border border-border p-2">3.0%</td><td className="border border-border p-2">2.0%</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -227,8 +249,79 @@ const LegalPage = () => {
             </div>
           </CardContent>
         </Card>
+        ) : (
+        /* ──────────────────── TERMS FR ──────────────────── */
+        <Card id="terms" data-testid="terms-section-fr">
+          <CardContent className="pt-6 space-y-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                <ScrollText className="h-6 w-6 text-blue-600" />
+              </div>
+              <h2 className="text-2xl font-bold">Conditions d'utilisation de BidVex</h2>
+            </div>
+            <p className="text-sm text-muted-foreground">Dernière mise à jour : Mars 2026</p>
+
+            <div className="prose prose-sm dark:prose-invert max-w-none space-y-5">
+              <h3 className="text-lg font-semibold">1. Introduction et acceptation des conditions</h3>
+              <p>Bienvenue sur BidVex. Les présentes conditions d'utilisation (« Conditions ») constituent un accord juridiquement contraignant entre vous (« Utilisateur ») et BidVex Inc. (« BidVex », « nous »). Ces Conditions régissent votre accès et votre utilisation de notre plateforme d'enchères en ligne, de notre site Web et des services connexes (collectivement, « la Plateforme »).</p>
+              <p><strong>En vous inscrivant, en naviguant sur la Plateforme ou en participant à une enchère,</strong> vous reconnaissez avoir lu, compris et accepté d'être lié par ces Conditions, ainsi que par notre Politique de confidentialité.</p>
+
+              <h3 className="text-lg font-semibold">2. Rôle de la plateforme et avis de non-responsabilité</h3>
+              <h4 className="font-semibold">2.1 Marché indépendant</h4>
+              <p>BidVex est un marché numérique et n'est pas un vendeur, un concessionnaire, un courtier, un propriétaire, un dépositaire ou un agent de tout article listé.</p>
+              <h4 className="font-semibold">2.2 Parties à la transaction</h4>
+              <p>Toutes les ventes sont conclues directement entre l'acheteur et le vendeur. BidVex n'est pas partie à la transaction réelle entre acheteurs et vendeurs.</p>
+
+              <h3 className="text-lg font-semibold">3. Comptes utilisateur</h3>
+              <p>Vous devez avoir au moins 18 ans et résider au Canada pour créer un compte. Vous êtes responsable de toute activité sous votre compte. BidVex se réserve le droit de suspendre ou résilier les comptes qui violent ces Conditions.</p>
+
+              <h3 className="text-lg font-semibold">4. Structure de tarification et frais</h3>
+              <p>Lors de l'inscription, les utilisateurs sont assignés à un niveau spécifique. Ce niveau détermine la prime acheteur et la commission vendeur applicables. Tous les montants sont en dollars canadiens (CAD). Les abonnements sont facturés annuellement.</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border-collapse">
+                  <thead><tr className="bg-muted"><th className="border border-border p-2 text-left">Niveau</th><th className="border border-border p-2 text-left">Prime acheteur</th><th className="border border-border p-2 text-left">Commission vendeur</th></tr></thead>
+                  <tbody>
+                    <tr><td className="border border-border p-2">Standard</td><td className="border border-border p-2">5,0 %</td><td className="border border-border p-2">4,0 %</td></tr>
+                    <tr><td className="border border-border p-2">Premium (360 $ CAD/an + taxes)</td><td className="border border-border p-2">3,5 %</td><td className="border border-border p-2">2,5 %</td></tr>
+                    <tr><td className="border border-border p-2">VIP Élite (600 $ CAD/an + taxes)</td><td className="border border-border p-2">3,0 %</td><td className="border border-border p-2">2,0 %</td></tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <h3 className="text-lg font-semibold">5. Moyen de paiement obligatoire (Politique Sticky Card)</h3>
+              <p>Pour créer une annonce, chaque Vendeur doit avoir un moyen de paiement valide enregistré, rattaché à son profil Stripe. Les Vendeurs <strong>ne peuvent pas supprimer</strong> leur moyen de paiement tant que leurs annonces sont actives. BidVex conserve un jeton Stripe (jamais les données brutes de carte).</p>
+
+              <h3 className="text-lg font-semibold">6. Pénalité d'annulation</h3>
+              <p>Une pénalité de <strong>50,00 $ CAD</strong> est appliquée lorsqu'un Vendeur signale l'impossibilité de livrer après la clôture d'une enchère. Le montant est prélevé automatiquement sur le moyen de paiement du Vendeur. En cas d'échec, le compte est signalé pour suspension.</p>
+
+              <h3 className="text-lg font-semibold">7. Dépôt fiduciaire et code de retrait</h3>
+              <p>Pour les articles non véhiculaires, les fonds sont détenus en fiducie par BidVex. Un code de retrait unique de 6 caractères est envoyé à l'Acheteur. Le Vendeur entre ce code pour libérer les fonds. Libération automatique après 48 heures si le code n'est pas présenté.</p>
+
+              <h3 className="text-lg font-semibold">8. Licence de vendeur de véhicules</h3>
+              <p>Seuls les vendeurs avec un permis OPC vérifié peuvent lister des véhicules routiers. Les vendeurs individuels (non licenciés) sont interdits de lister des véhicules.</p>
+
+              <h3 className="text-lg font-semibold">9. Conduite sur la plateforme</h3>
+              <ul className="list-disc pl-6 space-y-1">
+                <li>Enchères fictives sur vos propres articles interdites</li>
+                <li>Mise en vente d'articles contrefaits, volés ou illégaux interdite</li>
+                <li>Harcèlement via messages ou communauté Q&amp;R interdit</li>
+                <li>Contournement des systèmes de paiement interdit</li>
+              </ul>
+
+              <h3 className="text-lg font-semibold">10. Taxes</h3>
+              <p>Tous les prix et frais sont hors taxes. La <strong>TPS et TVQ</strong> sont appliquées conformément aux lois canadiennes et québécoises.</p>
+
+              <h3 className="text-lg font-semibold">11. Loi applicable</h3>
+              <p>Ces Conditions sont régies par les lois de la province de Québec et les lois fédérales du Canada. Tout litige sera résolu devant les tribunaux du Québec.</p>
+
+              <p className="text-xs text-muted-foreground mt-4">&copy; 2026 BidVex Inc. Tous droits réservés.</p>
+            </div>
+          </CardContent>
+        </Card>
+        )}
 
         {/* ──────────────────── PRIVACY POLICY ──────────────────── */}
+        {!fr ? (
         <Card id="privacy" data-testid="privacy-section">
           <CardContent className="pt-6 space-y-6">
             <div className="flex items-center gap-3 mb-4">
@@ -439,63 +532,96 @@ const LegalPage = () => {
                   </div>
                 </div>
 
-                {/* French Translation */}
-                <hr className="my-6 border-slate-200 dark:border-slate-700" />
-                <h2 className="text-xl font-semibold flex items-center gap-2">
-                  <CreditCard className="h-5 w-5 text-cyan-600" />
-                  Sécurité des paiements et système de dépôt fiduciaire — Addendum
-                </h2>
-                <p className="text-sm text-muted-foreground">En vigueur le 15 avril 2026 | Applicable à tous les utilisateurs</p>
-
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <span className="w-7 h-7 bg-cyan-100 dark:bg-cyan-900 rounded-full flex items-center justify-center text-cyan-600 text-xs font-bold">A1</span>
-                    Moyen de paiement obligatoire (Politique Sticky Card)
-                  </h3>
-                  <p>Pour créer une annonce sur BidVex, chaque Vendeur doit avoir un moyen de paiement valide enregistré, rattaché à son profil Stripe. Les Vendeurs <strong>ne peuvent pas supprimer</strong> leur moyen de paiement tant que l'une de leurs annonces est active. BidVex conserve un jeton Stripe (jamais les données brutes de carte). Ce jeton peut être utilisé pour traiter les pénalités d'annulation.</p>
-
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <span className="w-7 h-7 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center text-red-600 text-xs font-bold">A2</span>
-                    Pénalité d'annulation
-                  </h3>
-                  <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                    <p className="text-red-800 dark:text-red-200">Une pénalité de <strong>50,00 $ CAD</strong> est appliquée lorsqu'un Vendeur signale l'impossibilité de livrer après la clôture, ou lorsqu'un administrateur signale une non-livraison. Le montant est prélevé automatiquement. En cas d'échec, le compte est signalé pour suspension.</p>
-                  </div>
-
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <span className="w-7 h-7 bg-emerald-100 dark:bg-emerald-900 rounded-full flex items-center justify-center text-emerald-600 text-xs font-bold">B1</span>
-                    Dépôt fiduciaire et code de retrait (articles non véhiculaires)
-                  </h3>
-                  <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg p-5">
-                    <p className="text-emerald-800 dark:text-emerald-200">Pour les articles non véhiculaires, les fonds sont <strong>détenus en fiducie</strong> par BidVex après le paiement. Un code de retrait unique de 6 caractères est envoyé à l'Acheteur par courriel. Le Vendeur doit entrer ce code sur son tableau de bord pour confirmer la remise et libérer les fonds.</p>
-                  </div>
-
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <span className="w-7 h-7 bg-amber-100 dark:bg-amber-900 rounded-full flex items-center justify-center text-amber-600 text-xs font-bold">B2</span>
-                    Libération automatique après 48 heures
-                  </h3>
-                  <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
-                    <p className="text-amber-800 dark:text-amber-200">Si l'Acheteur ne présente pas le code dans les 48 heures, les fonds sont <strong>automatiquement libérés</strong> au Vendeur. Les deux parties reçoivent une notification. Les véhicules sont exclus de ce système.</p>
-                  </div>
-
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <span className="w-7 h-7 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-xs font-bold">B3</span>
-                    Litiges
-                  </h3>
-                  <p>Chaque partie peut ouvrir un litige sur un dépôt actif dans la fenêtre de 48 heures. Les fonds restent détenus pendant la résolution par l'équipe BidVex.</p>
-
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <span className="w-7 h-7 bg-slate-200 dark:bg-slate-700 rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 text-xs font-bold">B4</span>
-                    Données de dépôt et confidentialité
-                  </h3>
-                  <p>Les données de dépôt fiduciaire (codes, statuts, horodatages, journaux de tentatives) sont conservées 5 ans. Les journaux de pénalités sont conservés 7 ans. Ces données sont soumises à notre Politique de confidentialité et conformes à la LPRPDE et à la Loi 25.</p>
-                </div>
               </section>
 
               <p className="text-xs text-muted-foreground mt-4">&copy; 2026 BidVex Inc. All rights reserved.</p>
             </div>
           </CardContent>
         </Card>
+        ) : (
+        /* ──────────────────── PRIVACY FR ──────────────────── */
+        <Card id="privacy" data-testid="privacy-section-fr">
+          <CardContent className="pt-6 space-y-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                <Shield className="h-6 w-6 text-green-600" />
+              </div>
+              <h2 className="text-2xl font-bold">Politique de confidentialité de BidVex</h2>
+            </div>
+            <p className="text-sm text-muted-foreground">Dernière mise à jour : Mars 2026</p>
+            <div className="prose prose-sm dark:prose-invert max-w-none space-y-5">
+              <section className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-6">
+                <h2 className="text-xl font-semibold mb-4">Table des matières</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <ol className="list-decimal pl-6 space-y-1 text-blue-600 dark:text-blue-400"><li>Introduction</li><li>Renseignements collectés</li><li>Finalités du traitement</li><li>Partage des informations</li><li>Cookies et suivi</li></ol>
+                  <ol className="list-decimal pl-6 space-y-1 text-blue-600 dark:text-blue-400" start={6}><li>Moteur de recommandation IA</li><li>Sécurité des données</li><li>Vos droits</li><li>Conservation des données</li><li>Nous contacter</li></ol>
+                </div>
+              </section>
+              <section>
+                <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2"><span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">1</span>Introduction</h2>
+                <p>Chez BidVex Inc., nous nous engageons à protéger la vie privée et la sécurité de vos renseignements personnels. Cette politique est conforme à la Loi 25 du Québec, à la LPRPDE et au RGPD.</p>
+              </section>
+              <section>
+                <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2"><span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">2</span>Renseignements collectés</h2>
+                <div className="space-y-4">
+                  <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg p-5"><h3 className="text-lg font-semibold text-emerald-800 dark:text-emerald-200 mb-3">2.1 Vendeurs</h3><p className="text-emerald-700 dark:text-emerald-300 text-sm">Données d'identité, coordonnées, données commerciales, données d'actifs (NIV, rapports d'historique), données financières.</p></div>
+                  <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-5"><h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200 mb-3">2.2 Acheteurs</h3><p className="text-blue-700 dark:text-blue-300 text-sm">Données d'identité, coordonnées, données de paiement (via Stripe), données de transaction.</p></div>
+                  <div className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-5"><h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-3">2.3 Données techniques</h3><p className="text-slate-600 dark:text-slate-400 text-sm">Adresse IP, type de navigateur, fuseau horaire, identifiants d'appareil.</p></div>
+                </div>
+              </section>
+              <section>
+                <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2"><span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">3</span>Finalités du traitement</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="flex items-start gap-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg"><div><h4 className="font-semibold">Nécessité contractuelle</h4><p className="text-sm text-muted-foreground">Faciliter les enchères et transactions.</p></div></div>
+                  <div className="flex items-start gap-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg"><div><h4 className="font-semibold">Vérification d'identité</h4><p className="text-sm text-muted-foreground">Maintenir un marché de confiance.</p></div></div>
+                  <div className="flex items-start gap-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg"><div><h4 className="font-semibold">Traitement des paiements</h4><p className="text-sm text-muted-foreground">Gérer les frais via Stripe.</p></div></div>
+                  <div className="flex items-start gap-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg"><div><h4 className="font-semibold">Conformité légale</h4><p className="text-sm text-muted-foreground">Obligations fiscales et juridiques.</p></div></div>
+                </div>
+              </section>
+              <section>
+                <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2"><span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">4</span>Partage des informations</h2>
+                <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4"><p className="text-red-800 dark:text-red-200 font-semibold">Nous ne vendons pas vos données personnelles à des tiers.</p></div>
+              </section>
+              <section>
+                <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2"><span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-sm font-bold">5</span>Cookies et suivi</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-4"><h4 className="font-semibold text-green-800 dark:text-green-200">Essentiels</h4><p className="text-sm text-green-700 dark:text-green-300">Requis pour les fonctionnalités de base.</p></div>
+                  <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4"><h4 className="font-semibold text-blue-800 dark:text-blue-200">Analytiques</h4><p className="text-sm text-blue-700 dark:text-blue-300">Comprendre l'interaction utilisateur.</p></div>
+                </div>
+              </section>
+              <section>
+                <h2 className="text-2xl font-semibold mb-3 flex items-center gap-2"><span className="w-8 h-8 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center text-green-600 text-sm font-bold">7</span>Sécurité des données</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-4 text-center"><h4 className="font-semibold text-green-800 dark:text-green-200">TLS/SSL</h4><p className="text-sm text-green-700">Chiffrement en transit</p></div>
+                  <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-4 text-center"><h4 className="font-semibold text-green-800 dark:text-green-200">AES-256</h4><p className="text-sm text-green-700">Chiffrement au repos</p></div>
+                  <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-4 text-center"><h4 className="font-semibold text-green-800 dark:text-green-200">PCI-DSS</h4><p className="text-sm text-green-700">Conformité paiements</p></div>
+                </div>
+              </section>
+              <section className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-6">
+                <h2 className="text-2xl font-semibold mb-4"><span className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full inline-flex items-center justify-center text-blue-600 text-sm font-bold mr-2">10</span>Nous contacter</h2>
+                <p>Courriel : <a href="mailto:support@bidvex.com" className="text-blue-600 hover:underline">support@bidvex.com</a></p>
+              </section>
+
+              {/* FR Addendum */}
+              <section className="space-y-4 border-l-4 border-cyan-400 pl-4">
+                <h2 className="text-xl font-semibold flex items-center gap-2"><CreditCard className="h-5 w-5 text-cyan-600" />Sécurité des paiements — Addendum</h2>
+                <p className="text-sm text-muted-foreground">En vigueur le 15 avril 2026</p>
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2"><span className="w-7 h-7 bg-cyan-100 dark:bg-cyan-900 rounded-full flex items-center justify-center text-cyan-600 text-xs font-bold">A1</span>Moyen de paiement obligatoire</h3>
+                  <p>Chaque Vendeur doit avoir un moyen de paiement valide. Les Vendeurs <strong>ne peuvent pas supprimer</strong> leur moyen de paiement tant que leurs annonces sont actives.</p>
+                  <h3 className="text-lg font-semibold flex items-center gap-2"><span className="w-7 h-7 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center text-red-600 text-xs font-bold">A2</span>Pénalité d'annulation</h3>
+                  <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-4"><p className="text-red-800 dark:text-red-200">Pénalité de <strong>50,00 $ CAD</strong> pour non-livraison.</p></div>
+                  <h3 className="text-lg font-semibold flex items-center gap-2"><span className="w-7 h-7 bg-emerald-100 dark:bg-emerald-900 rounded-full flex items-center justify-center text-emerald-600 text-xs font-bold">B1</span>Dépôt fiduciaire et code de retrait</h3>
+                  <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg p-5"><p className="text-emerald-800 dark:text-emerald-200">Fonds <strong>détenus en fiducie</strong>. Code de retrait de 6 caractères envoyé par courriel.</p></div>
+                  <h3 className="text-lg font-semibold flex items-center gap-2"><span className="w-7 h-7 bg-amber-100 dark:bg-amber-900 rounded-full flex items-center justify-center text-amber-600 text-xs font-bold">B2</span>Libération automatique (48h)</h3>
+                  <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4"><p className="text-amber-800 dark:text-amber-200">Fonds <strong>automatiquement libérés</strong> après 48 heures.</p></div>
+                </div>
+              </section>
+              <p className="text-xs text-muted-foreground mt-4">&copy; 2026 BidVex Inc. Tous droits réservés.</p>
+            </div>
+          </CardContent>
+        </Card>
+        )}
       </div>
     </div>
   );
