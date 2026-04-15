@@ -2,20 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCategoryTree } from '../hooks/useCategoryTree';
 import { Label } from '../components/ui/label';
-import { ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronRight, Loader2, ShieldAlert } from 'lucide-react';
+import InfoTip from './InfoTip';
 
 /**
  * Two-step category selector for seller flows.
- * Step 1: Select parent category
- * Step 2: Select subcategory (only shown if parent has children)
- *
- * Props:
- *   value        — current category name_en string (e.g. "Machining & Welding")
- *   onChange      — callback(name_en) when category changes
- *   label         — optional label override
- *   required      — HTML required attribute
- *   filterVehicles — if true, hides vehicle categories for non-partner users
- *   userRole      — 'admin' | 'partner' | 'personal' etc.
+ * Vehicle categories shown but BLOCKED for non-licensed users with compliance modal.
  */
 const CategorySelector = ({
   value = '',
@@ -30,17 +22,15 @@ const CategorySelector = ({
 
   const [selectedParentId, setSelectedParentId] = useState('');
   const [selectedChildName, setSelectedChildName] = useState('');
+  const [showVehicleModal, setShowVehicleModal] = useState(false);
 
-  // Sync from external value (e.g. edit mode)
   useEffect(() => {
     if (!value || tree.length === 0) return;
-    // Check if value is a child
     const parentNode = getParent(value);
     if (parentNode) {
       setSelectedParentId(parentNode.id);
       setSelectedChildName(value);
     } else {
-      // Value is a root category
       const root = tree.find(r => r.nameEn === value);
       if (root) {
         setSelectedParentId(root.id);
@@ -51,17 +41,14 @@ const CategorySelector = ({
 
   const isPartnerOrAdmin = userRole === 'partner' || userRole === 'admin';
 
-  // Filter tree for vehicle restriction
-  const filteredTree = tree.filter(parent => {
-    if (!filterVehicles) return true;
-    const isVehicle = parent.nameEn?.toLowerCase() === 'vehicle' || parent.nameEn?.toLowerCase() === 'vehicles';
-    return !isVehicle || isPartnerOrAdmin;
-  });
+  const isVehicleCategory = (cat) => {
+    const name = (cat.nameEn || '').toLowerCase();
+    return name === 'vehicle' || name === 'vehicles' || name === 'road_vehicles';
+  };
 
   const selectedParent = tree.find(p => p.id === selectedParentId);
   const hasChildren = selectedParent?.children?.length > 0;
 
-  // Breadcrumb
   const breadcrumb = (() => {
     if (!selectedParent) return null;
     const parentName = getName(selectedParent);
@@ -91,15 +78,20 @@ const CategorySelector = ({
 
   const handleParentChange = (e) => {
     const parentId = e.target.value;
+    const parent = tree.find(p => p.id === parentId);
+
+    // Block vehicle selection for non-licensed users
+    if (parent && isVehicleCategory(parent) && filterVehicles && !isPartnerOrAdmin) {
+      setShowVehicleModal(true);
+      return;
+    }
+
     setSelectedParentId(parentId);
     setSelectedChildName('');
 
-    const parent = tree.find(p => p.id === parentId);
     if (parent && parent.children.length === 0) {
-      // Leaf parent — auto-select it as the category
       onChange(parent.nameEn);
     } else {
-      // Has children — wait for subcategory selection; clear value
       onChange('');
     }
   };
@@ -123,13 +115,17 @@ const CategorySelector = ({
 
   return (
     <div className="space-y-2" data-testid="category-selector">
-      <Label>{label || t('createListing.category', 'Category')} {required && '*'}</Label>
+      <div className="flex items-center gap-1.5">
+        <Label>{label || t('createListing.category', 'Category')} {required && '*'}</Label>
+        <InfoTip
+          en="Choose the category that best describes your item. Vehicle listings require a verified dealer license."
+          fr="Choisissez la catégorie qui décrit le mieux votre article. Les annonces de véhicules nécessitent un permis de commerçant vérifié."
+        />
+      </div>
 
-      {/* Breadcrumb */}
       {breadcrumb}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {/* Step 1: Parent Category */}
         <div>
           <select
             value={selectedParentId}
@@ -139,15 +135,17 @@ const CategorySelector = ({
             required={required}
           >
             <option value="">{t('createListing.selectCategory', 'Select category...')}</option>
-            {filteredTree.map(parent => (
-              <option key={parent.id} value={parent.id}>
-                {parent.icon} {getName(parent)}
-              </option>
-            ))}
+            {tree.map(parent => {
+              const blocked = isVehicleCategory(parent) && filterVehicles && !isPartnerOrAdmin;
+              return (
+                <option key={parent.id} value={parent.id} className={blocked ? 'text-slate-400' : ''}>
+                  {parent.icon} {getName(parent)} {blocked ? '🔒' : ''}
+                </option>
+              );
+            })}
           </select>
         </div>
 
-        {/* Step 2: Subcategory (only if parent has children) */}
         {selectedParentId && hasChildren && (
           <div>
             <select
@@ -168,8 +166,54 @@ const CategorySelector = ({
         )}
       </div>
 
-      {/* Hidden input for form validation if using native form submit */}
       <input type="hidden" name="category" value={value} />
+
+      {/* Vehicle Restriction Modal */}
+      {showVehicleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" data-testid="vehicle-restriction-modal">
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl max-w-md mx-4 p-6 space-y-4 border border-red-200 dark:border-red-800">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900 flex items-center justify-center shrink-0">
+                <ShieldAlert className="h-6 w-6 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg text-slate-900 dark:text-white">
+                  {t('vehicleRestriction.title', 'Vehicle Listing Restricted')}
+                </h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  {t('vehicleRestriction.subtitle', 'Compliance Requirement')}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3 text-sm">
+              <p className="text-slate-700 dark:text-slate-300 leading-relaxed">
+                You must be a licensed vehicle dealer to list vehicles on BidVex. This is required by Quebec's Office de la protection du consommateur (OPC).
+              </p>
+              <p className="text-slate-700 dark:text-slate-300 leading-relaxed" lang="fr">
+                Vous devez être un commerçant de véhicules d'occasion autorisé pour publier des véhicules sur BidVex. Cette exigence est imposée par l'Office de la protection du consommateur (OPC) du Québec.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 pt-2">
+              <a
+                href="/become-vehicle-seller"
+                className="inline-flex items-center justify-center px-4 py-2.5 rounded-lg bg-primary text-white font-medium text-sm hover:bg-primary/90 transition-colors"
+                data-testid="apply-vehicle-dealer-btn"
+              >
+                {t('vehicleRestriction.apply', 'Apply as Licensed Vehicle Dealer')}
+              </a>
+              <button
+                onClick={() => setShowVehicleModal(false)}
+                className="px-4 py-2 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                data-testid="close-vehicle-modal-btn"
+              >
+                {t('common.close', 'Close')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

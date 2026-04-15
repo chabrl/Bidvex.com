@@ -83,6 +83,15 @@ class Listing(BaseModel):
     title_fr: Optional[str] = None
     description_en: Optional[str] = None
     description_fr: Optional[str] = None
+    # Multi-lot fields (populated when listing is a lot within a multi-item auction)
+    listing_type: Optional[str] = None
+    parent_auction_id: Optional[str] = None
+    parent_auction_title: Optional[str] = None
+    lot_number: Optional[int] = None
+    total_lots: Optional[int] = None
+    badge_en: Optional[str] = None
+    badge_fr: Optional[str] = None
+    bids: Optional[int] = None
 
 
 # ========== BIDS ==========

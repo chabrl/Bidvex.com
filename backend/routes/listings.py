@@ -257,6 +257,63 @@ async def get_listings(
     sort_order = -1 if sort.startswith("-") else 1
     sort_field = sort.lstrip("-")
     listings = await db.listings.find(query, {"_id": 0}).sort(sort_field, sort_order).skip(skip).limit(limit).to_list(limit)
+
+    # Also include individual lots from multi-item listings as independent items
+    multi_query = {"status": "active"}
+    if category:
+        multi_query["category"] = category
+    if city:
+        multi_query["city"] = city
+    if region:
+        multi_query["region"] = region
+    if search:
+        multi_query["$or"] = [{"title": {"$regex": search, "$options": "i"}}, {"description": {"$regex": search, "$options": "i"}}]
+
+    multi_listings = await db.multi_item_listings.find(multi_query, {"_id": 0}).sort(sort_field, sort_order).limit(limit).to_list(limit)
+
+    for ml in multi_listings:
+        for lot in ml.get("lots", []):
+            lot_listing = {
+                "id": f"{ml['id']}_lot_{lot.get('lot_number', 0)}",
+                "title": lot.get("title", ml.get("title", "")),
+                "description": lot.get("description", ml.get("description", "")),
+                "category": ml.get("category", ""),
+                "condition": lot.get("condition", ml.get("condition", "used")),
+                "starting_price": lot.get("starting_price", 0),
+                "current_price": lot.get("current_bid", lot.get("starting_price", 0)),
+                "images": lot.get("images", ml.get("images", [])),
+                "seller_id": ml.get("seller_id", ""),
+                "status": "active",
+                "city": ml.get("city", ""),
+                "region": ml.get("region", ""),
+                "country": ml.get("country", "CA"),
+                "currency": ml.get("currency", "CAD"),
+                "auction_end_date": ml.get("end_time", ml.get("auction_end_date")),
+                "created_at": ml.get("created_at"),
+                "listing_type": "multi_lot",
+                "parent_auction_id": ml["id"],
+                "parent_auction_title": ml.get("title", ""),
+                "lot_number": lot.get("lot_number", 0),
+                "total_lots": len(ml.get("lots", [])),
+                "badge_en": "Part of Auction",
+                "badge_fr": "Partie d'une enchère",
+                "views": ml.get("views", 0),
+                "bids": lot.get("bid_count", 0),
+            }
+            # Apply price filters
+            if min_price is not None and lot_listing["current_price"] < min_price:
+                continue
+            if max_price is not None and lot_listing["current_price"] > max_price:
+                continue
+            if condition and lot_listing["condition"] != condition:
+                continue
+            listings.append(lot_listing)
+
+    # Sort combined results
+    reverse = sort_order == -1
+    listings.sort(key=lambda x: x.get(sort_field, ""), reverse=reverse)
+    listings = listings[:limit]
+
     for listing in listings:
         if isinstance(listing.get("created_at"), str):
             listing["created_at"] = datetime.fromisoformat(listing["created_at"])

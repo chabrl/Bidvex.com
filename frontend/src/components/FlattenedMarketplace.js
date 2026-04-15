@@ -65,7 +65,8 @@ const FlattenedMarketplace = ({
   variant = 'full', // 'full', 'compact', 'homepage'
   externalFilters = {}
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isFrench = i18n.language?.startsWith('fr');
   const { user, token } = useAuth();
   const navigate = useNavigate();
   const { trackView: insightView, trackClick: insightClick, trackSearch: insightSearch } = useInsightsTracker();
@@ -690,6 +691,18 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
               <Badge className="bg-violet-600 text-white border-0 shadow-lg text-xs" data-testid="partner-badge">
                 <ShieldCheck className="h-3 w-3 mr-1" />
                 {t('marketplace.verifiedPartner')}
+              </Badge>
+            )}
+            {/* Multi-Lot Badge */}
+            {item.listing_type === 'multi_lot' && (
+              <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200 text-xs" data-testid="multi-lot-badge">
+                {isFrench ? 'Partie d\'une enchère' : 'Part of Auction'}
+              </Badge>
+            )}
+            {/* New Listing Badge */}
+            {item.created_at && (Date.now() - new Date(item.created_at).getTime()) < 86400000 * 3 && (
+              <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-xs" data-testid="new-badge">
+                {isFrench ? 'Nouveau' : 'New'}
               </Badge>
             )}
           </div>

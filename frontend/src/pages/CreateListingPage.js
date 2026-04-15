@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { Loader2, Upload, AlertTriangle } from 'lucide-react';
 import LocationSelector from '../components/LocationSelector';
 import CategorySelector from '../components/CategorySelector';
+import InfoTip from '../components/InfoTip';
 import { CFIASoilBanner, CFIASoilCheckbox } from '../components/legal/LegalComplianceSections';
 import useGeoLocation from '../hooks/useGeoLocation';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
@@ -222,7 +223,9 @@ const CreateListingPage = () => {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="title">{t('createListing.auctionTitle', 'Title')} *</Label>
+                <Label htmlFor="title">{t('createListing.auctionTitle', 'Title')} *
+                  <InfoTip en="A clear, descriptive title helps buyers find your item faster." fr="Un titre clair et descriptif aide les acheteurs à trouver votre article plus rapidement." />
+                </Label>
                 <Input
                   id="title"
                   name="title"
@@ -235,7 +238,9 @@ const CreateListingPage = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="description">{t('createListing.description', 'Description')} *</Label>
+                <Label htmlFor="description">{t('createListing.description', 'Description')} *
+                  <InfoTip en="Include condition details, dimensions, and any flaws. Honest descriptions build trust." fr="Incluez l'état, les dimensions et tout défaut. Les descriptions honnêtes inspirent confiance." />
+                </Label>
                 <Textarea
                   id="description"
                   name="description"
@@ -289,7 +294,9 @@ const CreateListingPage = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="starting_price">{t('createListing.startingPrice', 'Starting Price')} ({formData.currency}) *</Label>
+                  <Label htmlFor="starting_price">{t('createListing.startingPrice', 'Starting Price')} ({formData.currency}) *
+                    <InfoTip en="Lower starting prices attract more bidders and often result in higher final prices." fr="Des prix de départ plus bas attirent plus d'enchérisseurs et mènent souvent à des prix finaux plus élevés." />
+                  </Label>
                   <Input
                     id="starting_price"
                     name="starting_price"
@@ -306,7 +313,9 @@ const CreateListingPage = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="buy_now_price">{t('createListing.buyNowPrice', 'Buy Now Price')} ({formData.currency})</Label>
+                  <Label htmlFor="buy_now_price">{t('createListing.buyNowPrice', 'Buy Now Price')} ({formData.currency})
+                    <InfoTip en="Optional. Allows buyers to skip bidding and purchase instantly at this price." fr="Optionnel. Permet aux acheteurs de sauter l'enchère et d'acheter instantanément à ce prix." />
+                  </Label>
                   <Input
                     id="buy_now_price"
                     name="buy_now_price"
@@ -323,7 +332,9 @@ const CreateListingPage = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="buyers_premium_percent">{t('createListing.buyersPremium', "Buyer's Premium (%)")}</Label>
+                <Label htmlFor="buyers_premium_percent">{t('createListing.buyersPremium', "Buyer's Premium (%)")}
+                  <InfoTip en="A fee added to the winning bid, paid by the buyer. Standard: 5%. This covers platform services." fr="Des frais ajoutés à l'enchère gagnante, payés par l'acheteur. Standard: 5%. Cela couvre les services de la plateforme." />
+                </Label>
                 {isPartner ? (
                   <>
                     <Input
@@ -350,7 +361,9 @@ const CreateListingPage = () => {
 
               {/* Payment Method Selection */}
               <div className="space-y-3" data-testid="payment-method-section">
-                <Label>Payment Method</Label>
+                <Label>Payment Method
+                  <InfoTip en="Choose how you want to receive your payment after a successful sale." fr="Choisissez comment vous souhaitez recevoir votre paiement après une vente réussie." />
+                </Label>
                 <div className="grid grid-cols-1 gap-2">
                   <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${paymentMethod === 'stripe' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
                     <input type="radio" name="payment_method" value="stripe" checked={paymentMethod === 'stripe'} onChange={(e) => setPaymentMethod(e.target.value)} className="text-blue-600" data-testid="payment-stripe" />
