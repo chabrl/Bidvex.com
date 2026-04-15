@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, CardContent } from '../components/ui/card';
-import { ScrollText, Shield, ArrowLeft } from 'lucide-react';
+import { ScrollText, Shield, ArrowLeft, CreditCard, Lock, Key, Clock, AlertTriangle, Database } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AIDisclosureLegalSection, VehicleAuctionLegalSection, CrossBorderLegalSection } from '../components/legal/LegalComplianceSections';
@@ -353,56 +353,144 @@ const LegalPage = () => {
                   Added April 15, 2026 — DO NOT modify content above
                   ════════════════════════════════════════════════ */}
 
-              <div className="mt-8 pt-8 border-t-2 border-dashed border-blue-200 dark:border-blue-800">
-                <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800 mb-6">
-                  <p className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-1">Addendum — Payment Safety &amp; Escrow System</p>
-                  <p className="text-xs text-blue-600 dark:text-blue-400">Effective April 15, 2026 | Applicable to all users</p>
-                </div>
+              <section id="sticky-card" className="space-y-4 border-l-4 border-cyan-400 pl-4">
+                <h2 className="text-xl font-semibold flex items-center gap-2">
+                  <CreditCard className="h-5 w-5 text-cyan-600" />
+                  Payment Safety &amp; Escrow System — Addendum
+                </h2>
+                <p className="text-sm text-muted-foreground">Effective April 15, 2026 | Applicable to all users</p>
 
-                <h3 className="text-lg font-semibold mt-6">A1. Mandatory Payment Method (Sticky Card Policy)</h3>
-                <p>To create a listing on BidVex, every Seller must have a valid payment method (credit or debit card) on file, attached to their Stripe Customer profile. Sellers <strong>cannot remove</strong> their payment method while any of their listings are in an active, live, or ending-soon status. BidVex stores a Stripe payment method token (not raw card data). This token may be used to process authorized charges, including cancellation penalties.</p>
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <span className="w-7 h-7 bg-cyan-100 dark:bg-cyan-900 rounded-full flex items-center justify-center text-cyan-600 text-xs font-bold">A1</span>
+                    Mandatory Payment Method (Sticky Card Policy)
+                  </h3>
+                  <p>To create a listing on BidVex, every Seller must have a valid payment method (credit or debit card) on file, attached to their Stripe Customer profile. Sellers <strong>cannot remove</strong> their payment method while any of their listings are in an active, live, or ending-soon status. BidVex stores a Stripe payment method token (not raw card data). This token may be used to process authorized charges, including cancellation penalties.</p>
 
-                <h3 className="text-lg font-semibold mt-6">A2. Cancellation Penalty</h3>
-                <p>A penalty of <strong>$50.00 CAD</strong> is triggered when a Seller marks an item as "unable to deliver" after auction close, or when flagged by an administrator for non-delivery. This amount is automatically charged to the Seller's payment method on file. If the charge fails, the account is flagged for suspension.</p>
-
-                <h3 className="text-lg font-semibold mt-6">B1. Escrow &amp; Pickup Code System (Non-Vehicle Items)</h3>
-                <p>For non-vehicle items, when a Buyer wins an auction and payment is captured, the funds are <strong>held in escrow</strong> by BidVex. A unique 6-character alphanumeric Pickup Code is generated and emailed to the Buyer. The Seller must enter this code on their dashboard to confirm item handoff and release the funds to their Stripe Connect account.</p>
-
-                <h3 className="text-lg font-semibold mt-6">B2. 48-Hour Auto-Release</h3>
-                <p>If the Buyer does not present the Pickup Code within 48 hours, funds are <strong>automatically released</strong> to the Seller. Both parties receive email notification of auto-release. Vehicle transactions are excluded from this system.</p>
-
-                <h3 className="text-lg font-semibold mt-6">B3. Disputes</h3>
-                <p>Either party may open a dispute on an active escrow within the 48-hour window. Disputed escrows are reviewed by the BidVex team. Funds remain held until resolution.</p>
-
-                <h3 className="text-lg font-semibold mt-6">B4. Escrow Data &amp; Privacy</h3>
-                <p>Escrow transaction data (pickup codes, status, timestamps, failed attempt logs) is retained for 5 years. Penalty logs are retained for 7 years. Pickup attempt logs are retained for 2 years. This data is subject to our Privacy Policy and complies with PIPEDA and Quebec's Law 25.</p>
-
-                {/* French Translation */}
-                <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700">
-                  <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800 mb-6">
-                    <p className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-1">Addendum — Sécurité des paiements et système de dépôt fiduciaire</p>
-                    <p className="text-xs text-blue-600 dark:text-blue-400">En vigueur le 15 avril 2026 | Applicable à tous les utilisateurs</p>
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <span className="w-7 h-7 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center text-red-600 text-xs font-bold">A2</span>
+                    Cancellation Penalty
+                  </h3>
+                  <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                    <p className="text-red-800 dark:text-red-200">A penalty of <strong>$50.00 CAD</strong> is triggered when a Seller marks an item as "unable to deliver" after auction close, or when flagged by an administrator for non-delivery. This amount is automatically charged to the Seller's payment method on file. If the charge fails, the account is flagged for suspension.</p>
                   </div>
 
-                  <h3 className="text-lg font-semibold mt-6">A1. Moyen de paiement obligatoire (Politique Sticky Card)</h3>
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <span className="w-7 h-7 bg-emerald-100 dark:bg-emerald-900 rounded-full flex items-center justify-center text-emerald-600 text-xs font-bold">B1</span>
+                    <Key className="h-4 w-4 text-emerald-600" />
+                    Escrow &amp; Pickup Code System (Non-Vehicle Items)
+                  </h3>
+                  <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg p-5">
+                    <p className="text-emerald-800 dark:text-emerald-200">For non-vehicle items, when a Buyer wins an auction and payment is captured, the funds are <strong>held in escrow</strong> by BidVex. A unique 6-character alphanumeric Pickup Code is generated and emailed to the Buyer. The Seller must enter this code on their dashboard to confirm item handoff and release the funds to their Stripe Connect account.</p>
+                  </div>
+
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <span className="w-7 h-7 bg-amber-100 dark:bg-amber-900 rounded-full flex items-center justify-center text-amber-600 text-xs font-bold">B2</span>
+                    <Clock className="h-4 w-4 text-amber-600" />
+                    48-Hour Auto-Release
+                  </h3>
+                  <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                    <p className="text-amber-800 dark:text-amber-200">If the Buyer does not present the Pickup Code within 48 hours, funds are <strong>automatically released</strong> to the Seller. Both parties receive email notification of auto-release. Vehicle transactions are excluded from this system.</p>
+                  </div>
+
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <span className="w-7 h-7 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-xs font-bold">B3</span>
+                    <AlertTriangle className="h-4 w-4 text-blue-600" />
+                    Disputes
+                  </h3>
+                  <p>Either party may open a dispute on an active escrow within the 48-hour window. Disputed escrows are reviewed by the BidVex team. Funds remain held until resolution.</p>
+
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <span className="w-7 h-7 bg-slate-200 dark:bg-slate-700 rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 text-xs font-bold">B4</span>
+                    <Database className="h-4 w-4 text-slate-600" />
+                    Escrow Data &amp; Privacy
+                  </h3>
+                  <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-4 p-2">
+                        <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <span className="text-lg font-bold text-blue-600">5</span>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-sm">Escrow Logs</h4>
+                          <p className="text-xs text-muted-foreground">Pickup codes, status, timestamps, failed attempt logs — retained for 5 years.</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4 p-2">
+                        <div className="w-12 h-12 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <span className="text-lg font-bold text-red-600">7</span>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-sm">Penalty Logs</h4>
+                          <p className="text-xs text-muted-foreground">Cancellation penalty records — retained for 7 years.</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4 p-2">
+                        <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <span className="text-lg font-bold text-amber-600">2</span>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-sm">Pickup Attempt Logs</h4>
+                          <p className="text-xs text-muted-foreground">Failed code entry attempts — retained for 2 years.</p>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-sm mt-3">This data is subject to our Privacy Policy and complies with PIPEDA and Quebec's Law 25.</p>
+                  </div>
+                </div>
+
+                {/* French Translation */}
+                <hr className="my-6 border-slate-200 dark:border-slate-700" />
+                <h2 className="text-xl font-semibold flex items-center gap-2">
+                  <CreditCard className="h-5 w-5 text-cyan-600" />
+                  Sécurité des paiements et système de dépôt fiduciaire — Addendum
+                </h2>
+                <p className="text-sm text-muted-foreground">En vigueur le 15 avril 2026 | Applicable à tous les utilisateurs</p>
+
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <span className="w-7 h-7 bg-cyan-100 dark:bg-cyan-900 rounded-full flex items-center justify-center text-cyan-600 text-xs font-bold">A1</span>
+                    Moyen de paiement obligatoire (Politique Sticky Card)
+                  </h3>
                   <p>Pour créer une annonce sur BidVex, chaque Vendeur doit avoir un moyen de paiement valide enregistré, rattaché à son profil Stripe. Les Vendeurs <strong>ne peuvent pas supprimer</strong> leur moyen de paiement tant que l'une de leurs annonces est active. BidVex conserve un jeton Stripe (jamais les données brutes de carte). Ce jeton peut être utilisé pour traiter les pénalités d'annulation.</p>
 
-                  <h3 className="text-lg font-semibold mt-6">A2. Pénalité d'annulation</h3>
-                  <p>Une pénalité de <strong>50,00 $ CAD</strong> est appliquée lorsqu'un Vendeur signale l'impossibilité de livrer après la clôture, ou lorsqu'un administrateur signale une non-livraison. Le montant est prélevé automatiquement. En cas d'échec, le compte est signalé pour suspension.</p>
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <span className="w-7 h-7 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center text-red-600 text-xs font-bold">A2</span>
+                    Pénalité d'annulation
+                  </h3>
+                  <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                    <p className="text-red-800 dark:text-red-200">Une pénalité de <strong>50,00 $ CAD</strong> est appliquée lorsqu'un Vendeur signale l'impossibilité de livrer après la clôture, ou lorsqu'un administrateur signale une non-livraison. Le montant est prélevé automatiquement. En cas d'échec, le compte est signalé pour suspension.</p>
+                  </div>
 
-                  <h3 className="text-lg font-semibold mt-6">B1. Dépôt fiduciaire et code de retrait (articles non véhiculaires)</h3>
-                  <p>Pour les articles non véhiculaires, les fonds sont <strong>détenus en fiducie</strong> par BidVex après le paiement. Un code de retrait unique de 6 caractères est envoyé à l'Acheteur par courriel. Le Vendeur doit entrer ce code sur son tableau de bord pour confirmer la remise et libérer les fonds.</p>
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <span className="w-7 h-7 bg-emerald-100 dark:bg-emerald-900 rounded-full flex items-center justify-center text-emerald-600 text-xs font-bold">B1</span>
+                    Dépôt fiduciaire et code de retrait (articles non véhiculaires)
+                  </h3>
+                  <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg p-5">
+                    <p className="text-emerald-800 dark:text-emerald-200">Pour les articles non véhiculaires, les fonds sont <strong>détenus en fiducie</strong> par BidVex après le paiement. Un code de retrait unique de 6 caractères est envoyé à l'Acheteur par courriel. Le Vendeur doit entrer ce code sur son tableau de bord pour confirmer la remise et libérer les fonds.</p>
+                  </div>
 
-                  <h3 className="text-lg font-semibold mt-6">B2. Libération automatique après 48 heures</h3>
-                  <p>Si l'Acheteur ne présente pas le code dans les 48 heures, les fonds sont <strong>automatiquement libérés</strong> au Vendeur. Les deux parties reçoivent une notification. Les véhicules sont exclus de ce système.</p>
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <span className="w-7 h-7 bg-amber-100 dark:bg-amber-900 rounded-full flex items-center justify-center text-amber-600 text-xs font-bold">B2</span>
+                    Libération automatique après 48 heures
+                  </h3>
+                  <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                    <p className="text-amber-800 dark:text-amber-200">Si l'Acheteur ne présente pas le code dans les 48 heures, les fonds sont <strong>automatiquement libérés</strong> au Vendeur. Les deux parties reçoivent une notification. Les véhicules sont exclus de ce système.</p>
+                  </div>
 
-                  <h3 className="text-lg font-semibold mt-6">B3. Litiges</h3>
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <span className="w-7 h-7 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 text-xs font-bold">B3</span>
+                    Litiges
+                  </h3>
                   <p>Chaque partie peut ouvrir un litige sur un dépôt actif dans la fenêtre de 48 heures. Les fonds restent détenus pendant la résolution par l'équipe BidVex.</p>
 
-                  <h3 className="text-lg font-semibold mt-6">B4. Données de dépôt et confidentialité</h3>
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <span className="w-7 h-7 bg-slate-200 dark:bg-slate-700 rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 text-xs font-bold">B4</span>
+                    Données de dépôt et confidentialité
+                  </h3>
                   <p>Les données de dépôt fiduciaire (codes, statuts, horodatages, journaux de tentatives) sont conservées 5 ans. Les journaux de pénalités sont conservés 7 ans. Ces données sont soumises à notre Politique de confidentialité et conformes à la LPRPDE et à la Loi 25.</p>
                 </div>
-              </div>
+              </section>
 
               <p className="text-xs text-muted-foreground mt-4">&copy; 2026 BidVex Inc. All rights reserved.</p>
             </div>

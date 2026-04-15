@@ -1,17 +1,12 @@
 import React from 'react';
-import { useTranslation } from 'react-i18next';
-import { TermsEN, TermsFR } from '../components/legal';
+import LegalPage from './LegalPage';
 
-const TermsOfServicePage = () => {
-  const { i18n } = useTranslation();
-  const currentLanguage = i18n.language || 'en';
-  
-  // Render the appropriate language component
-  if (currentLanguage === 'fr' || currentLanguage.startsWith('fr')) {
-    return <TermsFR />;
-  }
-  
-  return <TermsEN />;
-};
+/**
+ * Terms of Service page — renders the full LegalPage which contains
+ * the production-approved Terms & Conditions with all sections,
+ * including the Sticky Card + Escrow addendum.
+ * Layout matches: https://bidvex.com/terms-of-service
+ */
+const TermsOfServicePage = () => <LegalPage />;
 
 export default TermsOfServicePage;

@@ -1,4 +1,1 @@
-import React from 'react';
-import { Navigate } from 'react-router-dom';
-
-export const TermsFR = () => <Navigate to="/legal#terms" replace />;
+export const TermsFR = () => null;

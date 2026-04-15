@@ -1,17 +1,12 @@
 import React from 'react';
-import { useTranslation } from 'react-i18next';
-import { PrivacyEN, PrivacyFR } from '../components/legal';
+import LegalPage from './LegalPage';
 
-const PrivacyPolicyPage = () => {
-  const { i18n } = useTranslation();
-  const currentLanguage = i18n.language || 'en';
-  
-  // Render the appropriate language component
-  if (currentLanguage === 'fr' || currentLanguage.startsWith('fr')) {
-    return <PrivacyFR />;
-  }
-  
-  return <PrivacyEN />;
-};
+/**
+ * Privacy Policy page — renders the full LegalPage which contains
+ * the production-approved Privacy Policy with all sections,
+ * including the Sticky Card + Escrow addendum.
+ * Layout matches: https://bidvex.com/privacy-policy
+ */
+const PrivacyPolicyPage = () => <LegalPage />;
 
 export default PrivacyPolicyPage;
