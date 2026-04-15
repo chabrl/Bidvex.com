@@ -1,0 +1,162 @@
+{
+  "summary": "Seller Commission Tier Audit + Full Pricing Validation - Iteration 140. All 58 tests PASSED (34 from iteration 139 + 24 new tests). Verified SELLER_COMMISSION_RATES dict, 4 new proofs (A-D) for $50 table sold in Ontario, stripe recovery formula differences between non_vehicle_stripe (on hammer+BP) and non_vehicle_cash (on BP only), and all existing proofs unchanged.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_results": {
+    "backend_api_tests": {
+      "status": "PASS",
+      "total": 58,
+      "passed": 58,
+      "failed": 0,
+      "breakdown": {
+        "iteration_139_tests": 34,
+        "iteration_140_new_tests": 24
+      }
+    },
+    "seller_commission_rates_dict": {
+      "free": "0.04 (4%) - VERIFIED",
+      "standard": "0.04 (4%) - VERIFIED",
+      "premium": "0.025 (2.5%) - VERIFIED",
+      "vip": "0.02 (2%) - VERIFIED",
+      "vip_elite": "0.02 (2%) - VERIFIED",
+      "partner": "0.03 (3%) - VERIFIED"
+    },
+    "4_new_proofs_verified": {
+      "proof_A_standard_50_ON": {
+        "expected": "buyer=$54.88, seller=$47.33",
+        "actual": "buyer=$54.88, seller=$47.33",
+        "status": "PASS"
+      },
+      "proof_B_premium_50_ON": {
+        "expected": "buyer=$54.01, seller=$48.20",
+        "actual": "buyer=$54.01, seller=$48.20",
+        "status": "PASS"
+      },
+      "proof_C_vip_50_ON": {
+        "expected": "buyer=$53.72, seller=$48.50",
+        "actual": "buyer=$53.72, seller=$48.50",
+        "status": "PASS"
+      },
+      "proof_D_partner_50_ON": {
+        "expected": "buyer=$0.00, seller=$2.08",
+        "actual": "buyer=$0.00, seller=$2.08",
+        "status": "PASS"
+      }
+    },
+    "stripe_recovery_formula_verification": {
+      "non_vehicle_stripe_buyer_sr": {
+        "formula": "stripe_recovery(hammer+BP)",
+        "example_50_ON_standard": "$1.82 (on $52.50)",
+        "status": "VERIFIED"
+      },
+      "non_vehicle_cash_buyer_sr": {
+        "formula": "stripe_recovery(BP only)",
+        "example_50_ON_standard": "$0.37 (on $2.50)",
+        "status": "VERIFIED"
+      }
+    },
+    "existing_proofs_unchanged": {
+      "vehicle_auction_qc_1000": {
+        "expected": "buyer_total=$29.93",
+        "actual": "buyer_total=$29.93",
+        "status": "PASS"
+      },
+      "flat_purchase_on_300": {
+        "expected": "total=$349.17",
+        "actual": "total=$349.17",
+        "status": "PASS"
+      },
+      "non_vehicle_cash_ab_500": {
+        "expected": "buyer=$27.33, seller=$21.92",
+        "actual": "buyer=$27.33, seller=$21.92",
+        "status": "PASS"
+      },
+      "partner_auction_on_2000": {
+        "expected": "buyer=$0.00, seller=$70.11",
+        "actual": "buyer=$0.00, seller=$70.11",
+        "status": "PASS"
+      }
+    },
+    "connect_payment_engine_verification": {
+      "calculate_connect_checkout_general_ON_50": {
+        "expected": "stripe_charge=$54.88",
+        "actual": "stripe_charge=$54.88",
+        "status": "PASS"
+      }
+    }
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_pricing_manager_p0_audit_139.py",
+    "/app/backend/tests/test_pricing_manager_p0_audit_140.py",
+    "/app/test_reports/pytest/pytest_results_p0_audit_140.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_pricing_manager_p0_audit_140.py"
+  ],
+  "success_rate": {
+    "backend": "100% (58/58 passed)",
+    "frontend": "N/A (backend only testing)"
+  },
+  "test_credentials": "Admin: charbel911@gmail.com / Anderosli123!@#",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Seller Commission Tier Audit complete. SELLER_COMMISSION_RATES dict verified with all 6 keys (free=0.04, standard=0.04, premium=0.025, vip=0.02, vip_elite=0.02, partner=0.03). 4 new proofs for $50 table sold in Ontario verified: A(Standard) buyer=$54.88 seller=$47.33, B(Premium) buyer=$54.01 seller=$48.20, C(VIP) buyer=$53.72 seller=$48.50, D(Partner) buyer=$0 seller=$2.08. Key change verified: non_vehicle_stripe buyer-side stripe recovery is now on (hammer+BP) not just BP - for $50 ON Standard this is $1.82 (on $52.50). non_vehicle_cash buyer stripe recovery remains on BP only ($0.37 on $2.50). All existing proofs from iteration 139 unchanged.",
+  "verified_calculations": {
+    "proof_A_standard_50_ON": {
+      "hammer": 50.00,
+      "buyer_premium_5_percent": 2.50,
+      "buyer_stripe_on_hammer_plus_bp": 1.82,
+      "buyer_taxable": 4.32,
+      "buyer_tax_13_percent_hst": 0.56,
+      "buyer_total": 54.88,
+      "seller_commission_4_percent": 2.00,
+      "seller_stripe": 0.36,
+      "seller_tax": 0.31,
+      "seller_payout": 47.33
+    },
+    "proof_B_premium_50_ON": {
+      "hammer": 50.00,
+      "buyer_premium_3_5_percent": 1.75,
+      "buyer_stripe_on_hammer_plus_bp": 1.80,
+      "buyer_taxable": 3.55,
+      "buyer_tax_13_percent_hst": 0.46,
+      "buyer_total": 54.01,
+      "seller_commission_2_5_percent": 1.25,
+      "seller_stripe": 0.34,
+      "seller_tax": 0.21,
+      "seller_payout": 48.20
+    },
+    "proof_C_vip_50_ON": {
+      "hammer": 50.00,
+      "buyer_premium_3_percent": 1.50,
+      "buyer_stripe_on_hammer_plus_bp": 1.79,
+      "buyer_taxable": 3.29,
+      "buyer_tax_13_percent_hst": 0.43,
+      "buyer_total": 53.72,
+      "seller_commission_2_percent": 1.00,
+      "seller_stripe": 0.33,
+      "seller_tax": 0.17,
+      "seller_payout": 48.50
+    },
+    "proof_D_partner_50_ON": {
+      "buyer_fees": 0.00,
+      "buyer_stripe": 0.00,
+      "buyer_tax": 0.00,
+      "buyer_total": 0.00,
+      "seller_commission_3_percent": 1.50,
+      "seller_stripe": 0.34,
+      "seller_tax_13_percent_hst": 0.24,
+      "seller_total": 2.08
+    }
+  }
+}

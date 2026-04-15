@@ -54,15 +54,15 @@ class TestProof2NonVehicleStripe:
         
         result = PricingManager.non_vehicle_stripe(1000, 'QC', 'free', 'free')
         
-        # Expected buyer calculation:
+        # Expected buyer calculation (updated formula: SR on hammer+BP):
         # Hammer: $1000
         # Buyer Premium (5%): $50
-        # Stripe recovery: (50 * 0.029) + 0.30 = $1.75
-        # Taxable: 50 + 1.75 = $51.75
-        # Tax (14.975%): $7.75
-        # Total: 1000 + 50 + 1.75 + 7.75 = $1059.50
+        # Stripe recovery: (1050 * 0.029) + 0.30 = $30.75
+        # Taxable: 50 + 30.75 = $80.75
+        # Tax (14.975%): $12.09
+        # Total: 1000 + 50 + 30.75 + 12.09 = $1092.84
         
-        assert result.buyer_invoice.total == 1059.50, f"Expected buyer_total=1059.50, got {result.buyer_invoice.total}"
+        assert result.buyer_invoice.total == 1092.84, f"Expected buyer_total=1092.84, got {result.buyer_invoice.total}"
         print(f"PASS: Proof 2a - non_vehicle_stripe buyer_total=${result.buyer_invoice.total}")
     
     def test_non_vehicle_stripe_qc_1000_seller_total(self):
@@ -333,8 +333,9 @@ class TestConnectPaymentEngineWiring:
         )
         
         # Non-vehicle Stripe: buyer pays hammer + BP + stripe + tax
-        # Expected: $1059.50 (same as Proof 2)
-        assert result["stripe_charge"] == 1059.50, f"Expected stripe_charge=1059.50, got {result['stripe_charge']}"
+        # Stripe recovery now on (hammer+BP): (1050*0.029)+0.30=$30.75
+        # Expected: $1092.84
+        assert result["stripe_charge"] == 1092.84, f"Expected stripe_charge=1092.84, got {result['stripe_charge']}"
         assert result["is_vehicle"] == False, f"Expected is_vehicle=False, got {result['is_vehicle']}"
         print(f"PASS: calculate_connect_checkout general routes correctly, stripe_charge=${result['stripe_charge']}")
     

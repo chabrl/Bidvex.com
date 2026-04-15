@@ -189,7 +189,7 @@ class PricingManager:
         """
         Non-vehicle, seller chose Stripe.
         BidVex collects full hammer from buyer, pays out seller minus commission.
-        Buyer: hammer + BP + stripe_recovery(on BP) + tax(on BP + stripe).
+        Buyer: hammer + BP + stripe_recovery(on hammer+BP) + tax(on BP + stripe).
         Seller: hammer - SC - stripe_transfer(on SC) - tax(on SC + stripe).
         """
         hp = Decimal(str(hammer_price))
@@ -202,8 +202,10 @@ class PricingManager:
         bp = _r(hp * bp_rate)
         sc = _r(hp * sc_rate)
 
-        # Buyer side — stripe recovery on BP only (the BidVex fee)
-        b_sr = stripe_recovery(bp)
+        # Buyer side — stripe recovery on FULL Stripe charge (hammer + BP)
+        # because the entire amount flows through Stripe
+        b_sr = stripe_recovery(hp + bp)
+        # Tax on BidVex fees only (BP + stripe recovery), never on hammer
         b_taxable = bp + b_sr
         b_tax = calculate_taxes(b_taxable, buyer_province)
         b_total = _r(hp + bp + b_sr + b_tax.total_tax)
