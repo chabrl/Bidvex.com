@@ -672,9 +672,13 @@ async def get_stripe_connect_status(
 
 @profiles_router.post("/users/me/stripe-connect/dashboard-link")
 async def get_stripe_connect_dashboard_link(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
-    """Generate a login link to the Stripe Express Dashboard."""
+    """
+    Smart redirect: if onboarding is complete → Express Dashboard login link.
+    If incomplete → new AccountLink (onboarding) with eventually_due.
+    """
     current_user = await _require_auth(credentials)
 
     user = await _db.users.find_one({"id": current_user.id})
@@ -684,8 +688,22 @@ async def get_stripe_connect_dashboard_link(
         raise HTTPException(status_code=400, detail="No Stripe Connect account found.")
 
     try:
-        link = stripe.Account.create_login_link(connect_id)
-        return {"url": link.url}
+        account = stripe.Account.retrieve(connect_id)
+
+        if account.details_submitted:
+            link = stripe.Account.create_login_link(connect_id)
+            return {"url": link.url, "type": "dashboard"}
+        else:
+            base_url = os.environ.get("REACT_APP_BACKEND_URL", str(request.base_url).rstrip("/"))
+            link = stripe.AccountLink.create(
+                account=connect_id,
+                refresh_url=f"{base_url}/seller/dashboard?tab=earnings&stripe_refresh=true",
+                return_url=f"{base_url}/seller/dashboard?tab=earnings&stripe_onboard=success",
+                type="account_onboarding",
+                collection_options={"fields": "eventually_due"},
+            )
+            return {"url": link.url, "type": "onboarding"}
+
     except stripe.StripeError as e:
         logger.error(f"Stripe dashboard link error: {e}")
         raise HTTPException(status_code=400, detail=str(e))

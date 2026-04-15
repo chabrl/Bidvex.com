@@ -89,7 +89,11 @@ const SellerEarningsDashboard = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      window.open(response.data.dashboard_url, '_blank');
+      if (response.data.type === 'onboarding') {
+        window.location.href = response.data.url;
+      } else {
+        window.open(response.data.url, '_blank');
+      }
       
     } catch (err) {
       console.error('Failed to get dashboard link:', err);
@@ -205,7 +209,9 @@ const SellerEarningsDashboard = () => {
           </Button>
           <Button onClick={handleManageBankInfo} data-testid="manage-bank-info-btn">
             <CreditCard className="mr-2 h-4 w-4" />
-            {isFrench ? 'Gérer les infos bancaires' : 'Manage Bank Info'}
+            {connectStatus && !connectStatus.payouts_enabled
+              ? (isFrench ? 'Compléter le profil Stripe' : 'Complete Stripe Setup')
+              : (isFrench ? 'Gérer les infos bancaires' : 'Manage Bank Info')}
             <ExternalLink className="ml-2 h-3 w-3" />
           </Button>
         </div>
