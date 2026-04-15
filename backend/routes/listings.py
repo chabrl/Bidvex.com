@@ -46,7 +46,7 @@ async def _translate_multi_listing_bg(db, listing_id: str, title: str, descripti
 
         if lots:
             translated_lots = await translate_lot_fields(
-                [{"title": l.get("title", ""), "description": l.get("description", "")} for l in lots],
+                [{"title": lot_item.get("title", ""), "description": lot_item.get("description", "")} for lot_item in lots],
                 source_lang,
             )
             for i, tl in enumerate(translated_lots):
@@ -273,7 +273,7 @@ async def get_listings(
 
     # Deduplicate: collect parent auction IDs to exclude from standard listings
     multi_parent_ids = {ml["id"] for ml in multi_listings}
-    listings = [l for l in listings if l.get("id") not in multi_parent_ids]
+    listings = [item for item in listings if item.get("id") not in multi_parent_ids]
 
     for ml in multi_listings:
         for lot in ml.get("lots", []):
@@ -514,7 +514,7 @@ async def create_multi_item_listing(
     # Background translation — if _en/_fr not already provided
     if not listing_data.title_en or not listing_data.title_fr:
         import asyncio as _aio
-        raw_lots = [l.model_dump() if hasattr(l, "model_dump") else l for l in listing_data.lots]
+        raw_lots = [lot_item.model_dump() if hasattr(lot_item, "model_dump") else lot_item for lot_item in listing_data.lots]
         _aio.ensure_future(_translate_multi_listing_bg(
             db, listing.id, listing_data.title, listing_data.description,
             raw_lots, listing_data.content_language or "en"

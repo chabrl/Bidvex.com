@@ -453,7 +453,9 @@ const CreateListingPage = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="auction_end_date">{t('createListing.auctionEndDate', 'Auction End Date')} *</Label>
+                <Label htmlFor="auction_end_date">{t('createListing.auctionEndDate', 'Auction End Date')} *
+                  <InfoTip en="Auctions typically run 3-7 days. Shorter durations create urgency; longer ones reach more bidders." fr="Les enchères durent habituellement 3-7 jours. Des durées plus courtes créent l'urgence ; des plus longues atteignent plus d'enchérisseurs." />
+                </Label>
                 <Input
                   id="auction_end_date"
                   name="auction_end_date"
@@ -466,7 +468,9 @@ const CreateListingPage = () => {
               </div>
 
               <div className="space-y-2">
-                <Label>{t('createListing.images', 'Images')}</Label>
+                <Label>{t('createListing.images', 'Images')}
+                  <InfoTip en="Upload clear photos from multiple angles. First photo is the thumbnail. Max 10 images." fr="Téléversez des photos claires sous plusieurs angles. La première photo est la miniature. Max 10 images." />
+                </Label>
                 <input
                   type="file"
                   accept="image/*"
@@ -506,7 +510,9 @@ const CreateListingPage = () => {
               {/* Shipping Options Section */}
               <Card className="border-2">
                 <CardHeader>
-                  <CardTitle className="text-lg">{t('createListing.shipping', 'Shipping Options')}</CardTitle>
+                  <CardTitle className="text-lg">{t('createListing.shipping', 'Shipping Options')}
+                    <InfoTip en="Offering shipping options increases bids from distant buyers. Set clear rates for each method." fr="Offrir des options d'expédition augmente les enchères des acheteurs éloignés. Définissez des tarifs clairs pour chaque méthode." />
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center gap-2">

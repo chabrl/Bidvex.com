@@ -413,3 +413,23 @@ async def track_realtime_view(data: Dict[str, Any]):
         }
     
     return {"status": "listing_not_found"}
+
+
+
+@analytics_router.post("/cta-click")
+async def track_cta_click(data: Dict[str, Any]):
+    """Track CTA click events from frontend pages (e.g., How It Works)."""
+    db = get_db()
+    try:
+        await db.cta_analytics.insert_one({
+            "page": data.get("page", "unknown"),
+            "action": data.get("action", "unknown"),
+            "section": data.get("section", ""),
+            "label": data.get("label", ""),
+            "timestamp": data.get("timestamp", datetime.now(timezone.utc).isoformat()),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        return {"status": "tracked"}
+    except Exception as e:
+        logger.error(f"CTA tracking error: {e}")
+        return {"status": "error"}

@@ -37,6 +37,7 @@ import { CrossBorderAdvisoryPanel, CrossBorderBidModal } from '../components/leg
 import { VehicleFeeBreakdown, SellerContactGate } from '../components/vehicles/VehicleFeeBreakdown';
 import Lightbox from 'yet-another-react-lightbox';
 import 'yet-another-react-lightbox/styles.css';
+import InfoTip from '../components/InfoTip';
 import { useRealtimeBidding } from '../hooks/useRealtimeBidding';
 
 const API = API_BASE;
@@ -610,7 +611,9 @@ const ListingDetailPage = () => {
                   <form onSubmit={handlePlaceBid} className="space-y-3">
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <label className="text-sm font-medium">{t('listing.yourBid')}</label>
+                        <label className="text-sm font-medium">{t('listing.yourBid')}
+                          <InfoTip en="Enter an amount higher than the current bid. You'll see a full cost breakdown before confirming." fr="Entrez un montant supérieur à l'enchère actuelle. Vous verrez un détail complet des coûts avant de confirmer." />
+                        </label>
                         <Badge variant="outline" className="text-xs font-mono" data-testid="bid-currency-badge">
                           {t('currency.bidIn', { currency: listing.currency || 'CAD' })}
                         </Badge>
@@ -750,6 +753,7 @@ const ListingDetailPage = () => {
                 <DollarSign className="h-4 w-4 text-amber-600" />
                 <AlertDescription className="text-amber-800 dark:text-amber-300 text-sm font-medium">
                   A {formatPercent(listing.custom_buyer_premium_rate * 100, 1)} buyer's premium applies to this lot
+                  <InfoTip en="The buyer's premium is an additional fee on top of the hammer price, paid by the buyer. It covers platform services and seller-set premiums." fr="La prime acheteur est un frais supplémentaire au prix marteau, payé par l'acheteur. Elle couvre les services de la plateforme et les primes fixées par le vendeur." />
                 </AlertDescription>
               </Alert>
             )}

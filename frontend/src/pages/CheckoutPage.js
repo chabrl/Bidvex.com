@@ -25,6 +25,8 @@ import {
   Send,
 } from 'lucide-react';
 
+import InfoTip from '../components/InfoTip';
+
 const API = API_BASE;
 
 const CheckoutPage = () => {
@@ -530,6 +532,7 @@ const CheckoutPage = () => {
                     {isVehicle 
                       ? (isFrench ? 'Total à payer maintenant' : 'Total Due Now')
                       : (isFrench ? 'Total à payer' : 'Total Due')}
+                    <InfoTip en="This is the total amount you'll be charged, including all fees, premiums, and applicable taxes." fr="C'est le montant total qui vous sera facturé, incluant tous les frais, primes et taxes applicables." />
                   </span>
                   <span className="text-2xl font-bold text-primary" data-testid="checkout-total">
                     {formatCurrency(buyerTotal)}

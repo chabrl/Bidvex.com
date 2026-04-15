@@ -9,6 +9,7 @@ import { DollarSign, CheckCircle2, Info, Sparkles, ShieldCheck, Receipt } from '
 import { toast } from 'sonner';
 import { formatCurrency } from '../utils/currencyFormatter';
 import PushNotificationToggle from './PushNotificationToggle';
+import InfoTip from './InfoTip';
 
 const API = API_BASE;
 
@@ -150,7 +151,7 @@ const BidConfirmationDialog = ({
                   <span className="text-muted-foreground">
                     Buyer&apos;s Premium ({((costBreakdown.buyer_premium_rate || 0.05) * 100).toFixed(1)}%)
                   </span>
-                  <Info className="h-3 w-3 text-muted-foreground cursor-help" title="Standard platform fee" />
+                  <InfoTip en="A standard platform fee added to winning bids. Your tier determines the rate." fr="Frais de plateforme standard ajoutés aux enchères gagnantes. Votre niveau détermine le taux." />
                 </div>
                 <span>{formatCurrency(costBreakdown.buyer_premium)}</span>
               </div>

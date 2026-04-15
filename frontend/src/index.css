@@ -2734,3 +2734,66 @@ a > span {
 .dark [data-testid="legal-page"] aside nav::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.1);
 }
+
+
+/* ============================================
+   BIDVEX TOOLTIP SYSTEM - Bulletproof Visibility
+   Overrides ALL brute-force CSS rules above
+   ============================================ */
+
+/* Light mode tooltip */
+.bidvex-tooltip-content,
+[data-bidvex-tooltip="true"] {
+  background-color: #0f172a !important;
+  color: #ffffff !important;
+  border: 1px solid #334155 !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+  max-width: 280px !important;
+  z-index: 9999 !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25) !important;
+  pointer-events: none !important;
+}
+
+/* All children inside tooltip must inherit white text */
+.bidvex-tooltip-content *,
+[data-bidvex-tooltip="true"] *,
+[data-bidvex-tooltip="true"] p,
+[data-bidvex-tooltip="true"] span {
+  color: #ffffff !important;
+}
+
+/* Dark mode tooltip - inverted */
+.dark .bidvex-tooltip-content,
+.dark [data-bidvex-tooltip="true"] {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border: 1px solid #d1d5db !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+}
+
+.dark .bidvex-tooltip-content *,
+.dark [data-bidvex-tooltip="true"] *,
+.dark [data-bidvex-tooltip="true"] p,
+.dark [data-bidvex-tooltip="true"] span {
+  color: #111827 !important;
+}
+
+/* Tooltip arrow (Radix injects this) */
+.bidvex-tooltip-content [data-radix-tooltip-arrow],
+[data-bidvex-tooltip="true"] [data-radix-tooltip-arrow] {
+  fill: #0f172a !important;
+}
+
+.dark .bidvex-tooltip-content [data-radix-tooltip-arrow],
+.dark [data-bidvex-tooltip="true"] [data-radix-tooltip-arrow] {
+  fill: #f9fafb !important;
+}
+
+/* InfoTip trigger button - ensure it's not clipped */
+button[aria-label="Info"] {
+  position: relative !important;
+  z-index: 1 !important;
+}

@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { extractErrorMessage } from '../utils/errorHandler';
 import { formatCurrency } from '../utils/currencyFormatter';
 import { useTranslation } from 'react-i18next';
+import InfoTip from './InfoTip';
 
 const API = API_BASE;
 
@@ -164,7 +165,9 @@ const AutoBidModal = ({ listingId, currentBid, minimumIncrement, onAutoBidSetup 
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="max-bid-amount">{t("bidding.maxBidAmount")}</Label>
+                <Label htmlFor="max-bid-amount">{t("bidding.maxBidAmount")}
+                  <InfoTip en="The bot will bid in small increments up to this amount. You won't pay more than this." fr="Le robot enchérira par petits incréments jusqu'à ce montant. Vous ne paierez pas plus que ce montant." />
+                </Label>
                 <Input
                   id="max-bid-amount"
                   type="number"
