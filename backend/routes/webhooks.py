@@ -179,6 +179,7 @@ def _verify_stripe_event(payload: bytes, sig_header: str):
             os.environ.get("STRIPE_CONNECT_WEBHOOK_SECRET"),
             os.environ.get("STRIPE_WEBHOOK_SECRET"),
             os.environ.get("STRIPE_WEBHOOK_SECRET_2"),
+            os.environ.get("STRIPE_TEST_WEBHOOK_SECRET"),
         ] if s
     ]
 

@@ -99,7 +99,7 @@
 - `/app/backend/routes/subscriptions.py` — create_subscription_checkout uses PricingManager.flat_purchase with buyer province
 - `/app/backend/routes/payments_promotions.py` — Passes buyer_province to promotions + email credits
 
-### Testing: 34/34 (iteration_138), 34/34 (iteration_139), 58/58 (iteration_140)
+### Testing: 34/34 (iteration_138), 34/34 (iteration_139), 58/58 (iteration_140), 8/8 Stripe E2E (iteration_141)
 
 ## Completed (April 13, 2026) — Complete Email System Rebuild
 
