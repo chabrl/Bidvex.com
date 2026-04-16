@@ -2783,3 +2783,57 @@ span[aria-label="Info"] {
   position: relative !important;
   z-index: 1 !important;
 }
+
+
+/* ============================================
+   GLOBAL DARK MODE CONTRAST FIX
+   Fixes: form inputs, selects, textareas, buttons, placeholders
+   ============================================ */
+
+/* Form inputs - dark mode */
+html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([role="switch"]),
+html.dark select,
+html.dark textarea {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #64748b !important;
+}
+
+/* Light mode form inputs explicit */
+html:not(.dark) input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([role="switch"]),
+html:not(.dark) select,
+html:not(.dark) textarea {
+  color: #1e293b;
+}
+
+html:not(.dark) input::placeholder,
+html:not(.dark) textarea::placeholder {
+  color: #94a3b8;
+}
+
+/* File upload / dropzone areas in dark mode */
+html.dark [class*="upload"],
+html.dark [class*="dropzone"],
+html.dark label[for*="image"],
+html.dark .border-dashed {
+  border-color: #475569 !important;
+  color: #cbd5e1 !important;
+}
+
+/* Ghost/outline buttons on dark backgrounds must have visible text */
+html.dark button[class*="outline"],
+html.dark a[class*="outline"] {
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #f1f5f9;
+}
+
+/* Select dropdown text in dark mode */
+html.dark option {
+  background-color: #1e293b;
+  color: #f1f5f9;
+}

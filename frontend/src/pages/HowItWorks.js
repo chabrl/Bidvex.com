@@ -162,7 +162,7 @@ const HowItWorks = () => {
             <Zap className="h-4 w-4 text-cyan-400" />
             {fr ? 'Plateforme d\'enchères #1 au Canada' : '#1 Auction Platform in Canada'}
           </div>
-          <h1 className="text-4xl sm:text-5xl font-bold mb-4 leading-tight">
+          <h1 className="text-4xl sm:text-5xl font-bold mb-4 leading-tight text-white">
             {fr ? 'Comment fonctionne BidVex' : 'How BidVex Works'}
           </h1>
           <p className="text-lg text-slate-300 max-w-2xl mx-auto mb-8">

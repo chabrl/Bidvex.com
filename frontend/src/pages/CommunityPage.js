@@ -251,7 +251,7 @@ export default function CommunityPage() {
       {/* Hero */}
       <section className="py-12 px-4 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
         <div className="max-w-3xl mx-auto text-center">
-          <h1 className="text-3xl sm:text-4xl font-bold mb-2">
+          <h1 className="text-3xl sm:text-4xl font-bold mb-2 text-white">
             {fr ? 'Communauté BidVex' : 'BidVex Community'}
           </h1>
           <p className="text-slate-300 text-sm">

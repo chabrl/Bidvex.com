@@ -778,7 +778,7 @@ const HowItWorksSection = ({ navigate }) => {
         <div className={`transition-all duration-700 delay-500 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
           <Button 
             onClick={() => navigate('/how-it-works')}
-            className="btn-shine bg-white hover:bg-white/90 text-blue-700 font-bold px-10 py-6 text-lg shadow-xl shadow-white/30 hover:shadow-2xl hover:shadow-white/40 hover:-translate-y-1 transition-all whitespace-nowrap"
+            className="btn-shine bg-white hover:bg-white/90 text-blue-700 dark:text-blue-700 font-bold px-10 py-6 text-lg shadow-xl shadow-white/30 hover:shadow-2xl hover:shadow-white/40 hover:-translate-y-1 transition-all whitespace-nowrap"
           >
             {t('homepage.learnMore')}
             <ArrowRight className="ml-2 h-5 w-5" />
