@@ -27,7 +27,7 @@ import { toast } from 'sonner';
 import { 
   Users, CheckCircle, MessageCircleOff, Search, UserPlus, 
   Copy, Check, Eye, EyeOff, Building2, User, Shield, Mail,
-  Phone, AlertTriangle, X, Ban
+  Phone, AlertTriangle, X, Ban, Trash2
 } from 'lucide-react';
 
 const API = API_BASE;
@@ -148,6 +148,28 @@ const EnhancedUserManager = () => {
       fetchData();
     } catch (error) {
       toast.error(error.response?.data?.detail || `Failed to ${action} account`);
+    }
+  };
+
+  const [deleteUserModal, setDeleteUserModal] = useState({ open: false, user: null });
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteUser = async () => {
+    const targetUser = deleteUserModal.user;
+    if (!targetUser) return;
+    setDeleting(true);
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const res = await axios.delete(`${API}/admin/users/${targetUser.id}`, { headers });
+      const deleted = res.data.deleted || {};
+      const summary = Object.entries(deleted).map(([k, v]) => `${k}: ${v}`).join(', ');
+      toast.success(`User deleted. Cascade: ${summary}`);
+      setDeleteUserModal({ open: false, user: null });
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to delete user');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -447,6 +469,16 @@ const EnhancedUserManager = () => {
                     <Ban className="h-3.5 w-3.5 mr-1" />
                     {user.status === 'suspended' ? 'Suspended' : 'Suspend'}
                   </Button>
+                  <Button 
+                    size="sm" 
+                    variant="destructive"
+                    onClick={() => setDeleteUserModal({ open: true, user })}
+                    title="Permanently delete user and all related data"
+                    data-testid={`delete-user-${user.id}`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-1" />
+                    Delete
+                  </Button>
                 </div>
               </div>
             ))}
@@ -458,6 +490,53 @@ const EnhancedUserManager = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Delete User Confirmation Modal */}
+      {deleteUserModal.open && deleteUserModal.user && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-lg border-2 border-red-600" data-testid="delete-user-modal">
+            <CardHeader className="bg-red-50 dark:bg-red-900/20">
+              <CardTitle className="text-red-600 flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5" />
+                Permanently Delete User
+              </CardTitle>
+              <CardDescription className="text-red-500/80">
+                This will cascade-delete ALL related data. This cannot be undone.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-5 space-y-4">
+              <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                <p className="font-semibold text-slate-900 dark:text-slate-100">{deleteUserModal.user.name}</p>
+                <p className="text-sm text-muted-foreground">{deleteUserModal.user.email}</p>
+                <p className="text-xs text-muted-foreground mt-1">ID: {deleteUserModal.user.id}</p>
+              </div>
+              <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800 text-sm text-amber-800 dark:text-amber-300">
+                <p className="font-medium mb-1">The following will also be deleted:</p>
+                <ul className="list-disc list-inside text-xs space-y-0.5">
+                  <li>All listings & multi-item listings</li>
+                  <li>All bids placed by this user</li>
+                  <li>All messages (sent & received)</li>
+                  <li>All notifications & watchlist items</li>
+                  <li>All payment methods & escrow entries</li>
+                  <li>All community questions & replies</li>
+                </ul>
+              </div>
+              <div className="flex gap-2 justify-end pt-2 border-t">
+                <Button variant="outline" onClick={() => setDeleteUserModal({ open: false, user: null })} data-testid="cancel-delete-user">
+                  Cancel
+                </Button>
+                <Button variant="destructive" onClick={handleDeleteUser} disabled={deleting} data-testid="confirm-delete-user">
+                  {deleting ? (
+                    <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />Deleting...</>
+                  ) : (
+                    <><Trash2 className="h-4 w-4 mr-2" />Delete User & All Data</>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Create User Dialog - Fully Responsive */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>

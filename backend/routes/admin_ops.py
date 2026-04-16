@@ -739,7 +739,7 @@ async def admin_delete_user(user_id: str, current_user: User = Depends(require_a
         "cascade_deleted": deleted,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     })
-    return {"success": True, "message": f"User and all related data deleted.", "deleted": deleted}
+    return {"success": True, "message": "User and all related data deleted.", "deleted": deleted}
 
 
 
@@ -783,9 +783,9 @@ async def get_admin_listings_promotions(current_user: User = Depends(require_adm
     return {
         "listings": listings,
         "stats": {
-            "total_promoted": sum(1 for l in listings if l.get("is_promoted")),
-            "premium_count": sum(1 for l in listings if l.get("promotion_tier") == "premium"),
-            "elite_count": sum(1 for l in listings if l.get("promotion_tier") == "elite"),
+            "total_promoted": sum(1 for lst in listings if lst.get("is_promoted")),
+            "premium_count": sum(1 for lst in listings if lst.get("promotion_tier") == "premium"),
+            "elite_count": sum(1 for lst in listings if lst.get("promotion_tier") == "elite"),
             "promotion_revenue": promotion_revenue["premium"] + promotion_revenue["elite"]
         }
     }
@@ -869,33 +869,77 @@ async def get_admin_user_detail(user_id: str, current_user: User = Depends(requi
 
 @admin_ops_router.delete("/admin/listings/{listing_id}")
 async def admin_delete_listing(listing_id: str, current_user: User = Depends(require_admin)):
-    """Admin: Permanently delete a single listing."""
+    """Admin: Permanently delete a single listing and ALL related data (cascade)."""
     db = get_db()
-    result = await db.listings.delete_one({"id": listing_id})
-    if result.deleted_count == 0:
+    listing = await db.listings.find_one({"id": listing_id}, {"_id": 0, "title": 1, "seller_id": 1})
+    if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
+
+    deleted = {}
+    # Cascade: bids, watchlist, escrows, notifications, images, reports
+    for col, field in [
+        ("bids", "listing_id"), ("watchlist", "listing_id"),
+        ("escrow_transactions", "auction_id"), ("notifications", "listing_id"),
+        ("listing_images", "listing_id"), ("reports", "listing_id"),
+        ("deletion_requests", "listing_id"),
+    ]:
+        r = await db[col].delete_many({field: listing_id})
+        if r.deleted_count > 0:
+            deleted[col] = r.deleted_count
+
+    await db.listings.delete_one({"id": listing_id})
+    deleted["listings"] = 1
+
     await db.admin_logs.insert_one({
-        "id": str(uuid.uuid4()), "action": "listing_deleted",
+        "id": str(uuid.uuid4()), "action": "listing_cascade_deleted",
         "admin_id": current_user.id, "target_id": listing_id,
+        "target_title": listing.get("title", ""),
+        "cascade_deleted": deleted,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     })
-    return {"success": True, "message": "Listing deleted permanently"}
+    return {"success": True, "message": "Listing and all related data deleted.", "deleted": deleted}
 
 
 @admin_ops_router.delete("/admin/multi-item-listings/{listing_id}")
 async def admin_delete_multi_item_listing(listing_id: str, current_user: User = Depends(require_admin)):
-    """Admin: Permanently delete a multi-item listing and its lots."""
+    """Admin: Permanently delete a multi-item listing, lots, and ALL related data (cascade)."""
     db = get_db()
-    result = await db.multi_item_listings.delete_one({"id": listing_id})
-    if result.deleted_count == 0:
+    listing = await db.multi_item_listings.find_one({"id": listing_id}, {"_id": 0, "title": 1})
+    if not listing:
         raise HTTPException(status_code=404, detail="Multi-item listing not found")
-    await db.lots.delete_many({"listing_id": listing_id})
+
+    deleted = {}
+    # Get lot IDs for bid cascade
+    lots = await db.lots.find({"listing_id": listing_id}, {"_id": 0, "id": 1}).to_list(1000)
+    lot_ids = [lot["id"] for lot in lots]
+
+    # Delete bids on individual lots
+    if lot_ids:
+        r = await db.bids.delete_many({"lot_id": {"$in": lot_ids}})
+        if r.deleted_count > 0:
+            deleted["bids"] = r.deleted_count
+
+    for col, field in [
+        ("lots", "listing_id"), ("watchlist", "listing_id"),
+        ("escrow_transactions", "auction_id"), ("notifications", "listing_id"),
+        ("listing_images", "listing_id"), ("reports", "listing_id"),
+        ("deletion_requests", "listing_id"),
+    ]:
+        r = await db[col].delete_many({field: listing_id})
+        if r.deleted_count > 0:
+            deleted[col] = deleted.get(col, 0) + r.deleted_count
+
+    await db.multi_item_listings.delete_one({"id": listing_id})
+    deleted["multi_item_listings"] = 1
+
     await db.admin_logs.insert_one({
-        "id": str(uuid.uuid4()), "action": "multi_item_listing_deleted",
+        "id": str(uuid.uuid4()), "action": "multi_listing_cascade_deleted",
         "admin_id": current_user.id, "target_id": listing_id,
+        "target_title": listing.get("title", ""),
+        "cascade_deleted": deleted,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     })
-    return {"success": True, "message": "Multi-item listing and lots deleted permanently"}
+    return {"success": True, "message": "Multi-item listing, lots, and all related data deleted.", "deleted": deleted}
 
 
 @admin_ops_router.put("/admin/listings/{listing_id}/status")
@@ -1106,4 +1150,199 @@ async def admin_resend_welcome_email(data: ResendWelcomeRequest, current_user: U
     return {
         "success": success,
         "message": f"Welcome email {'sent' if success else 'failed'} for {user_doc['email']}"
+    }
+
+
+# ============= COMMUNITY MODERATION (Admin) ========================
+
+@admin_ops_router.delete("/admin/comments/question/{question_id}")
+async def admin_delete_question(question_id: str, current_user: User = Depends(require_admin)):
+    """Admin: Delete a community question and all its replies."""
+    db = get_db()
+    question = await db.community_questions.find_one({"id": question_id}, {"_id": 0, "title": 1})
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+
+    deleted = {}
+    r = await db.community_replies.delete_many({"question_id": question_id})
+    if r.deleted_count > 0:
+        deleted["community_replies"] = r.deleted_count
+    await db.community_questions.delete_one({"id": question_id})
+    deleted["community_questions"] = 1
+
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()), "action": "community_question_deleted",
+        "admin_id": current_user.id, "target_id": question_id,
+        "target_title": question.get("title", ""),
+        "cascade_deleted": deleted,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"success": True, "message": "Question and replies deleted.", "deleted": deleted}
+
+
+@admin_ops_router.delete("/admin/comments/reply/{reply_id}")
+async def admin_delete_reply(reply_id: str, current_user: User = Depends(require_admin)):
+    """Admin: Delete a single community reply."""
+    db = get_db()
+    reply = await db.community_replies.find_one({"id": reply_id}, {"_id": 0, "question_id": 1})
+    if not reply:
+        raise HTTPException(status_code=404, detail="Reply not found")
+
+    await db.community_replies.delete_one({"id": reply_id})
+    # Decrement reply count on parent question
+    await db.community_questions.update_one(
+        {"id": reply["question_id"]},
+        {"$inc": {"reply_count": -1}}
+    )
+
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()), "action": "community_reply_deleted",
+        "admin_id": current_user.id, "target_id": reply_id,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"success": True, "message": "Reply deleted."}
+
+
+# ============= ADMIN COMMUNITY LIST (for moderation panel) ========================
+
+@admin_ops_router.get("/admin/community/questions")
+async def admin_list_community_questions(
+    limit: int = 50,
+    skip: int = 0,
+    search: Optional[str] = None,
+    current_user: User = Depends(require_admin),
+):
+    """Admin: List all community questions for moderation."""
+    db = get_db()
+    query = {}
+    if search:
+        query["$or"] = [
+            {"title": {"$regex": search, "$options": "i"}},
+            {"body": {"$regex": search, "$options": "i"}},
+            {"author_name": {"$regex": search, "$options": "i"}},
+        ]
+    total = await db.community_questions.count_documents(query)
+    questions = await db.community_questions.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    return {"questions": questions, "total": total}
+
+
+@admin_ops_router.get("/admin/community/questions/{question_id}/replies")
+async def admin_list_replies(question_id: str, current_user: User = Depends(require_admin)):
+    """Admin: Get all replies for a specific question."""
+    db = get_db()
+    replies = await db.community_replies.find({"question_id": question_id}, {"_id": 0}).sort("created_at", 1).to_list(500)
+    return {"replies": replies}
+
+
+# ============= PLATFORM CLEANUP (Admin) ========================
+
+TEST_DATA_EMAIL_PATTERNS = ["test", "demo", "qa", "fake", "spam", "example.com", "mailinator"]
+
+@admin_ops_router.get("/admin/platform-cleanup/preview")
+async def admin_cleanup_preview(current_user: User = Depends(require_admin)):
+    """Admin: Preview what test data would be deleted (dry run)."""
+    db = get_db()
+    pattern_filter = {"$or": [{"email": {"$regex": p, "$options": "i"}} for p in TEST_DATA_EMAIL_PATTERNS]}
+
+    # Exclude admin's own email
+    admin_email = current_user.email.lower()
+    safe_filter = {"$and": [
+        pattern_filter,
+        {"email": {"$ne": admin_email}},
+        {"role": {"$ne": "admin"}},
+        {"role": {"$ne": "superadmin"}},
+    ]}
+    safe_test_users = await db.users.count_documents(safe_filter)
+
+    # Find IDs of test users
+    test_user_docs = await db.users.find(safe_filter, {"_id": 0, "id": 1}).to_list(5000)
+    test_user_ids = [u["id"] for u in test_user_docs]
+
+    # Count related data
+    preview = {
+        "test_users": safe_test_users,
+        "test_listings": await db.listings.count_documents({"seller_id": {"$in": test_user_ids}}) if test_user_ids else 0,
+        "test_multi_listings": await db.multi_item_listings.count_documents({"seller_id": {"$in": test_user_ids}}) if test_user_ids else 0,
+        "test_bids": await db.bids.count_documents({"user_id": {"$in": test_user_ids}}) if test_user_ids else 0,
+        "test_messages": await db.messages.count_documents({"$or": [{"sender_id": {"$in": test_user_ids}}, {"receiver_id": {"$in": test_user_ids}}]}) if test_user_ids else 0,
+        "test_notifications": await db.notifications.count_documents({"user_id": {"$in": test_user_ids}}) if test_user_ids else 0,
+        "test_payment_methods": await db.payment_methods.count_documents({"user_id": {"$in": test_user_ids}}) if test_user_ids else 0,
+        "test_escrows": await db.escrow_transactions.count_documents({"$or": [{"buyer_id": {"$in": test_user_ids}}, {"seller_id": {"$in": test_user_ids}}]}) if test_user_ids else 0,
+        "test_community_questions": await db.community_questions.count_documents({"author_id": {"$in": test_user_ids}}) if test_user_ids else 0,
+        "test_community_replies": await db.community_replies.count_documents({"author_id": {"$in": test_user_ids}}) if test_user_ids else 0,
+        "test_watchlist": await db.watchlist.count_documents({"user_id": {"$in": test_user_ids}}) if test_user_ids else 0,
+    }
+    preview["total_records"] = sum(preview.values())
+    return preview
+
+
+@admin_ops_router.post("/admin/platform-cleanup")
+async def admin_platform_cleanup(current_user: User = Depends(require_admin)):
+    """Admin: Delete all test/demo data from the platform. Protects admin and real user accounts."""
+    db = get_db()
+    pattern_filter = {"$or": [{"email": {"$regex": p, "$options": "i"}} for p in TEST_DATA_EMAIL_PATTERNS]}
+    admin_email = current_user.email.lower()
+
+    safe_filter = {"$and": [
+        pattern_filter,
+        {"email": {"$ne": admin_email}},
+        {"role": {"$ne": "admin"}},
+        {"role": {"$ne": "superadmin"}},
+    ]}
+
+    test_user_docs = await db.users.find(safe_filter, {"_id": 0, "id": 1, "email": 1}).to_list(5000)
+    test_user_ids = [u["id"] for u in test_user_docs]
+
+    if not test_user_ids:
+        return {"success": True, "message": "No test data found. Platform is clean.", "deleted": {}}
+
+    deleted = {}
+    # Cascade delete all related data for test users
+    collections_to_clean = [
+        ("listings", "seller_id"), ("multi_item_listings", "seller_id"),
+        ("bids", "user_id"), ("notifications", "user_id"),
+        ("watchlist", "user_id"), ("payment_methods", "user_id"),
+        ("community_questions", "author_id"), ("community_replies", "author_id"),
+        ("escrow_transactions", "buyer_id"), ("escrow_transactions", "seller_id"),
+        ("seller_payouts", "seller_id"), ("affiliate_referrals", "affiliate_id"),
+        ("marketing_contacts", "user_id"), ("lifecycle_email_log", "user_id"),
+        ("sessions", "user_id"), ("suspended_users", "user_id"),
+    ]
+
+    for col, field in collections_to_clean:
+        try:
+            r = await db[col].delete_many({field: {"$in": test_user_ids}})
+            if r.deleted_count > 0:
+                deleted[col] = deleted.get(col, 0) + r.deleted_count
+        except Exception:
+            pass  # Collection may not exist
+
+    # Delete messages (sender or receiver)
+    try:
+        r = await db.messages.delete_many({"$or": [
+            {"sender_id": {"$in": test_user_ids}},
+            {"receiver_id": {"$in": test_user_ids}},
+        ]})
+        if r.deleted_count > 0:
+            deleted["messages"] = r.deleted_count
+    except Exception:
+        pass
+
+    # Delete test users themselves
+    r = await db.users.delete_many({"id": {"$in": test_user_ids}})
+    deleted["users"] = r.deleted_count
+
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()), "action": "platform_cleanup",
+        "admin_id": current_user.id,
+        "test_users_deleted": len(test_user_ids),
+        "test_emails": [u.get("email", "") for u in test_user_docs[:20]],
+        "cascade_deleted": deleted,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+
+    return {
+        "success": True,
+        "message": f"Platform cleanup complete. {len(test_user_ids)} test users and all related data removed.",
+        "deleted": deleted,
     }

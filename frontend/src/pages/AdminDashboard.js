@@ -45,6 +45,8 @@ import PartnerManager from './admin/PartnerManager';
 import FinanceDashboard from './admin/FinanceDashboard';
 import EmailSettings from './admin/EmailSettings';
 import SystemMonitoringDashboard from './admin/SystemMonitoringDashboard';
+import PlatformCleanupManager from './admin/PlatformCleanupManager';
+import CommunityModerationManager from './admin/CommunityModerationManager';
 import TeamManager from '../components/admin/TeamManager';
 import AdminTaxDashboard from './AdminTaxDashboard';
 import { 
@@ -98,6 +100,8 @@ const SECONDARY_TABS = {
     { id: 'email-marketing', label: 'Email Marketing', icon: '📤', lucideIcon: Send },
     { id: 'trust-safety', label: 'Trust & Safety', icon: '🛡️', lucideIcon: Shield },
     { id: 'escrow-manager', label: 'Escrow & Penalties', icon: '🔒', lucideIcon: Lock },
+    { id: 'community-moderation', label: 'Community Moderation', icon: '💬', lucideIcon: MessageSquare },
+    { id: 'platform-cleanup', label: 'Platform Cleanup', icon: '🧹', lucideIcon: AlertTriangle },
     { id: 'email-templates', label: 'Email Templates', icon: '📧', lucideIcon: Mail },
   ],
   banners: [
@@ -333,6 +337,8 @@ const AdminDashboard = () => {
           case 'email-marketing': return <EmailMarketingManager />;
           case 'trust-safety': return <TrustSafetyDashboard />;
           case 'escrow-manager': return <AdminEscrowManager />;
+          case 'community-moderation': return <CommunityModerationManager />;
+          case 'platform-cleanup': return <PlatformCleanupManager />;
           case 'email-templates': return <EmailTemplates />;
           default: return <SiteModeManager />;
         }
