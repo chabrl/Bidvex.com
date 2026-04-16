@@ -703,19 +703,43 @@ async def admin_pause_user(user_id: str, current_user: User = Depends(require_ad
 
 @admin_ops_router.delete("/admin/users/{user_id}")
 async def admin_delete_user(user_id: str, current_user: User = Depends(require_admin)):
-    """Admin: Soft-delete a user account."""
+    """Admin: Hard-delete a user and ALL related data (cascade)."""
     db = get_db()
     if user_id == current_user.id:
         raise HTTPException(status_code=400, detail="Cannot delete your own account")
-    
-    await db.users.update_one({"id": user_id}, {"$set": {"status": "deleted", "updated_at": datetime.now(timezone.utc).isoformat()}})
-    
+
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "email": 1})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    deleted = {}
+    # Cascade delete all related data
+    for col, field in [
+        ("listings", "seller_id"), ("multi_item_listings", "seller_id"),
+        ("bids", "user_id"), ("notifications", "user_id"),
+        ("messages", "sender_id"), ("messages", "receiver_id"),
+        ("watchlist", "user_id"), ("payment_methods", "user_id"),
+        ("community_questions", "author_id"), ("community_replies", "author_id"),
+        ("escrow_transactions", "buyer_id"), ("escrow_transactions", "seller_id"),
+        ("seller_payouts", "seller_id"), ("affiliate_referrals", "affiliate_id"),
+        ("marketing_contacts", "user_id"), ("lifecycle_email_log", "user_id"),
+    ]:
+        r = await db[col].delete_many({field: user_id})
+        if r.deleted_count > 0:
+            deleted[col] = deleted.get(col, 0) + r.deleted_count
+
+    # Delete the user
+    await db.users.delete_one({"id": user_id})
+    deleted["users"] = 1
+
     await db.admin_logs.insert_one({
-        "id": str(uuid.uuid4()), "action": "user_deleted",
+        "id": str(uuid.uuid4()), "action": "user_hard_deleted",
         "admin_id": current_user.id, "target_user_id": user_id,
+        "target_email": user.get("email", ""),
+        "cascade_deleted": deleted,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     })
-    return {"success": True, "message": "User account deleted."}
+    return {"success": True, "message": f"User and all related data deleted.", "deleted": deleted}
 
 
 
