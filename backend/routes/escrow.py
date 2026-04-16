@@ -68,3 +68,34 @@ async def admin_charge_penalty(
     if not seller_id or not listing_id:
         raise HTTPException(status_code=400, detail="seller_id and listing_id are required")
     return await charge_cancellation_penalty(db, seller_id, listing_id, reason)
+
+
+
+@escrow_router.get("/admin/escrow/transactions")
+async def admin_list_escrows(current_user: User = Depends(get_current_user)):
+    """Admin: list all escrow transactions."""
+    if current_user.role not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    db = get_db()
+    escrows = await db.escrow_transactions.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return escrows
+
+
+@escrow_router.get("/admin/escrow/penalties")
+async def admin_list_penalties(current_user: User = Depends(get_current_user)):
+    """Admin: list all penalty charges."""
+    if current_user.role not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    db = get_db()
+    penalties = await db.penalty_log.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return penalties
+
+
+@escrow_router.get("/admin/escrow/disputes")
+async def admin_list_disputes(current_user: User = Depends(get_current_user)):
+    """Admin: list all escrow disputes."""
+    if current_user.role not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    db = get_db()
+    disputes = await db.escrow_disputes.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return disputes

@@ -38,6 +38,7 @@ import AIGuardDashboard from './admin/AIGuardDashboard';
 import RiskMonitoringDashboard from './admin/RiskMonitoringDashboard';
 import PricingManager from './admin/PricingManager';
 import CouponManager from './admin/CouponManager';
+import AdminEscrowManager from './admin/AdminEscrowManager';
 import SubscriptionAnalytics from './admin/SubscriptionAnalytics';
 import SiteModeManager from './admin/SiteModeManager';
 import PartnerManager from './admin/PartnerManager';
@@ -50,7 +51,7 @@ import {
   Users, Package, Gavel, Shield, TrendingUp, Bell, Settings, FileText, 
   MessageSquare, DollarSign, Search, Image, CreditCard, Megaphone, 
   Activity, AlertTriangle, ChevronRight, Power, Zap, Eye, History,
-  ToggleLeft, ToggleRight, Clock, Mail, Sliders, Car, Send, Bot, Ticket, BarChart3, Globe, Building2, BarChart2, ShieldAlert
+  ToggleLeft, ToggleRight, Clock, Mail, Sliders, Car, Send, Bot, Ticket, BarChart3, Globe, Building2, BarChart2, ShieldAlert, Lock
 } from 'lucide-react';
 
 const API = API_BASE;
@@ -96,6 +97,7 @@ const SECONDARY_TABS = {
     { id: 'coupon-codes', label: 'Coupon Codes', icon: '🎟️', lucideIcon: Ticket },
     { id: 'email-marketing', label: 'Email Marketing', icon: '📤', lucideIcon: Send },
     { id: 'trust-safety', label: 'Trust & Safety', icon: '🛡️', lucideIcon: Shield },
+    { id: 'escrow-manager', label: 'Escrow & Penalties', icon: '🔒', lucideIcon: Lock },
     { id: 'email-templates', label: 'Email Templates', icon: '📧', lucideIcon: Mail },
   ],
   banners: [
@@ -330,6 +332,7 @@ const AdminDashboard = () => {
           case 'coupon-codes': return <CouponManager />;
           case 'email-marketing': return <EmailMarketingManager />;
           case 'trust-safety': return <TrustSafetyDashboard />;
+          case 'escrow-manager': return <AdminEscrowManager />;
           case 'email-templates': return <EmailTemplates />;
           default: return <SiteModeManager />;
         }
