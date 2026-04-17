@@ -149,7 +149,7 @@ const CarLotImage = ({ label }) => {
       {/* Branding */}
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
         <div className={`flex items-center gap-3 transition-transform duration-300 ${hovered ? 'about-pulse' : ''}`}>
-          <img src={CANADA_FLAG_GIF} alt="Canada" className="h-12 w-auto drop-shadow-lg" />
+          <img src={CANADA_FLAG_GIF} alt="Canada" className="h-12 w-auto drop-shadow-lg" style={{ mixBlendMode: 'multiply' }} />
           <img src={LOGO_ICON} alt="BidVex" className="h-14 w-14 drop-shadow-lg" />
         </div>
         <p className="text-white text-sm md:text-base font-semibold text-center px-4 drop-shadow">{label}</p>
@@ -292,7 +292,9 @@ const AboutUsPage = () => {
         <div className="about-canada-pattern absolute inset-0 opacity-[0.04]" />
         <div className="relative z-10 max-w-[700px] mx-auto px-6 md:px-12 text-center">
           <AnimSection>
-            <img src={CANADA_FLAG_GIF} alt="Canada" className="about-flag-float mx-auto h-16 w-auto mb-6" />
+            <div className="about-flag-float mx-auto mb-6 w-20 h-20 rounded-2xl bg-white flex items-center justify-center overflow-hidden shadow-lg">
+              <img src={CANADA_FLAG_GIF} alt="Canada" className="h-14 w-auto" />
+            </div>
             <h2 className="text-2xl sm:text-3xl font-semibold text-white mb-5" style={{ fontFamily: "'Outfit', sans-serif" }}>{t.canadaTitle}</h2>
             <p className="text-base leading-relaxed text-[#93C5FD]">{t.canadaText}</p>
           </AnimSection>
