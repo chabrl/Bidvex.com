@@ -2837,3 +2837,66 @@ html.dark option {
   background-color: #1e293b;
   color: #f1f5f9;
 }
+
+
+/* ============ ABOUT US PAGE ANIMATIONS ============ */
+
+/* Scroll reveal animation */
+.about-animate {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 700ms ease-out, transform 700ms ease-out;
+}
+.about-animate.about-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Hero text slide-in */
+.about-hero-text {
+  animation: aboutSlideIn 600ms ease-out both;
+}
+@keyframes aboutSlideIn {
+  from { opacity: 0; transform: translateX(-40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* Canadian flag float */
+.about-flag-float {
+  animation: aboutFloat 3s ease-in-out infinite;
+}
+@keyframes aboutFloat {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+/* Car lot branding pulse on hover */
+.about-pulse {
+  animation: aboutPulse 600ms ease-in-out;
+}
+@keyframes aboutPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+/* Future section gradient background */
+.about-future-bg {
+  background: linear-gradient(135deg, #1C6EC1, #3FB4CB);
+  background-size: 200% 200%;
+  transition: background-position 800ms ease;
+}
+.about-future-bg:hover {
+  background-position: 100% 100%;
+}
+
+/* Canada section diagonal pattern (CSS only) */
+.about-canada-pattern {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 40px,
+    rgba(255,255,255,0.03) 40px,
+    rgba(255,255,255,0.03) 80px
+  );
+}
