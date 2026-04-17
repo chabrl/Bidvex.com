@@ -9,6 +9,7 @@ import {
 
 const FOUNDER_PHOTO = 'https://customer-assets.emergentagent.com/job_aec91123-f68c-44df-910e-d0f391e2836a/artifacts/5xtfvgc8_image.png';
 const LOGO_ICON = 'https://customer-assets.emergentagent.com/job_aec91123-f68c-44df-910e-d0f391e2836a/artifacts/qw7mgoo3_logo%20icon.png';
+const CANADA_FLAG_GIF = 'https://customer-assets.emergentagent.com/job_aec91123-f68c-44df-910e-d0f391e2836a/artifacts/qko352y2_Canada_240-animated-flag-gifs.gif';
 const CITY_IMG = 'https://images.unsplash.com/photo-1663602003573-d2a029baa5fc?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNzl8MHwxfHNlYXJjaHwxfHxUb3JvbnRvJTIwc2t5bGluZSUyMENOJTIwdG93ZXJ8ZW58MHx8fHwxNzc2NDM5ODY5fDA&ixlib=rb-4.1.0&q=85';
 const CAR_IMG = 'https://images.unsplash.com/photo-1766524791677-6c6c495e0218?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzl8MHwxfHNlYXJjaHwxfHxjYXIlMjBkZWFsZXJzaGlwJTIwcGFya2luZyUyMGxvdCUyMHZlaGljbGVzfGVufDB8fHx8MTc3NjQzOTk2NHww&ixlib=rb-4.1.0&q=85';
 
@@ -123,7 +124,7 @@ const HeroCityImage = ({ label }) => {
       />
       {/* Hover label */}
       <span
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white font-bold text-lg md:text-xl text-center px-4 transition-all duration-[400ms] pointer-events-none whitespace-nowrap"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white font-bold text-base sm:text-lg md:text-xl text-center px-6 max-w-[90%] leading-snug transition-all duration-[400ms] pointer-events-none"
         style={{ opacity: hovered ? 1 : 0, transform: `translate(-50%,-50%) scale(${hovered ? 1 : 0.9})` }}
       >
         {label}
@@ -148,7 +149,7 @@ const CarLotImage = ({ label }) => {
       {/* Branding */}
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
         <div className={`flex items-center gap-3 transition-transform duration-300 ${hovered ? 'about-pulse' : ''}`}>
-          <span className="text-5xl">&#127464;&#127462;</span>
+          <img src={CANADA_FLAG_GIF} alt="Canada" className="h-12 w-auto drop-shadow-lg" />
           <img src={LOGO_ICON} alt="BidVex" className="h-14 w-14 drop-shadow-lg" />
         </div>
         <p className="text-white text-sm md:text-base font-semibold text-center px-4 drop-shadow">{label}</p>
@@ -213,14 +214,13 @@ const AboutUsPage = () => {
                 >
                   {t.ctaSignup} <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
-                <Button
-                  variant="outline"
-                  className="rounded-full border-white/30 text-white hover:bg-white/10"
+                <button
+                  className="rounded-full border border-white/40 text-white hover:bg-white/10 px-6 py-2 text-sm font-medium transition-all"
                   onClick={() => navigate('/how-it-works')}
                   data-testid="hero-cta-learn"
                 >
                   {t.ctaLearn}
-                </Button>
+                </button>
               </div>
             </div>
             {/* Right image */}
@@ -292,7 +292,7 @@ const AboutUsPage = () => {
         <div className="about-canada-pattern absolute inset-0 opacity-[0.04]" />
         <div className="relative z-10 max-w-[700px] mx-auto px-6 md:px-12 text-center">
           <AnimSection>
-            <span className="about-flag-float inline-block text-6xl mb-6">&#127464;&#127462;</span>
+            <img src={CANADA_FLAG_GIF} alt="Canada" className="about-flag-float mx-auto h-16 w-auto mb-6" />
             <h2 className="text-2xl sm:text-3xl font-semibold text-white mb-5" style={{ fontFamily: "'Outfit', sans-serif" }}>{t.canadaTitle}</h2>
             <p className="text-base leading-relaxed text-[#93C5FD]">{t.canadaText}</p>
           </AnimSection>
