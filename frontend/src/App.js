@@ -64,6 +64,7 @@ const StorefrontPage = lazy(() => import('./pages/StorefrontPage'));
 const BulkImportPage = lazy(() => import('./pages/BulkImportPage'));
 const ReviewPage = lazy(() => import('./pages/ReviewPage'));
 const CommunityPage = lazy(() => import('./pages/CommunityPage'));
+const AboutUsPage = lazy(() => import('./pages/AboutUsPage'));
 
 // Vehicle Auction Module
 const VehicleAuctionsPage = lazy(() => import('./pages/vehicles/VehicleAuctionsPage'));
@@ -290,6 +291,8 @@ const App = () => {
           } />
           <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/community" element={<CommunityPage />} />
+          <Route path="/about" element={<AboutUsPage />} />
+          <Route path="/about-us" element={<AboutUsPage />} />
           <Route path="/watchlist" element={
             <ProtectedRoute><WatchlistPage /></ProtectedRoute>
           } />
