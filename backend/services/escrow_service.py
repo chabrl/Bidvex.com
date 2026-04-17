@@ -76,25 +76,17 @@ async def create_escrow_hold(
     # Send pickup code email to buyer
     try:
         buyer = await db.users.find_one({"id": buyer_id}, {"_id": 0, "email": 1, "name": 1, "preferred_language": 1, "language_preference": 1})
-        seller = await db.users.find_one({"id": seller_id}, {"_id": 0, "name": 1})
+        seller_doc = await db.users.find_one({"id": seller_id}, {"_id": 0, "name": 1})
         if buyer and buyer.get("email"):
-            from services.email_service import send_template_email, resolve_template
-            lang = buyer.get("preferred_language", buyer.get("language_preference", "en"))
-            tid = resolve_template("pickup_code", lang)
-            if tid:
-                await send_template_email(
-                    to_email=buyer["email"],
-                    template_id=tid,
-                    dynamic_data={
-                        "first_name": buyer.get("name", "Buyer"),
-                        "pickup_code": pickup_code,
-                        "auction_id": auction_id,
-                        "seller_name": (seller or {}).get("name", "Seller"),
-                        "expires_at": expires_at.strftime("%B %d, %Y at %I:%M %p UTC"),
-                        "subject": "Your Pickup Code" if lang == "en" else "Votre code de retrait",
-                    },
-                )
-                logger.info(f"[ESCROW] Pickup code email sent to {buyer['email']}")
+            from services.email_service import send_pickup_code_email
+            await send_pickup_code_email(
+                buyer=buyer,
+                seller=seller_doc or {"name": "Seller"},
+                pickup_code=pickup_code,
+                auction_id=auction_id,
+                expires_at=expires_at.strftime("%B %d, %Y at %I:%M %p UTC"),
+            )
+            logger.info(f"[ESCROW] Pickup code email sent to {buyer['email']}")
     except Exception as e:
         logger.error(f"[ESCROW] Failed to send pickup code email: {e}")
 
