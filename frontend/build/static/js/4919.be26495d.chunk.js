@@ -1,3 +1,0 @@
-/*! For license information please see 4919.be26495d.chunk.js.LICENSE.txt */
-"use strict";(self.webpackChunkfrontend=self.webpackChunkfrontend||[]).push([[4919],{44919(n,e,p){p.d(e,{A:()=>s});const s=(0,p(77784).A)("trending-up",[["polyline",{points:"22 7 13.5 15.5 8.5 10.5 2 17",key:"126l90"}],["polyline",{points:"16 7 22 7 22 13",key:"kwv8wd"}]])}}]);
-//# sourceMappingURL=4919.be26495d.chunk.js.map
