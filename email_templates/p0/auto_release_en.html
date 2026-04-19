@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<style>
+@media (prefers-color-scheme:dark){
+  .email-body{background-color:#1E293B!important}
+  .email-card{background-color:#0F172A!important}
+  .email-text{color:#E2E8F0!important}
+  .email-subtext{color:#94A3B8!important}
+  .data-card{background-color:#1E3A5F!important;border-color:#3FB4CB!important}
+}
+@media (max-width:600px){
+  .email-wrapper{width:100%!important}
+  .email-card{padding:20px 16px!important}
+  h1{font-size:20px!important}
+  .cta-button{padding:12px 24px!important;font-size:14px!important}
+}
+</style>
+</head>
+<body class="email-body" style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background-color:#f1f5f9;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f1f5f9;padding:32px 16px;">
+<tr><td align="center">
+<table class="email-wrapper" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+<tr><td style="background-color:#0B2545;text-align:center;padding:24px 40px 20px 40px;">
+<img src="http://cdn.mcauto-images-production.sendgrid.net/4fbf02710175d39f/9dc6a7c3-8237-4a66-b82b-0d9abc165b44/4500x1080.png" width="150" alt="BidVex" style="display:block;margin:0 auto;">
+</td></tr>
+<tr><td style="background-color:#3FB4CB;height:3px;font-size:0;line-height:0;">&nbsp;</td></tr>
+<tr><td style="background-color:#F59E0B;text-align:center;padding:32px 40px;">
+<div style="font-size:48px;margin-bottom:12px;">&#9200;</div>
+<h1 style="font-size:24px;font-weight:700;color:#FFFFFF;margin:0;">Funds Auto-Released</h1>
+</td></tr>
+<tr><td class="email-card" style="background-color:#FFFFFF;border-radius:0 0 10px 10px;box-shadow:0 4px 20px rgba(0,0,0,0.08);padding:32px 40px;">
+<p class="email-text" style="color:#334155;font-size:15px;line-height:1.6;">Hi {{first_name}},</p>
+<p class="email-text" style="color:#334155;font-size:15px;line-height:1.6;">The 48-hour pickup confirmation window has expired. Funds have been automatically released to the seller.</p>
+<table class="data-card" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F0F8FF;border:1px solid #3FB4CB;border-radius:8px;padding:16px;margin:16px 0;">
+<tr><td>
+<p class="email-subtext" style="margin:4px 0;color:#64748B;font-size:13px;">Auction: <strong style="color:#0B2545;">{{auction_id}}</strong></p>
+<p style="margin:8px 0;color:#0B2545;font-size:22px;font-weight:700;">{{amount_released}}</p>
+<p class="email-subtext" style="margin:4px 0;color:#64748B;font-size:13px;">{{auto_release_reason}}</p>
+</td></tr></table>
+<table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 0;">
+<a class="cta-button" href="{{dashboard_url}}" style="display:inline-block;background-color:#2186C6;color:#FFFFFF;font-weight:700;font-size:15px;text-decoration:none;padding:14px 32px;border-radius:8px;">View My Dashboard</a>
+</td></tr></table>
+</td></tr>
+<tr><td style="background-color:#0B2545;text-align:center;padding:24px 40px;border-radius:0 0 10px 10px;margin-top:8px;">
+<img src="http://cdn.mcauto-images-production.sendgrid.net/4fbf02710175d39f/9dc6a7c3-8237-4a66-b82b-0d9abc165b44/4500x1080.png" width="80" style="opacity:0.7;margin-bottom:12px;">
+<p style="color:#94A3B8;font-size:12px;margin:4px 0;">BidVex Canada | Sherbrooke, QC</p>
+<p style="color:#94A3B8;font-size:12px;margin:4px 0;">support@bidvex.com | bidvex.com</p>
+<p style="color:#94A3B8;font-size:11px;margin:12px 0 0 0;">&copy; {{current_year}} BidVex Canada. All rights reserved.</p>
+</td></tr>
+</table>
+</td></tr></table>
+</body></html>
