@@ -3,14 +3,14 @@ nixPkgs = ["nodejs_20", "python311Full", "curl"]
 
 [phases.install]
 cmds = [
-  "cd frontend && npm install --legacy-peer-deps && cd ..",
+  "cd frontend && rm -rf node_modules && npm install --legacy-peer-deps && cd ..",
   "curl -sSL https://bootstrap.pypa.io/get-pip.py | python3 - --break-system-packages",
   "python3 -m pip install --break-system-packages -r backend/requirements.txt"
 ]
 
 [phases.build]
 cmds = [
-  "cd frontend && npm run build && cd ..",
+  "cd frontend && npx craco build && cd ..",
   "ls -la frontend/build/index.html"
 ]
 

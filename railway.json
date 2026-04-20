@@ -2,7 +2,7 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "cd frontend && npm install --legacy-peer-deps && npm run build && cd .. && curl -sSL https://bootstrap.pypa.io/get-pip.py | python3 - --break-system-packages && python3 -m pip install --break-system-packages -r backend/requirements.txt",
+    "buildCommand": "cd frontend && rm -rf node_modules && npm install --legacy-peer-deps && npx craco build && cd .. && curl -sSL https://bootstrap.pypa.io/get-pip.py | python3 - --break-system-packages && python3 -m pip install --break-system-packages -r backend/requirements.txt",
     "nixpacksConfigPath": "nixpacks.toml"
   },
   "deploy": {
