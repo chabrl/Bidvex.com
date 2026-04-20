@@ -115,26 +115,38 @@ async def response_time_middleware(request: Request, call_next):
     if not path.startswith("/health") and elapsed > 500:
         logger.warning(f"SLOW {request.method} {path} — {elapsed}ms")
     response.headers["X-Response-Time"] = f"{elapsed}ms"
-    # Security headers for CDN proxy
+    # ── Security Headers (Cloudflare CDN-safe) ──
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
-    # FIX 5: Cache-Control — static assets get 1yr, HTML must revalidate
-    # Cloudflare CDN-specific headers for high-res image delivery
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+
+    # ── Cache-Control Strategy ──
+    # Tier 1: Static hashed assets (JS/CSS chunks) — immutable, cache forever
     if path.startswith("/static/") or any(path.endswith(ext) for ext in (".js", ".css", ".woff2", ".woff")):
         response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         response.headers["CDN-Cache-Control"] = "public, max-age=31536000"
+    # Tier 2: Images, fonts, icons — cache 1 year
     elif any(path.endswith(ext) for ext in (".png", ".jpg", ".jpeg", ".webp", ".svg", ".ico", ".gif", ".avif")):
         response.headers["Cache-Control"] = "public, max-age=31536000"
         response.headers["CDN-Cache-Control"] = "public, max-age=31536000"
         response.headers["Vary"] = "Accept-Encoding"
+    # Tier 3: HTML entry point — must revalidate every time
     elif path.endswith(".html") or path == "/":
         response.headers["Cache-Control"] = "no-cache"
+    # Tier 4: Public API routes — short CDN cache (5 min edge, 60s browser)
+    elif path.startswith("/api/") and _is_public_cacheable_api(path, request.method):
+        response.headers["Cache-Control"] = "public, max-age=60, s-maxage=300"
+        response.headers["CDN-Cache-Control"] = "public, max-age=300"
+        response.headers["Vary"] = "Accept-Encoding"
+    # Tier 5: All other API routes (user-specific, real-time) — never cache
     elif path.startswith("/api/"):
-        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        response.headers["Cache-Control"] = "private, no-store, no-cache, must-revalidate, max-age=0"
         response.headers["CDN-Cache-Control"] = "no-store"
-    # FIX 8: Security headers
-    response.headers["X-Frame-Options"] = "SAMEORIGIN"
-    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+
+    # CSP
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
         "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://assets.emergent.sh https://unpkg.com https://d2adkz2s9zrlge.cloudfront.net https://cdn.tailwindcss.com https://us-assets.i.posthog.com https://js.stripe.com; "
@@ -147,6 +159,26 @@ async def response_time_middleware(request: Request, call_next):
         "base-uri 'self'"
     )
     return response
+
+
+# Public API routes safe for CDN edge caching (GET only, non-personalized)
+_PUBLIC_CACHEABLE_PREFIXES = (
+    "/api/marketplace/items",
+    "/api/marketplace/filter-counts",
+    "/api/site-config",
+    "/api/categories",
+    "/api/listings/featured",
+    "/api/listings/active",
+    "/api/community/questions",
+    "/api/health",
+)
+
+
+def _is_public_cacheable_api(path: str, method: str) -> bool:
+    """Returns True for GET requests on public, non-personalized endpoints."""
+    if method != "GET":
+        return False
+    return any(path.startswith(prefix) for prefix in _PUBLIC_CACHEABLE_PREFIXES)
 
 # ─── 500 Error & Webhook Failure Tracking Middleware ───
 @app.middleware("http")
