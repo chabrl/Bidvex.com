@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /admin/*
+Disallow: /settings
+Disallow: /messages
+Disallow: /checkout/*
+Disallow: /create-listing
+Disallow: /create-multi-item-listing
+Disallow: /verify-phone
+Disallow: /payment/*
+
+Sitemap: https://bidvex.com/sitemap.xml
