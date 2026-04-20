@@ -1,14 +1,16 @@
 #!/bin/bash
 set -e
 
+echo "=== Current directory ==="
+pwd
+ls -la
+
 echo "=== Building React frontend ==="
-cd /app/frontend
-npm install --legacy-peer-deps
-npm run build
+npm install --prefix frontend --legacy-peer-deps
+npm run build --prefix frontend
 echo "=== Frontend build complete ==="
-ls -la /app/frontend/build/
+ls -la frontend/build/index.html
 
 echo "=== Installing Python dependencies ==="
-cd /app/backend
-pip install -r requirements.txt
-echo "=== Backend dependencies installed ==="
+pip install -r backend/requirements.txt
+echo "=== All done ==="
