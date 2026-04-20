@@ -535,3 +535,4 @@ credentials.json
 *.pem
 *.key
 .credentials
+frontend/build/

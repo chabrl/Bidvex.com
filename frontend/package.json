@@ -78,12 +78,13 @@
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^1.1.2",
     "yet-another-react-lightbox": "^3.25.0",
-    "zod": "^3.24.4"
+    "zod": "^3.24.4",
+    "@craco/craco": "^7.1.0"
   },
   "scripts": {
     "start": "npx serve -s build -l 3000",
-    "build": "craco build",
-    "test": "craco test",
+    "build": "./node_modules/.bin/craco build",
+    "test": "./node_modules/.bin/craco test",
     "i18n:audit": "node scripts/i18n-audit.js",
     "predeploy": "node scripts/i18n-audit.js"
   },
@@ -101,7 +102,6 @@
   },
   "devDependencies": {
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
-    "@craco/craco": "^7.1.0",
     "@eslint/js": "9.23.0",
     "autoprefixer": "^10.4.20",
     "eslint": "9.23.0",
@@ -112,5 +112,9 @@
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17"
   },
-  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e",
+  "engines": {
+    "node": ">=20.9.0",
+    "npm": ">=9.0.0"
+  }
 }
