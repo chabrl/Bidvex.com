@@ -477,12 +477,20 @@ app.include_router(api_router)
 
 @app.get("/")
 async def serve_spa_root():
-    """Serve React SPA index.html or return healthy JSON"""
+    """Serve React SPA index.html at root"""
     import os
-    index_path = os.path.join(os.path.dirname(__file__), "..", "frontend", "build", "index.html")
+    index_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "build", "index.html")
+    if not os.path.isfile(index_path):
+        # Try absolute path
+        index_path = "/app/frontend/build/index.html"
     if os.path.isfile(index_path):
         from starlette.responses import FileResponse
         return FileResponse(index_path, media_type="text/html")
+    return JSONResponse({"status": "healthy", "service": "BidVex API", "message": "Frontend build not found. Deploy frontend first."})
+
+@app.get("/api/status")
+async def api_status():
+    """API status endpoint (moved from root to avoid conflicting with SPA)"""
     return {"status": "healthy", "service": "BidVex API", "version": "1.0"}
 
 @app.get("/favicon.ico", include_in_schema=False)
@@ -533,33 +541,67 @@ async def on_shutdown():
 
 # ─── Static Frontend & SPA Catch-All (MUST be last) ───
 import os
-_frontend_build = os.path.join(os.path.dirname(__file__), "..", "frontend", "build")
-if os.path.isdir(_frontend_build):
+
+# Resolve frontend build directory — works on both local and Railway
+_server_dir = os.path.dirname(os.path.abspath(__file__))
+_possible_build_dirs = [
+    os.path.join(_server_dir, "..", "frontend", "build"),   # /app/backend/../frontend/build
+    os.path.join(_server_dir, "..", "frontend", "dist"),    # Vite fallback
+    os.path.join(_server_dir, "static"),                    # Copied into backend/static
+    "/app/frontend/build",                                  # Absolute fallback
+]
+_frontend_build = None
+for _d in _possible_build_dirs:
+    _resolved = os.path.abspath(_d)
+    if os.path.isdir(_resolved) and os.path.isfile(os.path.join(_resolved, "index.html")):
+        _frontend_build = _resolved
+        logger.info(f"[SPA] Frontend build found at: {_frontend_build}")
+        break
+
+if not _frontend_build:
+    logger.warning(f"[SPA] No frontend build directory found. Checked: {[os.path.abspath(d) for d in _possible_build_dirs]}")
+
+if _frontend_build:
     from starlette.staticfiles import StaticFiles
     from starlette.responses import FileResponse
-    app.mount("/static", StaticFiles(directory=os.path.join(_frontend_build, "static")), name="static-assets")
+
+    _static_dir = os.path.join(_frontend_build, "static")
+    if os.path.isdir(_static_dir):
+        app.mount("/static", StaticFiles(directory=_static_dir), name="static-assets")
+
+    # Serve public assets from build root (manifest.json, ads.txt, etc.)
+    _public_exts = {".xml", ".txt", ".ico", ".png", ".json", ".webmanifest"}
 
     @app.get("/sitemap.xml", include_in_schema=False)
     async def serve_sitemap():
-        sitemap_path = os.path.join(_frontend_build, "sitemap.xml")
-        if os.path.isfile(sitemap_path):
-            return FileResponse(sitemap_path, media_type="application/xml")
-        return JSONResponse({"detail": "sitemap.xml not found"}, status_code=404)
+        p = os.path.join(_frontend_build, "sitemap.xml")
+        return FileResponse(p, media_type="application/xml") if os.path.isfile(p) else JSONResponse({"detail": "not found"}, status_code=404)
 
     @app.get("/robots.txt", include_in_schema=False)
     async def serve_robots():
-        robots_path = os.path.join(_frontend_build, "robots.txt")
-        if os.path.isfile(robots_path):
-            return FileResponse(robots_path, media_type="text/plain")
-        return JSONResponse({"detail": "robots.txt not found"}, status_code=404)
+        p = os.path.join(_frontend_build, "robots.txt")
+        return FileResponse(p, media_type="text/plain") if os.path.isfile(p) else JSONResponse({"detail": "not found"}, status_code=404)
 
     @app.api_route("/{path:path}", methods=["GET"], include_in_schema=False)
     async def spa_catch_all(path: str):
-        """Serve React SPA for all non-API routes"""
+        """Serve static files from build root, or fall back to index.html for SPA routing."""
+        # 1. Try exact file match in build directory
         file_path = os.path.join(_frontend_build, path)
-        if os.path.isfile(file_path):
+        if os.path.isfile(file_path) and not path.startswith("api/"):
             return FileResponse(file_path)
+        # 2. SPA fallback — serve index.html for all client-side routes
         index_file = os.path.join(_frontend_build, "index.html")
         if os.path.isfile(index_file):
             return FileResponse(index_file, media_type="text/html")
         return JSONResponse({"status": "healthy", "detail": "SPA build not found"}, status_code=200)
+else:
+    # No build directory — serve a helpful message
+    @app.api_route("/{path:path}", methods=["GET"], include_in_schema=False)
+    async def no_frontend(path: str):
+        if path.startswith("api/"):
+            return JSONResponse({"detail": "Not found"}, status_code=404)
+        return JSONResponse({
+            "status": "healthy",
+            "service": "BidVex API",
+            "message": "Frontend build not found. Run 'cd frontend && yarn build' first.",
+        })
