@@ -3,7 +3,7 @@ BidVex - Email Marketing (Admin + User)
 Auto-extracted from server.py during P2 refactoring.
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Request, Query, UploadFile, File, Form, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, Depends, Request, Query, UploadFile, File, Form, WebSocket, WebSocketDisconnect, Body
 import os
 from deps import get_db, get_current_user, get_current_user_optional, User
 from shared import (
@@ -1121,6 +1121,47 @@ async def unsubscribe_user_contact(
         return {"status": "unsubscribed", "message": "You have been unsubscribed from this sender's list."}
     else:
         return {"status": "not_found", "message": "Contact not found or already unsubscribed."}
+
+
+@email_marketing_ext_router.post("/marketing/unsubscribe")
+async def marketing_unsubscribe_by_token(data: dict = Body(...)):
+    """
+    Public unsubscribe endpoint — called by frontend /unsubscribe page.
+    Token is either a user_id or an email address.
+    """
+    token = data.get("token", "").strip()
+    if not token:
+        return {"status": "error", "message": "Invalid token"}
+
+    db = get_db()
+    # Try to find user by ID or email
+    user = await db.users.find_one(
+        {"$or": [{"id": token}, {"email": token}]},
+        {"_id": 0, "id": 1, "email": 1, "marketing_unsubscribed": 1}
+    )
+
+    if user:
+        if user.get("marketing_unsubscribed"):
+            return {"status": "already", "success": True, "message": "You are already unsubscribed from marketing emails."}
+        await db.users.update_one(
+            {"id": user["id"]},
+            {"$set": {"marketing_unsubscribed": True, "marketing_unsubscribed_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        return {"status": "unsubscribed", "success": True, "message": "You have been successfully unsubscribed from marketing emails."}
+
+    # Token might be a raw email not in our user DB (manual recipient)
+    if "@" in token:
+        existing = await db.marketing_suppressions.find_one({"email": token.lower()})
+        if existing:
+            return {"status": "already", "success": True, "message": "This email is already unsubscribed."}
+        await db.marketing_suppressions.insert_one({
+            "email": token.lower(), "reason": "user_unsubscribed",
+            "unsubscribed_at": datetime.now(timezone.utc).isoformat()
+        })
+        return {"status": "unsubscribed", "success": True, "message": "You have been successfully unsubscribed."}
+
+    return {"status": "error", "message": "Could not process unsubscribe request. Please contact support@bidvex.com."}
+
 
 
 
