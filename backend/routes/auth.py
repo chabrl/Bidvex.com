@@ -280,6 +280,13 @@ async def register(user_data: UserCreate, request: Request):
         logger.info(f"[EMAIL_DEBUG] Welcome Email result: {email_result}")
     except Exception as email_err:
         logger.error(f"[EMAIL_DEBUG] Welcome Email FAILED for {user_data.email}: {email_err}")
+
+    # Admin notification — fire-and-forget
+    try:
+        from services.admin_notifications import notify_admin_new_user
+        asyncio.create_task(notify_admin_new_user(user_doc))
+    except Exception:
+        pass
     
     # Audit log for currency
     await db.currency_audit_logs.insert_one({

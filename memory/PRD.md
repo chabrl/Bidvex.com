@@ -1,17 +1,22 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: FilterBar Rebuild (April 20, 2026)
+## Latest: SendGrid Full Integration Fix (April 20, 2026)
 
-### Marketplace Filter Bar — Full Responsive Rebuild - DONE
-- Created `FilterBar/FilterBar.js` component with 4 toggle pills (Private Sales, 0% Buyer Fee, Lots Auction, No Taxes) + search + 4 dropdowns (Province, Category, Condition, Sort)
-- Desktop: all elements in one wrapping row, no horizontal overflow
-- Mobile (<768px): collapsed panel with Filters toggle button, 2-column dropdown grid
-- Dark mode support via `.dark` CSS selectors
-- Bilingual EN/FR via i18n
-- `pageContext="lots"` hides Lots Auction pill and pre-activates it
-- Wired into both `/items` (FlattenedMarketplace) and `/lots` (LotsMarketplacePage)
-- Backend: added `province`, `no_taxes`, `most_bids` sort to marketplace API
+### SendGrid Email Integration — DONE
+- FROM address: `noreply@bidvex.com` (BidVex Canada)
+- Reply-To: `support@bidvex.com`
+- Admin alerts: `info@bidvex.com`
+- Domain: `bidvex.com` authenticated + valid in SendGrid
+- 88 template IDs configured (44 keys × EN/FR)
+- Created `admin_notifications.py` with 4 admin alert functions
+- Wired admin new user notification to signup route (fire-and-forget)
+- Live E2E test: 5/5 passed (Welcome EN/FR, Admin notify, Bid confirmed, Pickup code)
+
+### Marketplace Filter Bar — DONE
+### Cloudflare CDN Optimization — DONE
+### About Us Page — DONE
+### Phase 7: Platform Cleanup — DONE
 
 ## Backlog
-- (P2) Post-launch monitoring & alerting
-- (Enhancement) Dispute resolution workflow
+- (P2) Post-launch monitoring
+- Railway deployment fix (pending dashboard config)

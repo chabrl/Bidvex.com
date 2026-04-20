@@ -89,8 +89,8 @@ async def send_template_email(
         logger.warning(f"[EMAIL] SendGrid not configured — skipping email to {to_email}")
         return False
 
-    from_email = os.environ.get("SENDGRID_FROM_EMAIL", "info@bidvex.com")
-    from_name = os.environ.get("SENDGRID_FROM_NAME", "BidVex")
+    from_email = os.environ.get("SENDGRID_FROM_EMAIL", "noreply@bidvex.com")
+    from_name = os.environ.get("SENDGRID_FROM_NAME", "BidVex Canada")
 
     # Ensure current_year is always present
     dynamic_data.setdefault("current_year", datetime.now().year)
@@ -99,6 +99,7 @@ async def send_template_email(
         from_email=Email(from_email, from_name),
         to_emails=To(to_email, to_name),
     )
+    message.reply_to = Email("support@bidvex.com", "BidVex Support")
     message.template_id = template_id
     message.dynamic_template_data = dynamic_data
 
