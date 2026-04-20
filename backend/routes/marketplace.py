@@ -306,6 +306,8 @@ async def get_marketplace_items(
     max_price: Optional[float] = None,
     condition: Optional[str] = None,
     zero_fee_only: Optional[str] = None,
+    province: Optional[str] = None,
+    no_taxes: Optional[str] = None,
     sort: str = "ending_soon",
     limit: int = 20,
     skip: int = 0,
@@ -374,6 +376,10 @@ async def get_marketplace_items(
         items = [i for i in items if (i.get("current_price") or 0) <= max_price]
     if condition:
         items = [i for i in items if i.get("condition") == condition]
+    if province:
+        items = [i for i in items if i.get("region") == province or i.get("province") == province]
+    if no_taxes and no_taxes.lower() == 'true':
+        items = [i for i in items if not i.get("seller_is_business") and not i.get("seller_is_tax_registered")]
 
     # Re-sort if not default (cache is already sorted by ending_soon)
     if sort == "price":
@@ -390,6 +396,8 @@ async def get_marketplace_items(
         ))
     elif sort == "newest":
         items = sorted(items, key=lambda x: -(x.get("created_at").timestamp() if isinstance(x.get("created_at"), datetime) else 0))
+    elif sort == "most_bids":
+        items = sorted(items, key=lambda x: -(x.get("bid_count", 0) or 0))
     # "ending_soon" is the default — already sorted by cache builder
 
     total_items = len(items)

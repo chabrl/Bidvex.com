@@ -12,6 +12,7 @@ import { Input } from './ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Separator } from './ui/separator';
 import BidConfirmationDialog from './BidConfirmationDialog';
+import FilterBar from './FilterBar/FilterBar';
 import { 
   Clock, 
   Gavel, 
@@ -290,100 +291,23 @@ const FlattenedMarketplace = ({
         </div>
       )}
 
-      {/* Filters — sticky horizontal bar */}
+      {/* Filters — New FilterBar Component */}
       {showFilters && (
-        <div className="sticky top-0 z-10 bg-white/95 dark:bg-slate-900/95 backdrop-blur -mx-4 px-4 py-3 mb-4 border-b border-slate-200 dark:border-slate-700">
-          {/* Scrollable filter row */}
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide items-center" style={{ WebkitOverflowScrolling: 'touch' }}>
-            {/* Private Sales Toggle */}
-            <Button
-              variant={filters.private_sales_only ? 'default' : 'outline'}
-              onClick={() => handleFilterChange('private_sales_only', !filters.private_sales_only)}
-              className={`gap-1.5 flex-shrink-0 text-xs h-9 ${filters.private_sales_only ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white' : ''}`}
-              size="sm"
-            >
-              <User className="h-3.5 w-3.5" />
-              {filters.private_sales_only ? t('marketplace.privateSales') : t('marketplace.privateSales')}
-            </Button>
-
-            {/* 0% Buyer Fee Toggle */}
-            <Button
-              variant={filters.zero_fee_only ? 'default' : 'outline'}
-              onClick={() => handleFilterChange('zero_fee_only', !filters.zero_fee_only)}
-              className={`gap-1.5 flex-shrink-0 text-xs h-9 ${filters.zero_fee_only ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white' : ''}`}
-              size="sm"
-              data-testid="zero-fee-toggle"
-            >
-              0% Buyer Fee
-            </Button>
-
-            {/* Search */}
-            <div className="relative flex-shrink-0 w-44 sm:w-56">
-              <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-muted-foreground h-3.5 w-3.5" />
-              <Input
-                placeholder={t('marketplace.searchItems', 'Search items...')}
-                value={filters.search}
-                onChange={(e) => handleFilterChange('search', e.target.value)}
-                className="pl-8 h-9 text-xs"
-              />
-            </div>
-
-            {/* Category */}
-            <select
-              value={filters.category}
-              onChange={(e) => handleFilterChange('category', e.target.value)}
-              className="px-3 py-1.5 border border-input rounded-md bg-background text-xs h-9 flex-shrink-0"
-            >
-              <option value="">{t("marketplace.allCategories")}</option>
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.name_en}>{cat.name_en}</option>
-              ))}
-            </select>
-
-            {/* Condition */}
-            <select
-              value={filters.condition}
-              onChange={(e) => handleFilterChange('condition', e.target.value)}
-              className="px-3 py-1.5 border border-input rounded-md bg-background text-xs h-9 flex-shrink-0"
-            >
-              <option value="">{t("marketplace.allConditions")}</option>
-              <option value="new">New</option>
-              <option value="like_new">{t("marketplace.likeNew")}</option>
-              <option value="excellent">{t("marketplace.excellent")}</option>
-              <option value="good">Good</option>
-              <option value="fair">Fair</option>
-            </select>
-
-            {/* Sort */}
-            <select
-              value={filters.sort}
-              onChange={(e) => handleFilterChange('sort', e.target.value)}
-              className="px-3 py-1.5 border border-input rounded-md bg-background text-xs h-9 flex-shrink-0"
-            >
-              <option value="ending_soon">{t("marketplace.endingSoon")}</option>
-              <option value="-promoted">{t("marketplace.featuredFirst")}</option>
-              <option value="newest">{t("marketplace.newestFirst")}</option>
-              <option value="price">Price: Low → High</option>
-              <option value="-price">Price: High → Low</option>
-              <option value="-created_at">{t("marketplace.newestFirst")}</option>
-            </select>
-
-            {/* Min / Max Price */}
-            <Input
-              type="number"
-              placeholder="Min $"
-              value={filters.min_price}
-              onChange={(e) => handleFilterChange('min_price', e.target.value)}
-              className="w-20 flex-shrink-0 h-9 text-xs"
-            />
-            <Input
-              type="number"
-              placeholder="Max $"
-              value={filters.max_price}
-              onChange={(e) => handleFilterChange('max_price', e.target.value)}
-              className="w-20 flex-shrink-0 h-9 text-xs"
-            />
-          </div>
+        <div className="mb-4">
+          <FilterBar
+            onFilterChange={(newFilters) => {
+              setFilters(prev => ({
+                ...prev,
+                search: newFilters.search,
+                category: newFilters.category,
+                condition: newFilters.condition,
+                sort: newFilters.sort,
+                private_sales_only: newFilters.private_sales_only,
+                zero_fee_only: newFilters.zero_fee_only,
+              }));
+            }}
+            pageContext="marketplace"
+          />
         </div>
       )}
 

@@ -19,6 +19,8 @@ import { getLocalized } from '../utils/localization';
 import { SellerRatingInline } from '../components/SellerReputation';
 import { LoadingTimeout } from '../components/LoadingTimeout';
 
+import FilterBar from '../components/FilterBar/FilterBar';
+
 const API = API_BASE;
 
 const LotsMarketplacePage = () => {
@@ -214,30 +216,40 @@ const LotsMarketplacePage = () => {
 
           {/* Main Content */}
           <div className="flex-1 min-w-0">
-            {/* Filter + stats bar — sticky on scroll */}
-            <div className="sticky top-0 z-10 bg-white/95 dark:bg-slate-900/95 backdrop-blur -mx-4 px-4 py-3 mb-4 border-b border-slate-200 dark:border-slate-700">
-              <div className="flex items-center justify-between gap-3">
-                <div className="hidden lg:flex items-center gap-4 text-sm" style={{ color: '#374151' }}>
+            {/* New FilterBar */}
+            <FilterBar
+              onFilterChange={(newFilters) => {
+                setSidebarFilters(prev => ({
+                  ...prev,
+                  search: newFilters.search || '',
+                  categories: newFilters.category ? [newFilters.category] : [],
+                }));
+              }}
+              pageContext="lots"
+            />
+
+            {/* Stats + View Toggle */}
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div className="hidden lg:flex items-center gap-4 text-sm" style={{ color: '#374151' }}>
+                <span>
+                  <strong style={{ color: '#2563eb' }}>{listings.length}</strong> auctions
+                  (<strong style={{ color: '#2563eb' }}>{marketStats.totalLots}</strong> lots)
+                </span>
+                {marketStats.privateSalesCount > 0 && (
                   <span>
-                    <strong style={{ color: '#2563eb' }}>{listings.length}</strong> auctions
-                    (<strong style={{ color: '#2563eb' }}>{marketStats.totalLots}</strong> lots)
+                    <strong style={{ color: '#15803d' }}>{marketStats.privateSalesCount}</strong> Tax-Free
                   </span>
-                  {marketStats.privateSalesCount > 0 && (
-                    <span>
-                      <strong style={{ color: '#15803d' }}>{marketStats.privateSalesCount}</strong> Tax-Free
-                    </span>
-                  )}
-                </div>
-                <div className="flex gap-1 border-2 rounded-lg p-1 flex-shrink-0" style={{ borderColor: '#e5e7eb' }}>
-                  <Button variant={viewMode === 'grid' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('grid')}
-                    className={viewMode === 'grid' ? 'bg-blue-600 text-white' : ''} data-testid="view-grid">
-                    <GridIcon className="h-4 w-4" />
-                  </Button>
-                  <Button variant={viewMode === 'list' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('list')}
-                    className={viewMode === 'list' ? 'bg-blue-600 text-white' : ''} data-testid="view-list">
-                    <ListIcon className="h-4 w-4" />
-                  </Button>
-                </div>
+                )}
+              </div>
+              <div className="flex gap-1 border-2 rounded-lg p-1 flex-shrink-0" style={{ borderColor: '#e5e7eb' }}>
+                <Button variant={viewMode === 'grid' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('grid')}
+                  className={viewMode === 'grid' ? 'bg-blue-600 text-white' : ''} data-testid="view-grid">
+                  <GridIcon className="h-4 w-4" />
+                </Button>
+                <Button variant={viewMode === 'list' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('list')}
+                  className={viewMode === 'list' ? 'bg-blue-600 text-white' : ''} data-testid="view-list">
+                  <ListIcon className="h-4 w-4" />
+                </Button>
               </div>
             </div>
 
