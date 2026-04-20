@@ -675,12 +675,13 @@ class EmailMarketingService:
             return {"status": "logged", "message": "SendGrid not configured - email logged only"}
         
         try:
+            plain_text = campaign.get("plain_text_content") or "View this email in HTML"
             message = Mail(
                 from_email=Email(campaign["from_email"], campaign["from_name"]),
                 to_emails=To(test_email),
                 subject=f"[TEST] {campaign['subject']}",
                 html_content=Content("text/html", campaign["html_content"]),
-                plain_text_content=Content("text/plain", campaign["plain_text_content"])
+                plain_text_content=Content("text/plain", plain_text)
             )
             
             # Add tracking
@@ -840,6 +841,7 @@ class EmailMarketingService:
                 "updated_at": now.isoformat(),
                 "stats.total_recipients": total,
                 "stats.sent": sent,
+                "stats.failed": failed,
                 "stats.segmented_count": audience["breakdown"]["segmented_count"],
                 "stats.manual_existing_count": audience["breakdown"]["manual_existing_count"],
                 "stats.manual_external_count": audience["breakdown"]["manual_external_count"],
@@ -891,30 +893,19 @@ class EmailMarketingService:
             html_content = campaign["html_content"]
             html_content = html_content.replace("{{name}}", name or "")
             html_content = html_content.replace("{{email}}", email)
-            # For external recipients without user_id, use email as unsubscribe token
             unsubscribe_token = user_id or email
             html_content = html_content.replace("{{unsubscribe_url}}", 
                 f"{FRONTEND_URL}/unsubscribe?token={unsubscribe_token}")
             
-            plain_content = campaign["plain_text_content"]
+            plain_content = campaign.get("plain_text_content") or ""
             plain_content = plain_content.replace("{{name}}", name or "")
             plain_content = plain_content.replace("{{email}}", email)
             
-            message = Mail(
-                from_email=Email(campaign["from_email"], campaign["from_name"]),
-                to_emails=To(email),
-                subject=campaign["subject"],
-                html_content=Content("text/html", html_content),
-                plain_text_content=Content("text/plain", plain_content)
-            )
+            message = Mail()
+            message.from_email = Email(campaign["from_email"], campaign["from_name"])
+            message.subject = campaign["subject"]
             
-            # Add tracking
-            tracking = TrackingSettings()
-            tracking.click_tracking = ClickTracking(True, True)
-            tracking.open_tracking = OpenTracking(True)
-            message.tracking_settings = tracking
-            
-            # Add custom args for webhook tracking
+            # Single personalization with recipient + custom tracking args
             personalization = Personalization()
             personalization.add_to(To(email))
             personalization.add_custom_arg(CustomArg("campaign_id", campaign["id"]))
@@ -922,6 +913,15 @@ class EmailMarketingService:
                 personalization.add_custom_arg(CustomArg("user_id", user_id))
             personalization.add_custom_arg(CustomArg("source", source))
             message.add_personalization(personalization)
+            
+            message.add_content(Content("text/plain", plain_content or "View this email in HTML"))
+            message.add_content(Content("text/html", html_content))
+            
+            # Add tracking
+            tracking = TrackingSettings()
+            tracking.click_tracking = ClickTracking(True, True)
+            tracking.open_tracking = OpenTracking(True)
+            message.tracking_settings = tracking
             
             response = marketing_client.send(message)
             message_id = response.headers.get("X-Message-Id")
