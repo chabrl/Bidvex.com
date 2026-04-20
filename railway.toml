@@ -1,6 +1,6 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "cd frontend && yarn install --frozen-lockfile && ./node_modules/.bin/craco build && cd .. && curl -sSL https://bootstrap.pypa.io/get-pip.py | python3 - --break-system-packages && python3 -m pip install --break-system-packages -r backend/requirements.txt && echo 'BUILD COMPLETE' && ls frontend/build/index.html"
+buildCommand = "cd frontend && npm install --legacy-peer-deps && node_modules/.bin/craco build && cd .. && curl -sSL https://bootstrap.pypa.io/get-pip.py | python3 - --break-system-packages && python3 -m pip install --break-system-packages -r backend/requirements.txt && echo 'BUILD COMPLETE' && ls frontend/build/index.html"
 
 [build.nixpacksPlan.phases.setup]
 nixPkgs = ["nodejs_20", "python311Full", "curl"]
