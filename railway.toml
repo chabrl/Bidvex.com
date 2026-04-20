@@ -1,20 +1,9 @@
 [build]
 builder = "NIXPACKS"
+buildCommand = "cd frontend && yarn install --frozen-lockfile && ./node_modules/.bin/craco build && cd .. && curl -sSL https://bootstrap.pypa.io/get-pip.py | python3 - --break-system-packages && python3 -m pip install --break-system-packages -r backend/requirements.txt && echo 'BUILD COMPLETE' && ls frontend/build/index.html"
 
 [build.nixpacksPlan.phases.setup]
-nixPkgs = ["nodejs_20", "yarn", "python311", "pip"]
-
-[build.nixpacksPlan.phases.install]
-cmds = [
-  "cd frontend && yarn install --frozen-lockfile && cd ..",
-  "pip3 install --break-system-packages -r backend/requirements.txt"
-]
-
-[build.nixpacksPlan.phases.build]
-cmds = [
-  "cd frontend && ./node_modules/.bin/craco build && cd ..",
-  "echo 'Build complete' && ls -la frontend/build/index.html"
-]
+nixPkgs = ["nodejs_20", "python311Full", "curl"]
 
 [deploy]
 startCommand = "cd backend && python3 -m uvicorn main:app --host 0.0.0.0 --port $PORT"
