@@ -181,14 +181,35 @@ async def generate_vehicle_invoice(
         # Send invoice email to buyer
         await send_invoice_created_email(buyer_invoice)
         
-        # Send auction won email to buyer
+        # Send auction won email to buyer (VEHICLE branch with EN/FR legal notice)
+        seller_contact = (
+            seller_user.get("phone")
+            or seller_user.get("email")
+            or "Available in your BidVex dashboard"
+        )
+        seller_display_name = seller_user.get("full_name") or seller_user.get(
+            "business_name"
+        ) or seller_user.get("name") or seller_user.get("email") or "Seller"
+
+        is_cross_border = bool(
+            vehicle_listing.get("is_cross_border")
+            or vehicle_listing.get("cross_border_availability")
+            or (vehicle_listing.get("country", "CA") not in ("CA", "Canada"))
+        )
+
         await send_auction_won_email(
-            buyer_email=winner_user.get("email"),
-            buyer_name=winner_user.get("full_name", winner_user.get("email")),
-            vehicle_title=buyer_invoice["vehicle_title"],
-            final_price=final_price,
-            invoice_id=buyer_invoice["id"],
-            buyers_premium_rate=0.0  # Vehicle: no buyer premium, only platform fee
+            to_email=winner_user.get("email"),
+            to_name=winner_user.get("full_name", winner_user.get("email")),
+            auction_id=buyer_invoice["id"],
+            item_name=buyer_invoice["vehicle_title"],
+            hammer_price=final_price,
+            platform_fee=bi.fees_subtotal,
+            seller_name=seller_display_name,
+            seller_contact=seller_contact,
+            is_vehicle=True,
+            is_cross_border=is_cross_border,
+            buyer_province=buyer_province,
+            payment_deadline=deadline.isoformat() if hasattr(deadline, "isoformat") else str(deadline),
         )
         
         # Send auction sold email to seller

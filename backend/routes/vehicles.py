@@ -1076,7 +1076,7 @@ async def place_vehicle_bid(
         deposit = await db.vehicle_bid_deposits.find_one({
             "vehicle_id": bid_data.vehicle_id,
             "bidder_id": user["id"],
-            "status": "paid"
+            "status": {"$in": ["paid", "authorized"]}
         })
         if not deposit:
             raise HTTPException(

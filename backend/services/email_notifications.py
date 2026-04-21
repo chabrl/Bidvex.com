@@ -686,68 +686,8 @@ async def send_seller_approved_email(
 
 
 # ===== AUCTION EMAILS =====
-
-async def send_auction_won_email(
-    buyer_email: str,
-    buyer_name: str,
-    vehicle_title: str,
-    final_price: float,
-    invoice_id: str,
-    buyers_premium_rate: float = 0.05
-) -> Dict[str, Any]:
-    """Send email when a buyer wins an auction"""
-    premium_amount = round(final_price * buyers_premium_rate, 2)
-    premium_pct = f"{buyers_premium_rate * 100:.1f}"
-    content = f"""
-    <h2 style="margin: 0 0 20px 0; color: #2563eb;">You Won!</h2>
-    
-    <p style="color: #475569; line-height: 1.6;">
-        Congratulations {buyer_name}!
-    </p>
-    
-    <p style="color: #475569; line-height: 1.6;">
-        You are the winning bidder for:
-    </p>
-    
-    <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background-color: #eff6ff; border: 2px solid #2563eb; border-radius: 8px; padding: 25px; margin: 20px 0; text-align: center;">        <p style="margin: 0; color: #1e40af; font-size: 20px; font-weight: bold;">
-            {vehicle_title}
-        </p>
-        <p style="margin: 15px 0 0 0; color: #1e293b; font-size: 14px;">Winning Bid</p>
-        <p style="margin: 5px 0 0 0; color: #2563eb; font-size: 32px; font-weight: bold;">
-            {_format_currency(final_price)}
-        </p></td></tr></table>
-    
-    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;"><tr><td style="background-color: #f8fafc; border-radius: 8px; padding: 15px;">
-        <table width="100%" style="font-size: 14px; color: #1e293b;">
-            <tr>
-                <td style="padding: 6px 0;"><strong>Buyer's Premium ({premium_pct}%):</strong></td>
-                <td style="padding: 6px 0; text-align: right;">{_format_currency(premium_amount)}</td>
-            </tr>
-            <tr>
-                <td style="padding: 6px 0; color: #64748b; font-size: 12px;" colspan="2">Plus applicable taxes (GST/QST). See invoice for full breakdown.</td>
-            </tr>
-        </table>
-    </td></tr></table>
-    
-    <p style="color: #475569; line-height: 1.6;">
-        An invoice has been generated with the full breakdown of fees and taxes. 
-        Please complete payment within 14 days.
-    </p>
-    
-    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
-        <tr>
-            <td align="center" style="background-color: #2563eb; padding: 14px 30px; border-radius: 8px;">
-                <a href="{FRONTEND_URL}/vehicle-auctions/invoices/{invoice_id}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">View Invoice & Pay</a>
-            </td>
-        </tr>
-    </table>
-    """
-    
-    return await send_email(
-        to_email=buyer_email,
-        subject=f"Congratulations! You Won: {vehicle_title}",
-        html_content=_base_template(content, "Auction Won")
-    )
+# Note: send_auction_won_email is defined further below (unified signature
+# supporting both vehicle and non-vehicle auctions with EN/FR legal text).
 
 
 async def send_auction_sold_email(
@@ -1160,27 +1100,145 @@ async def send_subscription_upgraded_email(
 # ========== AUCTION WINNER EMAILS ==========
 
 async def send_auction_won_email(
-    winner_email: str,
-    winner_name: str,
-    item_title: str,
-    final_price: float,
-    listing_id: str,
-    payment_deadline: str,
+    to_email: str = "",
+    to_name: str = "",
+    auction_id: str = "",
+    item_name: str = "",
+    hammer_price: float = 0.0,
+    platform_fee: float = 0.0,
+    seller_name: str = "",
+    seller_contact: str = "",
+    is_vehicle: bool = False,
+    is_cross_border: bool = False,
+    buyer_province: str = "QC",
+    payment_deadline: Optional[str] = None,
+    # --- Back-compat aliases (older callers) ---
+    winner_email: Optional[str] = None,
+    winner_name: Optional[str] = None,
+    item_title: Optional[str] = None,
+    final_price: Optional[float] = None,
+    listing_id: Optional[str] = None,
+    buyer_email: Optional[str] = None,
+    buyer_name: Optional[str] = None,
+    vehicle_title: Optional[str] = None,
+    invoice_id: Optional[str] = None,
+    buyers_premium_rate: Optional[float] = None,  # noqa: ARG001 — legacy, ignored
 ) -> Dict[str, Any]:
-    """Send 'You Won!' email to auction winner with checkout CTA"""
-    checkout_url = f"{FRONTEND_URL}/checkout/{listing_id}"
-    price_display = _format_currency(final_price)
+    """
+    Send 'You Won!' email to auction winner.
+
+    Legal-compliant behavior:
+      - For vehicles (is_vehicle=True), injects a bilingual EN/FR notice that
+        the hammer price is settled DIRECTLY between buyer and seller and that
+        BidVex only charges the 2.5% platform fee + taxes.
+      - For non-vehicles, shows the standard checkout CTA (BidVex collects full
+        hammer via Stripe Connect).
+      - For cross-border (is_cross_border=True), appends the cross-border
+        compliance notice in both languages.
+    """
+    # Back-compat normalization
+    to_email = to_email or winner_email or buyer_email or ""
+    to_name = to_name or winner_name or buyer_name or ""
+    item_name = item_name or item_title or vehicle_title or "Item"
+    auction_id = auction_id or listing_id or invoice_id or ""
+    if hammer_price in (None, 0.0) and final_price is not None:
+        hammer_price = final_price
+
+    checkout_url = f"{FRONTEND_URL}/checkout/{auction_id}"
+    invoice_url = f"{FRONTEND_URL}/vehicle-auctions/invoices/{auction_id}"
+    hammer_display = _format_currency(hammer_price)
+    fee_display = _format_currency(platform_fee)
+    # French Canadian currency: "10 000,00 $" — suffix style
+    def _fr_currency(amount):
+        s = f"{float(amount):,.2f}"  # 10,000.00
+        return s.replace(",", " ").replace(".", ",") + " $"
+    hammer_display_fr = _fr_currency(hammer_price)
+    fee_display_fr = _fr_currency(platform_fee)
     deadline_display = _format_date(payment_deadline) if payment_deadline else "14 days"
+
+    # ── Vehicle-specific payment notice (EN + FR) ──
+    vehicle_notice = ""
+    if is_vehicle:
+        seller_contact_line = seller_contact or "Available in your BidVex dashboard"
+        seller_display = seller_name or "Seller"
+        vehicle_notice = f"""
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;">
+      <tr><td style="background-color: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 20px;">
+        <p style="margin: 0 0 10px 0; color: #92400e; font-weight: bold; font-size: 15px;">
+          ⚠️ VEHICLE PAYMENT NOTICE
+        </p>
+        <p style="margin: 0 0 10px 0; color: #78350f; font-size: 14px; line-height: 1.6;">
+          Payment for the vehicle (<strong>{hammer_display}</strong>) is arranged directly
+          between you and the seller. BidVex does not process or hold vehicle purchase funds.
+        </p>
+        <p style="margin: 0 0 10px 0; color: #78350f; font-size: 14px; line-height: 1.6;">
+          <strong>Seller Contact:</strong> {seller_display} | {seller_contact_line}
+        </p>
+        <p style="margin: 0; color: #78350f; font-size: 14px; line-height: 1.6;">
+          BidVex Platform Fee of 2.5% (<strong>{fee_display}</strong>) has been charged
+          separately to your card on file. This is the only amount BidVex collects.
+        </p>
+      </td></tr>
+    </table>
+
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;">
+      <tr><td style="background-color: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 20px;">
+        <p style="margin: 0 0 10px 0; color: #92400e; font-weight: bold; font-size: 15px;">
+          ⚠️ AVIS DE PAIEMENT DU VÉHICULE
+        </p>
+        <p style="margin: 0 0 10px 0; color: #78350f; font-size: 14px; line-height: 1.6;">
+          Le paiement du véhicule (<strong>{hammer_display_fr}</strong>) est organisé
+          directement entre vous et le vendeur. BidVex ne traite pas et ne détient pas
+          les fonds d'achat de véhicules.
+        </p>
+        <p style="margin: 0 0 10px 0; color: #78350f; font-size: 14px; line-height: 1.6;">
+          <strong>Contact du vendeur :</strong> {seller_display} | {seller_contact_line}
+        </p>
+        <p style="margin: 0; color: #78350f; font-size: 14px; line-height: 1.6;">
+          Les frais de plateforme BidVex de 2,5 % (<strong>{fee_display_fr}</strong>) ont été
+          débités séparément de votre carte enregistrée. C'est le seul montant que BidVex perçoit.
+        </p>
+      </td></tr>
+    </table>
+    """
+
+    # ── Cross-border compliance notice (EN + FR) ──
+    cross_border_notice = ""
+    if is_cross_border:
+        cross_border_notice = f"""
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;">
+      <tr><td style="background-color: #eff6ff; border-left: 4px solid #2563eb; border-radius: 8px; padding: 20px;">
+        <p style="margin: 0 0 8px 0; color: #1e40af; font-weight: bold; font-size: 14px;">
+          🌐 Cross-Border Purchase Notice
+        </p>
+        <p style="margin: 0 0 8px 0; color: #1e293b; font-size: 13px; line-height: 1.6;">
+          This purchase crosses provincial or international borders. You may be responsible
+          for additional import duties, brokerage, GST/HST/QST on import, and compliance
+          with your province's ({buyer_province}) vehicle registration rules.
+        </p>
+        <p style="margin: 0; color: #1e293b; font-size: 13px; line-height: 1.6;">
+          Cet achat franchit des frontières provinciales ou internationales. Vous pourriez
+          être responsable des droits d'importation, du courtage, de la TPS/TVH/TVQ à
+          l'importation, et de la conformité aux règles d'immatriculation de votre
+          province ({buyer_province}).
+        </p>
+      </td></tr>
+    </table>
+    """
+
+    # ── CTA button ──
+    cta_url = invoice_url if is_vehicle else checkout_url
+    cta_label = "View Fee Invoice" if is_vehicle else "Complete Payment"
 
     content = f"""
     <h2 style="margin: 0 0 20px 0; color: #10b981;">Congratulations! You Won!</h2>
 
     <p style="color: #475569; line-height: 1.6;">
-        Hi {winner_name},
+        Hi {to_name},
     </p>
 
     <p style="color: #475569; line-height: 1.6;">
-        You've won the auction for <strong>{item_title}</strong>!
+        You've won the auction for <strong>{item_name}</strong>!
     </p>
 
     <table width="100%" cellpadding="0" cellspacing="0" border="0">
@@ -1189,11 +1247,11 @@ async def send_auction_won_email(
                 <table width="100%" cellpadding="0" cellspacing="0" border="0">
                     <tr>
                         <td style="color: #065f46; font-size: 14px; padding: 4px 0;">Item:</td>
-                        <td style="color: #065f46; font-size: 14px; font-weight: bold; text-align: right;">{item_title}</td>
+                        <td style="color: #065f46; font-size: 14px; font-weight: bold; text-align: right;">{item_name}</td>
                     </tr>
                     <tr>
                         <td style="color: #065f46; font-size: 14px; padding: 4px 0;">Winning Bid:</td>
-                        <td style="color: #065f46; font-size: 24px; font-weight: bold; text-align: right;">{price_display}</td>
+                        <td style="color: #065f46; font-size: 24px; font-weight: bold; text-align: right;">{hammer_display}</td>
                     </tr>
                     <tr>
                         <td style="color: #065f46; font-size: 14px; padding: 4px 0;">Payment Due By:</td>
@@ -1203,27 +1261,31 @@ async def send_auction_won_email(
             </td>
         </tr>
     </table>
-
-    <p style="color: #475569; line-height: 1.6; margin-top: 20px;">
-        Please complete your payment within <strong>14 days</strong>. After this period, a late penalty of 2% per month will be applied.
-    </p>
+    {vehicle_notice}
+    {cross_border_notice}
 
     <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
         <tr>
             <td align="center" style="background-color: #10b981; padding: 14px 30px; border-radius: 8px;">
-                <a href="{checkout_url}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">Complete Payment</a>
+                <a href="{cta_url}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;" data-testid="auction-won-cta">{cta_label}</a>
             </td>
         </tr>
     </table>
 
     <p style="color: #94a3b8; font-size: 12px; text-align: center;">
-        If the button doesn't work, copy this link: {checkout_url}
+        If the button doesn't work, copy this link: {cta_url}
     </p>
     """
 
+    subject = (
+        f"You Won! Vehicle {item_name} — Fee Invoice Ready"
+        if is_vehicle
+        else f"You Won! Complete Payment for {item_name}"
+    )
+
     return await send_email(
-        to_email=winner_email,
-        subject=f"You Won! Complete Payment for {item_title}",
+        to_email=to_email,
+        subject=subject,
         html_content=_base_template(content, "Auction Won")
     )
 

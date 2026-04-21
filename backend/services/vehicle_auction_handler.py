@@ -168,44 +168,62 @@ async def process_ended_auction(db, vehicle_listing: dict) -> AuctionEndResult:
             }
         )
         
-        # Credit deposit if applicable
+        # ── Release WINNER's deposit hold ──
+        # OPC compliance: the $500 deposit is a Stripe manual-capture hold.
+        # When the auction ends successfully, we RELEASE the winner's hold
+        # (cancel the PaymentIntent) — we do NOT apply it as credit toward the
+        # platform fee. The 2.5% platform fee is charged separately via
+        # `create_vehicle_fee_charge` on the buyer's card on file.
+        # The deposit only becomes a real charge via `capture_deposit` if the
+        # winner fails to pay the platform fee invoice within the deadline.
         if vehicle_listing.get("requires_deposit"):
-            deposit = await db.vehicle_bid_deposits.find_one({
+            winner_deposit = await db.vehicle_bid_deposits.find_one({
                 "vehicle_id": vehicle_listing["id"],
                 "bidder_id": winner_id,
-                "status": "paid"
+                "status": {"$in": ["paid", "authorized"]},
             })
-            
-            if deposit:
-                # Apply deposit as credit to invoice
-                from services.vehicle_invoice import apply_deposit_credit
-                await apply_deposit_credit(
-                    db,
-                    invoices["buyer_invoice"]["id"],
-                    deposit["amount"]
-                )
-                
-                # Mark deposit as applied
-                await db.vehicle_bid_deposits.update_one(
-                    {"id": deposit["id"]},
-                    {"$set": {"status": "applied", "applied_at": now}}
-                )
-        
-        # Refund deposits to non-winners
-        await db.vehicle_bid_deposits.update_many(
-            {
+
+            if winner_deposit:
+                try:
+                    from services.vehicle_payment import get_payment_service
+                    payment_svc = get_payment_service()
+                    await payment_svc.process_deposit_refund(
+                        db,
+                        winner_deposit["id"],
+                        reason="winner_fee_charged_separately",
+                    )
+                    logger.info(
+                        f"Winner deposit {winner_deposit['id']} released "
+                        f"(hold cancelled) — platform fee will be charged separately"
+                    )
+                except Exception as rel_err:
+                    logger.error(
+                        f"Failed to release winner deposit {winner_deposit['id']}: "
+                        f"{rel_err}"
+                    )
+
+        # ── Release NON-WINNERS' deposit holds ──
+        if vehicle_listing.get("requires_deposit"):
+            losing_deposits = await db.vehicle_bid_deposits.find({
                 "vehicle_id": vehicle_listing["id"],
                 "bidder_id": {"$ne": winner_id},
-                "status": "paid"
-            },
-            {
-                "$set": {
-                    "status": "refunded",
-                    "refunded_at": now,
-                    "refund_reason": "non_winning_bidder"
-                }
-            }
-        )
+                "status": {"$in": ["paid", "authorized"]},
+            }).to_list(length=None)
+
+            if losing_deposits:
+                from services.vehicle_payment import get_payment_service
+                payment_svc = get_payment_service()
+                for dep in losing_deposits:
+                    try:
+                        await payment_svc.process_deposit_refund(
+                            db,
+                            dep["id"],
+                            reason="non_winning_bidder",
+                        )
+                    except Exception as rel_err:
+                        logger.error(
+                            f"Failed to release loser deposit {dep['id']}: {rel_err}"
+                        )
         
         result.status = "sold"
         result.winner_id = winner_id

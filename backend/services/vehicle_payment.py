@@ -163,6 +163,11 @@ class PaymentService:
         cancel_url = f"{origin_url}/vehicle-auctions/{vehicle_id}?deposit=cancelled"
         
         # Create Stripe checkout session directly
+        # IMPORTANT (OPC compliance): Use manual capture so the $500 deposit is
+        # only a HOLD (authorization) on the buyer's card, not an immediate
+        # charge. The hold is RELEASED when the auction ends (winner or loser)
+        # and is only CAPTURED if the winning buyer fails to pay the separate
+        # 2.5% platform fee invoice within the deadline.
         session = stripe.checkout.Session.create(
             payment_method_types=["card"],
             mode="payment",
@@ -170,10 +175,20 @@ class PaymentService:
                 "price_data": {
                     "currency": "cad",
                     "unit_amount": int(float(amount) * 100),
-                    "product_data": {"name": f"Bid Deposit - Vehicle {vehicle_id[:8]}"},
+                    "product_data": {"name": f"Bid Deposit (Hold) - Vehicle {vehicle_id[:8]}"},
                 },
                 "quantity": 1,
             }],
+            payment_intent_data={
+                "capture_method": "manual",  # HOLD only — never auto-captured
+                "description": f"BidVex bid deposit hold for vehicle {vehicle_id}",
+                "metadata": {
+                    "payment_type": PaymentType.DEPOSIT,
+                    "vehicle_id": vehicle_id,
+                    "user_id": user_id,
+                    "deposit_type": "manual_capture_hold",
+                },
+            },
             success_url=success_url,
             cancel_url=cancel_url,
             metadata={
@@ -313,22 +328,32 @@ class PaymentService:
                 logger.info(f"Invoice {invoice_id} marked as paid via session {session_id}")
                 
             elif payment_type == PaymentType.DEPOSIT:
-                # Update deposit as paid
+                # Update deposit as authorized (HOLD in place, not captured)
                 deposit_id = transaction.get("deposit_id")
                 vehicle_id = transaction.get("vehicle_id")
-                
+
+                # Capture the PaymentIntent ID so we can cancel (release) or
+                # capture it later based on auction outcome.
+                payment_intent_id = getattr(stripe_session, "payment_intent", None)
+
                 await db.vehicle_bid_deposits.update_one(
                     {"id": deposit_id},
                     {
                         "$set": {
-                            "status": "paid",
-                            "paid_at": now,
-                            "stripe_session_id": session_id
+                            "status": "authorized",  # hold active, not captured
+                            "authorized_at": now,
+                            "paid_at": now,  # back-compat
+                            "stripe_session_id": session_id,
+                            "stripe_payment_intent_id": payment_intent_id,
+                            "capture_method": "manual",
                         }
                     }
                 )
-                
-                logger.info(f"Deposit {deposit_id} marked as paid for vehicle {vehicle_id}")
+
+                logger.info(
+                    f"Deposit {deposit_id} AUTHORIZED (hold placed) for vehicle "
+                    f"{vehicle_id} — PI={payment_intent_id}"
+                )
         
         return {
             "status": stripe_session.status,
@@ -346,53 +371,143 @@ class PaymentService:
         reason: str = "non_winning_bidder"
     ) -> Dict[str, Any]:
         """
-        Process refund for a bid deposit
-        Note: In production, this would call Stripe Refund API
-        For now, we mark the deposit as refunded
+        Release a bid deposit hold.
+
+        OPC-compliant flow: deposits are manual-capture PaymentIntents, so
+        "refund" means CANCELLING the authorization (no funds ever moved).
+        This is called both for non-winners AND for the winner once their
+        platform fee invoice is paid.
         """
         deposit = await db.vehicle_bid_deposits.find_one({"id": deposit_id})
         if not deposit:
             raise ValueError("Deposit not found")
-        
-        if deposit.get("status") != "paid":
-            raise ValueError(f"Cannot refund deposit with status: {deposit.get('status')}")
-        
+
+        if deposit.get("status") not in ("paid", "authorized"):
+            raise ValueError(f"Cannot release deposit with status: {deposit.get('status')}")
+
         now = datetime.now(timezone.utc)
-        
-        # Mark deposit as refunded
+
+        # Cancel the Stripe PaymentIntent to release the card hold
+        pi_id = deposit.get("stripe_payment_intent_id")
+        stripe_cancelled = False
+        stripe_error = None
+        if pi_id:
+            try:
+                stripe.PaymentIntent.cancel(pi_id)
+                stripe_cancelled = True
+                logger.info(f"Stripe PaymentIntent {pi_id} cancelled (hold released)")
+            except stripe.error.InvalidRequestError as e:
+                # PI may already be cancelled or in a non-cancellable state
+                stripe_error = str(e)
+                logger.warning(f"Could not cancel PI {pi_id}: {e}")
+            except Exception as e:
+                stripe_error = str(e)
+                logger.error(f"Stripe cancel error for PI {pi_id}: {e}")
+
+        # Mark deposit as released (no funds moved)
         await db.vehicle_bid_deposits.update_one(
             {"id": deposit_id},
             {
                 "$set": {
-                    "status": "refunded",
-                    "refunded_at": now,
-                    "refund_reason": reason
+                    "status": "released",
+                    "released_at": now,
+                    "refunded_at": now,  # back-compat
+                    "refund_reason": reason,
+                    "stripe_cancelled": stripe_cancelled,
+                    "stripe_cancel_error": stripe_error,
                 }
             }
         )
-        
+
         # Log audit
         await db.vehicle_audit_logs.insert_one({
             "id": str(uuid.uuid4()),
             "entity_type": "deposit",
             "entity_id": deposit_id,
-            "action": "deposit_refunded",
+            "action": "deposit_released",
             "performed_by": "system",
             "performed_by_role": "system",
             "new_value": {
                 "amount": deposit.get("amount"),
-                "reason": reason
+                "reason": reason,
+                "stripe_cancelled": stripe_cancelled,
+                "payment_intent_id": pi_id,
             },
             "created_at": now
         })
-        
-        logger.info(f"Deposit {deposit_id} refunded: {reason}")
-        
+
+        logger.info(f"Deposit {deposit_id} released: {reason}")
+
         return {
             "deposit_id": deposit_id,
-            "amount_refunded": deposit.get("amount"),
+            "amount_released": deposit.get("amount"),
             "reason": reason,
-            "status": "refunded"
+            "status": "released",
+            "stripe_cancelled": stripe_cancelled,
+        }
+
+    async def capture_deposit(
+        self,
+        db,
+        deposit_id: str,
+        reason: str = "fee_invoice_unpaid_past_deadline"
+    ) -> Dict[str, Any]:
+        """
+        Capture the deposit hold as a penalty when the winning buyer fails to
+        pay their 2.5% platform fee invoice within the deadline.
+
+        This is the ONLY path where the deposit actually becomes a charge.
+        """
+        deposit = await db.vehicle_bid_deposits.find_one({"id": deposit_id})
+        if not deposit:
+            raise ValueError("Deposit not found")
+
+        if deposit.get("status") not in ("paid", "authorized"):
+            raise ValueError(f"Cannot capture deposit with status: {deposit.get('status')}")
+
+        pi_id = deposit.get("stripe_payment_intent_id")
+        if not pi_id:
+            raise ValueError("Deposit has no PaymentIntent — cannot capture")
+
+        now = datetime.now(timezone.utc)
+
+        # Capture the PaymentIntent
+        captured_pi = stripe.PaymentIntent.capture(pi_id)
+        logger.info(f"Stripe PaymentIntent {pi_id} CAPTURED as penalty")
+
+        await db.vehicle_bid_deposits.update_one(
+            {"id": deposit_id},
+            {
+                "$set": {
+                    "status": "captured",
+                    "captured_at": now,
+                    "capture_reason": reason,
+                    "stripe_charge_id": getattr(captured_pi, "latest_charge", None),
+                }
+            }
+        )
+
+        await db.vehicle_audit_logs.insert_one({
+            "id": str(uuid.uuid4()),
+            "entity_type": "deposit",
+            "entity_id": deposit_id,
+            "action": "deposit_captured",
+            "performed_by": "system",
+            "performed_by_role": "system",
+            "new_value": {
+                "amount": deposit.get("amount"),
+                "reason": reason,
+                "payment_intent_id": pi_id,
+            },
+            "created_at": now
+        })
+
+        return {
+            "deposit_id": deposit_id,
+            "amount_captured": deposit.get("amount"),
+            "reason": reason,
+            "status": "captured",
+            "payment_intent_id": pi_id,
         }
 
 
