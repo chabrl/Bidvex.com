@@ -1,5 +1,42 @@
 # BidVex Changelog
 
+## Feb 15, 2026 - P0 Vehicle Payment Infrastructure — OPC Compliance Finalized
+
+### Fix 5: send_auction_won_email — bilingual vehicle legal notice
+- Unified `send_auction_won_email` in `/app/backend/services/email_notifications.py` into a single function with new signature: `(to_email, to_name, auction_id, item_name, hammer_price, platform_fee, seller_name, seller_contact, is_vehicle, is_cross_border, buyer_province, payment_deadline)`. Back-compat kwargs preserved for legacy callers.
+- When `is_vehicle=True`, injects bilingual EN + FR legal block: **"VEHICLE PAYMENT NOTICE / AVIS DE PAIEMENT DU VÉHICULE"** stating the hammer price is paid directly to the seller and BidVex only collects the 2.5% platform fee.
+- FR amounts use CA-French suffix convention (`10 000,00 $`).
+- Removed the orphaned duplicate definition at the top of the module (was hidden by the later override, causing silent TypeError at runtime).
+- Updated caller `services/vehicle_invoice.py` to pass `is_vehicle=True`, `seller_name`, `seller_contact`, `is_cross_border`, `buyer_province`.
+
+### Fix 6: $500 Deposit — Stripe manual-capture HOLD (never hammer-price hold)
+- `services/vehicle_payment.py` `create_deposit_checkout`: added `payment_intent_data={"capture_method": "manual"}` → deposit is an AUTHORIZATION (hold), not an immediate charge.
+- Webhook now stores `stripe_payment_intent_id` and sets status `"authorized"` on success.
+- Rewrote `process_deposit_refund` → now calls `stripe.PaymentIntent.cancel(pi_id)` to RELEASE the hold (no funds move). Used for both non-winners AND for the winner once auction closes.
+- Added new `PaymentService.capture_deposit(db, deposit_id, reason)` → calls `stripe.PaymentIntent.capture(pi_id)` to capture the $500 as a penalty if the winning buyer fails to pay the separate fee invoice within deadline.
+- `services/vehicle_auction_handler.py` `process_ended_auction`: removed the `apply_deposit_credit` call entirely; winner's deposit hold is now RELEASED, and platform fee is charged separately via the existing `create_vehicle_fee_charge` on the buyer's card on file.
+- `routes/vehicles.py` bid-placement endpoint now accepts both `"paid"` and `"authorized"` deposit statuses.
+
+### Compliance Verified (9/9)
+1. ✅ No hammer-price Stripe hold or charge exists anywhere
+2. ✅ Deposit is fixed $500 (from `listing.deposit_amount`, default 500)
+3. ✅ Deposit held via `capture_method=manual` (true authorization hold)
+4. ✅ Winner: deposit hold RELEASED on auction close
+5. ✅ Losers: deposit hold RELEASED on auction close
+6. ✅ Fee-non-payment path: `capture_deposit` captures the $500 as penalty
+7. ✅ Zero Stripe Connect transfer/destination/application_fee_amount to vehicle seller
+8. ✅ Pricing: QC $10k hammer → buyer charged exactly $296.12 (250 fee + 7.55 stripe + 38.57 GST+QST)
+9. ✅ Tax matrix: QC GST+QST 14.975%, ON HST 13%, AB/BC GST 5%
+
+### Testing
+- Backend: **14/14 tests passed (100%)** — iteration_153, zero critical/minor issues
+- All files linted clean (ruff)
+- Full EN + FR email render tests pass
+- Back-compat legacy kwargs path tested and working
+
+---
+
+
 ## March 14, 2026 - Bug Fixes: Homepage Translation Keys, Routing & Validation (4 Issues)
 
 ### Issue 1: Verify Now Button 404 (FIXED)
