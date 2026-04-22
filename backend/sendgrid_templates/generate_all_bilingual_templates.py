@@ -71,7 +71,7 @@ def cta(en_label, fr_label, url):
         f'<tr><td style="padding:8px 30px 32px;text-align:center;">'
         f'<table cellpadding="0" cellspacing="0" align="center"><tr>'
         f'<td style="background-color:{C["blue"]};border-radius:8px;padding:14px 32px;">'
-        f'<a href="{url}" style="color:{C["white"]};font-family:{FONT};font-size:15px;font-weight:bold;text-decoration:none;display:inline-block;" target="_blank">{en_label} / {fr_label}</a>'
+        f'<a href="{url}" style="color:{C["white"]};font-family:{FONT};font-size:15px;font-weight:bold;text-decoration:none;display:inline-block;" target="_blank" clicktracking=off>{en_label} / {fr_label}</a>'
         f'</td></tr></table></td></tr>'
     )
 
@@ -81,8 +81,8 @@ def footer():
         f'<tr><td style="background-color:{C["navy"]};padding:28px 30px;text-align:center;">'
         f'<img src="{LOGO_URL}" alt="BidVex" width="80" style="display:inline-block;width:80px;height:auto;opacity:0.7;margin-bottom:12px;" /><br/>'
         f'<p style="margin:0 0 6px;font-family:{FONT};font-size:12px;color:rgba(255,255,255,0.6);">BidVex Canada | Sherbrooke, QC</p>'
-        f'<p style="margin:0 0 6px;font-family:{FONT};font-size:12px;color:rgba(255,255,255,0.5);"><a href="mailto:support@bidvex.com" style="color:{C["sky"]};text-decoration:none;">support@bidvex.com</a></p>'
-        f'<p style="margin:0;font-family:{FONT};font-size:11px;color:rgba(255,255,255,0.35);"><a href="{CTA_BASE}/legal" style="color:rgba(255,255,255,0.45);text-decoration:underline;">Privacy</a> &nbsp;|&nbsp; <a href="{CTA_BASE}/legal" style="color:rgba(255,255,255,0.45);text-decoration:underline;">Terms</a></p>'
+        f'<p style="margin:0 0 6px;font-family:{FONT};font-size:12px;color:rgba(255,255,255,0.5);"><a href="mailto:support@bidvex.com" style="color:{C["sky"]};text-decoration:none;" clicktracking=off>support@bidvex.com</a></p>'
+        f'<p style="margin:0;font-family:{FONT};font-size:11px;color:rgba(255,255,255,0.35);"><a href="{CTA_BASE}/legal" style="color:rgba(255,255,255,0.45);text-decoration:underline;" clicktracking=off>Privacy</a> &nbsp;|&nbsp; <a href="{CTA_BASE}/legal" style="color:rgba(255,255,255,0.45);text-decoration:underline;" clicktracking=off>Terms</a></p>'
         f'<p style="margin:8px 0 0;font-family:{FONT};font-size:11px;color:rgba(255,255,255,0.3);">&copy; {{{{current_year}}}} BidVex Inc.</p>'
         f'</td></tr>'
     )
@@ -96,7 +96,7 @@ def law25_note():
     return (
         f'<p style="margin:12px 0 0;font-family:{FONT};font-size:12px;color:{C["text_med"]};">'
         f'BidVex uses AI for support, categorization, and fraud detection. You may request human review of any AI decision at '
-        f'<a href="mailto:privacy@bidvex.com" style="color:{C["blue"]};">privacy@bidvex.com</a> (Law 25).</p>'
+        f'<a href="mailto:privacy@bidvex.com" style="color:{C["blue"]};" clicktracking=off>privacy@bidvex.com</a> (Law 25).</p>'
     )
 
 
@@ -105,7 +105,7 @@ def law25_note_fr():
         f'<p style="margin:12px 0 0;font-family:{FONT};font-size:12px;color:{C["text_med"]};">'
         f'BidVex utilise l\'IA pour le support, la cat&eacute;gorisation et la d&eacute;tection de fraude. '
         f'Vous pouvez demander une r&eacute;vision humaine &agrave; '
-        f'<a href="mailto:privacy@bidvex.com" style="color:{C["blue"]};">privacy@bidvex.com</a> (Loi 25).</p>'
+        f'<a href="mailto:privacy@bidvex.com" style="color:{C["blue"]};" clicktracking=off>privacy@bidvex.com</a> (Loi 25).</p>'
     )
 
 
@@ -148,11 +148,11 @@ TEMPLATES.append(("auth_password_changed_bilingual", wrap(
     body(
         lang_label("ENGLISH") +
         p("Hi {{first_name}}, your BidVex password was successfully changed. If you made this change, no further action is needed.") +
-        p("If you did NOT change your password, please reset it immediately and contact <a href=\"mailto:support@bidvex.com\" style=\"color:#2186C6;\">support@bidvex.com</a>.") +
+        p("If you did NOT change your password, please reset it immediately and contact <a href=\"mailto:support@bidvex.com\" style=\"color:#2186C6;\" clicktracking=off>support@bidvex.com</a>.") +
         divider() +
         lang_label("FRAN&Ccedil;AIS") +
         p("Bonjour {{first_name}}, votre mot de passe BidVex a &eacute;t&eacute; modifi&eacute; avec succ&egrave;s. Si vous avez effectu&eacute; ce changement, aucune action suppl&eacute;mentaire n'est requise.") +
-        p("Si vous n'avez PAS modifi&eacute; votre mot de passe, veuillez le r&eacute;initialiser imm&eacute;diatement et contacter <a href=\"mailto:support@bidvex.com\" style=\"color:#2186C6;\">support@bidvex.com</a>.")
+        p("Si vous n'avez PAS modifi&eacute; votre mot de passe, veuillez le r&eacute;initialiser imm&eacute;diatement et contacter <a href=\"mailto:support@bidvex.com\" style=\"color:#2186C6;\" clicktracking=off>support@bidvex.com</a>.")
     ) +
     cta("Go to BidVex", "Aller sur BidVex", CTA_BASE) + footer()
 )))
@@ -202,11 +202,11 @@ TEMPLATES.append(("auth_login_alert_bilingual", wrap(
             kv_row("IP Address / Adresse IP", "{{login_ip}}") +
             kv_row("Device / Appareil", "{{login_device}}")
         )) +
-        p("If this was you, no action is needed. If you don't recognize this login, please <a href=\"" + CTA_BASE + "/settings\" style=\"color:#2186C6;\">change your password</a> immediately.") +
+        p("If this was you, no action is needed. If you don't recognize this login, please <a href=\"" + CTA_BASE + "/settings\" style=\"color:#2186C6;\" clicktracking=off>change your password</a> immediately.") +
         divider() +
         lang_label("FRAN&Ccedil;AIS") +
         p("Bonjour {{first_name}}, une nouvelle connexion &agrave; votre compte BidVex a &eacute;t&eacute; d&eacute;tect&eacute;e.") +
-        p("Si c'&eacute;tait vous, aucune action n'est requise. Sinon, veuillez <a href=\"" + CTA_BASE + "/settings\" style=\"color:#2186C6;\">changer votre mot de passe</a> imm&eacute;diatement.")
+        p("Si c'&eacute;tait vous, aucune action n'est requise. Sinon, veuillez <a href=\"" + CTA_BASE + "/settings\" style=\"color:#2186C6;\" clicktracking=off>changer votre mot de passe</a> imm&eacute;diatement.")
     ) +
     cta("Review Account Security", "V&eacute;rifier la s&eacute;curit&eacute; du compte", CTA_BASE + "/settings") + footer()
 )))
@@ -222,11 +222,11 @@ TEMPLATES.append(("admin_account_suspended_bilingual", wrap(
         lang_label("ENGLISH") +
         p("Hi {{first_name}}, your BidVex account has been suspended for the following reason:") +
         card(f'<p style="font-family:{FONT};font-size:15px;font-weight:bold;color:{C["red"]};margin:0;">{{{{reason}}}}</p>') +
-        p("If you believe this is an error, please contact our support team at <a href=\"mailto:support@bidvex.com\" style=\"color:#2186C6;\">support@bidvex.com</a> with your account details.") +
+        p("If you believe this is an error, please contact our support team at <a href=\"mailto:support@bidvex.com\" style=\"color:#2186C6;\" clicktracking=off>support@bidvex.com</a> with your account details.") +
         divider() +
         lang_label("FRAN&Ccedil;AIS") +
         p("Bonjour {{first_name}}, votre compte BidVex a &eacute;t&eacute; suspendu pour la raison suivante :") +
-        p("Si vous croyez qu'il s'agit d'une erreur, veuillez contacter notre &eacute;quipe de support &agrave; <a href=\"mailto:support@bidvex.com\" style=\"color:#2186C6;\">support@bidvex.com</a>.")
+        p("Si vous croyez qu'il s'agit d'une erreur, veuillez contacter notre &eacute;quipe de support &agrave; <a href=\"mailto:support@bidvex.com\" style=\"color:#2186C6;\" clicktracking=off>support@bidvex.com</a>.")
     ) + footer()
 )))
 
@@ -278,11 +278,11 @@ TEMPLATES.append(("comm_support_ack_bilingual", wrap(
             kv_row("Ticket ID / No de billet", "{{ticket_id}}") +
             kv_row("Subject / Sujet", "{{subject}}")
         )) +
-        p("In the meantime, you may find answers in our <a href=\"" + CTA_BASE + "/help\" style=\"color:#2186C6;\">Help Center</a>.") +
+        p("In the meantime, you may find answers in our <a href=\"" + CTA_BASE + "/help\" style=\"color:#2186C6;\" clicktracking=off>Help Center</a>.") +
         divider() +
         lang_label("FRAN&Ccedil;AIS") +
         p("Bonjour {{first_name}}, merci d'avoir contact&eacute; le support BidVex. Nous avons re&ccedil;u votre demande et r&eacute;pondrons dans un d&eacute;lai de 24 &agrave; 48 heures ouvrables.") +
-        p("Entre-temps, vous pouvez consulter notre <a href=\"" + CTA_BASE + "/help\" style=\"color:#2186C6;\">Centre d'aide</a>.")
+        p("Entre-temps, vous pouvez consulter notre <a href=\"" + CTA_BASE + "/help\" style=\"color:#2186C6;\" clicktracking=off>Centre d'aide</a>.")
     ) + footer()
 )))
 
@@ -442,11 +442,11 @@ TEMPLATES.append(("seller_listing_rejected_bilingual", wrap(
             f'<p style="font-family:{FONT};font-size:13px;color:{C["text_med"]};margin:0 0 4px;">Reason / Raison :</p>'
             f'<p style="font-family:{FONT};font-size:14px;color:{C["red"]};margin:0;font-weight:bold;">{{{{reason}}}}</p>'
         ) +
-        p("You may edit and resubmit your listing. If you have questions, please contact <a href=\"mailto:support@bidvex.com\" style=\"color:#2186C6;\">support@bidvex.com</a>.") +
+        p("You may edit and resubmit your listing. If you have questions, please contact <a href=\"mailto:support@bidvex.com\" style=\"color:#2186C6;\" clicktracking=off>support@bidvex.com</a>.") +
         divider() +
         lang_label("FRAN&Ccedil;AIS") +
         p("Bonjour {{first_name}}, malheureusement, votre annonce a &eacute;t&eacute; refus&eacute;e par notre &eacute;quipe de r&eacute;vision.") +
-        p("Vous pouvez modifier et resoumettre votre annonce. Pour toute question, contactez <a href=\"mailto:support@bidvex.com\" style=\"color:#2186C6;\">support@bidvex.com</a>.")
+        p("Vous pouvez modifier et resoumettre votre annonce. Pour toute question, contactez <a href=\"mailto:support@bidvex.com\" style=\"color:#2186C6;\" clicktracking=off>support@bidvex.com</a>.")
     ) +
     cta("Edit Listing", "Modifier l'annonce", CTA_BASE + "/dashboard/listings") + footer()
 )))
@@ -706,7 +706,7 @@ TEMPLATES.append(("trigger_cross_border_notice_bilingual", wrap(
             f'<li>RDPRM Lien Verification</li>'
             f'</ul>'
         ) +
-        p("For more information, visit our <a href=\"" + CTA_BASE + "/legal\" style=\"color:#2186C6;\">Cross-Border Guide</a>.") +
+        p("For more information, visit our <a href=\"" + CTA_BASE + "/legal\" style=\"color:#2186C6;\" clicktracking=off>Cross-Border Guide</a>.") +
         divider() +
         lang_label("FRAN&Ccedil;AIS") +
         p("Bonjour {{first_name}}, f&eacute;licitations pour avoir remport&eacute; une ench&egrave;re transfrontali&egrave;re ! Veuillez consulter les exigences de conformit&eacute; suivantes avant de finaliser votre achat :") +
@@ -721,7 +721,7 @@ TEMPLATES.append(("trigger_cross_border_notice_bilingual", wrap(
             f'<li>V&eacute;rification de privilège RDPRM</li>'
             f'</ul>'
         ) +
-        p("Pour plus d'information, consultez notre <a href=\"" + CTA_BASE + "/legal\" style=\"color:#2186C6;\">Guide transfrontalier</a>.")
+        p("Pour plus d'information, consultez notre <a href=\"" + CTA_BASE + "/legal\" style=\"color:#2186C6;\" clicktracking=off>Guide transfrontalier</a>.")
     ) +
     cta("View Purchase Details", "Voir les d&eacute;tails de l'achat", CTA_BASE + "/listing/{{auction_id}}") + footer()
 )))

@@ -17,6 +17,7 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import (
     Mail, Email, To, Content, Personalization,
     TrackingSettings, ClickTracking, OpenTracking,
+    SubscriptionTracking, Ganalytics,
     CustomArg
 )
 
@@ -798,9 +799,13 @@ class UserEmailMarketingService:
             message.add_content(Content("text/plain", plain_content or "View this email in HTML."))
             message.add_content(Content("text/html", html_content))
             
+            # SendGrid tracking: ALL OFF (belt & suspenders — clicktracking=off
+            # is also baked into every <a> tag in the HTML templates)
             tracking = TrackingSettings()
             tracking.click_tracking = ClickTracking(False, False)
             tracking.open_tracking = OpenTracking(False)
+            tracking.subscription_tracking = SubscriptionTracking(False)
+            tracking.ganalytics = Ganalytics(False)
             message.tracking_settings = tracking
             
             response = marketing_client.send(message)

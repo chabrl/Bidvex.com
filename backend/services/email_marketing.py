@@ -12,8 +12,9 @@ from datetime import datetime, timezone, timedelta
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import (
-    Mail, Email, To, Content, Personalization, 
+    Mail, Email, To, Content, Personalization,
     TrackingSettings, ClickTracking, OpenTracking,
+    SubscriptionTracking, Ganalytics,
     CustomArg
 )
 
@@ -684,10 +685,13 @@ class EmailMarketingService:
                 plain_text_content=Content("text/plain", plain_text)
             )
             
-            # Add tracking
+            # SendGrid tracking: ALL OFF (tracking is also suppressed per-link
+            # via clicktracking=off attribute baked into every template <a> tag)
             tracking = TrackingSettings()
-            tracking.click_tracking = ClickTracking(True, True)
-            tracking.open_tracking = OpenTracking(True)
+            tracking.click_tracking = ClickTracking(False, False)
+            tracking.open_tracking = OpenTracking(False)
+            tracking.subscription_tracking = SubscriptionTracking(False)
+            tracking.ganalytics = Ganalytics(False)
             message.tracking_settings = tracking
             
             response = marketing_client.send(message)
@@ -917,10 +921,12 @@ class EmailMarketingService:
             message.add_content(Content("text/plain", plain_content or "View this email in HTML"))
             message.add_content(Content("text/html", html_content))
             
-            # Add tracking
+            # SendGrid tracking: ALL OFF
             tracking = TrackingSettings()
-            tracking.click_tracking = ClickTracking(True, True)
-            tracking.open_tracking = OpenTracking(True)
+            tracking.click_tracking = ClickTracking(False, False)
+            tracking.open_tracking = OpenTracking(False)
+            tracking.subscription_tracking = SubscriptionTracking(False)
+            tracking.ganalytics = Ganalytics(False)
             message.tracking_settings = tracking
             
             response = marketing_client.send(message)

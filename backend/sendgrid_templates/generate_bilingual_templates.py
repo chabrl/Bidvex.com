@@ -49,7 +49,7 @@ def cta(en_label, fr_label, url):
         f'<tr><td style="padding:8px 30px 32px;text-align:center;">'
         f'<table cellpadding="0" cellspacing="0" align="center"><tr>'
         f'<td style="background-color:{C["blue"]};border-radius:8px;padding:14px 32px;">'
-        f'<a href="{url}" style="color:{C["white"]};font-family:{FONT};font-size:15px;font-weight:bold;text-decoration:none;display:inline-block;" target="_blank">{en_label} / {fr_label}</a>'
+        f'<a href="{url}" style="color:{C["white"]};font-family:{FONT};font-size:15px;font-weight:bold;text-decoration:none;display:inline-block;" target="_blank" clicktracking=off>{en_label} / {fr_label}</a>'
         f'</td></tr></table></td></tr>'
     )
 
@@ -58,8 +58,8 @@ def footer():
         f'<tr><td style="background-color:{C["navy"]};padding:28px 30px;text-align:center;">'
         f'<img src="{LOGO_URL}" alt="BidVex" width="80" style="display:inline-block;width:80px;height:auto;opacity:0.7;margin-bottom:12px;" /><br/>'
         f'<p style="margin:0 0 6px;font-family:{FONT};font-size:12px;color:rgba(255,255,255,0.6);">BidVex Canada | Sherbrooke, QC</p>'
-        f'<p style="margin:0 0 6px;font-family:{FONT};font-size:12px;color:rgba(255,255,255,0.5);"><a href="mailto:support@bidvex.com" style="color:{C["sky"]};text-decoration:none;">support@bidvex.com</a></p>'
-        f'<p style="margin:0;font-family:{FONT};font-size:11px;color:rgba(255,255,255,0.35);"><a href="{CTA_BASE}/legal" style="color:rgba(255,255,255,0.45);text-decoration:underline;">Privacy</a> &nbsp;|&nbsp; <a href="{CTA_BASE}/legal" style="color:rgba(255,255,255,0.45);text-decoration:underline;">Terms</a></p>'
+        f'<p style="margin:0 0 6px;font-family:{FONT};font-size:12px;color:rgba(255,255,255,0.5);"><a href="mailto:support@bidvex.com" style="color:{C["sky"]};text-decoration:none;" clicktracking=off>support@bidvex.com</a></p>'
+        f'<p style="margin:0;font-family:{FONT};font-size:11px;color:rgba(255,255,255,0.35);"><a href="{CTA_BASE}/legal" style="color:rgba(255,255,255,0.45);text-decoration:underline;" clicktracking=off>Privacy</a> &nbsp;|&nbsp; <a href="{CTA_BASE}/legal" style="color:rgba(255,255,255,0.45);text-decoration:underline;" clicktracking=off>Terms</a></p>'
         f'<p style="margin:8px 0 0;font-family:{FONT};font-size:11px;color:rgba(255,255,255,0.3);">&copy; {{{{current_year}}}} BidVex Inc.</p>'
         f'</td></tr>'
     )
@@ -104,11 +104,11 @@ TEMPLATES.append(("welcome_bilingual", wrap(
                   "Outils propulsés par l'IA", "Notre concierge intelligent est prêt à vous aider 24/7.") +
         icon_card("&#127760;", "Bilingual &amp; Cross-Border", "Seamlessly buy or sell across Canada and the US.",
                   "Bilingue et transfrontalier", "Achetez ou vendez partout au Canada et aux États-Unis.") +
-        f'<p style="margin:12px 0 0;font-family:{FONT};font-size:12px;color:{C["text_med"]};">BidVex uses AI for support, categorization, and fraud detection. You may request human review of any AI decision at <a href="mailto:privacy@bidvex.com" style="color:{C["blue"]};">privacy@bidvex.com</a> (Law 25).</p>' +
+        f'<p style="margin:12px 0 0;font-family:{FONT};font-size:12px;color:{C["text_med"]};">BidVex uses AI for support, categorization, and fraud detection. You may request human review of any AI decision at <a href="mailto:privacy@bidvex.com" style="color:{C["blue"]};" clicktracking=off>privacy@bidvex.com</a> (Law 25).</p>' +
         divider() +
         lang_label("FRANÇAIS") +
         p("Vous venez de rejoindre la plateforme « tout-en-un » la plus avancée en Amérique du Nord. Que vous cherchiez une flotte de camions, une pièce de collection unique ou que vous souhaitiez liquider un entrepôt complet d'équipement industriel — BidVex est conçu pour tout gérer.") +
-        f'<p style="margin:12px 0 0;font-family:{FONT};font-size:12px;color:{C["text_med"]};">BidVex utilise l\'IA pour le support, la catégorisation et la détection de fraude. Vous pouvez demander une révision humaine à <a href="mailto:privacy@bidvex.com" style="color:{C["blue"]};">privacy@bidvex.com</a> (Loi 25).</p>'
+        f'<p style="margin:12px 0 0;font-family:{FONT};font-size:12px;color:{C["text_med"]};">BidVex utilise l\'IA pour le support, la catégorisation et la détection de fraude. Vous pouvez demander une révision humaine à <a href="mailto:privacy@bidvex.com" style="color:{C["blue"]};" clicktracking=off>privacy@bidvex.com</a> (Loi 25).</p>'
     ) +
     cta("Explore the Marketplace", "Explorer le marché", f"{CTA_BASE}/marketplace") + footer()
 )))

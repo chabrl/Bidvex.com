@@ -55,7 +55,7 @@ def zone4_cta(label, url):
       <td style="padding:8px 30px 32px;text-align:center;">
         <table cellpadding="0" cellspacing="0" align="center"><tr>
           <td style="background-color:{C['blue']};border-radius:8px;padding:14px 32px;">
-            <a href="{url}" style="color:{C['white']};font-family:{FONT};font-size:15px;font-weight:bold;text-decoration:none;display:inline-block;" target="_blank">{label}</a>
+            <a href="{url}" style="color:{C['white']};font-family:{FONT};font-size:15px;font-weight:bold;text-decoration:none;display:inline-block;" target="_blank" clicktracking=off>{label}</a>
           </td>
         </tr></table>
       </td>
@@ -70,12 +70,12 @@ def zone5_footer():
         <img src="{LOGO_FOOTER_URL}" alt="BidVex" width="80" style="display:inline-block;width:80px;height:auto;opacity:0.7;margin-bottom:12px;" /><br/>
         <p style="margin:0 0 6px;font-family:{FONT};font-size:12px;color:rgba(255,255,255,0.6);">BidVex Canada | Sherbrooke, QC</p>
         <p style="margin:0 0 6px;font-family:{FONT};font-size:12px;color:rgba(255,255,255,0.5);">
-          <a href="mailto:support@bidvex.com" style="color:{C['sky']};text-decoration:none;">support@bidvex.com</a>
+          <a href="mailto:support@bidvex.com" style="color:{C['sky']};text-decoration:none;" clicktracking=off>support@bidvex.com</a>
         </p>
         <p style="margin:0;font-family:{FONT};font-size:11px;color:rgba(255,255,255,0.35);">
-          <a href="{CTA_BASE}/legal" style="color:rgba(255,255,255,0.45);text-decoration:underline;">Privacy</a> &nbsp;|&nbsp;
-          <a href="{CTA_BASE}/legal" style="color:rgba(255,255,255,0.45);text-decoration:underline;">Terms</a> &nbsp;|&nbsp;
-          <a href="{{{{unsubscribe_url}}}}" style="color:rgba(255,255,255,0.45);text-decoration:underline;">Unsubscribe</a>
+          <a href="{CTA_BASE}/legal" style="color:rgba(255,255,255,0.45);text-decoration:underline;" clicktracking=off>Privacy</a> &nbsp;|&nbsp;
+          <a href="{CTA_BASE}/legal" style="color:rgba(255,255,255,0.45);text-decoration:underline;" clicktracking=off>Terms</a> &nbsp;|&nbsp;
+          <a href="{{{{unsubscribe_url}}}}" style="color:rgba(255,255,255,0.45);text-decoration:underline;" clicktracking=off>Unsubscribe</a>
         </p>
         <p style="margin:8px 0 0;font-family:{FONT};font-size:11px;color:rgba(255,255,255,0.3);">&copy; {{{{current_year}}}} BidVex Inc.</p>
       </td>
@@ -176,7 +176,7 @@ TEMPLATES.append(("01_welcome_en", wrap(
         ]) +
         '<div style="height:8px;"></div>' +
         p("Your account is ready. Start exploring the marketplace today.") +
-        '<p style="margin:12px 0 0;font-family:' + FONT + ';font-size:12px;color:' + C["text_med"] + ';">BidVex uses AI for support, categorization, and fraud detection. You may request human review of any AI decision at <a href="mailto:privacy@bidvex.com" style="color:' + C["blue"] + ';">privacy@bidvex.com</a> (Law 25).</p>'
+        '<p style="margin:12px 0 0;font-family:' + FONT + ';font-size:12px;color:' + C["text_med"] + ';">BidVex uses AI for support, categorization, and fraud detection. You may request human review of any AI decision at <a href="mailto:privacy@bidvex.com" style="color:' + C["blue"] + ';" clicktracking=off>privacy@bidvex.com</a> (Law 25).</p>'
     ) +
     zone4_cta("Explore the Marketplace", f"{CTA_BASE}/marketplace") +
     zone5_footer()
@@ -198,7 +198,7 @@ TEMPLATES.append(("01_welcome_fr", wrap(
         ]) +
         '<div style="height:8px;"></div>' +
         p("Votre compte est prêt. Commencez à explorer le marché dès aujourd'hui.") +
-        '<p style="margin:12px 0 0;font-family:' + FONT + ';font-size:12px;color:' + C["text_med"] + ';">BidVex utilise l\'IA pour le support, la catégorisation et la détection de fraude. Vous pouvez demander une révision humaine à <a href="mailto:privacy@bidvex.com" style="color:' + C["blue"] + ';">privacy@bidvex.com</a> (Loi 25).</p>'
+        '<p style="margin:12px 0 0;font-family:' + FONT + ';font-size:12px;color:' + C["text_med"] + ';">BidVex utilise l\'IA pour le support, la catégorisation et la détection de fraude. Vous pouvez demander une révision humaine à <a href="mailto:privacy@bidvex.com" style="color:' + C["blue"] + ';" clicktracking=off>privacy@bidvex.com</a> (Loi 25).</p>'
     ) +
     zone4_cta("Explorer le marché", f"{CTA_BASE}/marketplace") +
     zone5_footer()
