@@ -82,7 +82,8 @@
     "@craco/craco": "^7.1.0"
   },
   "scripts": {
-    "start": "npx serve -s build -l 3000",
+    "start": "craco start",
+    "start:prod": "npx serve -s build -l 3000",
     "build": "./node_modules/.bin/craco build",
     "test": "./node_modules/.bin/craco test",
     "i18n:audit": "node scripts/i18n-audit.js",
