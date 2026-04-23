@@ -19,6 +19,7 @@ import {
   DialogFooter,
 } from '../ui/dialog';
 import { useTranslation } from 'react-i18next';
+import { depositHoldCopy } from '../../constants/depositHoldCopy';
 import {
   AlertTriangle, Shield, FileText, CheckCircle, Info,
   Clock, CreditCard, Gavel, Eye, Car, Scale, Users,
@@ -358,16 +359,26 @@ export const DepositNotice = ({ amount, isPaid = false }) => {
     data-testid="deposit-notice"
   >
     <CreditCard className={`h-5 w-5 ${isPaid ? 'text-green-600' : 'text-blue-600'}`} />
-    <AlertTitle className={isPaid ? "text-green-800 dark:text-green-200" : "text-blue-800 dark:text-blue-200"}>
-      {isPaid ? 'Deposit Confirmed' : 'Refundable Deposit Required'}
+    <AlertTitle className={isPaid ? "text-green-800 dark:text-green-200 space-y-0.5" : "text-blue-800 dark:text-blue-200 space-y-0.5"}>
+      {isPaid ? (
+        <>
+          <div data-testid="deposit-status-authorized-en">{depositHoldCopy.authorized.en}</div>
+          <div className="text-sm font-medium opacity-80">{depositHoldCopy.authorized.fr}</div>
+        </>
+      ) : (
+        <>
+          <div data-testid="deposit-status-required-en">{depositHoldCopy.required.en}</div>
+          <div className="text-sm font-medium opacity-80">{depositHoldCopy.required.fr}</div>
+        </>
+      )}
     </AlertTitle>
     <AlertDescription className={isPaid ? "text-green-700 dark:text-green-300" : "text-blue-700 dark:text-blue-300"}>
       {isPaid ? (
-        <span>{t("auction.yourDepositOf")} <strong>${amount}</strong> has been confirmed. You may now place bids.</span>
+        <span>{t("auction.yourDepositOf")} <strong>${amount}</strong> is reserved on your card. You may now place bids. No charge has been made.</span>
       ) : (
         <span>
-          A refundable deposit of <strong>${amount}</strong> is required before bidding. 
-          Deposits are returned to non-winning bidders within 5 business days.
+          A refundable <strong>${amount}</strong> pre-authorization hold is placed on your card before bidding.
+          The hold is released automatically at auction close to non-winning bidders.
         </span>
       )}
     </AlertDescription>

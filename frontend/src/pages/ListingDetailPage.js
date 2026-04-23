@@ -665,10 +665,13 @@ const ListingDetailPage = () => {
                     >
                       {canBid ? (
                         ((listing.starting_price || 0) >= 10000 && !depositAuthorized) ? (
-                          <>
-                            <Shield className="mr-2 h-4 w-4" />
-                            {i18n.language === 'fr' ? 'Dépôt requis pour enchérir' : 'Deposit Required to Bid'}
-                          </>
+                          <span className="flex flex-col items-center justify-center gap-0.5 leading-tight py-1" data-testid="bid-btn-deposit-required">
+                            <span className="flex items-center gap-2">
+                              <Shield className="h-4 w-4" />
+                              <span>Security Hold Required — $500 on your card</span>
+                            </span>
+                            <span className="text-[11px] font-normal opacity-80">Retenue de sécurité requise — 500 $ sur votre carte</span>
+                          </span>
                         ) : (
                           <>
                             <DollarSign className="mr-2 h-4 w-4" />

@@ -6,10 +6,11 @@ import API_BASE from '../config';
 import { Alert, AlertDescription } from './ui/alert';
 import { Button } from './ui/button';
 import { Shield, Lock, CheckCircle2, Loader2 } from 'lucide-react';
+import { depositHoldCopy, DEPOSIT_HOLD_AMOUNT } from '../constants/depositHoldCopy';
 
 const API = API_BASE;
 const DEPOSIT_THRESHOLD = 10000;
-const DEPOSIT_AMOUNT = 1000;
+const DEPOSIT_AMOUNT = DEPOSIT_HOLD_AMOUNT; // $500 — matches backend default
 
 /**
  * SecurityDepositBanner — Shown on listing detail pages for high-value auctions (>$10k).
@@ -86,11 +87,14 @@ const SecurityDepositBanner = ({ listingId, startingPrice, currency = 'CAD', onD
   if (hasActiveDeposit) {
     return (
       <Alert className="border-emerald-300 bg-emerald-50" data-testid="deposit-active-banner">
-        <AlertDescription className="flex items-center gap-2 text-emerald-800 text-sm font-medium">
-          <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
-          {isFr
-            ? `Dépôt de sécurité de ${formattedDeposit} autorisé. Vous pouvez enchérir.`
-            : `${formattedDeposit} security deposit authorized. You may place bids.`}
+        <AlertDescription className="text-emerald-800 text-sm">
+          <div className="flex items-start gap-2">
+            <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+            <div className="space-y-1" data-testid="deposit-status-authorized">
+              <p className="font-semibold leading-snug">{depositHoldCopy.authorized.en}</p>
+              <p className="font-medium leading-snug text-emerald-900/80">{depositHoldCopy.authorized.fr}</p>
+            </div>
+          </div>
         </AlertDescription>
       </Alert>
     );
@@ -101,16 +105,13 @@ const SecurityDepositBanner = ({ listingId, startingPrice, currency = 'CAD', onD
       <AlertDescription className="space-y-3">
         <div className="flex items-start gap-2">
           <Shield className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-          <div className="text-sm text-amber-900">
-            <p className="font-semibold mb-1">
+          <div className="text-sm text-amber-900 space-y-1" data-testid="deposit-status-required">
+            <p className="font-semibold leading-snug">{depositHoldCopy.required.en}</p>
+            <p className="font-medium leading-snug text-amber-900/80">{depositHoldCopy.required.fr}</p>
+            <p className="mt-2 text-amber-900/80">
               {isFr
-                ? `Dépôt de sécurité requis — ${formattedDeposit}`
-                : `Security Deposit Required — ${formattedDeposit}`}
-            </p>
-            <p>
-              {isFr
-                ? "Un dépôt de sécurité remboursable de 1 000 $ est requis pour enchérir sur ce véhicule de haute valeur. Ce montant sera retenu temporairement sur votre carte de crédit et libéré automatiquement si vous ne remportez pas l'enchère."
-                : 'A refundable $1,000 security deposit is required to bid on this high-value auction. This hold will be released automatically if you do not win.'}
+                ? "Cette somme est temporairement réservée sur votre carte (pré-autorisation — aucun débit). Elle est libérée automatiquement à la fin de l'enchère."
+                : "This amount is temporarily reserved on your card (pre-authorization — no charge). It is released automatically when the auction ends."}
             </p>
           </div>
         </div>
@@ -123,12 +124,12 @@ const SecurityDepositBanner = ({ listingId, startingPrice, currency = 'CAD', onD
           {creating ? (
             <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{isFr ? 'Traitement...' : 'Processing...'}</>
           ) : (
-            <><Lock className="h-4 w-4 mr-2" />{isFr ? `Autoriser le dépôt de ${formattedDeposit}` : `Authorize ${formattedDeposit} Deposit`}</>
+            <><Lock className="h-4 w-4 mr-2" />{isFr ? `Autoriser la retenue de ${formattedDeposit}` : `Authorize ${formattedDeposit} Hold`}</>
           )}
         </Button>
         <p className="text-xs text-amber-700 text-center">
           {isFr
-            ? 'Votre carte sera pré-autorisée, pas débitée. Le montant est entièrement remboursable.'
+            ? 'Votre carte sera pré-autorisée, pas débitée. Entièrement remboursable.'
             : 'Your card will be pre-authorized, not charged. Fully refundable.'}
         </p>
       </AlertDescription>

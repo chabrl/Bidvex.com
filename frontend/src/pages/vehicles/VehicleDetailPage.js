@@ -235,7 +235,11 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
         );
         if (depositResp.data.message) {
           setDepositPaid(true);
-          toast.success('Deposit confirmed');
+          toast.success(
+            i18n.language === 'fr'
+              ? 'Retenue autorisée — 500 $ réservés sur votre carte'
+              : 'Hold Authorized — $500 reserved on your card'
+          );
         }
       }
       
@@ -414,10 +418,13 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
                 ) : !user ? (
                   <>{t("auction.loginToBid")}</>
                 ) : ((vehicle?.starting_price || 0) >= 10000 && !depositAuthorized) ? (
-                  <>
-                    <Shield className="h-5 w-5 mr-2" />
-                    Deposit Required to Bid
-                  </>
+                  <span className="flex flex-col items-center justify-center gap-0.5 leading-tight py-1" data-testid="bid-btn-deposit-required">
+                    <span className="flex items-center gap-2">
+                      <Shield className="h-5 w-5" />
+                      <span>Security Hold Required — $500 on your card</span>
+                    </span>
+                    <span className="text-xs font-normal opacity-80">Retenue de sécurité requise — 500 $ sur votre carte</span>
+                  </span>
                 ) : (
                   <>
                     <Gavel className="h-5 w-5 mr-2" />

@@ -10,6 +10,7 @@ import { Button } from '../ui/button';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { useTranslation } from 'react-i18next';
+import { depositHoldCopy } from '../../constants/depositHoldCopy';
 import {
   Clock, TrendingUp, Shield, Zap, Info, AlertTriangle,
   ChevronRight, History, Users, Lock, CheckCircle,
@@ -379,8 +380,12 @@ export const AuctionRulesSummary = ({ vehicle }) => {
       </div>
       
       {vehicle?.requires_deposit && (
-        <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-2 text-sm text-blue-700">
-          <strong>Deposit Required:</strong> {formatCurrency(vehicle.deposit_amount)} (refundable)
+        <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-3 text-sm text-blue-700 space-y-1" data-testid="auction-rules-deposit-required">
+          <p className="font-semibold">{depositHoldCopy.required.en}</p>
+          <p className="font-medium opacity-80">{depositHoldCopy.required.fr}</p>
+          <p className="text-xs opacity-75">
+            Amount: {formatCurrency(vehicle.deposit_amount)} — held via Stripe pre-authorization, released automatically.
+          </p>
         </div>
       )}
     </CardContent>
