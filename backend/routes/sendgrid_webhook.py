@@ -60,7 +60,8 @@ async def _verify_signature(request: Request, raw_body: bytes) -> bool:
         ew = EventWebhook()
         pub_key = ew.convert_public_key_to_ecdsa(SENDGRID_WEBHOOK_PUBLIC_KEY)
         payload = raw_body.decode("utf-8") if isinstance(raw_body, (bytes, bytearray)) else str(raw_body)
-        ok = ew.verify_signature(pub_key, payload, signature, timestamp)
+        # SDK signature: verify_signature(payload, signature, timestamp, public_key=None)
+        ok = ew.verify_signature(payload, signature, timestamp, pub_key)
         if not ok:
             logger.warning("[SG_WEBHOOK] Signature verification FAILED")
         return bool(ok)
