@@ -660,34 +660,6 @@ async def review_currency_appeal(
 
 
 
-@misc_router.post("/webhooks/sendgrid")
-async def sendgrid_webhook(request: Request):
-    """
-    SendGrid Event Webhook for email tracking.
-    
-    Tracks: delivered, opened, clicked, bounced, dropped, spam_report, unsubscribe
-    Configure in SendGrid: Settings → Mail Settings → Event Webhook
-    """
-    try:
-        body = await request.body()
-        events = json.loads(body)
-        
-        if not isinstance(events, list):
-            events = [events]
-        
-        # Process each event using the marketing service
-        marketing = get_marketing_service(db)
-        
-        for event in events:
-            await marketing.process_webhook_event(event)
-            
-        return {"status": "processed", "count": len(events)}
-        
-    except Exception as e:
-        logger.exception(f"SendGrid webhook error: {str(e)}")
-        return {"status": "error", "message": str(e)}
-
-
 @misc_router.get("/multi-item-listings/{listing_id}/increment-info")
 async def get_increment_info(listing_id: str):
     """Get increment information for an auction"""

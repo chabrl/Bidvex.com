@@ -406,6 +406,7 @@ try:
         ("routes.reviews", "reviews_router", "set_reviews_db", False),
         ("routes.monitoring", "monitoring_router", None, False),
         ("routes.push_notifications", "push_router", "set_push_db", False),
+        ("routes.sendgrid_webhook", "sendgrid_webhook_router", None, False),
     ]
 
     for module_path, router_name, db_setter_name, app_level in SELF_CONTAINED_ROUTERS:
