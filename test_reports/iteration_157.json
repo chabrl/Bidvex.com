@@ -1,0 +1,36 @@
+{
+  "summary": "Iteration 157 — Backend audit (frontend skipped per request). Verified (a) EmailMarketing campaigns list + stats + delete 404/401 paths, (b) Legal-pages bug fix (GET/PUT/POST on /api/admin/site-config/legal-pages all return 200 for admin — was 500 before the 'name db is not defined' fix), (c) all 14 admin sections return 200 for charbel911@gmail.com, and (d) regression of Phase 1/2/3 endpoints (site-mode, vehicle-deposits, users/status, users/opc-verify, listings/bulk-action, listings PUT, invoice PDF fr). 32/32 tests passed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_admin_audit_iter157.py",
+    "/app/test_reports/pytest/iter157_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "legal.py fix is correct and consistent — all 3 admin handlers (GET/PUT/POST site-config/legal-pages + seed) now acquire db via the standard dependency and role check includes both 'admin' and 'super_admin'. Verified no 'db is not defined' leaks in response body.",
+    "Reminder from iter156: vehicles_admin.py:1493 (download_settlement_pdf) still uses bare `db` instead of `_db`. Same NameError bug class as the download_invoice_pdf bug that was fixed. Not exercised by iter157 tests (no settlement PDF endpoint hit) but latent.",
+    "EmailMarketingManager delete now uses ConfirmDialog (frontend) and the DELETE endpoint correctly returns 404 for nonexistent campaigns and 401/403 without auth — both confirmed.",
+    "Insights modal is a frontend-only change; the underlying /api/admin/marketing/campaigns/{id}/stats endpoint returns a dict with the expected numeric keys where present — shape validated."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_admin_audit_iter157.py"
+  ],
+  "success_rate": {
+    "backend": "100% (32/32 passed, 0 failed, 0 skipped)",
+    "frontend": "N/A (skipped per request)"
+  },
+  "test_credentials": "charbel911@gmail.com / Anderosli123!@# — verified working (role=admin)",
+  "seed_data_creation": "None — tests use error paths (nonexistent ids, no-auth) and GET/roundtrip PUT to avoid polluting real data.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "iter157 confirms: (1) Legal-pages fix works — /api/admin/site-config/legal-pages GET/PUT and /api/admin/site-config/seed-legal-pages POST all return 200 for admin, no 500s or 'db is not defined' errors. (2) Email Marketing: /api/admin/marketing/campaigns lists; /{id}/stats returns dict; DELETE returns 404 for fake id and 401 without auth. (3) All 14 admin section GETs return 200 for charbel911: site-config, marketplace-settings, subscription-plans, subscription-analytics, coupons, trust-safety/scores, vehicle-deposits, messages/flagged, platform-cleanup/preview, email-templates, marketing/campaigns, legal-pages (+site-mode accessible). (4) Regression: bulk-action empty→422, listings PUT nonexistent→404, invoice PDF fr nonexistent→404 (not 500), deposit release/users status/opc-verify return proper 4xx (not 500). Note: /api/admin/users/{id}/opc-verify is PUT (not POST). download_settlement_pdf on vehicles_admin.py:1493 latent bare-db NameError still pending.",
+  "rca of the issue": "N/A — no bugs reproduced this iteration. The legal.py 'name db is not defined' bug is fixed and verified via the 3 targeted tests (GET/PUT/POST); no NameError leakage in any response body."
+}

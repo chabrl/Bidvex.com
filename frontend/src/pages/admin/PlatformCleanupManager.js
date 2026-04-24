@@ -34,7 +34,7 @@ const PlatformCleanupManager = () => {
       setResult(null);
       setConfirmStep(false);
     } catch (error) {
-      toast.error('Failed to load cleanup preview');
+      toast.error(error.response?.data?.detail || 'Failed to load cleanup preview');
     } finally {
       setLoading(false);
     }

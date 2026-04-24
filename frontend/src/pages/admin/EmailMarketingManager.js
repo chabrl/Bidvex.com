@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from '../../components/ui/select';
 import { toast } from 'sonner';
+import { ConfirmDialog } from '../../components/ui/confirm-dialog';
 import { useTranslation } from 'react-i18next';
 import { 
   Mail, Send, Users, Calendar, BarChart3, Plus, Edit3, 
@@ -156,6 +157,8 @@ const EmailMarketingManager = () => {
 
   const [dashboardStats, setDashboardStats] = useState(null);
   const [syncingContacts, setSyncingContacts] = useState(false);
+  const [confirm, setConfirm] = useState(null);
+  const [insightsModal, setInsightsModal] = useState({ open: false, campaign: null, stats: null, loading: false });
 
   useEffect(() => {
     fetchCampaigns();
@@ -636,18 +639,30 @@ const EmailMarketingManager = () => {
   const [cloningId, setCloningId] = useState(null);
   const [resendingId, setResendingId] = useState(null);
 
-  const deleteCampaign = async (campaignId, e) => {
-    e?.stopPropagation();
-    if (!window.confirm('Delete this campaign permanently?')) return;
-    setDeletingId(campaignId);
+  const deleteCampaign = (campaignId, name) => {
+    setConfirm({
+      title: 'Delete this campaign permanently?',
+      description: `"${name || campaignId}" will be removed from the database. Historical email_events already sent to SendGrid will remain in their records.\n\nCette action est irréversible.`,
+      variant: 'destructive',
+      confirmText: 'Delete Campaign',
+      successMessage: 'Campaign deleted',
+      onConfirm: async () => {
+        await axios.delete(`${API}/admin/marketing/campaigns/${campaignId}`, { headers });
+        if (selectedCampaign?.id === campaignId) setSelectedCampaign(null);
+        fetchCampaigns();
+      },
+    });
+  };
+
+  const showInsights = async (campaign) => {
+    setInsightsModal({ open: true, campaign, stats: null, loading: true });
     try {
-      await axios.delete(`${API}/admin/marketing/campaigns/${campaignId}`, { headers });
-      toast.success('Campaign deleted');
-      if (selectedCampaign?.id === campaignId) setSelectedCampaign(null);
-      fetchCampaigns();
+      const res = await axios.get(`${API}/admin/marketing/campaigns/${campaign.id}/stats`, { headers });
+      setInsightsModal((m) => ({ ...m, stats: res.data, loading: false }));
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to delete');
-    } finally { setDeletingId(null); }
+      toast.error(err.response?.data?.detail || 'Failed to load campaign insights');
+      setInsightsModal((m) => ({ ...m, loading: false }));
+    }
   };
 
   const cloneCampaign = async (campaignId, e) => {
@@ -1142,6 +1157,9 @@ const EmailMarketingManager = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                    <Button variant="ghost" size="sm" onClick={() => showInsights(campaign)} title="View insights" data-testid={`insights-campaign-${campaign.id}`} className="text-blue-600 hover:text-blue-800 hover:bg-blue-50">
+                      <BarChart3 className="h-4 w-4" />
+                    </Button>
                     <Button variant="ghost" size="sm" onClick={() => selectCampaign(campaign)} title="View details" data-testid={`view-campaign-${campaign.id}`}>
                       <Eye className="h-4 w-4" />
                     </Button>
@@ -1153,8 +1171,8 @@ const EmailMarketingManager = () => {
                         {resendingId === campaign.id ? <RefreshCw className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4 text-blue-600" />}
                       </Button>
                     )}
-                    <Button variant="ghost" size="sm" onClick={(e) => deleteCampaign(campaign.id, e)} disabled={deletingId === campaign.id} title="Delete campaign" className="text-red-500 hover:text-red-700 hover:bg-red-50" data-testid={`delete-campaign-${campaign.id}`}>
-                      {deletingId === campaign.id ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    <Button variant="ghost" size="sm" onClick={() => deleteCampaign(campaign.id, campaign.name)} title="Delete campaign" className="text-red-500 hover:text-red-700 hover:bg-red-50" data-testid={`delete-campaign-${campaign.id}`}>
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
@@ -1588,6 +1606,70 @@ const EmailMarketingManager = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Campaign Insights Modal */}
+      <Dialog open={insightsModal.open} onOpenChange={(v) => !v && setInsightsModal({ open: false, campaign: null, stats: null, loading: false })}>
+        <DialogContent className="max-w-2xl" data-testid="campaign-insights-modal">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-blue-600" />
+              Campaign Insights — {insightsModal.campaign?.name || ''}
+            </DialogTitle>
+          </DialogHeader>
+          {insightsModal.loading ? (
+            <div className="py-8 text-center text-muted-foreground">
+              <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-3" />
+              Loading insights…
+            </div>
+          ) : insightsModal.stats ? (
+            <div className="space-y-4 py-2">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {(() => {
+                  const s = insightsModal.stats?.stats || insightsModal.stats || {};
+                  const sent = s.sent || s.total_sent || insightsModal.campaign?.sent_count || 0;
+                  const delivered = s.delivered || 0;
+                  const opened = s.opened || s.unique_opens || 0;
+                  const clicked = s.clicked || s.unique_clicks || 0;
+                  const bounced = s.bounced || s.bounces || 0;
+                  const unsubscribed = s.unsubscribed || s.unsubs || 0;
+                  const openRate = sent > 0 ? ((opened / sent) * 100).toFixed(1) : '0.0';
+                  const clickRate = sent > 0 ? ((clicked / sent) * 100).toFixed(1) : '0.0';
+                  const deliveryRate = sent > 0 ? ((delivered / sent) * 100).toFixed(1) : '0.0';
+                  const cards = [
+                    { label: 'Total Sent / Envoyés', value: sent, color: 'text-slate-900' },
+                    { label: 'Delivered', value: `${delivered} (${deliveryRate}%)`, color: 'text-green-600' },
+                    { label: 'Opened', value: `${opened} (${openRate}%)`, color: 'text-blue-600' },
+                    { label: 'Clicked', value: `${clicked} (${clickRate}%)`, color: 'text-purple-600' },
+                    { label: 'Bounced', value: bounced, color: 'text-amber-600' },
+                    { label: 'Unsubscribed', value: unsubscribed, color: 'text-red-600' },
+                    { label: 'Status', value: insightsModal.campaign?.status || '—', color: 'text-slate-600' },
+                    { label: 'Sent At', value: insightsModal.campaign?.sent_at ? new Date(insightsModal.campaign.sent_at).toLocaleString() : '—', color: 'text-slate-600' },
+                  ];
+                  return cards.map((c, i) => (
+                    <div key={i} className="border rounded-md p-3 bg-background">
+                      <p className="text-xs text-muted-foreground">{c.label}</p>
+                      <p className={`text-lg font-semibold ${c.color}`} data-testid={`insight-${c.label.replace(/[^a-z0-9]/gi,'-').toLowerCase()}`}>{c.value}</p>
+                    </div>
+                  ));
+                })()}
+              </div>
+              <p className="text-xs text-muted-foreground border-t pt-3">
+                Stats are pulled from our local DB and combined with SendGrid event webhook data (/api/webhooks/sendgrid).<br />
+                <span className="italic">Les statistiques proviennent de notre base de données et des événements SendGrid.</span>
+              </p>
+            </div>
+          ) : (
+            <div className="py-8 text-center text-muted-foreground">
+              Could not load stats. Please retry.
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setInsightsModal({ open: false, campaign: null, stats: null, loading: false })}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog state={confirm} onClose={() => setConfirm(null)} />
     </div>
   );
 };

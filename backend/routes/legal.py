@@ -82,9 +82,10 @@ async def get_legal_pages_admin(
     """Get legal pages for editing (Admin only)"""
     try:
         # Check admin role
-        if current_user.role != "admin":
+        if current_user.role not in ("admin", "super_admin"):
             raise HTTPException(status_code=403, detail="Admin access required")
         
+        db = get_db()
         # Get site config
         config = await db.site_config.find_one({"type": "legal_pages"})
         
@@ -137,9 +138,10 @@ async def update_legal_pages(
     """Update legal pages content (Admin only)"""
     try:
         # Check admin role
-        if current_user.role != "admin":
+        if current_user.role not in ("admin", "super_admin"):
             raise HTTPException(status_code=403, detail="Admin access required")
         
+        db = get_db()
         # Get existing config for audit log
         existing_config = await db.site_config.find_one({"type": "legal_pages"})
         
@@ -190,9 +192,10 @@ async def seed_legal_pages(
     """Seed legal pages with default content from existing pages (Admin only)"""
     try:
         # Check admin role
-        if current_user.role != "admin":
+        if current_user.role not in ("admin", "super_admin"):
             raise HTTPException(status_code=403, detail="Admin access required")
         
+        db = get_db()
         # Check if already seeded
         existing = await db.site_config.find_one({"type": "legal_pages"})
         if existing and existing.get("pages"):
