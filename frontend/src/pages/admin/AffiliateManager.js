@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
+import { ConfirmDialog } from '../../components/ui/confirm-dialog';
 import { DollarSign, CheckCircle, Users } from 'lucide-react';
 import { formatCurrency } from '../../utils/currencyFormatter';
 import { useTranslation } from 'react-i18next';
@@ -20,6 +21,7 @@ const AffiliateManager = () => {
   const [payouts, setPayouts] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [confirm, setConfirm] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -55,16 +57,17 @@ const AffiliateManager = () => {
     }
   };
 
-  const handleApprovePayout = async (payoutId) => {
-    if (window.confirm('Approve this payout request?')) {
-      try {
+  const handleApprovePayout = (payoutId, amount) => {
+    setConfirm({
+      title: 'Approve this affiliate payout?',
+      description: `Amount: $${(amount ?? 0).toFixed(2)}.\nThis will trigger the Stripe transfer.\nApprouver ce paiement d'affilié ?`,
+      confirmText: 'Approve Payout',
+      successMessage: 'Payout approved',
+      onConfirm: async () => {
         await axios.put(`${API}/admin/affiliate/payouts/${payoutId}/approve`, {}, { headers });
-        toast.success('Payout approved');
         fetchData();
-      } catch (error) {
-        toast.error('Failed to approve payout');
-      }
-    }
+      },
+    });
   };
 
   if (loading) {
@@ -101,7 +104,7 @@ const AffiliateManager = () => {
                   <div className="flex gap-2">
                     <Badge className={payout.status === 'approved' ? 'bg-green-600 text-white' : 'bg-yellow-600 text-white'}>{payout.status}</Badge>
                     {payout.status === 'pending' && (
-                      <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => handleApprovePayout(payout.id)}><CheckCircle className="h-4 w-4 mr-1" />Approve</Button>
+                      <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => handleApprovePayout(payout.id, payout.amount)} data-testid={`approve-payout-${payout.id}`}><CheckCircle className="h-4 w-4 mr-1" />Approve</Button>
                     )}
                   </div>
                 </div>
@@ -134,6 +137,7 @@ const AffiliateManager = () => {
           </div>
         </CardContent>
       </Card>
+      <ConfirmDialog state={confirm} onClose={() => setConfirm(null)} />
     </div>
   );
 };

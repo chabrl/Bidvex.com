@@ -514,7 +514,7 @@ async def create_auction_won_conversation(
 @messages_router.get("/admin/messages/flagged")
 async def admin_get_flagged_messages(current_user: User = Depends(get_current_user)):
     """Admin: Get all flagged messages."""
-    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     messages = await db.messages.find({"flagged": True}, {"_id": 0}).sort("created_at", -1).to_list(100)
@@ -524,7 +524,7 @@ async def admin_get_flagged_messages(current_user: User = Depends(get_current_us
 @messages_router.delete("/admin/messages/{message_id}")
 async def admin_delete_message(message_id: str, current_user: User = Depends(get_current_user)):
     """Admin: Delete a specific message."""
-    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     await db.messages.delete_one({"id": message_id})
@@ -534,7 +534,7 @@ async def admin_delete_message(message_id: str, current_user: User = Depends(get
 @messages_router.put("/admin/users/{user_id}/messaging")
 async def admin_suspend_messaging(user_id: str, data: Dict[str, bool], current_user: User = Depends(get_current_user)):
     """Admin: Suspend or restore messaging for a user."""
-    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     messaging_suspended = data.get("suspended", False)

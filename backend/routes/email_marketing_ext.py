@@ -1181,7 +1181,7 @@ async def get_user_email_templates_route(current_user: User = Depends(get_curren
 @email_marketing_ext_router.get("/admin/marketing/dashboard-stats")
 async def get_marketing_dashboard_stats(current_user: User = Depends(get_current_user)):
     """Get aggregate marketing stats for the admin dashboard."""
-    if current_user.role not in ["admin", "superadmin"]:
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     db = get_db()
     service = get_marketing_service(db)
@@ -1198,7 +1198,7 @@ async def get_marketing_dashboard_stats(current_user: User = Depends(get_current
 @email_marketing_ext_router.post("/admin/marketing/sync-contacts")
 async def sync_contacts(current_user: User = Depends(get_current_user)):
     """Sync all registered users into the marketing contacts pool."""
-    if current_user.role not in ["admin", "superadmin"]:
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     db = get_db()
     service = get_marketing_service(db)

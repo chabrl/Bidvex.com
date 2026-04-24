@@ -80,7 +80,7 @@ async def calculate_trust_score(user_id: str) -> int:
 @trust_safety_router.get("/admin/trust-safety/scores")
 async def get_trust_scores(current_user: User = Depends(get_current_user)):
     db = get_db()
-    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     users = await db.users.find({}, {"_id": 0, "password": 0}).to_list(100)
@@ -103,7 +103,7 @@ async def get_trust_scores(current_user: User = Depends(get_current_user)):
 @trust_safety_router.get("/admin/trust-safety/fraud-flags")
 async def get_fraud_flags(current_user: User = Depends(get_current_user)):
     db = get_db()
-    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     flags = []
@@ -171,7 +171,7 @@ async def get_fraud_flags(current_user: User = Depends(get_current_user)):
 @trust_safety_router.get("/admin/trust-safety/collusion-patterns")
 async def detect_collusion(current_user: User = Depends(get_current_user)):
     db = get_db()
-    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     patterns = []
@@ -213,7 +213,7 @@ async def detect_collusion(current_user: User = Depends(get_current_user)):
 @trust_safety_router.post("/admin/trust-safety/verify-requirement")
 async def enforce_verification_requirement(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
     db = get_db()
-    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     requirement_type = data.get("type")  # "email" or "phone"
@@ -550,7 +550,7 @@ async def risk_monitoring_clear_flag(
 
 @trust_safety_router.post("/admin/trust-safety/analyze-content")
 async def analyze_content_ai(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
-    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     content = data.get("content")
@@ -601,7 +601,7 @@ Respond in JSON format."""
 @trust_safety_router.post("/admin/trust-safety/scan-listing")
 async def scan_listing_ai(listing_id: str, current_user: User = Depends(get_current_user)):
     db = get_db()
-    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
@@ -663,7 +663,7 @@ Provide risk assessment in JSON format with risk_level, issues, and recommendati
 @trust_safety_router.post("/admin/trust-safety/scan-messages")
 async def scan_messages_ai(conversation_id: str, current_user: User = Depends(get_current_user)):
     db = get_db()
-    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     messages = await db.messages.find({"conversation_id": conversation_id}, {"_id": 0}).to_list(100)
@@ -700,7 +700,7 @@ async def scan_messages_ai(conversation_id: str, current_user: User = Depends(ge
 @trust_safety_router.get("/admin/trust-safety/behavioral-analysis")
 async def behavioral_analysis(user_id: str, current_user: User = Depends(get_current_user)):
     db = get_db()
-    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     user = await db.users.find_one({"id": user_id})
@@ -760,7 +760,7 @@ async def behavioral_analysis(user_id: str, current_user: User = Depends(get_cur
 @trust_safety_router.post("/admin/trust-safety/auto-action")
 async def execute_auto_action(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
     db = get_db()
-    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     user_id = data.get("user_id")

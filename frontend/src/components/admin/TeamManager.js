@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { toast } from 'sonner';
+import { ConfirmDialog } from '../../components/ui/confirm-dialog';
 import {
   Users, UserPlus, Shield, Mail, Trash2, Loader2, Copy, Clock, CheckCircle, XCircle, ChevronDown
 } from 'lucide-react';
@@ -31,6 +32,7 @@ const TeamManager = () => {
   const [inviteRole, setInviteRole] = useState('support');
   const [sending, setSending] = useState(false);
   const [lastInviteLink, setLastInviteLink] = useState('');
+  const [confirm, setConfirm] = useState(null);
 
   const headers = { Authorization: `Bearer ${token}` };
 
@@ -89,15 +91,18 @@ const TeamManager = () => {
     }
   };
 
-  const handleRemoveMember = async (userId, name) => {
-    if (!window.confirm(`Remove ${name} from the team? They will lose all admin access.`)) return;
-    try {
-      await axios.delete(`${API}/team/members/${userId}`, { headers });
-      toast.success('Member removed');
-      fetchData();
-    } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to remove member');
-    }
+  const handleRemoveMember = (userId, name) => {
+    setConfirm({
+      title: `Remove ${name} from the team?`,
+      description: `They will lose all admin access to BidVex.\nIls perdront tout accès administrateur à BidVex.`,
+      variant: 'destructive',
+      confirmText: 'Remove Member',
+      successMessage: 'Member removed',
+      onConfirm: async () => {
+        await axios.delete(`${API}/team/members/${userId}`, { headers });
+        fetchData();
+      },
+    });
   };
 
   const copyLink = (link) => {
@@ -279,6 +284,7 @@ const TeamManager = () => {
           </CardContent>
         </Card>
       )}
+      <ConfirmDialog state={confirm} onClose={() => setConfirm(null)} />
     </div>
   );
 };

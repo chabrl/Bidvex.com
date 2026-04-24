@@ -93,7 +93,7 @@ async def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(
         user = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
-        if user.get("role") != "admin" and user.get("role") != "superadmin":
+        if user.get("role") != "admin" and user.get("role") != "super_admin":
             raise HTTPException(status_code=403, detail="Admin access required")
         return user
     except JWTError:

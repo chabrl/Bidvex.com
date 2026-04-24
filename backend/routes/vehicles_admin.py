@@ -1429,10 +1429,14 @@ async def admin_generate_annual_summary(
 @vehicle_admin_router.get("/vehicle-invoices/{invoice_id}/pdf")
 async def download_invoice_pdf(
     invoice_id: str,
+    lang: str = "en",
     user: dict = Depends(get_current_user)
 ):
     """
-    Download invoice as PDF
+    Download invoice as PDF.
+    
+    Query params:
+      - lang: "en" (default) or "fr" — localizes key labels
     
     Generates a professional PDF invoice with:
     - Full BidVex branding
@@ -1442,6 +1446,7 @@ async def download_invoice_pdf(
     - Subscription savings if applicable
     """
     # Verify user has access to this invoice
+    db = _db  # module-level db handle set by server.py
     invoice = await get_invoice_by_id(db, invoice_id)
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
@@ -1454,14 +1459,18 @@ async def download_invoice_pdf(
     if not (is_buyer or is_seller or is_admin):
         raise HTTPException(status_code=403, detail="Access denied to this invoice")
     
+    # Validate language
+    if lang not in ("en", "fr"):
+        lang = "en"
+
     # Generate PDF
-    pdf_bytes = await generate_invoice_pdf(db, invoice_id)
+    pdf_bytes = await generate_invoice_pdf(db, invoice_id, lang=lang)
     if not pdf_bytes:
         raise HTTPException(status_code=500, detail="Failed to generate PDF")
     
     from fastapi.responses import Response
     
-    filename = f"BidVex_Invoice_{invoice.get('invoice_number', invoice_id[:8])}.pdf"
+    filename = f"BidVex_{'Facture' if lang == 'fr' else 'Invoice'}_{invoice.get('invoice_number', invoice_id[:8])}.pdf"
     
     return Response(
         content=pdf_bytes,

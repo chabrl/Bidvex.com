@@ -141,7 +141,7 @@ async def request_withdrawal(data: Dict[str, Any], current_user: User = Depends(
 async def get_pending_tax_verifications(current_user: User = Depends(get_current_user)):
     """Admin: Get all users with pending tax verification"""
     db = get_db()
-    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     users = await db.users.find({
@@ -164,7 +164,7 @@ async def get_pending_tax_verifications(current_user: User = Depends(get_current
 async def get_user_tax_details(user_id: str, current_user: User = Depends(get_current_user)):
     """Admin: Get full tax details for a specific user (compliance officer only)"""
     db = get_db()
-    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     user = await db.users.find_one({"id": user_id}, {"_id": 0})
@@ -192,7 +192,7 @@ async def approve_tax_verification(
 ):
     """Admin: Approve user's tax information"""
     db = get_db()
-    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     user = await db.users.find_one({"id": user_id})
@@ -241,7 +241,7 @@ async def reject_tax_verification(
 ):
     """Admin: Reject user's tax information"""
     db = get_db()
-    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     if not rejection_data.get("reason"):
@@ -293,7 +293,7 @@ async def reset_tax_status(
 ):
     """Admin: Reset tax verification status to allow resubmission"""
     db = get_db()
-    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     # Audit log
@@ -369,7 +369,7 @@ async def calculate_fees_endpoint(
 @misc_router.get("/admin/affiliate/payouts")
 async def admin_get_payout_requests(current_user: User = Depends(get_current_user)):
     db = get_db()
-    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     payouts = await db.payout_requests.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
@@ -380,7 +380,7 @@ async def admin_get_payout_requests(current_user: User = Depends(get_current_use
 @misc_router.put("/admin/affiliate/payouts/{payout_id}/approve")
 async def admin_approve_payout(payout_id: str, current_user: User = Depends(get_current_user)):
     db = get_db()
-    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     await db.payout_requests.update_one({"id": payout_id}, {"$set": {"status": "approved"}})
@@ -617,7 +617,7 @@ async def review_currency_appeal(
         Success message
     """
     db = get_db()
-    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     if status not in ["approved", "rejected"]:

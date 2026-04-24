@@ -59,7 +59,7 @@ async def admin_charge_penalty(
     current_user: User = Depends(get_current_user),
 ):
     """Admin-only: charge $50 cancellation penalty to a seller."""
-    if current_user.role not in ["admin", "superadmin"]:
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     db = get_db()
     seller_id = data.get("seller_id", "").strip()
@@ -74,7 +74,7 @@ async def admin_charge_penalty(
 @escrow_router.get("/admin/escrow/transactions")
 async def admin_list_escrows(current_user: User = Depends(get_current_user)):
     """Admin: list all escrow transactions."""
-    if current_user.role not in ["admin", "superadmin"]:
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     db = get_db()
     escrows = await db.escrow_transactions.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
@@ -84,7 +84,7 @@ async def admin_list_escrows(current_user: User = Depends(get_current_user)):
 @escrow_router.get("/admin/escrow/penalties")
 async def admin_list_penalties(current_user: User = Depends(get_current_user)):
     """Admin: list all penalty charges."""
-    if current_user.role not in ["admin", "superadmin"]:
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     db = get_db()
     penalties = await db.penalty_log.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
@@ -94,7 +94,7 @@ async def admin_list_penalties(current_user: User = Depends(get_current_user)):
 @escrow_router.get("/admin/escrow/disputes")
 async def admin_list_disputes(current_user: User = Depends(get_current_user)):
     """Admin: list all escrow disputes."""
-    if current_user.role not in ["admin", "superadmin"]:
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     db = get_db()
     disputes = await db.escrow_disputes.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)

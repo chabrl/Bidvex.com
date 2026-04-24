@@ -7,8 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
+import { Checkbox } from '../../components/ui/checkbox';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '../../components/ui/dialog';
+import { ConfirmDialog } from '../../components/ui/confirm-dialog';
+import { AsyncButton } from '../../components/ui/async-button';
 import { toast } from 'sonner';
-import { Package, Search, Edit2, Trash2, Pause, Archive, XCircle, Eye, AlertTriangle, Download, Star } from 'lucide-react';
+import { Package, Search, Edit2, Trash2, Pause, Archive, XCircle, Eye, AlertTriangle, Download, Star, Play } from 'lucide-react';
 import { formatCurrency } from '../../utils/currencyFormatter';
 
 const API = API_BASE;
@@ -20,10 +24,13 @@ const ManageAllAuctions = () => {
   const [singleListings, setSingleListings] = useState([]);
   const [multiListings, setMultiListings] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all'); // 'all', 'single', 'multi'
-  const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active', 'draft', 'ended'
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [deleteModal, setDeleteModal] = useState({ open: false, listing: null });
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkConfirm, setBulkConfirm] = useState(null);
+  const [editModal, setEditModal] = useState({ open: false, listing: null, form: {} });
 
   useEffect(() => {
     fetchAllListings();
@@ -76,6 +83,81 @@ const ManageAllAuctions = () => {
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to toggle feature');
     }
+  };
+
+  // ── Bulk selection ──
+  const toggleSelect = (id) =>
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  const selectAllVisible = (ids) => setSelectedIds(prev => {
+    const allSelected = ids.every(id => prev.has(id));
+    if (allSelected) return new Set();
+    const next = new Set(prev);
+    ids.forEach(id => next.add(id));
+    return next;
+  });
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const runBulkAction = async (action) => {
+    if (selectedIds.size === 0) throw new Error('Nothing selected');
+    const ids = [...selectedIds];
+    const res = await axios.post(`${API}/admin/listings/bulk-action`,
+      { action, listing_ids: ids }, { headers });
+    const { succeeded_count, failed_count } = res.data;
+    if (failed_count > 0) {
+      toast.warning(`${succeeded_count} succeeded, ${failed_count} failed`);
+    } else {
+      toast.success(`${action} applied to ${succeeded_count} listing(s)`);
+    }
+    clearSelection();
+    fetchAllListings();
+  };
+
+  // ── Edit listing ──
+  const openEditModal = (listing) => {
+    setEditModal({
+      open: true,
+      listing,
+      form: {
+        title: listing.title || '',
+        description: listing.description || '',
+        category: listing.category || '',
+        starting_price: listing.starting_price || listing.current_price || 0,
+        reserve_price: listing.reserve_price || '',
+        buy_now_price: listing.buy_now_price || '',
+        city: listing.city || '',
+        region: listing.region || '',
+      },
+    });
+  };
+
+  const saveEdit = async () => {
+    const { listing, form } = editModal;
+    if (!form.title?.trim()) {
+      toast.error('Title is required / Le titre est requis');
+      throw new Error('validation');
+    }
+    const body = {
+      title: form.title,
+      description: form.description,
+      category: form.category,
+      starting_price: Number(form.starting_price) || 0,
+      reserve_price: form.reserve_price === '' ? null : Number(form.reserve_price),
+      buy_now_price: form.buy_now_price === '' ? null : Number(form.buy_now_price),
+      city: form.city,
+      region: form.region,
+    };
+    const endpoint = listing.type === 'multi'
+      ? `multi-item-listings/${listing.id}`
+      : `listings/${listing.id}`;
+    await axios.put(`${API}/admin/${endpoint}`, body, { headers });
+    setEditModal({ open: false, listing: null, form: {} });
+    fetchAllListings();
   };
 
   const handleStatusChange = async (id, newStatus, isMultiItem) => {
@@ -266,10 +348,69 @@ const ManageAllAuctions = () => {
         />
       </div>
 
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <Card className="border-primary bg-primary/5" data-testid="bulk-action-bar">
+          <CardContent className="p-3 flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3">
+              <Badge className="bg-primary text-white">{selectedIds.size} selected</Badge>
+              <Button variant="ghost" size="sm" onClick={clearSelection} data-testid="bulk-clear-btn">
+                Clear
+              </Button>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <AsyncButton size="sm" variant="outline" data-testid="bulk-feature-btn"
+                onAction={() => runBulkAction('feature')}>
+                <Star className="h-3.5 w-3.5 mr-1" />Feature
+              </AsyncButton>
+              <AsyncButton size="sm" variant="outline" data-testid="bulk-unfeature-btn"
+                onAction={() => runBulkAction('unfeature')}>
+                Unfeature
+              </AsyncButton>
+              <AsyncButton size="sm" variant="outline" data-testid="bulk-pause-btn"
+                onAction={() => runBulkAction('pause')}>
+                <Pause className="h-3.5 w-3.5 mr-1" />Pause
+              </AsyncButton>
+              <AsyncButton size="sm" variant="outline" data-testid="bulk-resume-btn"
+                onAction={() => runBulkAction('resume')}>
+                <Play className="h-3.5 w-3.5 mr-1" />Resume
+              </AsyncButton>
+              <AsyncButton size="sm" variant="outline" data-testid="bulk-archive-btn"
+                onAction={() => runBulkAction('archive')}>
+                <Archive className="h-3.5 w-3.5 mr-1" />Archive
+              </AsyncButton>
+              <Button size="sm" variant="destructive" data-testid="bulk-delete-btn"
+                onClick={() => setBulkConfirm({
+                  title: `Delete ${selectedIds.size} listing(s) permanently?`,
+                  description: `This cannot be undone. ${selectedIds.size} auction(s) will be removed from the database.\n\nCette action est irréversible.`,
+                  variant: 'destructive',
+                  confirmText: `Delete ${selectedIds.size}`,
+                  successMessage: `${selectedIds.size} listing(s) deleted`,
+                  onConfirm: () => runBulkAction('delete'),
+                })}>
+                <Trash2 className="h-3.5 w-3.5 mr-1" />Delete
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Listings Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Auctions ({filteredListings.length})</CardTitle>
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle>Auctions ({filteredListings.length})</CardTitle>
+            {filteredListings.length > 0 && (
+              <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+                <Checkbox
+                  checked={filteredListings.every(l => selectedIds.has(l.id)) && filteredListings.length > 0}
+                  onCheckedChange={() => selectAllVisible(filteredListings.map(l => l.id))}
+                  data-testid="select-all-checkbox"
+                />
+                Select all visible
+              </label>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {filteredListings.length > 0 ? (
@@ -277,11 +418,18 @@ const ManageAllAuctions = () => {
               {filteredListings.map((listing) => (
                 <div
                   key={listing.id}
-                  className="flex flex-col md:flex-row justify-between gap-4 p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                  className={`flex flex-col md:flex-row justify-between gap-4 p-4 border rounded-lg hover:bg-accent/50 transition-colors ${selectedIds.has(listing.id) ? 'ring-1 ring-primary bg-primary/5' : ''}`}
                 >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="font-semibold text-slate-900 dark:text-slate-100">{listing.title}</h3>
+                  <div className="flex items-start gap-3 flex-1">
+                    <Checkbox
+                      className="mt-1.5"
+                      checked={selectedIds.has(listing.id)}
+                      onCheckedChange={() => toggleSelect(listing.id)}
+                      data-testid={`select-listing-${listing.id}`}
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <h3 className="font-semibold text-slate-900 dark:text-slate-100">{listing.title}</h3>
                       <Badge variant={listing.type === 'multi' ? 'default' : 'secondary'}>
                         {listing.type === 'multi' ? `Multi (${listing.lots?.length || 0} lots)` : 'Single'}
                       </Badge>
@@ -316,6 +464,17 @@ const ManageAllAuctions = () => {
                     >
                       <Eye className="h-4 w-4 mr-1" />
                       View
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openEditModal(listing)}
+                      disabled={listing.type === 'multi'}
+                      data-testid={`edit-btn-${listing.id}`}
+                      title={listing.type === 'multi' ? 'Edit not available for multi-item listings' : ''}
+                    >
+                      <Edit2 className="h-4 w-4 mr-1" />
+                      Edit
                     </Button>
                     <Button
                       size="sm"
@@ -354,6 +513,7 @@ const ManageAllAuctions = () => {
                       <Trash2 className="h-4 w-4 mr-1" />
                       Delete
                     </Button>
+                  </div>
                   </div>
                 </div>
               ))}
@@ -427,6 +587,65 @@ const ManageAllAuctions = () => {
           </Card>
         </div>
       )}
+
+      {/* Edit Listing Modal */}
+      <Dialog open={editModal.open} onOpenChange={(v) => !v && setEditModal({ open: false, listing: null, form: {} })}>
+        <DialogContent className="max-w-2xl" data-testid="edit-listing-modal">
+          <DialogHeader>
+            <DialogTitle>Edit Listing</DialogTitle>
+            <DialogDescription>
+              {editModal.listing?.title || ''}
+              <span className="block text-[11px] text-muted-foreground mt-1">
+                Modifier l'annonce — les modifications sont journalisées dans Admin Logs.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 py-2">
+            <div className="md:col-span-2 space-y-1">
+              <label className="text-xs text-muted-foreground">Title *</label>
+              <Input value={editModal.form.title || ''} onChange={(e) => setEditModal(m => ({ ...m, form: { ...m.form, title: e.target.value } }))} data-testid="edit-title-input" />
+            </div>
+            <div className="md:col-span-2 space-y-1">
+              <label className="text-xs text-muted-foreground">Description</label>
+              <textarea className="w-full h-24 px-3 py-2 text-sm border rounded-md bg-background"
+                value={editModal.form.description || ''}
+                onChange={(e) => setEditModal(m => ({ ...m, form: { ...m.form, description: e.target.value } }))}
+                data-testid="edit-description-input" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Category</label>
+              <Input value={editModal.form.category || ''} onChange={(e) => setEditModal(m => ({ ...m, form: { ...m.form, category: e.target.value } }))} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Starting Price (CAD)</label>
+              <Input type="number" step="0.01" value={editModal.form.starting_price || 0} onChange={(e) => setEditModal(m => ({ ...m, form: { ...m.form, starting_price: e.target.value } }))} data-testid="edit-starting-price" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Reserve Price (optional)</label>
+              <Input type="number" step="0.01" value={editModal.form.reserve_price ?? ''} onChange={(e) => setEditModal(m => ({ ...m, form: { ...m.form, reserve_price: e.target.value } }))} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Buy Now (optional)</label>
+              <Input type="number" step="0.01" value={editModal.form.buy_now_price ?? ''} onChange={(e) => setEditModal(m => ({ ...m, form: { ...m.form, buy_now_price: e.target.value } }))} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">City</label>
+              <Input value={editModal.form.city || ''} onChange={(e) => setEditModal(m => ({ ...m, form: { ...m.form, city: e.target.value } }))} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Region / Province</label>
+              <Input value={editModal.form.region || ''} onChange={(e) => setEditModal(m => ({ ...m, form: { ...m.form, region: e.target.value } }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditModal({ open: false, listing: null, form: {} })}>Cancel</Button>
+            <AsyncButton onAction={saveEdit} successMessage="Listing updated"
+              data-testid="edit-save-btn">Save Changes</AsyncButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog state={bulkConfirm} onClose={() => setBulkConfirm(null)} />
     </div>
   );
 };

@@ -72,7 +72,7 @@ async def require_admin(credentials: HTTPAuthorizationCredentials):
         current_user = User(**user_doc)
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
-    if current_user.role not in ["admin", "superadmin"]:
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
 

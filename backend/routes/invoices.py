@@ -1054,7 +1054,7 @@ async def generate_transaction_invoice(
         raise HTTPException(status_code=404, detail="Transaction not found")
 
     # Auth: admin, buyer, or seller
-    is_admin = current_user.role in ("admin", "superadmin")
+    is_admin = current_user.role in ("admin", "super_admin")
     is_buyer = txn.get("buyer_id") == current_user.id
     is_seller = txn.get("seller_id") == current_user.id
     if not (is_admin or is_buyer or is_seller):

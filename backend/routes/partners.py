@@ -259,7 +259,7 @@ async def serve_partner_document(filename: str, current_user: User = Depends(get
     # Only allow the owner or admin to access
     user_doc = await db.users.find_one({"id": current_user.id})
     is_owner = filename.startswith(f"neq_{current_user.id}") or filename.startswith(f"cert_{current_user.id}")
-    if not is_owner and user_doc.get("role") not in ["admin", "superadmin"]:
+    if not is_owner and user_doc.get("role") not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Access denied")
     return FileResponse(str(file_path))
 
@@ -270,7 +270,7 @@ async def serve_partner_document(filename: str, current_user: User = Depends(get
 async def get_partner_payment_status(current_user: User = Depends(get_current_user)):
     """Get current partner's payment status and checkout URL if needed."""
     db = get_db()
-    if not current_user.is_partner and current_user.role not in ["admin", "superadmin"]:
+    if not current_user.is_partner and current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=400, detail="Not a partner account")
     
     user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
@@ -291,7 +291,7 @@ async def get_partner_payment_status(current_user: User = Depends(get_current_us
 async def create_partner_checkout(current_user: User = Depends(get_current_user)):
     """Create a new Stripe Checkout Session for partner fee payment."""
     db = get_db()
-    if not current_user.is_partner and current_user.role not in ["admin", "superadmin"]:
+    if not current_user.is_partner and current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=400, detail="Not a partner account")
     if current_user.platform_fee_paid:
         raise HTTPException(status_code=400, detail="Annual fee already paid")
@@ -340,7 +340,7 @@ async def create_partner_billing_portal(current_user: User = Depends(get_current
     """Create a Stripe Customer Portal session for partner billing management.
     Partners can download invoices (with GST/QST), update payment methods, and manage subscriptions."""
     db = get_db()
-    if not current_user.is_partner and current_user.role not in ["admin", "superadmin"]:
+    if not current_user.is_partner and current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=400, detail="Not a partner account")
     
     user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
@@ -371,7 +371,7 @@ async def create_partner_billing_portal(current_user: User = Depends(get_current
 async def get_partner_dashboard(current_user: User = Depends(get_current_user)):
     """Get aggregated dashboard data for partner accounts. Admins can also access."""
     db = get_db()
-    if not current_user.is_partner and current_user.role not in ["admin", "superadmin"]:
+    if not current_user.is_partner and current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=400, detail="Not a partner account")
     
     user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0, "password": 0})
@@ -474,7 +474,7 @@ async def get_partner_stats_endpoint(current_user: User = Depends(get_current_us
     Includes: active listings, total bids received, and projected revenue.
     """
     db = get_db()
-    is_admin = current_user.role in ("admin", "superadmin")
+    is_admin = current_user.role in ("admin", "super_admin")
 
     if not is_admin:
         user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})

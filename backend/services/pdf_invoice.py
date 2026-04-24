@@ -49,12 +49,36 @@ def _format_date(dt) -> str:
     return dt.strftime("%B %d, %Y")
 
 
-async def generate_invoice_pdf(db, invoice_id: str) -> Optional[bytes]:
+async def generate_invoice_pdf(db, invoice_id: str, lang: str = "en") -> Optional[bytes]:
     """
     Generate a professional PDF invoice
     
     Returns PDF as bytes for download/email
+
+    Args:
+        lang: "en" (default) or "fr" — localizes key labels for Quebec-FR buyers.
     """
+    # Localization dictionary (compact — only the labels rendered on the invoice)
+    LABELS = {
+        "en": {
+            "invoice": "INVOICE",
+            "bill_to": "BILL TO",
+            "vehicle": "VEHICLE",
+            "invoice_details": "INVOICE DETAILS",
+            "seller_settlement": "SELLER SETTLEMENT STATEMENT",
+            "footer_contact": "Questions? Contact support@bidvex.com",
+        },
+        "fr": {
+            "invoice": "FACTURE",
+            "bill_to": "FACTURER À",
+            "vehicle": "VÉHICULE",
+            "invoice_details": "DÉTAILS DE LA FACTURE",
+            "seller_settlement": "RELEVÉ DE RÈGLEMENT DU VENDEUR",
+            "footer_contact": "Des questions ? Contactez support@bidvex.com",
+        },
+    }
+    L = LABELS.get(lang, LABELS["en"])
+    
     # Fetch invoice
     invoice = await db.vehicle_invoices.find_one({"id": invoice_id})
     if not invoice:
@@ -114,7 +138,7 @@ async def generate_invoice_pdf(db, invoice_id: str) -> Optional[bytes]:
     header_data = [
         [
             Paragraph(f"<b>{PLATFORM_NAME}</b>", styles['DetailText']),
-            Paragraph("<b>INVOICE</b>", styles['InvoiceTitle'])
+            Paragraph(f"<b>{L['invoice']}</b>", styles['InvoiceTitle'])
         ],
         [
             Paragraph(f"{PLATFORM_ADDRESS}<br/>{PLATFORM_PHONE}<br/>{PLATFORM_EMAIL}", styles['SmallText']),
@@ -164,7 +188,7 @@ async def generate_invoice_pdf(db, invoice_id: str) -> Optional[bytes]:
     """
     
     address_data = [
-        [Paragraph("<b>BILL TO</b>", styles['SectionTitle']), Paragraph("<b>VEHICLE</b>", styles['SectionTitle'])],
+        [Paragraph(f"<b>{L['bill_to']}</b>", styles['SectionTitle']), Paragraph(f"<b>{L['vehicle']}</b>", styles['SectionTitle'])],
         [Paragraph(bill_to, styles['DetailText']), Paragraph(vehicle_info, styles['DetailText'])]
     ]
     address_table = Table(address_data, colWidths=[3.5*inch, 3.5*inch])
@@ -181,7 +205,7 @@ async def generate_invoice_pdf(db, invoice_id: str) -> Optional[bytes]:
     elements.append(Spacer(1, 0.3*inch))
     
     # ===== LINE ITEMS =====
-    elements.append(Paragraph("<b>INVOICE DETAILS</b>", styles['SectionTitle']))
+    elements.append(Paragraph(f"<b>{L['invoice_details']}</b>", styles['SectionTitle']))
     
     # Table header
     line_items_data = [

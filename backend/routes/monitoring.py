@@ -16,7 +16,7 @@ monitoring_router = APIRouter(prefix="/monitoring", tags=["Monitoring"])
 
 
 def _admin_guard(user: User):
-    if user.role not in ("admin", "superadmin"):
+    if user.role not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
 
 

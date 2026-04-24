@@ -770,7 +770,7 @@ async def get_subscription_analytics(current_user: User = Depends(get_current_us
     Get comprehensive subscription analytics for admin dashboard.
     Includes revenue metrics, subscriber counts, plan distribution, coupon usage.
     """
-    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     try:

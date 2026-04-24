@@ -1522,7 +1522,10 @@ const VehicleInvoicesTab = ({ token }) => {
                           <Mail className="h-3.5 w-3.5 mr-1" /> Remind
                         </Button>
                         <Button size="sm" variant="outline"
-                          onClick={() => window.open(`${API}/vehicle-invoices/${inv.id}/pdf`, '_blank')}
+                          onClick={() => {
+                            const lang = (navigator.language || 'en').startsWith('fr') ? 'fr' : 'en';
+                            window.open(`${API}/vehicle-invoices/${inv.id}/pdf?lang=${lang}`, '_blank');
+                          }}
                           data-testid={`invoice-view-pdf-${inv.id}`}>
                           <FileText className="h-3.5 w-3.5 mr-1" /> PDF
                         </Button>

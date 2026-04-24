@@ -1250,7 +1250,7 @@ async def admin_cleanup_preview(current_user: User = Depends(require_admin)):
         pattern_filter,
         {"email": {"$ne": admin_email}},
         {"role": {"$ne": "admin"}},
-        {"role": {"$ne": "superadmin"}},
+        {"role": {"$ne": "super_admin"}},
     ]}
     safe_test_users = await db.users.count_documents(safe_filter)
 
@@ -1287,7 +1287,7 @@ async def admin_platform_cleanup(current_user: User = Depends(require_admin)):
         pattern_filter,
         {"email": {"$ne": admin_email}},
         {"role": {"$ne": "admin"}},
-        {"role": {"$ne": "superadmin"}},
+        {"role": {"$ne": "super_admin"}},
     ]}
 
     test_user_docs = await db.users.find(safe_filter, {"_id": 0, "id": 1, "email": 1}).to_list(5000)
