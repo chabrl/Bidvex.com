@@ -647,6 +647,7 @@ const EmailMarketingManager = () => {
       confirmText: 'Delete Campaign',
       successMessage: 'Campaign deleted',
       onConfirm: async () => {
+        const headers = { Authorization: `Bearer ${token}` };
         await axios.delete(`${API}/admin/marketing/campaigns/${campaignId}`, { headers });
         if (selectedCampaign?.id === campaignId) setSelectedCampaign(null);
         fetchCampaigns();
@@ -657,6 +658,7 @@ const EmailMarketingManager = () => {
   const showInsights = async (campaign) => {
     setInsightsModal({ open: true, campaign, stats: null, loading: true });
     try {
+      const headers = { Authorization: `Bearer ${token}` };
       const res = await axios.get(`${API}/admin/marketing/campaigns/${campaign.id}/stats`, { headers });
       setInsightsModal((m) => ({ ...m, stats: res.data, loading: false }));
     } catch (err) {
