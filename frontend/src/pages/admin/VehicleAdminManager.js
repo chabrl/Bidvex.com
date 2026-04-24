@@ -26,10 +26,11 @@ import {
   Car, User, Building2, Gavel, CheckCircle, XCircle, Clock,
   Eye, FileText, Shield, AlertTriangle, Search, RefreshCw,
   ChevronDown, ChevronUp, ExternalLink, Calendar, MapPin,
-  DollarSign, Settings2, Percent, Timer, Scale, Award
+  DollarSign, Settings2, Percent, Timer, Scale, Award, Mail
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/currencyFormatter';
 import { useTranslation } from 'react-i18next';
+import { ConfirmDialog } from '../../components/ui/confirm-dialog';
 
 const API = API_BASE;
 
@@ -45,8 +46,10 @@ const formatDate = (date) => {
 };
 
 // Seller Card Component
-const SellerCard = ({ seller, onApprove, onReject, onViewDetails, actionBusy }) => {
+const SellerCard = ({ seller, onApprove, onReject, onViewDetails, onToggleOpc, actionBusy }) => {
   const [expanded, setExpanded] = useState(false);
+  const [opcNumber, setOpcNumber] = useState(seller.opc_permit_number || '');
+  const opcVerified = !!seller.opc_permit_verified;
   
   const getSellerTypeIcon = (type) => {
     switch (type) {
@@ -180,6 +183,44 @@ const SellerCard = ({ seller, onApprove, onReject, onViewDetails, actionBusy }) 
               </div>
             </div>
             
+            {/* OPC Permit Verification (vehicle sellers) */}
+            <div className={`rounded-lg p-3 border ${opcVerified ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`} data-testid={`opc-panel-${seller.id}`}>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <p className="text-sm font-semibold flex items-center gap-2">
+                    OPC Permit Verification
+                    {opcVerified ? (
+                      <Badge className="bg-green-600 text-white text-[10px]">VERIFIED</Badge>
+                    ) : (
+                      <Badge className="bg-amber-500 text-white text-[10px]">UNVERIFIED</Badge>
+                    )}
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    Quebec Consumer Protection permit (dealers must register). / Permis OPC requis pour les concessionnaires du Québec.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-2 items-center">
+                <Input
+                  placeholder="OPC permit number"
+                  value={opcNumber}
+                  onChange={(e) => setOpcNumber(e.target.value)}
+                  className="h-8 text-sm max-w-xs"
+                  data-testid={`opc-number-input-${seller.id}`}
+                />
+                <Button
+                  size="sm"
+                  variant={opcVerified ? 'outline' : 'default'}
+                  className={opcVerified ? '' : 'bg-green-600 hover:bg-green-700 text-white'}
+                  disabled={actionBusy === `opc-${seller.id}`}
+                  onClick={() => onToggleOpc(seller, !opcVerified, opcNumber)}
+                  data-testid={`opc-toggle-btn-${seller.id}`}
+                >
+                  {actionBusy === `opc-${seller.id}` ? 'Saving…' : (opcVerified ? 'Un-verify' : 'Mark Verified')}
+                </Button>
+              </div>
+            </div>
+
             {/* Actions */}
             {(seller.verification_status === 'pending' || seller.verification_status === 'under_review') && (
               <div className="flex gap-2 pt-2">
@@ -498,6 +539,32 @@ const VehicleAdminManager = () => {
     }
   };
 
+  const handleToggleOpc = async (seller, enable, permitNumber) => {
+    if (actionBusy) return;
+    const userId = seller.user_id || seller.user?.id;
+    if (!userId) {
+      toast.error('Seller user ID missing');
+      return;
+    }
+    if (enable && !permitNumber?.trim()) {
+      toast.error('Enter the OPC permit number before marking verified / Saisissez le numéro de permis OPC');
+      return;
+    }
+    setActionBusy(`opc-${seller.id}`);
+    try {
+      await axios.put(`${API}/admin/users/${userId}/opc-verify`, {
+        opc_permit_verified: enable,
+        opc_permit_number: permitNumber || null,
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success(enable ? 'OPC permit marked verified' : 'OPC verification removed');
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to update OPC permit');
+    } finally {
+      setActionBusy(null);
+    }
+  };
+
   const handleRejectSeller = async () => {
     if (!rejectDialog.item || !rejectReason.trim()) {
       toast.error('Please provide a rejection reason');
@@ -674,6 +741,10 @@ const VehicleAdminManager = () => {
             <Settings2 className="h-4 w-4" />
             Auction Rules
           </TabsTrigger>
+          <TabsTrigger value="invoices" className="gap-2 bg-transparent" data-testid="admin-tab-invoices">
+            <FileText className="h-4 w-4" />
+            Invoices
+          </TabsTrigger>
           <TabsTrigger value="audit-logs" className="gap-2 bg-transparent">
             <FileText className="h-4 w-4" />
             Audit Logs
@@ -833,6 +904,7 @@ const VehicleAdminManager = () => {
                   seller={seller}
                   onApprove={handleApproveSeller}
                   onReject={(s) => openRejectDialog(s, 'seller')}
+                  onToggleOpc={handleToggleOpc}
                   actionBusy={actionBusy}
                 />
               ))}
@@ -862,6 +934,11 @@ const VehicleAdminManager = () => {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        {/* Invoices Tab */}
+        <TabsContent value="invoices" className="mt-6">
+          <VehicleInvoicesTab token={token} />
         </TabsContent>
 
         {/* Audit Logs Tab */}
@@ -1281,6 +1358,185 @@ const VehicleAdminManager = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+};
+
+// ═════════════════════════ Vehicle Invoices Tab ═══════════════════════════
+const VehicleInvoicesTab = ({ token }) => {
+  const [invoices, setInvoices] = React.useState([]);
+  const [stats, setStats] = React.useState({ pending: 0, overdue: 0, paid: 0 });
+  const [loading, setLoading] = React.useState(true);
+  const [statusFilter, setStatusFilter] = React.useState('all');
+  const [typeFilter, setTypeFilter] = React.useState('all');
+  const [search, setSearch] = React.useState('');
+  const [confirm, setConfirm] = React.useState(null);
+  const [busyId, setBusyId] = React.useState(null);
+
+  const headers = React.useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
+
+  const fetchData = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = { limit: 200 };
+      if (statusFilter !== 'all') params.status = statusFilter;
+      if (typeFilter !== 'all') params.invoice_type = typeFilter;
+      const res = await axios.get(`${API}/vehicle-admin/invoices`, { params, headers });
+      setInvoices(res.data?.invoices || []);
+      setStats(res.data?.stats || { pending: 0, overdue: 0, paid: 0 });
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to load invoices');
+    } finally {
+      setLoading(false);
+    }
+  }, [statusFilter, typeFilter, headers]);
+
+  React.useEffect(() => { fetchData(); }, [fetchData]);
+
+  const markPaid = async (inv) => {
+    setBusyId(inv.id);
+    try {
+      await axios.post(`${API}/admin/vehicle-invoices/${inv.id}/mark-paid`, null, {
+        headers, params: { note: 'admin_manual_payment' },
+      });
+      toast.success(`Invoice ${inv.id} marked paid`);
+      fetchData();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Failed to mark paid');
+    } finally { setBusyId(null); }
+  };
+
+  const sendReminder = async (inv) => {
+    setBusyId(inv.id);
+    try {
+      await axios.post(`${API}/admin/vehicle-invoices/${inv.id}/send-reminder`, null, { headers });
+      toast.success(`Reminder sent to ${inv.buyer_email || 'buyer'}`);
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Failed to send reminder');
+    } finally { setBusyId(null); }
+  };
+
+  const filtered = invoices.filter(i =>
+    !search || JSON.stringify(i).toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-4" data-testid="vehicle-invoices-tab">
+      <div className="grid grid-cols-3 gap-3">
+        <Card><CardContent className="p-4 text-center">
+          <p className="text-2xl font-bold text-amber-600">{stats.pending}</p>
+          <p className="text-xs text-muted-foreground">Pending</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-4 text-center">
+          <p className="text-2xl font-bold text-red-600">{stats.overdue}</p>
+          <p className="text-xs text-muted-foreground">Overdue</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-4 text-center">
+          <p className="text-2xl font-bold text-green-600">{stats.paid}</p>
+          <p className="text-xs text-muted-foreground">Paid</p>
+        </CardContent></Card>
+      </div>
+
+      <div className="flex gap-3 flex-wrap">
+        <Input placeholder="Search invoices, buyer, vehicle..." value={search}
+          onChange={(e) => setSearch(e.target.value)} className="flex-1 min-w-64"
+          data-testid="invoice-search" />
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+          className="h-10 px-3 border rounded-md bg-background" data-testid="invoice-status-filter">
+          <option value="all">All Status</option>
+          <option value="pending">Pending</option>
+          <option value="overdue">Overdue</option>
+          <option value="paid">Paid</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}
+          className="h-10 px-3 border rounded-md bg-background" data-testid="invoice-type-filter">
+          <option value="all">All Types</option>
+          <option value="buyer_fee">Buyer Fee</option>
+          <option value="seller_commission">Seller Commission</option>
+        </select>
+        <Button variant="outline" onClick={fetchData} disabled={loading} data-testid="invoice-refresh">
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+        </Button>
+      </div>
+
+      {loading ? (
+        <div className="py-8 text-center text-muted-foreground">Loading invoices...</div>
+      ) : filtered.length === 0 ? (
+        <Card><CardContent className="py-12 text-center">
+          <FileText className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+          <p className="text-muted-foreground">No invoices match your filters.</p>
+          <p className="text-xs text-muted-foreground/70">Aucune facture ne correspond.</p>
+        </CardContent></Card>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm" data-testid="invoices-table">
+            <thead><tr className="border-b bg-muted/50">
+              <th className="p-3 text-left">Invoice ID</th>
+              <th className="p-3 text-left">Type</th>
+              <th className="p-3 text-left">Vehicle</th>
+              <th className="p-3 text-left">Party</th>
+              <th className="p-3 text-left">Amount</th>
+              <th className="p-3 text-left">Status</th>
+              <th className="p-3 text-left">Due</th>
+              <th className="p-3 text-left">Actions</th>
+            </tr></thead>
+            <tbody>
+              {filtered.slice(0, 100).map(inv => {
+                const statusColor = {
+                  pending: 'bg-amber-100 text-amber-800',
+                  overdue: 'bg-red-100 text-red-800',
+                  paid: 'bg-green-100 text-green-800',
+                  cancelled: 'bg-slate-100 text-slate-600',
+                }[inv.payment_status] || 'bg-slate-100';
+                const isPaid = inv.payment_status === 'paid';
+                return (
+                  <tr key={inv.id} className="border-b hover:bg-muted/30" data-testid={`invoice-row-${inv.id}`}>
+                    <td className="p-3 font-mono text-xs">{inv.id?.slice(0, 12)}…</td>
+                    <td className="p-3 text-xs capitalize">{(inv.invoice_type || '').replace('_', ' ')}</td>
+                    <td className="p-3 text-xs">{inv.vehicle_title || inv.vehicle_id?.slice(0, 8) || '—'}</td>
+                    <td className="p-3 text-xs">
+                      {inv.invoice_type === 'buyer_fee' ? inv.buyer_email : inv.seller_email}
+                    </td>
+                    <td className="p-3 font-semibold">${(inv.total_amount ?? 0).toFixed(2)}</td>
+                    <td className="p-3"><Badge className={statusColor}>{inv.payment_status}</Badge></td>
+                    <td className="p-3 text-xs">
+                      {inv.due_date ? new Date(inv.due_date).toLocaleDateString() : '—'}
+                    </td>
+                    <td className="p-3">
+                      <div className="flex gap-1 flex-wrap">
+                        <Button size="sm" variant="outline" disabled={isPaid || busyId === inv.id}
+                          onClick={() => setConfirm({
+                            title: 'Mark this invoice as paid?',
+                            description: `This is an admin override — useful if the buyer paid offline (e-transfer, cash). It will NOT charge the card. Invoice ${inv.id} ($${(inv.total_amount ?? 0).toFixed(2)}).`,
+                            confirmText: 'Mark Paid',
+                            successMessage: 'Invoice marked paid',
+                            onConfirm: () => markPaid(inv),
+                          })}
+                          data-testid={`invoice-mark-paid-${inv.id}`}>
+                          <DollarSign className="h-3.5 w-3.5 mr-1" /> Mark Paid
+                        </Button>
+                        <Button size="sm" variant="outline" disabled={isPaid || busyId === inv.id}
+                          onClick={() => sendReminder(inv)}
+                          data-testid={`invoice-send-reminder-${inv.id}`}>
+                          <Mail className="h-3.5 w-3.5 mr-1" /> Remind
+                        </Button>
+                        <Button size="sm" variant="outline"
+                          onClick={() => window.open(`${API}/vehicle-invoices/${inv.id}/pdf`, '_blank')}
+                          data-testid={`invoice-view-pdf-${inv.id}`}>
+                          <FileText className="h-3.5 w-3.5 mr-1" /> PDF
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <ConfirmDialog state={confirm} onClose={() => setConfirm(null)} />
     </div>
   );
 };

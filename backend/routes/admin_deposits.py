@@ -186,3 +186,105 @@ async def admin_capture_vehicle_deposit(
         f"[ADMIN] {current_user.id} CAPTURED deposit {deposit_id}: {reason}"
     )
     return result
+
+
+# ═════════════════ Vehicle Invoice Admin Actions ════════════════════════════
+
+@admin_deposits_router.post("/admin/vehicle-invoices/{invoice_id}/mark-paid")
+async def admin_mark_invoice_paid(
+    invoice_id: str,
+    note: Optional[str] = Query("admin_manual_payment"),
+    current_user: User = Depends(require_admin),
+):
+    """
+    Admin override: mark a vehicle invoice as paid (e.g. buyer paid the 2.5%
+    platform fee via offline e-transfer, or admin is settling manually).
+    This does NOT charge anything — it just updates the invoice status.
+    """
+    db = get_db()
+    invoice = await db.vehicle_invoices.find_one({"id": invoice_id})
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    if invoice.get("payment_status") == "paid":
+        raise HTTPException(status_code=400, detail="Invoice already paid")
+
+    now = datetime.now(timezone.utc)
+    total = invoice.get("total_amount") or 0
+    await db.vehicle_invoices.update_one(
+        {"id": invoice_id},
+        {"$set": {
+            "payment_status": "paid",
+            "paid_at": now,
+            "paid_amount": total,
+            "payment_method": "admin_override",
+            "admin_payment_note": note,
+            "admin_payment_by": current_user.id,
+        }},
+    )
+    await db.vehicle_audit_logs.insert_one({
+        "entity_type": "invoice",
+        "entity_id": invoice_id,
+        "action": "admin_mark_invoice_paid",
+        "performed_by": current_user.id,
+        "performed_by_role": "admin",
+        "performed_by_email": getattr(current_user, "email", None),
+        "new_value": {"note": note, "amount": total},
+        "created_at": now,
+    })
+    logger.info(f"[ADMIN] {current_user.id} marked invoice {invoice_id} PAID ({note})")
+    return {"success": True, "invoice_id": invoice_id, "status": "paid", "amount": total}
+
+
+@admin_deposits_router.post("/admin/vehicle-invoices/{invoice_id}/send-reminder")
+async def admin_send_invoice_reminder(
+    invoice_id: str,
+    current_user: User = Depends(require_admin),
+):
+    """Send a payment-reminder email to the invoice's buyer."""
+    db = get_db()
+    invoice = await db.vehicle_invoices.find_one({"id": invoice_id}, {"_id": 0})
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    buyer = await db.users.find_one(
+        {"id": invoice.get("buyer_id")},
+        {"_id": 0, "email": 1, "full_name": 1, "name": 1},
+    )
+    if not buyer or not buyer.get("email"):
+        raise HTTPException(status_code=400, detail="Buyer email not found")
+
+    # Reminder via existing transactional email service
+    try:
+        from services.email_notifications import send_email, _base_template, _format_currency
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Email service unavailable: {e}")
+
+    amount_due = (
+        float(invoice.get("total_amount") or 0)
+        + float(invoice.get("penalty_amount") or 0)
+        - float(invoice.get("paid_amount") or 0)
+    )
+    buyer_name = buyer.get("full_name") or buyer.get("name") or buyer.get("email")
+    content = f"""
+    <h2 style="color: #dc2626;">Payment Reminder — BidVex</h2>
+    <p>Hi {buyer_name},</p>
+    <p>This is a reminder that your BidVex invoice <strong>{invoice.get('id')}</strong>
+       is currently <strong>{invoice.get('payment_status')}</strong>.</p>
+    <p>Amount due: <strong>{_format_currency(amount_due)}</strong></p>
+    <p>Please log in to pay: <a href="https://www.bidvex.com/dashboard/invoices" clicktracking=off>View Invoice</a></p>
+    <p style="margin-top: 24px;">— BidVex Canada, Sherbrooke, QC</p>
+    """
+    await send_email(
+        to_email=buyer["email"],
+        subject=f"Payment Reminder — Invoice {invoice.get('id')}",
+        html_content=_base_template(content, "Payment Reminder"),
+    )
+    await db.vehicle_audit_logs.insert_one({
+        "entity_type": "invoice",
+        "entity_id": invoice_id,
+        "action": "admin_send_invoice_reminder",
+        "performed_by": current_user.id,
+        "performed_by_role": "admin",
+        "new_value": {"recipient": buyer["email"], "amount_due": amount_due},
+        "created_at": datetime.now(timezone.utc),
+    })
+    return {"success": True, "sent_to": buyer["email"], "amount_due": amount_due}

@@ -10,6 +10,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter
 } from '../../components/ui/dialog';
 import { toast } from 'sonner';
+import { ConfirmDialog } from '../../components/ui/confirm-dialog';
 import {
   DollarSign, TrendingUp, Users, Building2, Gavel, CreditCard,
   Search, FileText, ExternalLink, Shield, Loader2, ToggleLeft,
@@ -38,6 +39,7 @@ const FinanceDashboard = () => {
   const [partnerFilter, setPartnerFilter] = useState('all');
   const [reviewDialog, setReviewDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [confirm, setConfirm] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
 
   const [activeTab, setActiveTab] = useState('overview');
@@ -61,7 +63,9 @@ const FinanceDashboard = () => {
       setTransactions(res.data.transactions || []);
       setTxTotal(res.data.total || 0);
       setTxPages(res.data.pages || 0);
-    } catch { /* silent */ }
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to load transactions');
+    }
     finally { setTxLoading(false); }
   }, [token, txPage, partnerOnly, txSearch]);
 
@@ -70,7 +74,9 @@ const FinanceDashboard = () => {
       const params = partnerFilter !== 'all' ? `?status=${partnerFilter}` : '';
       const res = await axios.get(`${API}/admin/partners${params}`, { headers });
       setPartners(res.data.applications || []);
-    } catch { /* silent */ }
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to load partners');
+    }
   }, [token, partnerFilter]);
 
   useEffect(() => { fetchRevenue(); }, [fetchRevenue]);
@@ -78,30 +84,39 @@ const FinanceDashboard = () => {
   useEffect(() => { if (activeTab === 'partners') fetchPartners(); }, [activeTab, fetchPartners]);
 
   const handleTogglePartner = async (userId) => {
+    if (actionLoading) return;
     setActionLoading(true);
     try {
       await axios.post(`${API}/admin/partners/${userId}/toggle`, {}, { headers });
       toast.success('Partner status toggled.');
       fetchPartners(); fetchRevenue();
-    } catch (err) { toast.error(err.response?.data?.detail || 'Failed.'); }
+    } catch (err) { toast.error(err.response?.data?.detail || 'Failed to toggle partner'); }
     finally { setActionLoading(false); }
   };
 
   const handlePauseUser = async (userId) => {
+    if (actionLoading) return;
+    setActionLoading(true);
     try {
       const res = await axios.post(`${API}/admin/users/${userId}/pause`, {}, { headers });
       toast.success(`Account ${res.data.new_status}.`);
       fetchPartners();
-    } catch (err) { toast.error(err.response?.data?.detail || 'Failed.'); }
+    } catch (err) { toast.error(err.response?.data?.detail || 'Failed to pause user'); }
+    finally { setActionLoading(false); }
   };
 
   const handleDeleteUser = async (userId) => {
-    if (!window.confirm('Are you sure? This will soft-delete the account.')) return;
-    try {
-      await axios.delete(`${API}/admin/users/${userId}`, { headers });
-      toast.success('Account deleted.');
-      fetchPartners();
-    } catch (err) { toast.error(err.response?.data?.detail || 'Failed.'); }
+    setConfirm({
+      title: 'Soft-delete this account?',
+      description: 'The user will lose access but data is retained for audit. Supprimer le compte ? L\'utilisateur perd l\'accès mais les données sont conservées.',
+      variant: 'destructive',
+      confirmText: 'Delete Account',
+      successMessage: 'Account deleted',
+      onConfirm: async () => {
+        await axios.delete(`${API}/admin/users/${userId}`, { headers });
+        fetchPartners();
+      },
+    });
   };
 
   const tabs = [
@@ -466,6 +481,7 @@ const FinanceDashboard = () => {
           )}
         </div>
       )}
+      <ConfirmDialog state={confirm} onClose={() => setConfirm(null)} />
     </div>
   );
 };

@@ -12,6 +12,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Switch } from './ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { ConfirmDialog } from './ui/confirm-dialog';
 import { useTranslation } from 'react-i18next';
 import {
   Image as ImageIcon, Link as LinkIcon, Clock, Plus, Trash2, Edit2,
@@ -30,14 +31,18 @@ const AdminBannerManager = () => {
 
   const [newBanner, setNewBanner] = useState({
     title: '',
+    title_fr: '',
     image_url: '',
     cta_text: '',
+    cta_text_fr: '',
     cta_url: '',
+    position: 'homepage',
     is_active: true,
     start_date: '',
     end_date: '',
     priority: 0
   });
+  const [confirm, setConfirm] = useState(null);
 
   const fetchBanners = useCallback(async () => {
     try {
@@ -78,17 +83,18 @@ const AdminBannerManager = () => {
     }
   };
 
-  const handleDeleteBanner = async (bannerId) => {
-    if (!window.confirm('Are you sure you want to delete this banner?')) return;
-    
-    try {
-      await axios.delete(`${API}/admin/banners/${bannerId}`);
-      toast.success('Banner deleted successfully!');
-      fetchBanners();
-    } catch (error) {
-      console.error('Failed to delete banner:', error);
-      toast.error('Failed to delete banner');
-    }
+  const handleDeleteBanner = (bannerId, bannerTitle) => {
+    setConfirm({
+      title: 'Delete this banner?',
+      description: `"${bannerTitle}" will be permanently removed from the site.`,
+      variant: 'destructive',
+      confirmText: 'Delete',
+      successMessage: 'Banner deleted',
+      onConfirm: async () => {
+        await axios.delete(`${API}/admin/banners/${bannerId}`);
+        fetchBanners();
+      },
+    });
   };
 
   const handleToggleActive = async (banner) => {
@@ -108,9 +114,12 @@ const AdminBannerManager = () => {
   const resetNewBanner = () => {
     setNewBanner({
       title: '',
+      title_fr: '',
       image_url: '',
       cta_text: '',
+      cta_text_fr: '',
       cta_url: '',
+      position: 'homepage',
       is_active: true,
       start_date: '',
       end_date: '',
@@ -297,8 +306,9 @@ const AdminBannerManager = () => {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleDeleteBanner(banner.id)}
+                        onClick={() => handleDeleteBanner(banner.id, banner.title)}
                         className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                        data-testid={`banner-delete-${banner.id}`}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -310,6 +320,7 @@ const AdminBannerManager = () => {
           ))
         )}
       </div>
+      <ConfirmDialog state={confirm} onClose={() => setConfirm(null)} />
     </div>
   );
 };
@@ -320,13 +331,43 @@ const BannerForm = ({ banner, setBanner, onSave, onCancel, saving, onImageUpload
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="title">{t("admin.bannerTitle")}</Label>
+          <Label htmlFor="title">Title (English)</Label>
           <Input
             id="title"
             value={banner.title}
             onChange={(e) => setBanner({ ...banner, title: e.target.value })}
             placeholder="Anniversary Sale Banner"
+            data-testid="banner-title-en"
           />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="title_fr">Titre (Français)</Label>
+          <Input
+            id="title_fr"
+            value={banner.title_fr || ''}
+            onChange={(e) => setBanner({ ...banner, title_fr: e.target.value })}
+            placeholder="Bannière de vente anniversaire"
+            data-testid="banner-title-fr"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="position">Position</Label>
+          <select
+            id="position"
+            value={banner.position || 'homepage'}
+            onChange={(e) => setBanner({ ...banner, position: e.target.value })}
+            className="w-full h-10 px-3 border rounded-md bg-background"
+            data-testid="banner-position"
+          >
+            <option value="homepage">Homepage Hero</option>
+            <option value="marketplace">Marketplace</option>
+            <option value="vehicles">Vehicles</option>
+            <option value="sidebar">Sidebar</option>
+          </select>
         </div>
 
         <div className="space-y-2">
@@ -337,6 +378,7 @@ const BannerForm = ({ banner, setBanner, onSave, onCancel, saving, onImageUpload
             value={banner.priority}
             onChange={(e) => setBanner({ ...banner, priority: parseInt(e.target.value) || 0 })}
             placeholder="0"
+            data-testid="banner-priority"
           />
         </div>
       </div>
@@ -377,24 +419,37 @@ const BannerForm = ({ banner, setBanner, onSave, onCancel, saving, onImageUpload
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="cta_text">Button Text (CTA)</Label>
+          <Label htmlFor="cta_text">Button Text — English</Label>
           <Input
             id="cta_text"
             value={banner.cta_text}
             onChange={(e) => setBanner({ ...banner, cta_text: e.target.value })}
             placeholder="Shop Now"
+            data-testid="banner-cta-en"
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="cta_url">Button Link (URL)</Label>
+          <Label htmlFor="cta_text_fr">Texte du bouton — Français</Label>
           <Input
-            id="cta_url"
-            value={banner.cta_url}
-            onChange={(e) => setBanner({ ...banner, cta_url: e.target.value })}
-            placeholder="/marketplace"
+            id="cta_text_fr"
+            value={banner.cta_text_fr || ''}
+            onChange={(e) => setBanner({ ...banner, cta_text_fr: e.target.value })}
+            placeholder="Magasiner"
+            data-testid="banner-cta-fr"
           />
         </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="cta_url">Button Link (URL)</Label>
+        <Input
+          id="cta_url"
+          value={banner.cta_url}
+          onChange={(e) => setBanner({ ...banner, cta_url: e.target.value })}
+          placeholder="/marketplace"
+          data-testid="banner-cta-url"
+        />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

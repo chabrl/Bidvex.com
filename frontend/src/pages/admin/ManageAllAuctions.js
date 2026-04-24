@@ -8,7 +8,7 @@ import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
-import { Package, Search, Edit2, Trash2, Pause, Archive, XCircle, Eye, AlertTriangle } from 'lucide-react';
+import { Package, Search, Edit2, Trash2, Pause, Archive, XCircle, Eye, AlertTriangle, Download, Star } from 'lucide-react';
 import { formatCurrency } from '../../utils/currencyFormatter';
 
 const API = API_BASE;
@@ -67,6 +67,17 @@ const ManageAllAuctions = () => {
     }
   };
 
+  const handleToggleFeature = async (listing) => {
+    try {
+      await axios.put(`${API}/admin/listings/${listing.id}/feature`,
+        { is_featured: !listing.is_featured }, { headers });
+      toast.success(listing.is_featured ? 'Listing unfeatured' : 'Listing featured');
+      fetchAllListings();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to toggle feature');
+    }
+  };
+
   const handleStatusChange = async (id, newStatus, isMultiItem) => {
     try {
       const endpoint = isMultiItem ? `multi-item-listings/${id}` : `listings/${id}`;
@@ -76,6 +87,35 @@ const ManageAllAuctions = () => {
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to update status');
     }
+  };
+
+  const exportToCsv = () => {
+    if (filteredListings.length === 0) {
+      toast.error('Nothing to export with current filters');
+      return;
+    }
+    const rows = [
+      ['ID', 'Type', 'Title', 'Category', 'Seller ID', 'Status', 'Current Price', 'Bid Count', 'Created'],
+      ...filteredListings.map(l => [
+        l.id || '',
+        l.type || '',
+        `"${(l.title || '').replace(/"/g, '""')}"`,
+        l.category || '',
+        l.seller_id || '',
+        l.status || '',
+        l.current_price ?? l.starting_price ?? '',
+        l.bid_count ?? '',
+        l.created_at ? new Date(l.created_at).toISOString() : '',
+      ].join(',')),
+    ].join('\n');
+    const blob = new Blob([rows], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `bidvex-auctions-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${filteredListings.length} auction(s) to CSV`);
   };
 
   // Combine and filter listings
@@ -114,12 +154,18 @@ const ManageAllAuctions = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold flex items-center gap-2">
-          <Package className="h-6 w-6" />
-          Manage All Auctions
-        </h2>
-        <p className="text-muted-foreground">Unified view of all single and multi-item listings</p>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            <Package className="h-6 w-6" />
+            Manage All Auctions
+          </h2>
+          <p className="text-muted-foreground">Unified view of all single and multi-item listings</p>
+        </div>
+        <Button variant="outline" onClick={exportToCsv} disabled={filteredListings.length === 0}
+          data-testid="export-auctions-csv">
+          <Download className="h-4 w-4 mr-2" /> Export CSV ({filteredListings.length})
+        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -246,6 +292,7 @@ const ManageAllAuctions = () => {
                       }>
                         {listing.status}
                       </Badge>
+                      {listing.is_featured && <Badge className="bg-amber-100 text-amber-900 border border-amber-300" data-testid={`featured-badge-${listing.id}`}>★ Featured</Badge>}
                     </div>
                     <p className="text-sm text-muted-foreground mb-2">{listing.category} • {listing.city}, {listing.region}</p>
                     <div className="flex gap-4 text-sm">
@@ -269,6 +316,18 @@ const ManageAllAuctions = () => {
                     >
                       <Eye className="h-4 w-4 mr-1" />
                       View
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={listing.is_featured ? 'default' : 'outline'}
+                      className={listing.is_featured ? 'bg-amber-500 hover:bg-amber-600 text-white' : ''}
+                      onClick={() => handleToggleFeature(listing)}
+                      disabled={listing.type === 'multi'}
+                      data-testid={`feature-btn-${listing.id}`}
+                      title={listing.type === 'multi' ? 'Feature not available for multi-item listings' : ''}
+                    >
+                      <Star className="h-4 w-4 mr-1" />
+                      {listing.is_featured ? 'Featured' : 'Feature'}
                     </Button>
                     <Button
                       size="sm"

@@ -1,0 +1,55 @@
+{
+  "summary": "Phase 2 admin panel audit (iter 155) — backend only. Verified 2 new endpoints (POST /api/admin/vehicle-invoices/{id}/mark-paid and /send-reminder), 3 Phase-1 gap endpoints now wired from admin UI (GET /api/vehicle-admin/invoices, PUT /api/admin/users/{id}/opc-verify, PUT /api/admin/listings/{id}/feature), analytics endpoints, and Phase-1 regression. 19/19 pytest tests PASSED.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_admin_audit_iter155.py",
+    "/app/test_reports/pytest/iter155.xml"
+  ],
+  "what_was_tested": [
+    "POST /api/auth/login (charbel911@gmail.com) — 200 + token",
+    "GET /api/vehicle-admin/invoices?limit=3 — 200 with {invoices:[], stats:{pending,overdue,paid}}",
+    "GET /api/vehicle-admin/invoices?status=paid — 200, all returned rows have payment_status==paid",
+    "GET /api/vehicle-admin/invoices?invoice_type=buyer_fee — 200",
+    "GET /api/vehicle-admin/invoices without auth — 401/403",
+    "POST /api/admin/vehicle-invoices/nonexistent/mark-paid (admin) — 404",
+    "POST /api/admin/vehicle-invoices/nonexistent/mark-paid (no auth) — 401/403",
+    "POST /api/admin/vehicle-invoices/nonexistent/send-reminder (admin) — 404",
+    "POST /api/admin/vehicle-invoices/nonexistent/send-reminder (no auth) — 401/403",
+    "PUT /api/admin/users/nonexistent/opc-verify — 404",
+    "PUT /api/admin/users/nonexistent/opc-verify (no auth) — 401/403",
+    "PUT /api/admin/users/{valid_id}/opc-verify {opc_permit_verified:true, opc_permit_number:'TEST_1234'} — 200, persisted via GET /detail, then reverted",
+    "PUT /api/admin/listings/nonexistent-id/feature {is_featured:true} — NOT 403 for admin (accepts 200/400/404)",
+    "GET /api/admin/analytics?days=30 — 200",
+    "GET /api/admin/analytics/revenue?days=7 — 200",
+    "GET /api/admin/analytics/listings — 200",
+    "Phase-1 regression: GET /api/admin/vehicle-deposits — 200",
+    "Phase-1 regression: PUT /api/admin/site-mode — 200",
+    "Phase-1 regression: PUT /api/admin/users/nonexistent/status — 404"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "admin_deposits.py mark-paid: correctly rejects re-paying with 400 'Invoice already paid' (idempotency guard). Good.",
+    "admin_deposits.py send-reminder: depends on services.email_notifications.send_email — wrapped in try/except on import but not on send. If SendGrid is down the caller will see a 500. Consider try/except around send_email + return a 502-style response, or queue the reminder.",
+    "admin_deposits.py send-reminder: hardcodes absolute URL 'https://www.bidvex.com/dashboard/invoices' in the email body. Should be read from env (e.g. PUBLIC_APP_URL) so staging/preview reminders don't point at production.",
+    "admin_ops.py opc-verify: update payload uses updated_at as ISO string while other admin toggles use datetime objects — minor inconsistency for downstream analytics. Low priority.",
+    "vehicles_admin.py admin_list_invoices accepts limit with no upper bound — consider clamping to e.g. 200 to protect against huge pulls."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_admin_audit_iter155.py (new, 19 tests, all passing)"
+  ],
+  "success_rate": {"backend": "100% (19/19)", "frontend": "not tested (out of scope)"},
+  "test_credentials": "charbel911@gmail.com / Anderosli123!@# (admin) — verified working",
+  "seed_data_creation": "None. OPC-verify happy-path toggles a real non-admin user's opc_permit_verified flag to true (with opc_permit_number='TEST_1234') and immediately reverts to false in the same test to keep state clean.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 2 backend additions are solid. If frontend testing is next: (1) Vehicle Invoices admin tab should call GET /api/vehicle-admin/invoices with status/invoice_type filters, (2) per-invoice 'Mark Paid' & 'Send Reminder' buttons should POST to /api/admin/vehicle-invoices/{id}/mark-paid and /send-reminder, (3) OPC permit toggle in user moderation should PUT /api/admin/users/{id}/opc-verify with body {opc_permit_verified, opc_permit_number?}. Admin login returns token under 'access_token' key.",
+  "rca_of_the_issue": "N/A — no bugs found. All Phase-2 endpoints behave per spec: 200 on happy path, 404 on unknown id, 401/403 without auth. OPC write persists via GET /admin/users/{id}/detail. Analytics endpoints return 200 for admin."
+}
