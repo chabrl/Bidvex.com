@@ -40,7 +40,7 @@ trust_safety_router = APIRouter(tags=["Trust & Safety"])
 @trust_safety_router.get("/admin/blocked-ips")
 async def get_blocked_ips_list(current_user: User = Depends(get_current_user)):
     """List all IPs currently blocked by brute-force protection."""
-    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     from services.brute_force import get_blocked_ips
     blocked = await get_blocked_ips()
@@ -50,7 +50,7 @@ async def get_blocked_ips_list(current_user: User = Depends(get_current_user)):
 @trust_safety_router.post("/admin/blocked-ips/{ip}/unblock")
 async def admin_unblock_ip(ip: str, current_user: User = Depends(get_current_user)):
     """Manually unblock an IP address."""
-    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     from services.brute_force import unblock_ip
     removed = await unblock_ip(ip)
@@ -80,7 +80,7 @@ async def calculate_trust_score(user_id: str) -> int:
 @trust_safety_router.get("/admin/trust-safety/scores")
 async def get_trust_scores(current_user: User = Depends(get_current_user)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
+    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     users = await db.users.find({}, {"_id": 0, "password": 0}).to_list(100)
@@ -103,7 +103,7 @@ async def get_trust_scores(current_user: User = Depends(get_current_user)):
 @trust_safety_router.get("/admin/trust-safety/fraud-flags")
 async def get_fraud_flags(current_user: User = Depends(get_current_user)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
+    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     flags = []
@@ -171,7 +171,7 @@ async def get_fraud_flags(current_user: User = Depends(get_current_user)):
 @trust_safety_router.get("/admin/trust-safety/collusion-patterns")
 async def detect_collusion(current_user: User = Depends(get_current_user)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
+    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     patterns = []
@@ -213,7 +213,7 @@ async def detect_collusion(current_user: User = Depends(get_current_user)):
 @trust_safety_router.post("/admin/trust-safety/verify-requirement")
 async def enforce_verification_requirement(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
+    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     requirement_type = data.get("type")  # "email" or "phone"
@@ -237,7 +237,7 @@ async def get_fraud_flags(
     current_user: User = Depends(get_current_user)
 ):
     """Get all fraud flags with optional filters."""
-    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
     fraud_service = get_fraud_detection_service(get_db())
@@ -258,7 +258,7 @@ async def scan_for_fraud(
     current_user: User = Depends(get_current_user)
 ):
     """Run fraud detection scan on all recent auctions."""
-    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
     fraud_service = get_fraud_detection_service(get_db())
@@ -291,7 +291,7 @@ async def analyze_single_auction(
     current_user: User = Depends(get_current_user)
 ):
     """Analyze a specific auction for fraud."""
-    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
     fraud_service = get_fraud_detection_service(get_db())
@@ -317,7 +317,7 @@ async def update_flag_status(
     current_user: User = Depends(get_current_user)
 ):
     """Update the status of a fraud flag."""
-    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
     new_status = data.get("status")
@@ -352,7 +352,7 @@ async def suspend_auction(
     current_user: User = Depends(get_current_user)
 ):
     """Suspend an auction due to fraud concerns."""
-    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
     reason = data.get("reason", "Suspended for fraud investigation")
@@ -382,7 +382,7 @@ async def generate_flag_summary(
     current_user: User = Depends(get_current_user)
 ):
     """Generate AI-powered fraud summary for a flag."""
-    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
     db = get_db()
@@ -412,7 +412,7 @@ async def generate_flag_summary(
 async def get_fraud_stats(current_user: User = Depends(get_current_user)):
     """Get fraud detection statistics."""
     db = get_db()
-    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
     # Get counts by status
@@ -447,7 +447,7 @@ async def get_risk_monitoring(
 ):
     """Risk Monitoring Dashboard — returns high-risk flags, users, and aggregate stats."""
     db = get_db()
-    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
 
     threshold = min_risk / 100.0
@@ -513,7 +513,7 @@ async def risk_monitoring_clear_flag(
 ):
     """Quick-clear a high-risk flag (false positive) with admin notes."""
     db = get_db()
-    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
 
     notes = data.get("notes", "Cleared via Risk Monitoring Dashboard")
@@ -550,7 +550,7 @@ async def risk_monitoring_clear_flag(
 
 @trust_safety_router.post("/admin/trust-safety/analyze-content")
 async def analyze_content_ai(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
-    if not current_user.email.endswith("@bidvex.com"):
+    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     content = data.get("content")
@@ -601,7 +601,7 @@ Respond in JSON format."""
 @trust_safety_router.post("/admin/trust-safety/scan-listing")
 async def scan_listing_ai(listing_id: str, current_user: User = Depends(get_current_user)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
+    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
@@ -663,7 +663,7 @@ Provide risk assessment in JSON format with risk_level, issues, and recommendati
 @trust_safety_router.post("/admin/trust-safety/scan-messages")
 async def scan_messages_ai(conversation_id: str, current_user: User = Depends(get_current_user)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
+    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     messages = await db.messages.find({"conversation_id": conversation_id}, {"_id": 0}).to_list(100)
@@ -700,7 +700,7 @@ async def scan_messages_ai(conversation_id: str, current_user: User = Depends(ge
 @trust_safety_router.get("/admin/trust-safety/behavioral-analysis")
 async def behavioral_analysis(user_id: str, current_user: User = Depends(get_current_user)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
+    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     user = await db.users.find_one({"id": user_id})
@@ -760,7 +760,7 @@ async def behavioral_analysis(user_id: str, current_user: User = Depends(get_cur
 @trust_safety_router.post("/admin/trust-safety/auto-action")
 async def execute_auto_action(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
+    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     user_id = data.get("user_id")

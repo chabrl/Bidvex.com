@@ -192,6 +192,66 @@ const PricingManager = () => {
 
         {/* Plans Tab */}
         <TabsContent value="plans" className="space-y-4 mt-4">
+          {/* Legal & Platform Constants (read-only — code constants for OPC compliance) */}
+          <Card className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20" data-testid="pricing-legal-constants">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base">Legal & Platform Constants</CardTitle>
+                  <CardDescription>
+                    Read-only by design. These rates are code-enforced for OPC (Loi sur la protection du consommateur) compliance.
+                  </CardDescription>
+                </div>
+                <Badge variant="outline" className="text-amber-700 border-amber-300">Read Only</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+              <div className="rounded-md border bg-white dark:bg-slate-900 p-3">
+                <div className="text-xs text-muted-foreground">Vehicle Platform Fee</div>
+                <div className="text-xl font-bold">2.5%</div>
+                <div className="text-[11px] text-muted-foreground">of hammer price</div>
+              </div>
+              <div className="rounded-md border bg-white dark:bg-slate-900 p-3">
+                <div className="text-xs text-muted-foreground">Buyer Premium (Standard)</div>
+                <div className="text-xl font-bold">15%</div>
+                <div className="text-[11px] text-muted-foreground">non-vehicle only</div>
+              </div>
+              <div className="rounded-md border bg-white dark:bg-slate-900 p-3">
+                <div className="text-xs text-muted-foreground">Seller Commission (Standard)</div>
+                <div className="text-xl font-bold">10%</div>
+                <div className="text-[11px] text-muted-foreground">non-vehicle only</div>
+              </div>
+              <div className="rounded-md border bg-white dark:bg-slate-900 p-3">
+                <div className="text-xs text-muted-foreground">Stripe Recovery</div>
+                <div className="text-xl font-bold">2.9% + $0.30</div>
+                <div className="text-[11px] text-muted-foreground">pass-through</div>
+              </div>
+              <div className="rounded-md border bg-white dark:bg-slate-900 p-3">
+                <div className="text-xs text-muted-foreground">Bid Deposit Hold</div>
+                <div className="text-xl font-bold">$500</div>
+                <div className="text-[11px] text-muted-foreground">auctions ≥ $10k</div>
+              </div>
+              <div className="rounded-md border bg-white dark:bg-slate-900 p-3">
+                <div className="text-xs text-muted-foreground">Tax (QC)</div>
+                <div className="text-xl font-bold">14.975%</div>
+                <div className="text-[11px] text-muted-foreground">GST 5% + QST 9.975%</div>
+              </div>
+              <div className="rounded-md border bg-white dark:bg-slate-900 p-3">
+                <div className="text-xs text-muted-foreground">Tax (ON)</div>
+                <div className="text-xl font-bold">13%</div>
+                <div className="text-[11px] text-muted-foreground">HST</div>
+              </div>
+              <div className="rounded-md border bg-white dark:bg-slate-900 p-3">
+                <div className="text-xs text-muted-foreground">Tax (AB / BC / SK / MB)</div>
+                <div className="text-xl font-bold">5%</div>
+                <div className="text-[11px] text-muted-foreground">GST only</div>
+              </div>
+            </CardContent>
+            <div className="px-6 pb-4 text-xs text-amber-800/80 dark:text-amber-200/80">
+              Defined in <code className="bg-white/60 px-1 rounded">backend/services/pricing_config.py</code> and <code className="bg-white/60 px-1 rounded">pricing_manager.py</code>. Changing these requires a code deploy.
+            </div>
+          </Card>
+
           <div className="grid md:grid-cols-3 gap-4">
             {plans.map((plan) => {
               const config = PLAN_CONFIG[plan.plan_id] || PLAN_CONFIG.free;

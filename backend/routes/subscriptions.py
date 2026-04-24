@@ -65,7 +65,7 @@ subscriptions_router = APIRouter(tags=["Subscriptions"])
 @subscriptions_router.get("/admin/subscription-plans")
 async def get_subscription_plans(current_user: User = Depends(get_current_user)):
     """Get all subscription plans with pricing"""
-    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
     pricing_service = get_pricing_service(get_db())
@@ -109,7 +109,7 @@ async def update_subscription_plan(
     current_user: User = Depends(get_current_user)
 ):
     """Update subscription plan pricing and settings"""
-    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
     pricing_service = get_pricing_service(get_db())
@@ -135,7 +135,7 @@ async def get_pricing_changelog(
     current_user: User = Depends(get_current_user)
 ):
     """Get pricing change history"""
-    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
     pricing_service = get_pricing_service(get_db())
@@ -150,7 +150,7 @@ async def create_coupon(
     current_user: User = Depends(get_current_user)
 ):
     """Create a new coupon code"""
-    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
     pricing_service = get_pricing_service(get_db())
@@ -170,7 +170,7 @@ async def get_coupons(
     current_user: User = Depends(get_current_user)
 ):
     """Get all coupon codes"""
-    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
     pricing_service = get_pricing_service(get_db())
@@ -185,7 +185,7 @@ async def get_coupon(
     current_user: User = Depends(get_current_user)
 ):
     """Get a specific coupon by ID"""
-    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
     pricing_service = get_pricing_service(get_db())
@@ -203,7 +203,7 @@ async def update_coupon(
     current_user: User = Depends(get_current_user)
 ):
     """Update a coupon code"""
-    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
     pricing_service = get_pricing_service(get_db())
@@ -226,7 +226,7 @@ async def delete_coupon(
     current_user: User = Depends(get_current_user)
 ):
     """Delete (deactivate) a coupon code"""
-    if current_user.role != 'admin' and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     
     pricing_service = get_pricing_service(get_db())
@@ -770,7 +770,7 @@ async def get_subscription_analytics(current_user: User = Depends(get_current_us
     Get comprehensive subscription analytics for admin dashboard.
     Includes revenue metrics, subscriber counts, plan distribution, coupon usage.
     """
-    if not current_user.email.endswith("@bidvex.com"):
+    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     try:

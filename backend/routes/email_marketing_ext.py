@@ -41,7 +41,7 @@ email_marketing_ext_router = APIRouter(tags=["Email Marketing"])
 @email_marketing_ext_router.get("/admin/marketing/segment-filters")
 async def get_segment_filters(current_user: User = Depends(get_current_user)):
     """Get available audience segment filter options"""
-    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     
     return {
@@ -58,7 +58,7 @@ async def preview_audience(
     current_user: User = Depends(get_current_user)
 ):
     """Preview audience matching basic filters"""
-    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     
     marketing = get_marketing_service(get_db())
@@ -87,7 +87,7 @@ async def preview_advanced_audience(
     - Preview of recipients
     - List of excluded/suppressed emails
     """
-    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     
     marketing = get_marketing_service(get_db())
@@ -115,7 +115,7 @@ async def parse_email_list(
     Request: {"emails": "email1@test.com, email2@test.com\\nemail3@test.com"}
     Returns: {"valid": [...], "invalid": [...], "count": N}
     """
-    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     
     email_text = data.get("emails", "")
@@ -151,7 +151,7 @@ async def parse_csv_emails(
     - duplicates: List of duplicate emails
     - total_rows: Number of rows processed
     """
-    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     
     # Validate file type
@@ -187,7 +187,7 @@ async def check_suppressed_emails(
     Request: {"emails": ["email1@test.com", "email2@test.com"]}
     Returns: {"suppressed": [...], "valid": [...]}
     """
-    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     
     emails = data.get("emails", [])
@@ -223,7 +223,7 @@ async def create_campaign(
     current_user: User = Depends(get_current_user)
 ):
     """Create new email campaign with advanced targeting support"""
-    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     
     marketing = get_marketing_service(get_db())
@@ -260,7 +260,7 @@ async def list_campaigns(
     current_user: User = Depends(get_current_user)
 ):
     """List email campaigns with optional status filter"""
-    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     
     marketing = get_marketing_service(get_db())
@@ -280,7 +280,7 @@ async def get_campaign(
     current_user: User = Depends(get_current_user)
 ):
     """Get campaign by ID"""
-    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     
     marketing = get_marketing_service(get_db())
@@ -301,7 +301,7 @@ async def update_campaign(
     current_user: User = Depends(get_current_user)
 ):
     """Update draft or scheduled campaign"""
-    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     
     marketing = get_marketing_service(get_db())
@@ -333,7 +333,7 @@ async def send_test_email(
     current_user: User = Depends(get_current_user)
 ):
     """Send test email for campaign preview"""
-    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     
     test_email = data.get("email")
@@ -366,7 +366,7 @@ async def schedule_campaign(
     current_user: User = Depends(get_current_user)
 ):
     """Schedule campaign for sending"""
-    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     
     scheduled_at = data.get("scheduled_at")
@@ -398,7 +398,7 @@ async def send_campaign_now(
     current_user: User = Depends(get_current_user)
 ):
     """Send campaign immediately"""
-    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     
     marketing = get_marketing_service(get_db())
@@ -426,7 +426,7 @@ async def cancel_campaign(
     current_user: User = Depends(get_current_user)
 ):
     """Cancel scheduled campaign"""
-    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     
     reason = data.get("reason", "")
@@ -458,7 +458,7 @@ async def get_campaign_stats(
     current_user: User = Depends(get_current_user)
 ):
     """Get campaign statistics with open/click rates"""
-    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     
     marketing = get_marketing_service(get_db())
@@ -483,7 +483,7 @@ async def get_campaign_events(
     current_user: User = Depends(get_current_user)
 ):
     """Get email events for a campaign"""
-    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     
     marketing = get_marketing_service(get_db())
@@ -505,7 +505,7 @@ async def get_marketing_audit_logs(
     current_user: User = Depends(get_current_user)
 ):
     """Get marketing audit logs"""
-    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     
     query = {}
@@ -524,7 +524,7 @@ async def get_marketing_audit_logs(
 @email_marketing_ext_router.delete("/admin/marketing/campaigns/{campaign_id}")
 async def delete_campaign(campaign_id: str, current_user: User = Depends(get_current_user)):
     """Delete a campaign by ID."""
-    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_db()
@@ -547,7 +547,7 @@ async def delete_campaign(campaign_id: str, current_user: User = Depends(get_cur
 @email_marketing_ext_router.post("/admin/marketing/campaigns/{campaign_id}/resend")
 async def resend_campaign(campaign_id: str, current_user: User = Depends(get_current_user)):
     """Re-send a completed or failed campaign."""
-    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_db()
@@ -583,7 +583,7 @@ async def resend_campaign(campaign_id: str, current_user: User = Depends(get_cur
 @email_marketing_ext_router.post("/admin/marketing/campaigns/{campaign_id}/clone")
 async def clone_campaign(campaign_id: str, current_user: User = Depends(get_current_user)):
     """Clone a campaign as a new draft."""
-    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_db()
@@ -629,7 +629,7 @@ async def clone_campaign(campaign_id: str, current_user: User = Depends(get_curr
 @email_marketing_ext_router.get("/admin/marketing/config")
 async def get_marketing_config(current_user: User = Depends(get_current_user)):
     """Get marketing email configuration status"""
-    if current_user.role not in ["admin", "super_admin"] and not current_user.email.endswith("@bidvex.com"):
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     
     marketing = get_marketing_service(get_db())

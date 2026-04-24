@@ -6,7 +6,8 @@ import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { toast } from 'sonner';
-import { Shield, AlertTriangle, TrendingUp, Users, MessageSquare, Eye, Loader2 } from 'lucide-react';
+import { ConfirmDialog } from '../../components/ui/confirm-dialog';
+import { Shield, AlertTriangle, TrendingUp, Users, MessageSquare, Eye, Loader2, UserX, Unlock } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 const API = API_BASE;
@@ -18,6 +19,26 @@ const TrustSafetyDashboard = () => {
   const [collusionPatterns, setCollusionPatterns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [scanningListing, setScanningListing] = useState(null);
+  const [confirm, setConfirm] = useState(null);
+
+  const banUser = async (userId, status) => {
+    const reason = window.prompt(
+      status === 'banned'
+        ? 'Reason for ban (required): / Raison du bannissement (requis) :'
+        : 'Reason (optional): / Raison (optionnel) :'
+    );
+    if (status === 'banned' && !reason) {
+      toast.error('A reason is required when banning / Une raison est requise');
+      return;
+    }
+    await axios.put(`${API}/admin/users/${userId}/status`, { status, reason: reason || '' });
+    toast.success(
+      status === 'banned' ? 'User banned' :
+      status === 'suspended' ? 'User suspended' :
+      'User restored to active'
+    );
+    fetchData();
+  };
 
   useEffect(() => {
     fetchData();
@@ -165,8 +186,48 @@ const TrustSafetyDashboard = () => {
                         {user.risk_level.toUpperCase()}
                       </Badge>
                       {user.risk_level === 'high' && (
-                        <Button size="sm" variant="destructive" onClick={() => handleAutoAction(user.user_id, 'suspend_messaging')}>Auto-Suspend</Button>
+                        <>
+                          <Button size="sm" variant="outline" onClick={() => handleAutoAction(user.user_id, 'suspend_messaging')} data-testid={`suspend-msg-btn-${user.user_id}`}>
+                            <MessageSquare className="h-3 w-3 mr-1" /> Block Msg
+                          </Button>
+                          <Button size="sm" variant="outline" className="text-amber-700 border-amber-300"
+                            onClick={() => setConfirm({
+                              title: 'Suspend this user account?',
+                              description: `Suspend ${user.email} — they keep their account but can't bid, buy, list, or message.\n\nSuspendre le compte : l'utilisateur garde son compte mais ne peut pas enchérir, acheter, lister ni envoyer de messages.`,
+                              confirmText: 'Suspend',
+                              onConfirm: () => banUser(user.user_id, 'suspended'),
+                            })}
+                            data-testid={`suspend-user-btn-${user.user_id}`}
+                          >
+                            <Loader2 className="h-3 w-3 mr-1 hidden" /> Suspend
+                          </Button>
+                          <Button size="sm" variant="destructive"
+                            onClick={() => setConfirm({
+                              title: 'BAN this user permanently?',
+                              description: `Ban ${user.email} from BidVex. They will lose all access.\n\nBannir l'utilisateur définitivement de BidVex. Il perdra tout accès.`,
+                              variant: 'destructive',
+                              confirmText: 'Ban User',
+                              onConfirm: () => banUser(user.user_id, 'banned'),
+                            })}
+                            data-testid={`ban-user-btn-${user.user_id}`}
+                          >
+                            <UserX className="h-3 w-3 mr-1" /> Ban
+                          </Button>
+                        </>
                       )}
+                      {user.status === 'banned' || user.status === 'suspended' ? (
+                        <Button size="sm" variant="outline"
+                          onClick={() => setConfirm({
+                            title: 'Restore user to active?',
+                            description: `Restore ${user.email}'s account to active status.`,
+                            confirmText: 'Restore',
+                            onConfirm: () => banUser(user.user_id, 'active'),
+                          })}
+                          data-testid={`restore-user-btn-${user.user_id}`}
+                        >
+                          <Unlock className="h-3 w-3 mr-1" /> Restore
+                        </Button>
+                      ) : null}
                     </div>
                   </div>
                 ))}
@@ -266,6 +327,7 @@ const TrustSafetyDashboard = () => {
           </Card>
         </TabsContent>
       </Tabs>
+      <ConfirmDialog state={confirm} onClose={() => setConfirm(null)} />
     </div>
   );
 };

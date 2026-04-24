@@ -484,8 +484,11 @@ def get_minimum_increment(auction: dict, current_bid: float) -> float:
 
 class SiteModeUpdate(BaseModel):
     mode: str = Field(..., description="Site mode: live, maintenance, coming_soon")
-    message: Optional[str] = None
+    message: Optional[str] = None            # EN (back-compat field)
+    message_fr: Optional[str] = None         # FR
     expected_back: Optional[str] = None
+    scheduled_start: Optional[str] = None    # ISO datetime for scheduled maintenance window
+    scheduled_end: Optional[str] = None
     social_links: Optional[dict] = None
 
 class EmailSubscription(BaseModel):

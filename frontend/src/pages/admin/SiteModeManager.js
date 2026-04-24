@@ -76,6 +76,9 @@ const SiteModeManager = () => {
   const [currentMode, setCurrentMode] = useState('live');
   const [message, setMessage] = useState('');
   const [expectedBack, setExpectedBack] = useState('');
+  const [messageFr, setMessageFr] = useState('');
+  const [scheduledStart, setScheduledStart] = useState('');
+  const [scheduledEnd, setScheduledEnd] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [updatedAt, setUpdatedAt] = useState(null);
@@ -111,7 +114,10 @@ const SiteModeManager = () => {
       });
       setCurrentMode(response.data.mode || 'live');
       setMessage(response.data.message || '');
+      setMessageFr(response.data.message_fr || '');
       setExpectedBack(response.data.expected_back || '');
+      setScheduledStart(response.data.scheduled_start || '');
+      setScheduledEnd(response.data.scheduled_end || '');
       setSocialLinks(response.data.social_links || { twitter: '', facebook: '', instagram: '', linkedin: '' });
       setUpdatedAt(response.data.updated_at);
     } catch (error) {
@@ -163,7 +169,10 @@ const SiteModeManager = () => {
       await axios.put(`${API}/admin/site-mode`, {
         mode: currentMode,
         message: message || null,
+        message_fr: messageFr || null,
         expected_back: expectedBack || null,
+        scheduled_start: scheduledStart || null,
+        scheduled_end: scheduledEnd || null,
         social_links: socialLinks
       }, {
         headers: { Authorization: `Bearer ${token}` }
@@ -368,28 +377,61 @@ const SiteModeManager = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Custom Message (Optional)</Label>
+              <Label>Custom Message — English <span className="text-xs text-muted-foreground">(Optional)</span></Label>
               <Textarea
                 placeholder="Enter a custom message for visitors..."
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 rows={3}
+                data-testid="site-mode-message-en"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Custom Message — Français <span className="text-xs text-muted-foreground">(Optionnel)</span></Label>
+              <Textarea
+                placeholder="Entrez un message personnalisé en français..."
+                value={messageFr}
+                onChange={(e) => setMessageFr(e.target.value)}
+                rows={3}
+                data-testid="site-mode-message-fr"
               />
               <p className="text-xs text-muted-foreground">
-                Leave empty to use the default message
+                Shown to French-speaking visitors. Leave empty to use English for both.
               </p>
             </div>
-            
-            <div className="space-y-2">
-              <Label>Expected Back Online (Optional)</Label>
-              <Input
-                type="datetime-local"
-                value={expectedBack}
-                onChange={(e) => setExpectedBack(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                If set, a countdown timer will be displayed
-              </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <Label>Expected Back Online</Label>
+                <Input
+                  type="datetime-local"
+                  value={expectedBack}
+                  onChange={(e) => setExpectedBack(e.target.value)}
+                  data-testid="site-mode-expected-back"
+                />
+                <p className="text-xs text-muted-foreground">Display as countdown</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Scheduled Start</Label>
+                <Input
+                  type="datetime-local"
+                  value={scheduledStart}
+                  onChange={(e) => setScheduledStart(e.target.value)}
+                  data-testid="site-mode-scheduled-start"
+                />
+                <p className="text-xs text-muted-foreground">Auto-activate at this time</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Scheduled End</Label>
+                <Input
+                  type="datetime-local"
+                  value={scheduledEnd}
+                  onChange={(e) => setScheduledEnd(e.target.value)}
+                  data-testid="site-mode-scheduled-end"
+                />
+                <p className="text-xs text-muted-foreground">Auto-revert to live</p>
+              </div>
             </div>
           </CardContent>
         </Card>

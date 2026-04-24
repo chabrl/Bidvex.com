@@ -1,0 +1,55 @@
+{
+  "summary": "Backend-only regression for Phase 1 admin panel repair sprint (iter 154). Verified the critical security fix (25 admin endpoints previously rejected charbel911@gmail.com with 403 due to email.endswith('@bidvex.com') — now use role-based admin check) and the new /api/admin/vehicle-deposits router. 21/21 pytest tests PASSED. No regressions detected.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_admin_audit_iter154.py",
+    "/app/test_reports/pytest/iter154.xml"
+  ],
+  "what_was_tested": [
+    "POST /api/auth/login with charbel911@gmail.com — 200 + token",
+    "PUT /api/admin/site-mode with full bilingual + scheduled payload — 200 {success:true} (was 403 pre-fix)",
+    "PUT /api/admin/site-mode invalid mode — 400",
+    "PUT /api/admin/site-mode no auth — 401/403",
+    "GET /api/admin/vehicle-deposits unauth — 401/403",
+    "GET /api/admin/vehicle-deposits admin — 200 {count,deposits[]}",
+    "GET /api/admin/vehicle-deposits/nonexistent-id — 404",
+    "POST /api/admin/vehicle-deposits/nonexistent-id/release — 404",
+    "POST /api/admin/vehicle-deposits/nonexistent-id/capture — 404",
+    "POST /api/admin/vehicle-deposits/{id}/release unauth — 401/403",
+    "PUT /api/admin/users/{id}/status invalid status — 400",
+    "PUT /api/admin/users/{id}/status happy path (suspend→restore) — 200",
+    "PUT /api/admin/users/nonexistent/status — 404",
+    "GET /api/admin/trust-safety/scores — 200 (was 403 pre-fix for charbel)",
+    "GET /api/escrow/admin/escrow/transactions — 200",
+    "GET /api/escrow/admin/escrow/penalties — 200",
+    "GET /api/escrow/admin/escrow/disputes — 200",
+    "POST /api/escrow/admin/charge-penalty — NOT 403 (role gate passes; Stripe downstream skipped per scope)",
+    "GET /api/health — 200",
+    "localhost:8001/openapi.json paths include all 4 new /api/admin/vehicle-deposits routes"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routes/admin_deposits.py status-gate allows release/capture only when deposit.status in ('paid','authorized') — good. However PaymentService.process_deposit_refund / capture_deposit are NOT idempotent by test; recommend main agent verify double-click protection persists status transition before Stripe call to avoid race (frontend actionBusy helps but server should enforce).",
+    "routes/site_mode.py update_site_mode persists scheduled_start/scheduled_end but GET /api/site-mode (public) does NOT echo message_fr / scheduled_start / scheduled_end. If the coming-soon / maintenance page needs them, update the public GET response shape (currently returns mode, message, expected_back, social_links only).",
+    "routes/admin.py update_user_status: performs db.users.update_one keyed on 'id' — confirm user schema uses 'id' not '_id' elsewhere; consistent with rest of codebase based on tests passing.",
+    "openapi.json is only reachable via localhost (ingress strips non-/api paths) — fine for internal inspection, but /api/openapi.json is 404. If main agent wants admin-facing API docs, either mount openapi under /api or expose /api/docs explicitly."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_admin_audit_iter154.py (new pytest file, 21 tests, all passing)"
+  ],
+  "success_rate": {"backend": "100% (21/21)", "frontend": "not tested (out of scope)"},
+  "test_credentials": "charbel911@gmail.com / Anderosli123!@# (admin) — verified working",
+  "seed_data_creation": "None. test_update_user_status_happy_path toggles an existing non-admin user's status to suspended then restores to active (idempotent cleanup).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter 154 backend-only. All Phase-1 admin security fixes verified. When frontend UI testing is needed, focus on: AdminEscrowManager Vehicle Deposits tab (release/capture confirm modals), SiteModeManager (FR message + schedule fields), TrustSafetyDashboard ban/suspend/restore buttons, VehicleAdminManager double-click protection. The admin login token from POST /api/auth/login uses 'access_token' key (fixture handles both 'access_token' and 'token').",
+  "rca_of_the_issue": "N/A — no bugs found this iteration. All 25 formerly-broken admin endpoints now accept charbel911@gmail.com. New /api/admin/vehicle-deposits routes behave correctly: 404 on missing ids, 401/403 without auth, 200 with proper shape for admin."
+}

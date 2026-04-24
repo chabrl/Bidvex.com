@@ -45,7 +45,7 @@ const formatDate = (date) => {
 };
 
 // Seller Card Component
-const SellerCard = ({ seller, onApprove, onReject, onViewDetails }) => {
+const SellerCard = ({ seller, onApprove, onReject, onViewDetails, actionBusy }) => {
   const [expanded, setExpanded] = useState(false);
   
   const getSellerTypeIcon = (type) => {
@@ -186,13 +186,17 @@ const SellerCard = ({ seller, onApprove, onReject, onViewDetails }) => {
                 <Button 
                   onClick={() => onApprove(seller)}
                   className="gap-2 bg-green-600 hover:bg-green-700"
+                  disabled={actionBusy === `seller-${seller.id}`}
+                  data-testid={`approve-seller-btn-${seller.id}`}
                 >
-                  <CheckCircle className="h-4 w-4" /> Approve Seller
+                  <CheckCircle className="h-4 w-4" /> {actionBusy === `seller-${seller.id}` ? 'Approving…' : 'Approve Seller'}
                 </Button>
                 <Button 
                   variant="destructive"
                   onClick={() => onReject(seller)}
                   className="gap-2"
+                  disabled={!!actionBusy}
+                  data-testid={`reject-seller-btn-${seller.id}`}
                 >
                   <XCircle className="h-4 w-4" /> Reject
                 </Button>
@@ -206,7 +210,7 @@ const SellerCard = ({ seller, onApprove, onReject, onViewDetails }) => {
 };
 
 // Vehicle Listing Card Component
-const VehicleListingCard = ({ vehicle, onApprove, onReject, onView }) => {
+const VehicleListingCard = ({ vehicle, onApprove, onReject, onView, actionBusy }) => {
   const [expanded, setExpanded] = useState(false);
   
   const getStatusBadge = (status) => {
@@ -336,13 +340,17 @@ const VehicleListingCard = ({ vehicle, onApprove, onReject, onView }) => {
                   <Button 
                     onClick={() => onApprove(vehicle)}
                     className="gap-2 bg-green-600 hover:bg-green-700"
+                    disabled={actionBusy === `vehicle-${vehicle.id}`}
+                    data-testid={`approve-vehicle-btn-${vehicle.id}`}
                   >
-                    <CheckCircle className="h-4 w-4" /> Approve Listing
+                    <CheckCircle className="h-4 w-4" /> {actionBusy === `vehicle-${vehicle.id}` ? 'Approving…' : 'Approve Listing'}
                   </Button>
                   <Button 
                     variant="destructive"
                     onClick={() => onReject(vehicle)}
                     className="gap-2"
+                    disabled={!!actionBusy}
+                    data-testid={`reject-vehicle-btn-${vehicle.id}`}
                   >
                     <XCircle className="h-4 w-4" /> Reject
                   </Button>
@@ -378,6 +386,7 @@ const VehicleAdminManager = () => {
   // Dialog states
   const [rejectDialog, setRejectDialog] = useState({ open: false, item: null, type: null });
   const [rejectReason, setRejectReason] = useState('');
+  const [actionBusy, setActionBusy] = useState(null); // id-string for the row currently processing
   
   // Stats
   const [stats, setStats] = useState({
@@ -474,6 +483,8 @@ const VehicleAdminManager = () => {
   }, [fetchData]);
 
   const handleApproveSeller = async (seller) => {
+    if (actionBusy) return;
+    setActionBusy(`seller-${seller.id}`);
     try {
       await axios.post(`${API}/vehicle-admin/sellers/${seller.id}/approve`, {}, {
         headers: { Authorization: `Bearer ${token}` }
@@ -482,6 +493,8 @@ const VehicleAdminManager = () => {
       fetchData();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to approve seller');
+    } finally {
+      setActionBusy(null);
     }
   };
 
@@ -490,7 +503,8 @@ const VehicleAdminManager = () => {
       toast.error('Please provide a rejection reason');
       return;
     }
-    
+    if (actionBusy) return;
+    setActionBusy(`reject-seller-${rejectDialog.item.id}`);
     try {
       await axios.post(`${API}/vehicle-admin/sellers/${rejectDialog.item.id}/reject?reason=${encodeURIComponent(rejectReason)}`, {}, {
         headers: { Authorization: `Bearer ${token}` }
@@ -501,10 +515,14 @@ const VehicleAdminManager = () => {
       fetchData();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to reject seller');
+    } finally {
+      setActionBusy(null);
     }
   };
 
   const handleApproveVehicle = async (vehicle) => {
+    if (actionBusy) return;
+    setActionBusy(`vehicle-${vehicle.id}`);
     try {
       await axios.post(`${API}/vehicle-admin/vehicles/${vehicle.id}/approve`, {}, {
         headers: { Authorization: `Bearer ${token}` }
@@ -513,6 +531,8 @@ const VehicleAdminManager = () => {
       fetchData();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to approve vehicle');
+    } finally {
+      setActionBusy(null);
     }
   };
 
@@ -521,7 +541,8 @@ const VehicleAdminManager = () => {
       toast.error('Please provide a rejection reason');
       return;
     }
-    
+    if (actionBusy) return;
+    setActionBusy(`reject-vehicle-${rejectDialog.item.id}`);
     try {
       await axios.post(`${API}/vehicle-admin/vehicles/${rejectDialog.item.id}/reject?reason=${encodeURIComponent(rejectReason)}`, {}, {
         headers: { Authorization: `Bearer ${token}` }
@@ -532,6 +553,8 @@ const VehicleAdminManager = () => {
       fetchData();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to reject vehicle');
+    } finally {
+      setActionBusy(null);
     }
   };
 
@@ -810,6 +833,7 @@ const VehicleAdminManager = () => {
                   seller={seller}
                   onApprove={handleApproveSeller}
                   onReject={(s) => openRejectDialog(s, 'seller')}
+                  actionBusy={actionBusy}
                 />
               ))}
             </div>
@@ -833,6 +857,7 @@ const VehicleAdminManager = () => {
                   onApprove={handleApproveVehicle}
                   onReject={(v) => openRejectDialog(v, 'vehicle')}
                   onView={(v) => window.open(`/vehicle-auctions/${v.id}`, '_blank')}
+                  actionBusy={actionBusy}
                 />
               ))}
             </div>
@@ -1248,9 +1273,10 @@ const VehicleAdminManager = () => {
             <Button 
               variant="destructive"
               onClick={rejectDialog.type === 'seller' ? handleRejectSeller : handleRejectVehicle}
-              disabled={!rejectReason.trim()}
+              disabled={!rejectReason.trim() || !!actionBusy}
+              data-testid="confirm-reject-btn"
             >
-              Reject
+              {actionBusy ? 'Rejecting…' : 'Reject'}
             </Button>
           </DialogFooter>
         </DialogContent>

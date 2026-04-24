@@ -73,7 +73,9 @@ async def update_site_mode(data: SiteModeUpdate, current_user: User = Depends(ge
     Valid modes: live, maintenance, coming_soon
     """
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
+    # FIX: role-based admin check (was brittle @bidvex.com email check which
+    # locked out primary admin charbel911@gmail.com).
+    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     if data.mode not in ["live", "maintenance", "coming_soon"]:
@@ -84,7 +86,10 @@ async def update_site_mode(data: SiteModeUpdate, current_user: User = Depends(ge
             "setting_id": "site_mode",
             "mode": data.mode,
             "message": data.message,
+            "message_fr": data.message_fr,
             "expected_back": data.expected_back,
+            "scheduled_start": data.scheduled_start,
+            "scheduled_end": data.scheduled_end,
             "social_links": data.social_links,
             "updated_at": datetime.now(timezone.utc).isoformat(),
             "updated_by": current_user.email
@@ -164,7 +169,7 @@ async def get_subscribers(
     Get all launch subscribers (admin only).
     """
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
+    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     try:
@@ -199,7 +204,7 @@ async def export_subscribers(current_user: User = Depends(get_current_user)):
     Export all subscribers as CSV (admin only).
     """
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
+    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     try:
@@ -230,7 +235,7 @@ async def delete_subscriber(subscriber_id: str, current_user: User = Depends(get
     Delete a subscriber (admin only).
     """
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
+    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     try:
@@ -254,7 +259,7 @@ async def get_subscriber_stats(current_user: User = Depends(get_current_user)):
     Get subscriber statistics (admin only).
     """
     db = get_db()
-    if not current_user.email.endswith("@bidvex.com"):
+    if getattr(current_user, "role", None) not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     try:
