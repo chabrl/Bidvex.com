@@ -209,8 +209,9 @@ Please answer the user's question using the context provided above. If the conte
             params = {
                 "messages": messages,
                 "api_key": self.api_key,
-                "max_tokens": 1024,
+                "max_tokens": 768,         # Reduced from 1024 for snappier responses
                 "temperature": 0.7,
+                "timeout": 25,             # 25s ceiling — prevents 4-min hangs on cold proxies
             }
             if self.is_emergent_key:
                 params["model"] = f"gemini/{self.model_name}"
@@ -222,7 +223,11 @@ Please answer the user's question using the context provided above. If the conte
             else:
                 params["model"] = f"gemini/{self.model_name}"
 
-            response = litellm.completion(**params)
+            # Use ASYNC variant so we don't block the event loop. The previous
+            # `litellm.completion` was synchronous and blocked the whole
+            # FastAPI worker — when the proxy was slow this caused 4+ minute
+            # response times because requests were serialized.
+            response = await litellm.acompletion(**params)
             response_text = response.choices[0].message.content
 
             # Check if user needs verification
