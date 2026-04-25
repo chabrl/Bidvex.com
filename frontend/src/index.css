@@ -2,6 +2,11 @@
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
+/* iPhone safe-area helpers (notch + home indicator) */
+.safe-area-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.safe-area-top { padding-top: env(safe-area-inset-top, 0px); }
+:root { --bidvex-mobile-nav-height: 64px; }
+
 /* BidVex CSS v2.0.1 - Build Date: 2026-01-08 - Cache Bust */
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap');
 

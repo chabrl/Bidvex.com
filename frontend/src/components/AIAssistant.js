@@ -7,11 +7,29 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 // Mobile bottom-nav height + safe gap. MobileBottomNav.js renders 64px nav
-// + safe-area-bottom; we add a 16px gap above it.
-const FAB_BOTTOM_OFFSET = 88;       // px above the bottom-nav
+// content + iPhone safe-area-inset-bottom (≈34px on iPhones with home indicator,
+// 0px on Android & iPads). We keep a 16px breathing-room gap above the nav.
+const MOBILE_NAV_HEIGHT = 64;       // matches --bidvex-mobile-nav-height
+const FAB_GAP = 16;                 // breathing room above the nav
 const FAB_RIGHT_OFFSET = 16;
 const FAB_SIZE = 56;                // 14 in tailwind ≈ 56px (3.5rem)
 const STORAGE_KEY = 'bidvex.fabPosition.v1';
+
+// Bottom inset (in px) including iPhone home-indicator safe area.
+// Read at runtime by querying a hidden element with `padding-bottom: env(...)`.
+const getSafeAreaBottom = () => {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return 0;
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;bottom:0;height:0;padding-bottom:env(safe-area-inset-bottom,0px);visibility:hidden;pointer-events:none;';
+  document.body.appendChild(probe);
+  const v = parseFloat(getComputedStyle(probe).paddingBottom) || 0;
+  document.body.removeChild(probe);
+  return v;
+};
+
+// Total floor offset from bottom of viewport that the FAB must respect:
+// nav-height + safe-area-inset-bottom + breathing gap.
+const getFabBottomFloor = () => MOBILE_NAV_HEIGHT + getSafeAreaBottom() + FAB_GAP;
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
@@ -36,7 +54,7 @@ const AIAssistant = () => {
   // Default sits the FAB above the mobile bottom-nav at the right edge.
   const computeDefaultPos = () => ({
     x: typeof window !== 'undefined' ? window.innerWidth - FAB_SIZE - FAB_RIGHT_OFFSET : 16,
-    y: typeof window !== 'undefined' ? window.innerHeight - FAB_SIZE - FAB_BOTTOM_OFFSET : 88,
+    y: typeof window !== 'undefined' ? window.innerHeight - FAB_SIZE - getFabBottomFloor() : 88,
   });
 
   const [fabPos, setFabPos] = useState(() => {
@@ -46,7 +64,7 @@ const AIAssistant = () => {
       if (saved && typeof saved.x === 'number' && typeof saved.y === 'number') {
         return {
           x: clamp(saved.x, 8, window.innerWidth - FAB_SIZE - 8),
-          y: clamp(saved.y, 8, window.innerHeight - FAB_SIZE - FAB_BOTTOM_OFFSET),
+          y: clamp(saved.y, 8, window.innerHeight - FAB_SIZE - getFabBottomFloor()),
         };
       }
     } catch { /* ignore */ }
@@ -60,7 +78,7 @@ const AIAssistant = () => {
     const onResize = () => {
       setFabPos((p) => ({
         x: clamp(p.x, 8, window.innerWidth - FAB_SIZE - 8),
-        y: clamp(p.y, 8, window.innerHeight - FAB_SIZE - FAB_BOTTOM_OFFSET),
+        y: clamp(p.y, 8, window.innerHeight - FAB_SIZE - getFabBottomFloor()),
       }));
     };
     window.addEventListener('resize', onResize);
@@ -98,7 +116,7 @@ const AIAssistant = () => {
     }
     if (!dragRef.current.moved) return;
     const nx = clamp(dragRef.current.origX + dx, 8, window.innerWidth - FAB_SIZE - 8);
-    const ny = clamp(dragRef.current.origY + dy, 8, window.innerHeight - FAB_SIZE - FAB_BOTTOM_OFFSET);
+    const ny = clamp(dragRef.current.origY + dy, 8, window.innerHeight - FAB_SIZE - getFabBottomFloor());
     setFabPos({ x: nx, y: ny });
   };
   const onPointerUp = () => {
@@ -239,8 +257,8 @@ const AIAssistant = () => {
             style={{
               left: '12px',
               right: '12px',
-              bottom: `${FAB_BOTTOM_OFFSET}px`,
-              maxHeight: 'calc(100vh - 140px)',
+              bottom: `calc(${MOBILE_NAV_HEIGHT}px + env(safe-area-inset-bottom, 0px) + ${FAB_GAP}px)`,
+              maxHeight: `calc(100vh - ${MOBILE_NAV_HEIGHT}px - env(safe-area-inset-bottom, 0px) - 64px)`,
             }}
           >
             {/* Header */}
