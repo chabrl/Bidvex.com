@@ -23,7 +23,22 @@ import httpx
 
 # ─── Environment ───
 ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env', override=False)
+# override=True so .env wins over the container's shell env. The Emergent
+# container ships a placeholder STRIPE_API_KEY=sk_test_emergent which isn't
+# a real Stripe key — we need the real one from .env.
+load_dotenv(ROOT_DIR / '.env', override=True)
+
+# Safety net: if STRIPE_API_KEY is the literal Emergent placeholder or
+# missing/expired-looking, fall back to STRIPE_TEST_SECRET_KEY (a real
+# Stripe test account provisioned for this project).
+_stripe_key = os.environ.get('STRIPE_API_KEY', '').strip()
+if not _stripe_key or _stripe_key == 'sk_test_emergent' or not _stripe_key.startswith(('sk_live_', 'sk_test_', 'rk_')):
+    _fallback = os.environ.get('STRIPE_TEST_SECRET_KEY', '').strip()
+    if _fallback.startswith('sk_test_'):
+        os.environ['STRIPE_API_KEY'] = _fallback
+        logging.getLogger(__name__).warning(
+            "[STRIPE] STRIPE_API_KEY missing/placeholder — using STRIPE_TEST_SECRET_KEY fallback"
+        )
 
 mongo_url = os.environ.get('MONGO_URL')
 db_name = os.environ.get('DB_NAME', 'bazario_db')
