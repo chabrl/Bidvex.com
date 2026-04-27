@@ -169,6 +169,22 @@ const PhoneVerificationRoute = ({ children }) => {
   return children;
 };
 
+// Convenience redirect: /dashboard → role-aware dashboard
+const DashboardRedirect = () => {
+  const { user, loading } = useAuth();
+  const location = useLocation();
+
+  if (loading) return <PageLoader />;
+  if (!user) return <Navigate to="/auth" state={{ from: location }} replace />;
+  if (user.role === 'admin' || user.role === 'super_admin') {
+    return <Navigate to="/admin" replace />;
+  }
+  if (user.role === 'seller' || user.account_type === 'business') {
+    return <Navigate to="/seller/dashboard" replace />;
+  }
+  return <Navigate to="/buyer/dashboard" replace />;
+};
+
 const FooterWrapper = () => {
   const location = useLocation();
   if (location.pathname === '/messages') return null;
@@ -305,6 +321,10 @@ const App = () => {
           <Route path="/buyer/dashboard" element={
             <ProtectedRoute><BuyerDashboard /></ProtectedRoute>
           } />
+          {/* Convenience aliases — /dashboard, /seller-dashboard, /buyer-dashboard */}
+          <Route path="/dashboard" element={<DashboardRedirect />} />
+          <Route path="/seller-dashboard" element={<Navigate to="/seller/dashboard" replace />} />
+          <Route path="/buyer-dashboard" element={<Navigate to="/buyer/dashboard" replace />} />
           <Route path="/create-listing" element={
             <ProtectedRoute><CreateListingPage /></ProtectedRoute>
           } />

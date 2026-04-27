@@ -1,6 +1,24 @@
 # BidVex Changelog
 
 
+## Apr 27, 2026 (Late) — Two micro-fixes before final deploy — DONE
+
+### Fix 1: `/dashboard` 404 → role-aware redirect
+- `frontend/src/App.js`: NEW `<DashboardRedirect />` component +
+  - `/dashboard` → `<DashboardRedirect />` (role-aware)
+  - `/seller-dashboard` → `<Navigate to="/seller/dashboard" replace />`
+  - `/buyer-dashboard` → `<Navigate to="/buyer/dashboard" replace />`
+- Logic: anonymous → `/auth` ; admin/super_admin → `/admin` ; seller or business → `/seller/dashboard` ; everyone else → `/buyer/dashboard`.
+- Verified live in preview: anonymous `/dashboard` → `/auth` ✅; admin `/dashboard` → `/admin` (Admin Control Panel renders) ✅.
+
+### Fix 2: React `fetchPriority` casing warning
+- `frontend/src/pages/AboutUsPage.js`: `fetchPriority="high"` → `fetchpriority="high"` (lowercase).
+- `Navbar.js` was already lowercase; AboutUsPage was the lone offender.
+- Confirmed `grep -r 'fetchPriority' frontend/src` returns 0 matches.
+
+---
+
+
 ## Apr 27, 2026 (PM) — Final 3 P3/P2 Polish + Live Auctions Pill — DONE
 
 ### Fix 1 (P3): Footer GET /api/site-config/legal-pages 500 → 200

@@ -61,8 +61,7 @@
 - (P2) Custom date range picker on admin analytics
 - (Enhancement) Dispute resolution & admin offline order management
 - (Enhancement) Scheduler job to auto-capture $500 deposit when fee invoice goes unpaid past deadline
-- (P3) React `fetchpriority` casing warning x2 on page load — cosmetic, surfaced in iter159
-- (P3) `/dashboard` URL returns 404 — route not registered; real dashboards live at /buyer-dashboard, /seller-dashboard, /admin
+- (Enhancement) "Recently Sold" rolling ticker beside the Live Auctions pill once you have ~10+ active listings
 
 ## Test credentials
 - Admin: `charbel911@gmail.com` / `Anderosli123!@#` (role=admin)
