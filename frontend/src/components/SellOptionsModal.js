@@ -64,15 +64,15 @@ const SellOptionsModal = ({ isOpen, onClose }) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl max-w-[calc(100vw-1.5rem)] p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold">Choose Listing Type</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-xl sm:text-2xl font-bold">Choose Listing Type</DialogTitle>
+          <DialogDescription className="text-xs sm:text-sm">
             Select the type of auction you want to create
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid md:grid-cols-2 gap-4 mt-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mt-3 sm:mt-4">
           {/* Partner Fee Lockdown Banner */}
           {isPartnerLocked && (
             <div className="md:col-span-2 rounded-lg border border-amber-200 bg-amber-50 p-5" data-testid="partner-fee-lockdown-banner">
@@ -106,35 +106,35 @@ const SellOptionsModal = ({ isOpen, onClose }) => {
             className={`transition-all duration-200 border-2 ${
               isPartnerLocked 
                 ? 'opacity-50 cursor-not-allowed bg-gray-50' 
-                : 'cursor-pointer hover:shadow-lg hover:scale-105 hover:border-primary'
+                : 'cursor-pointer hover:shadow-lg hover:border-primary'
             }`}
             onClick={() => handleSelectOption('/create-listing')}
             data-testid="sell-option-single"
           >
-            <CardContent className="p-6">
-              <div className="flex flex-col items-center text-center space-y-4">
-                <div className="p-4 bg-primary/10 rounded-full">
-                  <Package className="h-12 w-12 text-primary" />
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex flex-col items-center text-center space-y-3 sm:space-y-4">
+                <div className="p-3 sm:p-4 bg-primary/10 rounded-full">
+                  <Package className="h-9 w-9 sm:h-12 sm:w-12 text-primary" />
                 </div>
-                <h3 className="text-xl font-semibold">Single Item Listing</h3>
-                <p className="text-sm text-muted-foreground">
+                <h3 className="text-lg sm:text-xl font-semibold">Single Item Listing</h3>
+                <p className="text-xs sm:text-sm text-muted-foreground">
                   Perfect for selling individual items or single products
                 </p>
-                <ul className="text-sm text-left space-y-2 w-full">
+                <ul className="text-xs sm:text-sm text-left space-y-1.5 sm:space-y-2 w-full">
                   <li className="flex items-center gap-2">
-                    <ArrowRight className="h-4 w-4 text-primary" />
+                    <ArrowRight className="h-4 w-4 text-primary flex-shrink-0" />
                     One item per auction
                   </li>
                   <li className="flex items-center gap-2">
-                    <ArrowRight className="h-4 w-4 text-primary" />
+                    <ArrowRight className="h-4 w-4 text-primary flex-shrink-0" />
                     Simple setup process
                   </li>
                   <li className="flex items-center gap-2">
-                    <ArrowRight className="h-4 w-4 text-primary" />
+                    <ArrowRight className="h-4 w-4 text-primary flex-shrink-0" />
                     Quick to create
                   </li>
                 </ul>
-                <Button className="w-full gradient-button text-white border-0">
+                <Button className="w-full gradient-button text-white border-0" data-testid="single-listing-cta">
                   Create Single Listing
                 </Button>
               </div>
@@ -143,56 +143,38 @@ const SellOptionsModal = ({ isOpen, onClose }) => {
 
           {/* Multi-Item Auction Option */}
           <Card 
-            className={`transition-all duration-200 border-2 ${
-              canAccessMultiLot 
-                ? 'cursor-pointer hover:shadow-lg hover:scale-105 hover:border-primary' 
-                : 'opacity-75 cursor-not-allowed bg-gray-50'
-            }`}
+            className="transition-all duration-200 border-2 cursor-pointer hover:shadow-lg hover:border-primary"
             onClick={() => handleSelectOption('/create-multi-item-listing')}
+            data-testid="sell-option-multi"
           >
-            <CardContent className="p-6">
-              <div className="flex flex-col items-center text-center space-y-4">
-                <div className={`p-4 rounded-full ${canAccessMultiLot ? 'bg-purple-500/10' : 'bg-gray-200'}`}>
-                  {canAccessMultiLot ? (
-                    <Layers className="h-12 w-12 text-purple-600" />
-                  ) : (
-                    <Lock className="h-12 w-12 text-gray-400" />
-                  )}
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex flex-col items-center text-center space-y-3 sm:space-y-4">
+                <div className="p-3 sm:p-4 rounded-full bg-purple-500/10">
+                  <Layers className="h-9 w-9 sm:h-12 sm:w-12 text-purple-600" />
                 </div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-xl font-semibold">Multi-Item Auction</h3>
-                  {!canAccessMultiLot && (
-                    <Badge variant="secondary" className="bg-amber-100 text-amber-700">
-                      Business Only
-                    </Badge>
-                  )}
-                </div>
-                <p className="text-sm text-muted-foreground">
+                <h3 className="text-lg sm:text-xl font-semibold">Multi-Item Auction</h3>
+                <p className="text-xs sm:text-sm text-muted-foreground">
                   Ideal for bulk sales, liquidations, or multiple related items
                 </p>
-                <ul className="text-sm text-left space-y-2 w-full">
+                <ul className="text-xs sm:text-sm text-left space-y-1.5 sm:space-y-2 w-full">
                   <li className="flex items-center gap-2">
-                    <ArrowRight className={`h-4 w-4 ${canAccessMultiLot ? 'text-purple-600' : 'text-gray-400'}`} />
+                    <ArrowRight className="h-4 w-4 text-purple-600 flex-shrink-0" />
                     Multiple lots in one auction
                   </li>
                   <li className="flex items-center gap-2">
-                    <ArrowRight className={`h-4 w-4 ${canAccessMultiLot ? 'text-purple-600' : 'text-gray-400'}`} />
+                    <ArrowRight className="h-4 w-4 text-purple-600 flex-shrink-0" />
                     Staggered bidding (1-min intervals)
                   </li>
                   <li className="flex items-center gap-2">
-                    <ArrowRight className={`h-4 w-4 ${canAccessMultiLot ? 'text-purple-600' : 'text-gray-400'}`} />
+                    <ArrowRight className="h-4 w-4 text-purple-600 flex-shrink-0" />
                     Higher visibility
                   </li>
                 </ul>
                 <Button 
-                  className={`w-full ${
-                    canAccessMultiLot 
-                      ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white border-0 hover:opacity-90' 
-                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  }`}
-                  disabled={!canAccessMultiLot}
+                  className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white border-0 hover:opacity-90"
+                  data-testid="multi-listing-cta"
                 >
-                  {canAccessMultiLot ? 'Create Multi-Item Auction' : 'Upgrade to Business Account'}
+                  Create Multi-Item Auction
                 </Button>
               </div>
             </CardContent>

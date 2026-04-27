@@ -41,8 +41,6 @@ const MobileBottomNav = () => {
   const handleSellOption = (path) => {
     if (!user) {
       navigate('/auth');
-    } else if (path === '/create-multi-item-listing' && !canCreateMultiLot(user)) {
-      alert(t('mobileNav.businessRequired'));
     } else {
       navigate(path);
     }
@@ -61,21 +59,22 @@ const MobileBottomNav = () => {
               </button>
             </div>
             <div className="space-y-2">
-              <button onClick={() => handleSellOption('/create-listing')} className="w-full flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
-                <FileText className="h-6 w-6 text-primary" />
-                <div className="text-left">
-                  <p className="font-semibold">{t('mobileNav.singleItem')}</p>
-                  <p className="text-xs text-muted-foreground">{t('mobileNav.singleItemDesc')}</p>
+              <button onClick={() => handleSellOption('/create-listing')} className="w-full flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors border border-gray-200 dark:border-gray-700" data-testid="mobile-sell-single">
+                <div className="p-3 rounded-full bg-primary/10 flex-shrink-0">
+                  <FileText className="h-6 w-6 text-primary" />
+                </div>
+                <div className="text-left flex-1 min-w-0">
+                  <p className="font-semibold truncate">{t('mobileNav.singleItem')}</p>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{t('mobileNav.singleItemDesc')}</p>
                 </div>
               </button>
-              <button onClick={() => handleSellOption('/create-multi-item-listing')} className="w-full flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
-                <Layers className="h-6 w-6 text-primary" />
-                <div className="text-left">
-                  <p className="font-semibold">{t('mobileNav.multiLot')}</p>
-                  <p className="text-xs text-muted-foreground">{t('mobileNav.multiLotDesc')}</p>
-                  {user && user.account_type !== 'business' && (
-                    <p className="text-xs text-amber-500 mt-1">{t('mobileNav.businessRequired')}</p>
-                  )}
+              <button onClick={() => handleSellOption('/create-multi-item-listing')} className="w-full flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors border border-gray-200 dark:border-gray-700" data-testid="mobile-sell-multi">
+                <div className="p-3 rounded-full bg-purple-500/10 flex-shrink-0">
+                  <Layers className="h-6 w-6 text-purple-600" />
+                </div>
+                <div className="text-left flex-1 min-w-0">
+                  <p className="font-semibold truncate">{t('mobileNav.multiLot')}</p>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{t('mobileNav.multiLotDesc')}</p>
                 </div>
               </button>
             </div>

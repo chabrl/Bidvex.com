@@ -98,12 +98,12 @@ const SellerDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen py-8 px-4" data-testid="seller-dashboard">
-      <div className="max-w-7xl mx-auto space-y-8">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-3xl font-bold">{t('dashboard.seller.title')}</h1>
+    <div className="min-h-screen py-4 sm:py-8 px-3 sm:px-4 pb-24 lg:pb-8" data-testid="seller-dashboard">
+      <div className="max-w-7xl mx-auto space-y-5 sm:space-y-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
+          <div className="w-full sm:w-auto">
+            <div className="flex items-center gap-3 mb-2 flex-wrap">
+              <h1 className="text-2xl sm:text-3xl font-bold">{t('dashboard.seller.title')}</h1>
               {/* Tax Status Badge */}
               {user.tax_onboarding_completed && (
                 <Badge className={
@@ -119,113 +119,119 @@ const SellerDashboard = () => {
                 </Badge>
               )}
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs sm:text-sm text-muted-foreground">
               {user.account_type === 'business' ? t('dashboard.seller.businessAccount') : t('dashboard.seller.personalAccount')} - 
               {t('dashboard.seller.commissionRate')}: {user.subscription_tier === 'vip' ? '2%' : user.subscription_tier === 'premium' ? '2.5%' : '4%'}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
             <Button
-              className="gradient-button text-white border-0"
+              className="gradient-button text-white border-0 flex-1 sm:flex-initial min-w-0"
               onClick={() => navigate('/create-listing')}
               data-testid="create-listing-btn"
             >
-              <Plus className="mr-2 h-4 w-4" />
-              {t('dashboard.seller.createListing')}
+              <Plus className="mr-1.5 sm:mr-2 h-4 w-4 flex-shrink-0" />
+              <span className="truncate">{t('dashboard.seller.createListing')}</span>
             </Button>
             {canCreateMultiLot(user) && (
               <Button
                 variant="outline"
+                className="flex-1 sm:flex-initial min-w-0"
                 onClick={() => navigate('/create-multi-item-listing')}
                 data-testid="create-lot-btn"
               >
-                <Package className="mr-2 h-4 w-4" />
-                {t('dashboard.seller.createLot', 'Create Lot')}
+                <Package className="mr-1.5 sm:mr-2 h-4 w-4 flex-shrink-0" />
+                <span className="truncate">{t('dashboard.seller.createLot', 'Create Lot')}</span>
               </Button>
             )}
             <Button
               variant="outline"
+              className="flex-1 sm:flex-initial min-w-0"
               onClick={() => navigate('/client-marketing')}
               data-testid="client-marketing-btn"
             >
-              <Mail className="mr-2 h-4 w-4" />
-              {t('dashboard.seller.clientMarketing', 'Marketing')}
+              <Mail className="mr-1.5 sm:mr-2 h-4 w-4 flex-shrink-0" />
+              <span className="truncate">{t('dashboard.seller.clientMarketing', 'Marketing')}</span>
             </Button>
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex border-b border-slate-200 dark:border-slate-700">
+        {/* Tab Navigation — horizontally scrollable on mobile */}
+        <div className="border-b border-slate-200 dark:border-slate-700 -mx-4 sm:mx-0 px-4 sm:px-0">
+          <div className="flex overflow-x-auto no-scrollbar -mb-px scroll-smooth" data-testid="seller-tabs">
           <button
             onClick={() => setActiveTab('listings')}
-            className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 -mb-px ${
+            className={`px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-colors border-b-2 whitespace-nowrap flex-shrink-0 ${
               activeTab === 'listings'
                 ? 'border-[#06B6D4] text-[#06B6D4]'
                 : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
+            data-testid="tab-listings"
           >
-            <Package className="h-4 w-4 inline mr-2" />
+            <Package className="h-4 w-4 inline mr-1.5 sm:mr-2" />
             {t('dashboard.seller.listings', 'Listings')}
           </button>
           <button
             onClick={() => setActiveTab('earnings')}
-            className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 -mb-px ${
+            className={`px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-colors border-b-2 whitespace-nowrap flex-shrink-0 ${
               activeTab === 'earnings'
                 ? 'border-[#06B6D4] text-[#06B6D4]'
                 : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
             data-testid="earnings-tab"
           >
-            <Wallet className="h-4 w-4 inline mr-2" />
+            <Wallet className="h-4 w-4 inline mr-1.5 sm:mr-2" />
             {t('dashboard.seller.earnings', 'Earnings & Payouts')}
           </button>
           <button
             onClick={() => setActiveTab('analytics')}
-            className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 -mb-px ${
+            className={`px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-colors border-b-2 whitespace-nowrap flex-shrink-0 ${
               activeTab === 'analytics'
                 ? 'border-[#06B6D4] text-[#06B6D4]'
                 : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
+            data-testid="tab-analytics"
           >
-            <BarChart3 className="h-4 w-4 inline mr-2" />
+            <BarChart3 className="h-4 w-4 inline mr-1.5 sm:mr-2" />
             {t('dashboard.seller.analytics', 'Analytics')}
           </button>
           <button
             onClick={() => setActiveTab('ratings')}
-            className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 -mb-px ${
+            className={`px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-colors border-b-2 whitespace-nowrap flex-shrink-0 ${
               activeTab === 'ratings'
                 ? 'border-[#06B6D4] text-[#06B6D4]'
                 : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
             data-testid="ratings-tab"
           >
-            <TrendingUp className="h-4 w-4 inline mr-2" />
+            <TrendingUp className="h-4 w-4 inline mr-1.5 sm:mr-2" />
             Ratings & Reviews
           </button>
           <button
             onClick={() => setActiveTab('trends')}
-            className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 -mb-px ${
+            className={`px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-colors border-b-2 whitespace-nowrap flex-shrink-0 ${
               activeTab === 'trends'
                 ? 'border-[#06B6D4] text-[#06B6D4]'
                 : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
             data-testid="trends-tab"
           >
-            <MapPin className="h-4 w-4 inline mr-2" />
+            <MapPin className="h-4 w-4 inline mr-1.5 sm:mr-2" />
             Market Trends
           </button>
           <button
             onClick={() => setActiveTab('escrow')}
-            className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 -mb-px ${
+            className={`px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-colors border-b-2 whitespace-nowrap flex-shrink-0 ${
               activeTab === 'escrow'
                 ? 'border-[#06B6D4] text-[#06B6D4]'
                 : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
             data-testid="escrow-tab"
           >
-            <Lock className="h-4 w-4 inline mr-2" />
+            <Lock className="h-4 w-4 inline mr-1.5 sm:mr-2" />
             {t('dashboard.seller.escrow', 'Escrow & Pickup')}
           </button>
+          </div>
         </div>
 
         {/* Tab Content */}
@@ -241,7 +247,7 @@ const SellerDashboard = () => {
           <SellerEscrowPanel />
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-6">
           <StatCard
             icon={<Package className="h-6 w-6" />}
             title={t('dashboard.seller.activeListings')}
@@ -623,15 +629,15 @@ const SellerDashboard = () => {
 
 const StatCard = ({ icon, title, value, color, tip }) => (
   <Card className="glassmorphism">
-    <CardContent className="p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div className={`p-3 rounded-xl bg-${color}-100 dark:bg-${color}-900/20 text-${color}-600`}>
+    <CardContent className="p-3 sm:p-6">
+      <div className="flex items-center justify-between mb-2 sm:mb-4">
+        <div className={`p-2 sm:p-3 rounded-xl bg-${color}-100 dark:bg-${color}-900/20 text-${color}-600`}>
           {icon}
         </div>
         {tip && <InfoTip en={tip.en} fr={tip.fr} />}
       </div>
-      <p className="text-2xl font-bold mb-1">{value}</p>
-      <p className="text-sm text-muted-foreground">{title}</p>
+      <p className="text-xl sm:text-2xl font-bold mb-0.5 sm:mb-1">{value}</p>
+      <p className="text-xs sm:text-sm text-muted-foreground leading-tight">{title}</p>
     </CardContent>
   </Card>
 );
