@@ -1,6 +1,27 @@
 # BidVex Changelog
 
 
+## Apr 27, 2026 (End of Day) — AI Concierge REAL Root Cause — DONE
+
+### The actual bug
+The LLM backend was **fine all along**. The frontend was hitting `/api/api/ai-chat/message` (doubled `/api` prefix) returning **405 Method Not Allowed**, so the request never reached the chat route. My earlier "Gemini fallback" fix was backend-side insurance (still valuable for Railway), but the visible failure was pure URL doubling.
+
+### Fix (one line)
+- `frontend/src/components/AIAssistant.js:166` — `${backendUrl}/api/ai-chat/message` → `${backendUrl}/ai-chat/message`
+  (because `API_BASE` from `config.js` is already `${REACT_APP_BACKEND_URL}/api`).
+
+### How I found it
+Playwright intercept of `window.fetch` showed: `GET /api/api/ai-chat/message → 405`. Backend logs showed zero AI calls during that period, confirming the request never reached the router.
+
+### Verified live
+- URL: `/api/ai-chat/message` (single `/api`) → status `200` ✅
+- "hey" → "Hello! Welcome to BidVex. How may I assist you this evening?" ✅
+- Degraded banner: gone ✅
+- No console errors ✅
+
+---
+
+
 ## Apr 27, 2026 (Late Night) — AI Concierge Production Resilience — DONE
 
 ### Diagnosis

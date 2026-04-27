@@ -163,7 +163,7 @@ const AIAssistant = () => {
       const lang = (navigator.language || 'en').startsWith('fr') ? 'fr' : 'en';
       const ctrl = new AbortController();
       const timeoutId = setTimeout(() => ctrl.abort(), 30000); // 30s hard timeout
-      const res = await fetch(`${backendUrl}/api/ai-chat/message`, {
+      const res = await fetch(`${backendUrl}/ai-chat/message`, {
         method: 'POST',
         headers,
         signal: ctrl.signal,
