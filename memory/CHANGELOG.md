@@ -1,6 +1,47 @@
 # BidVex Changelog
 
 
+## Apr 27, 2026 (PM) — Final 3 P3/P2 Polish + Live Auctions Pill — DONE
+
+### Fix 1 (P3): Footer GET /api/site-config/legal-pages 500 → 200
+- `backend/routes/legal.py`: root cause was `if language in page_data` failing when `page_data` was a `bool` (legacy/malformed config).
+- Added `isinstance(page_data, dict|str)` guard + top-level try/except that returns `{success:false, pages:{}}` instead of raising 500.
+- The footer can never crash the public site now — even on corrupt config it degrades gracefully.
+
+### Fix 2 (P3): NotificationListener WebSocket — silent failure
+- `frontend/src/components/MessageNotificationListener.js`: full rewrite of error handling:
+  - Exponential backoff (5s → 10s → 20s → 40s → 80s capped) with hard-stop after **5 attempts**.
+  - All 3 logging sites (`onopen` / `onclose` / `onerror`) gated on `process.env.NODE_ENV === 'development'` and downgraded from `console.error` → `console.debug`.
+  - `ws.onerror` explicitly **absorbed** (no console output in production).
+  - All event handlers wrapped in try/catch — a malformed WS frame can no longer crash anything.
+  - `giveUp` flag prevents reconnect after unmount.
+- Verified iter159: 0 console.error from NotificationListener over 8s authenticated session.
+
+### Fix 3 (P2): Vehicle + General invoice PDFs — full bilingual EN/FR
+- `backend/services/invoice_generator.py`: rewrote both `generate_vehicle_invoice_pdf` and `generate_general_invoice_pdf` with `bi(en, fr)` helper that places EN bold over an 8pt grey FR line.
+- Bilingualised:
+  - Title (`AUCTION INVOICE / FACTURE D'ENCHÈRE`)
+  - Invoice info table (Number, Date, Auction Type, Payment Method, Seller Type)
+  - Buyer / Seller column headers (`ACHETEUR / VENDEUR`)
+  - Item table headers (Description, Rate, Amount, Hammer Price, Lot Number, VIN/NIV)
+  - Tax labels — separate **GST/TPS** + **QST/TVQ** lines AND a NEW combined **`GST + QST (combined 14.975%) / TPS + TVQ (combinées 14,975 %)`** line
+  - Section headers: PLATFORM SERVICE FEES, BALANCE DUE TO SELLER, PAYMENT INSTRUCTIONS, NEXT STEPS, ITEM SALE PRICE, TOTAL
+  - Payment instructions block (Step 1 / Step 2 / Note in both languages)
+  - Footer (`Questions? support@bidvex.com — Des questions ?`)
+- Verified via pypdf extraction (iter159): vehicle 10/10 + general 10/10 bilingual strings present.
+
+### Bonus: Live Auctions Pill in Hero
+- NEW endpoint `GET /api/stats/public` → `{active_auctions: int}` (sum of single-listing + multi-item listings with `status='active'`).
+- `frontend/src/pages/HomePage.js`: activeAuctions state, fetched on mount with cancelled guard; pill rendered ONLY when `activeAuctions > 0`. Bilingual label "Live Auctions Now" / "Enchères en direct maintenant".
+- Currently hidden (DB has 0 active auctions). Will appear automatically as listings go live.
+
+### Tests
+- iter159: 7/7 backend pytest passed, frontend 100%, no critical/minor issues.
+- Test file: `/app/backend/tests/test_prelaunch_fixes_159.py`
+
+---
+
+
 ## Apr 27, 2026 — P0 Final Pre-Launch Fixes (6/6) — DONE
 
 ### Fix 1: Google OAuth + Profile Settings (display name, email, password, photo, province)

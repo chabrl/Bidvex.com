@@ -1,6 +1,13 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: P0 Final Pre-Launch Fixes (Apr 27, 2026) — DONE
+## Latest: P3/P2 Final Polish + Live Auctions Pill (Apr 27 PM, 2026) — DONE
+- Footer GET /api/site-config/legal-pages: 500 → 200 (defensive isinstance guards + graceful fallback)
+- NotificationListener WS: silent error handling, 5-attempt exponential backoff, no console spam
+- Vehicle + General invoice PDFs fully bilingual EN/FR (body, line items, tax labels with combined 14.975%, payment instructions, footer)
+- New `GET /api/stats/public` + Hero live-auctions pill (renders only when active_auctions > 0)
+- Tests: iter159 — 7/7 backend, frontend 100%, zero issues
+
+## Latest: P0 Final Pre-Launch Fixes (Apr 27, 2026 AM) — DONE
 
 ### 6/6 P0 fixes shipped (all verified by iter158 — 100% backend + frontend)
 1. **Google OAuth + Profile Settings**
@@ -52,11 +59,10 @@
 - (P1) Marketplace approve/reject status workflow (architecture decision needed)
 - (P1) Advanced analytics aggregation (top sellers, conversion rate)
 - (P2) Custom date range picker on admin analytics
-- (P2) Vehicle invoice PDF bilingual gap (body/footer/line items still EN-only)
 - (Enhancement) Dispute resolution & admin offline order management
 - (Enhancement) Scheduler job to auto-capture $500 deposit when fee invoice goes unpaid past deadline
-- (P3) Footer /api/legal-pages/public 500 (pre-existing, surfaced in iter158)
-- (P3) NotificationListener WS event error (pre-existing, surfaced in iter158)
+- (P3) React `fetchpriority` casing warning x2 on page load — cosmetic, surfaced in iter159
+- (P3) `/dashboard` URL returns 404 — route not registered; real dashboards live at /buyer-dashboard, /seller-dashboard, /admin
 
 ## Test credentials
 - Admin: `charbel911@gmail.com` / `Anderosli123!@#` (role=admin)
