@@ -141,13 +141,18 @@ Remember: You are not just an assistant - you are the Master Concierge, the face
 """
 
     def __init__(self, api_key: str, db):
-        """Initialize the AI Assistant with Gemini 2.5 Flash via Emergent LLM Proxy"""
+        """Initialize the AI Assistant with Gemini 2.5 Flash via Emergent LLM Proxy (with direct-Gemini fallback)"""
         self.api_key = api_key
         self.db = db
         self.model_name = os.environ.get("AI_MODEL_ID", "gemini-2.5-flash")
-        self.is_emergent_key = api_key.startswith("sk-emergent-")
+        self.is_emergent_key = api_key.startswith("sk-emergent-") if api_key else False
         self.proxy_url = os.environ.get("INTEGRATION_PROXY_URL", "https://integrations.emergentagent.com")
-        logger.info(f"BidVex Master Concierge initialized with {self.model_name} (emergent_proxy={self.is_emergent_key})")
+        # Native Gemini key fallback — used if Emergent proxy fails (Railway / prod network issues)
+        self.gemini_api_key = os.environ.get("GEMINI_API_KEY", "")
+        logger.info(
+            f"BidVex Master Concierge initialized with {self.model_name} "
+            f"(emergent_proxy={self.is_emergent_key}, gemini_fallback={'yes' if self.gemini_api_key else 'no'})"
+        )
 
         # Initialize knowledge base
         try:
@@ -155,6 +160,54 @@ Remember: You are not just an assistant - you are the Master Concierge, the face
         except Exception as e:
             logger.error(f"Error initializing knowledge base: {e}")
             self.kb = None
+
+    async def _call_llm(self, messages: list) -> str:
+        """
+        Call the LLM with a Emergent-proxy-first, native-Gemini-fallback strategy.
+        Returns the response text. Raises on total failure.
+        """
+        # Attempt 1: Emergent proxy (preferred — free via EMERGENT_LLM_KEY)
+        if self.is_emergent_key and self.api_key:
+            try:
+                params = {
+                    "model": f"gemini/{self.model_name}",
+                    "messages": messages,
+                    "api_key": self.api_key,
+                    "api_base": self.proxy_url + "/llm",
+                    "custom_llm_provider": "openai",
+                    "max_tokens": 768,
+                    "temperature": 0.7,
+                    "timeout": 25,
+                }
+                app_url = os.environ.get("APP_URL") or os.environ.get("REACT_APP_BACKEND_URL", "")
+                if app_url:
+                    params["extra_headers"] = {"X-App-ID": app_url}
+                response = await litellm.acompletion(**params)
+                return response.choices[0].message.content
+            except Exception as e:
+                # Log loud enough that Railway shows it
+                logger.error(f"[AI_CONCIERGE] Emergent proxy failed: {type(e).__name__}: {e}. Falling back to direct Gemini API…")
+
+        # Attempt 2: Native Gemini API (fallback — requires GEMINI_API_KEY)
+        if self.gemini_api_key:
+            try:
+                response = await litellm.acompletion(
+                    model=f"gemini/{self.model_name}",
+                    messages=messages,
+                    api_key=self.gemini_api_key,
+                    max_tokens=768,
+                    temperature=0.7,
+                    timeout=25,
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                logger.error(f"[AI_CONCIERGE] Direct Gemini API failed: {type(e).__name__}: {e}")
+                raise
+
+        # No keys available
+        raise RuntimeError(
+            "No LLM credentials available — set EMERGENT_LLM_KEY or GEMINI_API_KEY in environment."
+        )
 
     async def chat(self, user_message: str, user_id: Optional[str] = None,
                    chat_history: List[Dict] = None, language: str = "en",
@@ -205,30 +258,9 @@ Please answer the user's question using the context provided above. If the conte
             # Add current user message
             messages.append({"role": "user", "content": enhanced_message})
 
-            # Build litellm params — route through Emergent proxy if using Emergent key
-            params = {
-                "messages": messages,
-                "api_key": self.api_key,
-                "max_tokens": 768,         # Reduced from 1024 for snappier responses
-                "temperature": 0.7,
-                "timeout": 25,             # 25s ceiling — prevents 4-min hangs on cold proxies
-            }
-            if self.is_emergent_key:
-                params["model"] = f"gemini/{self.model_name}"
-                params["api_base"] = self.proxy_url + "/llm"
-                params["custom_llm_provider"] = "openai"
-                app_url = os.environ.get("APP_URL") or os.environ.get("REACT_APP_BACKEND_URL", "")
-                if app_url:
-                    params["extra_headers"] = {"X-App-ID": app_url}
-            else:
-                params["model"] = f"gemini/{self.model_name}"
-
-            # Use ASYNC variant so we don't block the event loop. The previous
-            # `litellm.completion` was synchronous and blocked the whole
-            # FastAPI worker — when the proxy was slow this caused 4+ minute
-            # response times because requests were serialized.
-            response = await litellm.acompletion(**params)
-            response_text = response.choices[0].message.content
+            # Call LLM with Emergent-proxy-first, Gemini-fallback strategy.
+            # This prevents production outages when the Emergent proxy is unreachable (Railway).
+            response_text = await self._call_llm(messages)
 
             # Check if user needs verification
             needs_verification = False

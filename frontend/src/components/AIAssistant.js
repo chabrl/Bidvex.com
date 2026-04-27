@@ -179,6 +179,10 @@ const AIAssistant = () => {
         throw new Error(`HTTP ${res.status}`);
       }
       const data = await res.json();
+      if (data && data.success === false) {
+        // Backend returned 200 but with success:false (LLM unreachable) → degrade
+        throw new Error(data.error || 'LLM unavailable');
+      }
       setServiceDegraded(false);
       setMessages((prev) => [
         ...prev,

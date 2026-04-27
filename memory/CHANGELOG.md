@@ -1,6 +1,36 @@
 # BidVex Changelog
 
 
+## Apr 27, 2026 (Late Night) — AI Concierge Production Resilience — DONE
+
+### Diagnosis
+- User reported concierge failing with "Service temporarily unavailable" on production (`bidvex.com`).
+- Preview container was healthy (2.16s responses via Emergent proxy).
+- Root cause in production: Emergent LLM proxy unreachable or `EMERGENT_LLM_KEY` unset in Railway env. **No fallback** existed, so any single failure point killed the concierge for everyone.
+
+### Fix
+- `backend/services/ai_assistant_v2.py`: extracted litellm call into new `_call_llm()` method with **2-tier resilience**:
+  1. **Primary**: Emergent LLM proxy (free, works in dev + preview)
+  2. **Fallback**: Direct Gemini API via `GEMINI_API_KEY` (native, works from any network)
+- `backend/.env`: updated `GEMINI_API_KEY` with new valid user-provided key `AIzaSyAhDbRnTi…-Y-N-8` (active, has quota, `gemini-2.5-flash` model).
+- `frontend/src/components/AIAssistant.js`: now also degrades gracefully when backend returns `{success:false}` (previously only checked HTTP status).
+- Richer logging: `[AI_CONCIERGE]` prefix on every LLM failure with exception type — easy to grep in Railway logs.
+
+### Tests
+- Normal path (Emergent proxy): 4.67s response, proper BP explanation in EN ✅
+- Fallback path (direct Gemini w/ new key): "Hello, how are you today?" — works ✅
+- Production-like path (auth + FR chat): 4.38s response with full commission breakdown in French ✅
+
+### Railway env vars to set (user action)
+```
+GEMINI_API_KEY=<REDACTED>
+AI_MODEL_ID=gemini-2.5-flash          (default; safe to omit)
+EMERGENT_LLM_KEY=sk-emergent-…         (optional; preview uses it. If missing on Railway, Gemini fallback kicks in automatically)
+```
+
+---
+
+
 ## Apr 27, 2026 (Night) — Buy Now Payment Flow P0 Audit & Complete Rewire — DONE
 
 ### Audit findings (all 5 areas were broken or inconsistent, now ALL fixed)
