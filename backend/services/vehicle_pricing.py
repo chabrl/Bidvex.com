@@ -186,8 +186,10 @@ def calculate_taxes(taxable_amount: Decimal, province_code: str) -> TaxBreakdown
         breakdown.qst_rate = tax_info["qst"]
         breakdown.gst_amount = _round_currency(taxable_amount * breakdown.gst_rate)
         breakdown.qst_amount = _round_currency(taxable_amount * breakdown.qst_rate)
-        breakdown.total_tax = breakdown.gst_amount + breakdown.qst_amount
+        # Total tax uses composite rate rounded ONCE (customer-facing invoice total).
+        # Individual GST/QST amounts stay separately rounded for CRA line-item display.
         breakdown.total_rate = breakdown.gst_rate + breakdown.qst_rate
+        breakdown.total_tax = _round_currency(taxable_amount * breakdown.total_rate)
 
     else:  # GST only (AB, BC, MB, SK, YT, NT, NU)
         breakdown.gst_rate = tax_info["gst"]

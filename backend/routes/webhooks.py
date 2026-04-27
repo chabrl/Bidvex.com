@@ -803,8 +803,59 @@ async def _handle_checkout_completed(db, session):
             # Generate invoice for fees
             await _generate_vehicle_fees_invoice(db, auction, buyer_id, breakdown, invoice_id)
 
-    elif payment_type == "buy_now":
-        # Buy Now purchase — mark transaction paid
+    elif payment_type == "vehicle_buy_now":
+        # Vehicle Buy Now — only platform fee (2.5%) settled via Stripe.
+        # Hammer price is paid buyer ↔ seller directly outside BidVex.
+        transaction_id = metadata.get("transaction_id")
+        listing_id = metadata.get("listing_id")
+        buyer_id = metadata.get("buyer_id")
+        now = datetime.now(timezone.utc)
+
+        if transaction_id:
+            await db.vehicle_buy_now_transactions.update_one(
+                {"id": transaction_id},
+                {"$set": {
+                    "payment_status": "paid",
+                    "paid_at": now.isoformat(),
+                    "stripe_session_id": session_id,
+                    "card_charged": float(metadata.get("amount_total_cents", 0)) / 100 if metadata.get("amount_total_cents") else None,
+                }},
+            )
+
+        if listing_id:
+            await db.vehicle_listings.update_one(
+                {"id": listing_id},
+                {"$set": {
+                    "status": "sold",
+                    "sold_via_buy_now": True,
+                    "winner_id": buyer_id,
+                    "sold_at": now.isoformat(),
+                }},
+            )
+
+        # Winner email (is_vehicle=True)
+        try:
+            buyer = await db.users.find_one({"id": buyer_id}, {"_id": 0})
+            listing = await db.vehicle_listings.find_one({"id": listing_id}, {"_id": 0})
+            seller_doc = await db.users.find_one({"id": listing.get("seller_id")}, {"_id": 0}) if listing else None
+            if buyer and buyer.get("email"):
+                from services.email_notifications import send_auction_won_email
+                await send_auction_won_email(
+                    to_email=buyer["email"],
+                    to_name=buyer.get("name", "Buyer"),
+                    auction_id=listing_id,
+                    item_name=(listing.get("title") if listing else "Vehicle"),
+                    hammer_price=float(listing.get("buy_now_price", 0.0)) if listing else 0.0,
+                    platform_fee=float(metadata.get("platform_fee", 0) or 0),
+                    seller_name=(seller_doc.get("name") if seller_doc else ""),
+                    seller_contact=(seller_doc.get("email") if seller_doc else ""),
+                    is_vehicle=True,
+                    buyer_province=(buyer.get("province", "QC") or "QC"),
+                )
+        except Exception as e:
+            logger.warning(f"Vehicle Buy Now winner email failed: {e}")
+
+    elif payment_type == "buy_now":        # Buy Now purchase — mark transaction paid
         transaction_id = metadata.get("transaction_id")
         auction_id = metadata.get("auction_id")
         buyer_id = metadata.get("buyer_id")
@@ -836,24 +887,34 @@ async def _handle_checkout_completed(db, session):
                     "created_at": datetime.now(timezone.utc).isoformat(),
                 })
 
-                # Send confirmation email
+                # Send winner email — same template as auction winners (is_vehicle=False)
                 try:
                     buyer = await db.users.find_one({"id": buyer_id}, {"_id": 0})
+                    seller_doc = await db.users.find_one({"id": auction.get("seller_id")}, {"_id": 0})
                     if buyer and buyer.get("email"):
-                        from services.email_notifications import send_email
+                        from services.email_notifications import send_auction_won_email
                         lot_number = metadata.get("lot_number", "")
-                        lot_title = f"Lot #{lot_number}" if lot_number else "Item"
-                        await send_email(
+                        lot_title = f"{auction.get('title', 'Auction')} — Lot #{lot_number}" if lot_number else auction.get("title", "Auction")
+                        # Derive figures from the breakdown
+                        hammer_price = float(breakdown.get("hammer_price") or 0.0) if isinstance(breakdown, dict) else 0.0
+                        platform_fee = 0.0
+                        if isinstance(breakdown, dict):
+                            bi = breakdown.get("buyer_invoice") or {}
+                            platform_fee = float(bi.get("fees_subtotal") or 0.0)
+                        await send_auction_won_email(
                             to_email=buyer["email"],
-                            subject=f"Payment Confirmed - {auction.get('title', 'Buy Now Purchase')}",
-                            html_content=f"<p>Hi {buyer.get('name', 'Buyer')},</p>"
-                                         f"<p>Your Buy Now payment for <strong>{lot_title}</strong> "
-                                         f"from <strong>{auction.get('title', 'Auction')}</strong> has been confirmed.</p>"
-                                         f"<p>Transaction ID: {transaction_id}</p>"
-                                         f"<p>Thank you for your purchase!</p>",
+                            to_name=buyer.get("name", "Buyer"),
+                            auction_id=auction_id,
+                            item_name=lot_title,
+                            hammer_price=hammer_price,
+                            platform_fee=platform_fee,
+                            seller_name=(seller_doc.get("name") if seller_doc else ""),
+                            seller_contact=(seller_doc.get("email") if seller_doc else ""),
+                            is_vehicle=False,
+                            buyer_province=(buyer.get("province", "QC") or "QC"),
                         )
                 except Exception as e:
-                    logger.warning(f"Failed to send buy-now confirmation email: {e}")
+                    logger.warning(f"Failed to send buy-now winner email: {e}")
 
         # Schedule review request email (24h later)
         try:

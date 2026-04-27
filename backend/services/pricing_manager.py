@@ -203,9 +203,10 @@ class PricingManager:
         bp = _r(hp * bp_rate)
         sc = _r(hp * sc_rate)
 
-        # Buyer side — stripe recovery on FULL Stripe charge (hammer + BP)
-        # because the entire amount flows through Stripe
-        b_sr = stripe_recovery(hp + bp)
+        # Buyer side — stripe recovery on BidVex fees only (BP).
+        # BidVex absorbs the stripe cost on the hammer portion because that
+        # money belongs to the seller, not BidVex revenue.
+        b_sr = stripe_recovery(bp)
         # Tax on BidVex fees only (BP + stripe recovery), never on hammer
         b_taxable = bp + b_sr
         b_tax = calculate_taxes(b_taxable, buyer_province)

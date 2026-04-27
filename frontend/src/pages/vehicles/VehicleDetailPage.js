@@ -183,6 +183,10 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [depositPaid, setDepositPaid] = useState(false);
   const [depositAuthorized, setDepositAuthorized] = useState(false);
+  const [showBuyNowModal, setShowBuyNowModal] = useState(false);
+  const [buyNowPreview, setBuyNowPreview] = useState(null);
+  const [buyNowLoading, setBuyNowLoading] = useState(false);
+  const [buyNowProcessing, setBuyNowProcessing] = useState(false);
   
   // Real-time bidding data
   const { 
@@ -435,7 +439,12 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
               
               {/* Buy Now */}
               {vehicle?.buy_now_price && displayBid < vehicle.buy_now_price && (
-                <Button variant="outline" className="w-full h-12">
+                <Button
+                  variant="outline"
+                  className="w-full h-12"
+                  onClick={() => setShowBuyNowModal(true)}
+                  data-testid="vehicle-buy-now-btn"
+                >
                   {t('bid.buyNow', 'Buy Now')}: {formatPrice(vehicle.buy_now_price, vehicle?.currency)}
                 </Button>
               )}
@@ -511,9 +520,159 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Vehicle Buy Now Modal */}
+      <Dialog open={showBuyNowModal} onOpenChange={(o) => {
+        setShowBuyNowModal(o);
+        if (!o) { setBuyNowPreview(null); }
+      }}>
+        <DialogContent className="max-w-lg" data-testid="vehicle-buy-now-modal">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-amber-500" />
+              {t('bid.buyNowConfirm', 'Buy Now — Confirm')}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              {t('vehicle.buyNowNotice',
+                "BidVex never collects the vehicle price. Only the 2.5% platform fee (+ Stripe + tax) is charged now. You pay the seller directly for the vehicle."
+              )}
+              <br />
+              <span className="text-[11px] opacity-80">
+                BidVex ne perçoit jamais le prix du véhicule. Seuls les frais de plateforme de 2,5 % (+ Stripe + taxes) sont facturés maintenant. Vous payez le véhicule directement au vendeur.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <VehicleBuyNowBody
+            vehicle={vehicle}
+            preview={buyNowPreview}
+            setPreview={setBuyNowPreview}
+            loading={buyNowLoading}
+            setLoading={setBuyNowLoading}
+            processing={buyNowProcessing}
+            setProcessing={setBuyNowProcessing}
+            formatPrice={formatPrice}
+            onClose={() => setShowBuyNowModal(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
+
+// Vehicle Buy Now body — fetches 2.5% fee preview + executes checkout
+const VehicleBuyNowBody = ({ vehicle, preview, setPreview, loading, setLoading, processing, setProcessing, formatPrice, onClose }) => {
+  const { t } = useTranslation();
+  const API = `${API_BASE}/api`;
+
+  React.useEffect(() => {
+    if (!vehicle?.id || preview) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const token = localStorage.getItem('token');
+        const r = await axios.post(
+          `${API}/payments/vehicle-buy-now-preview`,
+          { listing_id: vehicle.id },
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        if (!cancelled) setPreview(r.data);
+      } catch (err) {
+        if (!cancelled) toast.error(err?.response?.data?.detail || t('common.error'));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [vehicle?.id]);
+
+  const submit = async () => {
+    setProcessing(true);
+    try {
+      const token = localStorage.getItem('token');
+      const r = await axios.post(
+        `${API}/payments/vehicle-buy-now-checkout`,
+        { listing_id: vehicle.id },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (r.data?.requires_checkout && r.data?.checkout_url) {
+        window.location.href = r.data.checkout_url;
+        return;
+      }
+      toast.success(t('bid.buyNowSuccess', 'Vehicle purchased. Check your email for next steps.'));
+      onClose();
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || t('common.error'));
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="py-8 text-center text-sm text-muted-foreground">{t('common.loading', 'Loading...')}</div>;
+  }
+  if (!preview) return null;
+
+  return (
+    <div className="space-y-4">
+      <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+        <div className="flex justify-between items-center text-sm">
+          <span>{t('bid.buyNowPrice', 'Buy Now Price (paid to seller directly)')}</span>
+          <span className="font-bold">{formatPrice(preview.buy_now_price, vehicle?.currency)}</span>
+        </div>
+        <p className="text-[11px] text-muted-foreground mt-1">
+          {t('vehicle.hammerDirect', 'Not charged by BidVex. The licensed OPC seller collects this.')}
+        </p>
+      </div>
+
+      <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 space-y-1.5 text-xs">
+        <div className="flex justify-between">
+          <span>{t('bid.platformFee', 'Platform fee')} (2.5%)</span>
+          <span>${preview.platform_fee.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>{t('bid.stripeRecovery', 'Stripe processing')}</span>
+          <span>${preview.stripe_recovery.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>{preview.tax_label}</span>
+          <span>${preview.tax_amount.toFixed(2)}</span>
+        </div>
+        <Separator />
+        <div className="flex justify-between font-bold text-sm pt-1">
+          <span>{t('bid.totalPlatformFee', 'Total charged now')}</span>
+          <span>${preview.total_platform_fee.toFixed(2)}</span>
+        </div>
+      </div>
+
+      {preview.has_deposit && (
+        <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 text-xs space-y-1">
+          <p className="font-semibold text-emerald-700 dark:text-emerald-400">
+            {t('vehicle.depositCapture', 'Deposit on file')}: ${preview.deposit_amount.toFixed(2)}
+          </p>
+          <p>{t('vehicle.willCaptureFromDeposit', 'Captured from deposit')}: ${preview.will_capture_from_deposit.toFixed(2)}</p>
+          {preview.will_charge_card_additional > 0 ? (
+            <p>{t('vehicle.willChargeCard', 'Extra charged to card on file')}: ${preview.will_charge_card_additional.toFixed(2)}</p>
+          ) : (
+            <p>{t('vehicle.remainderReleased', 'Remainder of deposit auto-released back to your card.')}</p>
+          )}
+        </div>
+      )}
+
+      <DialogFooter className="gap-2">
+        <Button variant="outline" onClick={onClose} disabled={processing} data-testid="vehicle-buy-now-cancel">
+          {t('common.cancel', 'Cancel')}
+        </Button>
+        <Button onClick={submit} disabled={processing} data-testid="vehicle-buy-now-confirm">
+          {processing ? t('common.processing', 'Processing...') : t('bid.confirmBuyNow', 'Confirm Buy Now')}
+        </Button>
+      </DialogFooter>
+    </div>
+  );
+};
+
+
 
 // Main Page Component
 const VehicleDetailPage = () => {

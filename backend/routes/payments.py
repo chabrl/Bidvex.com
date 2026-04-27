@@ -1119,6 +1119,16 @@ async def get_seller_transactions(
 
 # ========== BUY NOW CHECKOUT FLOW ==========
 
+def BUYER_PREMIUM_RATES_FOR_DISPLAY(tier: str, is_partner_seller: bool = False) -> float:
+    """Mirror of PricingManager.BUYER_PREMIUM_RATES exposed as float for API responses."""
+    if is_partner_seller:
+        return 0.05  # Standard BP still applies when seller is a partner
+    return {"free": 0.05, "basic": 0.05, "standard": 0.05,
+            "premium": 0.035,
+            "vip": 0.03, "vip_elite": 0.03,
+            "partner": 0.0}.get((tier or "free").lower(), 0.05)
+
+
 class BuyNowPreviewRequest(BaseModel):
     auction_id: str
     lot_number: int
@@ -1176,33 +1186,38 @@ async def buy_now_preview(
 
     user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
     buyer_tier = user_doc.get("subscription_tier", "free") if user_doc else "free"
+    buyer_province = (user_doc.get("province", "QC") if user_doc else "QC") or "QC"
 
     seller = await db.users.find_one({"id": auction["seller_id"]}, {"_id": 0})
     seller_is_business = seller.get("is_tax_registered", False) if seller else False
-    seller_tier = seller.get("subscription_tier", "basic") if seller else "basic"
+    seller_tier = seller.get("subscription_tier", "free") if seller else "free"
+    seller_is_partner = bool(seller.get("is_partner") and seller.get("platform_fee_paid")) if seller else False
 
-    breakdown = calculate_general_checkout(
-        hammer_price=item_total,
-        buyer_tier=buyer_tier,
-        seller_tier=seller_tier,
-        seller_is_tax_registered=seller_is_business,
-        include_processing_fee=True
-    )
+    # Canonical pricing — same engine winning-bid checkout uses.
+    from services.pricing_manager import PricingManager
+    if seller_is_partner:
+        pr = PricingManager.partner_auction(item_total, buyer_province)
+    else:
+        pr = PricingManager.non_vehicle_stripe(item_total, buyer_province, buyer_tier, seller_tier)
 
+    bi = pr.buyer_invoice
     return {
         "lot_title": target_lot.get("title", "Item"),
         "price_per_unit": buy_now_price,
         "quantity": data.quantity,
         "item_total": item_total,
-        "buyer_premium_rate": float(breakdown.buyer_premium_rate),
-        "buyer_premium": float(breakdown.buyer_premium),
-        "gst": float(breakdown.gst_on_fees + breakdown.gst_on_hammer),
-        "qst": float(breakdown.qst_on_fees + breakdown.qst_on_hammer),
-        "total_tax": float(breakdown.total_tax),
-        "processing_fee": float(breakdown.processing_fee),
-        "buyer_total": float(breakdown.buyer_total),
+        "buyer_premium_rate": BUYER_PREMIUM_RATES_FOR_DISPLAY(buyer_tier, seller_is_partner),
+        "buyer_premium": bi.fees_subtotal,
+        "gst": bi.tax_amount if bi.tax_type == "GST" else 0.0,
+        "qst": 0.0,  # Combined GST+QST shown in total_tax for QC
+        "total_tax": bi.tax_amount,
+        "tax_label": bi.tax_label,
+        "processing_fee": bi.stripe_recovery,
+        "buyer_total": bi.total,
         "seller_is_business": seller_is_business,
+        "seller_is_partner": seller_is_partner,
         "available_quantity": available_qty,
+        "breakdown": pr.to_dict(),
     }
 
 
@@ -1265,21 +1280,26 @@ async def buy_now_checkout(
 
     item_total = buy_now_price * data.quantity
 
-    # Calculate fees server-side
+    # Calculate fees server-side via canonical PricingManager
     user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
     buyer_tier = user_doc.get("subscription_tier", "free") if user_doc else "free"
+    buyer_province = (user_doc.get("province", "QC") if user_doc else "QC") or "QC"
 
     seller = await db.users.find_one({"id": auction["seller_id"]}, {"_id": 0})
-    seller_is_business = seller.get("is_tax_registered", False) if seller else False
-    seller_tier = seller.get("subscription_tier", "basic") if seller else "basic"
+    seller_tier = seller.get("subscription_tier", "free") if seller else "free"
+    seller_is_partner = bool(seller.get("is_partner") and seller.get("platform_fee_paid")) if seller else False
 
-    breakdown = calculate_general_checkout(
-        hammer_price=item_total,
-        buyer_tier=buyer_tier,
-        seller_tier=seller_tier,
-        seller_is_tax_registered=seller_is_business,
-        include_processing_fee=True
-    )
+    from services.pricing_manager import PricingManager
+    if seller_is_partner:
+        pr = PricingManager.partner_auction(item_total, buyer_province)
+    else:
+        pr = PricingManager.non_vehicle_stripe(item_total, buyer_province, buyer_tier, seller_tier)
+    bi = pr.buyer_invoice
+    buyer_total_cents = int(round(bi.total * 100))
+    # Application fee = all BidVex revenue (BP + SC + taxes on fees) → BidVex account
+    # Stripe recovery is a pass-through from buyer to Stripe, not BidVex revenue
+    app_fee_dollars = pr.bidvex_revenue + bi.tax_amount
+    stripe_application_fee_cents = int(round(app_fee_dollars * 100))
 
     # Decrement inventory
     new_available_qty = available_qty - data.quantity
@@ -1313,7 +1333,13 @@ async def buy_now_checkout(
         "quantity_purchased": data.quantity,
         "price_per_unit": buy_now_price,
         "total_amount": item_total,
-        "buyer_total": float(breakdown.buyer_total),
+        "buyer_total": bi.total,
+        "buyer_premium": bi.fees_subtotal,
+        "buyer_premium_rate": BUYER_PREMIUM_RATES_FOR_DISPLAY(buyer_tier, seller_is_partner),
+        "seller_commission": pr.seller_invoice.fees_subtotal if pr.seller_invoice else 0.0,
+        "total_tax": bi.tax_amount,
+        "tax_label": bi.tax_label,
+        "buyer_province": buyer_province,
         "payment_status": "pending",
         "transaction_date": now.isoformat(),
     }
@@ -1334,11 +1360,11 @@ async def buy_now_checkout(
         )
 
     lot_title = target_lot.get("title", "Item")
-    bp_pct = float(breakdown.buyer_premium_rate) * 100
+    bp_pct = BUYER_PREMIUM_RATES_FOR_DISPLAY(buyer_tier, seller_is_partner) * 100
     description = (
         f"{lot_title} x{data.quantity} | "
-        f"Buyer Premium ({bp_pct:.1f}%): ${float(breakdown.buyer_premium):,.2f} | "
-        f"Tax: ${float(breakdown.total_tax):,.2f}"
+        f"Buyer Premium ({bp_pct:.1f}%): ${bi.fees_subtotal:,.2f} | "
+        f"Tax: ${bi.tax_amount:,.2f}"
     )
 
     seller_connect_id = seller.get("stripe_connect_account_id") if seller else None
@@ -1352,7 +1378,7 @@ async def buy_now_checkout(
         "line_items": [{
             "price_data": {
                 "currency": auction_currency,
-                "unit_amount": breakdown.buyer_total_cents,
+                "unit_amount": buyer_total_cents,
                 "product_data": {
                     "name": f"Buy Now - {lot_title}",
                     "description": description,
@@ -1368,12 +1394,13 @@ async def buy_now_checkout(
             "auction_id": data.auction_id,
             "lot_number": str(data.lot_number),
             "buyer_id": current_user.id,
+            "is_vehicle": "false",
         },
     }
 
     if seller_connect_id:
         session_params["payment_intent_data"] = {
-            "application_fee_amount": breakdown.stripe_application_fee_cents,
+            "application_fee_amount": stripe_application_fee_cents,
             "transfer_data": {"destination": seller_connect_id},
         }
 
@@ -1390,7 +1417,7 @@ async def buy_now_checkout(
         "checkout_url": session.url,
         "session_id": session.id,
         "transaction_id": transaction_id,
-        "breakdown": breakdown.to_dict(),
+        "breakdown": pr.to_dict(),
     }
 
 
@@ -1815,3 +1842,350 @@ async def get_offline_order(
     if order.get("buyer_id") != current_user.id and order.get("seller_id") != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
     return order
+
+
+
+# ========== VEHICLE BUY NOW FLOW (Non-custodial — P0 audit) ==========
+
+class VehicleBuyNowRequest(BaseModel):
+    listing_id: str
+
+
+@payments_router.post("/vehicle-buy-now-preview")
+async def vehicle_buy_now_preview(
+    data: VehicleBuyNowRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """Preview the 2.5% platform fee breakdown for Vehicle Buy Now."""
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    current_user = await _auth(credentials)
+    db = get_db()
+
+    listing = await db.vehicle_listings.find_one({"id": data.listing_id}, {"_id": 0})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Vehicle listing not found")
+    if listing.get("status") != "active":
+        raise HTTPException(status_code=400, detail="Vehicle listing is not active")
+    if not listing.get("buy_now_price") or not listing.get("buy_now_enabled", True):
+        raise HTTPException(status_code=400, detail="Buy Now not available on this vehicle")
+    if listing.get("seller_id") == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot buy your own listing")
+
+    buy_now_price = float(listing["buy_now_price"])
+
+    user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
+    buyer_province = (user_doc.get("province", "QC") if user_doc else "QC") or "QC"
+
+    from services.pricing_manager import PricingManager
+    pr = PricingManager.vehicle_auction(buy_now_price, buyer_province)
+    bi = pr.buyer_invoice
+
+    # Check existing deposit hold
+    deposit = await db.vehicle_bid_deposits.find_one(
+        {"buyer_id": current_user.id, "listing_id": data.listing_id,
+         "status": {"$in": ["paid", "authorized"]}},
+        {"_id": 0},
+    )
+    deposit_amount = float(deposit.get("amount", 500.0)) if deposit else 0.0
+    will_capture_from_deposit = min(deposit_amount, bi.total) if deposit else 0.0
+    will_charge_card = max(0.0, bi.total - deposit_amount)
+
+    return {
+        "listing_id": data.listing_id,
+        "vehicle_title": listing.get("title", ""),
+        "buy_now_price": buy_now_price,
+        "platform_fee_rate": 0.025,
+        "platform_fee": bi.fees_subtotal,
+        "stripe_recovery": bi.stripe_recovery,
+        "tax_amount": bi.tax_amount,
+        "tax_label": bi.tax_label,
+        "buyer_province": buyer_province,
+        "total_platform_fee": bi.total,
+        "has_deposit": bool(deposit),
+        "deposit_amount": deposit_amount,
+        "will_capture_from_deposit": will_capture_from_deposit,
+        "will_charge_card_additional": will_charge_card,
+        "hammer_paid_directly_to_seller": buy_now_price,
+        "breakdown": pr.to_dict(),
+    }
+
+
+@payments_router.post("/vehicle-buy-now-checkout")
+async def vehicle_buy_now_checkout(
+    data: VehicleBuyNowRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """
+    Execute Vehicle Buy Now.
+    BidVex NEVER collects the hammer — only the 2.5% platform fee + stripe recovery + tax.
+
+    Deposit handling:
+      • fee ≤ $500  → partial capture of deposit (exact fee amount), remainder auto-released
+      • fee > $500  → capture full deposit + separate PaymentIntent for remainder
+      • no deposit → full fee charged to card on file
+    """
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    current_user = await _auth(credentials)
+    db = get_db()
+
+    # Validate listing
+    listing = await db.vehicle_listings.find_one({"id": data.listing_id}, {"_id": 0})
+    if not listing:
+        raise HTTPException(status_code=404, detail="Vehicle listing not found")
+    if listing.get("status") != "active":
+        raise HTTPException(status_code=400, detail="Vehicle listing is not active")
+    if not listing.get("buy_now_price") or not listing.get("buy_now_enabled", True):
+        raise HTTPException(status_code=400, detail="Buy Now not available on this vehicle")
+    if listing.get("seller_id") == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot buy your own listing")
+
+    buy_now_price = float(listing["buy_now_price"])
+
+    user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
+    if not user_doc:
+        raise HTTPException(status_code=401, detail="User not found")
+    buyer_province = (user_doc.get("province", "QC") or "QC").upper()
+
+    # Canonical pricing
+    from services.pricing_manager import PricingManager
+    pr = PricingManager.vehicle_auction(buy_now_price, buyer_province)
+    bi = pr.buyer_invoice
+    platform_fee_total = round(bi.total, 2)
+    platform_fee_cents = int(round(platform_fee_total * 100))
+
+    # Ensure Stripe customer
+    customer_id = user_doc.get("stripe_customer_id")
+    if not customer_id:
+        cust = stripe.Customer.create(
+            email=user_doc.get("email", current_user.email),
+            name=user_doc.get("name", current_user.email),
+            metadata={"user_id": current_user.id},
+        )
+        customer_id = cust.id
+        await db.users.update_one({"id": current_user.id}, {"$set": {"stripe_customer_id": customer_id}})
+
+    # Look up active deposit hold
+    deposit = await db.vehicle_bid_deposits.find_one(
+        {"buyer_id": current_user.id, "listing_id": data.listing_id,
+         "status": {"$in": ["paid", "authorized"]}},
+        {"_id": 0},
+    )
+
+    transaction_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc)
+
+    deposit_captured_amount = 0.0
+    card_charged_amount = 0.0
+    stripe_actions = []
+
+    try:
+        if deposit:
+            deposit_amount = float(deposit.get("amount", 500.0))
+            deposit_cents = int(round(deposit_amount * 100))
+            pi_id = deposit.get("stripe_payment_intent_id")
+            if not pi_id:
+                raise HTTPException(status_code=500, detail="Deposit missing PaymentIntent")
+
+            if platform_fee_cents <= deposit_cents:
+                # Partial capture — exact fee, remainder auto-released
+                stripe.PaymentIntent.capture(pi_id, amount_to_capture=platform_fee_cents)
+                deposit_captured_amount = platform_fee_total
+                stripe_actions.append({"action": "deposit_partial_capture", "pi": pi_id, "amount": platform_fee_total})
+                await db.vehicle_bid_deposits.update_one(
+                    {"id": deposit["id"]},
+                    {"$set": {
+                        "status": "partially_captured",
+                        "captured_amount": platform_fee_total,
+                        "released_amount": round(deposit_amount - platform_fee_total, 2),
+                        "captured_at": now,
+                        "capture_reason": "vehicle_buy_now_platform_fee",
+                    }},
+                )
+            else:
+                # Capture full deposit + charge remainder to card
+                stripe.PaymentIntent.capture(pi_id)
+                deposit_captured_amount = deposit_amount
+                stripe_actions.append({"action": "deposit_full_capture", "pi": pi_id, "amount": deposit_amount})
+
+                remainder_cents = platform_fee_cents - deposit_cents
+                remainder_amount = round(remainder_cents / 100.0, 2)
+                pi = stripe.PaymentIntent.create(
+                    amount=remainder_cents,
+                    currency="cad",
+                    customer=customer_id,
+                    payment_method=user_doc.get("stripe_default_payment_method"),
+                    off_session=True if user_doc.get("stripe_default_payment_method") else False,
+                    confirm=True if user_doc.get("stripe_default_payment_method") else False,
+                    description=f"BidVex Vehicle Platform Fee Remainder — Listing {data.listing_id}",
+                    metadata={
+                        "type": "vehicle_buy_now_remainder",
+                        "listing_id": data.listing_id,
+                        "buyer_id": current_user.id,
+                        "transaction_id": transaction_id,
+                        "bidvex_role": "platform_intermediary",
+                        "vehicle_price_collected_by_bidvex": "false",
+                        "fee_type": "vehicle_platform_fee_remainder",
+                    },
+                )
+                card_charged_amount = remainder_amount
+                stripe_actions.append({"action": "card_charge_remainder", "pi": pi.id, "amount": remainder_amount})
+                await db.vehicle_bid_deposits.update_one(
+                    {"id": deposit["id"]},
+                    {"$set": {
+                        "status": "captured",
+                        "captured_amount": deposit_amount,
+                        "captured_at": now,
+                        "capture_reason": "vehicle_buy_now_platform_fee",
+                    }},
+                )
+        else:
+            # No deposit — charge full fee to card on file
+            payment_method = user_doc.get("stripe_default_payment_method")
+            if not payment_method:
+                # Fall back to a Stripe Checkout session — card on file required for off-session
+                session = stripe.checkout.Session.create(
+                    customer=customer_id,
+                    payment_method_types=["card"],
+                    mode="payment",
+                    line_items=[{
+                        "price_data": {
+                            "currency": "cad",
+                            "unit_amount": platform_fee_cents,
+                            "product_data": {
+                                "name": f"Vehicle Platform Fee — {listing.get('title', 'Vehicle')}",
+                                "description": f"2.5% BidVex platform fee + stripe + {bi.tax_label}",
+                            },
+                        },
+                        "quantity": 1,
+                    }],
+                    success_url=f"{os.environ.get('FRONTEND_URL', 'https://bidvex.com')}/vehicle-auctions/{data.listing_id}?buy_now=success&txn={transaction_id}",
+                    cancel_url=f"{os.environ.get('FRONTEND_URL', 'https://bidvex.com')}/vehicle-auctions/{data.listing_id}?buy_now=cancelled",
+                    metadata={
+                        "type": "vehicle_buy_now",
+                        "listing_id": data.listing_id,
+                        "buyer_id": current_user.id,
+                        "transaction_id": transaction_id,
+                        "bidvex_role": "platform_intermediary",
+                        "vehicle_price_collected_by_bidvex": "false",
+                    },
+                )
+                # Record transaction as pending checkout
+                await db.vehicle_buy_now_transactions.insert_one({
+                    "id": transaction_id,
+                    "listing_id": data.listing_id,
+                    "buyer_id": current_user.id,
+                    "seller_id": listing.get("seller_id"),
+                    "buy_now_price": buy_now_price,
+                    "platform_fee": bi.fees_subtotal,
+                    "stripe_recovery": bi.stripe_recovery,
+                    "tax_amount": bi.tax_amount,
+                    "tax_label": bi.tax_label,
+                    "buyer_province": buyer_province,
+                    "total_platform_fee": platform_fee_total,
+                    "payment_status": "pending",
+                    "deposit_captured": 0.0,
+                    "card_charged": 0.0,
+                    "stripe_session_id": session.id,
+                    "transaction_date": now.isoformat(),
+                })
+                return {
+                    "success": True,
+                    "requires_checkout": True,
+                    "checkout_url": session.url,
+                    "session_id": session.id,
+                    "transaction_id": transaction_id,
+                    "breakdown": pr.to_dict(),
+                }
+
+            pi = stripe.PaymentIntent.create(
+                amount=platform_fee_cents,
+                currency="cad",
+                customer=customer_id,
+                payment_method=payment_method,
+                off_session=True,
+                confirm=True,
+                description=f"BidVex Vehicle Platform Fee — Listing {data.listing_id}",
+                metadata={
+                    "type": "vehicle_buy_now",
+                    "listing_id": data.listing_id,
+                    "buyer_id": current_user.id,
+                    "transaction_id": transaction_id,
+                    "bidvex_role": "platform_intermediary",
+                    "vehicle_price_collected_by_bidvex": "false",
+                },
+            )
+            card_charged_amount = platform_fee_total
+            stripe_actions.append({"action": "card_charge_full", "pi": pi.id, "amount": platform_fee_total})
+    except stripe.error.CardError as ce:
+        raise HTTPException(status_code=402, detail=f"Card declined: {ce.user_message or str(ce)}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("vehicle_buy_now stripe error")
+        raise HTTPException(status_code=500, detail=f"Payment processing error: {str(e)}")
+
+    # Mark listing as sold
+    await db.vehicle_listings.update_one(
+        {"id": data.listing_id},
+        {"$set": {
+            "status": "sold",
+            "sold_via_buy_now": True,
+            "winner_id": current_user.id,
+            "sold_at": now.isoformat(),
+            "final_price": buy_now_price,
+        }},
+    )
+
+    # Create transaction record
+    await db.vehicle_buy_now_transactions.insert_one({
+        "id": transaction_id,
+        "listing_id": data.listing_id,
+        "buyer_id": current_user.id,
+        "seller_id": listing.get("seller_id"),
+        "buy_now_price": buy_now_price,
+        "platform_fee": bi.fees_subtotal,
+        "stripe_recovery": bi.stripe_recovery,
+        "tax_amount": bi.tax_amount,
+        "tax_label": bi.tax_label,
+        "buyer_province": buyer_province,
+        "total_platform_fee": platform_fee_total,
+        "payment_status": "paid",
+        "deposit_captured": deposit_captured_amount,
+        "card_charged": card_charged_amount,
+        "stripe_actions": stripe_actions,
+        "transaction_date": now.isoformat(),
+        "paid_at": now.isoformat(),
+    })
+
+    # Send the standard winner email (is_vehicle=True inserts the bilingual non-custodial notice)
+    try:
+        from services.email_notifications import send_auction_won_email
+        seller = await db.users.find_one({"id": listing.get("seller_id")}, {"_id": 0})
+        await send_auction_won_email(
+            to_email=user_doc.get("email", current_user.email),
+            to_name=user_doc.get("name", current_user.email),
+            auction_id=data.listing_id,
+            item_name=listing.get("title", "Vehicle"),
+            hammer_price=buy_now_price,
+            platform_fee=platform_fee_total,
+            seller_name=(seller.get("name") if seller else ""),
+            seller_contact=(seller.get("email") if seller else ""),
+            is_vehicle=True,
+            buyer_province=buyer_province,
+        )
+    except Exception as e:
+        logger.warning(f"Vehicle Buy Now winner email failed: {e}")
+
+    return {
+        "success": True,
+        "requires_checkout": False,
+        "transaction_id": transaction_id,
+        "platform_fee_charged": platform_fee_total,
+        "deposit_captured": deposit_captured_amount,
+        "card_charged": card_charged_amount,
+        "stripe_actions": stripe_actions,
+        "hammer_paid_directly_to_seller": buy_now_price,
+        "breakdown": pr.to_dict(),
+    }
