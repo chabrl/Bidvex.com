@@ -1,36 +1,62 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: Vehicle Payment Infrastructure OPC Compliance (Feb 15, 2026)
+## Latest: P0 Final Pre-Launch Fixes (Apr 27, 2026) — DONE
 
-### Vehicle Payment Legal Compliance — DONE (P0)
-- BidVex never holds the vehicle hammer price; buyer charged only 2.5% fee + Stripe recovery + tax-on-fee
-- `send_auction_won_email` now injects bilingual EN+FR legal notice for vehicles (is_vehicle branch)
-- $500 deposit migrated to Stripe `capture_method="manual"` (true HOLD, not charge)
-- On auction close: winner + loser deposit holds RELEASED (PaymentIntent cancelled)
-- New `capture_deposit` method captures hold only if winner fails to pay fee invoice
-- Zero Stripe Connect transfer to vehicle seller (verified: no transfer_data/destination/application_fee_amount)
-- Tests: 14/14 backend pass (iteration_153)
+### 6/6 P0 fixes shipped (all verified by iter158 — 100% backend + frontend)
+1. **Google OAuth + Profile Settings**
+   - AuthPage now redirects to `https://auth.emergentagent.com` (no env-var dependency)
+   - Profile page adds: read-only Email + "Change Email" button + Province dropdown (13 CA provinces/territories, bilingual)
+   - New endpoints: `POST /api/auth/email-change/{request,confirm}` — Law 25 compliant double-opt-in (verification link sent to NEW email, change applied only after click, all sessions invalidated)
+2. **AI Chatbot graceful fallback** — 30s hard timeout + amber "Service degraded" banner + auto-recovery on next success + email-support action button
+3. **Tap-to-toggle InfoTip** — controlled state, opens on click/hover/focus, closes on outside-pointer-down (mobile-first)
+   - Buyer Dashboard: 6 bilingual tooltips (header, 3 stat cards, tabs section, hint)
+   - Seller Dashboard: 5 bilingual tooltips (commission rate + 4 stat cards)
+4. **Image compression** — `services/image_compression.py` (Pillow 12.1) compresses base64 listing images to JPEG 800px@85% (~60-94% size reduction). Cache-Control 1y already in middleware for image extensions
+5. **Farm Equipment deleted** — DB migrated (categories collection + listings + multi_item_listings + nested lots). FilterBar.js + admin_ops CFIA list updated. `/api/categories` cache invalidated.
+6. **Hero stats removed** — 50K+ / 10K+ / $2M+ / 99.9% stat cards deleted (Option A: clean hero, no replacement)
 
-## Previous: SendGrid Full Integration Fix (April 20, 2026)
+### Files changed
+- backend/routes/auth.py (+ email-change endpoints, asyncio import)
+- backend/routes/profiles.py (province/city/postal_code added to allowed_fields + ProfileUpdate)
+- backend/routes/listings.py (compress_image_list applied to single & multi-item)
+- backend/routes/admin_ops.py (CFIA list cleaned)
+- backend/services/image_compression.py (NEW — Pillow compression)
+- backend/scripts/migrate_farm_equipment.py (NEW — one-shot migration, executed)
+- frontend/src/pages/{HomePage,ProfileSettingsPage,BuyerDashboard,SellerDashboard,AuthPage}.js
+- frontend/src/components/{InfoTip,AIAssistant,FilterBar/FilterBar}.js
 
-### SendGrid Email Integration — DONE
-- FROM address: `noreply@bidvex.com` (BidVex Canada)
-- Reply-To: `support@bidvex.com`
-- Admin alerts: `info@bidvex.com`
-- Domain: `bidvex.com` authenticated + valid in SendGrid
-- 88 template IDs configured (44 keys × EN/FR)
-- Created `admin_notifications.py` with 4 admin alert functions
-- Wired admin new user notification to signup route (fire-and-forget)
-- Live E2E test: 5/5 passed (Welcome EN/FR, Admin notify, Bid confirmed, Pickup code)
+### Tests
+- iter158: 9/9 backend pass, frontend 100%, no critical/minor issues
+- Test file: /app/backend/tests/test_prelaunch_fixes_158.py
 
-### Marketplace Filter Bar — DONE
-### Cloudflare CDN Optimization — DONE
-### About Us Page — DONE
-### Phase 7: Platform Cleanup — DONE
+---
+
+## Previous: Vehicle Payment OPC Compliance (Feb 15, 2026) — DONE
+- BidVex never holds vehicle hammer price; buyer charged only 2.5% fee + Stripe recovery + tax-on-fee
+- $500 deposit migrated to Stripe `capture_method="manual"` (true HOLD)
+- Tests: 14/14 backend pass (iter153)
+
+## Previous: SendGrid Full Integration (Apr 20, 2026) — DONE
+- 88 template IDs (44 keys × EN/FR), Event Webhook with HMAC validation
+- Live E2E: 5/5 passed
+
+## Other major shipped items
+- Admin Panel Audit & Polish (23 sections)
+- Marketplace Filter Bar / Sidebar
+- Cloudflare CDN Optimization
+- About Us page
+- Stripe Connect destination charges for partners
+- Subscription lifecycle, branded PDF invoices, price-breakdown UI
 
 ## Backlog
-- (P2) Post-launch monitoring and alerting
+- (P1) Marketplace approve/reject status workflow (architecture decision needed)
+- (P1) Advanced analytics aggregation (top sellers, conversion rate)
+- (P2) Custom date range picker on admin analytics
+- (P2) Vehicle invoice PDF bilingual gap (body/footer/line items still EN-only)
 - (Enhancement) Dispute resolution & admin offline order management
 - (Enhancement) Scheduler job to auto-capture $500 deposit when fee invoice goes unpaid past deadline
-- Railway deployment fix (pending dashboard config)
+- (P3) Footer /api/legal-pages/public 500 (pre-existing, surfaced in iter158)
+- (P3) NotificationListener WS event error (pre-existing, surfaced in iter158)
 
+## Test credentials
+- Admin: `charbel911@gmail.com` / `Anderosli123!@#` (role=admin)

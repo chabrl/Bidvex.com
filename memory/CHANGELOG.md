@@ -1,5 +1,64 @@
 # BidVex Changelog
 
+
+## Apr 27, 2026 — P0 Final Pre-Launch Fixes (6/6) — DONE
+
+### Fix 1: Google OAuth + Profile Settings (display name, email, password, photo, province)
+- `frontend/src/pages/AuthPage.js`: handleGoogleLogin now redirects to `https://auth.emergentagent.com/?redirect=…` per the Emergent OAuth playbook (no env-var dependency, no fallbacks).
+- `frontend/src/pages/ProfileSettingsPage.js`:
+  - Email field now read-only with adjacent **"Change Email"** button + Law 25 notice.
+  - **Province / Territory** `<select>` added with all 13 Canadian provinces/territories (bilingual labels).
+  - **Email Change Modal** with 2-step flow (request → confirmation pending state) — auto-confirms when user lands on `/settings?email_change_token=…` and force-logs-out.
+- `backend/routes/profiles.py`: added `province`, `city`, `postal_code` to `allowed_fields` and `ProfileUpdate`.
+- `backend/routes/auth.py`: NEW endpoints
+  - `POST /api/auth/email-change/request` — verifies current password, rejects same-email + duplicates, creates `email_change_tokens` row (24h expiry), sends bilingual SendGrid verification link to NEW email.
+  - `POST /api/auth/email-change/confirm` — re-checks uniqueness (TOCTOU-safe), updates `users.email`, marks token used, deletes all sessions.
+- Verified: PUT `/api/users/me` `{province:"QC"}` persists ✅. Email-change rejects wrong password / same email with HTTP 400 ✅.
+
+### Fix 2: AI Chatbot graceful degraded fallback
+- `frontend/src/components/AIAssistant.js`:
+  - Added 30s `AbortController` hard timeout on `/api/ai-chat/message`.
+  - Detect non-2xx responses → set `serviceDegraded=true`.
+  - Bilingual amber **"⚠ Service degraded"** banner appears at top of chat with `mailto:support@bidvex.com` link.
+  - Auto-recovers (banner clears) on next successful response.
+  - Failure path now includes a primary "Email Support" action button (mail icon).
+
+### Fix 3: Tap-to-toggle InfoTip + 5 bilingual tooltips per dashboard
+- `frontend/src/components/InfoTip.js`: rewritten
+  - Controlled `open` state via `useState`.
+  - Tap toggles open/close (mobile primary).
+  - Hover still works on desktop (mouseenter/leave).
+  - `onPointerDownOutside={() => setOpen(false)}` closes on tap-outside.
+  - `aria-expanded` for accessibility.
+- `frontend/src/pages/BuyerDashboard.js`: added 6 InfoTips (page header, 3 stat cards via prop, MyBids title, all-bids hint).
+- `frontend/src/pages/SellerDashboard.js`: added 5th InfoTip next to "Seller Commission" rate text. (4 stat tooltips already in place.)
+
+### Fix 4: Listing image compression + lazy loading
+- `backend/services/image_compression.py` (NEW):
+  - `compress_data_url()` — base64 PNG/RGBA → JPEG 800px (longest side) @ 85% quality, with white-background flatten for transparent images, EXIF auto-orient, metadata strip.
+  - `compress_image_list()` — bulk helper for arrays.
+  - 8MB defensive cap to prevent worker OOM.
+- `backend/routes/listings.py`: applied to BOTH single-listing POST (line 192) and multi-item lots (line 482).
+- Frontend `<img>` tags already use `loading="lazy"` (FlattenedMarketplace, AuctionCarousel, OptimizedImage).
+- Cache-Control 1y already in `server.py` middleware for `.png/.jpg/.jpeg/.webp/.svg/.gif/.avif`.
+- Measured: 1600×1200 PNG → 800×600 JPEG, **60–94% size reduction**.
+
+### Fix 5: Delete Farm Equipment category
+- `backend/scripts/migrate_farm_equipment.py` (NEW, executed): renamed/deleted in `categories`, `listings`, `multi_item_listings`, and nested `lots`. 1 category renamed in-place + 1 duplicate deleted.
+- `backend/routes/admin_ops.py`: CFIA_TRIGGER_CATEGORIES list updated (`farm equipment` / `farm_equipment` → `heavy equipment` / `heavy_equipment`).
+- `frontend/src/components/FilterBar/FilterBar.js`: dropdown option "Farm Equipment" replaced with "Heavy Equipment" (bilingual).
+- API cache invalidated post-migration. Verified GET /api/categories returns `Heavy Equipment` and **zero** Farm Equipment entries.
+
+### Fix 6: Remove fake stats from Hero (Option A — no replacement)
+- `frontend/src/pages/HomePage.js`: deleted the 4-card grid (50K+ Active Bidders, 10K+ Live Auctions, $2M+ Items Won, 99.9% Satisfaction). Replaced 2-column `lg:grid-cols-2` with single `max-w-3xl` left content. Verified body text contains none of `50K+/10K+/$2M+/99.9%`.
+
+### Testing
+- Backend: 9/9 passed (iter158, 0 critical, 0 minor)
+- Frontend: 100% — all 6 fixes visually + programmatically verified
+- Test file: `/app/backend/tests/test_prelaunch_fixes_158.py`
+
+---
+
 ## Feb 15, 2026 - P0 Vehicle Payment Infrastructure — OPC Compliance Finalized
 
 ### Fix 5: send_auction_won_email — bilingual vehicle legal notice
