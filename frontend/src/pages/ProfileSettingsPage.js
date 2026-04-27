@@ -35,8 +35,10 @@ const ProfileSettingsPage = () => {
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [profileData, setProfileData] = useState({
     name: '',
+    email: '',
     phone: '',
     address: '',
+    province: '',
     company_name: '',
     tax_number: '',
     preferred_language: 'en',
@@ -45,6 +47,30 @@ const ProfileSettingsPage = () => {
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [showAddCard, setShowAddCard] = useState(false);
   const [recommendationsEnabled, setRecommendationsEnabled] = useState(true);
+  // Email change flow state
+  const [showEmailChange, setShowEmailChange] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [emailChangePassword, setEmailChangePassword] = useState('');
+  const [emailChangeLoading, setEmailChangeLoading] = useState(false);
+  const [emailChangeRequested, setEmailChangeRequested] = useState(false);
+
+  // Auto-confirm if user lands on /settings?email_change_token=...
+  useEffect(() => {
+    const token = searchParams.get('email_change_token');
+    if (!token) return;
+    (async () => {
+      try {
+        const r = await axios.post(`${API}/auth/email-change/confirm`, { token });
+        toast.success(r.data?.message || 'Email confirmed. Please log in with your new email.');
+        // Clear token from URL
+        window.history.replaceState({}, '', '/settings');
+        // Force logout because email changed → all sessions invalidated
+        setTimeout(() => { localStorage.removeItem('token'); window.location.href = '/login'; }, 1500);
+      } catch (err) {
+        toast.error(err?.response?.data?.detail || 'Failed to confirm email change.');
+      }
+    })();
+  }, [searchParams]);
 
   // Handler to switch to payment tab and open add card form
   const handleAddPaymentClick = () => {
@@ -56,8 +82,10 @@ const ProfileSettingsPage = () => {
     if (user) {
       setProfileData({
         name: user.name || '',
+        email: user.email || '',
         phone: user.phone || '',
         address: user.address || '',
+        province: user.province || '',
         company_name: user.company_name || '',
         tax_number: user.tax_number || '',
         preferred_language: user.preferred_language || 'en',
@@ -264,6 +292,33 @@ const ProfileSettingsPage = () => {
                     </div>
                   </div>
 
+                  {/* Email — read-only with Change Email button */}
+                  <div className="space-y-2" data-testid="email-section">
+                    <Label htmlFor="email">{t('profile.email', 'Email')}</Label>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <Input
+                        id="email"
+                        type="email"
+                        value={profileData.email}
+                        readOnly
+                        className="flex-1 bg-slate-50 dark:bg-slate-800/50"
+                        data-testid="email-input"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setShowEmailChange(true)}
+                        data-testid="open-email-change-btn"
+                        className="whitespace-nowrap"
+                      >
+                        {t('profile.changeEmail', 'Change Email')}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {t('profile.emailVerifyNotice', 'Changing your email requires verification at the new address (Law 25 compliance).')}
+                    </p>
+                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="address">{t('profile.address')}</Label>
                     <Input
@@ -272,6 +327,33 @@ const ProfileSettingsPage = () => {
                       onChange={(e) => setProfileData({ ...profileData, address: e.target.value })}
                       data-testid="address-input"
                     />
+                  </div>
+
+                  {/* Province — Canadian provinces dropdown */}
+                  <div className="space-y-2">
+                    <Label htmlFor="province">{t('profile.province', 'Province / Territory')}</Label>
+                    <select
+                      id="province"
+                      value={profileData.province}
+                      onChange={(e) => setProfileData({ ...profileData, province: e.target.value })}
+                      className="w-full px-3 py-2 border border-input rounded-md bg-background"
+                      data-testid="province-select"
+                    >
+                      <option value="">{t('profile.selectProvince', 'Select province / territory...')}</option>
+                      <option value="AB">Alberta</option>
+                      <option value="BC">British Columbia / Colombie-Britannique</option>
+                      <option value="MB">Manitoba</option>
+                      <option value="NB">New Brunswick / Nouveau-Brunswick</option>
+                      <option value="NL">Newfoundland and Labrador / Terre-Neuve-et-Labrador</option>
+                      <option value="NS">Nova Scotia / Nouvelle-Écosse</option>
+                      <option value="NT">Northwest Territories / Territoires du Nord-Ouest</option>
+                      <option value="NU">Nunavut</option>
+                      <option value="ON">Ontario</option>
+                      <option value="PE">Prince Edward Island / Île-du-Prince-Édouard</option>
+                      <option value="QC">Québec</option>
+                      <option value="SK">Saskatchewan</option>
+                      <option value="YT">Yukon</option>
+                    </select>
                   </div>
 
                   {user?.account_type === 'business' && (
@@ -577,6 +659,101 @@ const ProfileSettingsPage = () => {
           <TabsContent value="security">
             <ChangePasswordForm />
           </TabsContent>
+          {/* Email Change Modal */}
+          {showEmailChange && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" data-testid="email-change-modal">
+              <Card className="w-full max-w-md">
+                <CardHeader>
+                  <CardTitle>{t('profile.changeEmail', 'Change Email')}</CardTitle>
+                  <CardDescription>
+                    {t('profile.emailChangeNotice', 'A confirmation link will be sent to your new email. Your email will only change after you click the link.')}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {!emailChangeRequested ? (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="new-email-input">{t('profile.newEmail', 'New email address')}</Label>
+                        <Input
+                          id="new-email-input"
+                          type="email"
+                          value={newEmail}
+                          onChange={(e) => setNewEmail(e.target.value)}
+                          placeholder="you@example.com"
+                          data-testid="new-email-input"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="email-change-pwd">{t('profile.confirmPassword', 'Confirm with current password')}</Label>
+                        <Input
+                          id="email-change-pwd"
+                          type="password"
+                          value={emailChangePassword}
+                          onChange={(e) => setEmailChangePassword(e.target.value)}
+                          placeholder="••••••••"
+                          data-testid="email-change-password-input"
+                        />
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                        <Button
+                          onClick={async () => {
+                            if (!newEmail || !emailChangePassword) {
+                              toast.error(t('profile.fillBothFields', 'Please fill in both fields.'));
+                              return;
+                            }
+                            setEmailChangeLoading(true);
+                            try {
+                              const r = await axios.post(`${API}/auth/email-change/request`, {
+                                new_email: newEmail,
+                                current_password: emailChangePassword,
+                              });
+                              toast.success(r.data?.message || 'Verification link sent.');
+                              setEmailChangeRequested(true);
+                            } catch (err) {
+                              toast.error(err?.response?.data?.detail || t('common.error'));
+                            } finally {
+                              setEmailChangeLoading(false);
+                            }
+                          }}
+                          disabled={emailChangeLoading}
+                          className="flex-1"
+                          data-testid="submit-email-change-btn"
+                        >
+                          {emailChangeLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{t('common.loading')}</> : t('profile.sendVerification', 'Send verification link')}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => { setShowEmailChange(false); setNewEmail(''); setEmailChangePassword(''); }}
+                          data-testid="cancel-email-change-btn"
+                        >
+                          {t('common.cancel', 'Cancel')}
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center py-6 space-y-4">
+                      <div className="text-emerald-600 mx-auto">
+                        <Check className="h-12 w-12 mx-auto" />
+                      </div>
+                      <p className="text-sm">
+                        {t('profile.emailLinkSent', 'Verification link sent to')} <strong>{newEmail}</strong>.
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {t('profile.emailCheckInbox', 'Check your inbox and click the link within 24 hours to confirm. Your current email remains active until then.')}
+                      </p>
+                      <Button
+                        onClick={() => { setShowEmailChange(false); setNewEmail(''); setEmailChangePassword(''); setEmailChangeRequested(false); }}
+                        className="w-full"
+                        data-testid="close-email-change-confirmation-btn"
+                      >
+                        {t('common.close', 'Close')}
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </Tabs>
       </div>
     </div>

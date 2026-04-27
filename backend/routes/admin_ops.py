@@ -1120,7 +1120,7 @@ async def admin_opc_verify(user_id: str, data: OPCVerificationUpdate, current_us
 # ============= CFIA SOIL DECLARATION CATEGORIES ========================
 
 CFIA_TRIGGER_CATEGORIES = [
-    "farm equipment", "farm_equipment", "tractors", "excavators",
+    "heavy equipment", "heavy_equipment", "tractors", "excavators",
     "heavy_construction", "bulldozers", "skid_steers", "combines",
     "industrial_machinery", "construction & excavation", "material handling (forklifts)",
     "tillage & seeding", "harvesting (combines)", "livestock & dairy",

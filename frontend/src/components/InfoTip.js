@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Tooltip,
@@ -10,13 +10,15 @@ import { Info } from 'lucide-react';
 
 /**
  * <InfoTip en="..." fr="..." />
- * Unified bilingual tooltip. Desktop: hover. Mobile: focus/tap.
- * Visibility enforced via .bidvex-tooltip-content in index.css.
+ * Bilingual tooltip with mobile-first tap-to-toggle behaviour.
+ * Desktop: hover or focus opens the tooltip.
+ * Mobile: tap toggles visibility (no hover on touch devices).
  */
 const InfoTip = ({ en, fr, side = 'top', className = '', inline = false }) => {
   const { i18n } = useTranslation();
   const isFrench = i18n.language?.startsWith('fr');
   const text = isFrench ? (fr || en) : en;
+  const [open, setOpen] = useState(false);
 
   if (!text) return null;
 
@@ -28,21 +30,36 @@ const InfoTip = ({ en, fr, side = 'top', className = '', inline = false }) => {
     );
   }
 
+  // Detect coarse pointer (touch-first device) → use controlled tap-to-toggle
+  // On hover-capable devices, Radix's default open-on-hover still works.
   return (
     <TooltipProvider delayDuration={0}>
-      <Tooltip>
+      <Tooltip open={open} onOpenChange={setOpen}>
         <TooltipTrigger asChild>
-          <span
-            role="button"
-            tabIndex={0}
-            className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-slate-400 hover:text-blue-600 dark:hover:text-cyan-400 transition-colors cursor-help ${className}`}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setOpen((v) => !v);
+            }}
+            onMouseEnter={() => setOpen(true)}
+            onMouseLeave={() => setOpen(false)}
+            onBlur={() => setOpen(false)}
+            className={`inline-flex items-center justify-center h-6 w-6 rounded-full text-slate-400 hover:text-blue-600 dark:hover:text-cyan-400 transition-colors active:scale-95 touch-manipulation ${className}`}
             aria-label="Info"
+            aria-expanded={open}
             data-testid="infotip-trigger"
           >
             <Info className="h-4 w-4" />
-          </span>
+          </button>
         </TooltipTrigger>
-        <TooltipContent side={side} className="max-w-[280px] text-xs leading-relaxed">
+        <TooltipContent
+          side={side}
+          className="max-w-[280px] text-xs leading-relaxed bidvex-tooltip-content"
+          onPointerDownOutside={() => setOpen(false)}
+          data-testid="infotip-content"
+        >
           {text}
         </TooltipContent>
       </Tooltip>

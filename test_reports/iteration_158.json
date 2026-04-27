@@ -1,0 +1,44 @@
+{
+  "summary": "Iteration 158 — Backend + Frontend validation of 6 P0 pre-launch fixes (Google OAuth/Profile settings, AI chatbot fallback, InfoTip tap-to-toggle, image compression, Farm->Heavy Equipment migration, Hero stat-card removal). Backend: 9/10 passed + 1 skipped (listing-creation-via-API blocked by trust-status/payment-method guard — covered by direct unit test of compress_data_url which passes). Frontend: homepage hero has NO 50K+/10K+/$2M+/99.9% cards; /settings shows Email + 'Change Email' button + Province dropdown (13 provinces/territories + placeholder = 14 options); Google Login button redirects to https://auth.emergentagent.com/?redirect=…/marketplace; Buyer dashboard has 6 InfoTips (requirement 5+); Seller dashboard has 5 InfoTips with commission rate text (requirement 5+); AI FAB chat widget is visible in DOM bottom-right.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "All pages (pre-existing)", "issues": ["Footer endpoint returns 500 (/api/legal-pages/public or similar) causing repeated console AxiosError — not related to iter158 fixes but should be triaged separately", "NotificationListener Error: Event appears on every page load — pre-existing WebSocket/SSE issue unrelated to iter158"]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_prelaunch_fixes_158.py",
+    "/app/test_reports/pytest/iter158_results.xml"
+  ],
+  "action_items": [
+    "P3: Investigate pre-existing Footer 500 (likely legal-pages/public list) — appears on every page in console but orthogonal to iter158 scope.",
+    "P3: NotificationListener WS error on every page — pre-existing, out of iter158 scope."
+  ],
+  "critical_code_review_comments": [
+    "routes/auth.py email-change flow is clean: password verified with verify_password, same-email check, uniqueness check at BOTH request-time and confirm-time (prevents TOCTOU email hijack), 24h token expiry, sessions invalidated on confirm — Law 25 compliant. SendGrid failure is swallowed (log-only) so request succeeds even if email provider is down — UX trade-off; consider returning 202 if email send fails so the UI can show 'email may not have arrived'. Currently a silent partial success.",
+    "services/image_compression.py compress_data_url correctly handles PNG→JPEG, RGBA/LA/P alpha→white background, EXIF auto-orient, strip metadata, 800px longest-side cap. Measured 238KB PNG → ~13KB JPEG at 800x600 in unit test (94% reduction). Falls back to original on any exception which is the right behavior.",
+    "ProfileSettingsPage Province dropdown renders 13 provinces/territories + placeholder (14 options) bilingual (e.g. 'Québec', 'British Columbia / Colombie-Britannique'). PUT /api/users/me persists province=QC verified via /api/auth/me roundtrip.",
+    "Homepage hero cleanly removed stat cards block — verified by body-text search for '50K+','10K+','$2M+','99.9%' — none present.",
+    "Categories migration complete: GET /api/categories returns 'Heavy Equipment' and NO 'Farm Equipment' in any slug, name, name_en, or name_fr (including all subcategory children walked recursively).",
+    "AuthPage handleGoogleLogin → redirects to https://auth.emergentagent.com/?redirect=https%3A%2F%2Fprod-verify-2.preview.emergentagent.com%2Fmarketplace — confirmed via Playwright request interceptor.",
+    "Buyer and Seller dashboards have 6 and 5 [data-testid^='infotip'] elements respectively — meeting the '5+ each' requirement. Seller dashboard shows 'Seller Commission: 2%' text alongside InfoTip."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_prelaunch_fixes_158.py"
+  ],
+  "success_rate": {
+    "backend": "100% (9/9 passed, 0 failed, 1 skipped for external-guard reason)",
+    "frontend": "100% — all 6 fixes visually/programmatically verified"
+  },
+  "test_credentials": "charbel911@gmail.com / Anderosli123!@# — verified working (role=admin). Token obtained via /api/auth/login and injected to localStorage for dashboard tests.",
+  "seed_data_creation": "None — all tests use read-only GET, existing admin user, or error-path calls (bad token, wrong password, same email).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "iter158 confirms all 6 P0 pre-launch fixes land cleanly. Key test file: /app/backend/tests/test_prelaunch_fixes_158.py covers categories migration, province persistence, email-change request/confirm happy+unhappy paths, AI chatbot, /api/auth/session existence, and image compression via both API (skipped due to payment_method guard) and direct service import (passing). One minor caveat: creating a test listing via POST /api/listings for admin is blocked by trust-status/payment-method check (HTTP 402 payment_method_invalid). The image compression still runs server-side on every create; unit test validates the service itself. If future agent needs to test end-to-end listing POST, add a payment method to admin first or use a pre-verified seller account. Pre-existing issues out of iter158 scope: Footer 500 (legal-pages/public) and NotificationListener WS event error — these appear on every page and should be investigated in a follow-up iteration.",
+  "rca of the issue": "N/A — no bugs reproduced this iteration. Listing POST skip in TestImageCompression.test_listing_creation_compresses_images is due to the platform's payment_method_invalid 402 guard for sellers without a verified payment method (expected behavior); covered by the unit test test_compression_service_unit which directly invokes compress_data_url and validates JPEG output + 800px max dim + >30% size reduction."
+}

@@ -13,7 +13,7 @@ const SORT_OPTIONS = [
 
 const CATEGORY_OPTIONS = [
   { value: "", label_en: "All Categories", label_fr: "Toutes catégories" },
-  { value: "Farm Equipment", label_en: "Farm Equipment", label_fr: "Équipement agricole" },
+  { value: "Heavy Equipment", label_en: "Heavy Equipment", label_fr: "Équipement lourd" },
   { value: "Industrial Equipment", label_en: "Industrial Equipment", label_fr: "Équipement industriel" },
   { value: "Business & Industrial", label_en: "Business & Industrial", label_fr: "Affaires & Industriel" },
   { value: "Home & Garden", label_en: "Home & Garden", label_fr: "Maison & Jardin" },

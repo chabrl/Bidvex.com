@@ -119,9 +119,15 @@ const SellerDashboard = () => {
                 </Badge>
               )}
             </div>
-            <p className="text-xs sm:text-sm text-muted-foreground">
-              {user.account_type === 'business' ? t('dashboard.seller.businessAccount') : t('dashboard.seller.personalAccount')} - 
-              {t('dashboard.seller.commissionRate')}: {user.subscription_tier === 'vip' ? '2%' : user.subscription_tier === 'premium' ? '2.5%' : '4%'}
+            <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1.5 flex-wrap">
+              <span>
+                {user.account_type === 'business' ? t('dashboard.seller.businessAccount') : t('dashboard.seller.personalAccount')} - 
+                {t('dashboard.seller.commissionRate')}: {user.subscription_tier === 'vip' ? '2%' : user.subscription_tier === 'premium' ? '2.5%' : '4%'}
+              </span>
+              <InfoTip
+                en="Your commission rate is BidVex's percentage of each successful sale. VIP and Premium tiers pay lower rates. No commission is charged on unsold items."
+                fr="Votre taux de commission est le pourcentage que BidVex prélève sur chaque vente réussie. Les abonnés VIP et Premium paient un taux réduit. Aucune commission n'est facturée sur les articles invendus."
+              />
             </p>
           </div>
           <div className="flex flex-wrap gap-2 w-full sm:w-auto">

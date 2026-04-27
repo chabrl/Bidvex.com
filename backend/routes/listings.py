@@ -21,6 +21,7 @@ from utils import (
     detect_currency_from_location,
     get_tax_rates_for_currency,
 )
+from services.image_compression import compress_image_list
 
 logger = logging.getLogger(__name__)
 
@@ -188,7 +189,7 @@ async def create_listing(
         seller_id=current_user.id, title=listing_data.title, description=listing_data.description,
         category=listing_data.category, condition=listing_data.condition,
         starting_price=listing_data.starting_price, current_price=listing_data.starting_price,
-        buy_now_price=listing_data.buy_now_price, images=listing_data.images,
+        buy_now_price=listing_data.buy_now_price, images=compress_image_list(listing_data.images),
         location=listing_data.location, city=listing_data.city, region=listing_data.region,
         country=listing_data.country, postal_code=listing_data.postal_code,
         latitude=listing_data.latitude, longitude=listing_data.longitude,
@@ -476,6 +477,11 @@ async def create_multi_item_listing(
 
     promo = compute_promotion(current_user, listing_data)
     lots_with_end_time = build_lots_with_end_time(listing_data.lots, listing_data.auction_end_date)
+
+    # Compress images on every lot to reduce DB + bandwidth
+    for _lot in lots_with_end_time:
+        if isinstance(_lot, dict) and _lot.get("images"):
+            _lot["images"] = compress_image_list(_lot["images"])
 
     listing = MultiItemListing(
         seller_id=current_user.id,

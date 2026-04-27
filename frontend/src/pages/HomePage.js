@@ -168,7 +168,7 @@ const HomePage = () => {
 
         {/* Hero Content */}
         <div className="relative max-w-7xl mx-auto px-4 py-20 md:py-32 w-full">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
+          <div className="max-w-3xl">
             {/* Left Content */}
             <div className="text-white space-y-8">
               {/* Animated Badge */}
@@ -230,25 +230,7 @@ const HomePage = () => {
               </div>
             </div>
 
-            {/* Right Side - Live Stats Cards */}
-            <div className={`hidden lg:grid grid-cols-2 gap-5 transition-all duration-1000 delay-300 ${heroLoaded ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-20'}`}>
-              {[
-                { value: '50K+', label: t('homepage.activeBidders'), icon: <Users className="h-6 w-6" />, delay: 0 },
-                { value: '10K+', label: t('homepage.liveAuctions'), icon: <Gavel className="h-6 w-6" />, delay: 100 },
-                { value: '$2M+', label: t('homepage.itemsWon'), icon: <TrendingUp className="h-6 w-6" />, delay: 200 },
-                { value: '99.9%', label: t('homepage.satisfaction'), icon: <Award className="h-6 w-6" />, delay: 300 }
-              ].map((stat, i) => (
-                <div 
-                  key={i} 
-                  className="group bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 hover:bg-white/20 hover:border-cyan-400/40 transition-all duration-300 hover:-translate-y-2 hover:shadow-xl hover:shadow-cyan-500/20"
-                  style={{ animationDelay: `${stat.delay}ms` }}
-                >
-                  <div className="text-cyan-400 mb-3 group-hover:scale-110 transition-transform">{stat.icon}</div>
-                  <div className="text-4xl font-bold text-white mb-1">{stat.value}</div>
-                  <div className="text-blue-200/70 text-sm">{stat.label}</div>
-                </div>
-              ))}
-            </div>
+            {/* Right column removed — no fake stats per launch design */}
           </div>
         </div>
         

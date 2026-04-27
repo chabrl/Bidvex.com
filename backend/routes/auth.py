@@ -12,6 +12,7 @@ from typing import Optional
 from datetime import datetime, timezone, timedelta
 from passlib.context import CryptContext
 from jose import jwt, JWTError
+import asyncio
 import os
 import uuid
 import logging
@@ -825,3 +826,144 @@ async def admin_force_password_sync(request: Request):
 
     logger.info(f"[AUTH_DEBUG] Admin force-sync completed for '{email}' — hash starts with: {hashed[:10]}")
     return {"success": True, "message": f"Password synced for {email}. Hash verified."}
+
+
+
+# ============= EMAIL CHANGE WITH VERIFICATION (Law 25 Compliance) =============
+
+class EmailChangeRequest(BaseModel):
+    new_email: EmailStr
+    current_password: str
+
+
+@auth_router.post("/email-change/request")
+async def request_email_change(
+    request: EmailChangeRequest,
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    """
+    Step 1: User requests an email change.
+    Validates current password, then sends a confirmation link to the NEW email address.
+    The change is only applied after the user clicks the link (Law 25 + security).
+    """
+    new_email = request.new_email.strip().lower()
+    user_doc = await db.users.find_one({"id": current_user["id"]}, {"_id": 0})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Verify current password before allowing change
+    stored_pw = user_doc.get("password") or user_doc.get("password_hash", "")
+    if not stored_pw or not verify_password(request.current_password, stored_pw):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+
+    if new_email == (user_doc.get("email") or "").lower():
+        raise HTTPException(status_code=400, detail="New email is the same as current email")
+
+    # Check uniqueness
+    existing = await db.users.find_one({"email": new_email})
+    if existing:
+        raise HTTPException(status_code=400, detail="That email is already registered to another account")
+
+    token = str(uuid.uuid4())
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+    await db.email_change_tokens.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": current_user["id"],
+        "old_email": user_doc.get("email"),
+        "new_email": new_email,
+        "token": token,
+        "used": False,
+        "expires_at": expires_at.isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+    # Send verification link to NEW email
+    confirm_url = f"{os.environ.get('FRONTEND_URL', 'https://bidvex.com')}/settings?email_change_token={token}"
+    try:
+        from sendgrid import SendGridAPIClient
+        from sendgrid.helpers.mail import Mail
+        api_key = os.environ.get("SENDGRID_API_KEY")
+        from_email = os.environ.get("SENDGRID_FROM_EMAIL", "noreply@bidvex.com")
+        from_name = os.environ.get("SENDGRID_FROM_NAME", "BidVex Canada")
+        if api_key:
+            lang = user_doc.get("preferred_language", "en")
+            subject_en = "Confirm your new email address — BidVex"
+            subject_fr = "Confirmez votre nouvelle adresse courriel — BidVex"
+            body_en = f"""
+                <p>Hi {user_doc.get('name', '')},</p>
+                <p>You requested to change your BidVex account email to <strong>{new_email}</strong>.</p>
+                <p>To confirm this change, click the button below within 24 hours:</p>
+                <p><a href="{confirm_url}" style="display:inline-block;padding:12px 24px;background:#1E3A8A;color:#fff;border-radius:8px;text-decoration:none;">Confirm new email</a></p>
+                <p>If you did not request this change, ignore this email — your account is safe.</p>
+            """
+            body_fr = f"""
+                <p>Bonjour {user_doc.get('name', '')},</p>
+                <p>Vous avez demandé de changer votre courriel BidVex pour <strong>{new_email}</strong>.</p>
+                <p>Pour confirmer ce changement, cliquez sur le bouton ci-dessous dans les 24 heures :</p>
+                <p><a href="{confirm_url}" style="display:inline-block;padding:12px 24px;background:#1E3A8A;color:#fff;border-radius:8px;text-decoration:none;">Confirmer la nouvelle adresse</a></p>
+                <p>Si vous n'avez pas demandé ce changement, ignorez ce courriel — votre compte reste sécurisé.</p>
+            """
+            mail = Mail(
+                from_email=(from_email, from_name),
+                to_emails=new_email,
+                subject=subject_fr if lang == "fr" else subject_en,
+                html_content=body_fr if lang == "fr" else body_en,
+            )
+            mail.tracking_settings = None
+            sg = SendGridAPIClient(api_key)
+            sg.send(mail)
+            logger.info(f"[EMAIL_CHANGE] Verification link sent to new email '{new_email}' for user {current_user['id']}")
+    except Exception as e:
+        logger.error(f"[EMAIL_CHANGE] Failed to send verification email: {e}")
+
+    return {
+        "success": True,
+        "message": "A verification link has been sent to your new email address. Please check your inbox to confirm the change.",
+    }
+
+
+class EmailChangeConfirm(BaseModel):
+    token: str
+
+
+@auth_router.post("/email-change/confirm")
+async def confirm_email_change(payload: EmailChangeConfirm):
+    """
+    Step 2: User clicks confirmation link in their new email inbox.
+    Token is validated, email updated atomically, all sessions invalidated.
+    """
+    token_doc = await db.email_change_tokens.find_one(
+        {"token": payload.token, "used": False}, {"_id": 0}
+    )
+    if not token_doc:
+        raise HTTPException(status_code=400, detail="Invalid or already-used confirmation link")
+
+    expires_at = datetime.fromisoformat(token_doc["expires_at"])
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) > expires_at:
+        raise HTTPException(status_code=400, detail="Confirmation link has expired")
+
+    new_email = token_doc["new_email"]
+    # Re-check uniqueness at confirm-time
+    existing = await db.users.find_one({"email": new_email, "id": {"$ne": token_doc["user_id"]}})
+    if existing:
+        raise HTTPException(status_code=400, detail="That email is now registered to another account")
+
+    await db.users.update_one(
+        {"id": token_doc["user_id"]},
+        {"$set": {
+            "email": new_email,
+            "email_verified": True,
+            "email_changed_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
+    await db.email_change_tokens.update_one(
+        {"token": payload.token},
+        {"$set": {"used": True, "used_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    # Invalidate all sessions — user must log in again with new email
+    await db.sessions.delete_many({"user_id": token_doc["user_id"]})
+    logger.info(f"[EMAIL_CHANGE] Email confirmed: user={token_doc['user_id']} new={new_email}")
+    return {"success": True, "message": "Email updated. Please log in with your new email address.", "new_email": new_email}

@@ -114,13 +114,10 @@ const AuthPage = () => {
   };
 
   const handleGoogleLogin = () => {
+    // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
+    // Use window.location.origin so user returns to exact domain (prod, preview, etc.)
     const redirectUrl = `${window.location.origin}/marketplace`;
-    const authServiceUrl = process.env.REACT_APP_AUTH_SERVICE_URL;
-    if (!authServiceUrl) {
-      console.warn('REACT_APP_AUTH_SERVICE_URL not configured');
-      return;
-    }
-    window.location.href = `${authServiceUrl}/?redirect=${encodeURIComponent(redirectUrl)}`;
+    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
   };
 
   // Forced Password Reset Form

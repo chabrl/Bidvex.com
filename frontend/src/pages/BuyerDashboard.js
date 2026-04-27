@@ -13,6 +13,7 @@ import Countdown from 'react-countdown';
 import { formatCurrency } from '../utils/currencyFormatter';
 import { LoadingTimeout } from '../components/LoadingTimeout';
 import { BuyerEscrowPanel } from '../components/EscrowPickupPanel';
+import InfoTip from '../components/InfoTip';
 
 const API = API_BASE;
 
@@ -51,9 +52,15 @@ const BuyerDashboard = () => {
   return (
     <div className="min-h-screen py-8 px-4" data-testid="buyer-dashboard">
       <div className="max-w-7xl mx-auto space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">{t('dashboard.buyer.title')}</h1>
-          <p className="text-muted-foreground">{t('dashboard.buyer.trackBidsWins')}</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">{t('dashboard.buyer.title')}</h1>
+            <p className="text-muted-foreground">{t('dashboard.buyer.trackBidsWins')}</p>
+          </div>
+          <InfoTip
+            en="Your buyer dashboard. See active bids, items you've won, and your watchlist all in one place. Bids hold a payment authorization on your card — never a charge."
+            fr="Votre tableau de bord acheteur. Consultez vos enchères actives, vos articles gagnés et votre liste de surveillance au même endroit. Une enchère retient une autorisation sur votre carte — jamais un débit."
+          />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -62,24 +69,42 @@ const BuyerDashboard = () => {
             title={t('dashboard.buyer.activeBids')}
             value={dashboard?.active_bids || 0}
             color="blue"
+            tip={{
+              en: "Number of auctions where you currently hold the highest bid or are still actively bidding.",
+              fr: "Nombre d'enchères où vous détenez actuellement la mise la plus élevée ou enchérissez encore activement.",
+            }}
           />
           <StatCard
             icon={<Trophy className="h-6 w-6" />}
             title={t('dashboard.buyer.wonItems')}
             value={dashboard?.won_items || 0}
             color="green"
+            tip={{
+              en: "Auctions you have won. Pay the seller within the deadline to complete your purchase.",
+              fr: "Enchères que vous avez remportées. Payez le vendeur avant la date limite pour finaliser votre achat.",
+            }}
           />
           <StatCard
             icon={<DollarSign className="h-6 w-6" />}
             title="Total Bids"
             value={dashboard?.total_bids || 0}
             color="purple"
+            tip={{
+              en: "Lifetime number of bids you've placed across all auctions on BidVex.",
+              fr: "Nombre total d'enchères que vous avez placées sur toutes les ventes BidVex.",
+            }}
           />
         </div>
 
         <Card className="glassmorphism">
           <CardHeader>
-            <CardTitle>{t('dashboard.buyer.myBidsTitle')}</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              {t('dashboard.buyer.myBidsTitle')}
+              <InfoTip
+                en="All your bids — winning, outbid, and watched. Use the tabs to filter. Bids cannot be cancelled once placed."
+                fr="Toutes vos enchères — gagnantes, surenchéries et surveillées. Utilisez les onglets pour filtrer. Une enchère ne peut être annulée une fois placée."
+              />
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="all" className="space-y-4">
@@ -94,6 +119,13 @@ const BuyerDashboard = () => {
               </TabsList>
 
               <TabsContent value="all">
+                <div className="flex items-center gap-2 mb-3 text-sm text-muted-foreground">
+                  <span>{t('dashboard.buyer.allBidsHint', 'All auctions you have placed bids on.')}</span>
+                  <InfoTip
+                    en="Green = you're winning. Red = someone outbid you. Click any item to bid again."
+                    fr="Vert = vous gagnez. Rouge = quelqu'un a surenchéri. Cliquez sur un article pour enchérir à nouveau."
+                  />
+                </div>
                 {dashboard?.bids && dashboard.bids.length > 0 ? (
                   <div className="space-y-4">
                     {dashboard.bids.map((bid) => {
@@ -476,13 +508,14 @@ const BuyerDashboard = () => {
   );
 };
 
-const StatCard = ({ icon, title, value, color }) => (
+const StatCard = ({ icon, title, value, color, tip }) => (
   <Card className="glassmorphism">
     <CardContent className="p-6">
       <div className="flex items-center justify-between mb-4">
         <div className={`p-3 rounded-xl bg-${color}-100 dark:bg-${color}-900/20 text-${color}-600`}>
           {icon}
         </div>
+        {tip && <InfoTip en={tip.en} fr={tip.fr} />}
       </div>
       <p className="text-2xl font-bold mb-1">{value}</p>
       <p className="text-sm text-muted-foreground">{title}</p>

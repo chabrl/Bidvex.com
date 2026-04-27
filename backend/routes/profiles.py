@@ -63,6 +63,9 @@ class ProfileUpdate(BaseModel):
     language: Optional[str] = None
     picture: Optional[str] = None
     personalized_recommendations: Optional[bool] = None
+    province: Optional[str] = None
+    city: Optional[str] = None
+    postal_code: Optional[str] = None
 
 
 class AuctionRating(BaseModel):
@@ -151,6 +154,7 @@ async def update_user_me(
         "bank_details", "language", "picture", "preferred_language",
         "preferred_currency", "subscription_tier", "bio", "bio_fr",
         "privacy_settings", "personalized_recommendations",
+        "province", "city", "postal_code",
     ]
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
 

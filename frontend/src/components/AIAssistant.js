@@ -44,6 +44,7 @@ const AIAssistant = () => {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [serviceDegraded, setServiceDegraded] = useState(false);
   const messagesEndRef = useRef(null);
   const { token } = useAuth();
   const navigate = useNavigate();
@@ -160,27 +161,42 @@ const AIAssistant = () => {
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
       const lang = (navigator.language || 'en').startsWith('fr') ? 'fr' : 'en';
+      const ctrl = new AbortController();
+      const timeoutId = setTimeout(() => ctrl.abort(), 30000); // 30s hard timeout
       const res = await fetch(`${backendUrl}/api/ai-chat/message`, {
         method: 'POST',
         headers,
+        signal: ctrl.signal,
         body: JSON.stringify({
           message: userMessage,
           chat_history: messages.slice(-10).map((m) => ({ role: m.role, content: m.content })),
           language: lang,
         }),
       });
+      clearTimeout(timeoutId);
+      if (!res.ok) {
+        // Service responded but errored (5xx, 429, etc.) → graceful degraded state
+        throw new Error(`HTTP ${res.status}`);
+      }
       const data = await res.json();
+      setServiceDegraded(false);
       setMessages((prev) => [
         ...prev,
         { role: 'assistant', content: data.message, rich_content: data.rich_content },
       ]);
     } catch (e) {
+      setServiceDegraded(true);
       setMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          content: 'Sorry, I could not reach the BidVex Concierge right now. Please retry in a moment, or contact support@bidvex.com. / Désolé, le concierge BidVex est temporairement indisponible.',
-          rich_content: null,
+          content: 'Service temporarily unavailable. Please retry in a moment, or email support@bidvex.com for immediate help.\n\nService temporairement indisponible. Veuillez réessayer dans un instant ou écrire à support@bidvex.com pour de l\'aide immédiate.',
+          rich_content: {
+            has_rich_content: true,
+            action_buttons: [
+              { text: 'Email Support / Contacter le support', action: 'email', url: 'support@bidvex.com', icon: 'mail', style: 'primary' },
+            ],
+          },
         },
       ]);
     } finally {
@@ -278,6 +294,16 @@ const AIAssistant = () => {
                 <X className="h-5 w-5" />
               </Button>
             </div>
+
+            {/* Degraded service banner */}
+            {serviceDegraded && (
+              <div
+                className="px-4 py-2 bg-amber-50 dark:bg-amber-900/30 border-b border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs flex-shrink-0"
+                data-testid="ai-degraded-banner"
+              >
+                <span className="font-semibold">⚠ Service degraded.</span> Some replies may fail. Email <a href="mailto:support@bidvex.com" className="underline">support@bidvex.com</a> for urgent help.
+              </div>
+            )}
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-slate-800 min-h-0">
