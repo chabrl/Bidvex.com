@@ -1,0 +1,40 @@
+{
+  "summary": "Iteration 159 — Validated 4 pre-launch fixes (P3 legal-pages 500→200, P3 NotificationListener silent WS errors, P2 bilingual EN/FR vehicle+general invoice PDFs, bonus live-auctions hero pill). Backend: 7/7 pytest passed (legal-pages with en/fr/no-lang/invalid-lang all 200, /api/stats/public returns {active_auctions:int}>=0, vehicle PDF contains all 10 required bilingual labels including 'TPS','TVQ','14.975','Étape 1','traite bancaire','INSTRUCTIONS DE PAIEMENT','ACHETEUR','VENDEUR','FACTURE','Numéro de facture'; general PDF contains all 10 including 'TVQ sur la prime' and 'TOTAL GÉNÉRAL'). Frontend: live-auctions-pill correctly hidden when active_auctions=0; no fake stats (50K+/10K+/$2M+/99.9%) in DOM; /api/stats/public and /api/site-config/legal-pages reachable from browser context (200). NotificationListener verified silent: 0 console.error from NotificationListener/WS over 8s authenticated dashboard session (admin charbel911@gmail.com login 200, token injected, WS attempts confirmed via listener mount but errors absorbed silently as designed).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Global (pre-existing, NOT iter159)", "issues": ["React warning 'Invalid DOM property fetchpriority — Did you mean fetchPriority' x2 in console — appears on home/dashboard. Likely a third-party img/link tag using HTML attr casing. Cosmetic only, no user impact, but should be tidied at some point."]},
+      {"screen": "/dashboard route", "issues": ["Direct GET /dashboard returns 404 page (route not registered) — pre-existing, unrelated to iter159 fixes. User dashboards live elsewhere; /dashboard URL just doesn't have a registered route."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_prelaunch_fixes_159.py",
+    "/app/test_reports/pytest/iter159_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routes/legal.py get_legal_pages_public is now defensive: try/except around the entire body returns {success:false, pages:{}} instead of 500, AND inside the language filter it isinstance-checks page_data (dict for {en,fr}, str for legacy single-lang, ignores bool/null/list). Footer can now never crash the public site.",
+    "routes/misc.py get_public_stats does TWO indexed count_documents calls (listings + multi_item_listings, status='active') and falls back to {active_auctions:0} on any exception. Lightweight enough to call on every homepage mount.",
+    "services/invoice_generator.py — bilingual label helper bi(en, fr) used consistently. The combined 'GST + QST (combined 14.975%) / TPS + TVQ (combinées 14,975 %)' line is correctly added in BOTH vehicle (line 193) and general (line 412 + line 454 for buyer-premium tax) PDFs alongside separate GST/QST lines, satisfying the regulatory readability requirement. PDF text extraction via pypdf cleanly recovers all FR labels (no font-encoding loss).",
+    "components/MessageNotificationListener.js — exponential backoff 5s→10s→20s→40s→80s capped, hard-stop after 5 attempts (line 41), all 3 logging sites (connected/disconnected/error) gated on process.env.NODE_ENV==='development' and use console.debug (NEVER console.error). ws.onerror handler (line 119–121) explicitly absorbed with comment 'surfacing them as console errors confuses users'. All event handlers wrapped in try/catch. Verified: 0 NotificationListener console errors during 8s authenticated session.",
+    "pages/HomePage.js — activeAuctions state initialized to 0; /api/stats/public fetched in useEffect with cancelled guard; pill render is gated `activeAuctions > 0 &&` (line 235). Pill has data-testid='live-auctions-pill' for testability. Verified hidden when count is 0."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_prelaunch_fixes_159.py"
+  ],
+  "success_rate": {
+    "backend": "100% (7/7 passed)",
+    "frontend": "100% — all 4 visible behaviors verified"
+  },
+  "test_credentials": "charbel911@gmail.com / Anderosli123!@# — verified working (login HTTP 200, token issued, dashboard navigation succeeded with avatar+notif-bell rendered).",
+  "seed_data_creation": "None — read-only GETs and direct service-level invocations of generate_vehicle_invoice_pdf / generate_general_invoice_pdf with synthetic in-memory payment results (calculate_vehicle_payment(25000) and calculate_general_payment(2500, business=True)). No DB writes.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "iter159 closes the 3 P3/P2 footer/notification/PDF fixes and the live-pill bonus. Test file /app/backend/tests/test_prelaunch_fixes_159.py is reusable as regression: drop into pytest with REACT_APP_BACKEND_URL env. Notable pypdf gotcha: ReportLab puts FR text in a different font; use pypdf >= 3.x (already installed) for clean extraction. Pre-existing unrelated issues spotted but out of scope: (a) React fetchpriority casing warning x2 on every page load — cosmetic, (b) /dashboard URL returns 404 — likely the SPA route table doesn't have a literal '/dashboard' entry (auth gates / role-based redirect probably handles real dashboards via /buyer, /seller, /admin paths). Iter158 baseline still passes alongside this iteration.",
+  "rca of the issue": "N/A — all four fixes verified. PDF labels confirmed via pypdf extraction (vehicle: all 10/10 required strings present; general: all 10/10). Legal-pages now uses isinstance(page_data, dict|str) guard and a top-level try/except returning empty pages instead of 500, eliminating the 'argument of type bool is not iterable' regression."
+}

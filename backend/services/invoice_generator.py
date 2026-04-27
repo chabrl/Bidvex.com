@@ -98,30 +98,40 @@ def generate_vehicle_invoice_pdf(
     
     normal_style = styles['Normal']
     
-    # Header
-    elements.append(Paragraph("AUCTION INVOICE", title_style))
+    # ── Bilingual label helper (EN line / thin rule / FR line) ──
+    def bi(en: str, fr: str) -> str:
+        return f"<b>{en}</b><br/><font size='8' color='#6b7280'>{fr}</font>"
+
+    # Header — bilingual
+    elements.append(Paragraph("AUCTION INVOICE<br/><font size='12'>FACTURE D'ENCHÈRE</font>", title_style))
     elements.append(Spacer(1, 0.25*inch))
-    
-    # Invoice info table
+
+    # Invoice info table — bilingual labels
     invoice_info = [
-        ['Invoice Number:', invoice_num],
-        ['Invoice Date:', datetime.now(timezone.utc).strftime('%B %d, %Y')],
-        ['Auction Type:', 'Vehicle Auction'],
-        ['Payment Method:', 'BidVex Fees via Stripe / Balance via Bank Draft'],
+        [Paragraph(bi("Invoice Number:", "Numéro de facture :"), normal_style), invoice_num],
+        [Paragraph(bi("Invoice Date:", "Date de la facture :"), normal_style), datetime.now(timezone.utc).strftime('%B %d, %Y')],
+        [Paragraph(bi("Auction Type:", "Type d'enchère :"), normal_style),
+         Paragraph("Vehicle Auction<br/><font size='8' color='#6b7280'>Enchère de véhicule</font>", normal_style)],
+        [Paragraph(bi("Payment Method:", "Mode de paiement :"), normal_style),
+         Paragraph(
+             "BidVex Fees via Stripe / Balance via Bank Draft<br/>"
+             "<font size='8' color='#6b7280'>Frais BidVex via Stripe / Solde par traite bancaire</font>",
+             normal_style)],
     ]
     
-    info_table = Table(invoice_info, colWidths=[2*inch, 4*inch])
+    info_table = Table(invoice_info, colWidths=[2.2*inch, 3.8*inch])
     info_table.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, -1), 10),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
     ]))
     elements.append(info_table)
     elements.append(Spacer(1, 0.25*inch))
     
-    # Buyer & Seller info side by side
+    # Buyer & Seller info side by side — bilingual headers
     party_data = [
-        ['BUYER', 'SELLER'],
+        [Paragraph("<b>BUYER</b><br/><font size='8' color='#6b7280'>ACHETEUR</font>", normal_style),
+         Paragraph("<b>SELLER</b><br/><font size='8' color='#6b7280'>VENDEUR</font>", normal_style)],
         [buyer_info.get('name', 'N/A'), seller_info.get('name', 'N/A')],
         [buyer_info.get('email', ''), seller_info.get('email', '')],
         [buyer_info.get('address', ''), seller_info.get('address', '')],
@@ -129,55 +139,65 @@ def generate_vehicle_invoice_pdf(
     
     party_table = Table(party_data, colWidths=[3*inch, 3*inch])
     party_table.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 11),
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f3f4f6')),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
         ('TOPPADDING', (0, 0), (-1, -1), 5),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
     ]))
     elements.append(party_table)
     elements.append(Spacer(1, 0.25*inch))
     
-    # Auction Item
-    elements.append(Paragraph("AUCTION ITEM", section_style))
+    # Auction Item — bilingual
+    elements.append(Paragraph("AUCTION ITEM<br/><font size='10' color='#6b7280'>ARTICLE EN ENCHÈRE</font>", section_style))
     item_data = [
-        ['Item Description', auction_info.get('title', 'Vehicle')],
-        ['Lot Number', auction_info.get('lot_number', 'N/A')],
-        ['VIN', auction_info.get('vin', 'N/A')],
-        ['Hammer Price', format_currency(payment_result.hammer_price)],
+        [Paragraph(bi("Item Description", "Description de l'article"), normal_style), auction_info.get('title', 'Vehicle')],
+        [Paragraph(bi("Lot Number", "Numéro de lot"), normal_style), auction_info.get('lot_number', 'N/A')],
+        [Paragraph(bi("VIN", "NIV (Numéro d'identification du véhicule)"), normal_style), auction_info.get('vin', 'N/A')],
+        [Paragraph(bi("Hammer Price", "Prix marteau"), normal_style), format_currency(payment_result.hammer_price)],
     ]
     
-    item_table = Table(item_data, colWidths=[2*inch, 4*inch])
+    item_table = Table(item_data, colWidths=[2.4*inch, 3.6*inch])
     item_table.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, -1), 10),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
     ]))
     elements.append(item_table)
     elements.append(Spacer(1, 0.25*inch))
     
-    # Platform Service Fees (BidVex)
-    elements.append(Paragraph("PLATFORM SERVICE FEES", section_style))
-    elements.append(Paragraph(f"<b>Provider:</b> {BIDVEX_LEGAL_NAME}", normal_style))
-    elements.append(Paragraph(f"<b>GST #:</b> {BIDVEX_GST_NUMBER}", normal_style))
-    elements.append(Paragraph(f"<b>QST #:</b> {BIDVEX_QST_NUMBER}", normal_style))
+    # Platform Service Fees (BidVex) — bilingual
+    elements.append(Paragraph("PLATFORM SERVICE FEES<br/><font size='10' color='#6b7280'>FRAIS DE SERVICE DE LA PLATEFORME</font>", section_style))
+    elements.append(Paragraph(f"<b>Provider / Fournisseur :</b> {BIDVEX_LEGAL_NAME}", normal_style))
+    elements.append(Paragraph(f"<b>GST/TPS #:</b> {BIDVEX_GST_NUMBER}", normal_style))
+    elements.append(Paragraph(f"<b>QST/TVQ #:</b> {BIDVEX_QST_NUMBER}", normal_style))
     elements.append(Spacer(1, 0.1*inch))
     
     fees_data = [
-        ['Description', 'Rate', 'Amount'],
-        ['Buyer Premium', f"{payment_result.buyer_premium_rate * 100:.1f}%", format_currency(payment_result.buyer_premium)],
-        ['Platform Fee', '2.5%', format_currency(payment_result.platform_fee)],
-        ['Subtotal (Fees)', '', format_currency(payment_result.bidvex_fees_subtotal)],
-        ['GST (5%)', '', format_currency(payment_result.bidvex_fees_gst)],
-        ['QST (9.975%)', '', format_currency(payment_result.bidvex_fees_qst)],
-        ['TOTAL PLATFORM FEES (Charged Now)', '', format_currency(payment_result.stripe_charge_total)],
+        [Paragraph(bi("Description", "Description"), normal_style),
+         Paragraph(bi("Rate", "Taux"), normal_style),
+         Paragraph(bi("Amount", "Montant"), normal_style)],
+        [Paragraph(bi("Buyer Premium", "Prime de l'acheteur"), normal_style),
+         f"{payment_result.buyer_premium_rate * 100:.1f}%",
+         format_currency(payment_result.buyer_premium)],
+        [Paragraph(bi("Platform Fee", "Frais de plateforme"), normal_style),
+         '2.5%', format_currency(payment_result.platform_fee)],
+        [Paragraph(bi("Subtotal (Fees)", "Sous-total (frais)"), normal_style), '',
+         format_currency(payment_result.bidvex_fees_subtotal)],
+        [Paragraph(bi("GST (TPS — 5%)", "TPS (5 %)"), normal_style), '',
+         format_currency(payment_result.bidvex_fees_gst)],
+        [Paragraph(bi("QST (TVQ — 9.975%)", "TVQ (9,975 %)"), normal_style), '',
+         format_currency(payment_result.bidvex_fees_qst)],
+        [Paragraph(bi("GST + QST (combined 14.975%)", "TPS + TVQ (combinées 14,975 %)"), normal_style), '',
+         format_currency(payment_result.bidvex_fees_gst + payment_result.bidvex_fees_qst)],
+        [Paragraph(bi("TOTAL PLATFORM FEES (Charged Now)", "TOTAL DES FRAIS DE PLATEFORME (Facturé maintenant)"), normal_style),
+         '', format_currency(payment_result.stripe_charge_total)],
     ]
     
-    fees_table = Table(fees_data, colWidths=[3*inch, 1.5*inch, 1.5*inch])
+    fees_table = Table(fees_data, colWidths=[3.2*inch, 1.2*inch, 1.6*inch])
     fees_table.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, -1), 10),
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e40af')),
@@ -187,21 +207,23 @@ def generate_vehicle_invoice_pdf(
         ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
         ('TOPPADDING', (0, 0), (-1, -1), 8),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
     ]))
     elements.append(fees_table)
     elements.append(Spacer(1, 0.25*inch))
     
-    # Balance Due to Seller
-    elements.append(Paragraph("BALANCE DUE TO SELLER", section_style))
+    # Balance Due to Seller — bilingual
+    elements.append(Paragraph("BALANCE DUE TO SELLER<br/><font size='10' color='#6b7280'>SOLDE DÛ AU VENDEUR</font>", section_style))
     
     balance_data = [
-        ['Description', 'Amount'],
-        ['Hammer Price (Payable via Bank Draft)', format_currency(payment_result.seller_balance_due)],
+        [Paragraph(bi("Description", "Description"), normal_style),
+         Paragraph(bi("Amount", "Montant"), normal_style)],
+        [Paragraph(bi("Hammer Price (Payable via Bank Draft)", "Prix marteau (payable par traite bancaire)"), normal_style),
+         format_currency(payment_result.seller_balance_due)],
     ]
     
     balance_table = Table(balance_data, colWidths=[4*inch, 2*inch])
     balance_table.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, -1), 11),
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#dc2626')),
@@ -211,16 +233,35 @@ def generate_vehicle_invoice_pdf(
         ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
         ('TOPPADDING', (0, 0), (-1, -1), 10),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
     ]))
     elements.append(balance_table)
     elements.append(Spacer(1, 0.25*inch))
     
-    # Next Steps
-    elements.append(Paragraph("NEXT STEPS", section_style))
+    # Payment Instructions — bilingual block
+    elements.append(Paragraph("PAYMENT INSTRUCTIONS<br/><font size='10' color='#6b7280'>INSTRUCTIONS DE PAIEMENT</font>", section_style))
+    elements.append(Paragraph(
+        "<b>Step 1 / Étape 1 :</b> Platform fees are charged to your card on file via Stripe at auction close.<br/>"
+        "<font size='8' color='#6b7280'>Les frais de plateforme sont facturés à la carte enregistrée via Stripe à la clôture de l'enchère.</font>",
+        normal_style))
+    elements.append(Spacer(1, 0.05*inch))
+    elements.append(Paragraph(
+        "<b>Step 2 / Étape 2 :</b> The hammer price is paid directly to the seller via Bank Draft within 7 business days.<br/>"
+        "<font size='8' color='#6b7280'>Le prix marteau est payé directement au vendeur par traite bancaire dans un délai de 7 jours ouvrables.</font>",
+        normal_style))
+    elements.append(Spacer(1, 0.05*inch))
+    elements.append(Paragraph(
+        "<b>Note / Note :</b> BidVex never holds the hammer price. The platform only collects its 2.5% service fee.<br/>"
+        "<font size='8' color='#6b7280'>BidVex ne retient jamais le prix marteau. La plateforme ne perçoit que ses frais de service de 2,5 %.</font>",
+        normal_style))
+    elements.append(Spacer(1, 0.2*inch))
+
+    # Next Steps — bilingual
+    elements.append(Paragraph("NEXT STEPS<br/><font size='10' color='#6b7280'>PROCHAINES ÉTAPES</font>", section_style))
     elements.append(Paragraph(payment_result.next_steps_message, normal_style))
     elements.append(Spacer(1, 0.25*inch))
     
-    # Footer
+    # Footer — bilingual
     elements.append(Spacer(1, 0.5*inch))
     footer_style = ParagraphStyle(
         'Footer',
@@ -231,7 +272,8 @@ def generate_vehicle_invoice_pdf(
     )
     elements.append(Paragraph(
         f"{BIDVEX_LEGAL_NAME} | {BIDVEX_ADDRESS}<br/>"
-        f"GST/TPS #: {BIDVEX_GST_NUMBER} | QST/TVQ #: {BIDVEX_QST_NUMBER}",
+        f"GST/TPS #: {BIDVEX_GST_NUMBER} | QST/TVQ #: {BIDVEX_QST_NUMBER}<br/>"
+        "Questions? support@bidvex.com — Des questions ? support@bidvex.com",
         footer_style
     ))
     
@@ -292,78 +334,92 @@ def generate_general_invoice_pdf(
     
     normal_style = styles['Normal']
     
+    # ── Bilingual label helper ──
+    def bi(en: str, fr: str) -> str:
+        return f"<b>{en}</b><br/><font size='8' color='#6b7280'>{fr}</font>"
+
     # Header
-    elements.append(Paragraph("AUCTION INVOICE", title_style))
+    elements.append(Paragraph("AUCTION INVOICE<br/><font size='12'>FACTURE D'ENCHÈRE</font>", title_style))
     elements.append(Spacer(1, 0.25*inch))
     
     # Invoice info
     invoice_info = [
-        ['Invoice Number:', invoice_num],
-        ['Invoice Date:', datetime.now(timezone.utc).strftime('%B %d, %Y')],
-        ['Auction Type:', 'General Auction'],
-        ['Seller Type:', 'Business' if payment_result.seller_is_business else 'Private Individual'],
+        [Paragraph(bi("Invoice Number:", "Numéro de facture :"), normal_style), invoice_num],
+        [Paragraph(bi("Invoice Date:", "Date de la facture :"), normal_style), datetime.now(timezone.utc).strftime('%B %d, %Y')],
+        [Paragraph(bi("Auction Type:", "Type d'enchère :"), normal_style),
+         Paragraph("General Auction<br/><font size='8' color='#6b7280'>Enchère générale</font>", normal_style)],
+        [Paragraph(bi("Seller Type:", "Type de vendeur :"), normal_style),
+         Paragraph(
+             ("Business<br/><font size='8' color='#6b7280'>Entreprise</font>" if payment_result.seller_is_business
+              else "Private Individual<br/><font size='8' color='#6b7280'>Particulier</font>"),
+             normal_style)],
     ]
     
-    info_table = Table(invoice_info, colWidths=[2*inch, 4*inch])
+    info_table = Table(invoice_info, colWidths=[2.2*inch, 3.8*inch])
     info_table.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, -1), 10),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
     ]))
     elements.append(info_table)
     elements.append(Spacer(1, 0.25*inch))
     
     # Buyer & Seller info
     party_data = [
-        ['BUYER', 'SELLER'],
+        [Paragraph("<b>BUYER</b><br/><font size='8' color='#6b7280'>ACHETEUR</font>", normal_style),
+         Paragraph("<b>SELLER</b><br/><font size='8' color='#6b7280'>VENDEUR</font>", normal_style)],
         [buyer_info.get('name', 'N/A'), seller_info.get('name', 'N/A')],
         [buyer_info.get('email', ''), seller_info.get('email', '')],
     ]
     
     if payment_result.seller_is_business:
-        party_data.append(['', f"GST #: {seller_info.get('gst_number', 'N/A')}"])
-        party_data.append(['', f"QST #: {seller_info.get('qst_number', 'N/A')}"])
+        party_data.append(['', f"GST/TPS #: {seller_info.get('gst_number', 'N/A')}"])
+        party_data.append(['', f"QST/TVQ #: {seller_info.get('qst_number', 'N/A')}"])
     
     party_table = Table(party_data, colWidths=[3*inch, 3*inch])
     party_table.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 11),
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f3f4f6')),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
         ('TOPPADDING', (0, 0), (-1, -1), 5),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
     ]))
     elements.append(party_table)
     elements.append(Spacer(1, 0.25*inch))
     
     # SECTION 1: Item Sale Price
-    elements.append(Paragraph("ITEM SALE PRICE", section_style))
+    elements.append(Paragraph("ITEM SALE PRICE<br/><font size='10' color='#6b7280'>PRIX DE VENTE DE L'ARTICLE</font>", section_style))
     if payment_result.seller_is_business:
-        elements.append(Paragraph(f"<b>Seller (Business):</b> {seller_info.get('business_name', seller_info.get('name', 'N/A'))}", normal_style))
-        elements.append(Paragraph(f"<b>GST #:</b> {seller_info.get('gst_number', 'N/A')}", normal_style))
-        elements.append(Paragraph(f"<b>QST #:</b> {seller_info.get('qst_number', 'N/A')}", normal_style))
+        elements.append(Paragraph(f"<b>Seller (Business) / Vendeur (entreprise) :</b> {seller_info.get('business_name', seller_info.get('name', 'N/A'))}", normal_style))
+        elements.append(Paragraph(f"<b>GST/TPS #:</b> {seller_info.get('gst_number', 'N/A')}", normal_style))
+        elements.append(Paragraph(f"<b>QST/TVQ #:</b> {seller_info.get('qst_number', 'N/A')}", normal_style))
     else:
-        elements.append(Paragraph(f"<b>Seller (Private):</b> {seller_info.get('name', 'N/A')}", normal_style))
-        elements.append(Paragraph("<i>No tax applicable - private sale</i>", normal_style))
+        elements.append(Paragraph(f"<b>Seller (Private) / Vendeur (particulier) :</b> {seller_info.get('name', 'N/A')}", normal_style))
+        elements.append(Paragraph("<i>No tax applicable — private sale / Aucune taxe applicable — vente privée</i>", normal_style))
     elements.append(Spacer(1, 0.1*inch))
     
     item_data = [
-        ['Description', 'Amount'],
+        [Paragraph(bi("Description", "Description"), normal_style),
+         Paragraph(bi("Amount", "Montant"), normal_style)],
         [auction_info.get('title', 'Auction Item'), format_currency(payment_result.hammer_price)],
     ]
     
     if payment_result.seller_is_business:
         item_data.extend([
-            ['GST (5%)', format_currency(payment_result.hammer_gst)],
-            ['QST (9.975%)', format_currency(payment_result.hammer_qst)],
-            ['Item Subtotal', format_currency(payment_result.hammer_price + payment_result.hammer_tax_total)],
+            [Paragraph(bi("GST (TPS — 5%)", "TPS (5 %)"), normal_style), format_currency(payment_result.hammer_gst)],
+            [Paragraph(bi("QST (TVQ — 9.975%)", "TVQ (9,975 %)"), normal_style), format_currency(payment_result.hammer_qst)],
+            [Paragraph(bi("GST + QST (combined 14.975%)", "TPS + TVQ (combinées 14,975 %)"), normal_style),
+             format_currency(payment_result.hammer_gst + payment_result.hammer_qst)],
+            [Paragraph(bi("Item Subtotal", "Sous-total de l'article"), normal_style),
+             format_currency(payment_result.hammer_price + payment_result.hammer_tax_total)],
         ])
     else:
-        item_data.append(['Item Subtotal', format_currency(payment_result.hammer_price)])
+        item_data.append([Paragraph(bi("Item Subtotal", "Sous-total de l'article"), normal_style),
+                          format_currency(payment_result.hammer_price)])
     
     item_table = Table(item_data, colWidths=[4*inch, 2*inch])
     item_table.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, -1), 10),
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#059669')),
@@ -372,28 +428,37 @@ def generate_general_invoice_pdf(
         ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
         ('TOPPADDING', (0, 0), (-1, -1), 8),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
     ]))
     elements.append(item_table)
     elements.append(Spacer(1, 0.25*inch))
     
     # SECTION 2: Platform Service Fees
-    elements.append(Paragraph("PLATFORM SERVICE FEES", section_style))
-    elements.append(Paragraph(f"<b>Provider:</b> {BIDVEX_LEGAL_NAME}", normal_style))
-    elements.append(Paragraph(f"<b>GST #:</b> {BIDVEX_GST_NUMBER}", normal_style))
-    elements.append(Paragraph(f"<b>QST #:</b> {BIDVEX_QST_NUMBER}", normal_style))
+    elements.append(Paragraph("PLATFORM SERVICE FEES<br/><font size='10' color='#6b7280'>FRAIS DE SERVICE DE LA PLATEFORME</font>", section_style))
+    elements.append(Paragraph(f"<b>Provider / Fournisseur :</b> {BIDVEX_LEGAL_NAME}", normal_style))
+    elements.append(Paragraph(f"<b>GST/TPS #:</b> {BIDVEX_GST_NUMBER}", normal_style))
+    elements.append(Paragraph(f"<b>QST/TVQ #:</b> {BIDVEX_QST_NUMBER}", normal_style))
     elements.append(Spacer(1, 0.1*inch))
     
     fees_data = [
-        ['Description', 'Rate', 'Amount'],
-        ['Buyer Premium', f"{payment_result.buyer_premium_rate * 100:.1f}%", format_currency(payment_result.buyer_premium)],
-        ['GST on Buyer Premium (5%)', '', format_currency(payment_result.bidvex_fees_gst)],
-        ['QST on Buyer Premium (9.975%)', '', format_currency(payment_result.bidvex_fees_qst)],
-        ['Platform Fees Subtotal', '', format_currency(payment_result.buyer_pays_fees + payment_result.buyer_pays_fees_tax)],
+        [Paragraph(bi("Description", "Description"), normal_style),
+         Paragraph(bi("Rate", "Taux"), normal_style),
+         Paragraph(bi("Amount", "Montant"), normal_style)],
+        [Paragraph(bi("Buyer Premium", "Prime de l'acheteur"), normal_style),
+         f"{payment_result.buyer_premium_rate * 100:.1f}%",
+         format_currency(payment_result.buyer_premium)],
+        [Paragraph(bi("GST on Buyer Premium (TPS — 5%)", "TPS sur la prime de l'acheteur (5 %)"), normal_style),
+         '', format_currency(payment_result.bidvex_fees_gst)],
+        [Paragraph(bi("QST on Buyer Premium (TVQ — 9.975%)", "TVQ sur la prime de l'acheteur (9,975 %)"), normal_style),
+         '', format_currency(payment_result.bidvex_fees_qst)],
+        [Paragraph(bi("GST + QST (combined 14.975%)", "TPS + TVQ (combinées 14,975 %)"), normal_style),
+         '', format_currency(payment_result.bidvex_fees_gst + payment_result.bidvex_fees_qst)],
+        [Paragraph(bi("Platform Fees Subtotal", "Sous-total des frais de plateforme"), normal_style),
+         '', format_currency(payment_result.buyer_pays_fees + payment_result.buyer_pays_fees_tax)],
     ]
     
-    fees_table = Table(fees_data, colWidths=[3*inch, 1.5*inch, 1.5*inch])
+    fees_table = Table(fees_data, colWidths=[3.2*inch, 1.2*inch, 1.6*inch])
     fees_table.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, -1), 10),
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e40af')),
@@ -402,15 +467,17 @@ def generate_general_invoice_pdf(
         ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
         ('TOPPADDING', (0, 0), (-1, -1), 8),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
     ]))
     elements.append(fees_table)
     elements.append(Spacer(1, 0.25*inch))
     
     # GRAND TOTAL
-    elements.append(Paragraph("TOTAL", section_style))
+    elements.append(Paragraph("TOTAL<br/><font size='10' color='#6b7280'>TOTAL</font>", section_style))
     
     total_data = [
-        ['GRAND TOTAL (Charged Now)', format_currency(payment_result.buyer_total)],
+        [Paragraph(bi("GRAND TOTAL (Charged Now)", "TOTAL GÉNÉRAL (facturé maintenant)"), normal_style),
+         format_currency(payment_result.buyer_total)],
     ]
     
     total_table = Table(total_data, colWidths=[4*inch, 2*inch])
@@ -424,7 +491,22 @@ def generate_general_invoice_pdf(
         ('BOX', (0, 0), (-1, -1), 2, colors.HexColor('#059669')),
     ]))
     elements.append(total_table)
-    elements.append(Spacer(1, 0.5*inch))
+    elements.append(Spacer(1, 0.3*inch))
+
+    # Payment Instructions — bilingual (general auction)
+    elements.append(Paragraph("PAYMENT INSTRUCTIONS<br/><font size='10' color='#6b7280'>INSTRUCTIONS DE PAIEMENT</font>", section_style))
+    elements.append(Paragraph(
+        "<b>Charged now / Facturé maintenant :</b> Item price + applicable taxes + platform service fees, "
+        "via the card on file (Stripe).<br/>"
+        "<font size='8' color='#6b7280'>Prix de l'article + taxes applicables + frais de service de la plateforme, "
+        "via la carte enregistrée (Stripe).</font>",
+        normal_style))
+    elements.append(Spacer(1, 0.05*inch))
+    elements.append(Paragraph(
+        "<b>Refund policy / Politique de remboursement :</b> See BidVex Terms — service fees are non-refundable once the auction closes.<br/>"
+        "<font size='8' color='#6b7280'>Voir les Conditions BidVex — les frais de service ne sont pas remboursables après la clôture de l'enchère.</font>",
+        normal_style))
+    elements.append(Spacer(1, 0.4*inch))
     
     # Footer
     footer_style = ParagraphStyle(
@@ -436,7 +518,8 @@ def generate_general_invoice_pdf(
     )
     elements.append(Paragraph(
         f"{BIDVEX_LEGAL_NAME} | {BIDVEX_ADDRESS}<br/>"
-        f"GST/TPS #: {BIDVEX_GST_NUMBER} | QST/TVQ #: {BIDVEX_QST_NUMBER}",
+        f"GST/TPS #: {BIDVEX_GST_NUMBER} | QST/TVQ #: {BIDVEX_QST_NUMBER}<br/>"
+        "Questions? support@bidvex.com — Des questions ? support@bidvex.com",
         footer_style
     ))
     

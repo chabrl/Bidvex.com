@@ -72,12 +72,28 @@ const useScrollReveal = (threshold = 0.1) => {
 };
 
 const HomePage = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { isSectionVisible } = useSiteConfig();
   const [heroLoaded, setHeroLoaded] = useState(false);
+  const [activeAuctions, setActiveAuctions] = useState(0);
   const queryClient = useQueryClient();
+
+  // Lightweight public stats — live auctions count for hero pulse
+  useEffect(() => {
+    let cancelled = false;
+    const url = `${process.env.REACT_APP_BACKEND_URL}/api/stats/public`;
+    fetch(url)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!cancelled && data && typeof data.active_auctions === 'number') {
+          setActiveAuctions(data.active_auctions);
+        }
+      })
+      .catch(() => { /* silent — never break hero on stats failure */ });
+    return () => { cancelled = true; };
+  }, []);
 
   // React Query hooks replace manual useState + useEffect fetching
   const { data: topSellers = [] } = useTopSellers(8);
@@ -214,6 +230,20 @@ const HomePage = () => {
                   {t('homepage.howItWorks')}
                 </Button>
               </div>
+
+              {/* Live auction counter — only render when there are real active auctions */}
+              {activeAuctions > 0 && (
+                <div
+                  className="inline-flex items-center gap-2 bg-white/10 backdrop-blur rounded-full px-4 py-2 text-white border border-white/20"
+                  data-testid="live-auctions-pill"
+                >
+                  <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                  <span className="font-bold tabular-nums">{activeAuctions}</span>
+                  <span className="text-sm opacity-80">
+                    {(i18n.language || 'en').startsWith('fr') ? 'Enchères en direct maintenant' : 'Live Auctions Now'}
+                  </span>
+                </div>
+              )}
 
               {/* Trust Indicators */}
               <div className={`flex flex-wrap items-center gap-6 pt-4 transition-all duration-1000 delay-700 ${heroLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>

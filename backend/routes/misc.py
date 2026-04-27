@@ -69,6 +69,24 @@ async def get_google_maps_key():
         return {"api_key": "", "enabled": False}
 
 
+@misc_router.get("/stats/public")
+async def get_public_stats():
+    """Lightweight public counter for the homepage hero. Returns 0 if nothing live.
+    Cached at the DB layer is sufficient — this is one indexed count_documents call.
+    """
+    db = get_db()
+    try:
+        # Count active single-listing auctions + active multi-item lots
+        single_active = await db.listings.count_documents({"status": "active"})
+        multi_active = await db.multi_item_listings.count_documents({"status": "active"})
+        return {
+            "active_auctions": int(single_active + multi_active),
+        }
+    except Exception:
+        return {"active_auctions": 0}
+
+
+
 
 @misc_router.get("/affiliate/stats")
 async def get_affiliate_stats(current_user: User = Depends(get_current_user)):

@@ -49,14 +49,19 @@ async def get_legal_pages_public(language: str = "en"):
                 "message": "Legal pages not configured yet"
             }
         
-        pages = config.get("pages", {})
+        pages = config.get("pages", {}) or {}
         
         # If language specified, return only that language
         if language and language in ["en", "fr"]:
             result = {}
             for page_key, page_data in pages.items():
-                if language in page_data:
+                # Defensive: page_data may be a dict {en, fr} OR a string OR a bool
+                # (legacy data). Only descend if it's a dict containing the language.
+                if isinstance(page_data, dict) and language in page_data:
                     result[page_key] = page_data[language]
+                elif isinstance(page_data, str):
+                    # Legacy single-language entry — return as-is for any language
+                    result[page_key] = page_data
             return {
                 "success": True,
                 "pages": result,
@@ -71,7 +76,12 @@ async def get_legal_pages_public(language: str = "en"):
     
     except Exception as e:
         logger.error(f"Error fetching legal pages: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch legal pages")
+        # Never 500 the footer — return empty pages so the UI can render gracefully
+        return {
+            "success": False,
+            "pages": {},
+            "message": "Legal pages temporarily unavailable",
+        }
 
 
 
