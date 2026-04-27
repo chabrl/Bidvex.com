@@ -2118,7 +2118,7 @@ async def vehicle_buy_now_checkout(
             )
             card_charged_amount = platform_fee_total
             stripe_actions.append({"action": "card_charge_full", "pi": pi.id, "amount": platform_fee_total})
-    except stripe.error.CardError as ce:
+    except stripe.CardError as ce:
         raise HTTPException(status_code=402, detail=f"Card declined: {ce.user_message or str(ce)}")
     except HTTPException:
         raise

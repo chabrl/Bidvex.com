@@ -149,15 +149,10 @@ class TestVehicleBuyNowEndpoints:
     def test_vehicle_buy_now_checkout_creates_session_or_intent(self, admin_headers, seeded_vehicle):
         r = requests.post(f"{API}/payments/vehicle-buy-now-checkout",
                           headers=admin_headers, json={"listing_id": seeded_vehicle}, timeout=30)
-        # KNOWN BUG (iter160): backend uses `stripe.error.CardError` which doesn't exist
-        # in stripe SDK v8+ → triggers AttributeError → 500. Documenting until fixed.
-        if r.status_code == 500:
-            pytest.xfail(
-                "Known backend bug iter160: routes/payments.py:2121 uses "
-                "`stripe.error.CardError` which doesn't exist in modern Stripe SDK "
-                "(should be `stripe.CardError`) → AttributeError → 500. "
-                f"Response body: {r.text[:200]}"
-            )
+        # Fixed in iter161: stripe.error.CardError → stripe.CardError.
+        # Skip gracefully if Stripe API key is expired/invalid (operational, not code).
+        if r.status_code == 500 and "API Key" in r.text:
+            pytest.skip(f"Stripe API key issue (operational, not code): {r.text[:120]}")
         assert r.status_code in (200, 201), f"{r.status_code}: {r.text[:400]}"
         body = r.json()
         ok = bool(body.get("checkout_url") or body.get("payment_intent_id") or body.get("success"))

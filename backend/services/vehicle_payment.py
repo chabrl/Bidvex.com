@@ -396,7 +396,7 @@ class PaymentService:
                 stripe.PaymentIntent.cancel(pi_id)
                 stripe_cancelled = True
                 logger.info(f"Stripe PaymentIntent {pi_id} cancelled (hold released)")
-            except stripe.error.InvalidRequestError as e:
+            except stripe.InvalidRequestError as e:
                 # PI may already be cancelled or in a non-cancellable state
                 stripe_error = str(e)
                 logger.warning(f"Could not cancel PI {pi_id}: {e}")

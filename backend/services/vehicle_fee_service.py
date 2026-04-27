@@ -127,7 +127,7 @@ async def create_vehicle_fee_charge(
             **fees,
         }
 
-    except stripe.error.StripeError as e:
+    except stripe.StripeError as e:
         logger.error(f"[VehicleFee] Stripe error for auction {auction_id}: {e}")
         now = datetime.now(timezone.utc).isoformat()
         await db.vehicle_settlements.insert_one({

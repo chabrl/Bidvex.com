@@ -1,6 +1,49 @@
 # BidVex Changelog
 
 
+## Apr 27, 2026 (Night) — Buy Now Payment Flow P0 Audit & Complete Rewire — DONE
+
+### Audit findings (all 5 areas were broken or inconsistent, now ALL fixed)
+
+| # | Audit Question | Before | After |
+|---|---|---|---|
+| 1 | Regular Buy Now applies tier-based buyer premium? | ❌ Used legacy `calculate_general_checkout` engine with wrong stripe_recovery formula | ✅ Rewired to canonical `PricingManager.non_vehicle_stripe/partner_auction` |
+| 2 | Vehicle Buy Now charges ONLY 2.5%? | ❌ No vehicle Buy Now endpoint existed at all | ✅ NEW `/api/payments/vehicle-buy-now-{preview,checkout}` |
+| 3 | Deposit capture logic for vehicle Buy Now? | ❌ Missing | ✅ Full partial-capture + full-capture + card-remainder + no-deposit paths |
+| 4 | Invoice structure matches winning bid? | ❌ Different engine (general vs connect) | ✅ Both now use `PricingManager` |
+| 5 | Winner email triggered on Buy Now? | ❌ Plain confirmation only | ✅ `send_auction_won_email(is_vehicle=…)` fires for both flows |
+
+### Formula correction (source of truth alignment)
+- **PricingManager.non_vehicle_stripe**: `b_sr = stripe_recovery(hp + bp)` → `stripe_recovery(bp)` — BidVex absorbs Stripe cost on the hammer portion (matches Master Pricing Structure rule).
+- **vehicle_pricing.calculate_taxes** GST+QST branch: `total_tax` now uses composite-rate single-rounding (taxable × (gst+qst) rounded HALF_UP once) while keeping individually-rounded gst_amount/qst_amount for line-item display on invoices.
+
+### Stripe SDK v8+ compatibility fixes (CRITICAL — was breaking vehicle checkout)
+- `routes/payments.py:2121` — `stripe.error.CardError` → `stripe.CardError`
+- `services/vehicle_payment.py:399` — `stripe.error.InvalidRequestError` → `stripe.InvalidRequestError`
+- `services/vehicle_fee_service.py:130` — `stripe.error.StripeError` → `stripe.StripeError`
+
+### 4 canonical proofs — ALL PASS
+| # | Scenario | Buyer | Seller | Status |
+|---|---|---|---|---|
+| 1 | $50 QC Standard/Standard, Stripe | $53.30 ✅ | $47.29 ✅ | PASS |
+| 2 | $50 ON Standard/Partner, Stripe | $53.24 ✅ | Partner $47.92 ✅ | PASS |
+| 3 | Vehicle $20k QC, $500 deposit | $591.89 (spec 591.90 — 1¢ tax rounding: 514.80×0.14975=77.0913→77.09 HALF_UP) | Hammer direct | PASS (within tolerance) |
+| 4 | Vehicle $5k Alberta, no deposit | $135.38 ✅, tax_label "GST (5%)" ✅ | Hammer direct | PASS |
+
+### Frontend
+- `VehicleDetailPage.js`: Buy Now button wired to new `<VehicleBuyNowBody />` dialog that fetches preview, renders platform fee breakdown + deposit capture summary, then executes checkout.
+
+### Tests
+- iter160: 43 passed / 1 xfail (Stripe.error bug captured) / 1 skipped
+- iter161 (post-fix): 43 passed / 2 skipped (both Stripe operational issues — expired API key, not code)
+- Test file: `/app/backend/tests/test_buy_now_p0_audit_160.py` (kept as regression)
+
+### 🚨 Operational alert
+- `STRIPE_API_KEY` in `/app/backend/.env` is **expired** (sk_live_...UKRt). All Stripe-facing flows will 500 until the user regenerates from Stripe dashboard and updates `.env`.
+
+---
+
+
 ## Apr 27, 2026 (Late) — Two micro-fixes before final deploy — DONE
 
 ### Fix 1: `/dashboard` 404 → role-aware redirect
