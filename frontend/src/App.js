@@ -16,6 +16,7 @@ import Footer from './components/Footer';
 import TrendyAnnouncementBar from './components/TrendyAnnouncementBar';
 import MobileBottomNav from './components/MobileBottomNav';
 import ScrollToTop from './components/ScrollToTop';
+import FbPixelTracker from './components/FbPixelTracker';
 import CookieConsentBanner from './components/CookieConsentBanner';
 import MessageNotificationListener from './components/MessageNotificationListener';
 
@@ -284,6 +285,7 @@ const App = () => {
           <FeatureFlagsProvider>
           <SiteModeProvider>
             <ScrollToTop />
+            <FbPixelTracker />
             <CookieConsentBanner />
             <MaintenanceGuard>
         <div className="App min-h-screen bg-gradient-to-br from-blue-50 via-white to-teal-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
