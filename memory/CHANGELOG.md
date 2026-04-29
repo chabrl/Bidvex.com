@@ -1,6 +1,51 @@
 # BidVex Changelog
 
 
+## Apr 28, 2026 — Hero Phone Mockup with Floating Animation — DONE
+
+### What
+Replaced the empty right-column of the homepage hero with an animated phone-mockup mark — a hand holding a phone running the BidVex app. Premium SaaS treatment matching Stripe / Notion / Linear hero patterns.
+
+### Components added
+- `frontend/src/components/HeroPhone.js` — bilingual EN/FR (3 live-activity badges)
+- `frontend/src/components/HeroPhone.css` — full keyframe animations + responsive breakpoints
+- `frontend/public/assets/hero-phone-mockup.png` — 1295×1215 RGBA (transparent bg)
+
+### Animation details
+- **Float**: `phoneFloat` 6s ease-in-out infinite — vertical translate (-16px) + 2° tilt
+- **Entry**: `phoneEntry` 0.9s cubic-bezier slides up from +60px on first paint, 0.5s delay (after hero text)
+- **Glow**: `glowPulse` 4s — radial cyan→blue ambient light under phone, opacity 0.5↔0.8
+- **Badges**: 3 individual floats (5s / 5.5s / 4.8s) with staggered delays
+- **Status dots**: `dotPulse` 2s — green (top-left) + blue (top-right) for live-feel
+- **Reduced motion**: All animations disabled via `prefers-reduced-motion: reduce`
+
+### Live activity badges (bilingual)
+| Position | EN | FR |
+|---|---|---|
+| Top-left | 🔨 New bid — $245 | 🔨 Nouvelle enchère — 245 $ |
+| Top-right | 👤 14 bidders live | 👤 14 enchérisseurs en direct |
+| Bottom | ✅ ITEM SOLD — $1,280 · 3s ago | ✅ ARTICLE VENDU — 1 280 $ · il y a 3 s |
+
+### Responsive breakpoints
+- ≥1280px: phone 460px wide, badges full size
+- 1024-1280px: phone 380px, badges shrink to 11px
+- 768-1024px: phone 320px, badges pulled inward
+- ≤768px (mobile): phone stacks below text 280px wide, side badges hidden, bottom badge centered
+- ≤375px (small mobile): phone 220px
+
+### Layout changes
+- `HomePage.js` hero: single `max-w-3xl` column → `grid lg:grid-cols-[1.15fr_1fr] gap-10 lg:gap-16` two-column
+- Right column wired to `<HeroPhone />`
+
+### Live verification
+- Phone image: loaded ✅ (1295×1215 natural, 460px rendered desktop)
+- Float + glow + badge animations running ✅
+- Lint: 0 issues ✅
+- Bilingual labels render based on `i18n.language` ✅
+
+---
+
+
 ## Apr 28, 2026 — Direct Google OAuth 2.0 (replaces auth.emergentagent.com)
 
 ### Backend (FastAPI — chose to keep existing stack rather than rewrite to Node/Express)

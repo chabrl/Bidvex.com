@@ -1,0 +1,229 @@
+/* ─────────────────────────────────────────────────────────────
+ * Homepage Hero — Phone Mockup
+ * Floating animation + ambient glow + live activity badges
+ * ───────────────────────────────────────────────────────────── */
+
+/* CONTAINER */
+.hero-phone-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  animation: phoneEntry 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+  /* Stagger entry slightly behind the text content */
+  animation-delay: 0.5s;
+}
+
+/* AMBIENT GLOW behind phone */
+.hero-phone-glow {
+  position: absolute;
+  bottom: -40px;
+  left: 50%;
+  width: 60%;
+  height: 70px;
+  background: radial-gradient(ellipse, rgba(34, 211, 238, 0.55) 0%, rgba(33, 134, 198, 0.25) 50%, transparent 75%);
+  border-radius: 50%;
+  filter: blur(22px);
+  animation: glowPulse 4s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+  transform: translateX(-50%);
+}
+
+/* PHONE WRAPPER (the float lives here) */
+.hero-phone-wrapper {
+  position: relative;
+  z-index: 2;
+  animation: phoneFloat 6s ease-in-out infinite;
+  transform-origin: center bottom;
+  will-change: transform;
+}
+
+/* PHONE IMAGE */
+.hero-phone-image {
+  width: 100%;
+  max-width: 460px;
+  height: auto;
+  display: block;
+  background: transparent;
+  filter: drop-shadow(0 24px 48px rgba(11, 37, 69, 0.45));
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* FLOATING BADGES */
+.hero-badge {
+  position: absolute;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 24px;
+  padding: 8px 14px;
+  box-shadow: 0 12px 28px rgba(11, 37, 69, 0.28);
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0B2545;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.hero-badge--top-left {
+  top: 14%;
+  left: -10%;
+  animation: badgeFloat1 5s ease-in-out infinite;
+}
+
+.hero-badge--top-right {
+  top: 8%;
+  right: -8%;
+  animation: badgeFloat2 5.5s ease-in-out infinite 0.8s;
+}
+
+.hero-badge--bottom {
+  bottom: 14%;
+  left: -12%;
+  animation: badgeFloat3 4.8s ease-in-out infinite 1.4s;
+  padding: 10px 14px;
+  border-radius: 16px;
+}
+
+/* STATUS DOTS */
+.hero-badge__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.hero-badge__dot--green {
+  background: #059669;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.25);
+  animation: dotPulse 2s ease-in-out infinite;
+}
+
+.hero-badge__dot--blue {
+  background: #2186C6;
+  box-shadow: 0 0 0 3px rgba(33, 134, 198, 0.25);
+  animation: dotPulse 2s ease-in-out infinite 0.5s;
+}
+
+/* BOTTOM BADGE INFO */
+.hero-badge__icon {
+  font-size: 16px;
+}
+
+.hero-badge__info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.hero-badge__label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #059669;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.hero-badge__value {
+  font-size: 12px;
+  font-weight: 600;
+  color: #0B2545;
+}
+
+/* KEYFRAMES */
+@keyframes phoneEntry {
+  0%   { opacity: 0; transform: translateY(60px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes phoneFloat {
+  0%   { transform: translateY(0) rotate(-2deg); }
+  25%  { transform: translateY(-10px) rotate(-1.2deg); }
+  50%  { transform: translateY(-16px) rotate(-0.5deg); }
+  75%  { transform: translateY(-8px) rotate(-1.2deg); }
+  100% { transform: translateY(0) rotate(-2deg); }
+}
+
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.5; transform: translateX(-50%) scale(1); }
+  50%      { opacity: 0.8; transform: translateX(-50%) scale(1.1); }
+}
+
+@keyframes dotPulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.3); }
+  50%      { box-shadow: 0 0 0 6px rgba(5, 150, 105, 0.1); }
+}
+
+@keyframes badgeFloat1 {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
+
+@keyframes badgeFloat2 {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+
+@keyframes badgeFloat3 {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-10px); }
+}
+
+/* RESPONSIVE */
+@media (max-width: 1280px) {
+  .hero-phone-image { max-width: 380px; }
+  .hero-badge { font-size: 11px; padding: 7px 12px; }
+}
+
+@media (max-width: 1024px) {
+  .hero-phone-container { max-width: 360px; }
+  .hero-phone-image { max-width: 320px; }
+  .hero-badge--top-left  { left: -4%; top: 12%; }
+  .hero-badge--top-right { right: -4%; }
+  .hero-badge--bottom    { left: -4%; }
+}
+
+/* On lg+ we want side-by-side; below lg the column stacks via Tailwind */
+@media (max-width: 768px) {
+  .hero-phone-container {
+    max-width: 280px;
+    margin: 32px auto 0;
+  }
+  .hero-phone-image { max-width: 260px; }
+  /* Hide side badges on mobile — they'd overlap or look cramped */
+  .hero-badge--top-left,
+  .hero-badge--top-right { display: none; }
+  .hero-badge--bottom {
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: -8%;
+  }
+}
+
+@media (max-width: 375px) {
+  .hero-phone-image { max-width: 220px; }
+  .hero-phone-container { max-width: 240px; }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .hero-phone-wrapper,
+  .hero-phone-container,
+  .hero-badge,
+  .hero-phone-glow,
+  .hero-badge__dot--green,
+  .hero-badge__dot--blue {
+    animation: none !important;
+  }
+}

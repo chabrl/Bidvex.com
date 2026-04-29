@@ -7,6 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
+import HeroPhone from '../components/HeroPhone';
 import { 
   ArrowRight, Gavel, TrendingUp, Shield, Users, Award, Flame, 
   Search, Trophy, CreditCard, Sparkles, Clock, CheckCircle2,
@@ -182,9 +183,9 @@ const HomePage = () => {
           ))}
         </div>
 
-        {/* Hero Content */}
-        <div className="relative max-w-7xl mx-auto px-4 py-20 md:py-32 w-full">
-          <div className="max-w-3xl">
+        {/* Hero Content — 2-column grid: text + phone mockup */}
+        <div className="relative max-w-7xl mx-auto px-4 py-20 md:py-28 w-full">
+          <div className="grid lg:grid-cols-[1.15fr_1fr] gap-10 lg:gap-16 items-center">
             {/* Left Content */}
             <div className="text-white space-y-8">
               {/* Animated Badge */}
@@ -260,7 +261,10 @@ const HomePage = () => {
               </div>
             </div>
 
-            {/* Right column removed — no fake stats per launch design */}
+            {/* Right column — animated phone mockup */}
+            <div className="relative flex items-center justify-center" data-testid="hero-right-column">
+              <HeroPhone />
+            </div>
           </div>
         </div>
         
