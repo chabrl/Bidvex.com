@@ -22,11 +22,11 @@ import os
 import uuid
 
 import httpx
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from pydantic import BaseModel
 
-from deps import get_db
+from deps import get_db, require_admin, User
 
 logger = logging.getLogger(__name__)
 
@@ -202,3 +202,31 @@ async def is_marketing_suppressed(email: str) -> bool:
     # Fallback — user doc flag (webhook-set)
     user = await db.users.find_one({"email": normalized}, {"_id": 0, "marketing_unsubscribed": 1})
     return bool(user and user.get("marketing_unsubscribed"))
+
+
+
+# ── Admin-only debug helper ────────────────────────────────────
+# REMOVE BEFORE PRODUCTION GA (or leave — the `require_admin` gate makes it
+# safe; only super_admin / admin role can hit it). Useful for QA testing the
+# unsubscribe flow end-to-end without going through the email send pipeline.
+@unsubscribe_router.get("/generate-test-link")
+async def generate_test_link(email: str, _: User = Depends(require_admin)):
+    """
+    Admin-only: mint a 30-day signed unsubscribe token for any email.
+    Returns the EN + FR URLs so you can paste them into a browser to test the
+    full verify → confirm flow without needing SendGrid in the loop.
+
+    Example:
+      curl -H "Authorization: Bearer <admin-jwt>" \
+        "https://bidvex.com/api/unsubscribe/generate-test-link?email=test@example.com"
+    """
+    normalized = (email or "").strip().lower()
+    if not normalized or "@" not in normalized:
+        raise HTTPException(status_code=400, detail="invalid_email")
+    urls = build_unsubscribe_urls(normalized)
+    return {
+        "email": normalized,
+        "url_en": urls["en"],
+        "url_fr": urls["fr"],
+        "expires_in_days": UNSUBSCRIBE_TOKEN_TTL_SECONDS // 86400,
+    }
