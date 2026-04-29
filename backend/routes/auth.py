@@ -5,7 +5,7 @@ Handles user registration, login, password reset, and session management
 Extracted from server.py for maintainability
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends, Request, BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, EmailStr
 from typing import Optional
@@ -143,7 +143,7 @@ MAX_LOGIN_ATTEMPTS = 5
 
 @auth_router.post("/register")
 @_limiter.limit("5/minute")
-async def register(user_data: UserCreate, request: Request):
+async def register(user_data: UserCreate, request: Request, background_tasks: BackgroundTasks):
     """
     Register a new user
     
@@ -273,21 +273,17 @@ async def register(user_data: UserCreate, request: Request):
             })
             logger.info(f"[AFFILIATE] New referral: {ref_code} → {normalized_email} (affiliate={referrer['id']})")
     
-    # Send Welcome Email (Dynamic Template)
+    # ── Welcome + Admin notification (NON-BLOCKING via FastAPI BackgroundTasks) ──
+    # Welcome email is transactional (not subject to marketing email_suppressions).
+    # Both run AFTER the HTTP response is sent, so the user never waits on SendGrid.
     try:
-        from services.email_service import send_welcome_email as send_welcome_template
-        logger.info(f"[EMAIL_DEBUG] Triggering Welcome Email for: {user_data.email}")
-        email_result = await send_welcome_template(user_doc)
-        logger.info(f"[EMAIL_DEBUG] Welcome Email result: {email_result}")
-    except Exception as email_err:
-        logger.error(f"[EMAIL_DEBUG] Welcome Email FAILED for {user_data.email}: {email_err}")
-
-    # Admin notification — fire-and-forget
-    try:
-        from services.admin_notifications import notify_admin_new_user
-        asyncio.create_task(notify_admin_new_user(user_doc))
-    except Exception:
-        pass
+        from services.email_service import send_welcome_email as _send_welcome
+        from services.admin_notifications import notify_admin_new_user as _notify_admin
+        background_tasks.add_task(_send_welcome, user_doc)
+        background_tasks.add_task(_notify_admin, user_doc)
+        logger.info(f"[SIGNUP_EMAILS] Scheduled welcome + admin notify for {normalized_email} (provider=email)")
+    except Exception as e:
+        logger.error(f"[SIGNUP_EMAILS] Failed to schedule signup emails for {normalized_email}: {e}")
     
     # Audit log for currency
     await db.currency_audit_logs.insert_one({
@@ -1044,7 +1040,7 @@ def _frontend_url() -> str:
 
 
 @auth_router.get("/google/callback")
-async def google_oauth_callback(request: Request, code: str = "", state: str = "", error: str = ""):
+async def google_oauth_callback(request: Request, background_tasks: BackgroundTasks, code: str = "", state: str = "", error: str = ""):
     """
     Step 2 — Validate state, exchange code → tokens, fetch userinfo,
     find-or-create user in MongoDB, sign JWT, redirect to frontend with token
@@ -1143,6 +1139,18 @@ async def google_oauth_callback(request: Request, code: str = "", state: str = "
         except Exception as e:
             logger.error(f"[GOOGLE_OAUTH] insert user failed: {e}")
             return RedirectResponse(url=f"{frontend}/auth?google_error=user_creation_failed", status_code=302)
+
+        # ── Welcome + Admin notification (NON-BLOCKING via FastAPI BackgroundTasks) ──
+        # Only fires for NEW Google users — existing users skip the welcome.
+        # Welcome email is transactional (not subject to marketing email_suppressions).
+        try:
+            from services.email_service import send_welcome_email as _send_welcome
+            from services.admin_notifications import notify_admin_new_user as _notify_admin
+            background_tasks.add_task(_send_welcome, user)
+            background_tasks.add_task(_notify_admin, user)
+            logger.info(f"[SIGNUP_EMAILS] Scheduled welcome + admin notify for {google_email} (provider=google)")
+        except Exception as e:
+            logger.error(f"[SIGNUP_EMAILS] Failed to schedule Google signup emails for {google_email}: {e}")
     else:
         # Update existing user with latest Google data + login timestamp
         await db.users.update_one(
