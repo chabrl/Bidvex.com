@@ -1,6 +1,27 @@
 # BidVex Changelog
 
 
+## Feb, 2026 — P0 Signup Emails Not Firing — FIXED & VERIFIED
+
+### Bug
+- New user signup (email/password) was sending emails synchronously, blocking the HTTP response
+- Google OAuth signup wasn't triggering welcome or admin emails AT ALL
+- Admin notification recipient was hardcoded to `info@bidvex.com` instead of reading env var
+
+### Backend Fixes
+- **`services/admin_notifications.py`** — Removed hardcoded `ADMIN_EMAIL = "info@bidvex.com"` module constant. Added `_resolve_admin_email()` runtime helper with precedence `ADMIN_NOTIFICATION_EMAIL → ADMIN_EMAIL → "info@bidvex.com"`. Reads env at call-time so reloads/overrides take effect. `notify_admin_new_user()` now also includes `Provider` (email/google) field.
+- **`routes/auth.py:register()`** — Added `background_tasks: BackgroundTasks` parameter. Replaced synchronous `await send_welcome_template(...)` and ad-hoc `asyncio.create_task(notify_admin_new_user(...))` with `background_tasks.add_task(...)` calls so both emails run AFTER the HTTP response is sent (non-blocking).
+- **`routes/auth.py:google_oauth_callback()`** — Added `background_tasks: BackgroundTasks` parameter. Schedules welcome + admin emails via `BackgroundTasks` ONLY on the new-user creation branch (existing Google logins do NOT re-trigger welcome).
+- Welcome email is transactional (`is_marketing=False` default in `send_template_email`) — explicitly bypasses the new `email_suppressions` marketing-only check.
+
+### Verification
+- `/app/test_reports/iteration_162.json` — 11/11 tests passed
+- Response time: ~1.3s (down from blocking on SendGrid network round-trip)
+- 5 live signups → SendGrid status=202 on every welcome and admin email
+- Test suite: `/app/backend/tests/test_signup_emails_bgtasks_162.py`
+
+
+
 ## Apr 29, 2026 — Custom Unsubscribe Flow (replaces SendGrid default) — DONE
 
 ### Backend
