@@ -204,6 +204,78 @@ async def is_marketing_suppressed(email: str) -> bool:
     return bool(user and user.get("marketing_unsubscribed"))
 
 
+# ── Resubscribe (re-opt-in) ────────────────────────────────────
+# Uses the SAME signed token as unsubscribe — links from emails or success
+# pages are reusable for either direction since they only encode the email.
+@unsubscribe_router.get("/resubscribe-verify")
+async def verify_resubscribe_token(token: str = ""):
+    """Decode + return masked email and current subscription status."""
+    if not token:
+        raise HTTPException(status_code=400, detail="token_missing")
+    email = _decode_unsubscribe_token(token)
+    db = get_db()
+    user = await db.users.find_one({"email": email}, {"_id": 0, "marketing_unsubscribed": 1})
+    suppressed = await db.email_suppressions.find_one({"email": email}, {"_id": 0, "email": 1})
+    is_suppressed = bool((user and user.get("marketing_unsubscribed")) or suppressed)
+    return {
+        "email_masked": _mask_email(email),
+        "is_subscribed": not is_suppressed,
+    }
+
+
+@unsubscribe_router.post("/resubscribe-confirm")
+async def confirm_resubscribe(payload: ConfirmRequest, request: Request):
+    """Re-opt-in: clear DB suppression + remove from SendGrid global list."""
+    email = _decode_unsubscribe_token(payload.token)
+    db = get_db()
+    now = datetime.now(timezone.utc)
+
+    # Already subscribed?
+    suppressed = await db.email_suppressions.find_one({"email": email}, {"_id": 0, "email": 1})
+    user_flag = await db.users.find_one({"email": email}, {"_id": 0, "marketing_unsubscribed": 1})
+    if not suppressed and not (user_flag and user_flag.get("marketing_unsubscribed")):
+        return {"status": "already_subscribed", "email_masked": _mask_email(email)}
+
+    # 1. Clear the dedicated suppression list (fast-path source of truth)
+    await db.email_suppressions.delete_one({"email": email})
+
+    # 2. Flip the user-doc flag (don't upsert — only update if user exists)
+    await db.users.update_one(
+        {"email": email},
+        {
+            "$set": {
+                "marketing_unsubscribed": False,
+                "marketing_resubscribed_at": now,
+                "marketing_resubscribed_source": "link",
+                "marketing_resubscribed_ip": (request.client.host if request.client else None),
+            },
+            "$unset": {
+                "marketing_unsubscribed_at": "",
+                "marketing_unsubscribed_source": "",
+                "marketing_unsubscribed_group_id": "",
+            },
+        },
+    )
+
+    # 3. Propagate to SendGrid — remove from global suppressions
+    if SENDGRID_API_KEY:
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                r = await client.delete(
+                    f"{SENDGRID_SUPPRESSIONS_URL}/{email}",
+                    headers={"Authorization": f"Bearer {SENDGRID_API_KEY}"},
+                )
+                # 204 = removed, 404 = wasn't in list (still success), anything else = warn
+                if r.status_code not in (200, 204, 404):
+                    logger.warning(
+                        f"[RESUBSCRIBE] SendGrid DELETE returned {r.status_code}: {r.text[:200]}"
+                    )
+        except Exception as e:
+            # DB is source of truth — never fail the user flow on a SG hiccup.
+            logger.error(f"[RESUBSCRIBE] SendGrid API call failed: {type(e).__name__}: {e}")
+
+    return {"status": "success", "email_masked": _mask_email(email)}
+
 
 # ── Admin-only debug helper ────────────────────────────────────
 # REMOVE BEFORE PRODUCTION GA (or leave — the `require_admin` gate makes it

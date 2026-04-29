@@ -68,6 +68,7 @@ const ReviewPage = lazy(() => import('./pages/ReviewPage'));
 const CommunityPage = lazy(() => import('./pages/CommunityPage'));
 const AboutUsPage = lazy(() => import('./pages/AboutUsPage'));
 const UnsubscribePage = lazy(() => import('./pages/UnsubscribePage'));
+const ResubscribePage = lazy(() => import('./pages/ResubscribePage'));
 
 // Vehicle Auction Module
 const VehicleAuctionsPage = lazy(() => import('./pages/vehicles/VehicleAuctionsPage'));
@@ -316,6 +317,8 @@ const App = () => {
           <Route path="/about-us" element={<AboutUsPage />} />
           <Route path="/unsubscribe" element={<UnsubscribePage />} />
           <Route path="/desabonnement" element={<UnsubscribePage />} />
+          <Route path="/resubscribe" element={<ResubscribePage />} />
+          <Route path="/reabonnement" element={<ResubscribePage />} />
           <Route path="/watchlist" element={
             <ProtectedRoute><WatchlistPage /></ProtectedRoute>
           } />
