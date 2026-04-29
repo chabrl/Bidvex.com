@@ -1,6 +1,49 @@
 # BidVex Changelog
 
 
+## Apr 29, 2026 — Custom Unsubscribe Flow (replaces SendGrid default) — DONE
+
+### Backend
+- **NEW** `routes/unsubscribe.py` — itsdangerous URLSafeTimedSerializer (30-day TTL, scoped by `UNSUBSCRIBE_SECRET`):
+  - `GET /api/unsubscribe/verify?token=...` → masked email + already_unsubscribed status
+  - `POST /api/unsubscribe/confirm` → upserts `users.marketing_unsubscribed=true` + `email_suppressions` row + calls SendGrid Suppressions API
+  - `build_unsubscribe_urls(email)` helper used by send pipeline (returns bilingual EN/FR URLs)
+  - `is_marketing_suppressed(email)` async guard for send-time
+- **UPDATED** `services/email_service.py:send_template_email` — new `is_marketing` flag:
+  - `is_marketing=True` → suppression check first; injects `unsubscribe_url_en` + `unsubscribe_url_fr` into `dynamic_template_data`
+  - `is_marketing=False` (default for transactional) → always sends, suppression list bypassed
+  - `send_geo_auction_alert_email` now `is_marketing=True`
+- **UPDATED** `services/email_marketing.py:_send_campaign_email` — suppression guard + bilingual URL replacement (`{{unsubscribe_url_en}}`, `{{unsubscribe_url_fr}}`, plus legacy `{{unsubscribe_url}}` → EN)
+- **UPDATED** `routes/sendgrid_webhook.py`:
+  - `spamreport` moved from DELIVERABILITY_KILL_EVENTS → UNSUBSCRIBE_EVENTS (per spec)
+  - `_handle_unsubscribe` now upserts users (with UUID id) AND populates `email_suppressions` table
+  - Spam-alert call preserved within unsubscribe handler
+
+### Frontend
+- **REWRITTEN** `pages/UnsubscribePage.js` — bilingual EN/FR, Inter font, blue/cyan/slate palette (#2563eb / #06b6d4 / #0f172a), 5 states (loading / confirm / success / already / error)
+- Routes registered: `/unsubscribe?lang=en` and `/desabonnement?lang=fr` (both render same component, lang detected from query or path)
+
+### DB
+- **NEW** `email_suppressions` collection — unique index on `email`, fast send-time guard
+- **MIGRATION executed** `scripts/migrate_unsubscribe_fields.py` — backfilled 7 user docs with `marketing_unsubscribed=false`, created 3 suppressions from legacy data
+
+### Env
+- `.env`: added `UNSUBSCRIBE_SECRET=<64-char secret separate from JWT_SECRET>`
+
+### Tests (iter161)
+- **12/12 backend pass + 4/4 frontend pass** — full E2E verified live (verify → confirm → idempotent re-confirm → DB writes → bilingual UI states)
+- 3 minor consistency issues (collection-name typos `email_suppression` → `email_suppressions`, missing webhook upsert) **fixed in iter161-followup**: 12/12 still green
+- Regression test suite: `/app/backend/tests/test_unsubscribe_flow.py`
+
+### 🚨 SendGrid Dashboard — manual one-time settings
+Documented in `routes/unsubscribe.py` docstring. After deploy:
+1. **Mail Settings → Subscription Tracking → OFF** (otherwise SendGrid rewrites our links)
+2. **Mail Settings → Event Webhook → POST URL: `https://bidvex.com/api/sendgrid/event-webhook`**, events: `unsubscribe, group_unsubscribe, spamreport, bounce, dropped`, **Signed Event Webhook ON**
+3. (Optional) **Sender Authentication** — DKIM + SPF should already be configured
+
+---
+
+
 ## Apr 28, 2026 — Hero Phone Mockup with Floating Animation — DONE
 
 ### What

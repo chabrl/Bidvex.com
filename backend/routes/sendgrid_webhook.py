@@ -100,7 +100,7 @@ async def _handle_deliverability_kill(db, event: Dict[str, Any]) -> None:
 
     # 2. Add to suppression list (idempotent on sg_event_id)
     if sg_event_id:
-        await db.email_suppression.update_one(
+        await db.email_suppressions.update_one(
             {"sg_event_id": sg_event_id},
             {
                 "$setOnInsert": {
@@ -116,7 +116,7 @@ async def _handle_deliverability_kill(db, event: Dict[str, Any]) -> None:
             upsert=True,
         )
     else:
-        await db.email_suppression.insert_one(
+        await db.email_suppressions.insert_one(
             {
                 "email": email,
                 "event": event_type,
@@ -135,16 +135,26 @@ async def _handle_unsubscribe(db, event: Dict[str, Any]) -> None:
     if not email:
         return
     now = datetime.now(timezone.utc)
+    etype = event.get("event")
+    # Upsert users — webhook is source of truth even for contact-only imports.
+    import uuid as _uuid
     await db.users.update_one(
         {"email": email},
         {
             "$set": {
                 "marketing_unsubscribed": True,
                 "marketing_unsubscribed_at": now,
-                "marketing_unsubscribed_source": event.get("event"),
+                "marketing_unsubscribed_source": etype,
                 "marketing_unsubscribed_group_id": event.get("asm_group_id"),
-            }
+            },
+            "$setOnInsert": {
+                "id": str(_uuid.uuid4()),
+                "email": email,
+                "created_at": now,
+                "is_contact_only": True,
+            },
         },
+        upsert=True,
     )
     # Fast-lookup suppression table (used by send-time guard)
     await db.email_suppressions.update_one(
@@ -153,11 +163,19 @@ async def _handle_unsubscribe(db, event: Dict[str, Any]) -> None:
             "$set": {
                 "email": email,
                 "unsubscribed_at": now,
-                "source": event.get("event", "sendgrid_webhook"),
+                "source": etype or "sendgrid_webhook",
             }
         },
         upsert=True,
     )
+    # Preserve admin spam alert behaviour (was previously triggered by the
+    # deliverability_kill branch — preserved here now that spamreport is
+    # routed to UNSUBSCRIBE_EVENTS).
+    if etype == "spamreport":
+        try:
+            await _send_spam_alert(event)
+        except Exception as e:
+            logger.warning(f"[SG_WEBHOOK] spam alert failed: {e}")
 
 
 async def _handle_resubscribe(db, event: Dict[str, Any]) -> None:
@@ -269,8 +287,6 @@ async def _process_events(events: List[Dict[str, Any]]) -> Dict[str, int]:
         try:
             if etype in DELIVERABILITY_KILL_EVENTS:
                 await _handle_deliverability_kill(db, ev)
-                if etype == "spamreport":
-                    await _send_spam_alert(ev)
             elif etype in UNSUBSCRIBE_EVENTS:
                 await _handle_unsubscribe(db, ev)
             elif etype in RESUBSCRIBE_EVENTS:
@@ -373,7 +389,7 @@ async def admin_list_suppression(
     if email:
         q["email"] = email.lower().strip()
     items = (
-        await db.email_suppression.find(q, {"_id": 0})
+        await db.email_suppressions.find(q, {"_id": 0})
         .sort("created_at", -1)
         .to_list(limit)
     )
