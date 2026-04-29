@@ -17,8 +17,8 @@
 - `App.js`: registered route `/auth/google/finish`
 
 ### Env vars added to `/app/backend/.env`
-- `GOOGLE_CLIENT_ID=<REDACTED>`
-- `GOOGLE_CLIENT_SECRET=<REDACTED>`
+- `GOOGLE_CLIENT_ID=<REDACTED — see /app/backend/.env>`
+- `GOOGLE_CLIENT_SECRET=<REDACTED — see /app/backend/.env>`
 - `GOOGLE_CALLBACK_URL=https://api.bidvex.com/auth/google/callback`
 - `FRONTEND_URL=https://bidvex.com` (already existed)
 
@@ -65,7 +65,7 @@ Playwright intercept of `window.fetch` showed: `GET /api/api/ai-chat/message →
 - `backend/services/ai_assistant_v2.py`: extracted litellm call into new `_call_llm()` method with **2-tier resilience**:
   1. **Primary**: Emergent LLM proxy (free, works in dev + preview)
   2. **Fallback**: Direct Gemini API via `GEMINI_API_KEY` (native, works from any network)
-- `backend/.env`: updated `GEMINI_API_KEY` with new valid user-provided key `AIzaSyAhDbRnTi…-Y-N-8` (active, has quota, `gemini-2.5-flash` model).
+- `backend/.env`: updated `GEMINI_API_KEY` with a new valid user-provided key (active, has quota, `gemini-2.5-flash` model).
 - `frontend/src/components/AIAssistant.js`: now also degrades gracefully when backend returns `{success:false}` (previously only checked HTTP status).
 - Richer logging: `[AI_CONCIERGE]` prefix on every LLM failure with exception type — easy to grep in Railway logs.
 
@@ -76,7 +76,7 @@ Playwright intercept of `window.fetch` showed: `GET /api/api/ai-chat/message →
 
 ### Railway env vars to set (user action)
 ```
-GEMINI_API_KEY=<REDACTED>
+GEMINI_API_KEY=<REDACTED — see /app/backend/.env>
 AI_MODEL_ID=gemini-2.5-flash          (default; safe to omit)
 EMERGENT_LLM_KEY=sk-emergent-…         (optional; preview uses it. If missing on Railway, Gemini fallback kicks in automatically)
 ```

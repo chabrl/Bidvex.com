@@ -7,7 +7,7 @@
 
 ## Direct Google OAuth 2.0
 - Pixel ID / Google Cloud Project: configured per `/app/backend/.env`
-  - `GOOGLE_CLIENT_ID=<REDACTED>`
+  - `GOOGLE_CLIENT_ID=<REDACTED — see /app/backend/.env>`
   - `GOOGLE_CALLBACK_URL=https://api.bidvex.com/auth/google/callback`
 - Authorized JavaScript Origin (Google Console): `https://bidvex.com`
 - Authorized Redirect URIs (Google Console): `https://api.bidvex.com/auth/google/callback`
