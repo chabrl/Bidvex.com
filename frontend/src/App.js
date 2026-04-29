@@ -29,6 +29,7 @@ const MarketplacePage = lazy(() => import('./pages/MarketplacePage'));
 const ListingDetailPage = lazy(() => import('./pages/ListingDetailPage'));
 const AuthPage = lazy(() => import('./pages/AuthPage'));
 const SellerDashboard = lazy(() => import('./pages/SellerDashboard'));
+const GoogleAuthFinishPage = lazy(() => import('./pages/GoogleAuthFinishPage'));
 const BuyerDashboard = lazy(() => import('./pages/BuyerDashboard'));
 const CreateListingPage = lazy(() => import('./pages/CreateListingPage'));
 const PaymentSuccessPage = lazy(() => import('./pages/PaymentSuccessPage'));
@@ -303,6 +304,7 @@ const App = () => {
           <Route path="/store/:userId" element={<StorefrontPage />} />
           <Route path="/bulk-import" element={<ProtectedRoute><BulkImportPage /></ProtectedRoute>} />
           <Route path="/auth" element={<AuthPage />} />
+          <Route path="/auth/google/finish" element={<GoogleAuthFinishPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/verify-phone" element={

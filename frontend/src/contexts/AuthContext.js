@@ -99,6 +99,18 @@ export const AuthProvider = ({ children }) => {
     await fetchUser();
   };
 
+  // Direct Google OAuth — accepts a JWT minted by the backend's
+  // /api/auth/google/callback handler, persists it, and hydrates the user.
+  const setUserFromToken = async (jwt) => {
+    if (!jwt) throw new Error('No token provided');
+    setToken(jwt);
+    localStorage.setItem('token', jwt);
+    axios.defaults.headers.common['Authorization'] = `Bearer ${jwt}`;
+    const me = await axios.get(`${API}/auth/me`);
+    setUser(me.data);
+    return me.data;
+  };
+
   const logout = async () => {
     try {
       await axios.post(`${API}/auth/logout`);
@@ -158,7 +170,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, processGoogleSession, updateUserPreferences, refreshUser, token }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, processGoogleSession, setUserFromToken, updateUserPreferences, refreshUser, token }}>
       {children}
     </AuthContext.Provider>
   );

@@ -967,3 +967,205 @@ async def confirm_email_change(payload: EmailChangeConfirm):
     await db.sessions.delete_many({"user_id": token_doc["user_id"]})
     logger.info(f"[EMAIL_CHANGE] Email confirmed: user={token_doc['user_id']} new={new_email}")
     return {"success": True, "message": "Email updated. Please log in with your new email address.", "new_email": new_email}
+
+
+
+# ============================================================================
+# DIRECT GOOGLE OAUTH 2.0 (replaces auth.emergentagent.com proxy flow)
+# ----------------------------------------------------------------------------
+# Routes:
+#   GET /api/auth/google?redirect=/marketplace   → 302 to Google consent
+#   GET /api/auth/google/callback?code=&state=    → finds/creates user, signs
+#                                                    JWT, 302 to frontend
+#                                                    /auth/google/finish#token=...
+#
+# REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS,
+#           THIS BREAKS THE AUTH. The redirect_uri sent to Google MUST match
+#           a value listed in Google Cloud Console → Authorized Redirect URIs
+#           exactly. Configure via the GOOGLE_CALLBACK_URL env var.
+# ============================================================================
+
+import secrets
+from urllib.parse import urlencode
+
+import httpx
+from fastapi.responses import RedirectResponse
+
+
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+GOOGLE_CALLBACK_URL = os.environ.get("GOOGLE_CALLBACK_URL", "")
+GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
+
+
+@auth_router.get("/google")
+async def google_oauth_start(request: Request, redirect: str = "/marketplace"):
+    """
+    Step 1 — Generate state, store it in a short-lived DB record, redirect to
+    Google's consent screen.
+    """
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CALLBACK_URL:
+        raise HTTPException(
+            status_code=500,
+            detail="Google OAuth not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CALLBACK_URL.",
+        )
+
+    state = secrets.token_urlsafe(32)
+    await db.oauth_states.insert_one({
+        "state": state,
+        "post_login_redirect": redirect or "/marketplace",
+        "created_at": datetime.now(timezone.utc),
+        "ip": get_client_ip(request),
+        "ua": request.headers.get("user-agent", ""),
+    })
+
+    params = {
+        "client_id": GOOGLE_CLIENT_ID,
+        "redirect_uri": GOOGLE_CALLBACK_URL,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "offline",
+        "include_granted_scopes": "true",
+        "prompt": "select_account",
+        "state": state,
+    }
+    return RedirectResponse(url=f"{GOOGLE_AUTH_URL}?{urlencode(params)}", status_code=302)
+
+
+def _frontend_url() -> str:
+    """Frontend base URL — required for the post-callback redirect."""
+    return (
+        os.environ.get("FRONTEND_URL")
+        or os.environ.get("REACT_APP_FRONTEND_URL")
+        or ""
+    ).rstrip("/")
+
+
+@auth_router.get("/google/callback")
+async def google_oauth_callback(request: Request, code: str = "", state: str = "", error: str = ""):
+    """
+    Step 2 — Validate state, exchange code → tokens, fetch userinfo,
+    find-or-create user in MongoDB, sign JWT, redirect to frontend with token
+    in the URL fragment (#token=...) so it never hits a server log.
+    """
+    frontend = _frontend_url()
+    if not frontend:
+        raise HTTPException(
+            status_code=500,
+            detail="FRONTEND_URL env var not configured — cannot complete redirect.",
+        )
+
+    # User denied / Google returned an error
+    if error:
+        return RedirectResponse(url=f"{frontend}/auth?google_error={error}", status_code=302)
+    if not code or not state:
+        return RedirectResponse(url=f"{frontend}/auth?google_error=missing_code_or_state", status_code=302)
+
+    # Validate state (CSRF protection) and consume it
+    state_doc = await db.oauth_states.find_one_and_delete({"state": state})
+    if not state_doc:
+        return RedirectResponse(url=f"{frontend}/auth?google_error=invalid_state", status_code=302)
+
+    # Reject states older than 10 minutes (defense in depth)
+    created_at = state_doc.get("created_at")
+    if isinstance(created_at, datetime):
+        if (datetime.now(timezone.utc) - created_at.replace(tzinfo=timezone.utc) if created_at.tzinfo is None else datetime.now(timezone.utc) - created_at).total_seconds() > 600:
+            return RedirectResponse(url=f"{frontend}/auth?google_error=state_expired", status_code=302)
+
+    # Exchange code for tokens
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            tok_resp = await client.post(
+                GOOGLE_TOKEN_URL,
+                data={
+                    "code": code,
+                    "client_id": GOOGLE_CLIENT_ID,
+                    "client_secret": GOOGLE_CLIENT_SECRET,
+                    "redirect_uri": GOOGLE_CALLBACK_URL,
+                    "grant_type": "authorization_code",
+                },
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            if tok_resp.status_code != 200:
+                logger.error(f"[GOOGLE_OAUTH] token exchange {tok_resp.status_code}: {tok_resp.text[:300]}")
+                return RedirectResponse(url=f"{frontend}/auth?google_error=token_exchange_failed", status_code=302)
+            tokens = tok_resp.json()
+
+            access_token = tokens.get("access_token")
+            if not access_token:
+                return RedirectResponse(url=f"{frontend}/auth?google_error=no_access_token", status_code=302)
+
+            # Fetch userinfo
+            ui_resp = await client.get(
+                GOOGLE_USERINFO_URL,
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+            if ui_resp.status_code != 200:
+                logger.error(f"[GOOGLE_OAUTH] userinfo {ui_resp.status_code}: {ui_resp.text[:300]}")
+                return RedirectResponse(url=f"{frontend}/auth?google_error=userinfo_failed", status_code=302)
+            userinfo = ui_resp.json()
+    except Exception as e:
+        logger.error(f"[GOOGLE_OAUTH] network error: {type(e).__name__}: {e}")
+        return RedirectResponse(url=f"{frontend}/auth?google_error=network", status_code=302)
+
+    google_email = (userinfo.get("email") or "").strip().lower()
+    google_sub = userinfo.get("sub")
+    if not google_email or not userinfo.get("email_verified", False):
+        return RedirectResponse(url=f"{frontend}/auth?google_error=email_not_verified", status_code=302)
+
+    # Find-or-create user
+    now = datetime.now(timezone.utc)
+    user = await db.users.find_one({"email": google_email}, {"_id": 0, "password": 0})
+
+    if not user:
+        new_id = str(uuid.uuid4())
+        user = {
+            "id": new_id,
+            "email": google_email,
+            "name": userinfo.get("name") or google_email.split("@")[0],
+            "picture": userinfo.get("picture", ""),
+            "google_sub": google_sub,
+            "auth_provider": "google",
+            "email_verified": True,
+            "role": "user",
+            "subscription_tier": "free",
+            "preferred_language": "en",
+            "preferred_currency": "CAD",
+            "created_at": now.isoformat(),
+            "updated_at": now.isoformat(),
+            "last_login_at": now.isoformat(),
+        }
+        try:
+            await db.users.insert_one(user.copy())
+            logger.info(f"[GOOGLE_OAUTH] new user created via Google: {google_email}")
+        except Exception as e:
+            logger.error(f"[GOOGLE_OAUTH] insert user failed: {e}")
+            return RedirectResponse(url=f"{frontend}/auth?google_error=user_creation_failed", status_code=302)
+    else:
+        # Update existing user with latest Google data + login timestamp
+        await db.users.update_one(
+            {"id": user["id"]},
+            {"$set": {
+                "google_sub": google_sub,
+                "picture": user.get("picture") or userinfo.get("picture", ""),
+                "email_verified": True,
+                "last_login_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+            }},
+        )
+
+    # Sign JWT
+    token = create_access_token({
+        "sub": user["id"],
+        "email": user["email"],
+        "role": user.get("role", "user"),
+    })
+
+    # Redirect to frontend with token in URL fragment (never logged)
+    safe_redirect = state_doc.get("post_login_redirect", "/marketplace")
+    if not safe_redirect.startswith("/"):
+        safe_redirect = "/marketplace"
+    finish_url = f"{frontend}/auth/google/finish#token={token}&redirect={safe_redirect}"
+    return RedirectResponse(url=finish_url, status_code=302)

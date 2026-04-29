@@ -1,6 +1,38 @@
 # BidVex Changelog
 
 
+## Apr 28, 2026 — Direct Google OAuth 2.0 (replaces auth.emergentagent.com)
+
+### Backend (FastAPI — chose to keep existing stack rather than rewrite to Node/Express)
+- `backend/routes/auth.py` — appended:
+  - `GET /api/auth/google?redirect=/marketplace` → generates CSRF state, persists in `db.oauth_states`, 302 to `accounts.google.com/o/oauth2/v2/auth` with PKCE-style state
+  - `GET /api/auth/google/callback?code=&state=` → validates+consumes state (10-min TTL), exchanges code for tokens via `oauth2.googleapis.com/token`, fetches userinfo, find-or-create user in `db.users`, signs JWT via `create_access_token`, 302 to `${FRONTEND_URL}/auth/google/finish#token=<JWT>&redirect=...`
+- All errors redirect to `${FRONTEND_URL}/auth?google_error=<reason>` (never 500s the user)
+- Token in URL fragment (#) so it's never logged by proxies/Cloudflare
+
+### Frontend
+- `pages/AuthPage.js`: `handleGoogleLogin` now navigates to `${API_BASE}/auth/google?redirect=/marketplace` (no more `auth.emergentagent.com`)
+- `pages/GoogleAuthFinishPage.js`: NEW — reads token from `window.location.hash`, calls `setUserFromToken(jwt)`, navigates to original destination
+- `contexts/AuthContext.js`: NEW `setUserFromToken(jwt)` exposed in provider — persists token, hydrates user from `/api/auth/me`
+- `App.js`: registered route `/auth/google/finish`
+
+### Env vars added to `/app/backend/.env`
+- `GOOGLE_CLIENT_ID=<REDACTED>`
+- `GOOGLE_CLIENT_SECRET=<REDACTED>`
+- `GOOGLE_CALLBACK_URL=https://api.bidvex.com/auth/google/callback`
+- `FRONTEND_URL=https://bidvex.com` (already existed)
+
+### Live verification
+- `GET /api/auth/google` → 302 to `accounts.google.com` with correct `client_id`, `redirect_uri`, `scope=openid email profile`, CSRF state ✅
+- Invalid state attack → 302 to `/auth?google_error=invalid_state` ✅
+- Frontend route `/auth/google/finish` → 200 ✅
+
+### checkAuth middleware (already exists)
+- FastAPI dependency `Depends(get_current_user_from_token)` (in `routes/auth.py`) is the equivalent of the requested `checkAuth` — already applied across 200+ protected routes
+
+---
+
+
 ## Apr 27, 2026 (End of Day) — AI Concierge REAL Root Cause — DONE
 
 ### The actual bug

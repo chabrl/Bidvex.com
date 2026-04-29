@@ -115,9 +115,11 @@ const AuthPage = () => {
 
   const handleGoogleLogin = () => {
     // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
-    // Use window.location.origin so user returns to exact domain (prod, preview, etc.)
-    const redirectUrl = `${window.location.origin}/marketplace`;
-    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+    // Direct Google OAuth 2.0 — backend handles the consent flow.
+    // The backend's GOOGLE_CALLBACK_URL env var controls what's sent to Google
+    // and MUST match a value in Google Cloud Console → Authorized Redirect URIs.
+    const desiredRedirect = '/marketplace';
+    window.location.href = `${API_BASE}/auth/google?redirect=${encodeURIComponent(desiredRedirect)}`;
   };
 
   // Forced Password Reset Form
