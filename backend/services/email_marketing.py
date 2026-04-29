@@ -874,10 +874,29 @@ class EmailMarketingService:
         name = recipient.get("name", "")
         user_id = recipient.get("user_id")
         source = recipient.get("source", "unknown")
-        
+
+        # Suppression guard — respect the custom unsubscribe flow
+        try:
+            from routes.unsubscribe import is_marketing_suppressed
+            if await is_marketing_suppressed(email):
+                logger.info(f"[CAMPAIGN EMAIL] Suppressed: {email} has unsubscribed")
+                await self.email_sends.insert_one({
+                    "id": str(uuid.uuid4()),
+                    "campaign_id": campaign["id"],
+                    "user_id": user_id,
+                    "email": email,
+                    "source": source,
+                    "status": "suppressed_unsubscribed",
+                    "sent_at": datetime.now(timezone.utc).isoformat(),
+                    "message_id": None,
+                })
+                return {"success": False, "suppressed": True}
+        except Exception as e:
+            logger.warning(f"[CAMPAIGN EMAIL] Suppression check failed, sending anyway: {e}")
+
         if not marketing_client:
             logger.info(f"[CAMPAIGN EMAIL] To: {email}, Campaign: {campaign['id']}, Source: {source}")
-            
+
             # Still record the send
             await self.email_sends.insert_one({
                 "id": str(uuid.uuid4()),
@@ -889,22 +908,36 @@ class EmailMarketingService:
                 "sent_at": datetime.now(timezone.utc).isoformat(),
                 "message_id": None
             })
-            
+
             return {"success": True, "logged": True}
-        
+
         try:
+            # Build bilingual unsubscribe URLs with cryptographically-signed tokens
+            try:
+                from routes.unsubscribe import build_unsubscribe_urls
+                urls = build_unsubscribe_urls(email)
+                unsubscribe_url_en = urls["en"]
+                unsubscribe_url_fr = urls["fr"]
+            except Exception as e:
+                logger.warning(f"[CAMPAIGN EMAIL] Fallback unsubscribe URL: {e}")
+                unsubscribe_url_en = f"{FRONTEND_URL}/unsubscribe"
+                unsubscribe_url_fr = f"{FRONTEND_URL}/desabonnement"
+
             # Personalize content
             html_content = campaign["html_content"]
             html_content = html_content.replace("{{name}}", name or "")
             html_content = html_content.replace("{{email}}", email)
-            unsubscribe_token = user_id or email
-            html_content = html_content.replace("{{unsubscribe_url}}", 
-                f"{FRONTEND_URL}/unsubscribe?token={unsubscribe_token}")
-            
+            html_content = html_content.replace("{{unsubscribe_url}}", unsubscribe_url_en)
+            html_content = html_content.replace("{{unsubscribe_url_en}}", unsubscribe_url_en)
+            html_content = html_content.replace("{{unsubscribe_url_fr}}", unsubscribe_url_fr)
+
             plain_content = campaign.get("plain_text_content") or ""
             plain_content = plain_content.replace("{{name}}", name or "")
             plain_content = plain_content.replace("{{email}}", email)
-            
+            plain_content = plain_content.replace("{{unsubscribe_url}}", unsubscribe_url_en)
+            plain_content = plain_content.replace("{{unsubscribe_url_en}}", unsubscribe_url_en)
+            plain_content = plain_content.replace("{{unsubscribe_url_fr}}", unsubscribe_url_fr)
+
             message = Mail()
             message.from_email = Email(campaign["from_email"], campaign["from_name"])
             message.subject = campaign["subject"]

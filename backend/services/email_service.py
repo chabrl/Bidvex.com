@@ -78,12 +78,30 @@ async def send_template_email(
     template_id: str,
     dynamic_data: dict,
     max_retries: int = 3,
+    is_marketing: bool = False,
 ) -> bool:
     """
     Send email via SendGrid Dynamic Template.
     Retry logic: 3 attempts, exponential backoff.
-    Logs template_id, recipient, success/failure.
+
+    When `is_marketing=True`:
+      • We check the suppression list FIRST and skip sending if the user opted out.
+      • We inject bilingual unsubscribe URLs into the template data:
+          {{unsubscribe_url_en}} and {{unsubscribe_url_fr}}
+
+    Transactional emails (bids / payments / account alerts) set is_marketing=False
+    and always send — users cannot opt out of these (per platform policy).
     """
+    # Suppression guard — ONLY for marketing emails
+    if is_marketing:
+        try:
+            from routes.unsubscribe import is_marketing_suppressed
+            if await is_marketing_suppressed(to_email):
+                logger.info(f"[EMAIL] Suppressed (marketing) — {to_email} has unsubscribed")
+                return False
+        except Exception as e:
+            logger.warning(f"[EMAIL] Suppression check failed, sending anyway: {e}")
+
     sg = _get_sg()
     if not sg:
         logger.warning(f"[EMAIL] SendGrid not configured — skipping email to {to_email}")
@@ -94,6 +112,21 @@ async def send_template_email(
 
     # Ensure current_year is always present
     dynamic_data.setdefault("current_year", datetime.now().year)
+
+    # Inject bilingual unsubscribe URLs for marketing emails.
+    # For transactional emails, inject an empty string so the footer template can
+    # gracefully omit the block (Handlebars `{{#if unsubscribe_url_en}}...{{/if}}`).
+    if is_marketing:
+        try:
+            from routes.unsubscribe import build_unsubscribe_urls
+            urls = build_unsubscribe_urls(to_email)
+            dynamic_data.setdefault("unsubscribe_url_en", urls["en"])
+            dynamic_data.setdefault("unsubscribe_url_fr", urls["fr"])
+        except Exception as e:
+            logger.warning(f"[EMAIL] Failed to build unsubscribe URLs: {e}")
+    else:
+        dynamic_data.setdefault("unsubscribe_url_en", "")
+        dynamic_data.setdefault("unsubscribe_url_fr", "")
 
     message = Mail(
         from_email=Email(from_email, from_name),
@@ -108,7 +141,8 @@ async def send_template_email(
             response = sg.send(message)
             logger.info(
                 f"[EMAIL] Sent: to={to_email} template={template_id} "
-                f"status={response.status_code} msgid={response.headers.get('X-Message-Id', '?')}"
+                f"status={response.status_code} msgid={response.headers.get('X-Message-Id', '?')} "
+                f"marketing={is_marketing}"
             )
             return True
         except HTTPError as e:
@@ -368,6 +402,7 @@ async def send_geo_auction_alert(user: dict, auction: dict, distance_km: float, 
         to_name=user.get("name", ""),
         template_id=tid,
         dynamic_data=data,
+        is_marketing=True,  # Promotional — respects unsubscribe
     )
 
 

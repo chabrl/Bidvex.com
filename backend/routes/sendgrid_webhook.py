@@ -32,8 +32,8 @@ ADMIN_ALERT_EMAIL = os.environ.get("ADMIN_ALERT_EMAIL", "info@bidvex.com")
 HQ_LABEL = "BidVex Canada — Sherbrooke, QC"
 
 # Event → category (used for concise routing)
-DELIVERABILITY_KILL_EVENTS = {"bounce", "dropped", "spamreport"}
-UNSUBSCRIBE_EVENTS = {"unsubscribe", "group_unsubscribe"}
+DELIVERABILITY_KILL_EVENTS = {"bounce", "dropped"}
+UNSUBSCRIBE_EVENTS = {"unsubscribe", "group_unsubscribe", "spamreport"}
 RESUBSCRIBE_EVENTS = {"group_resubscribe"}
 DELIVERY_STATUS_EVENTS = {"processed", "delivered", "deferred"}
 ENGAGEMENT_EVENTS = {"open", "click"}
@@ -130,20 +130,33 @@ async def _handle_deliverability_kill(db, event: Dict[str, Any]) -> None:
 
 
 async def _handle_unsubscribe(db, event: Dict[str, Any]) -> None:
-    """unsubscribe / group_unsubscribe → set marketing_unsubscribed."""
+    """unsubscribe / group_unsubscribe / spamreport → set marketing_unsubscribed."""
     email = (event.get("email") or "").lower().strip()
     if not email:
         return
+    now = datetime.now(timezone.utc)
     await db.users.update_one(
         {"email": email},
         {
             "$set": {
                 "marketing_unsubscribed": True,
-                "marketing_unsubscribed_at": datetime.now(timezone.utc),
+                "marketing_unsubscribed_at": now,
                 "marketing_unsubscribed_source": event.get("event"),
                 "marketing_unsubscribed_group_id": event.get("asm_group_id"),
             }
         },
+    )
+    # Fast-lookup suppression table (used by send-time guard)
+    await db.email_suppressions.update_one(
+        {"email": email},
+        {
+            "$set": {
+                "email": email,
+                "unsubscribed_at": now,
+                "source": event.get("event", "sendgrid_webhook"),
+            }
+        },
+        upsert=True,
     )
 
 

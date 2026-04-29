@@ -315,6 +315,7 @@ const App = () => {
           <Route path="/about" element={<AboutUsPage />} />
           <Route path="/about-us" element={<AboutUsPage />} />
           <Route path="/unsubscribe" element={<UnsubscribePage />} />
+          <Route path="/desabonnement" element={<UnsubscribePage />} />
           <Route path="/watchlist" element={
             <ProtectedRoute><WatchlistPage /></ProtectedRoute>
           } />
