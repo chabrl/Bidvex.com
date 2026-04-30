@@ -1,6 +1,31 @@
 # BidVex Changelog
 
 
+## Feb, 2026 — P1 Listings Moderation Workflow + Admin Email Enrichment — DONE
+
+### Backend
+- **`services/admin_notifications.py`** — `notify_admin_new_user()` now renders **Country** (e.g. "United States (US)" from signup IP via `geolocation_service`) and **Referred by** (referrer name + email + affiliate code) rows. Falls back to "Unknown" / "Direct (no referral)".
+- **`routes/auth.py:register()`** — Captures `signup_country_code`, `signup_country_name`, `signup_ip` from the existing geolocation block onto `user_doc`. When a `ref_code` is provided, also stamps `referred_by_email` and `referred_by_name` on the user record (single DB read, no extra round-trip).
+- **`routes/auth.py:google_oauth_callback()`** — New Google users now also geolocate signup IP for the admin email.
+- **`services/listings_service.py`** — New `resolve_listing_status()` helper for single-item listings. Returns "pending" when `marketplace_settings.require_approval_new_sellers=True` AND seller has 0 prior completed listings (single OR multi). Admins always bypass.
+- **`routes/listings.py:create_listing()`** — Accepts `BackgroundTasks`, computes status via the new helper, and schedules `notify_admin_new_listing` via BackgroundTasks when a new listing lands as pending.
+- **`routes/admin_ops.py`** — New endpoints (legacy `/admin/listings/{id}/moderate` retained as `_legacy` for back-compat):
+  - `GET /admin/listings/pending` — combined single + multi pending list, batched seller enrichment (`_seller_email`, `_seller_name`, `_listing_type`), counters in response shape.
+  - `POST /admin/listings/{id}/approve` — flips status to active, writes `admin_audit_logs`, schedules `send_listing_approved_email` to seller, invalidates listing cache.
+  - `POST /admin/listings/{id}/reject` — REQUIRES `reason` (≥5 chars), persists `rejection_reason`, schedules `send_listing_rejected_email` with the reason in dynamic data.
+  - Both endpoints reject double-action (returns 400 if listing is not in `pending` status), 404 on unknown id, 401/403 for non-admins.
+
+### Frontend
+- **NEW** `pages/admin/ListingsModeration.js` — admin moderation dashboard with: 3 counter cards (Total/Single-Item/Multi-Item), pending listings table (thumbnail, title, description, seller, price, location, timestamp), Approve/Reject/Preview buttons, reject dialog with 5 quick-reason chips + custom textarea + character counter, optimistic UI updates, full data-testid coverage.
+- **`pages/AdminDashboard.js`** — Registered "Listings Moderation" tab under Marketplace category (sits between User Management and Lots Moderation).
+
+### Verification
+- `/app/test_reports/iteration_163.json` — **13/13 backend tests pass**
+- Live curl tests confirmed: `signup_country_name`/`signup_country_code` populate ("United States (US)"), referred_by_* fields populate (Charbel Admin <charbel911@gmail.com>), reject without reason → 400, reject with reason → 200 + `admin_audit_logs` entry + seller email scheduled, approve → status flips to "active" + audit log + seller approval email scheduled.
+- Frontend smoke screenshot confirmed page renders pending listing with all expected fields.
+
+
+
 ## Feb, 2026 — P0 Signup Emails Not Firing — FIXED & VERIFIED
 
 ### Bug
