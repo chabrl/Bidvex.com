@@ -1,6 +1,32 @@
 # BidVex Changelog
 
 
+## Feb, 2026 — P1 Advanced Analytics Aggregation — DONE
+
+### Backend
+- **`routes/admin_ops.py`** — New endpoint `GET /api/admin/analytics/advanced?days=N` (`days` validated via `Query(ge=1, le=730)`), admin-guarded.
+- Three aggregations:
+  - **Top Sellers** (top 10): joins paid `payment_transactions` + paid `buy_now_transactions` to `listing.seller_id` (across `listings`, `multi_item_listings`, `vehicle_listings`). Returns `{seller_id, name, email, items_sold, total_revenue, avg_sale_price}`.
+  - **Top Categories** (top 10): groups listings created in the window by `category` with `total_listings`, `sold_count`, `total_revenue`, `sell_through_rate`, `total_views`.
+  - **Conversion Rates** (3 metrics):
+    - `listing_to_sale` — sold listings ÷ created listings in window
+    - `visitor_to_bidder` — total bids ÷ cumulative `listings.views` in window
+    - `signup_to_action` — new users in window who placed a bid OR created a listing
+- **In-process 60s cache** keyed by `advanced:{days}` for sub-100ms repeat reads.
+
+### Frontend
+- **`pages/admin/AnalyticsDashboard.js`** — Extended with 3 new cards under Analytics → Dashboard:
+  - **Conversion Rates** card — 3 gradient stat tiles (emerald / blue / violet) with `data-testid="conv-listing-rate"`, `conv-bidder-rate`, `conv-signup-rate`
+  - **Top Sellers** table — rank, seller name+email, items sold, avg price, total revenue
+  - **Top Categories** table — rank, category badge, listings count, sold count, sell-through % (color-coded), revenue
+- Reuses existing date range selector (7d / 30d / 90d / 365d) — same query param flows to `/advanced` endpoint.
+
+### Verification
+- `/app/test_reports/iteration_164.json` — **19/19 backend tests pass** covering auth, validation, shape, seeded-numbers correctness, cache TTL, and empty-window edge cases.
+- Seeded demo data (10 listings + 5 paid txns) renders correctly in the UI: Charbel Admin top with $2,800 / 4 items, Electronics top category at 66.7% sell-through.
+
+
+
 ## Feb, 2026 — P1 Listings Moderation Workflow + Admin Email Enrichment — DONE
 
 ### Backend
