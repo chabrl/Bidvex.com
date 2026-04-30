@@ -690,6 +690,245 @@ async def admin_listing_analytics(current_user: User = Depends(require_admin)):
     }
 
 
+# ============================================================================
+# ADVANCED ANALYTICS — Top sellers, top categories, conversion rate
+# ----------------------------------------------------------------------------
+# GET /api/admin/analytics/advanced?days=30
+#
+# Sales attribution = paid payment_transactions + paid buy_now_transactions
+# (option 1.a: actual money movement only, not pending settlement).
+#
+# Visitor→bidder uses cumulative `listings.views` counter (option 2.a).
+#
+# Cached for 60 s in-process to keep page load fast.
+# ============================================================================
+
+_ADVANCED_ANALYTICS_CACHE: Dict[str, Dict[str, Any]] = {}
+_ADVANCED_ANALYTICS_TTL_SEC = 60
+
+
+def _cache_get(key: str) -> Optional[Dict[str, Any]]:
+    entry = _ADVANCED_ANALYTICS_CACHE.get(key)
+    if not entry:
+        return None
+    if (datetime.now(timezone.utc) - entry["ts"]).total_seconds() > _ADVANCED_ANALYTICS_TTL_SEC:
+        _ADVANCED_ANALYTICS_CACHE.pop(key, None)
+        return None
+    return entry["payload"]
+
+
+def _cache_set(key: str, payload: Dict[str, Any]) -> None:
+    _ADVANCED_ANALYTICS_CACHE[key] = {"ts": datetime.now(timezone.utc), "payload": payload}
+
+
+async def _build_listing_seller_map(db) -> Dict[str, str]:
+    """
+    Map listing_id → seller_id across `listings`, `multi_item_listings`,
+    and `vehicle_listings`. Built once per request — small dataset.
+    """
+    out: Dict[str, str] = {}
+    async for d in db.listings.find({}, {"_id": 0, "id": 1, "seller_id": 1, "category": 1}):
+        if d.get("id") and d.get("seller_id"):
+            out[d["id"]] = d["seller_id"]
+    async for d in db.multi_item_listings.find({}, {"_id": 0, "id": 1, "seller_id": 1}):
+        if d.get("id") and d.get("seller_id"):
+            out[d["id"]] = d["seller_id"]
+    async for d in db.vehicle_listings.find({}, {"_id": 0, "id": 1, "seller_id": 1}):
+        if d.get("id") and d.get("seller_id"):
+            out[d["id"]] = d["seller_id"]
+    return out
+
+
+async def _aggregate_top_sellers(db, cutoff_iso: str, listing_seller_map: Dict[str, str]) -> List[Dict[str, Any]]:
+    """Top 10 sellers by total revenue from PAID transactions in the window."""
+    revenue_by_seller: Dict[str, Dict[str, Any]] = {}
+
+    # 1. Standard auction settlements
+    cursor = db.payment_transactions.find(
+        {"payment_status": "paid", "created_at": {"$gte": cutoff_iso}},
+        {"_id": 0, "listing_id": 1, "amount": 1, "currency": 1},
+    )
+    async for tx in cursor:
+        seller_id = listing_seller_map.get(tx.get("listing_id"))
+        if not seller_id:
+            continue
+        bucket = revenue_by_seller.setdefault(seller_id, {"revenue": 0.0, "items_sold": 0})
+        bucket["revenue"] += float(tx.get("amount") or 0)
+        bucket["items_sold"] += 1
+
+    # 2. Buy Now transactions
+    cursor = db.buy_now_transactions.find(
+        {"payment_status": "paid", "transaction_date": {"$gte": cutoff_iso}},
+        {"_id": 0, "auction_id": 1, "total_amount": 1, "quantity_purchased": 1},
+    )
+    async for tx in cursor:
+        seller_id = listing_seller_map.get(tx.get("auction_id"))
+        if not seller_id:
+            continue
+        bucket = revenue_by_seller.setdefault(seller_id, {"revenue": 0.0, "items_sold": 0})
+        bucket["revenue"] += float(tx.get("total_amount") or 0)
+        bucket["items_sold"] += int(tx.get("quantity_purchased") or 1)
+
+    if not revenue_by_seller:
+        return []
+
+    seller_ids = list(revenue_by_seller.keys())
+    sellers_meta: Dict[str, Dict[str, Any]] = {}
+    async for u in db.users.find(
+        {"id": {"$in": seller_ids}},
+        {"_id": 0, "id": 1, "name": 1, "email": 1, "company_name": 1},
+    ):
+        sellers_meta[u["id"]] = u
+
+    rows: List[Dict[str, Any]] = []
+    for sid, stats in revenue_by_seller.items():
+        meta = sellers_meta.get(sid, {})
+        items_sold = stats["items_sold"]
+        revenue = round(stats["revenue"], 2)
+        rows.append({
+            "seller_id": sid,
+            "name": meta.get("name") or meta.get("company_name") or "(unknown)",
+            "email": meta.get("email") or "",
+            "items_sold": items_sold,
+            "total_revenue": revenue,
+            "avg_sale_price": round(revenue / items_sold, 2) if items_sold else 0.0,
+        })
+    rows.sort(key=lambda r: r["total_revenue"], reverse=True)
+    return rows[:10]
+
+
+async def _aggregate_top_categories(db, cutoff_iso: str) -> List[Dict[str, Any]]:
+    """
+    Top 10 categories by total listings in the window, with sold-count and revenue.
+    Sold attribution = listings.status='sold' OR vehicle_listings.status='sold'.
+    """
+    categories: Dict[str, Dict[str, Any]] = {}
+
+    async for lst in db.listings.find(
+        {"created_at": {"$gte": cutoff_iso}},
+        {"_id": 0, "id": 1, "category": 1, "status": 1, "current_price": 1, "starting_price": 1, "views": 1},
+    ):
+        cat = (lst.get("category") or "(uncategorized)").lower()
+        bucket = categories.setdefault(cat, {"total_listings": 0, "sold_count": 0, "total_revenue": 0.0, "total_views": 0})
+        bucket["total_listings"] += 1
+        bucket["total_views"] += int(lst.get("views") or 0)
+        if lst.get("status") == "sold":
+            bucket["sold_count"] += 1
+            bucket["total_revenue"] += float(lst.get("current_price") or lst.get("starting_price") or 0)
+
+    async for v in db.vehicle_listings.find(
+        {"created_at": {"$gte": cutoff_iso}},
+        {"_id": 0, "category": 1, "status": 1, "starting_price": 1, "final_price": 1},
+    ):
+        cat = (v.get("category") or "vehicles").lower()
+        bucket = categories.setdefault(cat, {"total_listings": 0, "sold_count": 0, "total_revenue": 0.0, "total_views": 0})
+        bucket["total_listings"] += 1
+        if v.get("status") == "sold":
+            bucket["sold_count"] += 1
+            bucket["total_revenue"] += float(v.get("final_price") or v.get("starting_price") or 0)
+
+    rows: List[Dict[str, Any]] = []
+    for cat, stats in categories.items():
+        total = stats["total_listings"]
+        sold = stats["sold_count"]
+        rows.append({
+            "category": cat,
+            "total_listings": total,
+            "sold_count": sold,
+            "total_revenue": round(stats["total_revenue"], 2),
+            "sell_through_rate": round(sold / total, 4) if total else 0.0,
+            "total_views": stats["total_views"],
+        })
+    rows.sort(key=lambda r: r["total_listings"], reverse=True)
+    return rows[:10]
+
+
+async def _compute_conversion_rates(db, cutoff_iso: str) -> Dict[str, Any]:
+    """Three conversion metrics for the analytics period."""
+    # 1. Listing → Sale  (listings created in window that ended in 'sold')
+    total_listings = await db.listings.count_documents({"created_at": {"$gte": cutoff_iso}})
+    sold_listings = await db.listings.count_documents({"created_at": {"$gte": cutoff_iso}, "status": "sold"})
+    listing_to_sale = {
+        "total_listings": total_listings,
+        "sold_listings": sold_listings,
+        "rate": round(sold_listings / total_listings, 4) if total_listings else 0.0,
+    }
+
+    # 2. Visitor → Bidder  (cumulative listings.views vs total bids in window)
+    total_views_pipeline = [
+        {"$match": {"created_at": {"$gte": cutoff_iso}}},
+        {"$group": {"_id": None, "total_views": {"$sum": {"$ifNull": ["$views", 0]}}}},
+    ]
+    total_views_doc = await db.listings.aggregate(total_views_pipeline).to_list(1)
+    total_views = total_views_doc[0]["total_views"] if total_views_doc else 0
+    total_bids = await db.bids.count_documents({"created_at": {"$gte": cutoff_iso}})
+    visitor_to_bidder = {
+        "total_views": total_views,
+        "total_bids": total_bids,
+        "rate": round(total_bids / total_views, 4) if total_views else 0.0,
+    }
+
+    # 3. Signup → Action  (new users in window who placed a bid OR created a listing)
+    new_user_ids: List[str] = []
+    async for u in db.users.find({"created_at": {"$gte": cutoff_iso}}, {"_id": 0, "id": 1}):
+        if u.get("id"):
+            new_user_ids.append(u["id"])
+    new_users = len(new_user_ids)
+
+    users_with_action = 0
+    if new_user_ids:
+        bidders = await db.bids.distinct("bidder_id", {"bidder_id": {"$in": new_user_ids}})
+        listers = await db.listings.distinct("seller_id", {"seller_id": {"$in": new_user_ids}})
+        users_with_action = len(set(bidders) | set(listers))
+
+    signup_to_action = {
+        "new_users": new_users,
+        "users_with_action": users_with_action,
+        "rate": round(users_with_action / new_users, 4) if new_users else 0.0,
+    }
+
+    return {
+        "listing_to_sale": listing_to_sale,
+        "visitor_to_bidder": visitor_to_bidder,
+        "signup_to_action": signup_to_action,
+    }
+
+
+@admin_ops_router.get("/admin/analytics/advanced")
+async def admin_advanced_analytics(
+    days: int = Query(30, ge=1, le=730),
+    current_user: User = Depends(require_admin),
+):
+    """
+    Advanced platform analytics: top sellers, top categories, conversion rates.
+    Cached in-process for 60s per `days` window.
+    """
+    cache_key = f"advanced:{days}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    db = get_db()
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff_iso = cutoff.isoformat()
+
+    listing_seller_map = await _build_listing_seller_map(db)
+
+    top_sellers = await _aggregate_top_sellers(db, cutoff_iso, listing_seller_map)
+    top_categories = await _aggregate_top_categories(db, cutoff_iso)
+    conversion = await _compute_conversion_rates(db, cutoff_iso)
+
+    payload = {
+        "period_days": days,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "top_sellers": top_sellers,
+        "top_categories": top_categories,
+        "conversion": conversion,
+    }
+    _cache_set(cache_key, payload)
+    return payload
+
+
 
 @admin_ops_router.get("/admin/finance/transactions/export")
 async def export_transactions_csv(

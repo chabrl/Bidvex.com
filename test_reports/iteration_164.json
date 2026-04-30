@@ -1,0 +1,44 @@
+{
+  "summary": "Iteration 164 — backend-only testing of the new P1 Advanced Analytics Aggregation endpoint GET /api/admin/analytics/advanced. Built pytest suite at /app/backend/tests/test_advanced_analytics_164.py covering 19 tests: auth guards, days validation, response shape, seeded-data correctness, cache behavior, and empty-window handling. All 19/19 tests PASSED against the live preview URL with seeded demo data.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_advanced_analytics_164.py",
+    "/app/test_reports/pytest/iter164_advanced_analytics.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "admin_ops.py line ~807 _aggregate_top_categories filters listings by created_at >= cutoff when counting sold_count — a listing created >30d ago but sold within the window will be excluded. This is internally consistent with sell_through_rate (sold/total within created_at window) but may under-count revenue for older listings sold recently. Consider documenting this choice or using sold_at/updated_at for sold_count attribution if business logic demands it.",
+    "admin_ops.py line ~712 _cache_get uses a module-level dict _ADVANCED_ANALYTICS_CACHE — fine for single-worker but not shared across uvicorn/gunicorn workers. Acceptable for now (documented in code comment: 'in-process per-Python-process'), but would not coalesce load with multi-worker deployments. Consider Redis if/when scaled.",
+    "Cache key is only 'advanced:{days}' — no invalidation on new transactions/listings. 60s TTL is acceptable since analytics tolerate 1-min staleness, but admins who just seeded data and immediately reload will see stale numbers for up to 60s. Could add a manual cache-bust endpoint or invalidate on tx paid events if needed.",
+    "_aggregate_top_sellers buy_now branch uses tx.get('transaction_date') while standard auction uses tx.get('created_at') — asymmetric date fields. Ensure buy_now_transactions consistently populate transaction_date; if null, the tx is silently excluded from the window. Low risk today (no buy_now data seeded) but a data-quality foot-gun."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_advanced_analytics_164.py"
+  ],
+  "success_rate": {
+    "backend": "100% (19/19 passed)",
+    "frontend": "N/A (backend-only request)"
+  },
+  "test_credentials": "Admin: charbel911@gmail.com / Anderosli123!@# (from /app/memory/test_credentials.md). Registration requires terms_agreed=true AND ai_disclosure_consent=true.",
+  "seed_data_creation": "Relied on main-agent's seeded demo data (10 demo-* listings + 5 paid demo-tx-* transactions from /tmp/seed_analytics_demo.py). Not deleted per request. Test fixture creates one ephemeral regular user (iter164_*@example.com) to verify non-admin 403 guard.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Reusable regression suite: /app/backend/tests/test_advanced_analytics_164.py. Loads both /app/backend/.env (for MONGO_URL) and /app/frontend/.env (for REACT_APP_BACKEND_URL). Registration payload requires 'terms_agreed' and 'ai_disclosure_consent' flags; login returns 'access_token'. Seeded demo data expectations: Charbel Admin = 4 items, $2800 revenue; electronics = 3 listings, 2 sold. Cache is per-python-process so if backend has been restarted since main agent's manual test, days=30 cache is cold again.",
+  "verified_behavior": {
+    "auth": "no-auth → 403, non-admin → 403, admin → 200",
+    "days_validation": "days=0/-1/731 → 422 ; days=730 → 200 (boundary inclusive)",
+    "shape": "period_days, generated_at, top_sellers (≤10, sorted desc by total_revenue), top_categories (≤10, sorted desc by total_listings, sell_through_rate ∈ [0,1]), conversion {listing_to_sale, visitor_to_bidder, signup_to_action} all with rate ∈ [0,1]",
+    "seeded_numbers": "Top seller Charbel Admin: items_sold=4, total_revenue=$2800.00, avg_sale_price=$700.00. 2nd seller: 1 item, $320. sold_listings≥5, total_listings≥10. electronics in top categories (≥3 listings, ≥2 sold).",
+    "days_param": "period_days echoed for 7/30/90/123/456/730. 7d total_listings ≤ 90d total_listings.",
+    "cache": "Same days within TTL → identical generated_at (cache hit). Different days → separate cache entries / different generated_at.",
+    "empty_window": "days=1 returns 200 with lists (possibly empty) and all rates 0.0 when denominators are 0 (no ZeroDivisionError)."
+  }
+}
