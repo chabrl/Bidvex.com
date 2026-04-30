@@ -1,6 +1,62 @@
 # BidVex Changelog
 
 
+## Feb, 2026 — P1 Vehicle Settlement Confirmation Workflow — DONE
+
+### Problem
+BidVex facilitates the vehicle 2.5% platform fee but never touches the hammer price (the buyer pays the dealer directly, off-platform). This created a gap: if a dealer disputed that a buyer walked away without paying, BidVex had no on-platform proof the transaction completed.
+
+### New Lifecycle
+`FEE_PAID` → `AWAITING_DEALER_CONFIRMATION` → `DEALER_CONFIRMED` → `FULLY_SETTLED`
+                                                               ↘ `DISPUTED` → `ADMIN_RESOLVED`
+
+### Backend
+- **`routes/vehicle_settlement.py`** — 7 new endpoints appended to existing router (no new file):
+  - `GET  /api/vehicles/dealer/pending-settlements` — dealer queue (enriched with vehicle + buyer)
+  - `POST /api/vehicles/{id}/dealer-confirm` — attestation REQUIRED (bilingual error), amount + method + notes; writes audit log
+  - `POST /api/vehicles/{id}/proof-upload` — optional PDF/PNG/JPEG/WebP (10 MB max) → MongoDB **GridFS** (`settlement_proofs` bucket)
+  - `GET  /api/vehicles/settlement/{id}/proof` — download (dealer/buyer/admin only)
+  - `GET  /api/vehicles/buyer/settlements` — buyer queue
+  - `POST /api/vehicles/{id}/buyer-acknowledge` — buyer confirms receipt → `FULLY_SETTLED`
+  - `POST /api/vehicles/{id}/buyer-dispute` — reason required (≥10 chars) → `DISPUTED` + audit log
+  - `GET  /api/admin/vehicles/disputed-settlements` — admin queue (enriched)
+  - `POST /api/admin/vehicles/{id}/resolve` — 3 resolution types + admin notes → `ADMIN_RESOLVED` + audit log
+- **`services/vehicle_fee_service.py`** — After buyer pays 2.5% fee, settlement transitions from `FEE_PROCESSING` → `AWAITING_DEALER_CONFIRMATION` (was `FEE_PAID`), and `seller_id` is now stamped from the vehicle listing.
+- **`services/scheduler.py`** — New daily cron at 9 AM UTC (`settlement_reminders_job`): D+7 dealer reminder email, D+14 admin alert + buyer nudge. Both have idempotency guards (`dealer_reminder_d7_sent_at` / `admin_alert_d14_sent_at`).
+- **`lifecycle.py`** — 3 new indexes on `vehicle_settlements` for seller / buyer / status-feepaid queries.
+- **Pre-existing bug fix** — `services/vehicle_fee_service.py` line 203 was importing `send_email` from `services.email_service` (doesn't exist there); now imports from `services.email_notifications`.
+
+### Frontend
+- **NEW** `pages/seller/VehicleSettlements.js` — Dealer tab under SellerDashboard with:
+  - Counter card + colored status badges
+  - Table with buyer contact, hammer, fee-paid timestamp, dealer-confirm timestamp, dispute reason
+  - Confirm modal: amount input (prefilled with hammer), 6-option method dropdown, notes, optional proof file upload, **required legal attestation checkbox** (bilingual)
+  - Proof-download button on rows where dealer uploaded proof
+  - `data-testid` coverage on every interactive element
+- **NEW** `pages/admin/DisputedSettlements.js` — Admin tab under Marketplace:
+  - Read-only view of each dispute (buyer + dealer cards + dispute reason in rose background)
+  - Resolve modal: 3 resolution types + required ≥10-char admin notes
+  - Link to dealer's uploaded proof
+- **`pages/SellerDashboard.js`** — New "Vehicle Settlements" tab between Escrow & Pickup and the content area
+- **`pages/AdminDashboard.js`** — New "Disputed Settlements" tab under Marketplace sidebar
+
+### Email notifications
+- Dealer confirm → buyer gets bilingual email with amount/method/notes + dispute link
+- D+7 → dealer reminder
+- D+14 → admin alert + buyer nudge
+
+### Verification
+- End-to-end curl tests confirmed all 4 lifecycle paths:
+  - `AWAITING → DEALER_CONFIRMED (with attestation)` ✅
+  - `DEALER_CONFIRMED → FULLY_SETTLED (buyer ack)` ✅
+  - `DEALER_CONFIRMED → DISPUTED (buyer dispute)` ✅
+  - `DISPUTED → ADMIN_RESOLVED (admin resolve)` ✅
+- Attestation-required validation returns 400 with bilingual error ✅
+- 2 `admin_audit_logs` rows per dispute/resolve ✅
+- Frontend smoke screenshot confirmed dealer UI renders seeded data correctly
+
+
+
 ## Feb, 2026 — P0 Seller Type, Tax & Pricing Engine — Iteration 165 Spec — DONE
 
 ### Critical math fix

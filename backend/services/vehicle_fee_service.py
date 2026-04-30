@@ -160,13 +160,27 @@ async def handle_vehicle_fee_succeeded(db, payment_intent_id: str):
         return False
 
     now = datetime.now(timezone.utc).isoformat()
+    # After the fee is paid, we enter the dealer-confirmation phase.
+    # settlement_status transitions: FEE_PROCESSING → FEE_PAID → AWAITING_DEALER_CONFIRMATION
+    # (once dealer marks settled) → DEALER_CONFIRMED → (optional buyer ack) → FULLY_SETTLED
+    # (or → DISPUTED if the buyer escalates → ADMIN_RESOLVED).
+
+    # Capture seller_id on the settlement so the dealer dashboard can query it.
+    listing = await db.vehicle_listings.find_one(
+        {"id": settlement["auction_id"]}, {"_id": 0, "seller_id": 1, "seller_user_id": 1}
+    ) or await db.listings.find_one(
+        {"id": settlement["auction_id"]}, {"_id": 0, "seller_id": 1}
+    ) or {}
+    seller_id = listing.get("seller_user_id") or listing.get("seller_id")
+
     await db.vehicle_settlements.update_one(
         {"stripe_payment_intent_id": payment_intent_id},
         {"$set": {
-            "settlement_status": "FEE_PAID",
+            "settlement_status": "AWAITING_DEALER_CONFIRMATION",
             "contact_revealed": True,
             "fee_paid_at": now,
             "updated_at": now,
+            **({"seller_id": seller_id} if seller_id else {}),
         }}
     )
 
@@ -186,7 +200,7 @@ async def handle_vehicle_fee_succeeded(db, payment_intent_id: str):
         seller = await db.users.find_one({"id": seller_id}, {"_id": 0, "name": 1, "email": 1, "phone": 1, "company_name": 1}) if seller_id else None
 
         if buyer and buyer.get("email") and seller:
-            from services.email_service import send_email
+            from services.email_notifications import send_email
             hammer = settlement["hammer_price"]
             fee_amount = settlement["net_commission_amount"]
             seller_name = seller.get("company_name") or seller.get("name", "Seller")

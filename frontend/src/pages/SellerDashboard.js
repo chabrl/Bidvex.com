@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import SellerAnalyticsDashboard from '../components/SellerAnalyticsDashboard';
 import SellerEarningsDashboard from '../components/SellerEarningsDashboard';
 import { SellerEscrowPanel } from '../components/EscrowPickupPanel';
+import VehicleSettlements from './seller/VehicleSettlements';
 import { formatCurrency, formatPercent } from '../utils/currencyFormatter';
 import { LoadingTimeout } from '../components/LoadingTimeout';
 import InfoTip from '../components/InfoTip';
@@ -237,6 +238,18 @@ const SellerDashboard = () => {
             <Lock className="h-4 w-4 inline mr-1.5 sm:mr-2" />
             {t('dashboard.seller.escrow', 'Escrow & Pickup')}
           </button>
+          <button
+            onClick={() => setActiveTab('vehicle-settlements')}
+            className={`px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-colors border-b-2 whitespace-nowrap flex-shrink-0 ${
+              activeTab === 'vehicle-settlements'
+                ? 'border-[#06B6D4] text-[#06B6D4]'
+                : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+            }`}
+            data-testid="vehicle-settlements-tab"
+          >
+            <Shield className="h-4 w-4 inline mr-1.5 sm:mr-2" />
+            Vehicle Settlements
+          </button>
           </div>
         </div>
 
@@ -251,6 +264,8 @@ const SellerDashboard = () => {
           <RegionalTrendsPanel token={token} />
         ) : activeTab === 'escrow' ? (
           <SellerEscrowPanel />
+        ) : activeTab === 'vehicle-settlements' ? (
+          <VehicleSettlements />
         ) : (
           <>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-6">

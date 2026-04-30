@@ -120,6 +120,10 @@ async def create_database_indexes(db):
                 ("multi_item_listings", [("seller_type", ASCENDING), ("status", ASCENDING)], "idx_multi_sellertype_status", False),
                 ("multi_item_listings", [("seller_province", ASCENDING), ("status", ASCENDING)], "idx_multi_province_status", False),
                 ("users", [("seller_type", ASCENDING)], "idx_users_seller_type", False),
+                # Vehicle settlement confirmation workflow (iteration 167)
+                ("vehicle_settlements", [("seller_id", ASCENDING), ("settlement_status", ASCENDING)], "idx_settlement_seller_status", False),
+                ("vehicle_settlements", [("buyer_id", ASCENDING), ("settlement_status", ASCENDING)], "idx_settlement_buyer_status", False),
+                ("vehicle_settlements", [("settlement_status", ASCENDING), ("fee_paid_at", ASCENDING)], "idx_settlement_status_feepaid", False),
                 ("users", [("email", ASCENDING)], "idx_users_email_unique", True),
                 ("users", [("role", ASCENDING)], "idx_users_role", False),
                 ("users", [("id", ASCENDING)], "idx_users_id_unique", True),

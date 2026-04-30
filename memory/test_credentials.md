@@ -5,6 +5,12 @@
 - Password: Anderosli123!@#
 - Role: Admin (full access)
 
+## Test buyer (for vehicle-settlement dispute tests)
+- Email: abc@gmail.com
+- Password: TestBuyer123!
+- Role: user (regular buyer)
+
+
 ## Direct Google OAuth 2.0
 - Pixel ID / Google Cloud Project: configured per `/app/backend/.env`
   - `GOOGLE_CLIENT_ID=<REDACTED — see /app/backend/.env>`

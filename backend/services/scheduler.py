@@ -510,6 +510,108 @@ async def process_scheduled_campaigns_job():
     return await safe_db_operation("process_scheduled_campaigns", _run)
 
 
+# ─────────────────────────────────────────────────────────────
+# VEHICLE SETTLEMENT CONFIRMATION REMINDERS (iteration 167)
+# ─────────────────────────────────────────────────────────────
+# D+7 post fee payment → reminder email to dealer.
+# D+14 post fee payment → admin alert + nudge email to buyer.
+
+async def _send_settlement_reminder_emails():
+    """Send D+7 dealer reminders and D+14 admin/buyer alerts."""
+    db = db_instance
+    if db is None:
+        return
+    from services.email_notifications import send_email
+    from datetime import timedelta
+    import os as _os
+    now = datetime.now(timezone.utc)
+    day7 = (now - timedelta(days=7)).isoformat()
+    day8 = (now - timedelta(days=8)).isoformat()
+    day14 = (now - timedelta(days=14)).isoformat()
+    day15 = (now - timedelta(days=15)).isoformat()
+
+    # ── D+7 dealer reminder (only if not already sent) ──
+    cursor = db.vehicle_settlements.find({
+        "settlement_status": "AWAITING_DEALER_CONFIRMATION",
+        "fee_paid_at": {"$gte": day8, "$lte": day7},
+        "dealer_reminder_d7_sent_at": {"$exists": False},
+    })
+    async for s in cursor:
+        seller_id = s.get("seller_id")
+        if not seller_id:
+            continue
+        seller = await db.users.find_one({"id": seller_id}, {"_id": 0, "email": 1, "name": 1})
+        if not seller or not seller.get("email"):
+            continue
+        vehicle_id = s["auction_id"]
+        html = f"""
+        <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;">
+          <h2 style="color:#F59E0B;">Action needed — Confirm Vehicle Settlement</h2>
+          <p>The buyer paid the BidVex platform fee 7 days ago for vehicle <strong>#{vehicle_id[:8]}</strong>.</p>
+          <p>Please visit your <a href="https://www.bidvex.com/seller-dashboard?tab=vehicle-settlements" style="color:#2186C6;">Vehicle Settlements dashboard</a> and confirm the transaction is complete — this keeps our audit trail intact for the OPC.</p>
+          <hr style="border:none;border-top:1px solid #eee;"/>
+          <p><strong>FR :</strong> L'acheteur a payé les frais de plateforme BidVex il y a 7 jours pour le véhicule <strong>#{vehicle_id[:8]}</strong>. Veuillez confirmer la transaction dans votre <a href="https://www.bidvex.com/seller-dashboard?tab=vehicle-settlements" style="color:#2186C6;">tableau de bord</a>.</p>
+        </div>
+        """
+        try:
+            await send_email(seller["email"], "Reminder — Confirm Vehicle Settlement", html)
+            await db.vehicle_settlements.update_one(
+                {"auction_id": vehicle_id},
+                {"$set": {"dealer_reminder_d7_sent_at": now.isoformat()}},
+            )
+        except Exception as e:
+            logger.error(f"[SETTLEMENT_REMINDER] D+7 email failed for {vehicle_id}: {e}")
+
+    # ── D+14 admin alert + buyer nudge ──
+    admin_email = (
+        _os.environ.get("ADMIN_NOTIFICATION_EMAIL")
+        or _os.environ.get("ADMIN_EMAIL")
+        or "info@bidvex.com"
+    )
+    cursor = db.vehicle_settlements.find({
+        "settlement_status": "AWAITING_DEALER_CONFIRMATION",
+        "fee_paid_at": {"$gte": day15, "$lte": day14},
+        "admin_alert_d14_sent_at": {"$exists": False},
+    })
+    async for s in cursor:
+        vehicle_id = s["auction_id"]
+        html_admin = f"""
+        <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;">
+          <h2 style="color:#DC2626;">⚠️ Dealer hasn't confirmed settlement — 14 days</h2>
+          <p>Vehicle <strong>#{vehicle_id[:8]}</strong> has been waiting for dealer confirmation for 14 days.</p>
+          <p>Dealer: {s.get('seller_id','')}<br/>Buyer: {s.get('buyer_id','')}<br/>Hammer: ${s.get('hammer_price',0):,.2f} CAD</p>
+          <p><a href="https://www.bidvex.com/admin" style="color:#2186C6;">Open admin queue</a></p>
+        </div>
+        """
+        try:
+            await send_email(admin_email, f"[Settlement D+14] Vehicle #{vehicle_id[:8]} unconfirmed", html_admin)
+            buyer = await db.users.find_one({"id": s.get("buyer_id")}, {"_id": 0, "email": 1})
+            if buyer and buyer.get("email"):
+                html_buyer = f"""
+                <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;">
+                  <h2 style="color:#F59E0B;">Settlement still pending — 14 days</h2>
+                  <p>The dealer hasn't yet confirmed the settlement for vehicle <strong>#{vehicle_id[:8]}</strong>.</p>
+                  <p>If the vehicle has already been paid for and delivered, no action is needed. If there's an issue, you can <a href="https://www.bidvex.com/buyer-dashboard" style="color:#2186C6;">open a dispute</a>.</p>
+                </div>
+                """
+                await send_email(buyer["email"], f"Vehicle #{vehicle_id[:8]} — Settlement update", html_buyer)
+            await db.vehicle_settlements.update_one(
+                {"auction_id": vehicle_id},
+                {"$set": {"admin_alert_d14_sent_at": now.isoformat()}},
+            )
+        except Exception as e:
+            logger.error(f"[SETTLEMENT_REMINDER] D+14 email failed for {vehicle_id}: {e}")
+
+
+async def settlement_reminders_job():
+    """Daily: send D+7 dealer reminders and D+14 admin/buyer alerts."""
+    async def _run():
+        await _send_settlement_reminder_emails()
+        return 0
+    return await safe_db_operation("settlement_reminders", _run)
+
+
+
 def init_scheduler(database):
     """Initialize the background scheduler with all jobs"""
     global scheduler, db_instance
@@ -569,6 +671,15 @@ def init_scheduler(database):
         id="daily_summary",
         name="Daily Summary",
         replace_existing=True
+    )
+
+    # Job 6b: Vehicle settlement confirmation reminders - daily at 9:00 AM UTC
+    scheduler.add_job(
+        settlement_reminders_job,
+        CronTrigger(hour=9, minute=0),
+        id="settlement_reminders",
+        name="Vehicle Settlement Confirmation Reminders",
+        replace_existing=True,
     )
     
     # Job 7: Check subscription expirations - daily at 00:30 UTC
