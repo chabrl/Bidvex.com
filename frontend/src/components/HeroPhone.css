@@ -78,16 +78,21 @@
 
 .hero-badge--top-left {
   top: 14%;
-  /* Anchor by the badge's RIGHT edge so longer text (FR) grows OUTWARD (left), never into the phone. */
-  right: calc(100% + 24px);
+  /* Desktop default — badges sit close to the visible phone bezel.
+     The phone PNG has transparent lateral padding, so anchoring by the
+     badge's RIGHT edge with a percentage that reaches INTO the container
+     places it just outside the actual visible bezel (~10–14px gap),
+     while longer FR text grows OUTWARD (left), never into the phone. */
+  right: calc(100% - 70px);
   left: auto;
   animation: badgeFloat1 5s ease-in-out infinite;
 }
 
 .hero-badge--top-right {
   top: 8%;
-  /* Anchor by the badge's LEFT edge so longer text (FR) grows OUTWARD (right), never into the phone. */
-  left: calc(100% + 24px);
+  /* Mirror of top-left: anchor by LEFT edge inside container so badge
+     sits right next to the visible bezel; longer FR text grows OUTWARD (right). */
+  left: calc(100% - 70px);
   right: auto;
   animation: badgeFloat2 5.5s ease-in-out infinite 0.8s;
 }
@@ -195,15 +200,15 @@
 @media (max-width: 1280px) {
   .hero-phone-image { max-width: 380px; }
   .hero-badge { font-size: 11px; padding: 7px 12px; }
-  .hero-badge--top-left  { right: calc(100% + 16px); }
-  .hero-badge--top-right { left:  calc(100% + 16px); }
+  .hero-badge--top-left  { right: calc(100% - 56px); }
+  .hero-badge--top-right { left:  calc(100% - 56px); }
 }
 
 @media (max-width: 1024px) {
   .hero-phone-container { max-width: 360px; }
   .hero-phone-image { max-width: 320px; }
-  .hero-badge--top-left  { top: 12%; right: calc(100% + 12px); }
-  .hero-badge--top-right { top: 6%;  left:  calc(100% + 12px); }
+  .hero-badge--top-left  { top: 12%; right: calc(100% - 48px); }
+  .hero-badge--top-right { top: 6%;  left:  calc(100% - 48px); }
   .hero-badge--bottom    { left: -10%; }
 }
 
