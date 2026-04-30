@@ -4,7 +4,7 @@ Handles all listing CRUD operations for both single-item and multi-item auctions
 including terms management and deletion requests.
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends, Request, BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone, timedelta
@@ -142,11 +142,13 @@ async def get_seller_listings(seller_id: str, limit: int = 20, skip: int = 0):
 @listings_router.post("/listings", response_model=Listing)
 async def create_listing(
     listing_data: ListingCreate,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     request: Request = None
 ):
     from services.listings_service import (
         validate_seller, build_agreement_metadata, apply_partner_tags, persist_listing,
+        resolve_listing_status,
     )
     from services.stripe_customer_service import validate_payment_method_for_listing
     db = get_db()
@@ -221,7 +223,22 @@ async def create_listing(
         listing_dict["payment_method"] = listing_data.payment_method
 
     await apply_partner_tags(db, current_user, listing_dict, listing_data.buyers_premium_rate)
+
+    # ── Moderation gate for single-item listings ──
+    # Mirrors resolve_multi_item_status: when require_approval_new_sellers is ON
+    # and the seller has zero completed listings, mark as pending so admins moderate.
+    settings = await get_marketplace_settings(db)
+    listing_dict["status"] = await resolve_listing_status(db, current_user, settings)
+
     result = await persist_listing(db, listing_dict, agreement_metadata)
+
+    # Notify admin when a listing needs moderation (non-blocking)
+    if listing_dict["status"] == "pending":
+        try:
+            from services.admin_notifications import notify_admin_new_listing
+            background_tasks.add_task(notify_admin_new_listing, result)
+        except Exception as e:
+            logger.error(f"[MODERATION] Failed to schedule admin notify for {result.get('id')}: {e}")
 
     # Background translation — if _en/_fr not already provided
     if not listing_data.title_en or not listing_data.title_fr:

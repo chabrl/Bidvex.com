@@ -97,6 +97,37 @@ async def persist_listing(db, listing_dict: Dict, agreement_metadata: Dict) -> D
     return listing_dict
 
 
+async def resolve_listing_status(db, current_user: User, settings: Dict) -> str:
+    """
+    Determine status for a NEW single-item listing.
+
+    Rule (matches resolve_multi_item_status for multi-item):
+    - If require_approval_new_sellers is ON in marketplace_settings AND the
+      seller has zero previously-completed listings, status = 'pending'
+      (admin must moderate before it goes live).
+    - Admins always bypass moderation.
+    - Otherwise status = 'active'.
+    """
+    if current_user.role == "admin":
+        return "active"
+    if not settings.get("require_approval_new_sellers", False):
+        return "active"
+
+    # New seller = zero completed listings (single OR multi)
+    completed_single = await db.listings.count_documents({
+        "seller_id": current_user.id,
+        "status": "completed",
+    })
+    completed_multi = await db.multi_item_listings.count_documents({
+        "seller_id": current_user.id,
+        "status": "completed",
+    })
+    if (completed_single + completed_multi) < 1:
+        logger.info(f"[MODERATION] New seller {current_user.email} → listing set to PENDING")
+        return "pending"
+    return "active"
+
+
 # ─── Multi-Item Creation ─────────────────────────────────────────────
 
 async def resolve_multi_item_status(db, current_user: User, listing_data, settings: Dict) -> str:

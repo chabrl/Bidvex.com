@@ -186,6 +186,8 @@ async def register(user_data: UserCreate, request: Request, background_tasks: Ba
     enforced_currency = "CAD"
     currency_locked = False
     location_confidence = 0.5
+    signup_country_code = None
+    signup_country_name = None
     
     # Try to get geolocation data
     try:
@@ -204,6 +206,8 @@ async def register(user_data: UserCreate, request: Request, background_tasks: Ba
         enforced_currency = enforcement_data.get('enforced_currency', 'CAD')
         currency_locked = enforcement_data.get('currency_locked', False)
         location_confidence = confidence_data.get('confidence_score', 0.5)
+        signup_country_code = ip_location.get('country_code')
+        signup_country_name = ip_location.get('country_name')
     except Exception as e:
         logger.warning(f"Geolocation failed for registration: {e}")
     
@@ -227,9 +231,14 @@ async def register(user_data: UserCreate, request: Request, background_tasks: Ba
         "enforced_currency": enforced_currency,
         "currency_locked": currency_locked,
         "location_confidence_score": location_confidence,
+        "signup_country_code": signup_country_code,
+        "signup_country_name": signup_country_name,
+        "signup_ip": client_ip,
         "affiliate_code": affiliate_code,
         "referred_by": None,
         "referred_by_code": None,
+        "referred_by_email": None,
+        "referred_by_name": None,
         "phone_verified": False,
         "email_verified": False,
         "terms_agreed_at": now.isoformat(),
@@ -251,11 +260,18 @@ async def register(user_data: UserCreate, request: Request, background_tasks: Ba
         if referrer and referrer["id"] != user_id:
             await db.users.update_one(
                 {"id": user_id},
-                {"$set": {"referred_by": referrer["id"], "referred_by_code": ref_code}}
+                {"$set": {
+                    "referred_by": referrer["id"],
+                    "referred_by_code": ref_code,
+                    "referred_by_email": referrer.get("email"),
+                    "referred_by_name": referrer.get("name"),
+                }}
             )
-            # Update user_doc to reflect the referral for the response
+            # Update user_doc to reflect the referral for the response + admin email
             user_doc["referred_by"] = referrer["id"]
             user_doc["referred_by_code"] = ref_code
+            user_doc["referred_by_email"] = referrer.get("email")
+            user_doc["referred_by_name"] = referrer.get("name")
             
             await db.affiliate_referrals.insert_one({
                 "id": str(uuid.uuid4()),
@@ -1117,6 +1133,18 @@ async def google_oauth_callback(request: Request, background_tasks: BackgroundTa
 
     if not user:
         new_id = str(uuid.uuid4())
+
+        # Geolocate signup IP for admin notification (best-effort, never blocks)
+        signup_country_code = None
+        signup_country_name = None
+        try:
+            from geolocation_service import geolocation_service
+            ip_location = await geolocation_service.get_location_from_ip(get_client_ip(request))
+            signup_country_code = ip_location.get("country_code")
+            signup_country_name = ip_location.get("country_name")
+        except Exception as e:
+            logger.warning(f"[GOOGLE_OAUTH] geolocation lookup failed: {e}")
+
         user = {
             "id": new_id,
             "email": google_email,
@@ -1129,6 +1157,13 @@ async def google_oauth_callback(request: Request, background_tasks: BackgroundTa
             "subscription_tier": "free",
             "preferred_language": "en",
             "preferred_currency": "CAD",
+            "signup_country_code": signup_country_code,
+            "signup_country_name": signup_country_name,
+            "signup_ip": get_client_ip(request),
+            "referred_by": None,
+            "referred_by_code": None,
+            "referred_by_email": None,
+            "referred_by_name": None,
             "created_at": now.isoformat(),
             "updated_at": now.isoformat(),
             "last_login_at": now.isoformat(),

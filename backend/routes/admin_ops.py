@@ -3,7 +3,7 @@ BidVex - Admin Operations (Reports, Listings, Users, Finance)
 Auto-extracted from server.py during P2 refactoring.
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Request, Query, UploadFile, File, Form, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, Depends, Request, Query, UploadFile, File, Form, WebSocket, WebSocketDisconnect, BackgroundTasks
 from deps import get_db, get_current_user, get_current_user_optional, require_admin, User
 from shared import (
     DEFAULT_EMAIL_TEMPLATES, EMAIL_TEMPLATE_CATEGORIES,
@@ -165,16 +165,9 @@ async def reject_deletion_request(
 
 
 
-@admin_ops_router.get("/admin/listings/pending")
-async def admin_get_pending_listings(current_user: User = Depends(require_admin)):
-    db = get_db()
-    listings = await db.listings.find({"status": "pending"}, {"_id": 0}).sort("created_at", -1).to_list(100)
-    return [dict(**listing) for listing in listings]
-
-
-
 @admin_ops_router.put("/admin/listings/{listing_id}/moderate")
-async def admin_moderate_listing(listing_id: str, data: Dict[str, str], current_user: User = Depends(require_admin)):
+async def admin_moderate_listing_legacy(listing_id: str, data: Dict[str, str], current_user: User = Depends(require_admin)):
+    """DEPRECATED: kept for backwards compatibility. Prefer /approve and /reject endpoints."""
     db = get_db()
     action = data.get("action")
     if action == "approve":
@@ -427,6 +420,201 @@ async def admin_moderate_lot(lot_id: str, data: Dict[str, str], current_user: Us
         raise HTTPException(status_code=400, detail="Invalid action")
     
     return {"message": f"Lot {action}d successfully"}
+
+
+# ============================================================================
+# SINGLE-ITEM LISTINGS MODERATION (require_approval_new_sellers gate)
+# ----------------------------------------------------------------------------
+# - GET  /api/admin/listings/pending          → all pending listings (single + multi)
+# - POST /api/admin/listings/{id}/approve      → status → active, notify seller
+# - POST /api/admin/listings/{id}/reject       → status → rejected + reason, notify seller
+# Listing type ('single' or 'multi') is auto-detected from which collection
+# holds the listing — no extra type query param needed.
+# ============================================================================
+
+
+async def _find_pending_listing(db, listing_id: str):
+    """Find a pending listing in either listings or multi_item_listings collection."""
+    listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
+    if listing:
+        return listing, "single"
+    listing = await db.multi_item_listings.find_one({"id": listing_id}, {"_id": 0})
+    if listing:
+        return listing, "multi"
+    return None, None
+
+
+@admin_ops_router.get("/admin/listings/pending")
+async def admin_get_pending_listings(current_user: User = Depends(require_admin)):
+    """Return all pending single-item + multi-item listings, newest first."""
+    db = get_db()
+    pending_single = await db.listings.find(
+        {"status": "pending"}, {"_id": 0}
+    ).sort("created_at", -1).to_list(200)
+    pending_multi = await db.multi_item_listings.find(
+        {"status": "pending"}, {"_id": 0}
+    ).sort("created_at", -1).to_list(200)
+
+    # Tag each with its listing_type for the UI router/buttons
+    for item in pending_single:
+        item["_listing_type"] = "single"
+    for item in pending_multi:
+        item["_listing_type"] = "multi"
+
+    # Enrich with seller email + name for the moderation UI
+    seller_ids = list({lst.get("seller_id") for lst in (pending_single + pending_multi) if lst.get("seller_id")})
+    sellers = {}
+    if seller_ids:
+        async for u in db.users.find(
+            {"id": {"$in": seller_ids}}, {"_id": 0, "id": 1, "email": 1, "name": 1, "company_name": 1}
+        ):
+            sellers[u["id"]] = u
+    for item in (pending_single + pending_multi):
+        s = sellers.get(item.get("seller_id"), {})
+        item["_seller_email"] = s.get("email", "")
+        item["_seller_name"] = s.get("name") or s.get("company_name") or ""
+
+    combined = sorted(
+        pending_single + pending_multi,
+        key=lambda lst: lst.get("created_at", ""),
+        reverse=True,
+    )
+    return {
+        "total": len(combined),
+        "single_count": len(pending_single),
+        "multi_count": len(pending_multi),
+        "listings": combined,
+    }
+
+
+class _ModerateAction(BaseModel):
+    reason: Optional[str] = None  # required for reject, ignored on approve
+
+
+@admin_ops_router.post("/admin/listings/{listing_id}/approve")
+async def admin_approve_listing(
+    listing_id: str,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(require_admin),
+):
+    """Approve a pending listing — set status to active and email the seller."""
+    db = get_db()
+    listing, kind = await _find_pending_listing(db, listing_id)
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    if listing.get("status") != "pending":
+        raise HTTPException(status_code=400, detail=f"Listing is not pending (current status: {listing.get('status')})")
+
+    coll = db.listings if kind == "single" else db.multi_item_listings
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await coll.update_one(
+        {"id": listing_id},
+        {"$set": {
+            "status": "active",
+            "moderated_at": now_iso,
+            "moderated_by": current_user.id,
+            "moderation_decision": "approved",
+        }, "$unset": {"rejection_reason": ""}},
+    )
+
+    # Audit log
+    await db.admin_audit_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "action": "listing_approved",
+        "target_type": kind,
+        "target_id": listing_id,
+        "admin_id": current_user.id,
+        "admin_email": current_user.email,
+        "timestamp": now_iso,
+    })
+
+    # Invalidate marketplace cache so the listing appears immediately
+    try:
+        from services.api_cache import invalidate_listing_caches
+        invalidate_listing_caches()
+    except Exception:
+        pass
+
+    # Email seller (non-blocking) — uses existing template send_listing_approved_email
+    seller = await db.users.find_one({"id": listing.get("seller_id")}, {"_id": 0})
+    if seller:
+        try:
+            from services.email_service import send_listing_approved_email
+            background_tasks.add_task(
+                send_listing_approved_email,
+                seller,
+                listing_id,
+                listing.get("title", ""),
+            )
+        except Exception as e:
+            logger.error(f"[MODERATION] Approve email schedule failed: {e}")
+
+    logger.info(f"[MODERATION] Listing {listing_id} ({kind}) APPROVED by {current_user.email}")
+    return {"success": True, "message": "Listing approved", "listing_id": listing_id, "type": kind}
+
+
+@admin_ops_router.post("/admin/listings/{listing_id}/reject")
+async def admin_reject_listing(
+    listing_id: str,
+    payload: _ModerateAction,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(require_admin),
+):
+    """Reject a pending listing — set status to rejected and email the seller with the reason."""
+    reason = (payload.reason or "").strip()
+    if not reason:
+        raise HTTPException(status_code=400, detail="A rejection reason is required so the seller knows what to fix.")
+    if len(reason) < 5:
+        raise HTTPException(status_code=400, detail="Rejection reason must be at least 5 characters.")
+
+    db = get_db()
+    listing, kind = await _find_pending_listing(db, listing_id)
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    if listing.get("status") != "pending":
+        raise HTTPException(status_code=400, detail=f"Listing is not pending (current status: {listing.get('status')})")
+
+    coll = db.listings if kind == "single" else db.multi_item_listings
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await coll.update_one(
+        {"id": listing_id},
+        {"$set": {
+            "status": "rejected",
+            "rejection_reason": reason,
+            "moderated_at": now_iso,
+            "moderated_by": current_user.id,
+            "moderation_decision": "rejected",
+        }},
+    )
+
+    await db.admin_audit_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "action": "listing_rejected",
+        "target_type": kind,
+        "target_id": listing_id,
+        "admin_id": current_user.id,
+        "admin_email": current_user.email,
+        "reason": reason,
+        "timestamp": now_iso,
+    })
+
+    # Email seller with the reason (non-blocking)
+    seller = await db.users.find_one({"id": listing.get("seller_id")}, {"_id": 0})
+    if seller:
+        try:
+            from services.email_service import send_listing_rejected_email
+            background_tasks.add_task(
+                send_listing_rejected_email,
+                seller,
+                listing_id,
+                listing.get("title", ""),
+                reason,
+            )
+        except Exception as e:
+            logger.error(f"[MODERATION] Reject email schedule failed: {e}")
+
+    logger.info(f"[MODERATION] Listing {listing_id} ({kind}) REJECTED by {current_user.email}: {reason}")
+    return {"success": True, "message": "Listing rejected", "listing_id": listing_id, "type": kind, "reason": reason}
 
 # REPORT ENHANCEMENTS
 

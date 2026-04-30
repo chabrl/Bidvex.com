@@ -72,35 +72,44 @@ async def _send_admin_raw(subject, html):
 
 
 async def notify_admin_new_user(user) -> bool:
-    email = user.get("email", "") if isinstance(user, dict) else getattr(user, "email", "")
-    name = (
-        user.get("name")
-        or user.get("full_name")
-        or email
-    ) if isinstance(user, dict) else (
-        getattr(user, "name", None)
-        or getattr(user, "full_name", None)
-        or email
+    def _g(key, default=""):
+        if isinstance(user, dict):
+            return user.get(key, default)
+        return getattr(user, key, default)
+
+    email = _g("email", "")
+    name = _g("name") or _g("full_name") or email
+    lang = (_g("preferred_language") or _g("language_preference") or "en") or "en"
+    auth_provider = (_g("auth_provider") or "email") or "email"
+
+    # Country (from signup IP geolocation)
+    country_name = _g("signup_country_name") or "Unknown"
+    country_code = _g("signup_country_code") or ""
+    country_display = (
+        f"{country_name} ({country_code})" if country_code and country_name != "Unknown" else country_name
     )
-    lang = (
-        user.get("preferred_language")
-        or user.get("language_preference", "en")
-    ) if isinstance(user, dict) else (
-        getattr(user, "preferred_language", None)
-        or getattr(user, "language_preference", "en")
-    )
-    lang = lang or "en"
-    auth_provider = (
-        user.get("auth_provider", "email")
-        if isinstance(user, dict)
-        else getattr(user, "auth_provider", "email")
-    ) or "email"
+
+    # Referral
+    ref_code = _g("referred_by_code")
+    ref_email = _g("referred_by_email")
+    ref_name = _g("referred_by_name")
+    if ref_code:
+        referred_display = (
+            f"{ref_name} &lt;{ref_email}&gt; — code <strong>{ref_code}</strong>"
+            if ref_email
+            else f"code <strong>{ref_code}</strong>"
+        )
+    else:
+        referred_display = "Direct (no referral)"
+
     return await _send_admin_raw(
         f"New Signup - {email}",
         _admin_card("New User Registration", [
             ("Name", name),
             ("Email", email),
             ("Provider", auth_provider.title()),
+            ("Country", country_display),
+            ("Referred by", referred_display),
             ("Language", lang.upper()),
             ("Time", datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")),
         ], cta_url="https://www.bidvex.com/admin/users", cta_label="View User"),
