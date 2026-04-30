@@ -78,19 +78,23 @@
 
 .hero-badge--top-left {
   top: 14%;
-  left: -10%;
+  /* Anchor by the badge's RIGHT edge so longer text (FR) grows OUTWARD (left), never into the phone. */
+  right: calc(100% + 24px);
+  left: auto;
   animation: badgeFloat1 5s ease-in-out infinite;
 }
 
 .hero-badge--top-right {
   top: 8%;
-  right: -8%;
+  /* Anchor by the badge's LEFT edge so longer text (FR) grows OUTWARD (right), never into the phone. */
+  left: calc(100% + 24px);
+  right: auto;
   animation: badgeFloat2 5.5s ease-in-out infinite 0.8s;
 }
 
 .hero-badge--bottom {
   bottom: 14%;
-  left: -12%;
+  left: -16%;
   animation: badgeFloat3 4.8s ease-in-out infinite 1.4s;
   padding: 10px 14px;
   border-radius: 16px;
@@ -180,40 +184,85 @@
   50%      { transform: translateY(-10px); }
 }
 
-/* RESPONSIVE */
+/* RESPONSIVE
+ * ─────────────────────────────────────────────────────────────
+ * Positioning rules:
+ *  • top-left  badge — anchored by its RIGHT edge → grows OUTWARD (left)
+ *  • top-right badge — anchored by its LEFT  edge → grows OUTWARD (right)
+ *  • bottom    badge — centered below phone using `left:0;right:0;margin:auto`
+ *    (does NOT use transform so the floatY keyframe stays clean)
+ *  Longer FR text therefore expands AWAY from the phone, never into it. */
 @media (max-width: 1280px) {
   .hero-phone-image { max-width: 380px; }
   .hero-badge { font-size: 11px; padding: 7px 12px; }
+  .hero-badge--top-left  { right: calc(100% + 16px); }
+  .hero-badge--top-right { left:  calc(100% + 16px); }
 }
 
 @media (max-width: 1024px) {
   .hero-phone-container { max-width: 360px; }
   .hero-phone-image { max-width: 320px; }
-  .hero-badge--top-left  { left: -4%; top: 12%; }
-  .hero-badge--top-right { right: -4%; }
-  .hero-badge--bottom    { left: -4%; }
+  .hero-badge--top-left  { top: 12%; right: calc(100% + 12px); }
+  .hero-badge--top-right { top: 6%;  left:  calc(100% + 12px); }
+  .hero-badge--bottom    { left: -10%; }
 }
 
-/* On lg+ we want side-by-side; below lg the column stacks via Tailwind */
+/* Mobile / narrow tablet — stack badges around the phone, never hidden. */
 @media (max-width: 768px) {
   .hero-phone-container {
-    max-width: 280px;
-    margin: 32px auto 0;
+    max-width: 220px;
+    /* Extra vertical room for the two top badges stacked above + bottom badge below */
+    margin: 88px auto 56px;
+    overflow: visible;
   }
-  .hero-phone-image { max-width: 260px; }
-  /* Hide side badges on mobile — they'd overlap or look cramped */
-  .hero-badge--top-left,
-  .hero-badge--top-right { display: none; }
+  .hero-phone-image { max-width: 200px; }
+
+  .hero-badge {
+    font-size: 11px;
+    padding: 6px 11px;
+    border-radius: 18px;
+  }
+
+  /* "New bid" — sits ABOVE the phone, slightly LEFT of center */
+  .hero-badge--top-left {
+    display: inline-flex;
+    top: -64px;
+    left: -8px;
+    right: auto;
+  }
+
+  /* "14 bidders live" — sits ABOVE the phone, slightly RIGHT, just below the first badge */
+  .hero-badge--top-right {
+    display: inline-flex;
+    top: -32px;
+    right: -8px;
+    left: auto;
+  }
+
+  /* "Item Sold" — centered below the phone (no transform → keyframe floatY stays clean) */
   .hero-badge--bottom {
-    left: 50%;
-    transform: translateX(-50%);
-    bottom: -8%;
+    bottom: -40px;
+    left: 0;
+    right: 0;
+    margin: 0 auto;
+    width: max-content;
   }
+}
+
+@media (max-width: 414px) {
+  .hero-phone-container { max-width: 200px; margin-top: 80px; }
+  .hero-phone-image { max-width: 180px; }
+  .hero-badge { font-size: 10.5px; padding: 5px 10px; }
+  .hero-badge--top-left  { top: -58px; }
+  .hero-badge--top-right { top: -28px; }
 }
 
 @media (max-width: 375px) {
-  .hero-phone-image { max-width: 220px; }
-  .hero-phone-container { max-width: 240px; }
+  .hero-phone-container { max-width: 180px; margin-top: 76px; }
+  .hero-phone-image { max-width: 160px; }
+  .hero-badge { font-size: 10px; padding: 4px 9px; }
+  .hero-badge--top-left  { top: -54px; left: -4px; }
+  .hero-badge--top-right { top: -26px; right: -4px; }
 }
 
 /* Reduced motion */
