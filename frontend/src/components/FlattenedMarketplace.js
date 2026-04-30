@@ -612,10 +612,20 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
               </Badge>
             )}
             {/* Verified Partner Badge */}
-            {item.is_partner_listing && (
-              <Badge className="bg-violet-600 text-white border-0 shadow-lg text-xs" data-testid="partner-badge">
+            {/* Partner Auction Badge — applies the spec's seller_type === "partner" rule. */}
+            {(item.seller_type === 'partner' || item.is_partner_listing) && (
+              <Badge
+                className="border text-[11px] font-bold tracking-wide px-2.5 py-0.5"
+                style={{
+                  background: 'rgba(33, 134, 198, 0.15)',
+                  borderColor: '#2186C6',
+                  color: '#2186C6',
+                  letterSpacing: '0.5px',
+                }}
+                data-testid="partner-auction-badge"
+              >
                 <ShieldCheck className="h-3 w-3 mr-1" />
-                {t('marketplace.verifiedPartner')}
+                {isFrench ? 'Enchère partenaire' : 'Partner Auction'}
               </Badge>
             )}
             {/* Multi-Lot Badge */}

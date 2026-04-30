@@ -1,4 +1,10 @@
 """
+[DEPRECATED — iteration 106 audit, superseded by iteration 165 spec]
+
+Encoded pre-165 pricing math (tax on Hammer + Premium for buyer; partner
+buyer_premium attribution differed from current spec).
+Replacement: `test_seller_type_pricing_165.py`. Skipped at runtime.
+
 BidVex Fee Schedule Audit - Iteration 106
 Tests all pricing configurations against official BidVex fee document.
 
@@ -13,6 +19,10 @@ CORE RATES VERIFIED:
 - §7.4 GST 5% + QST 9.975% on (Hammer + Premium)
 - §7.5 14-day overdue cron, 2%/month penalty
 """
+import pytest
+pytestmark = pytest.mark.skip(
+    reason="Superseded by test_seller_type_pricing_165.py (iteration 165 spec)"
+)
 
 import pytest
 import os

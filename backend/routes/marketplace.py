@@ -76,6 +76,9 @@ _LISTING_PROJECTION = {
     "is_partner_listing": 1, "city": 1, "region": 1, "country": 1,
     "created_at": 1,
     "title_en": 1, "title_fr": 1, "description_en": 1, "description_fr": 1,
+    # Seller-type pricing/badge/geo-sort fields (iteration 165 spec)
+    "seller_type": 1, "partner_bp_rate": 1,
+    "seller_province": 1, "seller_city": 1,
 }
 _MULTI_PROJECTION = {
     "_id": 0, "id": 1, "title": 1, "description": 1, "category": 1,
@@ -84,6 +87,9 @@ _MULTI_PROJECTION = {
     "is_featured": 1, "is_partner_listing": 1, "region": 1, "country": 1,
     "created_at": 1,
     "title_en": 1, "title_fr": 1, "description_en": 1, "description_fr": 1,
+    # Seller-type pricing/badge/geo-sort fields (iteration 165 spec)
+    "seller_type": 1, "partner_bp_rate": 1,
+    "seller_province": 1, "seller_city": 1,
 }
 
 
@@ -171,6 +177,10 @@ async def _build_marketplace_items():
                 "seller_id": auction.get("seller_id"),
                 "seller_is_business": seller_is_business,
                 "is_partner_listing": auction.get("is_partner_listing", False),
+                "seller_type": auction.get("seller_type", "individual"),
+                "partner_bp_rate": auction.get("partner_bp_rate"),
+                "seller_province": auction.get("seller_province") or auction.get("region"),
+                "seller_city": auction.get("seller_city") or auction.get("city"),
                 "region": auction.get("region"),
                 "country": auction.get("country"),
                 "created_at": auction.get("created_at"),
@@ -215,6 +225,10 @@ async def _build_marketplace_items():
             "seller_id": listing.get("seller_id"),
             "seller_is_business": sellers.get(listing.get("seller_id"), False),
             "is_partner_listing": listing.get("is_partner_listing", False),
+            "seller_type": listing.get("seller_type", "individual"),
+            "partner_bp_rate": listing.get("partner_bp_rate"),
+            "seller_province": listing.get("seller_province") or listing.get("region"),
+            "seller_city": listing.get("seller_city") or listing.get("city"),
             "city": listing.get("city"),
             "region": listing.get("region"),
             "country": listing.get("country"),
@@ -308,7 +322,9 @@ async def get_marketplace_items(
     zero_fee_only: Optional[str] = None,
     province: Optional[str] = None,
     no_taxes: Optional[str] = None,
-    sort: str = "ending_soon",
+    tax_status: Optional[str] = None,        # "partner" | "standard"
+    buyer_province: Optional[str] = None,    # for "nearby_first" geo-sort
+    sort: str = "nearby_first",
     limit: int = 20,
     skip: int = 0,
     cursor: Optional[str] = None,
@@ -381,8 +397,21 @@ async def get_marketplace_items(
     if no_taxes and no_taxes.lower() == 'true':
         items = [i for i in items if not i.get("seller_is_business") and not i.get("seller_is_tax_registered")]
 
+    # ── Tax Status filter (partner vs standard listings) ──
+    if tax_status == "partner":
+        items = [i for i in items if (i.get("seller_type") == "partner") or i.get("is_partner_listing")]
+    elif tax_status == "standard":
+        items = [i for i in items if (i.get("seller_type") in ("individual", "enterprise"))
+                 and not i.get("is_partner_listing")]
+
     # Re-sort if not default (cache is already sorted by ending_soon)
-    if sort == "price":
+    if sort == "nearby_first":
+        from services.geo_sort import geo_priority_value
+        items = sorted(items, key=lambda x: (
+            geo_priority_value(x.get("seller_province") or x.get("region"), buyer_province or ""),
+            -(x.get("created_at").timestamp() if isinstance(x.get("created_at"), datetime) else 0),
+        ))
+    elif sort == "price":
         items = sorted(items, key=lambda x: x.get("current_price", 0))
     elif sort == "-price":
         items = sorted(items, key=lambda x: -x.get("current_price", 0))

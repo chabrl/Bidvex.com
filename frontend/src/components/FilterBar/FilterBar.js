@@ -3,12 +3,19 @@ import { useTranslation } from "react-i18next";
 import "./FilterBar.css";
 
 const SORT_OPTIONS = [
+  { value: "nearby_first", label_en: "Nearby First", label_fr: "À proximité d'abord" },
   { value: "ending_soon", label_en: "Ending Soon", label_fr: "Se termine bientôt" },
   { value: "newest", label_en: "Newest First", label_fr: "Plus récent" },
   { value: "price", label_en: "Price: Low → High", label_fr: "Prix : Croissant" },
   { value: "-price", label_en: "Price: High → Low", label_fr: "Prix : Décroissant" },
   { value: "most_bids", label_en: "Most Bids", label_fr: "Plus d'offres" },
   { value: "-promoted", label_en: "Featured First", label_fr: "En vedette" },
+];
+
+const TAX_STATUS_OPTIONS = [
+  { value: "", label_en: "All Listings", label_fr: "Toutes annonces" },
+  { value: "partner", label_en: "Partner Auctions", label_fr: "Enchères partenaires" },
+  { value: "standard", label_en: "Standard (Individual + Enterprise)", label_fr: "Standard (Individuel + Entreprise)" },
 ];
 
 const CATEGORY_OPTIONS = [
@@ -68,8 +75,9 @@ const FilterBar = ({ onFilterChange, pageContext = "marketplace" }) => {
     search: "",
     category: "",
     condition: "",
-    sort: "ending_soon",
+    sort: "nearby_first",
     province: "",
+    tax_status: "",
   });
 
   const [mobileExpanded, setMobileExpanded] = useState(false);
@@ -83,8 +91,9 @@ const FilterBar = ({ onFilterChange, pageContext = "marketplace" }) => {
     filters.search !== "",
     filters.category !== "",
     filters.condition !== "",
-    filters.sort !== "ending_soon",
+    filters.sort !== "nearby_first",
     filters.province !== "",
+    filters.tax_status !== "",
   ].filter(Boolean).length;
 
   useEffect(() => {
@@ -98,7 +107,8 @@ const FilterBar = ({ onFilterChange, pageContext = "marketplace" }) => {
     setFilters({
       private_sales_only: false, zero_fee_only: false,
       lots_auction: pageContext === "lots", no_taxes: false,
-      search: "", category: "", condition: "", sort: "ending_soon", province: "",
+      search: "", category: "", condition: "", sort: "nearby_first", province: "",
+      tax_status: "",
     });
 
   const pillCls = (active) => `filter-pill ${active ? "filter-pill--active" : ""}`;
@@ -136,6 +146,9 @@ const FilterBar = ({ onFilterChange, pageContext = "marketplace" }) => {
       </select>
       <select className="filter-bar__select" value={filters.condition} onChange={(e) => set("condition", e.target.value)} data-testid="filter-condition">
         {CONDITION_OPTIONS.map((o) => <option key={o.value} value={o.value}>{t(o)}</option>)}
+      </select>
+      <select className="filter-bar__select" value={filters.tax_status} onChange={(e) => set("tax_status", e.target.value)} data-testid="filter-tax-status" title={lang === "fr" ? "Statut fiscal" : "Tax Status"}>
+        {TAX_STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{t(o)}</option>)}
       </select>
       <select className="filter-bar__select filter-bar__select--sort" value={filters.sort} onChange={(e) => set("sort", e.target.value)} data-testid="filter-sort">
         {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{t(o)}</option>)}

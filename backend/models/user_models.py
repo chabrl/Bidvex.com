@@ -20,6 +20,41 @@ class AccountType(str, Enum):
     BUSINESS = "business"
 
 
+# ── Seller Type ─────────────────────────────────────────────────
+# The canonical 3-state value used by the pricing engine.
+# Drives BP/SC routing, tax behavior, and listing badges.
+SELLER_TYPE_INDIVIDUAL = "individual"
+SELLER_TYPE_PARTNER = "partner"
+SELLER_TYPE_ENTERPRISE = "enterprise"
+ALLOWED_SELLER_TYPES = {
+    SELLER_TYPE_INDIVIDUAL,
+    SELLER_TYPE_PARTNER,
+    SELLER_TYPE_ENTERPRISE,
+}
+
+
+def resolve_seller_type(user: dict) -> str:
+    """
+    Canonical resolver for a user's seller_type.
+
+    Order of precedence:
+      1. Explicit `seller_type` field if already set and valid.
+      2. `is_partner=True` → "partner"
+      3. `account_type="business"` (or `is_business=True`) → "enterprise"
+      4. Default → "individual"
+    """
+    if not user:
+        return SELLER_TYPE_INDIVIDUAL
+    explicit = (user.get("seller_type") or "").lower().strip()
+    if explicit in ALLOWED_SELLER_TYPES:
+        return explicit
+    if user.get("is_partner") is True:
+        return SELLER_TYPE_PARTNER
+    if (user.get("account_type") or "").lower() == "business" or user.get("is_business") is True:
+        return SELLER_TYPE_ENTERPRISE
+    return SELLER_TYPE_INDIVIDUAL
+
+
 class UserTaxInfo(BaseModel):
     """User tax and business registration information"""
     is_business: bool = Field(default=False, description="Whether user operates as a registered business")

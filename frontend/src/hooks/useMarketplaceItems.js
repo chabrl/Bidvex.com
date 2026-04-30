@@ -17,7 +17,9 @@ const fetchMarketplaceItems = async ({ pageParam, filters, limit }) => {
   if (filters.max_price) params.append('max_price', filters.max_price);
   if (filters.condition) params.append('condition', filters.condition);
   if (filters.zero_fee_only === 'true' || filters.zero_fee_only === true) params.append('zero_fee_only', 'true');
-  params.append('sort', filters.sort || 'ending_soon');
+  if (filters.tax_status) params.append('tax_status', filters.tax_status);
+  if (filters.buyer_province) params.append('buyer_province', filters.buyer_province);
+  params.append('sort', filters.sort || 'nearby_first');
   params.append('limit', String(limit));
   params.append('track_impression', 'true');
   if (pageParam) params.append('cursor', pageParam);

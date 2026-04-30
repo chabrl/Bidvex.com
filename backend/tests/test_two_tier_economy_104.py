@@ -1,4 +1,14 @@
 """
+[DEPRECATED — iteration 104 audit, superseded by iteration 165 spec]
+
+This test file encoded the pre-iteration-165 pricing math:
+  • Buyer Stripe Recovery on BP only (old; now: on hammer + BP)
+  • Partner buyer.total = $0 (old; now: hammer + partner_bp; BidVex fee stays $0)
+
+The replacement, definitive test suite is `test_seller_type_pricing_165.py`.
+This file is kept for historical context but skipped at runtime so its
+obsolete assertions don't block the regression gate.
+
 BidVex Two-Tier Marketplace Economy Tests (Iteration 104)
 
 Tests the new Two-Tier economy system:
@@ -9,6 +19,9 @@ Tax calculation: GST (5%) + QST (9.975%) on (Hammer + Premium)
 """
 
 import pytest
+pytestmark = pytest.mark.skip(
+    reason="Superseded by test_seller_type_pricing_165.py (iteration 165 spec)"
+)
 import requests
 import os
 import sys

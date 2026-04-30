@@ -68,9 +68,52 @@ def build_agreement_metadata(current_user: User, client_ip: str, user_agent: str
 # ─── Single-Item Creation ────────────────────────────────────────────
 
 async def apply_partner_tags(db, current_user: User, listing_dict: Dict, buyers_premium_rate):
-    """Tag listing with partner badge and buyer premium rate."""
-    seller_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
-    if seller_doc and seller_doc.get("is_partner") and seller_doc.get("partner_verification_status") == "verified":
+    """
+    Stamp listing with seller-type pricing context, partner flags, BP rate, and
+    geo-sort coordinates copied from the seller user document.
+
+    Validates that partner sellers must have a `partner_bp_rate` configured
+    BEFORE creating a listing — required by the pricing engine.
+    """
+    from models.user_models import resolve_seller_type, SELLER_TYPE_PARTNER
+    seller_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0}) or {}
+
+    # ── Canonical seller_type (drives pricing engine + UI badge) ──
+    seller_type = resolve_seller_type(seller_doc)
+    listing_dict["seller_type"] = seller_type
+
+    # ── Partner-specific BP rate (validated below) ──
+    partner_bp_rate = seller_doc.get("partner_bp_rate")
+    if seller_type == SELLER_TYPE_PARTNER:
+        if partner_bp_rate is None:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "error": "partner_bp_rate_required",
+                    "message_en": "Partner sellers must set a Buyer's Premium rate "
+                                  "before creating a listing.",
+                    "message_fr": "Les vendeurs partenaires doivent définir un taux de "
+                                  "prime acheteur avant de créer une annonce.",
+                }
+            )
+        listing_dict["partner_bp_rate"] = float(partner_bp_rate)
+    else:
+        listing_dict["partner_bp_rate"] = None
+
+    # ── Geo-sort coordinates (province + city from seller profile) ──
+    listing_dict["seller_province"] = (
+        seller_doc.get("province")
+        or listing_dict.get("region")  # fall back to listing's region
+        or None
+    )
+    listing_dict["seller_city"] = (
+        seller_doc.get("city")
+        or listing_dict.get("city")
+        or None
+    )
+
+    # ── Legacy partner-listing flag (kept for compatibility) ──
+    if seller_doc.get("is_partner") and seller_doc.get("partner_verification_status") == "verified":
         listing_dict["is_partner_listing"] = True
         listing_dict["is_verified_firm"] = seller_doc.get("is_verified_firm", False)
         listing_dict["custom_buyer_premium_rate"] = (

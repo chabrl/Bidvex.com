@@ -203,10 +203,10 @@ class PricingManager:
         bp = _r(hp * bp_rate)
         sc = _r(hp * sc_rate)
 
-        # Buyer side — stripe recovery on BidVex fees only (BP).
-        # BidVex absorbs the stripe cost on the hammer portion because that
-        # money belongs to the seller, not BidVex revenue.
-        b_sr = stripe_recovery(bp)
+        # Buyer side — stripe recovery on the FULL charge amount (hammer + BP).
+        # This passes the actual Stripe processing cost back to the buyer because
+        # Stripe charges 2.9% + $0.30 on the FULL charge, not just BidVex fees.
+        b_sr = stripe_recovery(hp + bp)
         # Tax on BidVex fees only (BP + stripe recovery), never on hammer
         b_taxable = bp + b_sr
         b_tax = calculate_taxes(b_taxable, buyer_province)
@@ -386,30 +386,40 @@ class PricingManager:
     def partner_auction(
         hammer_price: float,
         buyer_province: str,
+        partner_bp_rate: float = 0.0,
     ) -> PricingResult:
         """
         Partner-tier seller listing.
-        Buyer pays: $0 BP from BidVex. Partner sets and keeps their own BP.
-        Seller (Partner) pays: 3% flat commission + stripe recovery + tax.
-        BidVex has no visibility or claim on the Partner's own buyer premium.
+        Buyer pays: hammer + partner's own BP (goes ENTIRELY to partner, not BidVex).
+                    BidVex charges buyer $0 platform fee, $0 Stripe recovery, $0 tax.
+        Seller (Partner) pays BidVex: 3% flat commission + Stripe recovery + tax.
+        BidVex has no claim on the partner's own buyer premium.
         """
         hp = Decimal(str(hammer_price))
+        partner_bp_d = Decimal(str(partner_bp_rate or 0))
+        partner_bp = _r(hp * partner_bp_d)
 
-        # BUYER INVOICE — BidVex charges buyer nothing
+        # BUYER INVOICE — Partner BP goes to partner. BidVex charges nothing.
+        partner_bp_pct = _f(partner_bp_d * 100)
         buyer = SideInvoice(
             lines=[
-                InvoiceLine("Buyer Premium (Partner listing — $0 BidVex fee)", 0.0, "fee", 0.0),
+                InvoiceLine("Hammer Price", _f(hp), "hammer"),
+                InvoiceLine(
+                    f"Buyer's Premium ({partner_bp_pct:.1f}% — set by auctioneer)",
+                    _f(partner_bp), "fee", _f(partner_bp_d),
+                ),
+                InvoiceLine("BidVex Platform Fee", 0.0, "fee", 0.0),
             ],
-            fees_subtotal=0.0,
+            fees_subtotal=0.0,        # BidVex's fee is $0
             stripe_recovery=0.0,
             tax_amount=0.0,
             tax_rate=0.0,
             tax_type="N/A",
             tax_label="N/A",
-            total=0.0,
+            total=_f(_r(hp + partner_bp)),  # buyer pays partner this total
         )
 
-        # SELLER (PARTNER) INVOICE — 3% flat commission
+        # SELLER (PARTNER) INVOICE — 3% flat commission to BidVex + tax
         sc = _r(hp * PARTNER_SELLER_COMMISSION_RATE)
         sr = stripe_recovery(sc)
         taxable = sc + sr
@@ -440,6 +450,58 @@ class PricingManager:
             seller_tier="partner",
             province=buyer_province.upper(),
             bidvex_revenue=_f(sc),
+        )
+
+    # ── UNIFIED ENTRY POINT — routes by seller_type ─────────
+    @staticmethod
+    def calculate_fees(
+        hammer_price: float,
+        seller_type: str,                 # "individual" | "partner" | "enterprise"
+        buyer_province: str,
+        buyer_tier: str = "free",
+        seller_tier: str = "free",
+        payment_method: str = "stripe",   # "stripe" | "cash" | "etransfer"
+        partner_bp_rate: float = 0.0,
+    ) -> PricingResult:
+        """
+        Single source of truth for routing fee calculations by seller_type.
+
+        Tax ALWAYS applies to BidVex platform fees (BP + SC + Stripe recovery)
+        for ALL seller types. There is NO tax-free treatment for individuals.
+        The difference between seller types is WHAT fees are charged and
+        WHO pays them — not whether tax applies.
+
+        - "individual": tier-based BP + SC, full tax on BidVex fees.
+        - "enterprise": same as individual (tier-based BP + SC, full tax).
+        - "partner":     buyer pays $0 BidVex fee; partner pays 3% + tax.
+        """
+        st = (seller_type or "individual").lower().strip()
+
+        if st == "partner":
+            return PricingManager.partner_auction(
+                hammer_price=hammer_price,
+                buyer_province=buyer_province,
+                partner_bp_rate=partner_bp_rate,
+            )
+
+        if st not in ("individual", "enterprise"):
+            raise ValueError(f"Unknown seller_type: '{seller_type}'")
+
+        # Individual + Enterprise share the standard tier-based flow.
+        # Tax always applies to BidVex fees.
+        pm = (payment_method or "stripe").lower().strip()
+        if pm in ("cash", "etransfer", "e-transfer"):
+            return PricingManager.non_vehicle_cash(
+                hammer_price=hammer_price,
+                buyer_province=buyer_province,
+                buyer_tier=buyer_tier,
+                seller_tier=seller_tier,
+            )
+        return PricingManager.non_vehicle_stripe(
+            hammer_price=hammer_price,
+            buyer_province=buyer_province,
+            buyer_tier=buyer_tier,
+            seller_tier=seller_tier,
         )
 
 

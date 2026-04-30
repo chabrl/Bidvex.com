@@ -92,6 +92,11 @@ class Listing(BaseModel):
     badge_en: Optional[str] = None
     badge_fr: Optional[str] = None
     bids: Optional[int] = None
+    # ── Seller-type pricing/badge/geo-sort fields (copied at listing creation) ──
+    seller_type: str = "individual"   # "individual" | "partner" | "enterprise"
+    partner_bp_rate: Optional[float] = None  # only set for partner sellers
+    seller_province: Optional[str] = None    # for geo-sort ("nearby first")
+    seller_city: Optional[str] = None
 
 
 # ========== BIDS ==========
@@ -177,8 +182,11 @@ class Lot(BaseModel):
     title_fr: Optional[str] = None
     description_en: Optional[str] = None
     description_fr: Optional[str] = None
-
-
+    # ── Seller-type pricing/badge/geo-sort fields (copied at creation) ──
+    seller_type: str = "individual"
+    partner_bp_rate: Optional[float] = None
+    seller_province: Optional[str] = None
+    seller_city: Optional[str] = None
 class MultiItemListingCreate(BaseModel):
     title: str
     description: str

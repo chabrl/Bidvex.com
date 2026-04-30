@@ -229,7 +229,10 @@ async def setup_test_environment():
         await db.auctions.insert_one(auction_doc)
         
         seller_badge = "🏢 Business" if auction_doc["seller_is_business"] else "👤 Individual"
-        tax_badge = "💰 Tax on Item" if auction_doc["seller_is_business"] else "🎉 Tax-Free Item"
+        # Note: All listings are taxable on BidVex fees per iteration-165 spec.
+        # The label below was a legacy private-resale display from before the
+        # unified seller_type model and is kept only for visual debug parity.
+        tax_badge = "💰 Tax on item (resale)" if auction_doc["seller_is_business"] else "🎉 Private resale"
         
         print(f"  ✅ Created: {auction_data['id']} - {auction_data['title']}")
         print(f"     {seller_badge} | {tax_badge} | Starting: ${auction_data['starting_price']:.2f}")

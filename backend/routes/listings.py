@@ -254,6 +254,8 @@ async def get_listings(
     condition: Optional[str] = None, min_price: Optional[float] = None, max_price: Optional[float] = None,
     search: Optional[str] = None, sort: str = "created_at", limit: int = 50, skip: int = 0,
     currency: Optional[str] = None,
+    tax_status: Optional[str] = None,        # "partner" | "standard" — UI filter
+    buyer_province: Optional[str] = None,    # for "nearby_first" geo-sort
 ):
     db = get_db()
     query = {"status": "active"}
@@ -276,8 +278,18 @@ async def get_listings(
             query["current_price"] = {"$lte": max_price}
     if search:
         query["$or"] = [{"title": {"$regex": search, "$options": "i"}}, {"description": {"$regex": search, "$options": "i"}}]
+
+    # ── Tax Status filter (partner vs standard listings) ──
+    if tax_status == "partner":
+        query["seller_type"] = "partner"
+    elif tax_status == "standard":
+        query["seller_type"] = {"$in": ["individual", "enterprise"]}
+
+    # ── Sort handling: special "nearby_first" geo-sort ──
+    is_geo_sort = sort == "nearby_first"
     sort_order = -1 if sort.startswith("-") else 1
-    sort_field = sort.lstrip("-")
+    sort_field = sort.lstrip("-") if not is_geo_sort else "created_at"
+
     listings = await db.listings.find(query, {"_id": 0}).sort(sort_field, sort_order).skip(skip).limit(limit).to_list(limit)
 
     # Also include individual lots from multi-item listings as independent items
@@ -290,6 +302,11 @@ async def get_listings(
         multi_query["region"] = region
     if search:
         multi_query["$or"] = [{"title": {"$regex": search, "$options": "i"}}, {"description": {"$regex": search, "$options": "i"}}]
+    # Tax Status filter applies to multi-item too
+    if tax_status == "partner":
+        multi_query["seller_type"] = "partner"
+    elif tax_status == "standard":
+        multi_query["seller_type"] = {"$in": ["individual", "enterprise"]}
 
     multi_listings = await db.multi_item_listings.find(multi_query, {"_id": 0}).sort(sort_field, sort_order).limit(limit).to_list(limit)
 
@@ -325,6 +342,11 @@ async def get_listings(
                 "badge_fr": "Partie d'une enchère",
                 "views": ml.get("views", 0),
                 "bids": lot.get("bid_count", 0),
+                # Propagate seller-type pricing context onto synthesized lot items
+                "seller_type": ml.get("seller_type", "individual"),
+                "partner_bp_rate": ml.get("partner_bp_rate"),
+                "seller_province": ml.get("seller_province"),
+                "seller_city": ml.get("seller_city"),
             }
             # Apply price filters
             if min_price is not None and lot_listing["current_price"] < min_price:
@@ -335,14 +357,23 @@ async def get_listings(
                 continue
             listings.append(lot_listing)
 
-    # Sort combined results with safe key extraction
-    reverse = sort_order == -1
-    def _sort_key(x):
-        v = x.get(sort_field)
-        if v is None:
-            return "" if isinstance(sort_field, str) and sort_field != "current_price" else 0
-        return v
-    listings.sort(key=_sort_key, reverse=reverse)
+    # Sort combined results
+    if is_geo_sort:
+        # Geo-sort: same province → adjacent → other; tiebreak by created_at desc
+        from services.geo_sort import geo_priority_value
+        listings.sort(key=lambda x: (
+            geo_priority_value(x.get("seller_province"), buyer_province or ""),
+            -(x.get("created_at").timestamp() if hasattr(x.get("created_at"), "timestamp")
+              else 0)
+        ))
+    else:
+        reverse = sort_order == -1
+        def _sort_key(x):
+            v = x.get(sort_field)
+            if v is None:
+                return "" if isinstance(sort_field, str) and sort_field != "current_price" else 0
+            return v
+        listings.sort(key=_sort_key, reverse=reverse)
     listings = listings[:limit]
 
     for listing in listings:

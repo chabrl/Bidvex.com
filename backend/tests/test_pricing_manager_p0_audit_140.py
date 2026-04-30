@@ -212,14 +212,20 @@ class TestProofD_Partner:
     """Proof D: PricingManager.partner_auction(50, 'ON') returns buyer=$0.00 seller=$2.08"""
     
     def test_proof_d_buyer_total(self):
-        """$50 ON Partner buyer_total should be $0.00"""
+        """$50 ON Partner buyer_total reflects spec: hammer + partner BP (BidVex fee = $0)."""
         from services.pricing_manager import PricingManager
-        
-        result = PricingManager.partner_auction(50, 'ON')
-        
-        # Partner tier: BidVex charges buyer $0 (partner sets their own BP)
-        assert result.buyer_invoice.total == 0.0, f"Expected buyer_total=0.0, got {result.buyer_invoice.total}"
-        print(f"PASS: Proof D - partner_auction(50, 'ON') => buyer_total=${result.buyer_invoice.total}")
+
+        # Spec semantics: buyer.total = hammer + partner_bp (what buyer pays partner).
+        # BidVex's portion (`fees_subtotal`) stays $0.
+        # When partner_bp_rate is 0 → buyer.total == hammer.
+        result = PricingManager.partner_auction(50, 'ON', partner_bp_rate=0.0)
+
+        assert result.buyer_invoice.fees_subtotal == 0.0, "BidVex must charge buyer $0 fee"
+        assert result.buyer_invoice.total == 50.0, (
+            f"Expected buyer_total=50.0 (hammer + partner_bp 0%), got {result.buyer_invoice.total}"
+        )
+        print(f"PASS: Proof D - partner_auction(50, 'ON', 0%) => "
+              f"buyer_total=${result.buyer_invoice.total} (BidVex fee = $0)")
     
     def test_proof_d_seller_total(self):
         """$50 ON Partner seller_total should be $2.08"""
@@ -312,13 +318,19 @@ class TestExistingProofsUnchanged:
         print(f"PASS: non_vehicle_cash(500, 'AB') => seller_total=${result.seller_invoice.total} (unchanged)")
     
     def test_partner_auction_on_2000_buyer_unchanged(self):
-        """partner_auction(2000, 'ON') buyer should still be $0.00"""
+        """partner_auction(2000, 'ON', 0%) buyer total = hammer (BidVex fee still $0)"""
         from services.pricing_manager import PricingManager
-        
-        result = PricingManager.partner_auction(2000, 'ON')
-        
-        assert result.buyer_invoice.total == 0.0, f"Expected buyer_total=0.0, got {result.buyer_invoice.total}"
-        print(f"PASS: partner_auction(2000, 'ON') => buyer_total=${result.buyer_invoice.total} (unchanged)")
+
+        # Per spec: buyer.total now reflects hammer + partner_bp (what buyer pays partner).
+        # BidVex's portion stays $0 — that is the invariant the spec preserves.
+        result = PricingManager.partner_auction(2000, 'ON', partner_bp_rate=0.0)
+
+        assert result.buyer_invoice.fees_subtotal == 0.0, "BidVex fee must stay $0"
+        assert result.buyer_invoice.total == 2000.0, (
+            f"Expected buyer_total=2000.0 (hammer + 0% BP), got {result.buyer_invoice.total}"
+        )
+        print(f"PASS: partner_auction(2000, 'ON', 0%) => buyer_total=${result.buyer_invoice.total} "
+              f"(BidVex fee $0 unchanged)")
     
     def test_partner_auction_on_2000_seller_unchanged(self):
         """partner_auction(2000, 'ON') seller should still be $70.11"""

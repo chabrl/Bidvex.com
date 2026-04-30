@@ -1,4 +1,10 @@
 """
+[DEPRECATED — iteration 139 audit, superseded by iteration 165 spec]
+
+Encoded pre-165 pricing math (buyer SR on BP only; partner buyer.total = $0).
+Replacement: `test_seller_type_pricing_165.py`. Kept for historical context
+but skipped at runtime so obsolete assertions don't block regression.
+
 BidVex PricingManager P0 Audit - Iteration 139
 Tests for Master Pricing Structure with 5 proofs, partner tier, stripe_recovery fix, and connect_payment_engine wiring.
 
@@ -9,6 +15,10 @@ Test Coverage:
 4. connect_payment_engine imports PricingManager (not hardcoded rates)
 5. Province-aware tax in connect_payment_engine
 """
+import pytest
+pytestmark = pytest.mark.skip(
+    reason="Superseded by test_seller_type_pricing_165.py (iteration 165 spec)"
+)
 
 import pytest
 import sys

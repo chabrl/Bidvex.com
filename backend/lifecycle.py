@@ -114,6 +114,12 @@ async def create_database_indexes(db):
                 ("listings", [("status", ASCENDING), ("auction_end_date", ASCENDING)], "idx_listings_status_enddate", False),
                 ("listings", [("seller_id", ASCENDING), ("status", ASCENDING)], "idx_listings_seller_status", False),
                 ("listings", [("id", ASCENDING)], "idx_listings_id_unique", True),
+                # Seller-type pricing/badge filter + geo-sort indexes
+                ("listings", [("seller_type", ASCENDING), ("status", ASCENDING)], "idx_listings_sellertype_status", False),
+                ("listings", [("seller_province", ASCENDING), ("status", ASCENDING)], "idx_listings_province_status", False),
+                ("multi_item_listings", [("seller_type", ASCENDING), ("status", ASCENDING)], "idx_multi_sellertype_status", False),
+                ("multi_item_listings", [("seller_province", ASCENDING), ("status", ASCENDING)], "idx_multi_province_status", False),
+                ("users", [("seller_type", ASCENDING)], "idx_users_seller_type", False),
                 ("users", [("email", ASCENDING)], "idx_users_email_unique", True),
                 ("users", [("role", ASCENDING)], "idx_users_role", False),
                 ("users", [("id", ASCENDING)], "idx_users_id_unique", True),

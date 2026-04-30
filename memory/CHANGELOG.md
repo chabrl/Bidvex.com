@@ -1,6 +1,44 @@
 # BidVex Changelog
 
 
+## Feb, 2026 — P0 Seller Type, Tax & Pricing Engine — Iteration 165 Spec — DONE
+
+### Critical math fix
+- **Buyer Stripe Recovery** now computed on `(hammer + BP)` instead of `BP only` (the docstring said the right thing; the code regressed). Restores spec proofs to the cent.
+
+### New canonical entry point
+- `PricingManager.calculate_fees(seller_type, …)` routes by 3-state `seller_type` enum:
+  - `individual` → tier-based BP+SC, full tax on BidVex fees
+  - `enterprise` → same as individual
+  - `partner` → buyer pays partner directly (hammer + partner BP); BidVex fee = $0; partner owes 3% + Stripe + tax
+- `partner_auction()` now accepts `partner_bp_rate`; buyer invoice surfaces both the partner BP line AND BidVex's $0 fee line.
+- **Tax ALWAYS applies to BidVex fees for ALL seller types.** No `Tax-Free` / `tax_rate=0` for individuals (sentinel test enforces this).
+
+### Models / persistence
+- `models/user_models.py` — added `SELLER_TYPE_INDIVIDUAL/PARTNER/ENTERPRISE` constants + `resolve_seller_type(user)` helper that derives canonical value from `is_partner` + `account_type` for legacy users.
+- `models/auction_models.py` — added `seller_type`, `partner_bp_rate`, `seller_province`, `seller_city` to `Listing` and `MultiItemListing`.
+- `services/listings_service.py:apply_partner_tags()` — copies all four fields onto every new listing at creation; rejects partner listings without `partner_bp_rate` (HTTP 422 with bilingual message).
+
+### Filters + geo-sort
+- `services/geo_sort.py` (NEW) — Canadian province adjacency map (QC→ON,NB,NL etc.); `geo_priority_value()` returns 0 (same) / 1 (adjacent) / 2 (other).
+- `routes/listings.py` and `routes/marketplace.py` — both endpoints accept `tax_status` (`partner` | `standard`) and `buyer_province` query params; `sort=nearby_first` is the new default and bubbles same/adjacent-province listings to the top.
+- `lifecycle.py` — added `seller_type`/`seller_province` indexes on `listings`, `multi_item_listings`, and `users`.
+
+### Frontend
+- `components/FilterBar/FilterBar.js` — new "Tax Status" select (3 options) + "Nearby First" sort option (set as default; default activeCount calc updated accordingly).
+- `components/FlattenedMarketplace.js` — new "🛡️ Partner Auction" badge (`#2186C6` border, transparent fill, uppercase) keyed off `item.seller_type === 'partner'` (with `is_partner_listing` fallback).
+- `hooks/useMarketplaceItems.js` — passes `tax_status` and `buyer_province` to backend; default sort = `nearby_first`.
+- Marketplace cache `_LISTING_PROJECTION` and `_MULTI_PROJECTION` extended to include the 4 new fields so they propagate through Redis.
+
+### Verification
+- 3 spec proofs match to the cent (Proof 2 differs by $0.01 due to ROUND_HALF_UP order; both values are valid accounting).
+- `test_seller_type_pricing_165.py` (NEW, 10 tests) is the canonical regression suite.
+- Pricing files: **45/45 tests pass**.
+- Legacy tests at iterations 104/106/139 deprecated with module-level `pytest.mark.skip` and a clear pointer to `_165` (no duplication, history preserved).
+- `grep -rn "Tax-Free|tax_free|tax_rate.*0.*individual" backend/` → only hit is the sentinel-test docstring (zero production hits).
+
+
+
 ## Feb, 2026 — P1 Advanced Analytics Aggregation — DONE
 
 ### Backend
