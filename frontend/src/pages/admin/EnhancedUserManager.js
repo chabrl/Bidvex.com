@@ -27,7 +27,7 @@ import { toast } from 'sonner';
 import { 
   Users, CheckCircle, MessageCircleOff, Search, UserPlus, 
   Copy, Check, Eye, EyeOff, Building2, User, Shield, Mail,
-  Phone, AlertTriangle, X, Ban, Trash2
+  Phone, AlertTriangle, X, Ban, Trash2, MapPin
 } from 'lucide-react';
 
 const API = API_BASE;
@@ -40,6 +40,8 @@ const EnhancedUserManager = () => {
   const [filter, setFilter] = useState('all');
   const [analytics, setAnalytics] = useState({});
   const [loading, setLoading] = useState(true);
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortDir, setSortDir] = useState('desc');
 
   // Create User Dialog State
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -64,19 +66,21 @@ const EnhancedUserManager = () => {
 
   useEffect(() => {
     fetchData();
-  }, [filter]);
+  }, [filter, sortBy, sortDir]);
 
   useEffect(() => {
-    // Real-time search filtering
+    // Real-time search filtering (client-side within the current page)
     if (searchQuery.trim() === '') {
       setFilteredUsers(users);
     } else {
       const query = searchQuery.toLowerCase();
-      const filtered = users.filter(user => 
+      const filtered = users.filter(user =>
         user.name?.toLowerCase().includes(query) ||
         user.email?.toLowerCase().includes(query) ||
         user.id?.toLowerCase().includes(query) ||
-        user.company_name?.toLowerCase().includes(query)
+        user.company_name?.toLowerCase().includes(query) ||
+        user.phone?.toLowerCase().includes(query) ||
+        user.city?.toLowerCase().includes(query)
       );
       setFilteredUsers(filtered);
     }
@@ -85,7 +89,11 @@ const EnhancedUserManager = () => {
   const fetchData = async () => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const endpoint = filter === 'all' ? '/admin/users' : `/admin/users/filter?account_type=${filter}`;
+      const qp = `sort_by=${encodeURIComponent(sortBy)}&sort_dir=${encodeURIComponent(sortDir)}&limit=200`;
+      const endpoint =
+        filter === 'all'
+          ? `/admin/users?${qp}`
+          : `/admin/users/filter?account_type=${filter}`;
       const [usersRes, analyticsRes] = await Promise.all([
         axios.get(`${API}${endpoint}`, { headers }),
         axios.get(`${API}/admin/analytics/users`, { headers })
@@ -98,6 +106,15 @@ const EnhancedUserManager = () => {
       toast.error('Failed to load users');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const toggleSort = (column) => {
+    if (sortBy === column) {
+      setSortDir(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(column);
+      setSortDir('asc');
     }
   };
 
@@ -400,9 +417,41 @@ const EnhancedUserManager = () => {
       {/* User List - Responsive */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base sm:text-lg">
-            Users ({filteredUsers.length}{searchQuery && ` of ${users.length}`})
-          </CardTitle>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <CardTitle className="text-base sm:text-lg">
+              Users ({filteredUsers.length}{searchQuery && ` of ${users.length}`})
+            </CardTitle>
+            {/* Sortable column bar */}
+            <div className="flex flex-wrap items-center gap-1 text-xs" data-testid="user-sort-bar">
+              <span className="text-muted-foreground mr-1">Sort:</span>
+              {[
+                { key: 'name', label: 'Name' },
+                { key: 'email', label: 'Email' },
+                { key: 'phone', label: 'Phone' },
+                { key: 'city', label: 'City' },
+                { key: 'role', label: 'Role' },
+                { key: 'created_at', label: 'Created' },
+              ].map(col => {
+                const active = sortBy === col.key;
+                return (
+                  <button
+                    key={col.key}
+                    type="button"
+                    onClick={() => toggleSort(col.key)}
+                    className={`px-2 py-1 rounded border transition-colors ${
+                      active
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-card text-muted-foreground border-border hover:bg-accent'
+                    }`}
+                    data-testid={`sort-by-${col.key}`}
+                    aria-pressed={active}
+                  >
+                    {col.label}{active && (sortDir === 'asc' ? ' ▲' : ' ▼')}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="p-3 sm:p-6 pt-0">
           <div className="space-y-3">
@@ -410,6 +459,7 @@ const EnhancedUserManager = () => {
               <div 
                 key={user.id} 
                 className="flex flex-col gap-3 p-3 sm:p-4 border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                data-testid={`user-row-${user.id}`}
               >
                 {/* User Info */}
                 <div className="flex-1 min-w-0">
@@ -425,6 +475,22 @@ const EnhancedUserManager = () => {
                   {user.company_name && (
                     <p className="text-sm text-blue-600 dark:text-blue-400 truncate">{user.company_name}</p>
                   )}
+                  {/* Phone + City — new iteration 168 fields */}
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1" data-testid={`user-phone-${user.id}`}>
+                      <Phone className="h-3 w-3" />
+                      {user.phone ? (
+                        <a href={`tel:${user.phone}`} className="hover:underline">{user.phone}</a>
+                      ) : (
+                        <span className="italic opacity-60">no phone</span>
+                      )}
+                    </span>
+                    <span className="flex items-center gap-1" data-testid={`user-city-${user.id}`}>
+                      <MapPin className="h-3 w-3" />
+                      {user.city || <span className="italic opacity-60">no city</span>}
+                      {user.province && <span className="text-[10px] ml-1 opacity-70">({user.province})</span>}
+                    </span>
+                  </div>
                   <div className="flex flex-wrap gap-1.5 mt-2">
                     <Badge variant="outline" className="text-xs">
                       {user.account_type === 'business' ? 'Business' : 'Individual'}

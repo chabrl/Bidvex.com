@@ -85,30 +85,55 @@ async def list_users(
     limit: int = 20,
     search: Optional[str] = None,
     role: Optional[str] = None,
+    sort_by: Optional[str] = "created_at",
+    sort_dir: Optional[str] = "desc",
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
-    """List all users with pagination"""
+    """List all users with pagination, filtering, and sortable columns.
+
+    Sortable columns: name, email, phone, city, role, created_at
+    sort_dir: "asc" | "desc"
+    """
     await require_admin(credentials)
     db = get_db()
-    
+
     query = {}
     if search:
         query["$or"] = [
             {"name": {"$regex": search, "$options": "i"}},
-            {"email": {"$regex": search, "$options": "i"}}
+            {"email": {"$regex": search, "$options": "i"}},
+            {"phone": {"$regex": search, "$options": "i"}},
+            {"city": {"$regex": search, "$options": "i"}},
         ]
     if role:
         query["role"] = role
-    
+
+    # Whitelist sortable columns to prevent injection / wasted index scans.
+    ALLOWED_SORT = {"name", "email", "phone", "city", "role", "created_at"}
+    if sort_by not in ALLOWED_SORT:
+        sort_by = "created_at"
+    direction = 1 if (sort_dir or "").lower() == "asc" else -1
+
     skip = (page - 1) * limit
-    users = await db.users.find(query, {"_id": 0, "password_hash": 0}).skip(skip).limit(limit).to_list(limit)
+    # Note: phone/city are stored with whitespace/case variance — we cast to a
+    # case-insensitive collation via the secondary `name` tiebreaker.
+    users = (
+        await db.users.find(query, {"_id": 0, "password_hash": 0, "password": 0})
+        .collation({"locale": "en", "strength": 2})
+        .sort([(sort_by, direction), ("name", 1)])
+        .skip(skip)
+        .limit(limit)
+        .to_list(limit)
+    )
     total = await db.users.count_documents(query)
-    
+
     return {
         "users": users,
         "total": total,
         "page": page,
-        "pages": (total + limit - 1) // limit
+        "pages": (total + limit - 1) // limit,
+        "sort_by": sort_by,
+        "sort_dir": "asc" if direction == 1 else "desc",
     }
 
 

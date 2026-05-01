@@ -517,7 +517,18 @@ async def process_scheduled_campaigns_job():
 # D+14 post fee payment → admin alert + nudge email to buyer.
 
 async def _send_settlement_reminder_emails():
-    """Send D+7 dealer reminders and D+14 admin/buyer alerts."""
+    """
+    Send D+7 dealer reminders and D+14 admin/buyer alerts.
+
+    Self-healing / catch-up behavior:
+    - D+7 fires for any AWAITING_DEALER_CONFIRMATION settlement where fee was paid
+      at least 7 days ago AND `dealer_reminder_d7_sent_at` is missing.
+    - D+14 fires for any AWAITING settlement where fee was paid ≥14 days ago AND
+      `admin_alert_d14_sent_at` is missing.
+    Missed days (scheduler downtime, deploys, crashes) are automatically caught up
+    on the next successful run because the idempotency guard is the `*_sent_at`
+    flag, not a narrow date match.
+    """
     db = db_instance
     if db is None:
         return
@@ -525,17 +536,16 @@ async def _send_settlement_reminder_emails():
     from datetime import timedelta
     import os as _os
     now = datetime.now(timezone.utc)
-    day7 = (now - timedelta(days=7)).isoformat()
-    day8 = (now - timedelta(days=8)).isoformat()
-    day14 = (now - timedelta(days=14)).isoformat()
-    day15 = (now - timedelta(days=15)).isoformat()
+    day7_cutoff = (now - timedelta(days=7)).isoformat()
+    day14_cutoff = (now - timedelta(days=14)).isoformat()
 
-    # ── D+7 dealer reminder (only if not already sent) ──
+    # ── D+7 dealer reminder (catch-up: any settlement ≥7d old without the flag) ──
     cursor = db.vehicle_settlements.find({
         "settlement_status": "AWAITING_DEALER_CONFIRMATION",
-        "fee_paid_at": {"$gte": day8, "$lte": day7},
+        "fee_paid_at": {"$lte": day7_cutoff},
         "dealer_reminder_d7_sent_at": {"$exists": False},
     })
+    d7_sent = 0
     async for s in cursor:
         seller_id = s.get("seller_id")
         if not seller_id:
@@ -559,10 +569,11 @@ async def _send_settlement_reminder_emails():
                 {"auction_id": vehicle_id},
                 {"$set": {"dealer_reminder_d7_sent_at": now.isoformat()}},
             )
+            d7_sent += 1
         except Exception as e:
             logger.error(f"[SETTLEMENT_REMINDER] D+7 email failed for {vehicle_id}: {e}")
 
-    # ── D+14 admin alert + buyer nudge ──
+    # ── D+14 admin alert + buyer nudge (catch-up) ──
     admin_email = (
         _os.environ.get("ADMIN_NOTIFICATION_EMAIL")
         or _os.environ.get("ADMIN_EMAIL")
@@ -570,9 +581,10 @@ async def _send_settlement_reminder_emails():
     )
     cursor = db.vehicle_settlements.find({
         "settlement_status": "AWAITING_DEALER_CONFIRMATION",
-        "fee_paid_at": {"$gte": day15, "$lte": day14},
+        "fee_paid_at": {"$lte": day14_cutoff},
         "admin_alert_d14_sent_at": {"$exists": False},
     })
+    d14_sent = 0
     async for s in cursor:
         vehicle_id = s["auction_id"]
         html_admin = f"""
@@ -599,8 +611,12 @@ async def _send_settlement_reminder_emails():
                 {"auction_id": vehicle_id},
                 {"$set": {"admin_alert_d14_sent_at": now.isoformat()}},
             )
+            d14_sent += 1
         except Exception as e:
             logger.error(f"[SETTLEMENT_REMINDER] D+14 email failed for {vehicle_id}: {e}")
+
+    if d7_sent or d14_sent:
+        logger.info(f"[SETTLEMENT_REMINDER] catch-up sweep: {d7_sent} D+7, {d14_sent} D+14 reminders sent")
 
 
 async def settlement_reminders_job():
