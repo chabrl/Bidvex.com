@@ -1,6 +1,53 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: P3/P2 Final Polish + Live Auctions Pill (Apr 27 PM, 2026) — DONE
+## Latest: P0 Storage Auctions — Payment Method Choice + Deposit System (May 1, 2026 / iter170) — DONE
+
+### Spec
+Facility chooses payment method per listing (Stripe / Cash / E-Transfer). Optional participation deposit configured per auction. 4 frontend polish fixes (white hero title + bilingual content swap, footer restored, 3-step facility registration, listing-create payment+deposit UI). Backend pricing rewritten for 3 methods + Stripe Connect Express on facility registration + deposit hold/release/forfeit lifecycle + bid guard (HTTP 402 when deposit required).
+
+### Source-of-truth math (3 spec proofs — verified to the cent)
+- **Stripe path** ($800 QC + $100 deposit) → buyer pays $874.34, remaining at pickup $774.34, facility receives full $800 hammer
+- **Cash path** ($800 QC + $100 deposit) → buyer pays $700 cash to facility, BidVex invoices facility $47.67 (40 fee + 1.46 stripe + 6.21 tax), facility net $752.33
+- **E-Transfer** ($1500 ON, no deposit) → buyer pays $1500 e-transfer, facility owes BidVex $87.55 (75 fee + 2.48 stripe + 10.07 HST), facility net $1412.45
+
+### Backend
+- **`services/storage_pricing.py`** — Rewritten with branching for Stripe (BidVex collects 5% + stripe + tax from BUYER, facility nets full hammer) vs Cash/E-Transfer (BidVex invoices FACILITY 5% + stripe + tax). All 3 spec proofs assert at module load.
+- **`services/storage_deposit_service.py`** (NEW) — `create_deposit_hold` (Stripe PaymentIntent capture_method=manual), `release_deposits_on_close` (winner→applied/canceled, losers→refunded/canceled), `forfeit_deposit` (capture as penalty when winner doesn't pay).
+- **`models/storage_auction.py`** — `StorageAuctionCreate` adds single `payment_method` (validator + 422 on invalid), `deposit_required`, `deposit_amount` (validator: required >0 if deposit_required=true with bilingual error). NEW `StorageDepositRequest` model.
+- **`routes/storage_auctions.py`**:
+  - `POST /storage-facilities/register` now creates Stripe Connect Express account (CA, MCC 4225, transfers+card_payments capabilities) and returns `stripe_onboarding_url`. Graceful degradation if Stripe rejects (returns null URL, doesn't 500). 409 on duplicate with bilingual error.
+  - `POST /storage-facilities/auctions` validates payment_method ∈ {stripe,cash,etransfer}, deposit_required+amount, persists single payment_method on the auction doc.
+  - `POST /storage-auctions/{id}/bid` → **NEW deposit guard** returns HTTP 402 with `{error, deposit_amount, message_en, message_fr, action: "pay_deposit"}` when deposit required and not paid.
+  - `POST /storage-auctions/{id}/deposit` (NEW) — buyer authorizes deposit via Stripe PI manual-capture. Idempotent (returns existing held deposit).
+  - `GET /storage-auctions/{id}/pricing` accepts `payment_method` + `deposit_amount` query params, returns the new buyer/facility invoice shape.
+  - `POST /admin/storage-auctions/{id}/release-deposits` and `/forfeit-deposit` (NEW) — admin-only manual deposit lifecycle controls.
+  - `PUT /admin/storage-auctions/{id}/cancel` now releases held deposits.
+
+### Frontend
+- **`pages/storage/StorageHero.{js,css}`** — Title `Trésors cachés. Révélés.` rendered in pure `#FFFFFF` with text-shadow. Removed dual-language secondary lines. Single content map per language (EN/FR) with eyebrow/line1/line2/subtitle/CTAs/4 badges all swapping based on `i18n.language`.
+- **`components/Footer.js`** — Removed Storage Auctions section (was 25-line subsection). Global footer restored to `How It Works | About Us | Community | Privacy Policy | Terms of Service | Contact Support | Cookie Settings | Social icons | Copyright`.
+- **`pages/storage/StorageFooterBanner.js`** (NEW) — Contextual "Do you manage a storage facility?" banner rendered ONLY on storage routes (Browse, Detail, Dashboard, Policies×3, Register).
+- **`pages/storage/StorageAuctionsBrowse.js`** — Updated transparency banner: "No buyer fees on cash/e-transfer auctions. Stripe fee + taxes apply on Stripe-payment auctions."
+- **`pages/storage/StorageAuctionCreate.js`** — Replaced multi-checkbox `payment_methods_accepted` with single `payment_method` selector (3 colored cards with bilingual descriptions). Added deposit toggle + amount input with live UX preview of who pays what.
+- **`pages/storage/StorageFacilityRegister.js`** — Rewritten as 3-step wizard (Step 1: Facility Info → Step 2: Business Credentials w/ NEQ + OPC permit if QC → Step 3: Stripe Setup + T&C). Submit returns Stripe onboarding URL → redirects user to Stripe.
+- **`pages/storage/StoragePolicies.js`** — Updated Section 4 ("No Buyer Fees" → "Buyer Fees Depend on Payment Method") to match new pricing rules. Added `<StorageFooterBanner />` to all 3 exported components.
+
+### Tests
+- `/app/backend/tests/test_storage_payment_deposit_iter170.py` — **10/10 unit pass** (3 spec proofs + AB tax + unknown province + 5 Pydantic validation tests)
+- `/app/backend/tests/test_storage_iter170_api.py` (testing-agent created) — **16/16 API integration pass**
+- Total: **26/26 storage tests green**, zero critical/minor blockers.
+
+### Verification artifacts
+- Live screenshots: hero EN white title, hero FR white title (no English bleed), Storage Browse with new banner + storage footer, 3-step register wizard rendering, listing-create payment selector with Cash highlighted + deposit toggle/amount input populated.
+- Module-load proofs: all 3 buyer/facility invoice spec values (Proof 1/2/3) match to the cent.
+
+### Files changed
+- backend: `services/storage_pricing.py`, `services/storage_deposit_service.py` (NEW), `models/storage_auction.py`, `routes/storage_auctions.py`
+- frontend: `pages/storage/StorageHero.{js,css}`, `pages/storage/StorageFooterBanner.js` (NEW), `pages/storage/StorageAuctionsBrowse.js`, `pages/storage/StorageAuctionCreate.js`, `pages/storage/StorageFacilityRegister.js`, `pages/storage/StorageAuctionDetail.js`, `pages/storage/StorageDashboard.js`, `pages/storage/StoragePolicies.js`, `components/Footer.js`
+
+---
+
+## Previous: P3/P2 Final Polish + Live Auctions Pill (Apr 27 PM, 2026) — DONE
 - Footer GET /api/site-config/legal-pages: 500 → 200 (defensive isinstance guards + graceful fallback)
 - NotificationListener WS: silent error handling, 5-attempt exponential backoff, no console spam
 - Vehicle + General invoice PDFs fully bilingual EN/FR (body, line items, tax labels with combined 14.975%, payment instructions, footer)
