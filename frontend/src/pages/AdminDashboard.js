@@ -553,6 +553,7 @@ const AdminDashboard = () => {
                 <button
                   key={tab.id}
                   onClick={() => setSecondaryTab(tab.id)}
+                  data-testid={`admin-tab-${tab.id}`}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-sm transition-all whitespace-nowrap ${
                     isActive 
                       ? 'bg-white text-primary shadow border border-primary/20' 

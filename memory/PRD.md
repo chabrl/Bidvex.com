@@ -1,5 +1,30 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: P0 — Final Polish Sprint (May 1, 2026 / iter173) — 6/6 DONE
+
+### Spec (6/6 delivered)
+1. **QR Code Pickup Integration** — `qrcode==8.2` installed; new `GET /api/storage-auctions/{id}/pickup-qr` returns PNG (ERROR_CORRECT_H, box_size=10) restricted to winner / facility-owner / admin. Winner email now embeds a 180×180 base64 QR alongside the existing `BV-XXXX-XXXX` code with bilingual "Scan at pickup · Show code to staff" caption.
+2. **Storage Auto-Bid UI Tier Callout** — `StorageAuctionDetail` sidebar now renders a tier-aware bilingual callout below the bid input: 👑 amber "Pro Auto-Bid · Auto-Enchère Pro" badge for Premium/VIP/VIP_Elite/Partner_Pro/Business; blue "Auto-Bid Info" upsell with "Upgrade to Premium · Passez à Premium" link for free tier. Storage proxy is intrinsic (every bid = max_bid ceiling), so all users still get auto-bidding.
+3. **Facility Promotion Modal** — New `PromoteAuctionModal.js` with 3-tier grid (Basic $9.99 / Featured $24.99 / Premium $49.99) → Stripe `confirmCardPayment` flow → activates promotion via existing `/promote` + `/promote/confirm` endpoints. Wired into `StorageDashboard` per-auction "Promote · Promouvoir" button (only on active/upcoming auctions without an existing promotion).
+4. **Admin "Create Storage Auction" UI** — New `AdminStorageAuctions.js` admin page with auction list + filters + Create dialog (facility picker, all 11 fields with date-time pickers, payment-method selector, optional deposit). Wired under Admin → Marketplace → "Storage Auctions" secondary tab (data-testid `admin-tab-storage-auctions-admin`).
+5. **Vehicle Deposit Flow UI ($500 Manual Capture)** — `SecurityDepositBanner` rewritten: clicking "Authorize Hold" now opens a Stripe Elements modal with `<CardElement>` → `stripe.confirmCardPayment(client_secret)` → new backend endpoint `POST /api/deposits/confirm` syncs the hold status (`requires_capture` = held). OPC-compliant manual capture: card pre-authorized, never charged unless winner defaults on fee invoice.
+6. **Pydantic V2 Migration** — Replaced all bare `@validator` decorators in `models/storage_auction.py` with `@field_validator(mode='after')` + `@model_validator(mode='after')`. Replaced `.dict()` calls in `services/subscription_pricing.py`, `services/ai_assistant.py`, `routes/subscriptions.py`, `routes/storage_auctions.py` with `.model_dump()` (with V1 fallback). Tests assert ABSENCE of V1 `@validator` decorator.
+
+### Tests — 33/33 green
+- `test_storage_iter173_api.py` (NEW) — 17 tests pass + 2 skipped (env-only, need sold auction with pickup_code)
+- Regression: `test_storage_payment_deposit_iter170.py` — 10/10 + `test_storage_proxy_bug_iter172.py` — 6/6
+- Pydantic V2 ValidationError correctly raised on invalid `payment_method='bitcoin'` and `deposit_required=True with deposit_amount=0`
+- Pickup-QR auth ordering verified: 401 → 404 → 403 in correct sequence
+
+### Files changed (iter173)
+- Backend: `routes/storage_auctions.py` (+pickup-qr endpoint, +_generate_pickup_qr_png_bytes, fixed Pydantic V1 dict()), `routes/deposits.py` (+POST /confirm endpoint), `services/email_notifications.py` (QR base64 embed in winner email), `models/storage_auction.py` (Pydantic V2 decorators), `services/subscription_pricing.py` (.model_dump()), `services/ai_assistant.py` (.model_dump() with fallback), `routes/subscriptions.py` (.model_dump() with fallback), `requirements.txt` (+qrcode==8.2)
+- Frontend: `pages/storage/PromoteAuctionModal.js` (NEW), `pages/admin/AdminStorageAuctions.js` (NEW), `pages/storage/StorageDashboard.js` (Promote button), `pages/storage/StorageAuctionDetail.js` (Auto-Bid callout), `pages/AdminDashboard.js` (+secondary tab + data-testid), `components/SecurityDepositBanner.js` (REWRITE with Stripe Elements)
+
+### GitHub push
+Per Emergent platform policy, please use the **"Save to Github"** button in the chat input.
+
+---
+
 ## Latest: P0 — Storage + Vehicle Sprint (May 1, 2026 / iter172) — 11/11 DONE
 
 ### 🔴 CRITICAL PROXY-BID BUG — FIXED
