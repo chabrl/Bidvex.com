@@ -36,43 +36,103 @@
   letter-spacing: 3px;
   text-transform: uppercase;
   color: #3FB4CB;
-  margin-bottom: 12px;
+  margin-bottom: 4px;
   padding: 4px 10px;
   background: rgba(63, 180, 203, 0.12);
   border: 1px solid rgba(63, 180, 203, 0.4);
   border-radius: 20px;
+}
+.storage-hero__label--fr {
+  display: inline-block;
+  margin-left: 0;
+  margin-top: 4px;
+  margin-bottom: 12px;
+  color: rgba(63, 180, 203, 0.85);
+  background: rgba(63, 180, 203, 0.08);
+  border-color: rgba(63, 180, 203, 0.25);
+  letter-spacing: 2px;
 }
 
 .storage-hero__title {
   font-size: clamp(36px, 6vw, 60px);
   font-weight: 900;
   line-height: 1.05;
-  margin: 0 0 8px 0;
+  margin: 0 0 4px 0;
   letter-spacing: -1.5px;
   color: #FFFFFF;
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
 }
 
 .storage-hero__title-line2 {
-  display: block;
+  display: inline;
   color: #FFFFFF;
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
 }
 
+/* French title — visible, smaller, sky-tinted */
+.storage-hero__title-fr-visible {
+  display: block;
+  font-size: clamp(22px, 3.4vw, 32px);
+  font-weight: 700;
+  line-height: 1.15;
+  margin: 0 0 8px 0;
+  letter-spacing: -0.5px;
+  color: #3FB4CB;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+.storage-hero__title-fr-line2 {
+  color: #3FB4CB;
+}
+
+/* Legacy class kept for backwards-compat — hidden */
 .storage-hero__title-fr {
-  display: none; /* dual-language secondary line removed in iter170 */
+  display: none;
 }
 
 .storage-hero__subtitle {
   max-width: 560px;
   font-size: clamp(14px, 1.6vw, 17px);
   line-height: 1.5;
-  color: rgba(255, 255, 255, 0.85);
+  color: rgba(255, 255, 255, 0.9);
   margin-top: 20px;
 }
 
+.storage-hero__subtitle-fr-visible {
+  max-width: 560px;
+  font-size: clamp(12px, 1.35vw, 14px);
+  line-height: 1.45;
+  font-style: italic;
+  color: rgba(63, 180, 203, 0.85);
+  margin-top: 8px;
+}
+
 .storage-hero__subtitle--fr {
-  display: none; /* dual-language secondary line removed in iter170 */
+  display: none; /* legacy */
+}
+
+/* CTA dual-language labels */
+.storage-hero__cta .cta-en { display: block; }
+.storage-hero__cta .cta-fr {
+  display: block;
+  font-size: 11px;
+  opacity: 0.8;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+/* Badge dual-language */
+.storage-hero__badge {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  opacity: 0;
+  animation: badgeFadeIn 500ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.storage-hero__badge .badge-fr {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.55);
+  font-style: italic;
 }
 
 .storage-hero__ctas {
@@ -125,8 +185,9 @@
 }
 .storage-hero__badge {
   display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
   opacity: 0;
   animation: badgeFadeIn 500ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }

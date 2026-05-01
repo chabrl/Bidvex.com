@@ -129,6 +129,33 @@ def _resolve_status(auction: dict) -> str:
 # PUBLIC ROUTES
 # ─────────────────────────────────────────────────────────────
 
+@storage_router.get("/storage-auctions/stats/public")
+async def storage_public_stats():
+    """
+    Public (unauthenticated) stats for the browse page marquee.
+    Returns zero-safe counts; frontend hides cards that equal 0.
+    """
+    db = get_db()
+    now_iso = _now().isoformat()
+    total_sold = await db.storage_auctions.count_documents({"status": "sold"})
+    active_auctions = await db.storage_auctions.count_documents(
+        {"status": "active", "end_time": {"$gt": now_iso}}
+    )
+    active_facilities = await db.storage_facilities.count_documents(
+        {"status": "verified", "verified": True}
+    )
+    bids_agg = await db.storage_auctions.aggregate(
+        [{"$group": {"_id": None, "total": {"$sum": "$bid_count"}}}]
+    ).to_list(1)
+    total_bids = int((bids_agg[0] or {}).get("total", 0)) if bids_agg else 0
+    return {
+        "total_sold": total_sold,
+        "active_facilities": active_facilities,
+        "active_auctions": active_auctions,
+        "total_bids_placed": total_bids,
+    }
+
+
 @storage_router.get("/storage-auctions/provinces")
 async def list_provinces():
     """Province → active-auction count."""
@@ -828,6 +855,90 @@ async def admin_forfeit_deposit(
     if not buyer_id:
         raise HTTPException(status_code=400, detail="buyer_id required")
     return await forfeit_deposit(db, auction_id, buyer_id, reason)
+
+
+# ─────────────────────────────────────────────────────────────
+# ADMIN DEPOSITS DASHBOARD (iter171)
+# ─────────────────────────────────────────────────────────────
+
+@storage_router.get("/admin/storage-deposits")
+async def admin_list_deposits(
+    current_user: User = Depends(_require_admin),
+    status: Optional[str] = Query(None),
+):
+    """
+    Returns deposit stats + a flat list of all deposits (enriched with
+    bidder name / auction unit number / facility name for the UI table).
+    """
+    db = get_db()
+
+    # Count by status (4 KPI cards). Stripe stores 'held' after authorization,
+    # but the spec labels this as 'Active Holds' (authorized). We count BOTH
+    # 'held' and 'authorized' for safety.
+    pipe = [{"$group": {"_id": "$status", "count": {"$sum": 1}}}]
+    by_status = {}
+    async for r in db.storage_deposits.aggregate(pipe):
+        by_status[r["_id"]] = r["count"]
+
+    stats = {
+        "active_holds": by_status.get("held", 0) + by_status.get("authorized", 0),
+        "applied": by_status.get("applied", 0),
+        "refunded": by_status.get("refunded", 0),
+        "forfeited": by_status.get("forfeited", 0),
+    }
+
+    # Rows
+    q = {}
+    if status:
+        # Accept 'active' as an alias for held + authorized
+        if status == "active":
+            q["status"] = {"$in": ["held", "authorized"]}
+        else:
+            q["status"] = status
+    rows = await db.storage_deposits.find(q, {"_id": 0}).sort("created_at", -1).limit(500).to_list(500)
+
+    # Enrich
+    buyer_ids = list({r.get("buyer_id") for r in rows if r.get("buyer_id")})
+    auction_ids = list({r.get("auction_id") for r in rows if r.get("auction_id")})
+
+    buyers = {}
+    if buyer_ids:
+        async for u in db.users.find({"id": {"$in": buyer_ids}}, {"_id": 0, "id": 1, "name": 1, "full_name": 1, "email": 1}):
+            buyers[u["id"]] = u
+
+    auctions = {}
+    fac_ids_set = set()
+    if auction_ids:
+        async for a in db.storage_auctions.find(
+            {"id": {"$in": auction_ids}},
+            {"_id": 0, "id": 1, "unit_number": 1, "facility_id": 1, "facility_name": 1, "current_bid": 1},
+        ):
+            auctions[a["id"]] = a
+            if a.get("facility_id"):
+                fac_ids_set.add(a["facility_id"])
+
+    facilities = {}
+    if fac_ids_set:
+        async for f in db.storage_facilities.find(
+            {"id": {"$in": list(fac_ids_set)}},
+            {"_id": 0, "id": 1, "company_name": 1},
+        ):
+            facilities[f["id"]] = f
+
+    enriched = []
+    for r in rows:
+        auc = auctions.get(r.get("auction_id", ""), {})
+        fac = facilities.get(auc.get("facility_id", ""), {})
+        buyer = buyers.get(r.get("buyer_id", ""), {})
+        enriched.append({
+            **r,
+            "bidder_name": buyer.get("full_name") or buyer.get("name") or buyer.get("email") or "—",
+            "bidder_email": buyer.get("email") or "—",
+            "auction_unit_number": auc.get("unit_number", "—"),
+            "facility_name": fac.get("company_name") or auc.get("facility_name") or "—",
+        })
+
+    return {"stats": stats, "total": len(enriched), "deposits": enriched}
 
 
 # ─────────────────────────────────────────────────────────────

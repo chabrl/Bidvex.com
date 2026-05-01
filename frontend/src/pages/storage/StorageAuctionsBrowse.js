@@ -35,6 +35,7 @@ const StorageAuctionsBrowse = () => {
 
   const [data, setData] = useState({ total: 0, auctions: [] });
   const [provinces, setProvinces] = useState([]);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
     province: '',
@@ -57,12 +58,14 @@ const StorageAuctionsBrowse = () => {
       params.append('sort', filters.sort);
       params.append('limit', '24');
 
-      const [list, provs] = await Promise.all([
+      const [list, provs, pub] = await Promise.all([
         axios.get(`${API}/storage-auctions?${params.toString()}`),
         axios.get(`${API}/storage-auctions/provinces`),
+        axios.get(`${API}/storage-auctions/stats/public`).catch(() => ({ data: null })),
       ]);
       setData(list.data);
       setProvinces(provs.data?.provinces || []);
+      setStats(pub.data || null);
     } catch (err) {
       // No-op — empty state is fine on first launch
     } finally {
@@ -78,17 +81,56 @@ const StorageAuctionsBrowse = () => {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900" data-testid="storage-browse-page">
       <StorageHero />
 
-      {/* Pricing transparency banner — depends on facility's chosen payment method */}
-      <div className="bg-emerald-50 dark:bg-emerald-950/30 border-y border-emerald-200 dark:border-emerald-900/40 py-2.5 text-center text-xs text-emerald-800 dark:text-emerald-300">
-        💰 <strong>{isFr ? 'Frais transparents.' : 'Transparent fees.'}</strong>
-        {' '}
-        {isFr
-          ? 'Aucuns frais acheteur sur les enchères au comptant ou par virement Interac. Frais Stripe et taxes appliqués sur les enchères Stripe.'
-          : 'No buyer fees on cash or e-transfer auctions. Stripe fee + taxes apply on Stripe-payment auctions.'}
+      {/* ── PUBLIC STATS BAR (iter171) — always bilingual, hides zero cards ── */}
+      {stats && (stats.total_sold > 0 || stats.active_facilities > 0 || stats.active_auctions > 0) && (
+        <div className="bg-[#0B2545] border-b border-[#1a3a5c] py-4" data-testid="storage-public-stats">
+          <div className="container mx-auto px-4">
+            <div className="flex flex-wrap justify-center items-start gap-6 md:gap-12 text-white">
+              {stats.total_sold > 0 && (
+                <div className="text-center" data-testid="stat-total-sold">
+                  <p className="text-2xl md:text-3xl font-black text-[#3FB4CB]">{stats.total_sold}</p>
+                  <p className="text-xs text-gray-300">Units Sold</p>
+                  <p className="text-[11px] italic text-[#3FB4CB]/70">Unités vendues</p>
+                </div>
+              )}
+              {stats.active_facilities > 0 && (
+                <div className="text-center" data-testid="stat-active-facilities">
+                  <p className="text-2xl md:text-3xl font-black text-[#3FB4CB]">{stats.active_facilities}</p>
+                  <p className="text-xs text-gray-300">Verified Facilities</p>
+                  <p className="text-[11px] italic text-[#3FB4CB]/70">Facilités vérifiées</p>
+                </div>
+              )}
+              {stats.active_auctions > 0 && (
+                <div className="text-center" data-testid="stat-active-auctions">
+                  <p className="text-2xl md:text-3xl font-black text-[#3FB4CB]">{stats.active_auctions}</p>
+                  <p className="text-xs text-gray-300">Live Now</p>
+                  <p className="text-[11px] italic text-[#3FB4CB]/70">En direct maintenant</p>
+                </div>
+              )}
+              {stats.total_bids_placed > 0 && (
+                <div className="text-center" data-testid="stat-total-bids">
+                  <p className="text-2xl md:text-3xl font-black text-[#3FB4CB]">{stats.total_bids_placed.toLocaleString()}</p>
+                  <p className="text-xs text-gray-300">Bids Placed</p>
+                  <p className="text-[11px] italic text-[#3FB4CB]/70">Offres placées</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pricing transparency banner — always bilingual (Bill 96) */}
+      <div className="bg-emerald-50 dark:bg-emerald-950/30 border-y border-emerald-200 dark:border-emerald-900/40 py-3 text-center text-xs text-emerald-800 dark:text-emerald-300">
+        💰 <strong>Transparent fees.</strong>{' '}
+        No buyer fees on cash or e-transfer auctions. Stripe fee + taxes apply on Stripe-payment auctions.
         {' • '}
-        <Link to="/storage-auctions/how-it-works" className="underline hover:no-underline">
-          {isFr ? 'Comment ça marche' : 'How it works'}
-        </Link>
+        <Link to="/storage-auctions/how-it-works" className="underline hover:no-underline">How it works</Link>
+        <br className="md:hidden" />
+        <em className="opacity-80 block mt-0.5 md:inline md:ml-2">
+          <strong>Frais transparents.</strong> Aucuns frais acheteur sur les enchères au comptant ou par virement Interac. Frais Stripe et taxes appliqués sur les enchères Stripe.
+          {' • '}
+          <Link to="/storage-auctions/how-it-works" className="underline hover:no-underline">Comment ça marche</Link>
+        </em>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">

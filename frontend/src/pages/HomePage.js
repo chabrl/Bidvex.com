@@ -281,6 +281,9 @@ const HomePage = () => {
         <LiveAuctionsSection items={endingSoon} navigate={navigate} />
       )}
 
+      {/* ========== STORAGE AUCTIONS PROMO (iter171 — always bilingual) ========== */}
+      <StorageAuctionsPromo navigate={navigate} />
+
       {/* ========== HOT ITEMS WITH LIVE ANIMATIONS ========== */}
       {isSectionVisible('hot_items') && (
         <HotItemsSection items={hotItems} navigate={navigate} />
@@ -799,6 +802,128 @@ const HowItWorksSection = ({ navigate }) => {
             {t('homepage.learnMore')}
             <ArrowRight className="ml-2 h-5 w-5" />
           </Button>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+// ========== STORAGE AUCTIONS PROMO (iter171) ==========
+// Always renders EN + FR simultaneously (Bill 96).
+const StorageAuctionsPromo = ({ navigate }) => {
+  const [stats, setStats] = React.useState(null);
+
+  React.useEffect(() => {
+    const API = (process.env.REACT_APP_BACKEND_URL || '') + '/api';
+    fetch(`${API}/storage-auctions/stats/public`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => d && setStats(d))
+      .catch(() => {});
+  }, []);
+
+  return (
+    <section className="py-14 bg-gradient-to-r from-[#0B2545] to-[#0E2B52] relative overflow-hidden" data-testid="homepage-storage-promo">
+      {/* Subtle particle background */}
+      <div className="absolute inset-0 opacity-30 pointer-events-none">
+        <div className="absolute top-4 left-10 w-1.5 h-1.5 bg-[#3FB4CB] rounded-full animate-pulse" />
+        <div className="absolute top-12 left-1/4 w-1 h-1 bg-[#3FB4CB] rounded-full animate-pulse" style={{ animationDelay: '0.5s' }} />
+        <div className="absolute bottom-8 right-1/4 w-1.5 h-1.5 bg-[#3FB4CB] rounded-full animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-1/2 right-10 w-1 h-1 bg-[#3FB4CB] rounded-full animate-pulse" style={{ animationDelay: '1.5s' }} />
+      </div>
+
+      <div className="container mx-auto px-4 relative">
+        <div className="flex flex-col md:flex-row items-center gap-8">
+
+          {/* Animated lock visual */}
+          <div className="flex-shrink-0 relative w-32 h-32 flex items-center justify-center">
+            <div className="text-8xl animate-bounce" style={{ animationDuration: '2.2s' }}>
+              🔒
+            </div>
+            <div className="absolute -top-2 -right-2 text-4xl animate-pulse">✨</div>
+          </div>
+
+          {/* Text content */}
+          <div className="flex-1 text-white">
+            <div
+              className="inline-block bg-[#3FB4CB] text-[#0B2545] text-xs font-bold px-3 py-1 rounded-full mb-3 uppercase tracking-wider"
+              data-testid="homepage-storage-promo-badge"
+            >
+              NEW FEATURE <span className="opacity-75 font-semibold">· NOUVELLE FONCTIONNALITÉ</span>
+            </div>
+
+            <h2 className="text-3xl md:text-4xl font-black mb-1" data-testid="homepage-storage-promo-title-en">
+              Storage Unit Auctions
+            </h2>
+            <h3 className="text-xl md:text-2xl text-[#3FB4CB] font-bold mb-4 italic" data-testid="homepage-storage-promo-title-fr">
+              Enchères d'unités d'entreposage
+            </h3>
+
+            <p className="text-gray-200 mb-1" data-testid="homepage-storage-promo-desc-en">
+              Bid on abandoned storage lockers from verified Canadian facilities. No buyer fees on cash auctions. Real-time proxy bidding. Soft-close protection.
+            </p>
+            <p className="text-gray-400 text-sm mb-6 italic" data-testid="homepage-storage-promo-desc-fr">
+              Enchérissez sur des casiers abandonnés de facilités canadiennes vérifiées. Aucuns frais acheteur sur les enchères au comptant. Enchères par procuration en temps réel. Protection contre la fermeture anticipée.
+            </p>
+
+            {/* Trust badges — dual-language */}
+            <div className="flex flex-wrap gap-2.5 mb-6">
+              <span className="bg-emerald-900/60 text-emerald-200 px-3 py-1.5 rounded-full text-xs font-semibold border border-emerald-700/40">
+                ✅ No Buyer Fees · <em className="opacity-80">Sans frais acheteur</em>
+              </span>
+              <span className="bg-blue-900/60 text-blue-200 px-3 py-1.5 rounded-full text-xs font-semibold border border-blue-700/40">
+                🇨🇦 Canadian Facilities · <em className="opacity-80">Facilités canadiennes</em>
+              </span>
+              <span className="bg-purple-900/60 text-purple-200 px-3 py-1.5 rounded-full text-xs font-semibold border border-purple-700/40">
+                ⚡ Real-Time Bidding · <em className="opacity-80">Enchères en temps réel</em>
+              </span>
+            </div>
+
+            {/* Live stats inline (if > 0) */}
+            {stats && (stats.total_sold > 0 || stats.active_auctions > 0 || stats.active_facilities > 0) && (
+              <div className="flex flex-wrap gap-4 mb-5 text-xs text-gray-300" data-testid="homepage-storage-promo-stats">
+                {stats.active_auctions > 0 && (
+                  <span className="font-semibold">
+                    <span className="text-[#3FB4CB] text-base font-black">{stats.active_auctions}</span>{' '}
+                    Live Now · <em>En direct</em>
+                  </span>
+                )}
+                {stats.active_facilities > 0 && (
+                  <span className="font-semibold">
+                    <span className="text-[#3FB4CB] text-base font-black">{stats.active_facilities}</span>{' '}
+                    Facilities · <em>Facilités</em>
+                  </span>
+                )}
+                {stats.total_sold > 0 && (
+                  <span className="font-semibold">
+                    <span className="text-[#3FB4CB] text-base font-black">{stats.total_sold}</span>{' '}
+                    Sold · <em>Vendues</em>
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* CTA buttons */}
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => navigate('/storage-auctions')}
+                className="bg-[#3FB4CB] hover:bg-[#2FA0BA] text-[#0B2545] font-bold py-3 px-6 rounded-xl transition-all hover:-translate-y-0.5 hover:shadow-lg"
+                data-testid="homepage-storage-promo-browse-btn"
+              >
+                <span className="block leading-tight">Browse Storage Auctions →</span>
+                <span className="block text-xs opacity-80 italic font-semibold">Parcourir les enchères →</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/storage-auctions/register-facility')}
+                className="border-2 border-[#3FB4CB] text-[#3FB4CB] hover:bg-[#3FB4CB]/10 font-bold py-3 px-6 rounded-xl transition-all"
+                data-testid="homepage-storage-promo-register-btn"
+              >
+                <span className="block leading-tight">List Your Facility</span>
+                <span className="block text-xs opacity-80 italic font-semibold">Lister votre facilité</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </section>

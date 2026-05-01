@@ -356,3 +356,167 @@ async def send_auction_ending_soon_notifications(db):
             logger.info(f"[ENDING_SOON] Sent {sent_count} ending-soon notifications for {len(ending_auctions)} auctions")
     except Exception as e:
         logger.error(f"Error in send_auction_ending_soon_notifications: {e}")
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Storage Auctions — auto-close processor (iter171)
+# Runs every 5 minutes via scheduler.py. For each ACTIVE storage auction whose
+# end_time has passed:
+#   1. If soft_close_enabled and a bid landed in last 10 min → extend end_time
+#      by soft_close_extension_minutes (default 10) instead of closing.
+#   2. Otherwise:
+#      a. Flip status → "sold" if there is a winning bidder, else "unsold"
+#      b. Release held deposits (winner→applied, losers→refunded) via
+#         services.storage_deposit_service.release_deposits_on_close
+#      c. Email winner (per-payment-method bilingual) + email facility
+#      d. Queue seller commission invoice (5% + Stripe + tax) email
+#      e. Log the close event in storage_close_logs
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+async def process_ended_storage_auctions(db):
+    """Auto-close ended storage auctions with soft-close awareness."""
+    try:
+        now = datetime.now(timezone.utc)
+        active_ended = await db.storage_auctions.find(
+            {"status": "active", "end_time": {"$lte": now.isoformat()}},
+            {"_id": 0},
+        ).to_list(500)
+
+        if not active_ended:
+            return {"processed": 0, "closed": 0, "extended": 0}
+
+        closed = 0
+        extended = 0
+        errors = []
+
+        for auction in active_ended:
+            try:
+                auction_id = auction["id"]
+                bids = auction.get("bids", [])
+
+                # ── Soft-close guard ──
+                if auction.get("soft_close_enabled", True) and bids:
+                    soft_minutes = int(auction.get("soft_close_extension_minutes", 10) or 10)
+                    # Find the most recent bid's placed_at
+                    last_bid_time = None
+                    for b in bids:
+                        pa = b.get("placed_at")
+                        if pa:
+                            try:
+                                dt = datetime.fromisoformat(str(pa).replace("Z", "+00:00"))
+                                if not last_bid_time or dt > last_bid_time:
+                                    last_bid_time = dt
+                            except Exception:
+                                pass
+
+                    if last_bid_time:
+                        end_time_dt = datetime.fromisoformat(str(auction["end_time"]).replace("Z", "+00:00"))
+                        window_start = end_time_dt - timedelta(minutes=soft_minutes)
+                        if last_bid_time >= window_start:
+                            # Extend end_time by soft_minutes
+                            new_end = end_time_dt + timedelta(minutes=soft_minutes)
+                            await db.storage_auctions.update_one(
+                                {"id": auction_id},
+                                {"$set": {"end_time": new_end.isoformat(), "updated_at": now.isoformat()}},
+                            )
+                            extended += 1
+                            logger.info(f"[STORAGE_CLOSE] soft-extended {auction_id} by {soft_minutes}m")
+                            continue
+
+                # ── Actually close ──
+                winner_id = auction.get("winning_bidder_id")
+                current_bid = float(auction.get("current_bid", 0) or 0)
+                new_status = "sold" if winner_id and bids else "unsold"
+
+                await db.storage_auctions.update_one(
+                    {"id": auction_id},
+                    {
+                        "$set": {
+                            "status": new_status,
+                            "winning_bid": current_bid if new_status == "sold" else None,
+                            "closed_at": now.isoformat(),
+                            "updated_at": now.isoformat(),
+                        }
+                    },
+                )
+
+                # ── Release deposits (best-effort) ──
+                try:
+                    from services.storage_deposit_service import release_deposits_on_close
+                    await release_deposits_on_close(db, auction_id, winner_id)
+                except Exception as e:
+                    logger.error(f"[STORAGE_CLOSE] deposit release failed for {auction_id}: {e}")
+
+                # ── Fetch facility + buyer ──
+                facility = await db.storage_facilities.find_one(
+                    {"id": auction["facility_id"]}, {"_id": 0}
+                ) or {}
+                buyer = {}
+                if winner_id:
+                    buyer = await db.users.find_one({"id": winner_id}, {"_id": 0}) or {}
+
+                # ── Compute pricing for emails ──
+                pricing = None
+                try:
+                    from services.storage_pricing import calculate_storage_pricing
+                    pricing = calculate_storage_pricing(
+                        current_bid,
+                        facility.get("province", ""),
+                        auction.get("payment_method", "stripe"),
+                        deposit_amount=auction.get("deposit_amount") or 0,
+                    )
+                except Exception as e:
+                    logger.error(f"[STORAGE_CLOSE] pricing calc failed for {auction_id}: {e}")
+
+                # ── Emails (non-blocking in practice; awaited for reliability here) ──
+                if new_status == "sold":
+                    try:
+                        from services.email_notifications import (
+                            send_storage_auction_won_email,
+                            send_storage_auction_sold_email,
+                            send_storage_seller_commission_invoice,
+                        )
+                        await send_storage_auction_won_email(buyer, auction, facility, pricing)
+                        await send_storage_auction_sold_email(facility, auction, buyer)
+                        if pricing:
+                            # Reuse existing commission invoice helper (it accepts "seller_invoice" shape)
+                            seller_invoice_compat = {
+                                "seller_invoice": {
+                                    "commission": pricing["facility_invoice"].get("bidvex_platform_fee", 0) if auction.get("payment_method") != "stripe" else pricing["buyer_invoice"].get("platform_fee", 0),
+                                    "stripe_recovery": pricing["facility_invoice"].get("stripe_recovery", 0) if auction.get("payment_method") != "stripe" else pricing["buyer_invoice"].get("stripe_recovery", 0),
+                                    "tax": pricing["facility_invoice"].get("tax", 0) if auction.get("payment_method") != "stripe" else pricing["buyer_invoice"].get("tax", 0),
+                                    "tax_label": pricing.get("tax_label", ""),
+                                    "total": pricing["facility_invoice"].get("facility_owes_bidvex", 0) if auction.get("payment_method") != "stripe" else (float(pricing["buyer_invoice"].get("platform_fee", 0)) + float(pricing["buyer_invoice"].get("stripe_recovery", 0)) + float(pricing["buyer_invoice"].get("tax", 0))),
+                                }
+                            }
+                            # Only send a separate invoice for cash/etransfer (Stripe path = fee already charged to buyer)
+                            if auction.get("payment_method") in ("cash", "etransfer"):
+                                await send_storage_seller_commission_invoice(facility, auction, seller_invoice_compat)
+                    except Exception as e:
+                        logger.error(f"[STORAGE_CLOSE] email dispatch failed for {auction_id}: {e}")
+
+                # ── Log ──
+                await db.storage_close_logs.insert_one({
+                    "auction_id": auction_id,
+                    "facility_id": auction.get("facility_id"),
+                    "winning_bid": current_bid,
+                    "winner_id": winner_id,
+                    "final_status": new_status,
+                    "payment_method": auction.get("payment_method"),
+                    "bids_count": len(bids),
+                    "closed_at": now.isoformat(),
+                })
+
+                closed += 1
+            except Exception as e:
+                logger.error(f"[STORAGE_CLOSE] failed to close {auction.get('id')}: {e}")
+                errors.append({"id": auction.get("id"), "error": str(e)})
+
+        if closed or extended:
+            logger.info(f"[STORAGE_CLOSE] closed={closed} extended={extended} errors={len(errors)}")
+        return {"processed": len(active_ended), "closed": closed, "extended": extended, "errors": errors}
+    except Exception as e:
+        logger.error(f"[STORAGE_CLOSE] top-level error: {e}")
+        return {"error": str(e)}

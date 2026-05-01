@@ -1554,63 +1554,163 @@ async def send_storage_outbid_email(buyer: dict, auction: dict, new_current: flo
     )
 
 
-async def send_storage_auction_won_email(buyer: dict, auction: dict, facility: dict) -> bool:
+async def send_storage_auction_won_email(buyer: dict, auction: dict, facility: dict, pricing: dict = None) -> bool:
+    """
+    Bilingual winner email. Branches on auction.payment_method:
+      • stripe   → BidVex charged buyer card (5% + stripe + tax); buyer pays hammer via Stripe to facility
+      • cash     → buyer pays hammer CASH directly to facility
+      • etransfer→ buyer sends Interac e-Transfer to facility's registered email
+
+    Always includes a cleanup-deadline warning with forfeit clause.
+    """
     if not buyer or not buyer.get("email"):
         return False
-    a_id = (auction or {}).get("id", "")[:8]
+
+    unit = auction.get("unit_number", "—")
     bid = float(auction.get("winning_bid") or auction.get("current_bid") or 0)
-    methods = ", ".join(auction.get("payment_methods_accepted", [])) or "—"
-    body_en = (
-        f"Congratulations — you won storage unit auction <strong>#{a_id}</strong> at "
-        f"<strong>${bid:,.2f}</strong>. Contact the facility directly to arrange payment.<br/><br/>"
-        f"<strong>Facility:</strong> {facility.get('company_name','—')}<br/>"
-        f"<strong>City:</strong> {facility.get('city','—')}, {facility.get('province','')}<br/>"
-        f"<strong>Phone:</strong> {facility.get('phone','—')}<br/>"
-        f"<strong>Email:</strong> {facility.get('email','—')}<br/>"
-        f"<strong>Payment methods:</strong> {methods}<br/>"
-        f"<strong>Cleanup deadline:</strong> {auction.get('cleanup_deadline','—')}<br/>"
-        f"<strong>Cleaning deposit:</strong> ${float(auction.get('cleanup_deposit',0)):.2f}<br/><br/>"
-        f"BidVex charges no buyer fee. The 5% commission is paid by the facility."
+    pm = (auction.get("payment_method") or "stripe").lower()
+    fac_name = facility.get("company_name", "—")
+    fac_contact = facility.get("contact_name", "—")
+    fac_phone = facility.get("phone", "—")
+    fac_email = facility.get("email", "—")
+    pay_deadline = auction.get("payment_deadline") or auction.get("cleanup_deadline", "—")
+    cleanup_deadline = auction.get("cleanup_deadline", "—")
+    cleanup_deposit = float(auction.get("cleanup_deposit", 0) or 0)
+    buyer_name = buyer.get("name") or buyer.get("full_name") or "—"
+
+    # Optional BidVex charge (for Stripe path only)
+    buyer_stripe_charge = 0.0
+    if pricing and pricing.get("buyer_invoice"):
+        # stripe path: platform_fee + stripe_recovery + tax (BidVex-collected portion)
+        bi = pricing["buyer_invoice"]
+        buyer_stripe_charge = float(bi.get("platform_fee", 0)) + float(bi.get("stripe_recovery", 0)) + float(bi.get("tax", 0))
+
+    # ── Per-method body ──
+    if pm == "stripe":
+        body_en = (
+            f"Congratulations! You won Unit <strong>#{unit}</strong> at <strong>{fac_name}</strong>.<br/>"
+            f"Your winning bid: <strong>${bid:,.2f}</strong><br/><br/>"
+            f"BidVex has charged your card <strong>${buyer_stripe_charge:,.2f}</strong> (platform fee + Stripe + taxes).<br/>"
+            f"You must pay <strong>${bid:,.2f}</strong> to the facility via Stripe before <strong>{pay_deadline}</strong>.<br/><br/>"
+            f"<strong>Facility contact:</strong> {fac_contact} | {fac_phone} | {fac_email}<br/>"
+        )
+        body_fr = (
+            f"Félicitations! Vous avez remporté l'unité <strong>#{unit}</strong> à <strong>{fac_name}</strong>.<br/>"
+            f"Votre offre gagnante : <strong>{bid:,.2f} $</strong><br/><br/>"
+            f"BidVex a débité <strong>{buyer_stripe_charge:,.2f} $</strong> sur votre carte (frais de plateforme + Stripe + taxes).<br/>"
+            f"Vous devez payer <strong>{bid:,.2f} $</strong> à la facilité via Stripe avant le <strong>{pay_deadline}</strong>.<br/><br/>"
+            f"<strong>Contact facilité :</strong> {fac_contact} | {fac_phone} | {fac_email}<br/>"
+        )
+    elif pm == "cash":
+        body_en = (
+            f"Congratulations! You won Unit <strong>#{unit}</strong> at <strong>{fac_name}</strong> for "
+            f"<strong>${bid:,.2f}</strong>.<br/><br/>"
+            f"You must pay <strong>${bid:,.2f} CASH</strong> directly to the facility.<br/>"
+            f"Contact the facility to arrange payment and pickup:<br/>"
+            f"<strong>{fac_contact}</strong> | {fac_phone} | {fac_email}<br/>"
+            f"<strong>Payment deadline:</strong> {pay_deadline}<br/>"
+            f"<strong>Cleanup deadline:</strong> {cleanup_deadline}<br/>"
+        )
+        body_fr = (
+            f"Félicitations! Vous avez remporté l'unité <strong>#{unit}</strong> à <strong>{fac_name}</strong> pour "
+            f"<strong>{bid:,.2f} $</strong>.<br/><br/>"
+            f"Vous devez payer <strong>{bid:,.2f} $ COMPTANT</strong> directement à la facilité.<br/>"
+            f"Contactez la facilité pour organiser le paiement et le ramassage :<br/>"
+            f"<strong>{fac_contact}</strong> | {fac_phone} | {fac_email}<br/>"
+            f"<strong>Date limite de paiement :</strong> {pay_deadline}<br/>"
+            f"<strong>Date limite de nettoyage :</strong> {cleanup_deadline}<br/>"
+        )
+    else:  # etransfer
+        body_en = (
+            f"Congratulations! You won Unit <strong>#{unit}</strong> at <strong>{fac_name}</strong> for "
+            f"<strong>${bid:,.2f}</strong>.<br/><br/>"
+            f"Send <strong>${bid:,.2f}</strong> via <strong>Interac e-Transfer</strong> to: <strong>{fac_email}</strong><br/>"
+            f"<strong>Reference:</strong> BidVex Unit #{unit} — {buyer_name}<br/>"
+            f"Contact the facility to confirm receipt:<br/>"
+            f"<strong>{fac_contact}</strong> | {fac_phone}<br/>"
+            f"<strong>Payment deadline:</strong> {pay_deadline}<br/>"
+            f"<strong>Cleanup deadline:</strong> {cleanup_deadline}<br/>"
+        )
+        body_fr = (
+            f"Félicitations! Vous avez remporté l'unité <strong>#{unit}</strong> à <strong>{fac_name}</strong> pour "
+            f"<strong>{bid:,.2f} $</strong>.<br/><br/>"
+            f"Envoyez <strong>{bid:,.2f} $</strong> par <strong>virement Interac</strong> à : <strong>{fac_email}</strong><br/>"
+            f"<strong>Référence :</strong> BidVex Unité #{unit} — {buyer_name}<br/>"
+            f"Contactez la facilité pour confirmer la réception :<br/>"
+            f"<strong>{fac_contact}</strong> | {fac_phone}<br/>"
+            f"<strong>Date limite de paiement :</strong> {pay_deadline}<br/>"
+            f"<strong>Date limite de nettoyage :</strong> {cleanup_deadline}<br/>"
+        )
+
+    # ── Cleanup / forfeit notice (always appended, bilingual) ──
+    cleanup_en = (
+        f"<hr style='margin:16px 0;border:none;border-top:1px solid #e2e8f0'/>"
+        f"⚠️ <strong>IMPORTANT:</strong> You must completely empty the unit by "
+        f"<strong>{cleanup_deadline}</strong>. Failure to empty the unit forfeits your "
+        f"cleaning deposit of <strong>${cleanup_deposit:.2f}</strong> and will result in "
+        f"account suspension.<br/>"
+        f"Cleaning deposit: <strong>${cleanup_deposit:.2f}</strong> (refunded after the unit is confirmed empty)."
     )
-    body_fr = (
-        f"Félicitations — vous avez gagné l'enchère <strong>#{a_id}</strong> à "
-        f"<strong>{bid:,.2f} $</strong>. Contactez la facilité directement pour le paiement.<br/><br/>"
-        f"<strong>Facilité :</strong> {facility.get('company_name','—')}<br/>"
-        f"<strong>Ville :</strong> {facility.get('city','—')}, {facility.get('province','')}<br/>"
-        f"<strong>Téléphone :</strong> {facility.get('phone','—')}<br/>"
-        f"<strong>Courriel :</strong> {facility.get('email','—')}<br/>"
-        f"<strong>Modes de paiement :</strong> {methods}<br/>"
-        f"<strong>Date limite de nettoyage :</strong> {auction.get('cleanup_deadline','—')}<br/>"
-        f"<strong>Dépôt de nettoyage :</strong> {float(auction.get('cleanup_deposit',0)):.2f} $<br/><br/>"
-        f"BidVex ne facture aucun frais acheteur. La commission de 5% est payée par la facilité."
+    cleanup_fr = (
+        f"<hr style='margin:16px 0;border:none;border-top:1px solid #e2e8f0'/>"
+        f"⚠️ <strong>IMPORTANT :</strong> Vous devez vider complètement l'unité avant "
+        f"<strong>{cleanup_deadline}</strong>. Le non-respect de cette date limite entraîne la "
+        f"perte de votre dépôt de nettoyage de <strong>{cleanup_deposit:.2f} $</strong> et la "
+        f"suspension de votre compte.<br/>"
+        f"Dépôt de nettoyage : <strong>{cleanup_deposit:.2f} $</strong> (remboursé après confirmation que l'unité est vide)."
     )
+
     return await send_email(
         to_email=buyer["email"],
-        subject=f"🎉 You won — Storage Auction #{a_id}",
-        html_content=_storage_panel("You won the auction", "Vous avez gagné l'enchère", body_en, body_fr),
+        subject=f"🎉 You won — Storage Auction Unit #{unit}",
+        html_content=_storage_panel(
+            "You won the auction",
+            "Vous avez gagné l'enchère",
+            body_en + cleanup_en,
+            body_fr + cleanup_fr,
+            cta_url=f"https://www.bidvex.com/storage-auctions/{auction.get('id','')}",
+            cta_en="View auction",
+            cta_fr="Voir l'enchère",
+        ),
     )
 
 
 async def send_storage_auction_sold_email(facility: dict, auction: dict, buyer: dict) -> bool:
+    """Bilingual notification to the facility when their unit sells."""
     if not facility or not facility.get("email"):
         return False
     a_id = auction.get("id", "")[:8]
+    unit = auction.get("unit_number", "—")
     bid = float(auction.get("winning_bid") or auction.get("current_bid") or 0)
+    pm = (auction.get("payment_method") or "stripe").lower()
+    pm_label_en = {"stripe": "Stripe (online)", "cash": "Cash", "etransfer": "Interac e-Transfer"}.get(pm, pm)
+    pm_label_fr = {"stripe": "Stripe (en ligne)", "cash": "Comptant", "etransfer": "Virement Interac"}.get(pm, pm)
+
+    buyer_name = buyer.get("name") or buyer.get("full_name") or "—"
+    buyer_email = buyer.get("email", "—")
+    buyer_phone = buyer.get("phone", "—")
+
     body_en = (
-        f"Storage unit auction <strong>#{a_id}</strong> sold for <strong>${bid:,.2f}</strong>.<br/>"
-        f"<strong>Buyer:</strong> {buyer.get('name','—')} &lt;{buyer.get('email','—')}&gt;<br/>"
-        f"<strong>Buyer phone:</strong> {buyer.get('phone','—')}<br/>"
-        f"BidVex commission invoice (5% + Stripe + tax) will arrive separately."
+        f"Storage auction for Unit <strong>#{unit}</strong> (#{a_id}) sold for "
+        f"<strong>${bid:,.2f}</strong>.<br/><br/>"
+        f"<strong>Payment method:</strong> {pm_label_en}<br/>"
+        f"<strong>Winning bidder:</strong> {buyer_name} &lt;{buyer_email}&gt;<br/>"
+        f"<strong>Phone:</strong> {buyer_phone}<br/><br/>"
+        f"Contact the winner to coordinate payment and pickup. "
+        f"Your BidVex commission invoice (5% + Stripe + applicable tax) will arrive separately."
     )
     body_fr = (
-        f"L'enchère <strong>#{a_id}</strong> a été vendue pour <strong>{bid:,.2f} $</strong>.<br/>"
-        f"<strong>Acheteur :</strong> {buyer.get('name','—')} &lt;{buyer.get('email','—')}&gt;<br/>"
-        f"<strong>Téléphone :</strong> {buyer.get('phone','—')}<br/>"
-        f"Une facture de commission BidVex (5% + Stripe + taxes) suivra séparément."
+        f"L'enchère pour l'unité <strong>#{unit}</strong> (#{a_id}) a été vendue pour "
+        f"<strong>{bid:,.2f} $</strong>.<br/><br/>"
+        f"<strong>Mode de paiement :</strong> {pm_label_fr}<br/>"
+        f"<strong>Enchérisseur gagnant :</strong> {buyer_name} &lt;{buyer_email}&gt;<br/>"
+        f"<strong>Téléphone :</strong> {buyer_phone}<br/><br/>"
+        f"Contactez le gagnant pour organiser le paiement et le ramassage. "
+        f"Votre facture de commission BidVex (5 % + Stripe + taxes applicables) suivra séparément."
     )
     return await send_email(
         to_email=facility["email"],
-        subject=f"✅ Sold — Storage Auction #{a_id}",
+        subject=f"✅ Sold — Storage Auction Unit #{unit}",
         html_content=_storage_panel("Auction sold", "Enchère vendue", body_en, body_fr),
     )
 

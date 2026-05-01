@@ -739,8 +739,23 @@ def init_scheduler(database):
         name="Process Scheduled Email Campaigns",
         replace_existing=True
     )
-    
-    logger.info("Scheduler initialized with 9 jobs")
+
+    # Job 10: Process ended storage auctions (soft-close aware) - every 5 minutes
+    async def storage_close_job():
+        if db_instance is None:
+            return
+        from services.scheduled_jobs import process_ended_storage_auctions
+        await process_ended_storage_auctions(db_instance)
+
+    scheduler.add_job(
+        storage_close_job,
+        IntervalTrigger(minutes=5),
+        id="process_ended_storage_auctions",
+        name="Process Ended Storage Auctions",
+        replace_existing=True,
+    )
+
+    logger.info("Scheduler initialized with 10 jobs")
     return scheduler
 
 
