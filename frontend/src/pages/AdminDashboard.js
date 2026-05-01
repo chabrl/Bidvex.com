@@ -53,6 +53,7 @@ import TeamManager from '../components/admin/TeamManager';
 import AdminTaxDashboard from './AdminTaxDashboard';
 import AdminStorageDeposits from './admin/AdminStorageDeposits';
 import AdminStorageAuctions from './admin/AdminStorageAuctions';
+import AdminFeatureFlags from './admin/AdminFeatureFlags';
 import { 
   Users, Package, Gavel, Shield, TrendingUp, Bell, Settings, FileText, 
   MessageSquare, DollarSign, Search, Image, CreditCard, Megaphone, 
@@ -93,6 +94,7 @@ const SECONDARY_TABS = {
   ],
   vehicles: [
     { id: 'vehicle-admin', label: 'Vehicle Administration', icon: '🚗', lucideIcon: Car },
+    { id: 'feature-flags', label: 'Feature Flags', icon: '🚩', lucideIcon: Car },
     { id: 'ai-guard', label: 'AI Guard', icon: '🤖', lucideIcon: Bot },
     { id: 'risk-monitoring', label: 'Risk Monitoring', icon: '🔴', lucideIcon: ShieldAlert },
   ],
@@ -325,6 +327,7 @@ const AdminDashboard = () => {
           case 'auctions': return <AuctionControl />;
           case 'storage-deposits': return <AdminStorageDeposits />;
           case 'storage-auctions-admin': return <AdminStorageAuctions />;
+          case 'feature-flags': return <AdminFeatureFlags />;
           case 'categories': return <CategoryManager />;
           case 'partner-applications': return <PartnerManager />;
           default: return <EnhancedUserManager />;

@@ -26,6 +26,8 @@
   html {
     scroll-behavior: smooth;
     overflow-x: hidden;
+    /* iter176 — extra defence against mobile horizontal scroll bleeds */
+    max-width: 100vw;
   }
   
   body {
@@ -34,6 +36,9 @@
     font-feature-settings: 'cv11', 'ss01';
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* iter176 — same defence on body */
+    overflow-x: hidden;
+    max-width: 100vw;
   }
   
   h1, h2, h3, h4, h5, h6 {
@@ -41,10 +46,11 @@
     @apply font-semibold tracking-tight;
   }
   
-  /* Global image defaults — prevent CLS */
+  /* Global image defaults — prevent CLS + prevent overflow at every breakpoint */
   img {
     max-width: 100%;
     height: auto;
+    display: block;
     content-visibility: auto;
   }
   

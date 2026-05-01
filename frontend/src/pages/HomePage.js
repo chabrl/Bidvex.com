@@ -349,7 +349,7 @@ const LiveAuctionsSection = ({ items, navigate }) => {
               <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 truncate">{t('homepage.endingSoonDesc')}</p>
             </div>
           </div>
-          <Button onClick={() => navigate('/marketplace?sort=ending')} variant="outline" className="hidden sm:flex border-2 border-slate-300 dark:border-cyan-500/50 hover:border-cyan-500 hover:text-cyan-600 dark:text-slate-200 dark:hover:text-cyan-400 whitespace-nowrap shrink-0">
+          <Button onClick={() => navigate('/marketplace?sort=ending')} variant="outline" className="flex border-2 border-slate-300 dark:border-cyan-500/50 hover:border-cyan-500 hover:text-cyan-600 dark:text-slate-200 dark:hover:text-cyan-400 whitespace-nowrap shrink-0 text-xs sm:text-sm px-3 sm:px-4">
             {t('homepage.viewAll')} <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
         </div>
@@ -477,7 +477,7 @@ const HotItemsSection = ({ items, navigate }) => {
           <Button 
             onClick={() => navigate('/marketplace?sort=hot')} 
             variant="outline"
-            className="hidden sm:flex items-center gap-1 px-5 py-2 rounded-md font-semibold transition-all hover:-translate-y-0.5 whitespace-nowrap border-2 border-slate-300 dark:border-cyan-500/60 text-slate-700 dark:text-white hover:border-cyan-500 hover:text-cyan-600 dark:hover:bg-cyan-500/20 dark:hover:border-cyan-400 shrink-0"
+            className="hidden sm:flex items-center gap-1 px-3 sm:px-5 py-2 rounded-md font-semibold transition-all hover:-translate-y-0.5 whitespace-nowrap border-2 border-slate-300 dark:border-cyan-500/60 text-slate-700 dark:text-white hover:border-cyan-500 hover:text-cyan-600 dark:hover:bg-cyan-500/20 dark:hover:border-cyan-400 shrink-0 text-xs sm:text-sm"
           >
             {t('homepage.viewAll')} <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
@@ -619,7 +619,7 @@ const NewListingsSection = ({ items, navigate }) => {
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 dark:text-slate-50">{t('homepage.justListed')}</h2>
             <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 mt-1 sm:mt-2">{t('homepage.freshAuctions')}</p>
           </div>
-          <Button onClick={() => navigate('/marketplace?sort=newest')} variant="outline" className="hidden sm:flex border-2 border-slate-300 dark:border-cyan-500/50 hover:border-cyan-500 hover:text-cyan-600 dark:text-slate-200 dark:hover:text-cyan-400 whitespace-nowrap shrink-0">
+          <Button onClick={() => navigate('/marketplace?sort=newest')} variant="outline" className="flex border-2 border-slate-300 dark:border-cyan-500/50 hover:border-cyan-500 hover:text-cyan-600 dark:text-slate-200 dark:hover:text-cyan-400 whitespace-nowrap shrink-0 text-xs sm:text-sm px-3 sm:px-4">
             {t('homepage.viewAll')} <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
         </div>

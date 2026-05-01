@@ -16,6 +16,7 @@ import {
 } from './ui/dropdown-menu';
 import SellOptionsModal from './SellOptionsModal';
 import NotificationCenter from './NotificationCenter';
+import useFeatureFlag from '../hooks/useFeatureFlag';
 
 const Navbar = () => {
   const { t, i18n } = useTranslation();
@@ -55,12 +56,16 @@ const Navbar = () => {
 
   const isActive = (path) => location.pathname === path;
 
+  // iter176 — surface "SOON · BIENTÔT" badge when the feature flag is off
+  const { enabled: vehicleEnabled } = useFeatureFlag('vehicle_auctions_enabled');
+  const showVehicleComingSoon = vehicleEnabled === false;
+
   const navLinks = [
     { path: '/', label: t('nav.home'), icon: Home },
     { path: '/marketplace', label: t('nav.marketplace'), icon: ShoppingBag },
     { path: '/lots', label: t('nav.lotsAuction'), icon: Gavel },
     { path: '/storage-auctions', label: t('nav.storageAuctions', 'Storage Auctions'), icon: Lock },
-    { path: '/vehicle-auctions', label: t('vehicles.vehicleAuctions'), icon: Car },
+    { path: '/vehicle-auctions', label: t('vehicles.vehicleAuctions'), icon: Car, comingSoon: showVehicleComingSoon },
   ];
 
   return (
@@ -105,6 +110,15 @@ const Navbar = () => {
                   >
                     <link.icon className="w-4 h-4 mr-1.5" />
                     {link.label}
+                    {link.comingSoon && (
+                      <span
+                        className="ml-1.5 inline-flex items-center rounded-full bg-cyan-500/15 border border-cyan-500/40 text-cyan-700 dark:text-cyan-300 px-1.5 py-[1px] font-bold"
+                        style={{ fontSize: '10px', lineHeight: 1.2, letterSpacing: '0.5px' }}
+                        data-testid="nav-vehicle-coming-soon-badge"
+                      >
+                        SOON · BIENTÔT
+                      </span>
+                    )}
                   </Button>
                 </Link>
               ))}

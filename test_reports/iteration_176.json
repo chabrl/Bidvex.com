@@ -1,0 +1,53 @@
+{
+  "summary": "iter176 audit: backend feature-flags + vehicle waitlist APIs work end-to-end (14/16 pytest pass, 2 skipped). Storage regression 33/33 green. Frontend Coming Soon page, Navbar SOON·BIENTÔT badge, FR alias /encheres-de-vehicules, Storage hero color fix (#FFFFFF + #22d3ee) all verified. Two issues found: (1) CRITICAL admin-dashboard wiring bug — Feature Flags secondary tab exists under Vehicles but content case is in Marketplace switch, so clicking it renders VehicleAdminManager instead of AdminFeatureFlags; (2) MINOR backend Cache-Control: max-age=60 is overridden by global no-store middleware on the public flag endpoint. Flag state restored to OFF.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/feature-flags/{key}",
+        "issue": "Response header 'Cache-Control: public, max-age=60' set in route handler is overridden by a global middleware returning 'no-store, no-cache, must-revalidate'. Client-side 60s TTL is therefore enforced only in the useFeatureFlag in-memory cache, not at the HTTP layer as intended."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "AdminDashboard (feature-flags secondary tab routing)",
+        "issue": "The 'feature-flags' tab is registered under the Vehicles primary tab (secondaryTabs.vehicles line 97) but the render switch in vehicles case (lines 336-341) has no 'feature-flags' case, so it falls through to default and renders <VehicleAdminManager />. The <AdminFeatureFlags /> case is misplaced in the marketplace switch (line 330). Net effect: clicking data-testid='admin-tab-feature-flags' visually highlights the tab but shows the wrong component. flag-card-vehicle_auctions_enabled, flag-toggle-vehicle_auctions_enabled, vehicle-waitlist-count, admin-feature-flags, admin-feature-flags-refresh are NEVER rendered.",
+        "selector": "[data-testid='admin-tab-feature-flags']",
+        "priority": "HIGH"
+      },
+      {
+        "component": "VehicleComingSoonPage",
+        "issue": "Expected data-testids 'vehicle-waitlist-lang-en' and 'vehicle-waitlist-lang-fr' were not found on the page (queried but returned null). If these are supposed to be user-visible language toggle buttons on the Coming Soon page, they are missing or the data-testid attributes are absent.",
+        "selector": "[data-testid='vehicle-waitlist-lang-en'] / -fr",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter176_feature_flags.py",
+    "/app/test_reports/pytest/iter176_results.xml"
+  ],
+  "action_items": [
+    "MAIN AGENT: Fix AdminDashboard.js routing — move `case 'feature-flags': return <AdminFeatureFlags />;` from the marketplace switch (line 330) into the vehicles switch (after line 337). This is a one-line move.",
+    "MAIN AGENT: Investigate why the global response middleware is overwriting Cache-Control on /api/feature-flags/{key} — if intentional security policy, acknowledge that HTTP caching of the flag is not in effect (only the JS in-memory cache provides the 60s TTL).",
+    "MAIN AGENT: Either add the lang-toggle buttons with data-testid 'vehicle-waitlist-lang-en' / 'vehicle-waitlist-lang-fr' to VehicleComingSoonPage, or remove them from the spec list."
+  ],
+  "critical_code_review_comments": [
+    "AdminDashboard.js: secondary-tab routing is fragile (two parallel switch statements on secondaryTab inside a switch on primaryTab). A lookup table keyed by (primaryTab, secondaryTab) would prevent the exact bug seen with feature-flags.",
+    "feature_flags.py: public GET explicitly sets Cache-Control but a global middleware clobbers it — either exempt this route or accept that HTTP caching is off.",
+    "feature_flags.py: EmailStr already validates, the extra EMAIL_RE re-check in /waitlist/vehicle-auctions is dead code (Pydantic rejects before the handler runs).",
+    "feature_flags.py: get_db() is called inside every handler instead of being a dependency — cosmetic, not broken."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "93% (14 pass / 1 fail / 2 skip on iter176; 33/33 storage regression pass)", "frontend": "85% (Coming Soon + FR alias + nav badge + storage hero colors all green; admin feature-flags UI not functional)"},
+  "test_credentials": "Admin charbel911@gmail.com / Anderosli123!@# (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Vehicle waitlist entries created with TEST_ / pw_iter176_ / test_waitlist_ email prefixes (several rows). Safe to leave — admin list caps to 500.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Flag vehicle_auctions_enabled is currently OFF (verified via curl). Backend APIs for feature-flags + waitlist are solid. The primary remaining work is the AdminDashboard.js routing fix for the feature-flags tab under Vehicles primary (one-line move). After that fix, re-run the admin-dashboard part of the playwright checks: click data-testid='admin-tab-feature-flags' under Vehicles, verify data-testid='admin-feature-flags', 'flag-card-vehicle_auctions_enabled', 'flag-toggle-vehicle_auctions_enabled', 'vehicle-waitlist-count' all render, toggle ON, confirm /vehicle-auctions (opened in a new tab so useFeatureFlag cache is fresh) renders the real VehicleAuctionsPage and the nav-vehicle-coming-soon-badge disappears, then toggle OFF to restore Coming Soon.",
+  "rca of the issue": "AdminDashboard routing RCA: The secondaryTabs config map (line 95-100) places id='feature-flags' inside the vehicles[] array, meaning when primaryTab='vehicles' is selected, the secondary tab bar shows the Feature Flags button. Clicking it calls setSecondaryTab('feature-flags'). The renderContent() function then enters switch(primaryTab){ case 'vehicles': switch(secondaryTab) { case 'vehicle-admin': ...; case 'ai-guard': ...; case 'risk-monitoring': ...; default: return <VehicleAdminManager />; } }. Because there is no case 'feature-flags' in that inner switch, default wins and VehicleAdminManager renders. The case 'feature-flags': return <AdminFeatureFlags />; line exists but is inside the 'marketplace' primary's switch, unreachable from Vehicles primary. Fix: move that single case into the vehicles switch (or duplicate it). Reproduction: log in as admin, go to /admin, click Vehicles primary tab, click Feature Flags secondary tab — you will see Vehicle Auction Administration content, not Feature Flags."
+}

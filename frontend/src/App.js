@@ -83,7 +83,7 @@ const EmailPreferencesPage = lazy(() => import('./pages/EmailPreferencesPage'));
 const ResubscribePage = lazy(() => import('./pages/ResubscribePage'));
 
 // Vehicle Auction Module
-const VehicleAuctionsPage = lazy(() => import('./pages/vehicles/VehicleAuctionsPage'));
+const VehicleAuctionsRoute = lazy(() => import('./pages/vehicles/VehicleAuctionsRoute'));
 const VehicleDetailPage = lazy(() => import('./pages/vehicles/VehicleDetailPage'));
 const CreateVehicleListingPage = lazy(() => import('./pages/vehicles/CreateVehicleListingPage'));
 const SellerRegistrationPage = lazy(() => import('./pages/vehicles/SellerRegistrationPage'));
@@ -396,7 +396,8 @@ const App = () => {
           } />
           
           {/* Vehicle Auction Module */}
-          <Route path="/vehicle-auctions" element={<VehicleAuctionsPage />} />
+          <Route path="/vehicle-auctions" element={<VehicleAuctionsRoute />} />
+          <Route path="/encheres-de-vehicules" element={<VehicleAuctionsRoute />} />
           <Route path="/vehicle-auctions/:id" element={<VehicleDetailPage />} />
           <Route path="/vehicle-auctions/create" element={
             <ProtectedRoute><CreateVehicleListingPage /></ProtectedRoute>
