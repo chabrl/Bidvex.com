@@ -11,6 +11,7 @@ import { Loader2, Filter, MapPin, Layers, RefreshCw, ShieldCheck } from 'lucide-
 import { Link } from 'react-router-dom';
 import StorageHero from './StorageHero';
 import StorageAuctionCard from './StorageAuctionCard';
+import StorageFooterBanner from './StorageFooterBanner';
 
 const API = API_BASE;
 
@@ -77,13 +78,13 @@ const StorageAuctionsBrowse = () => {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900" data-testid="storage-browse-page">
       <StorageHero />
 
-      {/* No buyer-fees disclaimer banner */}
+      {/* Pricing transparency banner — depends on facility's chosen payment method */}
       <div className="bg-emerald-50 dark:bg-emerald-950/30 border-y border-emerald-200 dark:border-emerald-900/40 py-2.5 text-center text-xs text-emerald-800 dark:text-emerald-300">
-        ✅ <strong>{isFr ? 'BidVex ne facture AUCUNS frais acheteur.' : 'BidVex charges ZERO buyer fees.'}</strong>
+        💰 <strong>{isFr ? 'Frais transparents.' : 'Transparent fees.'}</strong>
         {' '}
         {isFr
-          ? 'Vous payez uniquement le montant de l\'offre gagnante à la facilité.'
-          : "You pay only the winning bid amount to the facility."}
+          ? 'Aucuns frais acheteur sur les enchères au comptant ou par virement Interac. Frais Stripe et taxes appliqués sur les enchères Stripe.'
+          : 'No buyer fees on cash or e-transfer auctions. Stripe fee + taxes apply on Stripe-payment auctions.'}
         {' • '}
         <Link to="/storage-auctions/how-it-works" className="underline hover:no-underline">
           {isFr ? 'Comment ça marche' : 'How it works'}
@@ -246,6 +247,7 @@ const StorageAuctionsBrowse = () => {
           )}
         </main>
       </div>
+      <StorageFooterBanner />
     </div>
   );
 };

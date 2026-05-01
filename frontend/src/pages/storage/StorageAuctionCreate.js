@@ -36,20 +36,18 @@ const StorageAuctionCreate = () => {
     photos: [], video_url: '',
     starting_price: 1, reserve_price: '', bid_increment: 10,
     start_time: '', end_time: '',
-    cleanup_deadline_hours: 72, cleanup_deposit: 0,
-    payment_methods_accepted: ['stripe', 'cash', 'etransfer'],
+    cleanup_deadline_hours: 72,
+    // ── Payment method (single) ──
+    payment_method: 'stripe',
+    // ── Optional participation deposit ──
+    deposit_required: false,
+    deposit_amount: '',
     soft_close_enabled: true, soft_close_extension_minutes: 10,
   });
   const [submitting, setSubmitting] = useState(false);
   const [uploadingIdx, setUploadingIdx] = useState(false);
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
-  const togglePM = (m) => setForm(p => ({
-    ...p,
-    payment_methods_accepted: p.payment_methods_accepted.includes(m)
-      ? p.payment_methods_accepted.filter(x => x !== m)
-      : [...p.payment_methods_accepted, m],
-  }));
 
   const uploadPhotos = async (files) => {
     setUploadingIdx(true);
@@ -78,6 +76,10 @@ const StorageAuctionCreate = () => {
       toast.error(isFr ? 'L\'heure de fin doit être après le début' : 'End time must be after start time');
       return;
     }
+    if (form.deposit_required && (!form.deposit_amount || parseFloat(form.deposit_amount) <= 0)) {
+      toast.error(isFr ? 'Définissez un montant de dépôt > 0' : 'Set a deposit amount > 0');
+      return;
+    }
     setSubmitting(true);
     try {
       const payload = {
@@ -86,8 +88,9 @@ const StorageAuctionCreate = () => {
         reserve_price: form.reserve_price ? parseFloat(form.reserve_price) : null,
         past_due_balance: form.past_due_balance ? parseFloat(form.past_due_balance) : null,
         bid_increment: parseFloat(form.bid_increment) || 10,
-        cleanup_deposit: parseFloat(form.cleanup_deposit) || 0,
         cleanup_deadline_hours: parseInt(form.cleanup_deadline_hours) || 72,
+        deposit_amount: form.deposit_required && form.deposit_amount
+          ? parseFloat(form.deposit_amount) : null,
         start_time: new Date(form.start_time).toISOString(),
         end_time: new Date(form.end_time).toISOString(),
       };
@@ -97,7 +100,9 @@ const StorageAuctionCreate = () => {
       toast.success(isFr ? 'Enchère créée' : 'Auction created');
       navigate(`/storage-auctions/${res.data.id}`);
     } catch (err) {
-      toast.error(err?.response?.data?.detail || 'Failed to create');
+      const detail = err?.response?.data?.detail;
+      const msg = (typeof detail === 'object' && detail) ? (isFr ? detail.message_fr : detail.message_en) : detail;
+      toast.error(msg || 'Failed to create');
     } finally {
       setSubmitting(false);
     }
@@ -206,26 +211,113 @@ const StorageAuctionCreate = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label>{isFr ? 'Délai de nettoyage (heures après fin)' : 'Cleanup deadline (hours after end)'}</Label>
-                <Input type="number" min="24" max="168" value={form.cleanup_deadline_hours} onChange={e => set('cleanup_deadline_hours', e.target.value)} />
-              </div>
-              <div>
-                <Label>{isFr ? 'Dépôt de nettoyage' : 'Cleaning deposit'}</Label>
-                <Input type="number" step="0.01" value={form.cleanup_deposit} onChange={e => set('cleanup_deposit', e.target.value)} />
-              </div>
+            <div>
+              <Label>{isFr ? 'Délai de nettoyage (heures après fin)' : 'Cleanup deadline (hours after end)'}</Label>
+              <Input type="number" min="24" max="168" value={form.cleanup_deadline_hours} onChange={e => set('cleanup_deadline_hours', e.target.value)} />
             </div>
 
-            <div>
-              <Label className="block mb-2">{isFr ? 'Modes de paiement acceptés' : 'Payment methods accepted'}</Label>
-              <div className="flex gap-3">
-                {['stripe', 'cash', 'etransfer'].map(m => (
-                  <label key={m} className="flex items-center gap-1.5 text-sm cursor-pointer">
-                    <Checkbox checked={form.payment_methods_accepted.includes(m)} onCheckedChange={() => togglePM(m)} />
-                    <span className="capitalize">{m}</span>
-                  </label>
+            {/* ── PAYMENT SETTINGS ── */}
+            <div className="space-y-3 p-4 border rounded-lg bg-blue-50/40 dark:bg-blue-950/20">
+              <div className="flex items-center justify-between">
+                <Label className="text-base font-semibold">
+                  {isFr ? 'Paramètres de paiement' : 'Payment Settings'}
+                </Label>
+              </div>
+
+              <Label className="text-sm">{isFr ? 'Mode de paiement' : 'Payment Method'}</Label>
+              <div className="grid grid-cols-1 gap-2" data-testid="payment-method-selector">
+                {[
+                  { v: 'stripe', emoji: '💳',
+                    label_en: 'Online Payment (Stripe)',
+                    label_fr: 'Paiement en ligne (Stripe)',
+                    sub_en: 'BidVex collects 5% fee + Stripe + tax from the buyer. Facility receives full hammer price.',
+                    sub_fr: 'BidVex perçoit 5% + Stripe + taxes auprès de l\'acheteur. La facilité reçoit le prix marteau complet.' },
+                  { v: 'cash', emoji: '💵',
+                    label_en: 'Cash',
+                    label_fr: 'Comptant',
+                    sub_en: 'Buyer pays you directly in cash. BidVex invoices 5% + Stripe + taxes to your facility.',
+                    sub_fr: 'L\'acheteur vous paie directement en comptant. BidVex facture 5% + Stripe + taxes à votre facilité.' },
+                  { v: 'etransfer', emoji: '📧',
+                    label_en: 'E-Transfer',
+                    label_fr: 'Virement Interac',
+                    sub_en: 'Buyer sends you an Interac e-Transfer. BidVex invoices 5% + Stripe + taxes to your facility.',
+                    sub_fr: 'L\'acheteur vous envoie un virement Interac. BidVex facture 5% + Stripe + taxes à votre facilité.' },
+                ].map(opt => (
+                  <button
+                    type="button"
+                    key={opt.v}
+                    onClick={() => set('payment_method', opt.v)}
+                    data-testid={`payment-method-${opt.v}`}
+                    className={`text-left p-3 rounded-lg border-2 transition-all ${form.payment_method === opt.v
+                      ? 'border-blue-600 bg-blue-100/60 dark:bg-blue-900/30'
+                      : 'border-slate-200 dark:border-slate-700 hover:border-blue-400'}`}
+                  >
+                    <div className="flex items-center gap-2 font-semibold text-sm">
+                      <span>{opt.emoji}</span>
+                      <span>{isFr ? opt.label_fr : opt.label_en}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 ml-6">
+                      {isFr ? opt.sub_fr : opt.sub_en}
+                    </p>
+                  </button>
                 ))}
+              </div>
+
+              {/* Fee preview */}
+              <div className="rounded-lg bg-white dark:bg-slate-900 p-3 text-xs border">
+                {form.payment_method === 'stripe' ? (
+                  <p>
+                    👤 <strong>
+                      {isFr ? 'L\'acheteur paie:' : 'Buyer pays:'}
+                    </strong>{' '}
+                    {isFr
+                      ? 'Prix marteau + 5% frais + Stripe + taxes. Vous recevez: Prix marteau complet.'
+                      : 'Hammer price + 5% fee + Stripe + taxes. You receive: Full hammer price.'}
+                  </p>
+                ) : (
+                  <p>
+                    👤 <strong>
+                      {isFr ? 'L\'acheteur vous paie:' : 'Buyer pays you:'}
+                    </strong>{' '}
+                    {isFr
+                      ? 'Le prix marteau directement. BidVex vous facture: 5% + Stripe + taxes.'
+                      : 'Hammer price directly. BidVex invoices you: 5% + Stripe + taxes.'}
+                  </p>
+                )}
+              </div>
+
+              {/* Deposit toggle */}
+              <div className="flex items-start gap-2 pt-2">
+                <Checkbox
+                  checked={form.deposit_required}
+                  onCheckedChange={v => set('deposit_required', v === true)}
+                  className="mt-0.5"
+                  data-testid="deposit-required-toggle"
+                />
+                <div className="flex-1">
+                  <Label className="cursor-pointer text-sm">
+                    {isFr ? 'Exiger un dépôt pour participer' : 'Require a deposit to participate'}
+                  </Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    {isFr
+                      ? 'Les enchérisseurs doivent autoriser ce montant avant leur première offre. Refundé pour les perdants. Capturé en cas de défaut de paiement du gagnant.'
+                      : 'Bidders must authorize this amount before their first bid. Refunded for losers. Captured if winner fails to pay.'}
+                  </p>
+                  {form.deposit_required && (
+                    <div className="mt-2">
+                      <Label className="text-xs">{isFr ? 'Montant du dépôt (CAD)' : 'Deposit Amount (CAD)'}</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={form.deposit_amount}
+                        onChange={e => set('deposit_amount', e.target.value)}
+                        placeholder={isFr ? 'ex: 100' : 'e.g. 100'}
+                        data-testid="deposit-amount-input"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 

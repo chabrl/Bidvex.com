@@ -47,11 +47,17 @@ from fastapi import (
 
 from deps import User, get_current_user, get_db
 from models.storage_auction import (
-    StorageFacilityRegister, StorageAuctionCreate, StorageBidPayload,
+    StorageFacilityRegister, StorageAuctionCreate, StorageBidPayload, StorageDepositRequest,
     UNIT_SIZES, UNIT_TYPES, PAYMENT_METHODS, AUCTION_STATUSES, CANADIAN_PROVINCES,
 )
 from services.storage_pricing import calculate_storage_pricing
 from services.storage_auction_service import place_bid as _place_bid_proxy
+from services.storage_deposit_service import (
+    create_deposit_hold,
+    get_existing_deposit,
+    release_deposits_on_close,
+    forfeit_deposit,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -285,21 +291,77 @@ async def place_storage_bid(
     current_user: User = Depends(get_current_user),
 ):
     db = get_db()
+
+    # ── Deposit guard ──
+    auction = await db.storage_auctions.find_one(
+        {"id": auction_id},
+        {"_id": 0, "deposit_required": 1, "deposit_amount": 1, "status": 1},
+    )
+    if not auction:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    if auction.get("deposit_required") and float(auction.get("deposit_amount", 0)) > 0:
+        existing = await get_existing_deposit(db, auction_id, current_user.id)
+        if not existing:
+            amt = float(auction["deposit_amount"])
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "error": "deposit_required",
+                    "deposit_amount": amt,
+                    "message_en": f"A deposit of ${amt:.2f} CAD is required to participate in this auction.",
+                    "message_fr": f"Un dépôt de {amt:.2f} $ CAD est requis pour participer à cette enchère.",
+                    "action": "pay_deposit",
+                },
+            )
+
     result = await _place_bid_proxy(db, auction_id, current_user.id, float(payload.max_bid))
 
     # Send bid-confirmation + outbid emails (non-blocking)
     try:
         from services.email_notifications import send_storage_bid_placed_email, send_storage_outbid_email
-        auction = await db.storage_auctions.find_one({"id": auction_id}, {"_id": 0})
-        background_tasks.add_task(send_storage_bid_placed_email, current_user.dict() if hasattr(current_user, "dict") else dict(current_user), auction, result)
+        a = await db.storage_auctions.find_one({"id": auction_id}, {"_id": 0})
+        background_tasks.add_task(send_storage_bid_placed_email, current_user.dict() if hasattr(current_user, "dict") else dict(current_user), a, result)
         if result.get("outbid_user_id"):
             outbid = await db.users.find_one({"id": result["outbid_user_id"]}, {"_id": 0})
             if outbid:
-                background_tasks.add_task(send_storage_outbid_email, outbid, auction, result["current_bid"])
+                background_tasks.add_task(send_storage_outbid_email, outbid, a, result["current_bid"])
     except Exception as e:
         logger.error(f"[STORAGE] bid-email schedule failed: {e}")
 
     return result
+
+
+@storage_router.post("/storage-auctions/{auction_id}/deposit")
+async def pay_storage_deposit(
+    auction_id: str,
+    payload: StorageDepositRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Buyer authorizes the participation deposit (held via Stripe with capture_method=manual).
+    Idempotent — returns the existing 'held' deposit if already paid.
+    """
+    db = get_db()
+    auction = await db.storage_auctions.find_one(
+        {"id": auction_id},
+        {"_id": 0, "deposit_required": 1, "deposit_amount": 1, "status": 1},
+    )
+    if not auction:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    if not auction.get("deposit_required") or float(auction.get("deposit_amount", 0)) <= 0:
+        raise HTTPException(status_code=400, detail="No deposit required for this auction.")
+    if auction.get("status") not in ("active", "upcoming"):
+        raise HTTPException(status_code=400, detail="Auction not accepting deposits.")
+
+    deposit = await create_deposit_hold(
+        db,
+        auction_id=auction_id,
+        buyer_id=current_user.id,
+        buyer_email=current_user.email,
+        amount=float(auction["deposit_amount"]),
+        payment_method_id=payload.payment_method_id,
+    )
+    return {"success": True, "deposit": deposit}
 
 
 @storage_router.post("/storage-auctions/{auction_id}/payment")
@@ -347,7 +409,52 @@ async def register_facility(
     db = get_db()
     existing = await db.storage_facilities.find_one({"owner_user_id": current_user.id}, {"_id": 0, "id": 1})
     if existing:
-        raise HTTPException(status_code=400, detail="A facility profile already exists for this account.")
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "facility_already_registered",
+                "message_en": "You already have a facility registered.",
+                "message_fr": "Vous avez déjà une facilité enregistrée.",
+            },
+        )
+
+    # ── Create Stripe Connect Express account so BidVex can charge facility ──
+    stripe_account_id = None
+    onboarding_url = None
+    try:
+        import stripe as _stripe
+        _stripe.api_key = os.environ.get("STRIPE_API_KEY")
+        if _stripe.api_key:
+            acct = _stripe.Account.create(
+                type="express",
+                country="CA",
+                email=payload.email,
+                capabilities={
+                    "card_payments": {"requested": True},
+                    "transfers": {"requested": True},
+                },
+                business_type="company",
+                business_profile={
+                    "name": payload.company_name,
+                    "mcc": "4225",  # public warehousing & storage
+                },
+                metadata={
+                    "platform": "bidvex_storage",
+                    "owner_user_id": current_user.id,
+                },
+            )
+            stripe_account_id = acct.id
+            base_url = os.environ.get("FRONTEND_URL") or os.environ.get("REACT_APP_BACKEND_URL") or "https://bidvex.com"
+            link = _stripe.AccountLink.create(
+                account=stripe_account_id,
+                refresh_url=f"{base_url}/storage-auctions/register-facility?refresh=true",
+                return_url=f"{base_url}/storage-dashboard?onboarding=complete",
+                type="account_onboarding",
+            )
+            onboarding_url = link.url
+    except Exception as e:
+        logger.error(f"[STORAGE] Stripe Connect Express creation failed: {e}")
+        # Don't block registration on Stripe outage — admin can re-issue link later
 
     fac_id = str(uuid.uuid4())
     doc = {
@@ -364,10 +471,13 @@ async def register_facility(
         "postal_code": payload.postal_code,
         "units_available": payload.units_available,
         "referral_source": payload.referral_source,
+        "business_registration_number": payload.business_registration_number,
+        "opc_permit_number": payload.opc_permit_number,
         "verified": False,
         "status": "pending_verification",
         "seller_tier": "storage_facility",  # always 5% commission
-        "stripe_account_id": None,
+        "stripe_account_id": stripe_account_id,
+        "stripe_onboarding_complete": False,
         "total_units_sold": 0,
         "average_sale_price": 0.0,
         "created_at": _now().isoformat(),
@@ -387,7 +497,14 @@ async def register_facility(
         logger.error(f"[STORAGE] registration email failed: {e}")
 
     doc.pop("_id", None)
-    return doc
+    return {
+        "facility_id": fac_id,
+        "status": "pending_verification",
+        "stripe_onboarding_url": onboarding_url,
+        "message_en": "Registered successfully. Complete Stripe onboarding to receive payouts. Verification takes 24–48 hours.",
+        "message_fr": "Inscription réussie. Complétez l'intégration Stripe pour recevoir des paiements. Vérification sous 24 à 48 heures.",
+        **doc,
+    }
 
 
 @storage_router.get("/storage-facilities/me")
@@ -410,9 +527,17 @@ async def create_storage_auction(
         raise HTTPException(status_code=400, detail=f"unit_type must be one of {UNIT_TYPES}")
     if payload.start_time >= payload.end_time:
         raise HTTPException(status_code=400, detail="end_time must be after start_time")
-    invalid_methods = [m for m in payload.payment_methods_accepted if m not in PAYMENT_METHODS]
-    if invalid_methods:
-        raise HTTPException(status_code=400, detail=f"Invalid payment methods: {invalid_methods}")
+    if payload.payment_method not in PAYMENT_METHODS:
+        raise HTTPException(status_code=400, detail=f"payment_method must be one of {PAYMENT_METHODS}")
+    if payload.deposit_required and (not payload.deposit_amount or payload.deposit_amount <= 0):
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "deposit_amount_required",
+                "message_en": "You must set a deposit amount when requiring a deposit.",
+                "message_fr": "Vous devez définir un montant de dépôt lorsqu'un dépôt est requis.",
+            },
+        )
 
     db = get_db()
     auction_id = str(uuid.uuid4())
@@ -448,11 +573,16 @@ async def create_storage_auction(
         "winning_bid": None,
         "bid_count": 0,
         "bids": [],
-        "payment_method": None,
+        # Single facility-chosen payment method (legacy multi-select kept for compat readers)
+        "payment_method": payload.payment_method,
+        "payment_methods_accepted": [payload.payment_method],
         "payment_status": "pending",
+        # Optional participation deposit
+        "deposit_required": bool(payload.deposit_required),
+        "deposit_amount": float(payload.deposit_amount) if payload.deposit_amount else 0.0,
+        "deposit_description_en": payload.deposit_description_en,
+        "deposit_description_fr": payload.deposit_description_fr,
         "cleanup_deadline": cleanup_deadline.isoformat(),
-        "cleanup_deposit": float(payload.cleanup_deposit),
-        "payment_methods_accepted": payload.payment_methods_accepted,
         "created_at": _now().isoformat(),
         "updated_at": _now().isoformat(),
     }
@@ -667,7 +797,37 @@ async def admin_cancel_auction(auction_id: str, current_user: User = Depends(_re
     )
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Auction not found")
+    # Release any held deposits — losers get refunded, no winner exists
+    try:
+        await release_deposits_on_close(db, auction_id, winner_buyer_id=None)
+    except Exception as e:
+        logger.error(f"[STORAGE] release deposits on cancel failed: {e}")
     return {"success": True, "auction_id": auction_id, "status": "cancelled"}
+
+
+@storage_router.post("/admin/storage-auctions/{auction_id}/release-deposits")
+async def admin_release_deposits(auction_id: str, current_user: User = Depends(_require_admin)):
+    """Manually trigger deposit release for an ended auction."""
+    db = get_db()
+    a = await db.storage_auctions.find_one({"id": auction_id}, {"_id": 0, "winning_bidder_id": 1})
+    if not a:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    return await release_deposits_on_close(db, auction_id, a.get("winning_bidder_id"))
+
+
+@storage_router.post("/admin/storage-auctions/{auction_id}/forfeit-deposit")
+async def admin_forfeit_deposit(
+    auction_id: str,
+    payload: dict,
+    current_user: User = Depends(_require_admin),
+):
+    """Capture the held deposit as penalty (winner failed to pay)."""
+    db = get_db()
+    buyer_id = payload.get("buyer_id")
+    reason = payload.get("reason") or "Payment deadline missed"
+    if not buyer_id:
+        raise HTTPException(status_code=400, detail="buyer_id required")
+    return await forfeit_deposit(db, auction_id, buyer_id, reason)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -677,10 +837,23 @@ async def admin_cancel_auction(auction_id: str, current_user: User = Depends(_re
 @storage_router.get("/storage-auctions/{auction_id}/pricing")
 async def auction_pricing_preview(
     auction_id: str,
-    payment_method: str = Query("stripe"),
+    payment_method: str = Query(None),
+    deposit_amount: float = Query(None),
 ):
     db = get_db()
-    a = await db.storage_auctions.find_one({"id": auction_id}, {"_id": 0, "current_bid": 1, "facility_province": 1})
+    a = await db.storage_auctions.find_one(
+        {"id": auction_id},
+        {"_id": 0, "current_bid": 1, "facility_province": 1, "payment_method": 1, "deposit_required": 1, "deposit_amount": 1},
+    )
     if not a:
         raise HTTPException(status_code=404, detail="Auction not found")
-    return calculate_storage_pricing(a.get("current_bid", 0), a.get("facility_province", ""), payment_method)
+    pm = (payment_method or a.get("payment_method") or "stripe").lower()
+    dep = deposit_amount if deposit_amount is not None else (
+        float(a.get("deposit_amount") or 0) if a.get("deposit_required") else 0
+    )
+    return calculate_storage_pricing(
+        a.get("current_bid", 0),
+        a.get("facility_province", ""),
+        pm,
+        deposit_amount=dep,
+    )

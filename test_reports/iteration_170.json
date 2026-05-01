@@ -1,0 +1,41 @@
+{
+  "summary": "Iteration 170 — BidVex Storage Auctions Payment Method + Deposit System. Backend-only API integration testing. 16/16 NEW API tests passing + existing 10/10 pricing/Pydantic unit tests still green (regression intact). Verified all 14 review-request items: public list regression, Stripe Connect Express creation on facility register, 409 duplicate guard with bilingual messages, payment_method='bitcoin' → 422, deposit_required without amount → 422, stripe+no-deposit success, cash+deposit persistence verified via GET, bid endpoint 402 deposit_required with deposit_amount/message_en/message_fr/action='pay_deposit', non-deposit bid succeeds, pricing preview shapes for stripe (buyer_invoice.platform_fee/stripe_recovery/tax/total/remaining_after_deposit + facility_invoice.facility_receives) and cash (facility_invoice.bidvex_platform_fee/facility_owes_bidvex/facility_net), deposit endpoint 422 without payment_method_id and graceful with bogus pm, admin release-deposits 403 for non-admin, admin forfeit-deposit 403 for non-admin and 400 without buyer_id.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "models/storage_auction.py", "issue": "Uses Pydantic V1-style @validator decorators (deprecation warnings). Should migrate to @field_validator for Pydantic V2 compatibility before V3.0."},
+      {"endpoint": "/api/storage-facilities/auctions", "issue": "Note for next testing agent: the admin user charbel911@gmail.com does NOT have a verified facility profile attached (despite review-request claim). Tests now self-bootstrap via register-fresh-user → admin-verify flow."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_storage_iter170_api.py",
+    "/app/backend/tests/test_storage_payment_deposit_iter170.py",
+    "/app/test_reports/pytest/iter170_api.xml"
+  ],
+  "action_items": [
+    "(Optional) Migrate /app/backend/models/storage_auction.py validators to Pydantic V2 @field_validator to silence deprecation warnings (V3 will remove V1 style).",
+    "(Doc-only) Update /app/memory/test_credentials.md or review-request templates: charbel admin currently has NO storage_facility document; test bootstrap creates a separate verified facility owner."
+  ],
+  "critical_code_review_comments": [
+    "register_facility correctly handles Stripe Connect Express failure with graceful degradation (stripe_onboarding_url=None) — verified at API level.",
+    "Deposit guard in place_storage_bid returns proper bilingual 402 with all 5 fields (error, deposit_amount, message_en, message_fr, action). Confirmed.",
+    "Pricing preview switches buyer-vs-facility invoice shape correctly across stripe / cash / etransfer.",
+    "RBAC on /api/admin/storage-auctions/{id}/release-deposits and /forfeit-deposit enforced via _require_admin (verified 403 for buyer token).",
+    "Forfeit endpoint properly returns 400 when buyer_id missing (admin-side validation)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_storage_iter170_api.py (NEW — 16 API integration tests)"
+  ],
+  "success_rate": {"backend": "100% (16/16 API + 10/10 unit)", "frontend": "n/a (skipped per request)"},
+  "test_credentials": "Admin charbel911@gmail.com / Anderosli123!@# and buyer abc@gmail.com / TestBuyer123! — both authenticated successfully. Tests also auto-create TEST_-prefixed facility owner users via /api/auth/register and admin-verify them.",
+  "seed_data_creation": "Each test run creates: 1 fresh user for facility-registration test, 1 fresh facility owner that gets admin-verified, multiple TEST_-prefixed storage_auctions documents. All prefixed with TEST_ for easy cleanup. No production data modified.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 170 storage payment + deposit backend is fully validated. Test suite at /app/backend/tests/test_storage_iter170_api.py self-bootstraps (registers user → registers facility → admin-verifies) so it doesn't depend on charbel admin having a facility. Note: charbel admin user does NOT currently own a storage_facility document — if you need a registered-facility scenario, either use the verified_facility fixture pattern or query mongo directly. Stripe Connect Express creates real (test/live) accounts; the graceful 200+null fallback is in place if Stripe rejects.",
+  "rca of the issue": "No bugs found. Only deviation from review-request claim: charbel admin is NOT a registered facility owner — tests adjusted to self-bootstrap a verified facility via register+admin-verify. All endpoint contracts match the spec exactly."
+}

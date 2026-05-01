@@ -14,6 +14,7 @@ import {
   CreditCard, Banknote, Send,
 } from 'lucide-react';
 import StorageCountdown from './StorageCountdown';
+import StorageFooterBanner from './StorageFooterBanner';
 
 const API = API_BASE;
 
@@ -311,6 +312,7 @@ const StorageAuctionDetail = () => {
           </aside>
         </div>
       </div>
+      <StorageFooterBanner />
     </div>
   );
 };

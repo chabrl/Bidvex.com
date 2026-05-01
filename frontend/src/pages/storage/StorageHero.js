@@ -3,9 +3,38 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import './StorageHero.css';
 
+// Single source of truth for hero copy — content swaps based on user language.
+const STORAGE_HERO_CONTENT = {
+  en: {
+    eyebrow: 'STORAGE UNIT AUCTIONS',
+    line1: 'Hidden Treasures.',
+    line2: 'Revealed.',
+    subtitle: 'Bid on abandoned storage units from verified Canadian facilities. No buyer fees on cash auctions. Pure bidding.',
+    cta_browse: 'Browse Auctions →',
+    cta_list: 'List Your Facility',
+    badge1: '🔒 Verified facilities only',
+    badge2: '💰 Transparent fees',
+    badge3: '🇨🇦 Canadian platform',
+    badge4: '⚡ Real-time bidding',
+  },
+  fr: {
+    eyebrow: "ENCHÈRES D'UNITÉS D'ENTREPOSAGE",
+    line1: 'Trésors cachés.',
+    line2: 'Révélés.',
+    subtitle: "Enchérissez sur des unités d'entreposage abandonnées de facilités canadiennes vérifiées. Frais transparents. Enchères pures.",
+    cta_browse: 'Parcourir les enchères →',
+    cta_list: 'Lister votre facilité',
+    badge1: '🔒 Facilités vérifiées uniquement',
+    badge2: '💰 Frais transparents',
+    badge3: '🇨🇦 Plateforme canadienne',
+    badge4: '⚡ Enchères en temps réel',
+  },
+};
+
 const StorageHero = () => {
   const { i18n } = useTranslation();
-  const isFr = (i18n.language || '').startsWith('fr');
+  const lang = (i18n.language || '').startsWith('fr') ? 'fr' : 'en';
+  const t = STORAGE_HERO_CONTENT[lang];
 
   // 12 particle dots positioned absolutely
   const particles = Array.from({ length: 12 }).map((_, i) => {
@@ -51,28 +80,16 @@ const StorageHero = () => {
       {/* Hero content */}
       <div className="storage-hero__inner">
         <span className="storage-hero__label" data-testid="storage-hero-label">
-          {isFr ? "ENCHÈRES D'UNITÉS D'ENTREPOSAGE" : 'STORAGE UNIT AUCTIONS'}
+          {t.eyebrow}
         </span>
 
-        <h1 className="storage-hero__title">
-          {isFr ? 'Trésors cachés.' : 'Hidden Treasures.'}
-          <span className="storage-hero__title-line2">
-            {isFr ? ' Révélés.' : ' Revealed.'}
-          </span>
-          <div className="storage-hero__title-fr">
-            {isFr ? 'Hidden Treasures. Revealed.' : 'Trésors cachés. Révélés.'}
-          </div>
+        <h1 className="storage-hero__title" data-testid="storage-hero-title">
+          {t.line1}
+          <span className="storage-hero__title-line2">{` ${t.line2}`}</span>
         </h1>
 
-        <p className="storage-hero__subtitle">
-          {isFr
-            ? "Enchérissez sur des unités d'entreposage abandonnées de facilités canadiennes vérifiées. Aucuns frais acheteur. Aucune charge cachée. Juste des enchères pures."
-            : "Bid on abandoned storage units from verified Canadian facilities. No buyer fees. No hidden charges. Just pure auction."}
-        </p>
-        <p className="storage-hero__subtitle storage-hero__subtitle--fr">
-          {isFr
-            ? "Bid on abandoned storage units from verified Canadian facilities. No buyer fees."
-            : "Enchérissez sur des unités d'entreposage abandonnées de facilités canadiennes vérifiées. Aucuns frais acheteur."}
+        <p className="storage-hero__subtitle" data-testid="storage-hero-subtitle">
+          {t.subtitle}
         </p>
 
         <div className="storage-hero__ctas">
@@ -81,22 +98,22 @@ const StorageHero = () => {
             className="storage-hero__cta storage-hero__cta--primary"
             data-testid="storage-hero-browse-btn"
           >
-            {isFr ? 'Parcourir les enchères →' : 'Browse Storage Auctions →'}
+            {t.cta_browse}
           </Link>
           <Link
             to="/storage-auctions/register-facility"
             className="storage-hero__cta storage-hero__cta--secondary"
             data-testid="storage-hero-register-btn"
           >
-            {isFr ? 'Lister votre facilité' : 'List Your Facility'}
+            {t.cta_list}
           </Link>
         </div>
 
         <div className="storage-hero__badges">
-          <span className="storage-hero__badge">🔒 {isFr ? 'Facilités vérifiées uniquement' : 'Verified Facilities Only'}</span>
-          <span className="storage-hero__badge">💰 {isFr ? 'Aucuns frais acheteur' : 'No Buyer Fees'}</span>
-          <span className="storage-hero__badge">🇨🇦 {isFr ? 'Plateforme canadienne' : 'Canadian Platform'}</span>
-          <span className="storage-hero__badge">⚡ {isFr ? 'Enchères en temps réel' : 'Real-Time Bidding'}</span>
+          <span className="storage-hero__badge">{t.badge1}</span>
+          <span className="storage-hero__badge">{t.badge2}</span>
+          <span className="storage-hero__badge">{t.badge3}</span>
+          <span className="storage-hero__badge">{t.badge4}</span>
         </div>
       </div>
     </section>

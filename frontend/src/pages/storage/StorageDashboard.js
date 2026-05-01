@@ -12,6 +12,7 @@ import {
   Loader2, Package, DollarSign, TrendingUp, Receipt, Plus, ShieldCheck,
   Clock,
 } from 'lucide-react';
+import StorageFooterBanner from './StorageFooterBanner';
 
 const API = API_BASE;
 
@@ -156,6 +157,7 @@ const StorageDashboard = () => {
           )}
         </Card>
       </div>
+      <StorageFooterBanner />
     </div>
   );
 };

@@ -1,15 +1,30 @@
 """
-BidVex Storage Auction Pricing — iteration 169
-==============================================
-Self-contained pricing rules. Reuses get_tax_rate() from the canonical
-PricingManager so provincial tax math stays in one place.
+BidVex Storage Auction Pricing — iteration 170 (PAYMENT-METHOD-AWARE)
+======================================================================
+Three payment methods (facility chooses per listing):
 
-Spec proofs (verified inline at module load when run as __main__):
-  Proof 1 — $200 QC Stripe → seller invoice $12.18
-  Proof 2 — $500 ON Cash   → seller invoice $29.41
+OPTION A — STRIPE (online)
+  Buyer pays via Stripe (BidVex collects):
+    hammer_price + (hammer_price × 5%) + stripe_recovery + tax_on_(5%+stripe)
+  stripe_recovery = (hammer + 5%) × 2.9% + $0.30
+  tax = (5% fee + stripe_recovery) × provincial_rate
+  Facility receives: full hammer_price (BidVex's fee already collected from buyer)
+
+OPTION B/C — CASH or E-TRANSFER (offline)
+  Buyer pays facility directly: hammer_price (off-platform)
+  BidVex invoices the FACILITY:
+    (hammer × 5%) + stripe_recovery_on_5% + tax_on_(5%+stripe_recovery)
+  stripe_recovery_on_5% = (5% fee × 2.9%) + $0.30
+  tax = (5% fee + stripe_recovery) × provincial_rate
+  Facility net = hammer_price − facility_owes_bidvex
+
+Tax always applies to BidVex's 5% commission for ALL provinces. Provincial
+sales tax on the actual goods is the FACILITY's responsibility (not BidVex's).
+
+Spec proofs verified inline at module load when run as __main__.
 """
 from decimal import Decimal, ROUND_HALF_UP
-from typing import Dict
+from typing import Dict, Optional
 
 
 SELLER_COMMISSION_RATE = Decimal("0.05")   # Flat 5% to BidVex
@@ -17,8 +32,7 @@ STRIPE_PERCENT = Decimal("0.029")
 STRIPE_FIXED = Decimal("0.30")
 
 
-# Province → (rate, label) — same source of truth as PricingManager.
-# Defined locally to avoid circular imports during testing.
+# Province → (rate, label)
 _PROV_TAX = {
     "QC": (Decimal("0.14975"), "GST + QST (14.975%)"),
     "ON": (Decimal("0.13"), "HST (13%)"),
@@ -55,84 +69,104 @@ def calculate_storage_pricing(
     winning_bid: float,
     province: str,
     payment_method: str = "stripe",
+    deposit_amount: Optional[float] = None,
 ) -> Dict:
     """
-    Compute the seller (facility) and buyer invoice splits for a storage
-    auction. Returns a dict with keys: seller_invoice, buyer_invoice,
-    bidvex_revenue, payment_method, province, tax_label.
-
-    Seller side (always taxable):
-      seller_commission = bid × 5%
-      stripe_recovery   = (commission × 2.9%) + $0.30   ← BidVex's processing cost
-      tax               = (commission + stripe_recovery) × provincial_rate
-      seller_invoice    = commission + stripe_recovery + tax
-
-    Buyer side (depends on payment method):
-      stripe   → buyer pays winning_bid + (winning_bid × 2.9% + $0.30)
-                 (Stripe fees passed through so facility nets full bid)
-      cash     → buyer pays winning_bid (off-platform; BidVex not involved)
-      etransfer→ buyer pays winning_bid (off-platform; BidVex not involved)
-
-      Provincial sales tax on the winning bid is collected by the FACILITY
-      (their goods, their tax registration); BidVex never collects it.
+    Returns a dict with:
+      payment_method, province, tax_rate, tax_label,
+      buyer_invoice {...}, facility_invoice {...}, bidvex_revenue
     """
-    bid = Decimal(str(winning_bid))
+    bid = Decimal(str(winning_bid or 0))
+    deposit = Decimal(str(deposit_amount or 0))
     rate, label = get_storage_tax(province)
-
-    # Seller invoice
-    sc = bid * SELLER_COMMISSION_RATE
-    sr = (sc * STRIPE_PERCENT) + STRIPE_FIXED
-    tax = (sc + sr) * rate
-    seller_total = sc + sr + tax
-
-    # Buyer side
     pm = (payment_method or "").lower()
+
+    fee_rate = SELLER_COMMISSION_RATE
+    platform_fee = bid * fee_rate
+
     if pm == "stripe":
-        buyer_stripe_fee = (bid * STRIPE_PERCENT) + STRIPE_FIXED
-        buyer_total = bid + buyer_stripe_fee
-    else:
-        buyer_stripe_fee = Decimal("0")
-        buyer_total = bid
+        # ── BUYER pays via Stripe (BidVex collects all of it) ──
+        # stripe recovery on FULL amount (hammer + 5% fee)
+        stripe_recovery = (bid + platform_fee) * STRIPE_PERCENT + STRIPE_FIXED
+        tax = (platform_fee + stripe_recovery) * rate
+        buyer_total = bid + platform_fee + stripe_recovery + tax
+        buyer_remaining = max(buyer_total - deposit, Decimal("0"))
+
+        return {
+            "payment_method": "stripe",
+            "province": (province or "").upper(),
+            "tax_rate": _f(rate),
+            "tax_label": label,
+            "buyer_invoice": {
+                "hammer_price": _f(bid),
+                "platform_fee": _f(platform_fee),
+                "platform_fee_rate": "5.0%",
+                "stripe_recovery": _f(stripe_recovery),
+                "tax": _f(tax),
+                "tax_label": label,
+                "deposit_paid": _f(deposit),
+                "total": _f(buyer_total),
+                "remaining_after_deposit": _f(buyer_remaining),
+                "fee_payer": "buyer",
+                "note_en": "BidVex collects platform fee + Stripe + tax via your card. Facility receives full hammer price.",
+                "note_fr": "BidVex perçoit les frais + Stripe + taxes via votre carte. La facilité reçoit le prix marteau complet.",
+            },
+            "facility_invoice": {
+                "hammer_price": _f(bid),
+                "bidvex_fee": 0.0,
+                "platform_fee": 0.0,
+                "stripe_recovery": 0.0,
+                "tax": 0.0,
+                "facility_owes_bidvex": 0.0,
+                "facility_receives": _f(bid),
+                "facility_net": _f(bid),
+                "note_en": "BidVex fee collected from buyer — facility receives full hammer price.",
+                "note_fr": "Les frais BidVex sont perçus auprès de l'acheteur — la facilité reçoit le prix marteau complet.",
+            },
+            "bidvex_revenue": _f(platform_fee + stripe_recovery + tax),
+        }
+
+    # ── CASH / E-TRANSFER ── BidVex invoices the FACILITY
+    stripe_recovery = platform_fee * STRIPE_PERCENT + STRIPE_FIXED
+    tax = (platform_fee + stripe_recovery) * rate
+    facility_owes = platform_fee + stripe_recovery + tax
+    facility_net = bid - facility_owes
+
+    method_en = "cash" if pm == "cash" else "Interac e-Transfer"
+    method_fr = "comptant" if pm == "cash" else "virement Interac"
+    buyer_remaining_cash = max(bid - deposit, Decimal("0"))
 
     return {
-        "winning_bid": _f(bid),
+        "payment_method": pm if pm in ("cash", "etransfer") else "cash",
         "province": (province or "").upper(),
         "tax_rate": _f(rate),
         "tax_label": label,
-        "payment_method": pm,
-        "seller_invoice": {
-            "commission": _f(sc),
-            "commission_rate": "5%",
-            "stripe_recovery": _f(sr),
+        "buyer_invoice": {
+            "hammer_price": _f(bid),
+            "platform_fee": 0.0,
+            "stripe_recovery": 0.0,
+            "tax": 0.0,
+            "deposit_paid": _f(deposit),
+            "total": _f(bid),
+            "remaining_after_deposit": _f(buyer_remaining_cash),
+            "fee_payer": "facility",
+            "note_en": f"Pay ${_f(bid):.2f} CAD directly to facility via {method_en}. BidVex charges no buyer fee.",
+            "note_fr": f"Payez {_f(bid):.2f} $ CAD directement à la facilité par {method_fr}. BidVex ne facture aucun frais acheteur.",
+        },
+        "facility_invoice": {
+            "hammer_price": _f(bid),
+            "bidvex_platform_fee": _f(platform_fee),
+            "platform_fee_rate": "5.0%",
+            "stripe_recovery": _f(stripe_recovery),
             "tax": _f(tax),
             "tax_label": label,
-            "total": _f(seller_total),
-            "breakdown_text": (
-                f"Commission (5%): ${_f(sc):.2f}  +  Stripe Recovery: ${_f(sr):.2f}  "
-                f"+  Tax {label}: ${_f(tax):.2f}  =  ${_f(seller_total):.2f}"
-            ),
+            "facility_owes_bidvex": _f(facility_owes),
+            "facility_net": _f(facility_net),
+            "facility_receives": _f(facility_net),
+            "note_en": f"Buyer pays you ${_f(bid):.2f} directly. BidVex invoices your card on file for ${_f(facility_owes):.2f}.",
+            "note_fr": f"L'acheteur vous paie {_f(bid):.2f} $ directement. BidVex facture votre carte enregistrée de {_f(facility_owes):.2f} $.",
         },
-        "buyer_invoice": {
-            "winning_bid": _f(bid),
-            "stripe_fee": _f(buyer_stripe_fee),
-            "total": _f(buyer_total),
-            "bidvex_fee": 0.0,
-            "note_en": (
-                "Buyer pays Stripe processing fees only — BidVex charges no buyer fee."
-                if pm == "stripe"
-                else "Buyer pays facility directly via "
-                + ("cash" if pm == "cash" else "Interac e-Transfer")
-                + " — BidVex is not involved in this transaction."
-            ),
-            "note_fr": (
-                "L'acheteur paie uniquement les frais de traitement Stripe — BidVex ne facture aucun frais acheteur."
-                if pm == "stripe"
-                else "L'acheteur paie directement à la facilité par "
-                + ("comptant" if pm == "cash" else "virement Interac")
-                + " — BidVex n'est pas impliqué dans cette transaction."
-            ),
-        },
-        "bidvex_revenue": _f(sc),
+        "bidvex_revenue": _f(facility_owes),
     }
 
 
@@ -140,17 +174,53 @@ def calculate_storage_pricing(
 # Inline spec verification — runs only when executed directly.
 # ─────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    p1 = calculate_storage_pricing(200, "QC", "stripe")
-    print("PROOF 1 — $200 QC Stripe:")
-    print(f"  Seller invoice: ${p1['seller_invoice']['total']:.2f}  (spec: $12.18)")
-    print(f"  Buyer pays:     ${p1['buyer_invoice']['total']:.2f}  (spec: $206.10)")
-    assert abs(p1["seller_invoice"]["total"] - 12.18) <= 0.01
-    assert abs(p1["buyer_invoice"]["total"] - 206.10) <= 0.01
-    print()
-    p2 = calculate_storage_pricing(500, "ON", "cash")
-    print("PROOF 2 — $500 ON Cash:")
-    print(f"  Seller invoice: ${p2['seller_invoice']['total']:.2f}  (spec: $29.41)")
-    print(f"  Buyer pays:     ${p2['buyer_invoice']['total']:.2f}  (spec: $500.00 cash to facility)")
-    assert abs(p2["seller_invoice"]["total"] - 29.41) <= 0.01
-    assert abs(p2["buyer_invoice"]["total"] - 500.00) <= 0.01
-    print("\nAll spec proofs passed.")
+    # PROOF 1 — Stripe Payment, $800 hammer, QC, $100 deposit
+    p1 = calculate_storage_pricing(800, "QC", "stripe", deposit_amount=100)
+    print("PROOF 1 — Stripe QC $800 + $100 deposit:")
+    print(f"  Hammer:                {p1['buyer_invoice']['hammer_price']:>8.2f}  (spec: 800.00)")
+    print(f"  Platform Fee (5%):     {p1['buyer_invoice']['platform_fee']:>8.2f}  (spec: 40.00)")
+    print(f"  Stripe Recovery:       {p1['buyer_invoice']['stripe_recovery']:>8.2f}  (spec: 24.66)")
+    print(f"  Tax QC (14.975%):      {p1['buyer_invoice']['tax']:>8.2f}  (spec: 9.68)")
+    print(f"  Buyer Total:           {p1['buyer_invoice']['total']:>8.2f}  (spec: 874.34)")
+    print(f"  After deposit:         {p1['buyer_invoice']['remaining_after_deposit']:>8.2f}  (spec: 774.34)")
+    print(f"  Facility receives:     {p1['facility_invoice']['facility_receives']:>8.2f}  (spec: 800.00)")
+    assert abs(p1["buyer_invoice"]["platform_fee"] - 40.00) < 0.01
+    assert abs(p1["buyer_invoice"]["stripe_recovery"] - 24.66) < 0.01
+    assert abs(p1["buyer_invoice"]["tax"] - 9.68) < 0.01
+    assert abs(p1["buyer_invoice"]["total"] - 874.34) < 0.01
+    assert abs(p1["buyer_invoice"]["remaining_after_deposit"] - 774.34) < 0.01
+    assert abs(p1["facility_invoice"]["facility_receives"] - 800.00) < 0.01
+
+    # PROOF 2 — Cash, $800 hammer, QC, $100 deposit
+    p2 = calculate_storage_pricing(800, "QC", "cash", deposit_amount=100)
+    print("\nPROOF 2 — Cash QC $800 + $100 deposit:")
+    print(f"  Buyer pays facility:   {p2['buyer_invoice']['total']:>8.2f}  (spec: 800.00 cash to facility)")
+    print(f"  After deposit (cash):  {p2['buyer_invoice']['remaining_after_deposit']:>8.2f}  (spec: 700.00)")
+    print(f"  Platform fee (5%):     {p2['facility_invoice']['bidvex_platform_fee']:>8.2f}  (spec: 40.00)")
+    print(f"  Stripe Recovery:       {p2['facility_invoice']['stripe_recovery']:>8.2f}  (spec: 1.46)")
+    print(f"  Tax QC:                {p2['facility_invoice']['tax']:>8.2f}  (spec: 6.21)")
+    print(f"  Facility owes BidVex:  {p2['facility_invoice']['facility_owes_bidvex']:>8.2f}  (spec: 47.67)")
+    print(f"  Facility net:          {p2['facility_invoice']['facility_net']:>8.2f}  (spec: 752.33)")
+    assert abs(p2["facility_invoice"]["bidvex_platform_fee"] - 40.00) < 0.01
+    assert abs(p2["facility_invoice"]["stripe_recovery"] - 1.46) < 0.01
+    assert abs(p2["facility_invoice"]["tax"] - 6.21) < 0.01
+    assert abs(p2["facility_invoice"]["facility_owes_bidvex"] - 47.67) < 0.01
+    assert abs(p2["facility_invoice"]["facility_net"] - 752.33) < 0.01
+    assert abs(p2["buyer_invoice"]["remaining_after_deposit"] - 700.00) < 0.01
+
+    # PROOF 3 — E-Transfer, $1500 ON, no deposit
+    p3 = calculate_storage_pricing(1500, "ON", "etransfer", deposit_amount=None)
+    print("\nPROOF 3 — E-Transfer ON $1500 (no deposit):")
+    print(f"  Buyer pays facility:   {p3['buyer_invoice']['total']:>8.2f}  (spec: 1500.00)")
+    print(f"  Platform fee (5%):     {p3['facility_invoice']['bidvex_platform_fee']:>8.2f}  (spec: 75.00)")
+    print(f"  Stripe Recovery:       {p3['facility_invoice']['stripe_recovery']:>8.2f}  (spec: 2.48)")
+    print(f"  Tax ON HST (13%):      {p3['facility_invoice']['tax']:>8.2f}  (spec: 10.07)")
+    print(f"  Facility owes BidVex:  {p3['facility_invoice']['facility_owes_bidvex']:>8.2f}  (spec: 87.55)")
+    print(f"  Facility net:          {p3['facility_invoice']['facility_net']:>8.2f}  (spec: 1412.45)")
+    assert abs(p3["facility_invoice"]["bidvex_platform_fee"] - 75.00) < 0.01
+    assert abs(p3["facility_invoice"]["stripe_recovery"] - 2.48) < 0.01
+    assert abs(p3["facility_invoice"]["tax"] - 10.07) < 0.01
+    assert abs(p3["facility_invoice"]["facility_owes_bidvex"] - 87.55) < 0.01
+    assert abs(p3["facility_invoice"]["facility_net"] - 1412.45) < 0.01
+
+    print("\n✓ All 3 spec proofs passed.")

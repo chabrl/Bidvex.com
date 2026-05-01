@@ -49,18 +49,18 @@
   line-height: 1.05;
   margin: 0 0 8px 0;
   letter-spacing: -1.5px;
+  color: #FFFFFF;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
 }
 
 .storage-hero__title-line2 {
   display: block;
-  color: #3FB4CB;
+  color: #FFFFFF;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
 }
 
 .storage-hero__title-fr {
-  font-size: clamp(20px, 3vw, 28px);
-  color: rgba(255, 255, 255, 0.65);
-  font-weight: 700;
-  margin-top: 6px;
+  display: none; /* dual-language secondary line removed in iter170 */
 }
 
 .storage-hero__subtitle {
@@ -72,9 +72,7 @@
 }
 
 .storage-hero__subtitle--fr {
-  color: rgba(255, 255, 255, 0.6);
-  margin-top: 10px;
-  font-size: clamp(13px, 1.5vw, 15px);
+  display: none; /* dual-language secondary line removed in iter170 */
 }
 
 .storage-hero__ctas {

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Card } from '../../components/ui/card';
 import { ArrowLeft } from 'lucide-react';
+import StorageFooterBanner from './StorageFooterBanner';
 
 const Section = ({ title_en, title_fr, body_en, body_fr }) => (
   <div className="mb-6">
@@ -46,10 +47,10 @@ export const HowItWorks = () => {
             body_fr="Pour assurer l'équité, toute offre placée dans les 10 dernières minutes d'une enchère prolonge l'enchère de 10 minutes. Cela empêche les offres de dernière seconde et donne à chaque enchérisseur une chance équitable de répondre."
           />
           <Section
-            title_en="4. No Buyer Fees"
-            title_fr="4. Aucuns frais acheteur"
-            body_en="BidVex charges ZERO buyer fees on all storage unit auctions. You pay only the winning bid amount directly to the storage facility. BidVex's commission is paid by the facility, not by you."
-            body_fr="BidVex ne facture AUCUNS frais acheteur pour les enchères d'unités d'entreposage. Vous payez uniquement le montant de l'offre gagnante directement à la facilité d'entreposage. La commission de BidVex est payée par la facilité, pas par vous."
+            title_en="4. Buyer Fees Depend on Payment Method"
+            title_fr="4. Les frais acheteur dépendent du mode de paiement"
+            body_en="On Cash and Interac e-Transfer auctions, buyers pay only the winning bid price directly to the storage facility — zero BidVex fees. On Stripe-payment auctions, BidVex collects a 5% platform fee + Stripe processing recovery + applicable provincial tax from the buyer (the facility receives the full hammer price). The facility selects the payment method when listing each auction."
+            body_fr="Sur les enchères au comptant et par virement Interac, les acheteurs paient uniquement le prix de l'offre gagnante directement à la facilité — aucuns frais BidVex. Sur les enchères payées par Stripe, BidVex perçoit auprès de l'acheteur des frais de 5 % + récupération Stripe + taxes provinciales applicables (la facilité reçoit le prix marteau complet). La facilité choisit le mode de paiement lors de la création de chaque enchère."
           />
           <Section
             title_en="5. Payment Methods"
@@ -65,6 +66,7 @@ export const HowItWorks = () => {
           />
         </Card>
       </div>
+      <StorageFooterBanner />
     </div>
   );
 };
@@ -117,6 +119,7 @@ export const StorageTerms = () => {
           />
         </Card>
       </div>
+      <StorageFooterBanner />
     </div>
   );
 };
@@ -151,6 +154,7 @@ export const StorageForFacilities = () => {
           />
         </Card>
       </div>
+      <StorageFooterBanner />
     </div>
   );
 };

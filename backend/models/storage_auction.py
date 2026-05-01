@@ -1,23 +1,23 @@
 """
-BidVex Storage Unit Auction Models — iteration 169
+BidVex Storage Unit Auction Models — iteration 170
 ==================================================
 Two MongoDB collections:
   • storage_facilities  — verified Canadian self-storage operators
   • storage_auctions    — individual unit auctions (lien or non-lien)
 
-Pricing rules (single source of truth):
-  • Seller (facility): 5% flat commission + Stripe recovery + provincial tax
-  • Buyer: ZERO BidVex fees. Pays facility directly.
-    - Stripe payment → +Stripe fees passed through (facility nets full bid)
-    - Cash / E-Transfer → exact winning bid only
+NEW in iter170:
+  • Single `payment_method` per auction (stripe | cash | etransfer)
+  • Optional participation `deposit_required` + `deposit_amount`
+  • storage_deposits collection (escrow holds via Stripe PI)
 
-Tax always applies to BidVex's 5% commission for ALL provinces. Provincial
-sales tax on the winning bid is the FACILITY's responsibility, not BidVex's
-(matches the vehicle module's intermediary posture).
+Pricing rules (single source of truth — see services/storage_pricing.py):
+  • Stripe path → BidVex collects 5% + Stripe + tax from BUYER (facility nets full hammer)
+  • Cash/E-Transfer path → buyer pays facility off-platform (hammer only)
+       BidVex invoices FACILITY 5% + Stripe + tax
 """
 from typing import List, Optional
 from datetime import datetime
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, validator
 
 
 CANADIAN_PROVINCES = ["AB", "BC", "MB", "NB", "NL", "NS", "ON", "PE", "QC", "SK", "NT", "NU", "YT"]
@@ -40,6 +40,8 @@ class StorageFacilityRegister(BaseModel):
     postal_code: str
     units_available: int = Field(default=0, ge=0)
     referral_source: Optional[str] = None
+    business_registration_number: Optional[str] = None
+    opc_permit_number: Optional[str] = None
     accepted_terms: bool
 
 
@@ -62,10 +64,39 @@ class StorageAuctionCreate(BaseModel):
     soft_close_enabled: bool = True
     soft_close_extension_minutes: int = Field(default=10, ge=1, le=60)
     cleanup_deadline_hours: int = Field(default=72, ge=24, le=168)
-    cleanup_deposit: float = Field(default=0.0, ge=0)
-    payment_methods_accepted: List[str] = Field(default_factory=lambda: ["stripe", "cash", "etransfer"])
+
+    # ── PAYMENT METHOD (single) ──
+    payment_method: str = Field(default="stripe")  # stripe | cash | etransfer
+
+    # ── PARTICIPATION DEPOSIT (optional) ──
+    deposit_required: bool = False
+    deposit_amount: Optional[float] = Field(default=None, ge=0)
+    deposit_description_en: Optional[str] = None
+    deposit_description_fr: Optional[str] = None
+
+    @validator("payment_method")
+    def _vm(cls, v):
+        v = (v or "").lower()
+        if v not in PAYMENT_METHODS:
+            raise ValueError(f"payment_method must be one of {PAYMENT_METHODS}")
+        return v
+
+    @validator("deposit_amount", always=True)
+    def _vd(cls, v, values):
+        req = values.get("deposit_required", False)
+        if req and (v is None or v <= 0):
+            raise ValueError(
+                "deposit_amount must be > 0 when deposit_required is true. "
+                "Le montant du dépôt doit être supérieur à 0 si un dépôt est requis."
+            )
+        return v
 
 
 class StorageBidPayload(BaseModel):
     """A user placing a bid (with proxy max)."""
     max_bid: float = Field(..., ge=1)
+
+
+class StorageDepositRequest(BaseModel):
+    """Buyer pays the participation deposit before placing first bid."""
+    payment_method_id: str  # Stripe payment_method id (pm_xxx) from frontend Elements
