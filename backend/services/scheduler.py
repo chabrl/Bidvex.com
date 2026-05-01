@@ -755,7 +755,22 @@ def init_scheduler(database):
         replace_existing=True,
     )
 
-    logger.info("Scheduler initialized with 10 jobs")
+    # Job 11: Downgrade expired promotions - every hour
+    async def promotions_downgrade_job():
+        if db_instance is None:
+            return
+        from services.scheduled_jobs import process_expired_promotions
+        await process_expired_promotions(db_instance)
+
+    scheduler.add_job(
+        promotions_downgrade_job,
+        IntervalTrigger(hours=1),
+        id="process_expired_promotions",
+        name="Downgrade Expired Promotions",
+        replace_existing=True,
+    )
+
+    logger.info("Scheduler initialized with 11 jobs")
     return scheduler
 
 

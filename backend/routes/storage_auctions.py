@@ -791,17 +791,6 @@ async def admin_verify_facility(
     return {"success": True, "facility_id": facility_id, "status": "verified"}
 
 
-@storage_router.put("/admin/storage-facilities/{facility_id}/suspend")
-async def admin_suspend_facility(facility_id: str, current_user: User = Depends(_require_admin)):
-    db = get_db()
-    res = await db.storage_facilities.update_one(
-        {"id": facility_id}, {"$set": {"status": "suspended", "verified": False, "suspended_at": _now().isoformat()}}
-    )
-    if res.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Facility not found")
-    return {"success": True, "facility_id": facility_id, "status": "suspended"}
-
-
 @storage_router.get("/admin/storage-auctions")
 async def admin_list_auctions(
     current_user: User = Depends(_require_admin),
@@ -855,6 +844,631 @@ async def admin_forfeit_deposit(
     if not buyer_id:
         raise HTTPException(status_code=400, detail="buyer_id required")
     return await forfeit_deposit(db, auction_id, buyer_id, reason)
+
+
+@storage_router.post("/admin/storage-auctions")
+async def admin_create_storage_auction(
+    payload: StorageAuctionCreate,
+    facility_id: str = Query(...),
+    current_user: User = Depends(_require_admin),
+):
+    """
+    Admin creates an auction on behalf of any facility. Bypasses the
+    'must be verified facility' owner guard; admin takes responsibility.
+    """
+    db = get_db()
+    facility = await db.storage_facilities.find_one({"id": facility_id}, {"_id": 0})
+    if not facility:
+        raise HTTPException(status_code=404, detail="Facility not found")
+
+    # Reuse the same validation
+    if payload.unit_size not in UNIT_SIZES:
+        raise HTTPException(status_code=400, detail=f"unit_size must be one of {UNIT_SIZES}")
+    if payload.unit_type not in UNIT_TYPES:
+        raise HTTPException(status_code=400, detail=f"unit_type must be one of {UNIT_TYPES}")
+    if payload.start_time >= payload.end_time:
+        raise HTTPException(status_code=400, detail="end_time must be after start_time")
+    if payload.payment_method not in PAYMENT_METHODS:
+        raise HTTPException(status_code=400, detail=f"payment_method must be one of {PAYMENT_METHODS}")
+    if payload.deposit_required and (not payload.deposit_amount or payload.deposit_amount <= 0):
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "deposit_amount_required",
+                "message_en": "You must set a deposit amount when requiring a deposit.",
+                "message_fr": "Vous devez définir un montant de dépôt lorsqu'un dépôt est requis.",
+            },
+        )
+
+    auction_id = str(uuid.uuid4())
+    cleanup_deadline = payload.end_time + timedelta(hours=payload.cleanup_deadline_hours)
+    starting = float(payload.starting_price)
+
+    doc = {
+        "id": auction_id,
+        "facility_id": facility["id"],
+        "facility_name": facility.get("company_name"),
+        "facility_city": facility.get("city"),
+        "facility_province": facility.get("province"),
+        "unit_number": payload.unit_number,
+        "unit_size": payload.unit_size,
+        "unit_type": payload.unit_type,
+        "is_lien_unit": payload.is_lien_unit,
+        "past_due_balance": payload.past_due_balance,
+        "description_en": payload.description_en,
+        "description_fr": payload.description_fr or payload.description_en,
+        "photos": payload.photos[:MAX_PHOTOS_PER_AUCTION],
+        "video_url": payload.video_url,
+        "starting_price": starting,
+        "current_bid": starting,
+        "reserve_price": payload.reserve_price,
+        "reserve_met": False if payload.reserve_price else True,
+        "bid_increment": float(payload.bid_increment),
+        "start_time": payload.start_time.isoformat(),
+        "end_time": payload.end_time.isoformat(),
+        "soft_close_enabled": payload.soft_close_enabled,
+        "soft_close_extension_minutes": payload.soft_close_extension_minutes,
+        "status": "upcoming" if payload.start_time > _now() else "active",
+        "winning_bidder_id": None,
+        "winning_bid": None,
+        "bid_count": 0,
+        "bids": [],
+        "payment_method": payload.payment_method,
+        "payment_methods_accepted": [payload.payment_method],
+        "payment_status": "pending",
+        "deposit_required": bool(payload.deposit_required),
+        "deposit_amount": float(payload.deposit_amount) if payload.deposit_amount else 0.0,
+        "cleanup_deadline": cleanup_deadline.isoformat(),
+        "created_by_admin": current_user.id,
+        "created_at": _now().isoformat(),
+        "updated_at": _now().isoformat(),
+    }
+    await db.storage_auctions.insert_one(doc.copy())
+    doc.pop("_id", None)
+    return doc
+
+
+# User-facing: list user's own deposits (iter172)
+@storage_router.get("/my-storage-deposits")
+async def my_storage_deposits(current_user: User = Depends(get_current_user)):
+    """Return the current user's deposit history for the My Deposits profile tab."""
+    db = get_db()
+    rows = await db.storage_deposits.find(
+        {"buyer_id": current_user.id},
+        {"_id": 0},
+    ).sort("created_at", -1).limit(200).to_list(200)
+
+    # Enrich with auction unit_number/facility
+    auction_ids = list({r.get("auction_id") for r in rows if r.get("auction_id")})
+    auctions = {}
+    if auction_ids:
+        async for a in db.storage_auctions.find(
+            {"id": {"$in": auction_ids}},
+            {"_id": 0, "id": 1, "unit_number": 1, "facility_name": 1, "facility_city": 1, "facility_province": 1},
+        ):
+            auctions[a["id"]] = a
+    for r in rows:
+        a = auctions.get(r.get("auction_id", ""), {})
+        r["auction_unit_number"] = a.get("unit_number", "—")
+        r["facility_name"] = a.get("facility_name", "—")
+        r["facility_city"] = a.get("facility_city")
+        r["facility_province"] = a.get("facility_province")
+    return {"total": len(rows), "deposits": rows}
+
+
+# ─────────────────────────────────────────────────────────────
+# STORAGE PROMOTION TIERS (iter172)
+# ─────────────────────────────────────────────────────────────
+STORAGE_PROMOTION_TIERS = {
+    "basic": {
+        "name_en": "Basic Boost",
+        "name_fr": "Promotion de base",
+        "price_cad": 9.99,
+        "duration_days": 7,
+        "features_en": ["Homepage stats bar priority", "Search result boost"],
+        "features_fr": ["Priorité sur la barre de statistiques", "Améliore les résultats de recherche"],
+    },
+    "featured": {
+        "name_en": "Featured Unit",
+        "name_fr": "Unité en vedette",
+        "price_cad": 24.99,
+        "duration_days": 14,
+        "features_en": ["Featured badge on card", "Homepage section priority", "Email blast to local buyers"],
+        "features_fr": ["Badge vedette sur la carte", "Priorité section accueil", "Courriel aux acheteurs locaux"],
+    },
+    "premium": {
+        "name_en": "Premium Spotlight",
+        "name_fr": "Mise en vedette premium",
+        "price_cad": 49.99,
+        "duration_days": 30,
+        "features_en": ["Top placement in all views", "Banner on storage browse", "Email blast to all buyers", "Social media feature"],
+        "features_fr": ["Placement au sommet", "Bannière sur navigation", "Courriel à tous les acheteurs", "Promotion sur réseaux sociaux"],
+    },
+}
+
+
+@storage_router.get("/storage-promotion-tiers")
+async def get_storage_promotion_tiers():
+    """Public — frontend pricing table."""
+    return {"tiers": STORAGE_PROMOTION_TIERS}
+
+
+@storage_router.post("/storage-auctions/{auction_id}/promote")
+async def facility_promote_auction(
+    auction_id: str,
+    payload: dict,
+    facility=Depends(_require_verified_facility),
+):
+    """
+    Facility buys a promotion tier for one of their auctions.
+    Returns a Stripe PaymentIntent client_secret so frontend can confirm payment.
+    On successful payment, webhook (or manual confirmation) marks the auction
+    with the promotion_tier + promoted_until timestamp.
+    """
+    tier = (payload.get("tier") or "").lower()
+    if tier not in STORAGE_PROMOTION_TIERS:
+        raise HTTPException(status_code=400, detail=f"tier must be one of {list(STORAGE_PROMOTION_TIERS.keys())}")
+
+    db = get_db()
+    auction = await db.storage_auctions.find_one(
+        {"id": auction_id, "facility_id": facility["id"]},
+        {"_id": 0},
+    )
+    if not auction:
+        raise HTTPException(status_code=404, detail="Auction not found or not yours")
+
+    spec = STORAGE_PROMOTION_TIERS[tier]
+    price_cents = int(round(spec["price_cad"] * 100))
+
+    # Create Stripe PaymentIntent
+    try:
+        import stripe as _stripe
+        _stripe.api_key = os.environ.get("STRIPE_API_KEY")
+        pi = _stripe.PaymentIntent.create(
+            amount=price_cents,
+            currency="cad",
+            automatic_payment_methods={"enabled": True, "allow_redirects": "never"},
+            description=f"BidVex storage promotion: {tier} — auction {auction_id[:8]}",
+            metadata={
+                "type": "storage_promotion",
+                "auction_id": auction_id,
+                "facility_id": facility["id"],
+                "tier": tier,
+                "duration_days": str(spec["duration_days"]),
+            },
+        )
+    except Exception as e:
+        logger.error(f"[STORAGE_PROMOTION] PI create failed: {e}")
+        raise HTTPException(status_code=502, detail=f"Stripe payment init failed: {e}")
+
+    # Record the purchase intent
+    await db.storage_promotion_purchases.insert_one({
+        "auction_id": auction_id,
+        "facility_id": facility["id"],
+        "tier": tier,
+        "price_cad": spec["price_cad"],
+        "duration_days": spec["duration_days"],
+        "stripe_payment_intent_id": pi.id,
+        "status": "pending",
+        "created_at": _now().isoformat(),
+    })
+    return {
+        "payment_intent_id": pi.id,
+        "client_secret": pi.client_secret,
+        "amount_cad": spec["price_cad"],
+        "tier": tier,
+    }
+
+
+@storage_router.post("/storage-auctions/{auction_id}/promote/confirm")
+async def facility_confirm_promotion(
+    auction_id: str,
+    payload: dict,
+    facility=Depends(_require_verified_facility),
+):
+    """
+    Called by frontend after Stripe confirmCardPayment resolves with status=succeeded.
+    Activates the promotion on the auction.
+    """
+    pi_id = payload.get("payment_intent_id")
+    if not pi_id:
+        raise HTTPException(status_code=400, detail="payment_intent_id required")
+
+    # Verify with Stripe
+    try:
+        import stripe as _stripe
+        _stripe.api_key = os.environ.get("STRIPE_API_KEY")
+        pi = _stripe.PaymentIntent.retrieve(pi_id)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Stripe verify failed: {e}")
+
+    if pi.status != "succeeded":
+        raise HTTPException(status_code=402, detail=f"Payment not succeeded (status={pi.status})")
+
+    db = get_db()
+    purchase = await db.storage_promotion_purchases.find_one(
+        {"stripe_payment_intent_id": pi_id, "facility_id": facility["id"]},
+        {"_id": 0},
+    )
+    if not purchase:
+        raise HTTPException(status_code=404, detail="Promotion purchase not found")
+
+    tier = purchase["tier"]
+    duration = int(purchase["duration_days"])
+    promoted_until = (_now() + timedelta(days=duration)).isoformat()
+
+    await db.storage_auctions.update_one(
+        {"id": auction_id},
+        {"$set": {
+            "promotion_tier": tier,
+            "promoted_until": promoted_until,
+            "is_featured": tier in ("featured", "premium"),
+            "updated_at": _now().isoformat(),
+        }},
+    )
+    await db.storage_promotion_purchases.update_one(
+        {"stripe_payment_intent_id": pi_id},
+        {"$set": {"status": "active", "promoted_until": promoted_until, "confirmed_at": _now().isoformat()}},
+    )
+    return {"success": True, "auction_id": auction_id, "tier": tier, "promoted_until": promoted_until}
+
+
+@storage_router.post("/admin/storage-auctions/{auction_id}/grant-promotion")
+async def admin_grant_promotion(
+    auction_id: str,
+    payload: dict,
+    current_user: User = Depends(_require_admin),
+):
+    """Admin comps a promotion for free (e.g. launch partner)."""
+    tier = (payload.get("tier") or "").lower()
+    days = int(payload.get("duration_days") or STORAGE_PROMOTION_TIERS.get(tier, {}).get("duration_days", 7))
+    if tier not in STORAGE_PROMOTION_TIERS:
+        raise HTTPException(status_code=400, detail=f"tier must be one of {list(STORAGE_PROMOTION_TIERS.keys())}")
+    db = get_db()
+    promoted_until = (_now() + timedelta(days=days)).isoformat()
+    res = await db.storage_auctions.update_one(
+        {"id": auction_id},
+        {"$set": {
+            "promotion_tier": tier,
+            "promoted_until": promoted_until,
+            "is_featured": tier in ("featured", "premium"),
+            "promotion_granted_by": current_user.id,
+            "promotion_granted_at": _now().isoformat(),
+            "updated_at": _now().isoformat(),
+        }},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    return {"success": True, "auction_id": auction_id, "tier": tier, "promoted_until": promoted_until}
+
+
+@storage_router.post("/admin/storage-auctions/{auction_id}/revoke-promotion")
+async def admin_revoke_promotion(auction_id: str, current_user: User = Depends(_require_admin)):
+    """Remove a promotion immediately."""
+    db = get_db()
+    res = await db.storage_auctions.update_one(
+        {"id": auction_id},
+        {"$set": {
+            "promotion_tier": None,
+            "promoted_until": None,
+            "is_featured": False,
+            "promotion_revoked_by": current_user.id,
+            "promotion_revoked_at": _now().isoformat(),
+        }},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    return {"success": True, "auction_id": auction_id}
+
+
+# ─────────────────────────────────────────────────────────────
+# ADMIN STORAGE AUCTION + FACILITY CONTROLS (iter172)
+# ─────────────────────────────────────────────────────────────
+
+@storage_router.post("/admin/storage-facilities/{facility_id}/reject")
+async def admin_reject_facility(
+    facility_id: str,
+    payload: dict,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(_require_admin),
+):
+    db = get_db()
+    reason = payload.get("reason") or "Does not meet verification requirements."
+    fac = await db.storage_facilities.find_one({"id": facility_id}, {"_id": 0})
+    if not fac:
+        raise HTTPException(status_code=404, detail="Facility not found")
+    await db.storage_facilities.update_one(
+        {"id": facility_id},
+        {"$set": {
+            "status": "rejected", "verified": False,
+            "rejected_at": _now().isoformat(), "rejected_by": current_user.id,
+            "rejection_reason": reason,
+        }},
+    )
+    return {"success": True, "facility_id": facility_id, "status": "rejected"}
+
+
+@storage_router.post("/admin/storage-facilities/{facility_id}/suspend")
+async def admin_suspend_facility(facility_id: str, current_user: User = Depends(_require_admin)):
+    db = get_db()
+    res = await db.storage_facilities.update_one(
+        {"id": facility_id},
+        {"$set": {"status": "suspended", "suspended_at": _now().isoformat(), "suspended_by": current_user.id}},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Facility not found")
+    await db.storage_auctions.update_many(
+        {"facility_id": facility_id, "status": "active"},
+        {"$set": {"status": "suspended", "updated_at": _now().isoformat()}},
+    )
+    return {"success": True, "facility_id": facility_id, "status": "suspended"}
+
+
+@storage_router.post("/admin/storage-facilities/{facility_id}/unsuspend")
+async def admin_unsuspend_facility(facility_id: str, current_user: User = Depends(_require_admin)):
+    db = get_db()
+    res = await db.storage_facilities.update_one(
+        {"id": facility_id},
+        {"$set": {"status": "verified", "verified": True, "unsuspended_at": _now().isoformat()}},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Facility not found")
+    await db.storage_auctions.update_many(
+        {"facility_id": facility_id, "status": "suspended"},
+        {"$set": {"status": "active", "updated_at": _now().isoformat()}},
+    )
+    return {"success": True, "facility_id": facility_id, "status": "verified"}
+
+
+@storage_router.delete("/admin/storage-facilities/{facility_id}")
+async def admin_delete_facility(facility_id: str, current_user: User = Depends(_require_admin)):
+    db = get_db()
+    fac = await db.storage_facilities.find_one({"id": facility_id}, {"_id": 0, "id": 1})
+    if not fac:
+        raise HTTPException(status_code=404, detail="Facility not found")
+    await db.storage_auctions.delete_many({"facility_id": facility_id})
+    await db.storage_facilities.delete_one({"id": facility_id})
+    return {"success": True, "facility_id": facility_id, "deleted": True}
+
+
+@storage_router.post("/admin/storage-auctions/{auction_id}/pause")
+async def admin_pause_auction(auction_id: str, current_user: User = Depends(_require_admin)):
+    db = get_db()
+    res = await db.storage_auctions.update_one(
+        {"id": auction_id},
+        {"$set": {"status": "paused", "paused_at": _now().isoformat(), "paused_by": current_user.id}},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    return {"success": True, "auction_id": auction_id, "status": "paused"}
+
+
+@storage_router.post("/admin/storage-auctions/{auction_id}/resume")
+async def admin_resume_auction(auction_id: str, current_user: User = Depends(_require_admin)):
+    db = get_db()
+    res = await db.storage_auctions.update_one(
+        {"id": auction_id, "status": "paused"},
+        {"$set": {"status": "active", "resumed_at": _now().isoformat()}},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Auction not found or not paused")
+    return {"success": True, "auction_id": auction_id, "status": "active"}
+
+
+@storage_router.put("/admin/storage-auctions/{auction_id}")
+async def admin_edit_auction(
+    auction_id: str,
+    payload: dict,
+    current_user: User = Depends(_require_admin),
+):
+    db = get_db()
+    updates = {}
+    for field in ("unit_number", "description_en", "description_fr", "reserve_price",
+                  "starting_price", "bid_increment", "payment_method",
+                  "deposit_required", "deposit_amount", "promotion_tier"):
+        if field in payload:
+            updates[field] = payload[field]
+    if "end_time" in payload and payload["end_time"]:
+        updates["end_time"] = payload["end_time"]
+    if not updates:
+        raise HTTPException(status_code=400, detail="No valid fields to update")
+    updates["updated_at"] = _now().isoformat()
+    updates["updated_by_admin"] = current_user.id
+    res = await db.storage_auctions.update_one({"id": auction_id}, {"$set": updates})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    return {"success": True, "updated_fields": list(updates.keys())}
+
+
+@storage_router.delete("/admin/storage-auctions/{auction_id}")
+async def admin_delete_auction(auction_id: str, current_user: User = Depends(_require_admin)):
+    db = get_db()
+    a = await db.storage_auctions.find_one({"id": auction_id}, {"_id": 0})
+    if not a:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    try:
+        await release_deposits_on_close(db, auction_id, winner_buyer_id=None)
+    except Exception as e:
+        logger.error(f"[STORAGE] release deposits on delete failed: {e}")
+    await db.storage_auctions.delete_one({"id": auction_id})
+    return {"success": True, "auction_id": auction_id, "deleted": True}
+
+
+@storage_router.post("/admin/storage-auctions/{auction_id}/override-winner")
+async def admin_override_winner(
+    auction_id: str,
+    payload: dict,
+    current_user: User = Depends(_require_admin),
+):
+    db = get_db()
+    new_winner_id = payload.get("winner_id")
+    reason = (payload.get("reason") or "").strip()
+    if not new_winner_id or not reason:
+        raise HTTPException(status_code=400, detail="winner_id and reason required")
+    a = await db.storage_auctions.find_one({"id": auction_id}, {"_id": 0})
+    if not a:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    has_bid = any(b.get("bidder_id") == new_winner_id for b in a.get("bids", []))
+    if not has_bid:
+        raise HTTPException(status_code=400, detail="Target user has no bid on this auction")
+    await db.storage_auctions.update_one(
+        {"id": auction_id},
+        {"$set": {
+            "winning_bidder_id": new_winner_id,
+            "override_winner_by": current_user.id,
+            "override_winner_at": _now().isoformat(),
+            "override_winner_reason": reason,
+            "updated_at": _now().isoformat(),
+        }},
+    )
+    return {"success": True, "auction_id": auction_id, "new_winner_id": new_winner_id}
+
+
+@storage_router.post("/admin/storage-auctions/{auction_id}/force-close")
+async def admin_force_close(
+    auction_id: str,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(_require_admin),
+):
+    db = get_db()
+    a = await db.storage_auctions.find_one({"id": auction_id}, {"_id": 0})
+    if not a:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    if a.get("status") not in ("active", "paused"):
+        raise HTTPException(status_code=400, detail=f"Cannot force-close auction with status={a.get('status')}")
+    from services.scheduled_jobs import process_ended_storage_auctions
+    await db.storage_auctions.update_one(
+        {"id": auction_id},
+        {"$set": {"end_time": _now().isoformat(), "status": "active"}},
+    )
+    result = await process_ended_storage_auctions(db)
+    return {"success": True, "auction_id": auction_id, "close_result": result}
+
+
+# ─────────────────────────────────────────────────────────────
+# DIGITAL PICKUP CODE (iter172)
+# ─────────────────────────────────────────────────────────────
+
+@storage_router.post("/storage-facilities/verify-pickup-code")
+async def facility_verify_pickup_code(
+    payload: dict,
+    facility=Depends(_require_verified_facility),
+):
+    """
+    Facility enters a buyer's pickup code to verify → returns winner + unit.
+    Does NOT mark it used. Call /mark-picked-up after identity verification.
+    """
+    code = (payload.get("pickup_code") or "").strip().upper()
+    if not code:
+        raise HTTPException(status_code=400, detail="pickup_code required")
+
+    db = get_db()
+    auction = await db.storage_auctions.find_one(
+        {"pickup_code": code, "facility_id": facility["id"]},
+        {"_id": 0},
+    )
+    if not auction:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "pickup_code_invalid",
+                "message_en": "Pickup code not found for this facility.",
+                "message_fr": "Code de récupération introuvable pour cette facilité.",
+            },
+        )
+    if auction.get("pickup_code_used"):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "pickup_code_already_used",
+                "used_at": auction.get("pickup_code_used_at"),
+                "message_en": "This pickup code has already been used.",
+                "message_fr": "Ce code de récupération a déjà été utilisé.",
+            },
+        )
+
+    winner = {}
+    if auction.get("winning_bidder_id"):
+        winner = await db.users.find_one(
+            {"id": auction["winning_bidder_id"]},
+            {"_id": 0, "id": 1, "name": 1, "full_name": 1, "email": 1, "phone": 1},
+        ) or {}
+
+    return {
+        "auction_id": auction["id"],
+        "unit_number": auction.get("unit_number"),
+        "unit_size": auction.get("unit_size"),
+        "winning_bid": auction.get("winning_bid"),
+        "payment_method": auction.get("payment_method"),
+        "winner": winner,
+        "pickup_code": code,
+        "cleanup_deadline": auction.get("cleanup_deadline"),
+    }
+
+
+@storage_router.post("/storage-facilities/mark-picked-up")
+async def facility_mark_picked_up(
+    payload: dict,
+    facility=Depends(_require_verified_facility),
+):
+    """Facility marks a pickup code as used after verifying the buyer."""
+    code = (payload.get("pickup_code") or "").strip().upper()
+    if not code:
+        raise HTTPException(status_code=400, detail="pickup_code required")
+
+    db = get_db()
+    result = await db.storage_auctions.update_one(
+        {"pickup_code": code, "facility_id": facility["id"], "pickup_code_used": False},
+        {
+            "$set": {
+                "pickup_code_used": True,
+                "pickup_code_used_at": _now().isoformat(),
+                "pickup_verified_by": facility["owner_user_id"],
+            }
+        },
+    )
+    if result.matched_count == 0:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "pickup_code_not_found_or_used",
+                "message_en": "Code not found or already used.",
+                "message_fr": "Code introuvable ou déjà utilisé.",
+            },
+        )
+    return {"success": True, "pickup_code": code, "used_at": _now().isoformat()}
+
+
+@storage_router.post("/admin/storage-auctions/{auction_id}/regenerate-pickup-code")
+async def admin_regenerate_pickup_code(
+    auction_id: str,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(_require_admin),
+):
+    """Admin regenerates a pickup code (e.g. user lost it). Sends new email to winner."""
+    db = get_db()
+    auction = await db.storage_auctions.find_one({"id": auction_id}, {"_id": 0})
+    if not auction:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    if auction.get("status") != "sold":
+        raise HTTPException(status_code=400, detail="Pickup codes exist only for sold auctions")
+
+    from services.scheduled_jobs import generate_pickup_code
+    new_code = generate_pickup_code()
+    await db.storage_auctions.update_one(
+        {"id": auction_id},
+        {"$set": {"pickup_code": new_code, "pickup_code_used": False, "pickup_code_used_at": None}},
+    )
+    # Re-fire the winner email with the new code (best effort)
+    try:
+        from services.email_notifications import send_storage_auction_won_email
+        buyer = await db.users.find_one({"id": auction["winning_bidder_id"]}, {"_id": 0}) or {}
+        facility = await db.storage_facilities.find_one({"id": auction["facility_id"]}, {"_id": 0}) or {}
+        auction["pickup_code"] = new_code
+        background_tasks.add_task(send_storage_auction_won_email, buyer, auction, facility, None)
+    except Exception as e:
+        logger.error(f"[STORAGE] regenerate pickup code email failed: {e}")
+    return {"success": True, "pickup_code": new_code}
 
 
 # ─────────────────────────────────────────────────────────────

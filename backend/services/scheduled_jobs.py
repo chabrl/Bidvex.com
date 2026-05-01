@@ -372,7 +372,18 @@ async def send_auction_ending_soon_notifications(db):
 #      c. Email winner (per-payment-method bilingual) + email facility
 #      d. Queue seller commission invoice (5% + Stripe + tax) email
 #      e. Log the close event in storage_close_logs
+# iter172: winner auctions also get a generated pickup_code (BV-XXXX-XXXX).
 # ─────────────────────────────────────────────────────────────────────────────
+
+
+def generate_pickup_code() -> str:
+    """BidVex digital pickup code: BV-XXXX-XXXX (alphanumeric, uppercase)."""
+    import secrets
+    import string
+    chars = string.ascii_uppercase + string.digits
+    p1 = "".join(secrets.choice(chars) for _ in range(4))
+    p2 = "".join(secrets.choice(chars) for _ in range(4))
+    return f"BV-{p1}-{p2}"
 
 
 async def process_ended_storage_auctions(db):
@@ -430,17 +441,29 @@ async def process_ended_storage_auctions(db):
                 current_bid = float(auction.get("current_bid", 0) or 0)
                 new_status = "sold" if winner_id and bids else "unsold"
 
+                # Generate pickup code for winning auctions (iter172)
+                pickup_code = None
+                if new_status == "sold":
+                    pickup_code = generate_pickup_code()
+
+                set_update = {
+                    "status": new_status,
+                    "winning_bid": current_bid if new_status == "sold" else None,
+                    "closed_at": now.isoformat(),
+                    "updated_at": now.isoformat(),
+                }
+                if pickup_code:
+                    set_update["pickup_code"] = pickup_code
+                    set_update["pickup_code_used"] = False
+                    set_update["pickup_code_used_at"] = None
+
                 await db.storage_auctions.update_one(
                     {"id": auction_id},
-                    {
-                        "$set": {
-                            "status": new_status,
-                            "winning_bid": current_bid if new_status == "sold" else None,
-                            "closed_at": now.isoformat(),
-                            "updated_at": now.isoformat(),
-                        }
-                    },
+                    {"$set": set_update},
                 )
+                # Refresh auction dict with the new fields so the email sees them
+                if pickup_code:
+                    auction["pickup_code"] = pickup_code
 
                 # ── Release deposits (best-effort) ──
                 try:
@@ -519,4 +542,40 @@ async def process_ended_storage_auctions(db):
         return {"processed": len(active_ended), "closed": closed, "extended": extended, "errors": errors}
     except Exception as e:
         logger.error(f"[STORAGE_CLOSE] top-level error: {e}")
+        return {"error": str(e)}
+
+
+# ─────────────────────────────────────────────────────────────
+# Expired promotions auto-downgrade (iter172)
+# Runs every hour — finds any listing where promoted_until < now and resets
+# promotion_tier and is_featured. Covers marketplace listings, vehicles, and
+# storage auctions.
+# ─────────────────────────────────────────────────────────────
+
+async def process_expired_promotions(db):
+    try:
+        now_iso = datetime.now(timezone.utc).isoformat()
+        stats = {}
+        for coll_name in ("listings", "vehicle_listings", "storage_auctions"):
+            coll = db[coll_name]
+            result = await coll.update_many(
+                {
+                    "$or": [
+                        {"promoted_until": {"$lt": now_iso}, "promotion_tier": {"$nin": [None, ""]}},
+                        {"promoted_until": {"$lt": now_iso}, "is_featured": True},
+                    ]
+                },
+                {"$set": {
+                    "promotion_tier": None,
+                    "is_featured": False,
+                    "promotion_expired_at": now_iso,
+                }},
+            )
+            stats[coll_name] = result.modified_count
+        total = sum(stats.values())
+        if total:
+            logger.info(f"[PROMOTIONS] downgraded {total} expired promotions: {stats}")
+        return {"downgraded": total, "per_collection": stats}
+    except Exception as e:
+        logger.error(f"[PROMOTIONS] downgrade error: {e}")
         return {"error": str(e)}

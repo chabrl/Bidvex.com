@@ -54,6 +54,7 @@ const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 const StorageAuctionsBrowse = lazy(() => import('./pages/storage/StorageAuctionsBrowse'));
 const StorageAuctionDetail = lazy(() => import('./pages/storage/StorageAuctionDetail'));
 const StorageFacilityRegister = lazy(() => import('./pages/storage/StorageFacilityRegister'));
+const MyStorageDeposits = lazy(() => import('./pages/storage/MyStorageDeposits'));
 const StorageDashboard = lazy(() => import('./pages/storage/StorageDashboard'));
 const StorageAuctionCreate = lazy(() => import('./pages/storage/StorageAuctionCreate'));
 const StorageHowItWorks = lazy(() => import('./pages/storage/StoragePolicies').then(m => ({ default: m.HowItWorks })));
@@ -421,6 +422,9 @@ const App = () => {
           <Route path="/storage-auctions/for-facilities" element={<StorageForFacilities />} />
           <Route path="/storage-auctions/register-facility" element={
             <ProtectedRoute><StorageFacilityRegister /></ProtectedRoute>
+          } />
+          <Route path="/storage-auctions/my-deposits" element={
+            <ProtectedRoute><MyStorageDeposits /></ProtectedRoute>
           } />
           <Route path="/storage-auctions/create" element={
             <ProtectedRoute><StorageAuctionCreate /></ProtectedRoute>

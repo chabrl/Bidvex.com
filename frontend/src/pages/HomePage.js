@@ -284,6 +284,12 @@ const HomePage = () => {
       {/* ========== STORAGE AUCTIONS PROMO (iter171 — always bilingual) ========== */}
       <StorageAuctionsPromo navigate={navigate} />
 
+      {/* ========== LIVE VEHICLE AUCTIONS (iter172) ========== */}
+      <HomepageLiveVehicles navigate={navigate} />
+
+      {/* ========== LIVE STORAGE LOTS (iter172) ========== */}
+      <HomepageLiveStorage navigate={navigate} />
+
       {/* ========== HOT ITEMS WITH LIVE ANIMATIONS ========== */}
       {isSectionVisible('hot_items') && (
         <HotItemsSection items={hotItems} navigate={navigate} />
@@ -925,6 +931,142 @@ const StorageAuctionsPromo = ({ navigate }) => {
             </div>
           </div>
         </div>
+      </div>
+    </section>
+  );
+};
+
+// ========== HOMEPAGE LIVE VEHICLE AUCTIONS (iter172) ==========
+const HomepageLiveVehicles = ({ navigate }) => {
+  const [items, setItems] = React.useState(null);
+  React.useEffect(() => {
+    const API = (process.env.REACT_APP_BACKEND_URL || '') + '/api';
+    fetch(`${API}/vehicles?status=active&limit=10`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setItems(d?.vehicles || []))
+      .catch(() => setItems([]));
+  }, []);
+
+  if (items && items.length === 0) return null; // Hide entirely if 0
+
+  return (
+    <section className="py-12 bg-[#0B2545]" data-testid="homepage-live-vehicles">
+      <div className="container mx-auto px-4">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h2 className="text-3xl font-black text-white">Live Vehicle Auctions</h2>
+            <h3 className="text-xl font-bold text-[#3FB4CB] italic">Enchères de véhicules en direct</h3>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/vehicles')}
+            className="text-[#3FB4CB] font-semibold hover:underline text-sm"
+            data-testid="homepage-vehicles-view-all"
+          >
+            View All · Voir tout →
+          </button>
+        </div>
+
+        {items === null ? (
+          <div className="flex gap-4 overflow-x-auto pb-3">
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} className="min-w-[260px] h-56 bg-slate-800/50 animate-pulse rounded-xl" />
+            ))}
+          </div>
+        ) : (
+          <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory" data-testid="homepage-vehicles-list">
+            {items.slice(0, 10).map(v => (
+              <div
+                key={v.id}
+                className="min-w-[260px] snap-start bg-slate-800 rounded-xl overflow-hidden border border-slate-700 hover:border-[#3FB4CB] transition-all cursor-pointer hover:-translate-y-0.5"
+                onClick={() => navigate(`/vehicles/${v.id}`)}
+                data-testid={`homepage-vehicle-card-${v.id}`}
+              >
+                <div className="h-36 bg-slate-700 overflow-hidden">
+                  {v.photos?.[0] && (
+                    <img src={v.photos[0]} alt="" loading="lazy" className="w-full h-full object-cover" />
+                  )}
+                </div>
+                <div className="p-3">
+                  <p className="text-xs text-slate-400 truncate">{v.year} {v.make}</p>
+                  <p className="text-sm font-bold text-white truncate">{v.model}</p>
+                  <p className="text-lg font-black text-[#3FB4CB] mt-1">${Number(v.current_bid || 0).toLocaleString()}</p>
+                  <p className="text-[10px] text-slate-500">
+                    {v.bid_count || 0} bids · offres
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+};
+
+// ========== HOMEPAGE LIVE STORAGE LOTS (iter172) ==========
+const HomepageLiveStorage = ({ navigate }) => {
+  const [items, setItems] = React.useState(null);
+  React.useEffect(() => {
+    const API = (process.env.REACT_APP_BACKEND_URL || '') + '/api';
+    fetch(`${API}/storage-auctions?status=active&limit=10`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setItems(d?.auctions || []))
+      .catch(() => setItems([]));
+  }, []);
+
+  if (items && items.length === 0) return null;
+
+  return (
+    <section className="py-12 bg-[#0E2B52]" data-testid="homepage-live-storage">
+      <div className="container mx-auto px-4">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h2 className="text-3xl font-black text-white">🔒 Storage Unit Auctions</h2>
+            <h3 className="text-xl font-bold text-[#3FB4CB] italic">Enchères d'unités d'entreposage</h3>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/storage-auctions')}
+            className="text-[#3FB4CB] font-semibold hover:underline text-sm"
+            data-testid="homepage-storage-view-all"
+          >
+            View All · Voir tout →
+          </button>
+        </div>
+
+        {items === null ? (
+          <div className="flex gap-4 overflow-x-auto pb-3">
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} className="min-w-[260px] h-56 bg-slate-800/50 animate-pulse rounded-xl" />
+            ))}
+          </div>
+        ) : (
+          <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory" data-testid="homepage-storage-list">
+            {items.slice(0, 10).map(a => (
+              <div
+                key={a.id}
+                className="min-w-[260px] snap-start bg-slate-800 rounded-xl overflow-hidden border border-slate-700 hover:border-[#3FB4CB] transition-all cursor-pointer hover:-translate-y-0.5"
+                onClick={() => navigate(`/storage-auctions/${a.id}`)}
+                data-testid={`homepage-storage-card-${a.id}`}
+              >
+                <div className="h-36 bg-slate-700 overflow-hidden flex items-center justify-center text-4xl">
+                  {a.photos?.[0] ? (
+                    <img src={a.photos[0]} alt="" loading="lazy" className="w-full h-full object-cover" />
+                  ) : '🔒'}
+                </div>
+                <div className="p-3">
+                  <p className="text-xs text-slate-400 truncate">{a.facility_name}</p>
+                  <p className="text-sm font-bold text-white truncate">Unit #{a.unit_number} · {a.unit_size}</p>
+                  <p className="text-lg font-black text-[#3FB4CB] mt-1">${Number(a.current_bid || 0).toLocaleString()}</p>
+                  <p className="text-[10px] text-slate-500">
+                    {a.bid_count || 0} bids · offres
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

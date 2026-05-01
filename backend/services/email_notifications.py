@@ -1643,6 +1643,31 @@ async def send_storage_auction_won_email(buyer: dict, auction: dict, facility: d
         )
 
     # ── Cleanup / forfeit notice (always appended, bilingual) ──
+    pickup_code = auction.get("pickup_code")
+    pickup_en = ""
+    pickup_fr = ""
+    if pickup_code:
+        pickup_en = (
+            f"<hr style='margin:16px 0;border:none;border-top:1px solid #e2e8f0'/>"
+            f"<div style='background:#fef3c7;border:2px dashed #d97706;border-radius:10px;padding:16px;text-align:center;margin:12px 0'>"
+            f"<div style='font-size:11px;letter-spacing:2px;color:#92400e;font-weight:700'>YOUR PICKUP CODE</div>"
+            f"<div style='font-size:28px;font-weight:900;color:#78350f;letter-spacing:3px;font-family:monospace;margin-top:6px'>{pickup_code}</div>"
+            f"</div>"
+            f"Present this code to facility staff when you arrive for pickup. "
+            f"The facility will mark this code as used upon verification. "
+            f"<strong>Do not share this code</strong> — it authorizes access to the unit."
+        )
+        pickup_fr = (
+            f"<hr style='margin:16px 0;border:none;border-top:1px solid #e2e8f0'/>"
+            f"<div style='background:#fef3c7;border:2px dashed #d97706;border-radius:10px;padding:16px;text-align:center;margin:12px 0'>"
+            f"<div style='font-size:11px;letter-spacing:2px;color:#92400e;font-weight:700'>VOTRE CODE DE RÉCUPÉRATION</div>"
+            f"<div style='font-size:28px;font-weight:900;color:#78350f;letter-spacing:3px;font-family:monospace;margin-top:6px'>{pickup_code}</div>"
+            f"</div>"
+            f"Présentez ce code au personnel de la facilité lors de votre arrivée. "
+            f"La facilité marquera ce code comme utilisé après vérification. "
+            f"<strong>Ne partagez pas ce code</strong> — il autorise l'accès à l'unité."
+        )
+
     cleanup_en = (
         f"<hr style='margin:16px 0;border:none;border-top:1px solid #e2e8f0'/>"
         f"⚠️ <strong>IMPORTANT:</strong> You must completely empty the unit by "
@@ -1666,8 +1691,8 @@ async def send_storage_auction_won_email(buyer: dict, auction: dict, facility: d
         html_content=_storage_panel(
             "You won the auction",
             "Vous avez gagné l'enchère",
-            body_en + cleanup_en,
-            body_fr + cleanup_fr,
+            body_en + pickup_en + cleanup_en,
+            body_fr + pickup_fr + cleanup_fr,
             cta_url=f"https://www.bidvex.com/storage-auctions/{auction.get('id','')}",
             cta_en="View auction",
             cta_fr="Voir l'enchère",
