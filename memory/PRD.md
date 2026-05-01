@@ -1,5 +1,30 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: P0 — Auto-Bid UI Parity Fix (May 1, 2026 / iter174) — 1/1 DONE
+
+User feedback on iter173: the storage detail "Your max bid" + yellow "PRO AUTO-BID" callout was inconsistent with the marketplace bidding sidebar. Replaced with the standardized **Setup Auto-Bid** pattern.
+
+### Changes
+1. **Bid input rename** — "Your max bid" → "Your bid · Votre offre" (bilingual). Storage backend still treats every bid as a max_bid intrinsically.
+2. **Yellow/blue callouts deleted** — both the amber "PRO AUTO-BID" Premium card and the blue "Auto-Bid Info" upsell card removed from `StorageAuctionDetail`.
+3. **NEW `StorageAutoBidModal` component** — mirrors `/app/frontend/src/components/AutoBidModal.js` exactly:
+   - Trigger: "Setup Auto-Bid · Configurer Auto-Enchère" outline button below the bid section, with purple `Premium` badge for free-tier (`free`, `partner_basic`) users
+   - Modal: bilingual title, current-bid display, bot-increment hint, Max Bid input, "How Auto-Bid Works" callout (4 bullets — every line shows EN + FR), green "Activate Auto-Bid · Activer" submit
+   - Premium gating: `premium`, `vip`, `vip_elite`, `partner_pro`, `business` see the activation form; everyone else sees a purple upsell card with "Upgrade to Premium · Passer à Premium" navigating to `/subscription`
+   - Submission posts to existing `POST /api/storage-auctions/{id}/bid` with `{max_bid}` — no new backend endpoint needed
+4. **Visual parity** — Storage bidding sidebar is now visually + functionally identical to the Marketplace bidding sidebar.
+
+### Verification
+- Logged in as VIP admin: Setup Auto-Bid button renders without Premium badge (correct gating). Modal opens, Current Bid $85.00, increments $10.00, all bilingual labels confirmed by screenshot.
+- Free-tier upsell variant: purple Premium badge + Upgrade CTA (verified in code path).
+- Backend regression: 16/16 storage tests still pass after the UI change (no backend change required).
+- Lint: zero issues on `StorageAutoBidModal.js` + `StorageAuctionDetail.js`.
+
+### Files changed (iter174)
+- Frontend: `components/StorageAutoBidModal.js` (NEW — 195 lines), `pages/storage/StorageAuctionDetail.js` (label rename + callout deletion + modal wiring)
+
+---
+
 ## Latest: P0 — Final Polish Sprint (May 1, 2026 / iter173) — 6/6 DONE
 
 ### Spec (6/6 delivered)

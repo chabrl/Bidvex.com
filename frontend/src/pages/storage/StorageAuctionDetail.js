@@ -15,12 +15,13 @@ import {
 } from 'lucide-react';
 import StorageCountdown from './StorageCountdown';
 import StorageFooterBanner from './StorageFooterBanner';
+import StorageAutoBidModal from '../../components/StorageAutoBidModal';
 
 const API = API_BASE;
 
 const StorageAuctionDetail = () => {
   const { id } = useParams();
-  const { token, user } = useAuth();
+  const { token } = useAuth();
   const { i18n } = useTranslation();
   const isFr = (i18n.language || '').startsWith('fr');
 
@@ -245,7 +246,7 @@ const StorageAuctionDetail = () => {
               {isLive && (
                 <>
                   <label className="text-xs font-medium mb-1 block">
-                    {isFr ? 'Votre offre maximale' : 'Your max bid'} (≥ ${minNext.toFixed(2)})
+                    {isFr ? 'Votre offre · Your bid' : 'Your bid · Votre offre'} (≥ ${minNext.toFixed(2)})
                   </label>
                   <div className="flex gap-2">
                     <Input
@@ -259,65 +260,19 @@ const StorageAuctionDetail = () => {
                       data-testid="max-bid-input"
                     />
                     <Button onClick={handlePlaceBid} disabled={submittingBid} className="bg-blue-600 hover:bg-blue-700 text-white" data-testid="place-bid-btn">
-                      {submittingBid ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Gavel className="h-4 w-4 mr-1" /> {isFr ? 'Enchérir' : 'Bid'}</>}
+                      {submittingBid ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Gavel className="h-4 w-4 mr-1" /> {isFr ? 'Enchérir · Bid' : 'Bid · Enchérir'}</>}
                     </Button>
                   </div>
-                  <p className="text-[10px] text-muted-foreground mt-2 leading-snug">
-                    {isFr
-                      ? "Le système enchérira automatiquement en votre nom jusqu'à ce maximum, par tranches de 10 $. Vous ne payez que le minimum requis pour gagner."
-                      : 'The system will auto-bid up to your max in $10 increments. You only pay the minimum needed to win.'}
-                  </p>
 
-                  {/* Tier-aware Auto-Bid callout (iter173) */}
-                  {(() => {
-                    const tier = (user?.subscription_tier || 'free').toLowerCase();
-                    const isPremium = ['premium', 'vip', 'vip_elite', 'partner_pro', 'business'].includes(tier);
-                    if (isPremium) {
-                      return (
-                        <div
-                          data-testid="storage-autobid-premium-badge"
-                          className="mt-3 rounded-md border border-amber-300 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30 p-3"
-                        >
-                          <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200 text-xs font-bold uppercase tracking-wider">
-                            <span role="img" aria-label="crown">👑</span>
-                            {isFr
-                              ? `Auto-Enchère Pro · Pro Auto-Bid (${tier.toUpperCase()})`
-                              : `Pro Auto-Bid · Auto-Enchère Pro (${tier.toUpperCase()})`}
-                          </div>
-                          <p className="text-[11px] text-amber-900 dark:text-amber-100 mt-1 leading-snug">
-                            {isFr
-                              ? "Votre offre maximale est protégée par notre proxy — les rafales de dernière seconde sont gérées automatiquement. Your max bid is shielded by our proxy — last-second spikes are handled automatically."
-                              : "Your max bid is shielded by our proxy — last-second spikes are handled automatically. Votre offre maximale est protégée par notre proxy — les rafales de dernière seconde sont gérées automatiquement."}
-                          </p>
-                        </div>
-                      );
-                    }
-                    // Free tier upsell
-                    return (
-                      <div
-                        data-testid="storage-autobid-upsell"
-                        className="mt-3 rounded-md border border-blue-200 dark:border-blue-900/50 bg-blue-50 dark:bg-blue-950/30 p-3"
-                      >
-                        <div className="flex items-center gap-2 text-blue-800 dark:text-blue-200 text-xs font-semibold">
-                          <Info className="h-3 w-3" />
-                          {isFr
-                            ? 'Info Auto-Enchère · Auto-Bid Info'
-                            : 'Auto-Bid Info · Info Auto-Enchère'}
-                        </div>
-                        <p className="text-[11px] text-blue-900 dark:text-blue-100 mt-1 leading-snug">
-                          {isFr
-                            ? "Toutes les offres sur les enchères de stockage utilisent le proxy automatique. All storage bids use automatic proxy. "
-                            : "All storage bids use automatic proxy. Toutes les offres sur les enchères de stockage utilisent le proxy automatique. "}
-                          <Link to="/subscription" className="underline font-semibold">
-                            {isFr ? 'Passez à Premium' : 'Upgrade to Premium'}
-                          </Link>
-                          {isFr
-                            ? " pour débloquer l'auto-enchère sur marketplace + véhicules."
-                            : " to unlock auto-bid on marketplace + vehicles."}
-                        </p>
-                      </div>
-                    );
-                  })()}
+                  {/* Setup Auto-Bid (mirrors marketplace) — purple Premium badge gates non-premium tiers */}
+                  <div className="mt-3">
+                    <StorageAutoBidModal
+                      auctionId={auction.id}
+                      currentBid={auction.current_bid || 0}
+                      bidIncrement={auction.bid_increment || 10}
+                      onActivated={() => { setMaxBid(''); fetchData(); }}
+                    />
+                  </div>
                 </>
               )}
             </Card>
