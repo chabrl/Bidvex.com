@@ -7,7 +7,7 @@ import os
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone, timedelta
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, ValidationInfo
 import stripe
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
@@ -44,7 +44,8 @@ class PlanPricing(BaseModel):
     monthly_listing_limit: int = Field(10, ge=0)
     is_active: bool = True
     
-    @validator('price_monthly', 'price_yearly', 'original_price_monthly', 'original_price_yearly', pre=True)
+    @field_validator('price_monthly', 'price_yearly', 'original_price_monthly', 'original_price_yearly', mode='before')
+    @classmethod
     def validate_price(cls, v):
         if v is None:
             return 0.0
@@ -69,21 +70,24 @@ class CouponCode(BaseModel):
     created_at: Optional[str] = None
     created_by: Optional[str] = None
     
-    @validator('code', pre=True)
+    @field_validator('code', mode='before')
+    @classmethod
     def uppercase_code(cls, v):
         return v.upper().strip() if v else v
-    
-    @validator('discount_type', pre=True)
+
+    @field_validator('discount_type', mode='before')
+    @classmethod
     def validate_discount_type(cls, v):
         if v not in ['percentage', 'fixed']:
             raise ValueError('discount_type must be "percentage" or "fixed"')
         return v
-    
-    @validator('value', pre=True)
-    def validate_value(cls, v, values):
+
+    @field_validator('value', mode='before')
+    @classmethod
+    def validate_value(cls, v, info: ValidationInfo):
         if v <= 0:
             raise ValueError('Discount value must be positive')
-        if values.get('discount_type') == 'percentage' and v > 100:
+        if info.data.get('discount_type') == 'percentage' and v > 100:
             raise ValueError('Percentage discount cannot exceed 100%')
         return float(v)
 
