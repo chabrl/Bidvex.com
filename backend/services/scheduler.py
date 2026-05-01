@@ -770,7 +770,25 @@ def init_scheduler(database):
         replace_existing=True,
     )
 
-    logger.info("Scheduler initialized with 11 jobs")
+    # Job 12: Auto-capture overdue vehicle deposits — every 6 hours (iter175)
+    async def auto_capture_overdue_deposits_job():
+        if db_instance is None:
+            return
+        from services.deposit_auto_capture import run_auto_capture_overdue_deposits
+        return await safe_db_operation(
+            "auto_capture_overdue_deposits",
+            lambda: run_auto_capture_overdue_deposits(db_instance),
+        )
+
+    scheduler.add_job(
+        auto_capture_overdue_deposits_job,
+        IntervalTrigger(hours=6),
+        id="auto_capture_overdue_deposits",
+        name="Auto-Capture Overdue Vehicle Deposits",
+        replace_existing=True,
+    )
+
+    logger.info("Scheduler initialized with 12 jobs")
     return scheduler
 
 

@@ -8,6 +8,7 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import HeroPhone from '../components/HeroPhone';
+import RecentlySoldTicker from '../components/RecentlySoldTicker';
 import { 
   ArrowRight, Gavel, TrendingUp, Shield, Users, Award, Flame, 
   Search, Trophy, CreditCard, Sparkles, Clock, CheckCircle2,
@@ -150,6 +151,9 @@ const HomePage = () => {
           }
         }}
       />
+      {/* Recently Sold Ticker (iter175) — only renders when ≥10 sold auctions exist */}
+      <RecentlySoldTicker />
+
       {/* ========== EXTRAORDINARY HERO SECTION ========== */}
       <section className="relative min-h-[90vh] flex items-center overflow-hidden">
         {/* Animated Gradient Background */}

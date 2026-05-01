@@ -79,6 +79,7 @@ const ReviewPage = lazy(() => import('./pages/ReviewPage'));
 const CommunityPage = lazy(() => import('./pages/CommunityPage'));
 const AboutUsPage = lazy(() => import('./pages/AboutUsPage'));
 const UnsubscribePage = lazy(() => import('./pages/UnsubscribePage'));
+const EmailPreferencesPage = lazy(() => import('./pages/EmailPreferencesPage'));
 const ResubscribePage = lazy(() => import('./pages/ResubscribePage'));
 
 // Vehicle Auction Module
@@ -328,6 +329,8 @@ const App = () => {
           <Route path="/about-us" element={<AboutUsPage />} />
           <Route path="/unsubscribe" element={<UnsubscribePage />} />
           <Route path="/desabonnement" element={<UnsubscribePage />} />
+          <Route path="/email-preferences" element={<EmailPreferencesPage />} />
+          <Route path="/preferences-courriel" element={<EmailPreferencesPage />} />
           <Route path="/resubscribe" element={<ResubscribePage />} />
           <Route path="/reabonnement" element={<ResubscribePage />} />
           <Route path="/watchlist" element={

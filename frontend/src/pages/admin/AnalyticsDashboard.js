@@ -1,6 +1,8 @@
 import API_BASE from '../../config';
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
@@ -8,12 +10,14 @@ import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
 import {
   TrendingUp, Download, RefreshCw, Trophy, Tag, Target, Users,
-  ShoppingBag, Eye,
+  ShoppingBag, Eye, Calendar,
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/currencyFormatter';
 import { useTranslation } from 'react-i18next';
 
 const API = API_BASE;
+
+const toISODate = (d) => (d instanceof Date && !isNaN(d) ? d.toISOString().slice(0, 10) : '');
 
 const AnalyticsDashboard = () => {
   const { t } = useTranslation();
@@ -24,14 +28,26 @@ const AnalyticsDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(30);
 
+  // Custom date range (iter175) — overrides `days` when both set.
+  const [rangeStart, setRangeStart] = useState(null);
+  const [rangeEnd, setRangeEnd] = useState(null);
+  const useCustomRange = rangeStart instanceof Date && rangeEnd instanceof Date;
+
   const fetchAnalytics = useCallback(async () => {
     setLoading(true);
     try {
+      const dayParam = useCustomRange
+        ? Math.min(730, Math.max(1, Math.ceil((rangeEnd - rangeStart) / 86400000) + 1))
+        : days;
+      const rangeParams = useCustomRange
+        ? `&start_date=${toISODate(rangeStart)}&end_date=${toISODate(rangeEnd)}`
+        : '';
+
       const [revenueRes, listingsRes, summaryRes, advancedRes] = await Promise.all([
-        axios.get(`${API}/admin/analytics/revenue?days=${days}`).catch(() => ({ data: [] })),
+        axios.get(`${API}/admin/analytics/revenue?days=${dayParam}${rangeParams}`).catch(() => ({ data: [] })),
         axios.get(`${API}/admin/analytics/listings`).catch(() => ({ data: {} })),
-        axios.get(`${API}/admin/analytics?days=${days}`).catch(() => ({ data: {} })),
-        axios.get(`${API}/admin/analytics/advanced?days=${days}`).catch(() => ({ data: null })),
+        axios.get(`${API}/admin/analytics?days=${dayParam}`).catch(() => ({ data: {} })),
+        axios.get(`${API}/admin/analytics/advanced?days=${dayParam}`).catch(() => ({ data: null })),
       ]);
       const revData = revenueRes.data;
       setRevenueData(Array.isArray(revData) ? revData : (revData.daily || revData.revenue_data || []));
@@ -44,9 +60,14 @@ const AnalyticsDashboard = () => {
     } finally {
       setLoading(false);
     }
-  }, [days]);
+  }, [days, rangeStart, rangeEnd, useCustomRange]);
 
   useEffect(() => { fetchAnalytics(); }, [fetchAnalytics]);
+
+  const clearCustomRange = () => {
+    setRangeStart(null);
+    setRangeEnd(null);
+  };
 
   const exportToCSV = () => {
     if (!revenueData.length) {
@@ -77,15 +98,51 @@ const AnalyticsDashboard = () => {
           <p className="text-muted-foreground">Revenue trends and platform insights</p>
         </div>
         <div className="flex gap-2 items-center flex-wrap">
-          <label className="text-sm text-muted-foreground">Period:</label>
-          <select value={days} onChange={(e) => setDays(parseInt(e.target.value, 10))}
+          <label className="text-sm text-muted-foreground">Period · Période :</label>
+          <select value={days} onChange={(e) => { clearCustomRange(); setDays(parseInt(e.target.value, 10)); }}
             className="h-10 px-3 border rounded-md bg-background text-sm"
+            disabled={useCustomRange}
             data-testid="analytics-date-range">
             <option value={7}>Last 7 days</option>
             <option value={30}>Last 30 days</option>
             <option value={90}>Last 90 days</option>
             <option value={365}>Last 12 months</option>
           </select>
+
+          {/* iter175 — Custom date-range picker (react-datepicker) */}
+          <div className="flex items-center gap-1 border rounded-md px-2 py-1 bg-background">
+            <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+            <DatePicker
+              selected={rangeStart}
+              onChange={(date) => setRangeStart(date)}
+              selectsStart
+              startDate={rangeStart}
+              endDate={rangeEnd}
+              maxDate={rangeEnd || new Date()}
+              dateFormat="yyyy-MM-dd"
+              placeholderText="From · Du"
+              className="h-7 w-28 text-xs bg-transparent outline-none"
+              data-testid="analytics-range-start"
+            />
+            <span className="text-muted-foreground text-xs">→</span>
+            <DatePicker
+              selected={rangeEnd}
+              onChange={(date) => setRangeEnd(date)}
+              selectsEnd
+              startDate={rangeStart}
+              endDate={rangeEnd}
+              minDate={rangeStart}
+              maxDate={new Date()}
+              dateFormat="yyyy-MM-dd"
+              placeholderText="To · Au"
+              className="h-7 w-28 text-xs bg-transparent outline-none"
+              data-testid="analytics-range-end"
+            />
+            {useCustomRange && (
+              <Button variant="ghost" size="sm" onClick={clearCustomRange} className="h-6 px-2 text-xs" data-testid="analytics-range-clear">×</Button>
+            )}
+          </div>
+
           <Button variant="outline" size="sm" onClick={fetchAnalytics} disabled={loading}
             data-testid="analytics-refresh">
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />

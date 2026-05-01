@@ -98,6 +98,130 @@ async def get_featured_listings(limit: int = 12):
         raise HTTPException(status_code=500, detail="Failed to fetch featured listings")
 
 
+@carousel_router.get("/carousel/recently-sold-ticker")
+async def get_recently_sold_ticker(limit: int = 30):
+    """
+    Unified rolling ticker (iter175) — combines sold auctions across all three
+    surfaces:
+      • marketplace (`db.listings`)         status=sold
+      • storage     (`db.storage_auctions`) status=sold
+      • vehicle     (`db.vehicle_listings`) status=sold
+
+    Per spec, the ticker is hidden until the platform has >= 10 completed
+    auctions in TOTAL across all three sources. The endpoint returns
+        { visible: bool, total: int, items: [...] }
+    where each item is a normalized:
+        { kind, price, currency, city, province, label_en, label_fr, sold_at }
+
+    Cached 60s.
+    """
+    cache_key = f"{LISTINGS_NS}sold_ticker:{limit}"
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    db = get_db()
+    out = []
+
+    try:
+        # 1. Marketplace
+        async for x in db.listings.find(
+            {"status": "sold"},
+            {
+                "_id": 0, "id": 1, "title": 1, "title_fr": 1, "category": 1,
+                "current_price": 1, "currency": 1, "city": 1, "province": 1,
+                "sold_at": 1, "ended_at": 1,
+            },
+        ).sort("sold_at", -1).limit(limit):
+            label_en = x.get("title") or x.get("category") or "Marketplace lot"
+            label_fr = x.get("title_fr") or x.get("title") or x.get("category") or "Lot Marketplace"
+            out.append({
+                "kind": "marketplace",
+                "price": float(x.get("current_price") or 0),
+                "currency": x.get("currency") or "CAD",
+                "city": x.get("city") or "",
+                "province": x.get("province") or "",
+                "label_en": label_en,
+                "label_fr": label_fr,
+                "sold_at": x.get("sold_at") or x.get("ended_at"),
+            })
+    except Exception as e:
+        logger.error(f"[ticker] marketplace failed: {e}")
+
+    try:
+        # 2. Storage
+        async for x in db.storage_auctions.find(
+            {"status": "sold"},
+            {
+                "_id": 0, "id": 1, "unit_number": 1, "unit_type": 1, "unit_size": 1,
+                "current_bid": 1, "facility_city": 1, "facility_province": 1,
+                "ended_at": 1, "end_time": 1, "city": 1, "province": 1,
+            },
+        ).sort("ended_at", -1).limit(limit):
+            unit_size = x.get("unit_size") or ""
+            unit_type = (x.get("unit_type") or "").replace("_", " ")
+            label_en = f"Storage unit {unit_size} ({unit_type})".strip()
+            label_fr = f"Unité d'entreposage {unit_size} ({unit_type})".strip()
+            out.append({
+                "kind": "storage",
+                "price": float(x.get("current_bid") or 0),
+                "currency": "CAD",
+                "city": x.get("facility_city") or x.get("city") or "",
+                "province": x.get("facility_province") or x.get("province") or "",
+                "label_en": label_en,
+                "label_fr": label_fr,
+                "sold_at": x.get("ended_at") or x.get("end_time"),
+            })
+    except Exception as e:
+        logger.error(f"[ticker] storage failed: {e}")
+
+    try:
+        # 3. Vehicle
+        async for x in db.vehicle_listings.find(
+            {"status": "sold"},
+            {
+                "_id": 0, "id": 1, "year": 1, "make": 1, "model": 1, "trim": 1,
+                "current_bid": 1, "final_price": 1, "city": 1, "province": 1,
+                "ended_at": 1, "sold_at": 1,
+            },
+        ).sort("sold_at", -1).limit(limit):
+            yr = x.get("year") or ""
+            make = x.get("make") or ""
+            model = x.get("model") or ""
+            label_en = f"{yr} {make} {model}".strip() or "Vehicle"
+            label_fr = label_en
+            price = x.get("final_price") or x.get("current_bid") or 0
+            out.append({
+                "kind": "vehicle",
+                "price": float(price),
+                "currency": "CAD",
+                "city": x.get("city") or "",
+                "province": x.get("province") or "",
+                "label_en": label_en,
+                "label_fr": label_fr,
+                "sold_at": x.get("sold_at") or x.get("ended_at"),
+            })
+    except Exception as e:
+        logger.error(f"[ticker] vehicle failed: {e}")
+
+    # Sort by sold_at desc, take top `limit`
+    def _sort_key(it):
+        v = it.get("sold_at")
+        return v or ""
+    out.sort(key=_sort_key, reverse=True)
+    items = out[:limit]
+    total = len(out)
+
+    payload = {
+        "visible": total >= 10,
+        "total": total,
+        "threshold": 10,
+        "items": items,
+    }
+    await cache_set(cache_key, payload, 60)
+    return payload
+
+
 @carousel_router.get("/carousel/new-listings")
 async def get_new_listings(limit: int = 12):
     """Get newest listings (created in last 7 days) — cached 60s"""

@@ -1869,3 +1869,58 @@ async def send_storage_facility_pending_user_email(facility: dict) -> bool:
         html_content=_storage_panel("Application received", "Demande reçue", body_en, body_fr),
     )
 
+
+# ─────────────────────────────────────────────────────────────
+# iter175 — Vehicle deposit auto-captured (bilingual EN+FR per Bill 96)
+# ─────────────────────────────────────────────────────────────
+async def send_vehicle_deposit_captured_email(
+    buyer: dict,
+    invoice: dict,
+    deposit: dict,
+    captured_amount: float,
+) -> bool:
+    """
+    Sent automatically when the auto-capture cron job captures a $500 vehicle
+    bidding deposit because the winner's 2.5% platform-fee invoice remained
+    unpaid past `payment_deadline + 48h`. EN+FR per Bill 96.
+    """
+    if not buyer or not buyer.get("email"):
+        return False
+
+    inv_no = invoice.get("invoice_number", "—")
+    veh_title = invoice.get("vehicle_title", "your vehicle")
+    fee_total = invoice.get("total_amount") or invoice.get("platform_fee") or 0
+    amt = captured_amount or deposit.get("amount") or 500.0
+
+    body_en = (
+        f"Your $500 bidding deposit for <strong>{veh_title}</strong> has been "
+        f"captured because invoice <strong>{inv_no}</strong> "
+        f"(${fee_total:.2f} CAD platform fee) was not paid within 48 hours of "
+        f"the deadline. Amount captured: <strong>${amt:.2f} CAD</strong>. "
+        f"This brings your account into good standing — no further action is required. "
+        f"If you believe this was in error, contact support@bidvex.com within 14 days."
+    )
+    body_fr = (
+        f"Votre dépôt d'enchère de 500 $ pour <strong>{veh_title}</strong> a été "
+        f"saisi parce que la facture <strong>{inv_no}</strong> "
+        f"({fee_total:.2f} $ CAD de frais de plateforme) n'a pas été payée dans les "
+        f"48 heures suivant l'échéance. Montant saisi : <strong>{amt:.2f} $ CAD</strong>. "
+        f"Votre compte est maintenant en règle — aucune autre action requise. "
+        f"Si vous croyez qu'il s'agit d'une erreur, contactez support@bidvex.com dans les 14 jours."
+    )
+
+    html = _storage_panel(
+        "Bidding deposit captured",
+        "Dépôt d'enchère saisi",
+        body_en,
+        body_fr,
+        cta_url="https://www.bidvex.com/profile/settings?tab=billing",
+        cta_en="View invoices",
+        cta_fr="Voir les factures",
+    )
+    return await send_email(
+        to_email=buyer["email"],
+        subject=f"[BidVex] Bidding deposit captured · Dépôt saisi — Invoice {inv_no}",
+        html_content=html,
+    )
+

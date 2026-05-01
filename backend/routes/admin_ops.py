@@ -655,22 +655,55 @@ async def admin_filter_reports(category: str = None, severity: str = None, statu
 
 
 @admin_ops_router.get("/admin/analytics/revenue")
-async def admin_revenue_analytics(current_user: User = Depends(require_admin)):
+async def admin_revenue_analytics(
+    current_user: User = Depends(require_admin),
+    days: int = Query(30, ge=1, le=730),
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+):
+    """
+    Daily-grouped revenue from paid `payment_transactions`.
+
+    Date filter (highest-priority first):
+      • If both `start_date` and `end_date` (ISO date YYYY-MM-DD) are passed,
+        they are used directly (inclusive on both ends, UTC).
+      • Otherwise falls back to last `days` (default 30, max 730).
+    """
     db = get_db()
-    # Get transactions from last 30 days grouped by date
-    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    now = datetime.now(timezone.utc)
+
+    if start_date and end_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc)
+            end_dt = datetime.fromisoformat(end_date).replace(
+                hour=23, minute=59, second=59, tzinfo=timezone.utc
+            )
+        except ValueError:
+            raise HTTPException(status_code=400, detail="invalid start_date or end_date (expected YYYY-MM-DD)")
+        if end_dt < start_dt:
+            raise HTTPException(status_code=400, detail="end_date must be >= start_date")
+    else:
+        start_dt = now - timedelta(days=days)
+        end_dt = now
+
     transactions = await db.payment_transactions.find(
-        {"payment_status": "paid", "created_at": {"$gte": thirty_days_ago.isoformat()}},
-        {"_id": 0, "amount": 1, "created_at": 1}
-    ).to_list(1000)
-    
-    # Group by date
-    daily_revenue = {}
+        {
+            "payment_status": "paid",
+            "created_at": {
+                "$gte": start_dt.isoformat(),
+                "$lte": end_dt.isoformat(),
+            },
+        },
+        {"_id": 0, "amount": 1, "created_at": 1},
+    ).to_list(5000)
+
+    daily_revenue: Dict[str, float] = {}
     for tx in transactions:
-        date = tx["created_at"][:10]
-        daily_revenue[date] = daily_revenue.get(date, 0) + tx.get("amount", 0)
-    
-    return [{"date": date, "revenue": revenue} for date, revenue in sorted(daily_revenue.items())]
+        date = (tx.get("created_at") or "")[:10]
+        if date:
+            daily_revenue[date] = daily_revenue.get(date, 0) + float(tx.get("amount") or 0)
+
+    return [{"date": d, "revenue": rev} for d, rev in sorted(daily_revenue.items())]
 
 
 

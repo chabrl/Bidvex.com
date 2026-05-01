@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@craco/craco": "^7.1.0",
     "@hookform/resolvers": "^5.0.1",
     "@radix-ui/react-accordion": "^1.2.8",
     "@radix-ui/react-alert-dialog": "^1.1.11",
@@ -59,6 +60,7 @@
     "react": "^19.0.0",
     "react-avatar-editor": "^13.0.2",
     "react-countdown": "^2.3.6",
+    "react-datepicker": "^9.1.0",
     "react-day-picker": "8.10.1",
     "react-dom": "^19.0.0",
     "react-dropzone": "^14.3.8",
@@ -78,8 +80,7 @@
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^1.1.2",
     "yet-another-react-lightbox": "^3.25.0",
-    "zod": "^3.24.4",
-    "@craco/craco": "^7.1.0"
+    "zod": "^3.24.4"
   },
   "scripts": {
     "start": "craco start",

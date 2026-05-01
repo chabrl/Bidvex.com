@@ -31,6 +31,7 @@ import { VerifiedBadge } from '../components/VerifiedBadge';
 import PartnerBadge from '../components/PartnerBadge';
 import SecurityDepositBanner from '../components/SecurityDepositBanner';
 import ListingPromotionModal from '../components/ListingPromotionModal';
+import QuickBidButtons from '../components/QuickBidButtons';
 import { useTrustStatus, BidBlocker } from '../components/TrustVerification';
 import { SellerReputationCard, SellerReviewsList } from '../components/SellerReputation';
 import { CrossBorderAdvisoryPanel, CrossBorderBidModal } from '../components/legal/LegalComplianceSections';
@@ -609,6 +610,26 @@ const ListingDetailPage = () => {
                   />
                   
                   <form onSubmit={handlePlaceBid} className="space-y-3">
+                    {/* Quick Bid pills (iter175) — one-tap +$X / +$Y / +$Z */}
+                    {canBid && !((listing.starting_price || 0) >= 10000 && !depositAuthorized) && (
+                      <QuickBidButtons
+                        currentBid={realtimePrice ?? listing.current_price ?? 0}
+                        bidIncrement={listing.bid_increment || 1}
+                        loading={placingBid}
+                        disabled={!canBid}
+                        onConfirm={(amount) => {
+                          setBidAmount(String(amount));
+                          setPendingBidAmount(amount);
+                          if (isCrossBorder && !crossBorderAccepted) {
+                            setCrossBorderModalOpen(true);
+                          } else {
+                            setBidConfirmDialogOpen(true);
+                          }
+                        }}
+                        testidPrefix="marketplace-quick-bid"
+                      />
+                    )}
+
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <label className="text-sm font-medium">{t('listing.yourBid')}

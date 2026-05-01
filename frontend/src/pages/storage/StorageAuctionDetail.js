@@ -16,6 +16,7 @@ import {
 import StorageCountdown from './StorageCountdown';
 import StorageFooterBanner from './StorageFooterBanner';
 import StorageAutoBidModal from '../../components/StorageAutoBidModal';
+import QuickBidButtons from '../../components/QuickBidButtons';
 
 const API = API_BASE;
 
@@ -59,8 +60,8 @@ const StorageAuctionDetail = () => {
     return () => clearInterval(t);
   }, [fetchData]);
 
-  const handlePlaceBid = async () => {
-    const amt = parseFloat(maxBid);
+  const handlePlaceBid = async (overrideAmount) => {
+    const amt = parseFloat(overrideAmount ?? maxBid);
     if (!Number.isFinite(amt) || amt <= 0) {
       toast.error(isFr ? "Entrez une offre maximale valide" : 'Enter a valid max bid');
       return;
@@ -245,6 +246,21 @@ const StorageAuctionDetail = () => {
 
               {isLive && (
                 <>
+                  {/* Quick Bid pills (iter175) — one-tap +$X / +$Y / +$Z scaled by bid_increment */}
+                  <div className="mb-3">
+                    <QuickBidButtons
+                      currentBid={auction.current_bid || 0}
+                      bidIncrement={auction.bid_increment || 10}
+                      loading={submittingBid}
+                      onConfirm={async (amount) => {
+                        setMaxBid(String(amount));
+                        await new Promise(r => setTimeout(r, 30));
+                        await handlePlaceBid(amount);
+                      }}
+                      testidPrefix="storage-quick-bid"
+                    />
+                  </div>
+
                   <label className="text-xs font-medium mb-1 block">
                     {isFr ? 'Votre offre · Your bid' : 'Your bid · Votre offre'} (≥ ${minNext.toFixed(2)})
                   </label>
