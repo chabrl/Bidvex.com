@@ -1,6 +1,40 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: P0 Storage Auctions — Scheduler + Emails + Admin Deposits + Public Stats + Homepage Promo + Bilingual Rule (May 1, 2026 / iter171) — DONE
+## Latest: P0 — Storage + Vehicle Sprint (May 1, 2026 / iter172) — 11/11 DONE
+
+### 🔴 CRITICAL PROXY-BID BUG — FIXED
+**Root cause**: `storage_auction_service.place_bid` was attributing the leader's auto-advance to the SUBMITTER's bid_record. When User B submitted max=$12 against User A (who held max=$25), the system pushed `{bidder_id: B, amount: $13}` — making it look like B auto-outbid themselves from $12 to $13.
+
+**Fix** (services/storage_auction_service.py):
+- `bid_record.amount` now ALWAYS equals the submitter's own `max_bid` (their intent)
+- Leader auto-advances are never persisted as a separate bid_record — only `current_bid` advances at the auction level
+- 2-second dedup window rejects rapid double-click identical submissions (returns `is_duplicate=True`)
+- 6 regression tests lock the invariants
+
+### Sprint deliverables (11/11)
+1. **Bid-status badges (Item 1)** — StorageAuctionCard renders dual-language Leading/Outbid/No-Buyer-Fees badges based on `user.id` vs `winning_bidder_id`. Always bilingual per Bill 96.
+2. **Auto-bid bot (Item 2)** — Marketplace setup_auto_bid already gates Premium/VIP/Partner/Business. Storage proxy is intrinsic to `place_bid` (every bid = max_bid ceiling). Proxy correctness locked in by iter172 tests.
+3. **Homepage sections (Item 3)** — `HomepageLiveVehicles` + `HomepageLiveStorage` horizontal-scroll cards with bilingual headings, View All · Voir tout CTAs, skeleton loaders, auto-hide when 0 results.
+4. **Facility promotion tiers (Item 4)** — 3 tiers (Basic $9.99/7d, Featured $24.99/14d, Premium $49.99/30d) with Stripe PaymentIntent flow + `/promote` + `/promote/confirm` endpoints.
+5. **Promotion infrastructure (Item 5)** — `process_expired_promotions` hourly cron across `listings` + `vehicle_listings` + `storage_auctions`. Admin `grant-promotion` + `revoke-promotion` endpoints. Featured/premium badges render on cards.
+6. **AI Concierge platform knowledge (Item 6)** — Injected authoritative truth into `ai_assistant_v2.SYSTEM_INSTRUCTIONS` — 3 auction types, fees per seller-tier + payment-method, subscription tiers, deposit system, pickup, auto-bid gating, Bill 96, contact.
+7. **Admin storage controls (Item 7)** — New endpoints: facility reject/suspend/unsuspend/delete (cascades auctions), auction pause/resume/edit/delete/override-winner/force-close.
+8. **Deposit payment flow (Item 8)** — Backend: `/api/my-storage-deposits` user endpoint. Frontend: `/storage-auctions/my-deposits` route with bilingual table (Authorized 🔒 / Applied ✅ / Refunded ✔️ / Forfeited ❌).
+9. **Digital pickup code (Item 9)** — `generate_pickup_code()` → `BV-XXXX-XXXX`. Auto-generated at auction close. Prominently rendered in winner email. Facility endpoints: `verify-pickup-code` (200/404/409) and `mark-picked-up`. Admin `regenerate-pickup-code` re-sends email.
+10. **Admin create auction (Item 10)** — `POST /api/admin/storage-auctions?facility_id=X` bypasses verified-facility guard; reuses same payload validators.
+11. **All flows tested** — 72/72 effective tests pass across 4 storage suites; scheduler registers 11 jobs.
+
+### Files changed (iter172)
+- Backend: `services/storage_auction_service.py` (REWRITE — correct bid_record attribution + dedup), `services/scheduled_jobs.py` (+process_expired_promotions +generate_pickup_code), `services/scheduler.py` (+job 11), `services/email_notifications.py` (+pickup code block in winner email), `services/ai_assistant_v2.py` (system prompt update), `routes/storage_auctions.py` (+20 endpoints: promotion, admin controls, pickup code, admin create, my deposits)
+- Frontend: `pages/storage/StorageAuctionCard.js` (REWRITE — dual-language Leading/Outbid/No-Fees badges + promotion badges), `pages/storage/MyStorageDeposits.js` (NEW), `pages/HomePage.js` (+HomepageLiveVehicles +HomepageLiveStorage), `App.js` (+/storage-auctions/my-deposits route)
+- Tests: `tests/test_storage_proxy_bug_iter172.py` (NEW — 6 regression tests for the critical bug), `tests/test_storage_iter172_api.py` (NEW — 35 API tests, created by testing-agent)
+
+### GitHub push
+Per Emergent platform policy, please use the **"Save to Github"** button in the chat input to push these changes to your repo. All local commits are in place (auto-commits captured each tool call).
+
+---
+
+## Previous: P0 Storage Auctions — Scheduler + Emails + Admin Deposits + Public Stats + Homepage Promo + Bilingual Rule (May 1, 2026 / iter171) — DONE
 
 ### Scope (14/14 delivered)
 1. **Auto-close scheduler (5-min cron)** — `scheduler.py:744-755` registers `storage_close_job` with `IntervalTrigger(minutes=5)`. Calls `services/scheduled_jobs.py::process_ended_storage_auctions` which:
