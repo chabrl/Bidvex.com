@@ -327,7 +327,6 @@ const AdminDashboard = () => {
           case 'auctions': return <AuctionControl />;
           case 'storage-deposits': return <AdminStorageDeposits />;
           case 'storage-auctions-admin': return <AdminStorageAuctions />;
-          case 'feature-flags': return <AdminFeatureFlags />;
           case 'categories': return <CategoryManager />;
           case 'partner-applications': return <PartnerManager />;
           default: return <EnhancedUserManager />;
@@ -335,6 +334,7 @@ const AdminDashboard = () => {
       case 'vehicles':
         switch (secondaryTab) {
           case 'vehicle-admin': return <VehicleAdminManager />;
+          case 'feature-flags': return <AdminFeatureFlags />;
           case 'ai-guard': return <AIGuardDashboard />;
           case 'risk-monitoring': return <RiskMonitoringDashboard />;
           default: return <VehicleAdminManager />;

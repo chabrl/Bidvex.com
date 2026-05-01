@@ -26,9 +26,7 @@ Seed defaults
 on first read. Subsequent admin toggles are persisted.
 """
 from datetime import datetime, timezone
-from typing import Optional
 import logging
-import re
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -46,8 +44,6 @@ KNOWN_FLAGS: dict[str, dict] = {
         "description_fr": "Activer ou désactiver la page d'enchères de véhicules pour tous les utilisateurs. Lorsque désactivée, les visiteurs voient une page « Bientôt disponible » avec un formulaire d'inscription.",
     },
 }
-
-EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 async def _get_or_seed_flag(db, key: str) -> dict:
@@ -156,10 +152,11 @@ class VehicleWaitlistSignup(BaseModel):
 
 @waitlist_router.post("/waitlist/vehicle-auctions")
 async def join_vehicle_waitlist(payload: VehicleWaitlistSignup, request: Request):
-    """Public: join the vehicle-auctions waitlist. Upsert on email."""
+    """Public: join the vehicle-auctions waitlist. Upsert on email.
+
+    EmailStr already validates the address shape — no need for a second regex.
+    """
     email = payload.email.strip().lower()
-    if not EMAIL_RE.match(email):
-        raise HTTPException(status_code=400, detail="invalid_email")
 
     db = get_db()
     now = datetime.now(timezone.utc)

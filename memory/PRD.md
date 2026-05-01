@@ -1,5 +1,47 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: P0 — Layout Fixes + Vehicle Coming-Soon (May 1, 2026 / iter176) — 3/3 sections DONE
+
+### Section 1 — Global responsive layout
+- `index.css` — added `max-width: 100vw` + `overflow-x: hidden` on **both** `html` AND `body` (was previously only on `html`); `img { max-width: 100%; height: auto; display: block }` global rule.
+- `HomePage.js` — homepage "View All / Tout voir" buttons now visible on mobile (removed `hidden sm:flex` on Ending Soon and New Today sections; Hot section already had a dedicated mobile button so its desktop one stays hidden on small screens to avoid duplicates).
+
+### Section 2 — Storage Hero contrast fix (Bill 96 + WCAG AA)
+- `StorageHero.css`:
+  - `.storage-hero__label` → color `#FFFFFF` (was `#3FB4CB` low-contrast). Border + background bumped to white-rgba.
+  - `.storage-hero__label--fr` → bright cyan `#22d3ee` (was 85% opacity teal).
+  - `.storage-hero__subtitle` → 92% white opacity (was 90%).
+  - `.storage-hero__subtitle-fr-visible` → `#22d3ee` (was 85% opacity teal).
+  - `.storage-hero__badges` text base color → 92% white opacity, badge primary text explicit `#FFFFFF`.
+
+### Section 3 — Vehicle Auctions Coming-Soon page + Admin Feature Flags
+
+**Backend** (`/app/backend/routes/feature_flags.py` NEW — 4 routers registered)
+- `feature_flags` collection auto-seeds `vehicle_auctions_enabled = false` on first read.
+- `KNOWN_FLAGS` whitelist prevents arbitrary flag minting; bilingual `description_en` / `description_fr`.
+- Public: `GET /api/feature-flags/{key}` (60s cache) — falls back closed (Coming Soon) if Mongo unreachable.
+- Admin: `GET/PATCH /api/admin/feature-flags`, `GET /api/admin/waitlist/vehicle-auctions/count`, `GET /api/admin/waitlist/vehicle-auctions`.
+- Public waitlist: `POST /api/waitlist/vehicle-auctions { email, lang }` — upserts on lowercased email; returns `already_on_list` flag.
+
+**Frontend**
+- `pages/vehicles/VehicleComingSoonPage.js` (NEW) — bilingual headlines, animated floating car icon, dark navy gradient background, pill-shaped email input + "Notify Me · Me notifier" CTA, success state, EN/FR language preference toggle for the launch email, 3 teaser feature pills.
+- `pages/vehicles/VehicleAuctionsRoute.js` (NEW) — gate that uses `useFeatureFlag('vehicle_auctions_enabled')` and renders ComingSoon when false, real `VehicleAuctionsPage` when true; minimal centered spinner while loading.
+- `hooks/useFeatureFlag.js` (NEW) — in-memory cache (60s TTL) + `invalidateFeatureFlag(key)` exported for admin "I just toggled" cache-busting.
+- `pages/admin/AdminFeatureFlags.js` (NEW) — admin tab UI: card per flag, animated Switch, Active/Coming-Soon badges, optimistic-update with revert-on-error, Waitlist signup count card, last-updated trail with admin email.
+- `pages/AdminDashboard.js` — registered `feature-flags` secondary tab under **Vehicles** primary (initial bug placed it under Marketplace primary — caught and fixed by testing agent iter176).
+- `components/Navbar.js` — flag-driven `SOON · BIENTÔT` cyan badge next to Vehicle Auctions nav link, hides when flag is ON.
+- `App.js` — `/vehicle-auctions` and FR alias `/encheres-de-vehicules` both routed through the gate.
+
+### Tests — 47/49 green (2 false positives caught)
+- New: `/app/backend/tests/test_iter176_feature_flags.py` — 14/16 pass + 2 skipped (env-only). Storage regression 33/33 still green.
+- 2 issues caught by testing agent: AdminDashboard routing bug (now FIXED — moved `case 'feature-flags'` from marketplace switch to vehicles switch), and Cache-Control header overridden by global no-store middleware (acknowledged — JS in-memory cache provides the 60s TTL, HTTP caching off by design for security policy).
+
+### Files changed (iter176)
+- Backend: `routes/feature_flags.py` (NEW), `server.py` (registered 4 routers)
+- Frontend: `pages/vehicles/VehicleComingSoonPage.js` (NEW), `pages/vehicles/VehicleAuctionsRoute.js` (NEW), `hooks/useFeatureFlag.js` (NEW), `pages/admin/AdminFeatureFlags.js` (NEW), `pages/AdminDashboard.js` (+ tab + correct routing), `components/Navbar.js` (+ flag badge), `App.js` (gate + FR alias), `pages/storage/StorageHero.css` (contrast fix), `index.css` (overflow guards), `pages/HomePage.js` (mobile View All buttons)
+
+---
+
 ## Latest: P0 — Final Polishing Phase (May 1, 2026 / iter175) — 4/4 DONE
 
 User-approved final polishing sprint before production. All 4 items shipped + tested (48/48 backend tests pass).
