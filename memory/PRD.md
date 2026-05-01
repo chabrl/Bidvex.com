@@ -1,6 +1,46 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: P0 Storage Auctions — Payment Method Choice + Deposit System (May 1, 2026 / iter170) — DONE
+## Latest: P0 Storage Auctions — Scheduler + Emails + Admin Deposits + Public Stats + Homepage Promo + Bilingual Rule (May 1, 2026 / iter171) — DONE
+
+### Scope (14/14 delivered)
+1. **Auto-close scheduler (5-min cron)** — `scheduler.py:744-755` registers `storage_close_job` with `IntervalTrigger(minutes=5)`. Calls `services/scheduled_jobs.py::process_ended_storage_auctions` which:
+   - Soft-close guard: extends `end_time` by `soft_close_extension_minutes` (default 10) when a bid landed within the last 10 min
+   - Otherwise: flips status → `sold` (winner) or `unsold` (no bids), releases held deposits (winner→applied, losers→refunded), fires winner + facility emails, queues 5% commission invoice for cash/e-transfer, writes `storage_close_logs`
+2. **Winner email bilingual per payment method** — `send_storage_auction_won_email(buyer, auction, facility, pricing)` branches on `auction.payment_method`:
+   - Stripe → "BidVex has charged your card ${fee} + you pay ${hammer} via Stripe to facility"
+   - Cash → "Pay ${hammer} CASH directly to facility — contact {facility_contact}"
+   - E-Transfer → "Send ${hammer} via Interac e-Transfer to {facility_email}, Reference: BidVex Unit #{unit} – {your_name}"
+   - All branches include mandatory cleanup-deadline forfeit notice (bilingual)
+3. **Facility-sold email** — `send_storage_auction_sold_email(facility, auction, buyer)` with payment-method label + buyer contact
+4. **Admin Deposits Dashboard** (`/admin` → Marketplace → Storage Deposits)
+   - 4 KPI cards: Active Holds / Applied to Fees / Refunded / Forfeited (all bilingual)
+   - Search + table (Bidder / Unit / Facility / Amount / Placed At / Status / Actions)
+   - Release (green) + Forfeit (red) per-row buttons with confirmation modal (reason required for forfeit)
+   - Backend: `GET /api/admin/storage-deposits` with enrichment (bidder_name / auction_unit_number / facility_name) + status filter
+5. **Public stats endpoint** — `GET /api/storage-auctions/stats/public` (unauthenticated) returns `{total_sold, active_facilities, active_auctions, total_bids_placed}` zero-safe
+6. **Stats bar on browse page** — Renders under hero when any stat > 0; hides zero cards per spec
+7. **Homepage Storage Promo section** — Inserted after LiveAuctions in `HomePage.js`. Features animated padlock + sparkle + particle dots, dual-language badge "NEW FEATURE · NOUVELLE FONCTIONNALITÉ", EN title + italic FR title, 3 trust badges (all dual-language), live inline stats, dual-language CTAs "Browse Storage Auctions → · Parcourir les enchères →"
+8. **Bilingual always-visible rule (Quebec Bill 96)** — Applied to all storage pages: Hero renders EN title in white `#FFFFFF` + FR title in cyan `#3FB4CB` directly beneath, every eyebrow/subtitle/CTA/badge shows EN + FR simultaneously. Admin Deposits page also fully bilingual.
+
+### Files
+- Backend: `services/scheduler.py` (+10 lines), `services/scheduled_jobs.py` (+180 lines new `process_ended_storage_auctions`), `services/email_notifications.py` (rewrote 2 functions), `routes/storage_auctions.py` (+90 lines for `/stats/public` + `/admin/storage-deposits`)
+- Frontend: `pages/storage/StorageHero.{js,css}` (dual-language rewrite), `pages/storage/StorageAuctionsBrowse.js` (stats bar + bilingual banner), `pages/HomePage.js` (new `StorageAuctionsPromo` component), `pages/admin/AdminStorageDeposits.js` (NEW), `pages/AdminDashboard.js` (wired tab + case)
+
+### Testing — 31/31 green
+- `test_storage_payment_deposit_iter170.py` — 10/10 unit regression pass
+- `test_storage_iter171_api.py` (testing-agent) — 21/21 API integration pass (public stats, admin deposits CRUD, scheduler registration, email coroutine validation per-method, 402 bid-guard regression)
+- Zero critical; zero minor (type-hint drift on two email functions fixed post-test via `bool(...)` coercion)
+- Live screenshots: bilingual hero + stats bar, homepage promo with inline live stats, admin deposits dashboard with 4 KPIs + bilingual table empty state
+
+### Live verification artifacts
+- `/var/log/supervisor/backend.err.log` → "Scheduler initialized with 10 jobs" (job #10 = storage auto-close)
+- `GET /api/storage-auctions/stats/public` → `{"total_sold":0,"active_facilities":1,"active_auctions":3,"total_bids_placed":2}`
+- Homepage `/` screenshot shows storage promo section below hero with live stats inline
+- Storage Browse `/storage-auctions` screenshot shows stats bar `1 Facility / 3 Live / 2 Bids` below bilingual hero
+
+---
+
+## Previous: P0 Storage Auctions — Payment Method Choice + Deposit System (May 1, 2026 / iter170) — DONE
 
 ### Spec
 Facility chooses payment method per listing (Stripe / Cash / E-Transfer). Optional participation deposit configured per auction. 4 frontend polish fixes (white hero title + bilingual content swap, footer restored, 3-step facility registration, listing-create payment+deposit UI). Backend pricing rewritten for 3 methods + Stripe Connect Express on facility registration + deposit hold/release/forfeit lifecycle + bid guard (HTTP 402 when deposit required).

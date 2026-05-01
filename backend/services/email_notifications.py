@@ -1660,7 +1660,7 @@ async def send_storage_auction_won_email(buyer: dict, auction: dict, facility: d
         f"Dépôt de nettoyage : <strong>{cleanup_deposit:.2f} $</strong> (remboursé après confirmation que l'unité est vide)."
     )
 
-    return await send_email(
+    return bool(await send_email(
         to_email=buyer["email"],
         subject=f"🎉 You won — Storage Auction Unit #{unit}",
         html_content=_storage_panel(
@@ -1672,7 +1672,7 @@ async def send_storage_auction_won_email(buyer: dict, auction: dict, facility: d
             cta_en="View auction",
             cta_fr="Voir l'enchère",
         ),
-    )
+    ))
 
 
 async def send_storage_auction_sold_email(facility: dict, auction: dict, buyer: dict) -> bool:
@@ -1708,11 +1708,11 @@ async def send_storage_auction_sold_email(facility: dict, auction: dict, buyer: 
         f"Contactez le gagnant pour organiser le paiement et le ramassage. "
         f"Votre facture de commission BidVex (5 % + Stripe + taxes applicables) suivra séparément."
     )
-    return await send_email(
+    return bool(await send_email(
         to_email=facility["email"],
         subject=f"✅ Sold — Storage Auction Unit #{unit}",
         html_content=_storage_panel("Auction sold", "Enchère vendue", body_en, body_fr),
-    )
+    ))
 
 
 async def send_storage_ending_soon_email(buyer: dict, auction: dict) -> bool:
