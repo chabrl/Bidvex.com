@@ -23,10 +23,10 @@ import httpx
 
 # ─── Environment ───
 ROOT_DIR = Path(__file__).parent
-# override=True so .env wins over the container's shell env. The Emergent
-# container ships a placeholder STRIPE_API_KEY=sk_test_emergent which isn't
-# a real Stripe key — we need the real one from .env.
-load_dotenv(ROOT_DIR / '.env', override=True)
+# override=False so Kubernetes container env vars (set by Emergent at deploy
+# time) take precedence over the local .env file. The .env file is still used
+# as a fallback for any keys not set in the container env.
+load_dotenv(ROOT_DIR / '.env', override=False)
 
 # Safety net: if STRIPE_API_KEY is the literal Emergent placeholder or
 # missing/expired-looking, fall back to STRIPE_TEST_SECRET_KEY (a real
