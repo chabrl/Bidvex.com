@@ -52,6 +52,7 @@ import CommunityModerationManager from './admin/CommunityModerationManager';
 import TeamManager from '../components/admin/TeamManager';
 import AdminTaxDashboard from './AdminTaxDashboard';
 import AdminStorageDeposits from './admin/AdminStorageDeposits';
+import AdminStorageAuctions from './admin/AdminStorageAuctions';
 import { 
   Users, Package, Gavel, Shield, TrendingUp, Bell, Settings, FileText, 
   MessageSquare, DollarSign, Search, Image, CreditCard, Megaphone, 
@@ -86,6 +87,7 @@ const SECONDARY_TABS = {
     { id: 'tax-dashboard', label: 'Tax Dashboard', icon: '📊', lucideIcon: BarChart2 },
     { id: 'auctions', label: 'Auction Control', icon: '🔨', lucideIcon: Gavel },
     { id: 'storage-deposits', label: 'Storage Deposits', icon: '💰', lucideIcon: DollarSign },
+    { id: 'storage-auctions-admin', label: 'Storage Auctions', icon: '📦', lucideIcon: Package },
     { id: 'categories', label: 'Categories', icon: '📂', lucideIcon: Settings },
     { id: 'partner-applications', label: 'Partner Applications', icon: '🏢', lucideIcon: Building2 },
   ],
@@ -322,6 +324,7 @@ const AdminDashboard = () => {
           case 'tax-dashboard': return <AdminTaxDashboard />;
           case 'auctions': return <AuctionControl />;
           case 'storage-deposits': return <AdminStorageDeposits />;
+          case 'storage-auctions-admin': return <AdminStorageAuctions />;
           case 'categories': return <CategoryManager />;
           case 'partner-applications': return <PartnerManager />;
           default: return <EnhancedUserManager />;

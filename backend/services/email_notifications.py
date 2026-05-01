@@ -1647,13 +1647,33 @@ async def send_storage_auction_won_email(buyer: dict, auction: dict, facility: d
     pickup_en = ""
     pickup_fr = ""
     if pickup_code:
+        # Generate inline base64 QR image so it renders in every email client
+        qr_img_tag = ""
+        try:
+            import base64 as _b64
+            from routes.storage_auctions import _generate_pickup_qr_png_bytes
+            qr_bytes = _generate_pickup_qr_png_bytes(pickup_code)
+            qr_b64 = _b64.b64encode(qr_bytes).decode("ascii")
+            qr_img_tag = (
+                f"<div style='margin:12px auto;display:inline-block;background:#fff;"
+                f"padding:10px;border-radius:8px;border:1px solid #fde68a'>"
+                f"<img src='data:image/png;base64,{qr_b64}' alt='Pickup QR' "
+                f"width='180' height='180' "
+                f"style='display:block;width:180px;height:180px;image-rendering:pixelated'/>"
+                f"</div>"
+            )
+        except Exception as e:
+            logger.error(f"[STORAGE_EMAIL] QR embed failed: {e}")
+
         pickup_en = (
             f"<hr style='margin:16px 0;border:none;border-top:1px solid #e2e8f0'/>"
             f"<div style='background:#fef3c7;border:2px dashed #d97706;border-radius:10px;padding:16px;text-align:center;margin:12px 0'>"
             f"<div style='font-size:11px;letter-spacing:2px;color:#92400e;font-weight:700'>YOUR PICKUP CODE</div>"
             f"<div style='font-size:28px;font-weight:900;color:#78350f;letter-spacing:3px;font-family:monospace;margin-top:6px'>{pickup_code}</div>"
+            f"{qr_img_tag}"
+            f"<div style='font-size:11px;color:#92400e;margin-top:4px'>Scan at pickup · Show code to staff</div>"
             f"</div>"
-            f"Present this code to facility staff when you arrive for pickup. "
+            f"Present this code (or the QR) to facility staff when you arrive for pickup. "
             f"The facility will mark this code as used upon verification. "
             f"<strong>Do not share this code</strong> — it authorizes access to the unit."
         )
@@ -1662,8 +1682,10 @@ async def send_storage_auction_won_email(buyer: dict, auction: dict, facility: d
             f"<div style='background:#fef3c7;border:2px dashed #d97706;border-radius:10px;padding:16px;text-align:center;margin:12px 0'>"
             f"<div style='font-size:11px;letter-spacing:2px;color:#92400e;font-weight:700'>VOTRE CODE DE RÉCUPÉRATION</div>"
             f"<div style='font-size:28px;font-weight:900;color:#78350f;letter-spacing:3px;font-family:monospace;margin-top:6px'>{pickup_code}</div>"
+            f"{qr_img_tag}"
+            f"<div style='font-size:11px;color:#92400e;margin-top:4px'>Scanner à la récupération · Présentez le code</div>"
             f"</div>"
-            f"Présentez ce code au personnel de la facilité lors de votre arrivée. "
+            f"Présentez ce code (ou le QR) au personnel de la facilité lors de votre arrivée. "
             f"La facilité marquera ce code comme utilisé après vérification. "
             f"<strong>Ne partagez pas ce code</strong> — il autorise l'accès à l'unité."
         )

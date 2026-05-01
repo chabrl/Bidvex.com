@@ -257,7 +257,7 @@ async def validate_coupon_code(data: Dict[str, Any]):
         billing_period=billing_period
     )
     
-    return result.dict()
+    return result.model_dump() if hasattr(result, "model_dump") else (result.dict() if hasattr(result, "dict") else result)
 
 
 

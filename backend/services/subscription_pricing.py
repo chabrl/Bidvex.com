@@ -432,7 +432,7 @@ class SubscriptionPricingService:
             raise ValueError(f"Coupon code {coupon_data.code} already exists")
         
         # Generate ID
-        coupon_dict = coupon_data.dict()
+        coupon_dict = coupon_data.model_dump()
         coupon_dict["id"] = f"coupon-{datetime.now().timestamp()}"
         coupon_dict["created_at"] = datetime.now(timezone.utc).isoformat()
         coupon_dict["created_by"] = admin_id

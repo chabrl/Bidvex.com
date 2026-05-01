@@ -17,7 +17,7 @@ Pricing rules (single source of truth — see services/storage_pricing.py):
 """
 from typing import List, Optional
 from datetime import datetime
-from pydantic import BaseModel, Field, EmailStr, validator
+from pydantic import BaseModel, Field, EmailStr, field_validator, model_validator
 
 
 CANADIAN_PROVINCES = ["AB", "BC", "MB", "NB", "NL", "NS", "ON", "PE", "QC", "SK", "NT", "NU", "YT"]
@@ -74,22 +74,22 @@ class StorageAuctionCreate(BaseModel):
     deposit_description_en: Optional[str] = None
     deposit_description_fr: Optional[str] = None
 
-    @validator("payment_method")
+    @field_validator("payment_method")
+    @classmethod
     def _vm(cls, v):
         v = (v or "").lower()
         if v not in PAYMENT_METHODS:
             raise ValueError(f"payment_method must be one of {PAYMENT_METHODS}")
         return v
 
-    @validator("deposit_amount", always=True)
-    def _vd(cls, v, values):
-        req = values.get("deposit_required", False)
-        if req and (v is None or v <= 0):
+    @model_validator(mode="after")
+    def _vd(self):
+        if self.deposit_required and (self.deposit_amount is None or self.deposit_amount <= 0):
             raise ValueError(
                 "deposit_amount must be > 0 when deposit_required is true. "
                 "Le montant du dépôt doit être supérieur à 0 si un dépôt est requis."
             )
-        return v
+        return self
 
 
 class StorageBidPayload(BaseModel):

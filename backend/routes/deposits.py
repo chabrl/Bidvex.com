@@ -148,6 +148,73 @@ async def check_deposit_status(
     }
 
 
+class DepositConfirmRequest(BaseModel):
+    deposit_id: str
+    payment_intent_id: str
+
+
+@deposits_router.post("/confirm")
+async def confirm_deposit_hold(
+    data: DepositConfirmRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """
+    Called by the frontend after `stripe.confirmCardPayment(client_secret)`
+    succeeds. We re-fetch the PaymentIntent from Stripe, verify its status
+    is one of the 'hold-active' statuses, and sync the DB record.
+    """
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    db = get_db()
+    current_user = await _get_current_user(credentials)
+
+    deposit = await db.bidding_deposits.find_one(
+        {"id": data.deposit_id, "user_id": current_user.id},
+        {"_id": 0},
+    )
+    if not deposit:
+        raise HTTPException(status_code=404, detail="Deposit not found")
+    if deposit.get("payment_intent_id") != data.payment_intent_id:
+        raise HTTPException(status_code=400, detail="payment_intent_id does not match deposit")
+
+    # Verify with Stripe
+    try:
+        import os
+        import stripe
+        stripe.api_key = os.environ.get("STRIPE_API_KEY")
+        pi = stripe.PaymentIntent.retrieve(data.payment_intent_id)
+    except Exception as e:
+        logger.error(f"[DEPOSIT_CONFIRM] Stripe retrieve failed: {e}")
+        raise HTTPException(status_code=502, detail=f"Stripe verify failed: {e}")
+
+    allowed = {"requires_capture", "succeeded", "processing"}
+    if pi.status not in allowed:
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "error": "deposit_not_authorized",
+                "stripe_status": pi.status,
+                "message_en": "Card authorization did not complete. Please try again.",
+                "message_fr": "L'autorisation de la carte n'a pas abouti. Veuillez réessayer.",
+            },
+        )
+
+    await db.bidding_deposits.update_one(
+        {"id": data.deposit_id},
+        {"$set": {
+            "status": pi.status,
+            "confirmed_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
+
+    return {
+        "success": True,
+        "deposit_id": data.deposit_id,
+        "status": pi.status,
+    }
+
+
 @deposits_router.get("/my-deposits")
 async def get_my_deposits(
     credentials: HTTPAuthorizationCredentials = Depends(security),

@@ -1,0 +1,50 @@
+{
+  "summary": "Iteration 173 — BidVex final polish sprint. Validated backend endpoints for QR pickup, storage promotion tiers, admin-only storage auction CRUD, deposit confirmation, and Pydantic V2 migration. 17 new iter173 tests PASS (2 skipped for env-only reasons: no auction with pickup_code in current dataset). Full regression of iter170+iter172 (16 tests) PASS. Frontend: admin login works; StorageAuctionDetail premium Auto-Bid badge renders correctly as VIP admin with bilingual EN+FR text. Admin secondary-tab click selector was ambiguous (matched top-navbar link by text) so did not fully confirm the 'storage-auctions-admin' secondary tab renders AdminStorageAuctions in UI — however the underlying API endpoints are verified and the code import wiring in AdminDashboard.js is confirmed by file grep.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/admin/storage-auctions", "issue": "Returns 400/422 for missing facility_id Query param — both are acceptable; FastAPI default is 422 with validation error envelope. Consider standardizing to 400 with bilingual message body for consistency."},
+      {"endpoint": "POST /api/deposits/confirm", "issue": "Returns 404 for unknown deposit_id — correct. payment_intent_id mismatch 400 branch not exercisable without creating a real deposit; logic inspected and is correct."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Admin Dashboard → Marketplace → Storage Auctions secondary tab", "issue": "Text-based selector 'Storage Auctions' is ambiguous because the same text appears in the top navbar as nav-storage-auctions-link. Suggest adding data-testid='admin-tab-storage-auctions-admin' on the secondary-tab trigger in AdminDashboard.js for reliable test targeting.", "affected_selectors": ["[data-testid='admin-create-storage-auction-btn']"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_storage_iter173_api.py",
+    "/app/test_reports/pytest/iter173_api.xml",
+    "/app/test_reports/pytest/iter173_regression.xml"
+  ],
+  "action_items": [
+    "(LOW) Add data-testid='admin-tab-storage-auctions-admin' to the secondary-tab trigger button in /app/frontend/src/pages/AdminDashboard.js so automated tests can disambiguate from the top-navbar 'Storage Auctions' link.",
+    "(INFO) Tester could not exercise the PNG return path of /storage-auctions/{id}/pickup-qr because no auction with pickup_code exists in the current dataset. The code path is inspected and looks correct (uses qrcode lib with ERROR_CORRECT_H, returns image/png with X-Pickup-Code header).",
+    "(INFO) The /promote/confirm and /deposits/confirm Stripe-confirm branches require real Stripe card interactions — verified auth/shape/404 guardrails only, per request."
+  ],
+  "critical_code_review_comments": [
+    "PYDANTIC V2 MIGRATION VERIFIED: /app/backend/models/storage_auction.py uses @field_validator and @model_validator (mode='after') decorators; bare V1 @validator(...) decorators are ABSENT (asserted by test_no_v1_validator_decorator_used). Invalid payment_method 'bitcoin' correctly raises pydantic.ValidationError; deposit_required=True with deposit_amount=0 or None correctly raises ValidationError.",
+    "RBAC discipline confirmed: GET /api/admin/storage-auctions returns 200 for admin, 401/403 for buyer. POST /api/storage-auctions/{id}/promote returns 401 unauth and 401/403 for non-facility buyer. POST /api/deposits/confirm returns 401 unauth, 404 for unknown deposit_id.",
+    "Pickup-QR endpoint /api/storage-auctions/{id}/pickup-qr: auth ordering is correct — 401 unauth fires before 404, 404 unknown auction fires before 403 authorization check, 403 non-authorized user is the last guard. _generate_pickup_qr_png_bytes uses H-level error correction with box_size=10 — appropriate for printing.",
+    "Public stats endpoint /api/storage-auctions/stats/public still returns 4 numeric fields (verified_facilities, active_auctions, total_bids, and at least one more). Shape preserved across Pydantic V2 migration.",
+    "StorageAuctionDetail premium Auto-Bid callout: data-testid='storage-autobid-premium-badge' renders with correct bilingual text for VIP admin: '👑 Pro Auto-Bid · Auto-Enchère Pro (VIP) — Your max bid is shielded by our proxy ... Votre offre maximale est protégée par notre proxy ...' — complies with Quebec Bill 96.",
+    "AdminDashboard.js correctly imports AdminStorageAuctions (line 55), registers the secondary tab {id:'storage-auctions-admin', label:'Storage Auctions', icon:'📦'} at line 90, and renders <AdminStorageAuctions /> for case 'storage-auctions-admin' at line 327. Code wiring is sound.",
+    "AdminStorageAuctions.js exposes data-testid='admin-create-storage-auction-btn' (line 118), data-testid='admin-create-storage-dialog' (line 302), and data-testid='admin-create-storage-submit' (line 413) — covers the admin create flow.",
+    "Storage promotion endpoints: GET /storage-promotion-tiers is public and returns {tiers:{...}} with ≥3 tiers (basic/featured/premium). POST /storage-auctions/{id}/promote uses Depends(_require_verified_facility) — a buyer attempting it is correctly refused (401/403)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_storage_iter173_api.py (NEW — 19 tests covering pickup-qr auth/404/png-return-path, promotion tiers public + facility-only promote, admin storage auction list/create guards, deposits/confirm 401/404, Pydantic V2 ValidationError on invalid payment_method + deposit_required=True with deposit_amount<=0, V2 decorator presence assertion, public stats shape)"
+  ],
+  "success_rate": {
+    "backend": "100% (17 pass / 2 skipped — skips are env-only, no sold auction with pickup_code in dataset); regression 16/16 pass",
+    "frontend": "Partial — premium Auto-Bid badge verified on StorageAuctionDetail page; admin secondary-tab UI confirmation blocked by ambiguous text-based selector (see action_items)"
+  },
+  "test_credentials": "Admin charbel911@gmail.com / Anderosli123!@# — login OK, redirects to /marketplace. Buyer abc@gmail.com / TestBuyer123! — login OK via API.",
+  "seed_data_creation": "None. All tests are read-only or use intentionally unknown IDs for 404 paths.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter173 adds /app/backend/tests/test_storage_iter173_api.py (19 tests). Run all iter170/172/173 storage suites with: `cd /app && python -m pytest backend/tests/test_storage_*.py -v`. Known env-skips: the 2 tests that need an auction with a pickup_code (winner-sold path) — to enable, seed a sold storage auction and run again. For the admin secondary-tab UI verification, add data-testid='admin-tab-storage-auctions-admin' to the secondary-tab trigger in AdminDashboard.js (the generic sub-tab button) — then the Playwright selector becomes deterministic. Premium badge UI test passes; upsell card only renders for free-tier users (expected).",
+  "rca of the issue": "No critical bugs found. Minor ambiguity in Playwright selector is a test-side concern, not a product bug — the admin page and button are correctly wired in source. Skipped tests are data-dependent (need a sold auction with pickup_code), not code defects."
+}

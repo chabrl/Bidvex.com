@@ -255,7 +255,7 @@ Remember: You are not just an assistant - you are the Master Concierge, the face
                 "message": assistant_message.content,
                 "language": language,
                 "rich_content": response_data,
-                "usage": response.usage.dict() if hasattr(response, 'usage') else None
+                "usage": (response.usage.model_dump() if hasattr(response.usage, "model_dump") else response.usage.dict()) if hasattr(response, 'usage') and response.usage else None
             }
         
         except Exception as e:

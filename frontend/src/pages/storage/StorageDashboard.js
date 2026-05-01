@@ -10,9 +10,10 @@ import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
 import {
   Loader2, Package, DollarSign, TrendingUp, Receipt, Plus, ShieldCheck,
-  Clock,
+  Clock, Sparkles,
 } from 'lucide-react';
 import StorageFooterBanner from './StorageFooterBanner';
+import PromoteAuctionModal from './PromoteAuctionModal';
 
 const API = API_BASE;
 
@@ -50,6 +51,8 @@ const StorageDashboard = () => {
   }, [token]);
 
   useEffect(() => { load(); }, [load]);
+
+  const [promoteTarget, setPromoteTarget] = useState(null);
 
   if (loading) return <div className="min-h-screen flex justify-center items-center"><Loader2 className="h-10 w-10 animate-spin text-blue-600" /></div>;
 
@@ -143,14 +146,36 @@ const StorageDashboard = () => {
           ) : (
             <div className="divide-y">
               {auctions.map(a => (
-                <div key={a.id} className="py-3 flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold">Unit #{a.unit_number} — {a.unit_size}</p>
+                <div key={a.id} className="py-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold flex items-center gap-2 flex-wrap">
+                      Unit #{a.unit_number} — {a.unit_size}
+                      {a.promotion_tier && (
+                        <Badge className="bg-gradient-to-r from-amber-400 to-orange-500 text-white border-0 text-[10px] uppercase" data-testid={`promotion-active-${a.id}`}>
+                          <Sparkles className="h-3 w-3 mr-1" />
+                          {a.promotion_tier} · {isFr ? 'Actif' : 'Active'}
+                        </Badge>
+                      )}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       {a.bid_count || 0} bids • Current ${Number(a.current_bid || 0).toLocaleString()}
                     </p>
                   </div>
-                  <Badge variant="outline">{a.live_status || a.status}</Badge>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Badge variant="outline">{a.live_status || a.status}</Badge>
+                    {(a.live_status === 'active' || a.status === 'active' || a.status === 'upcoming') && !a.promotion_tier && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-amber-300 text-amber-700 hover:bg-amber-50"
+                        onClick={() => setPromoteTarget(a)}
+                        data-testid={`promote-auction-btn-${a.id}`}
+                      >
+                        <Sparkles className="h-3 w-3 mr-1" />
+                        {isFr ? 'Promouvoir · Promote' : 'Promote · Promouvoir'}
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -158,6 +183,13 @@ const StorageDashboard = () => {
         </Card>
       </div>
       <StorageFooterBanner />
+      <PromoteAuctionModal
+        auction={promoteTarget}
+        open={!!promoteTarget}
+        onOpenChange={(o) => { if (!o) setPromoteTarget(null); }}
+        onSuccess={() => { setPromoteTarget(null); load(); }}
+        isFr={isFr}
+      />
     </div>
   );
 };

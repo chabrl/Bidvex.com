@@ -347,7 +347,8 @@ async def place_storage_bid(
     try:
         from services.email_notifications import send_storage_bid_placed_email, send_storage_outbid_email
         a = await db.storage_auctions.find_one({"id": auction_id}, {"_id": 0})
-        background_tasks.add_task(send_storage_bid_placed_email, current_user.dict() if hasattr(current_user, "dict") else dict(current_user), a, result)
+        user_payload = current_user.model_dump() if hasattr(current_user, "model_dump") else (current_user.dict() if hasattr(current_user, "dict") else dict(current_user))
+        background_tasks.add_task(send_storage_bid_placed_email, user_payload, a, result)
         if result.get("outbid_user_id"):
             outbid = await db.users.find_one({"id": result["outbid_user_id"]}, {"_id": 0})
             if outbid:
@@ -1469,6 +1470,84 @@ async def admin_regenerate_pickup_code(
     except Exception as e:
         logger.error(f"[STORAGE] regenerate pickup code email failed: {e}")
     return {"success": True, "pickup_code": new_code}
+
+
+# ─────────────────────────────────────────────────────────────
+# PICKUP QR CODE (iter173)
+# ─────────────────────────────────────────────────────────────
+
+def _generate_pickup_qr_png_bytes(pickup_code: str) -> bytes:
+    """Render a high-contrast PNG QR encoding the pickup code. Returns raw bytes."""
+    import io
+    import qrcode
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=qrcode.constants.ERROR_CORRECT_H,
+        box_size=10,
+        border=2,
+    )
+    qr.add_data(pickup_code)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="#0f172a", back_color="#FFFFFF")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+@storage_router.get("/storage-auctions/{auction_id}/pickup-qr")
+async def get_pickup_qr(
+    auction_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Returns a PNG QR code encoding the pickup_code for this auction.
+    Accessible ONLY to:
+      • the winning bidder
+      • the facility that owns the auction
+      • an admin
+    The QR encodes just the pickup code string (BV-XXXX-XXXX).
+    """
+    from fastapi.responses import Response
+
+    db = get_db()
+    auction = await db.storage_auctions.find_one({"id": auction_id}, {"_id": 0})
+    if not auction:
+        raise HTTPException(status_code=404, detail="Auction not found")
+
+    pickup_code = auction.get("pickup_code")
+    if not pickup_code:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "no_pickup_code",
+                "message_en": "No pickup code available for this auction yet.",
+                "message_fr": "Aucun code de récupération disponible pour cette enchère.",
+            },
+        )
+
+    # Authorization
+    is_winner = auction.get("winning_bidder_id") == current_user.id
+    is_admin = current_user.role == "admin"
+    is_facility_owner = False
+    if not is_winner and not is_admin:
+        fac = await db.storage_facilities.find_one(
+            {"id": auction.get("facility_id"), "owner_user_id": current_user.id},
+            {"_id": 0, "id": 1},
+        )
+        is_facility_owner = bool(fac)
+
+    if not (is_winner or is_admin or is_facility_owner):
+        raise HTTPException(status_code=403, detail="Not authorized to view this pickup code")
+
+    png_bytes = _generate_pickup_qr_png_bytes(pickup_code)
+    return Response(
+        content=png_bytes,
+        media_type="image/png",
+        headers={
+            "Cache-Control": "private, max-age=300",
+            "X-Pickup-Code": pickup_code,
+        },
+    )
 
 
 # ─────────────────────────────────────────────────────────────
