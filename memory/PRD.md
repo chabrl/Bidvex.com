@@ -1,5 +1,46 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: P0 — Final Polishing Phase (May 1, 2026 / iter175) — 4/4 DONE
+
+User-approved final polishing sprint before production. All 4 items shipped + tested (48/48 backend tests pass).
+
+### Item 1 — Quick Bid pills (HIGH PRIORITY)
+- New shared component `/app/frontend/src/components/QuickBidButtons.js` — three one-tap pills `+1×` / `+5×` / `+10×` scaled by the auction's `bid_increment` (so a $10-increment storage auction shows +$10 / +$50 / +$100; a $100-increment vehicle auction shows +$100 / +$500 / +$1,000).
+- **Mobile-safety rapid Confirm step**: clicking a pill stages the candidate amount and surfaces a yellow "Confirm bid · Confirmez l'offre" banner with bilingual Confirm + Cancel buttons before submission.
+- Wired into both `StorageAuctionDetail` (above bid input) and marketplace `ListingDetailPage` (above the existing form). On marketplace, confirming the rapid step seeds `bidAmount` and triggers the existing `BidConfirmationDialog` for the price-breakdown step (two-step flow: rapid mobile confirm → full price breakdown).
+
+### Item 2 — Email Preferences page (CASL Compliance)
+- Route: `/email-preferences?token=<UUID-signed-token>` (and FR alias `/preferences-courriel`).
+- Backend: new router `/app/backend/routes/email_preferences.py` with 3 endpoints:
+  - `GET /api/email-preferences/verify?token=…` — returns masked email + 3 categories with EN+FR labels and descriptions
+  - `POST /api/email-preferences/update` — persists per-category prefs; setting marketing=false also flips legacy `marketing_unsubscribed` flag and writes to `email_suppressions`
+  - `GET /api/email-preferences/generate-token` (admin-only) — QA convenience
+- Three categories: **Marketing & Promotions**, **Bidding Alerts**, **Transactional (Required, locked, CASL §6(6))**
+- Token uses same `UNSUBSCRIBE_SECRET` env var with distinct salt `bidvex-email-preferences-v1` so the two token types are NOT interchangeable. 30-day TTL via itsdangerous.
+- Send-time guard helper `is_category_suppressed(email, category)` available for email pipeline integration.
+
+### Item 3 — Analytics & Financial Security
+- **react-datepicker integration** — admin Analytics dashboard now has a "From · Du → To · Au" custom date-range picker beside the period dropdown. Backend `GET /api/admin/analytics/revenue` upgraded to accept optional `start_date` + `end_date` (ISO YYYY-MM-DD) query params; falls back to `?days=N` when not provided.
+- **Auto-Capture cron job** — new `/app/backend/services/deposit_auto_capture.py` + Job 12 in scheduler (`IntervalTrigger(hours=6)`). When a buyer's 2.5% platform-fee invoice is unpaid >48h past `payment_deadline`, the matching $500 vehicle deposit is captured via `PaymentService.capture_deposit()`. Grace hours configurable via env `DEPOSIT_AUTO_CAPTURE_GRACE_HOURS` (default 48).
+- **Bilingual notification email** — new `send_vehicle_deposit_captured_email()` in `email_notifications.py`, sent automatically by the cron job, EN+FR per Bill 96 with invoice number, fee amount, captured amount, 14-day dispute window.
+- Scheduler now logs **"Scheduler initialized with 12 jobs"** (was 11).
+
+### Item 4 — Recently Sold Ticker (Social Proof)
+- New backend endpoint `GET /api/carousel/recently-sold-ticker?limit=30` — aggregates sold auctions across all 3 surfaces (marketplace + storage + vehicle), sorted by `sold_at` desc, returns `{visible, total, threshold:10, items}`.
+- **Threshold gate**: `visible=false` until total >= 10 sold auctions across all sources, so the marquee doesn't render an anaemic strip pre-launch.
+- Frontend marquee `/app/frontend/src/components/RecentlySoldTicker.js` — placed above the homepage hero. Smooth horizontal CSS marquee animation (60s cycle, items duplicated for seamless loop), edge-fade gradients, kind-specific icons (ShoppingBag · Package · Car), polls every 60s.
+- Format per item: `[icon] $1,234 · Toronto, ON · 10x10 storage unit` with FR label in `title` tooltip.
+
+### Tests — 48/48 green
+- New: `/app/backend/tests/test_iter175_polishing.py` — 15 tests covering email-preferences flow, recently-sold-ticker visibility threshold, custom date-range params, auto-capture import safety, bilingual email helper signature.
+- Regression: 16 + 17 = 33/33 from iter170/172/173 still pass.
+
+### Files changed (iter175)
+- Backend: `routes/email_preferences.py` (NEW), `services/deposit_auto_capture.py` (NEW), `routes/carousel.py` (+ /recently-sold-ticker), `routes/admin_ops.py` (revenue start/end_date), `services/scheduler.py` (Job 12), `services/email_notifications.py` (+ bilingual deposit-captured helper), `server.py` (router registration)
+- Frontend: `components/QuickBidButtons.js` (NEW), `components/RecentlySoldTicker.js` (NEW), `pages/EmailPreferencesPage.js` (NEW), `pages/admin/AnalyticsDashboard.js` (+react-datepicker), `pages/storage/StorageAuctionDetail.js` (+QB), `pages/ListingDetailPage.js` (+QB), `pages/HomePage.js` (+ticker), `App.js` (+ /email-preferences route), `package.json` (react-datepicker@9.1.0)
+
+---
+
 ## Latest: P0 — Auto-Bid UI Parity Fix (May 1, 2026 / iter174) — 1/1 DONE
 
 User feedback on iter173: the storage detail "Your max bid" + yellow "PRO AUTO-BID" callout was inconsistent with the marketplace bidding sidebar. Replaced with the standardized **Setup Auto-Bid** pattern.
