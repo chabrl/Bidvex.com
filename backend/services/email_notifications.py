@@ -1469,3 +1469,256 @@ async def send_review_request_email(
         subject=f"How was your purchase of {item_title}?",
         html_content=_base_template(content, "Leave a Review")
     )
+
+
+# ============================================================================
+# STORAGE UNIT AUCTIONS — bilingual EN+FR (iteration 169)
+# ============================================================================
+import os as _os
+from datetime import datetime as _dt
+
+
+def _storage_panel(title_en: str, title_fr: str, body_en: str, body_fr: str, cta_url: str = "", cta_en: str = "", cta_fr: str = "") -> str:
+    cta_block = ""
+    if cta_url and cta_en:
+        cta_block = f"""
+        <div style="text-align:center;margin:20px 0;">
+          <a href="{cta_url}" style="background:#0F3060;color:#fff;text-decoration:none;font-weight:700;padding:12px 26px;border-radius:24px;display:inline-block;">
+            {cta_en} / {cta_fr}
+          </a>
+        </div>
+        """
+    return f"""
+    <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;padding:24px;background:#fff;">
+      <div style="background:linear-gradient(135deg,#0B2545,#0F3060);color:#fff;padding:24px;border-radius:12px;margin-bottom:16px;">
+        <p style="margin:0;font-size:11px;letter-spacing:2px;opacity:0.7;">🔒 BIDVEX STORAGE AUCTIONS</p>
+        <h2 style="margin:6px 0 0 0;font-size:22px;">{title_en}</h2>
+        <p style="margin:4px 0 0 0;font-size:14px;color:#3FB4CB;">{title_fr}</p>
+      </div>
+      <div style="color:#1e293b;font-size:14px;line-height:1.55;">
+        <p><strong>EN:</strong> {body_en}</p>
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:12px 0;"/>
+        <p><strong>FR:</strong> {body_fr}</p>
+      </div>
+      {cta_block}
+      <p style="font-size:11px;color:#94a3b8;text-align:center;margin-top:24px;">BidVex Canada — bilingual auction marketplace</p>
+    </div>
+    """
+
+
+async def send_storage_bid_placed_email(buyer: dict, auction: dict, bid_state: dict) -> bool:
+    if not buyer or not buyer.get("email"):
+        return False
+    a_id = (auction or {}).get("id", "")[:8]
+    cur = bid_state.get("current_bid", 0)
+    winning = bid_state.get("you_are_winning")
+    body_en = (
+        f"Your bid was placed on storage unit auction <strong>#{a_id}</strong>. "
+        f"Current leading bid: <strong>${cur:,.2f}</strong>. "
+        + ("You are currently winning. " if winning else "You are NOT currently winning — your maximum was outbid. ")
+    )
+    body_fr = (
+        f"Votre offre a été placée sur l'enchère d'unité d'entreposage <strong>#{a_id}</strong>. "
+        f"Offre actuelle en tête : <strong>{cur:,.2f} $</strong>. "
+        + ("Vous êtes en tête. " if winning else "Vous N'êtes PAS en tête — votre maximum a été surenchéri. ")
+    )
+    return await send_email(
+        to_email=buyer["email"],
+        subject=f"Bid placed — Storage Auction #{a_id}",
+        html_content=_storage_panel("Bid placed", "Offre placée", body_en, body_fr,
+                                    cta_url=f"https://www.bidvex.com/storage-auctions/{auction.get('id','')}",
+                                    cta_en="View auction", cta_fr="Voir l'enchère"),
+    )
+
+
+async def send_storage_outbid_email(buyer: dict, auction: dict, new_current: float) -> bool:
+    if not buyer or not buyer.get("email"):
+        return False
+    a_id = (auction or {}).get("id", "")[:8]
+    body_en = (
+        f"You've been outbid on storage unit auction <strong>#{a_id}</strong>. "
+        f"The leading bid is now <strong>${new_current:,.2f}</strong>. "
+        f"Place a higher max bid to retake the lead."
+    )
+    body_fr = (
+        f"Vous avez été surenchéri sur l'enchère d'unité d'entreposage <strong>#{a_id}</strong>. "
+        f"L'offre en tête est maintenant <strong>{new_current:,.2f} $</strong>. "
+        f"Placez une offre maximale plus élevée pour reprendre la tête."
+    )
+    return await send_email(
+        to_email=buyer["email"],
+        subject=f"⚠️ Outbid — Storage Auction #{a_id}",
+        html_content=_storage_panel("You've been outbid", "Vous avez été surenchéri", body_en, body_fr,
+                                    cta_url=f"https://www.bidvex.com/storage-auctions/{auction.get('id','')}",
+                                    cta_en="Bid again", cta_fr="Enchérir à nouveau"),
+    )
+
+
+async def send_storage_auction_won_email(buyer: dict, auction: dict, facility: dict) -> bool:
+    if not buyer or not buyer.get("email"):
+        return False
+    a_id = (auction or {}).get("id", "")[:8]
+    bid = float(auction.get("winning_bid") or auction.get("current_bid") or 0)
+    methods = ", ".join(auction.get("payment_methods_accepted", [])) or "—"
+    body_en = (
+        f"Congratulations — you won storage unit auction <strong>#{a_id}</strong> at "
+        f"<strong>${bid:,.2f}</strong>. Contact the facility directly to arrange payment.<br/><br/>"
+        f"<strong>Facility:</strong> {facility.get('company_name','—')}<br/>"
+        f"<strong>City:</strong> {facility.get('city','—')}, {facility.get('province','')}<br/>"
+        f"<strong>Phone:</strong> {facility.get('phone','—')}<br/>"
+        f"<strong>Email:</strong> {facility.get('email','—')}<br/>"
+        f"<strong>Payment methods:</strong> {methods}<br/>"
+        f"<strong>Cleanup deadline:</strong> {auction.get('cleanup_deadline','—')}<br/>"
+        f"<strong>Cleaning deposit:</strong> ${float(auction.get('cleanup_deposit',0)):.2f}<br/><br/>"
+        f"BidVex charges no buyer fee. The 5% commission is paid by the facility."
+    )
+    body_fr = (
+        f"Félicitations — vous avez gagné l'enchère <strong>#{a_id}</strong> à "
+        f"<strong>{bid:,.2f} $</strong>. Contactez la facilité directement pour le paiement.<br/><br/>"
+        f"<strong>Facilité :</strong> {facility.get('company_name','—')}<br/>"
+        f"<strong>Ville :</strong> {facility.get('city','—')}, {facility.get('province','')}<br/>"
+        f"<strong>Téléphone :</strong> {facility.get('phone','—')}<br/>"
+        f"<strong>Courriel :</strong> {facility.get('email','—')}<br/>"
+        f"<strong>Modes de paiement :</strong> {methods}<br/>"
+        f"<strong>Date limite de nettoyage :</strong> {auction.get('cleanup_deadline','—')}<br/>"
+        f"<strong>Dépôt de nettoyage :</strong> {float(auction.get('cleanup_deposit',0)):.2f} $<br/><br/>"
+        f"BidVex ne facture aucun frais acheteur. La commission de 5% est payée par la facilité."
+    )
+    return await send_email(
+        to_email=buyer["email"],
+        subject=f"🎉 You won — Storage Auction #{a_id}",
+        html_content=_storage_panel("You won the auction", "Vous avez gagné l'enchère", body_en, body_fr),
+    )
+
+
+async def send_storage_auction_sold_email(facility: dict, auction: dict, buyer: dict) -> bool:
+    if not facility or not facility.get("email"):
+        return False
+    a_id = auction.get("id", "")[:8]
+    bid = float(auction.get("winning_bid") or auction.get("current_bid") or 0)
+    body_en = (
+        f"Storage unit auction <strong>#{a_id}</strong> sold for <strong>${bid:,.2f}</strong>.<br/>"
+        f"<strong>Buyer:</strong> {buyer.get('name','—')} &lt;{buyer.get('email','—')}&gt;<br/>"
+        f"<strong>Buyer phone:</strong> {buyer.get('phone','—')}<br/>"
+        f"BidVex commission invoice (5% + Stripe + tax) will arrive separately."
+    )
+    body_fr = (
+        f"L'enchère <strong>#{a_id}</strong> a été vendue pour <strong>{bid:,.2f} $</strong>.<br/>"
+        f"<strong>Acheteur :</strong> {buyer.get('name','—')} &lt;{buyer.get('email','—')}&gt;<br/>"
+        f"<strong>Téléphone :</strong> {buyer.get('phone','—')}<br/>"
+        f"Une facture de commission BidVex (5% + Stripe + taxes) suivra séparément."
+    )
+    return await send_email(
+        to_email=facility["email"],
+        subject=f"✅ Sold — Storage Auction #{a_id}",
+        html_content=_storage_panel("Auction sold", "Enchère vendue", body_en, body_fr),
+    )
+
+
+async def send_storage_ending_soon_email(buyer: dict, auction: dict) -> bool:
+    if not buyer or not buyer.get("email"):
+        return False
+    a_id = auction.get("id", "")[:8]
+    body_en = f"Auction <strong>#{a_id}</strong> ends in less than 1 hour. Place your final max bid now."
+    body_fr = f"L'enchère <strong>#{a_id}</strong> se termine dans moins d'une heure. Placez votre offre maximale finale maintenant."
+    return await send_email(
+        to_email=buyer["email"],
+        subject=f"⏰ Ending soon — Storage Auction #{a_id}",
+        html_content=_storage_panel("Ending soon", "Se termine bientôt", body_en, body_fr,
+                                    cta_url=f"https://www.bidvex.com/storage-auctions/{auction.get('id','')}",
+                                    cta_en="Bid now", cta_fr="Enchérir"),
+    )
+
+
+async def send_storage_facility_approved_email(facility: dict) -> bool:
+    if not facility or not facility.get("email"):
+        return False
+    body_en = (
+        f"Welcome to BidVex Storage Auctions, <strong>{facility.get('company_name','')}</strong>! "
+        f"Your facility has been verified. You can now log in and create your first storage unit auction. "
+        f"BidVex charges a flat 5% commission on each successful sale — buyers pay no platform fee."
+    )
+    body_fr = (
+        f"Bienvenue chez BidVex Enchères d'entreposage, <strong>{facility.get('company_name','')}</strong>! "
+        f"Votre facilité a été vérifiée. Vous pouvez maintenant vous connecter et créer votre première enchère. "
+        f"BidVex facture une commission fixe de 5% sur chaque vente réussie — les acheteurs ne paient aucun frais de plateforme."
+    )
+    return await send_email(
+        to_email=facility["email"],
+        subject="✅ Your BidVex Storage Facility account is approved",
+        html_content=_storage_panel("Facility approved", "Facilité approuvée", body_en, body_fr,
+                                    cta_url="https://www.bidvex.com/storage-dashboard",
+                                    cta_en="Open dashboard", cta_fr="Ouvrir le tableau de bord"),
+    )
+
+
+async def send_storage_seller_commission_invoice(facility: dict, auction: dict, pricing: dict) -> bool:
+    if not facility or not facility.get("email"):
+        return False
+    s = pricing["seller_invoice"]
+    a_id = auction.get("id", "")[:8]
+    body_en = (
+        f"BidVex commission invoice for storage auction <strong>#{a_id}</strong>:<br/>"
+        f"• Commission (5%): <strong>${s['commission']:.2f}</strong><br/>"
+        f"• Stripe processing: ${s['stripe_recovery']:.2f}<br/>"
+        f"• Tax — {s['tax_label']}: ${s['tax']:.2f}<br/>"
+        f"<strong>Total due to BidVex: ${s['total']:.2f}</strong>"
+    )
+    body_fr = (
+        f"Facture de commission BidVex pour l'enchère <strong>#{a_id}</strong> :<br/>"
+        f"• Commission (5 %) : <strong>{s['commission']:.2f} $</strong><br/>"
+        f"• Frais Stripe : {s['stripe_recovery']:.2f} $<br/>"
+        f"• Taxe — {s['tax_label']} : {s['tax']:.2f} $<br/>"
+        f"<strong>Total dû à BidVex : {s['total']:.2f} $</strong>"
+    )
+    return await send_email(
+        to_email=facility["email"],
+        subject=f"BidVex Commission Invoice — Storage Auction #{a_id}",
+        html_content=_storage_panel("Commission invoice", "Facture de commission", body_en, body_fr),
+    )
+
+
+# Internal admin alert helpers (not in the 7 user-facing list, but referenced by routes)
+
+async def send_storage_facility_registration_admin_alert(facility: dict) -> bool:
+    admin_email = (
+        _os.environ.get("ADMIN_NOTIFICATION_EMAIL")
+        or _os.environ.get("ADMIN_EMAIL")
+        or "info@bidvex.com"
+    )
+    body_en = (
+        f"New storage facility registration awaiting verification:<br/>"
+        f"<strong>{facility.get('company_name','—')}</strong><br/>"
+        f"Contact: {facility.get('contact_name','—')} &lt;{facility.get('email','—')}&gt;<br/>"
+        f"Phone: {facility.get('phone','—')}<br/>"
+        f"Location: {facility.get('city','—')}, {facility.get('province','')}<br/>"
+        f"Units available: {facility.get('units_available',0)}"
+    )
+    body_fr = "Nouvelle facilité d'entreposage en attente de vérification."
+    return await send_email(
+        to_email=admin_email,
+        subject=f"[Storage Facility] New registration — {facility.get('company_name','')}",
+        html_content=_storage_panel("New facility registration", "Nouvelle facilité", body_en, body_fr,
+                                    cta_url="https://www.bidvex.com/admin", cta_en="Review", cta_fr="Examiner"),
+    )
+
+
+async def send_storage_facility_pending_user_email(facility: dict) -> bool:
+    if not facility or not facility.get("email"):
+        return False
+    body_en = (
+        "Thanks for registering your storage facility with BidVex! Your application "
+        "is under review by our team. You'll receive a confirmation email within "
+        "1–2 business days once your account is verified."
+    )
+    body_fr = (
+        "Merci d'avoir inscrit votre facilité d'entreposage chez BidVex! Votre demande "
+        "est en cours d'examen par notre équipe. Vous recevrez un courriel de confirmation "
+        "dans 1 à 2 jours ouvrables une fois votre compte vérifié."
+    )
+    return await send_email(
+        to_email=facility["email"],
+        subject="Application received — BidVex Storage Auctions",
+        html_content=_storage_panel("Application received", "Demande reçue", body_en, body_fr),
+    )
+

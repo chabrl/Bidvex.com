@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { 
   Moon, Sun, User, LogOut, LayoutDashboard, 
-  MessageCircle, DollarSign, Shield, Menu, X,
+  MessageCircle, DollarSign, Shield, Lock, Menu, X,
   Home, ShoppingBag, Gavel, ChevronDown, Car, Building2
 } from 'lucide-react';
 import { Button } from './ui/button';
@@ -59,8 +59,8 @@ const Navbar = () => {
     { path: '/', label: t('nav.home'), icon: Home },
     { path: '/marketplace', label: t('nav.marketplace'), icon: ShoppingBag },
     { path: '/lots', label: t('nav.lotsAuction'), icon: Gavel },
+    { path: '/storage-auctions', label: t('nav.storageAuctions', 'Storage Auctions'), icon: Lock },
     { path: '/vehicle-auctions', label: t('vehicles.vehicleAuctions'), icon: Car },
-    { path: '/community', label: t('nav.community', 'Community'), icon: MessageCircle },
   ];
 
   return (

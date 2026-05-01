@@ -49,6 +49,16 @@ const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
 const TermsOfServicePage = lazy(() => import('./pages/TermsOfServicePage'));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
+
+// ── Storage Unit Auctions (iteration 169) ──
+const StorageAuctionsBrowse = lazy(() => import('./pages/storage/StorageAuctionsBrowse'));
+const StorageAuctionDetail = lazy(() => import('./pages/storage/StorageAuctionDetail'));
+const StorageFacilityRegister = lazy(() => import('./pages/storage/StorageFacilityRegister'));
+const StorageDashboard = lazy(() => import('./pages/storage/StorageDashboard'));
+const StorageAuctionCreate = lazy(() => import('./pages/storage/StorageAuctionCreate'));
+const StorageHowItWorks = lazy(() => import('./pages/storage/StoragePolicies').then(m => ({ default: m.HowItWorks })));
+const StorageTerms = lazy(() => import('./pages/storage/StoragePolicies').then(m => ({ default: m.StorageTerms })));
+const StorageForFacilities = lazy(() => import('./pages/storage/StoragePolicies').then(m => ({ default: m.StorageForFacilities })));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 const PhoneVerificationPage = lazy(() => import('./pages/PhoneVerificationPage'));
 const ClientEmailMarketing = lazy(() => import('./pages/ClientEmailMarketing'));
@@ -402,7 +412,24 @@ const App = () => {
           <Route path="/vehicle-auctions/seller/financials" element={
             <ProtectedRoute><SellerFinancialsPage /></ProtectedRoute>
           } />
-          
+
+          {/* ── Storage Unit Auctions (iteration 169) ── */}
+          <Route path="/storage-auctions" element={<StorageAuctionsBrowse />} />
+          <Route path="/storage-auctions/browse" element={<StorageAuctionsBrowse />} />
+          <Route path="/storage-auctions/how-it-works" element={<StorageHowItWorks />} />
+          <Route path="/storage-auctions/terms" element={<StorageTerms />} />
+          <Route path="/storage-auctions/for-facilities" element={<StorageForFacilities />} />
+          <Route path="/storage-auctions/register-facility" element={
+            <ProtectedRoute><StorageFacilityRegister /></ProtectedRoute>
+          } />
+          <Route path="/storage-auctions/create" element={
+            <ProtectedRoute><StorageAuctionCreate /></ProtectedRoute>
+          } />
+          <Route path="/storage-dashboard" element={
+            <ProtectedRoute><StorageDashboard /></ProtectedRoute>
+          } />
+          <Route path="/storage-auctions/:id" element={<StorageAuctionDetail />} />
+
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
           </Suspense>

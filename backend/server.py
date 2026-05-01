@@ -475,6 +475,9 @@ try:
     from routes.vehicle_settlement import vehicle_settlement_router
     api_router.include_router(vehicle_settlement_router)
 
+    from routes.storage_auctions import storage_router
+    api_router.include_router(storage_router)
+
     @app.on_event("startup")
     async def start_vehicle_auction_scheduler():
         try:

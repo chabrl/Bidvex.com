@@ -1,0 +1,236 @@
+/* Storage Auction — Animated Hero Banner */
+.storage-hero {
+  position: relative;
+  width: 100%;
+  height: 500px;
+  background: linear-gradient(135deg, #0B2545 0%, #0F3060 100%);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+@media (max-width: 768px) {
+  .storage-hero { height: 380px; }
+}
+
+.storage-hero__inner {
+  position: relative;
+  z-index: 5;
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 32px 24px;
+  color: #fff;
+  animation: heroSlideIn 600ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes heroSlideIn {
+  from { transform: translateX(-40px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+
+.storage-hero__label {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #3FB4CB;
+  margin-bottom: 12px;
+  padding: 4px 10px;
+  background: rgba(63, 180, 203, 0.12);
+  border: 1px solid rgba(63, 180, 203, 0.4);
+  border-radius: 20px;
+}
+
+.storage-hero__title {
+  font-size: clamp(36px, 6vw, 60px);
+  font-weight: 900;
+  line-height: 1.05;
+  margin: 0 0 8px 0;
+  letter-spacing: -1.5px;
+}
+
+.storage-hero__title-line2 {
+  display: block;
+  color: #3FB4CB;
+}
+
+.storage-hero__title-fr {
+  font-size: clamp(20px, 3vw, 28px);
+  color: rgba(255, 255, 255, 0.65);
+  font-weight: 700;
+  margin-top: 6px;
+}
+
+.storage-hero__subtitle {
+  max-width: 560px;
+  font-size: clamp(14px, 1.6vw, 17px);
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.85);
+  margin-top: 20px;
+}
+
+.storage-hero__subtitle--fr {
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 10px;
+  font-size: clamp(13px, 1.5vw, 15px);
+}
+
+.storage-hero__ctas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.storage-hero__cta {
+  padding: 13px 28px;
+  border-radius: 28px;
+  font-weight: 700;
+  font-size: 14px;
+  text-decoration: none;
+  transition: all 240ms ease;
+  display: inline-block;
+  cursor: pointer;
+  border: none;
+}
+
+.storage-hero__cta--primary {
+  background: #3FB4CB;
+  color: #0B2545;
+}
+.storage-hero__cta--primary:hover {
+  background: #2FA0BA;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(63, 180, 203, 0.4);
+}
+
+.storage-hero__cta--secondary {
+  background: transparent;
+  color: #fff;
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
+}
+.storage-hero__cta--secondary:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+/* Trust badges */
+.storage-hero__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-top: 32px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+}
+.storage-hero__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0;
+  animation: badgeFadeIn 500ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.storage-hero__badge:nth-child(1) { animation-delay: 700ms; }
+.storage-hero__badge:nth-child(2) { animation-delay: 850ms; }
+.storage-hero__badge:nth-child(3) { animation-delay: 1000ms; }
+.storage-hero__badge:nth-child(4) { animation-delay: 1150ms; }
+
+@keyframes badgeFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Floating padlock icons */
+.storage-hero__padlock {
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+}
+
+@keyframes floatY {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-15px); }
+}
+
+.padlock-1 { top: 18%;  right: 12%; font-size: 32px; opacity: 0.30; animation: floatY 4s ease-in-out infinite; }
+.padlock-2 { top: 65%;  right: 32%; font-size: 24px; opacity: 0.20; animation: floatY 5.5s ease-in-out infinite 0.4s; }
+.padlock-3 { top: 28%;  right: 5%;  font-size: 48px; opacity: 0.15; animation: floatY 6.5s ease-in-out infinite 1.2s; }
+.padlock-4 { top: 78%;  right: 18%; font-size: 24px; opacity: 0.25; animation: floatY 4.8s ease-in-out infinite 0.7s; }
+.padlock-5 { top: 8%;   right: 45%; font-size: 32px; opacity: 0.18; animation: floatY 7s ease-in-out infinite 1.6s; }
+.padlock-6 { top: 50%;  right: 60%; font-size: 24px; opacity: 0.22; animation: floatY 5s ease-in-out infinite 0.2s; }
+
+/* Storage unit door silhouettes */
+.storage-doors {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 40%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 12px;
+  padding-right: 32px;
+  padding-bottom: 0;
+  pointer-events: none;
+}
+.storage-door {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+  position: relative;
+  animation: doorSlideUp 800ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  overflow: hidden;
+}
+.storage-door::before,
+.storage-door::after,
+.storage-door span {
+  content: '';
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.storage-door::before { top: 30%; }
+.storage-door::after  { top: 50%; }
+.storage-door span { top: 70%; display: block; }
+.storage-door:nth-child(1) { width: 80px;  height: 220px; animation-delay: 200ms; }
+.storage-door:nth-child(2) { width: 100px; height: 280px; animation-delay: 350ms; }
+.storage-door:nth-child(3) { width: 80px;  height: 200px; animation-delay: 500ms; }
+
+@keyframes doorSlideUp {
+  from { transform: translateY(60px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+/* Particle dots */
+.storage-particle {
+  position: absolute;
+  background: #3FB4CB;
+  border-radius: 50%;
+  opacity: 0.3;
+  pointer-events: none;
+  animation: pulse 3s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.15; transform: scale(1); }
+  50%      { opacity: 0.5;  transform: scale(1.4); }
+}
+
+@media (max-width: 768px) {
+  .storage-doors { display: none; }
+  .padlock-3, .padlock-5 { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .storage-hero__inner,
+  .storage-hero__padlock,
+  .storage-particle,
+  .storage-door,
+  .storage-hero__badge { animation: none !important; }
+}

@@ -163,6 +163,34 @@ const Footer = () => {
           </button>
         </div>
 
+        {/* Storage Auctions subsection — iteration 169 */}
+        <div className="mb-6 pb-5 border-b border-gray-800" data-testid="footer-storage-section">
+          <p className="text-center text-xs uppercase tracking-widest text-gray-500 mb-3">
+            🔒 {language === 'fr' ? 'Enchères entreposage' : 'Storage Auctions'}
+          </p>
+          <div className="flex flex-wrap justify-center items-center gap-x-5 gap-y-2 text-sm">
+            <Link to="/storage-auctions/browse" className="hover:text-white transition-colors">
+              {language === 'fr' ? 'Parcourir les enchères' : 'Browse auctions'}
+            </Link>
+            <span className="text-gray-600">|</span>
+            <Link to="/storage-auctions/how-it-works" className="hover:text-white transition-colors">
+              {language === 'fr' ? 'Comment ça marche' : 'How It Works'}
+            </Link>
+            <span className="text-gray-600">|</span>
+            <Link to="/storage-auctions/terms" className="hover:text-white transition-colors">
+              {language === 'fr' ? 'Conditions' : 'Terms'}
+            </Link>
+            <span className="text-gray-600">|</span>
+            <Link to="/storage-auctions/for-facilities" className="hover:text-white transition-colors">
+              {language === 'fr' ? 'Pour facilités' : 'For Facilities'}
+            </Link>
+            <span className="text-gray-600">|</span>
+            <Link to="/storage-auctions/register-facility" className="hover:text-white transition-colors">
+              {language === 'fr' ? 'Lister votre facilité' : 'List Your Facility'}
+            </Link>
+          </div>
+        </div>
+
         {/* Social Media Icons */}
         {socialLinks && SOCIAL_PLATFORM_CONFIG.some(p => socialLinks[p.key]) && (
           <div className="flex justify-center items-center gap-4 mb-6" data-testid="footer-social-links">
