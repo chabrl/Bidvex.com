@@ -1179,6 +1179,8 @@
   },
   "mobileNav": {
     "home": "Home",
+    "vehicles": "Vehicles",
+    "storage": "Storage",
     "search": "Search",
     "lots": "Lots",
     "sell": "Sell",

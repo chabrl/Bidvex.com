@@ -1179,6 +1179,8 @@
   },
   "mobileNav": {
     "home": "Accueil",
+    "vehicles": "Véhicules",
+    "storage": "Entrepôt",
     "search": "Rechercher",
     "lots": "Lots",
     "sell": "Vendre",

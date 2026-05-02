@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
-import { Home, Search, Heart, User, Plus, Package, X, FileText, Layers } from 'lucide-react';
+import { Car, Warehouse, Search, Heart, Plus, Package, X, FileText, Layers } from 'lucide-react';
 
 const MobileBottomNav = () => {
   const navigate = useNavigate();
@@ -13,13 +13,15 @@ const MobileBottomNav = () => {
   const { canCreateMultiLot } = useFeatureFlags();
   const [showSellMenu, setShowSellMenu] = useState(false);
 
+  // iter177 — Replaced Home → Vehicles and Profile → Storage per product request.
+  // Search / Lots / Sell / Watchlist remain untouched.
   const navItems = [
-    { icon: Home, labelKey: 'mobileNav.home', path: '/', key: 'home' },
-    { icon: Search, labelKey: 'mobileNav.search', path: '/marketplace', key: 'search' },
-    { icon: Package, labelKey: 'mobileNav.lots', path: '/lots', key: 'lots' },
-    { icon: Plus, labelKey: 'mobileNav.sell', path: '/create-listing', key: 'sell', requireAuth: true, hasMenu: true },
-    { icon: Heart, labelKey: 'mobileNav.watchlist', path: '/watchlist', key: 'watchlist', requireAuth: true },
-    { icon: User, labelKey: 'mobileNav.profile', path: '/settings', key: 'profile', dynamicPath: true }
+    { icon: Car,       labelKey: 'mobileNav.vehicles', path: '/vehicle-auctions', key: 'vehicles' },
+    { icon: Search,    labelKey: 'mobileNav.search',   path: '/marketplace',      key: 'search' },
+    { icon: Package,   labelKey: 'mobileNav.lots',     path: '/lots',             key: 'lots' },
+    { icon: Plus,      labelKey: 'mobileNav.sell',     path: '/create-listing',   key: 'sell', requireAuth: true, hasMenu: true },
+    { icon: Heart,     labelKey: 'mobileNav.watchlist',path: '/watchlist',        key: 'watchlist', requireAuth: true },
+    { icon: Warehouse, labelKey: 'mobileNav.storage',  path: '/storage-auctions', key: 'storage' },
   ];
 
   const isActive = (path) => {
@@ -30,8 +32,6 @@ const MobileBottomNav = () => {
   const handleNavigation = (item) => {
     if (item.key === 'sell' && item.hasMenu) {
       setShowSellMenu(!showSellMenu);
-    } else if (item.key === 'profile') {
-      navigate(user ? '/settings' : '/auth');
     } else {
       navigate(item.path);
       setShowSellMenu(false);
@@ -93,6 +93,7 @@ const MobileBottomNav = () => {
               <button
                 key={item.key}
                 onClick={() => handleNavigation(item)}
+                data-testid={`mobile-nav-${item.key}`}
                 className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
                   active ? 'text-primary' : 'text-gray-500 dark:text-gray-400 hover:text-primary'
                 } ${showSellMenu && item.key === 'sell' ? 'text-primary' : ''}`}
