@@ -403,7 +403,7 @@ const FlattenedMarketplace = ({
                 <div className="flex-1">
                   <h4 className="font-semibold line-clamp-1">{selectedItem.title}</h4>
                   <p className="text-sm text-muted-foreground">
-                    Current: {formatCurrency(selectedItem.current_price)}
+                    Current: {formatCurrency(selectedItem.current_price, selectedItem.currency)} <span className="ml-1"><span data-testid="currency-code-selected" className={`text-[10px] font-bold px-1.5 py-0 rounded-full ${selectedItem.currency === 'USD' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{selectedItem.currency || 'CAD'}</span></span>
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {selectedItem.bid_count || 0} bids
@@ -735,7 +735,10 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('marketplace.currentBid')}</span>
             <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
-              {formatCurrency(item.current_price || item.starting_price || 0)}
+              {formatCurrency(item.current_price || item.starting_price || 0, item.currency)}
+              <span className={`ml-1.5 text-[9px] font-bold px-1.5 py-0 rounded-full ${item.currency === 'USD' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`} data-testid="listing-currency-badge">
+                {item.currency || 'CAD'}
+              </span>
             </span>
           </div>
 

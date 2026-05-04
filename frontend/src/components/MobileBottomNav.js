@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
-import { Car, Warehouse, Heart, Plus, Package, X, FileText, Layers } from 'lucide-react';
+import { Car, Warehouse, Heart, Plus, Package, ShoppingBag, X, FileText, Layers } from 'lucide-react';
 
 const MobileBottomNav = () => {
   const navigate = useNavigate();
@@ -13,14 +13,14 @@ const MobileBottomNav = () => {
   const { canCreateMultiLot } = useFeatureFlags();
   const [showSellMenu, setShowSellMenu] = useState(false);
 
-  // iter178 — Order: Vehicles | Lots | Storage | Sell | Watchlist
-  // (Search removed — available via navbar search icon.)
+  // iter179 — Order: Marketplace | Vehicles | Lots | Storage | Sell | Watchlist (6 items)
   const navItems = [
-    { icon: Car,       labelKey: 'mobileNav.vehicles', path: '/vehicle-auctions', key: 'vehicles' },
-    { icon: Package,   labelKey: 'mobileNav.lots',     path: '/lots',             key: 'lots' },
-    { icon: Warehouse, labelKey: 'mobileNav.storage',  path: '/storage-auctions', key: 'storage' },
-    { icon: Plus,      labelKey: 'mobileNav.sell',     path: '/create-listing',   key: 'sell', requireAuth: true, hasMenu: true },
-    { icon: Heart,     labelKey: 'mobileNav.watchlist',path: '/watchlist',        key: 'watchlist', requireAuth: true },
+    { icon: ShoppingBag, labelKey: 'mobileNav.marketplace', path: '/marketplace',      key: 'marketplace' },
+    { icon: Car,         labelKey: 'mobileNav.vehicles',    path: '/vehicle-auctions', key: 'vehicles' },
+    { icon: Package,     labelKey: 'mobileNav.lots',        path: '/lots',             key: 'lots' },
+    { icon: Warehouse,   labelKey: 'mobileNav.storage',     path: '/storage-auctions', key: 'storage' },
+    { icon: Plus,        labelKey: 'mobileNav.sell',        path: '/create-listing',   key: 'sell', requireAuth: true, hasMenu: true },
+    { icon: Heart,       labelKey: 'mobileNav.watchlist',   path: '/watchlist',        key: 'watchlist', requireAuth: true },
   ];
 
   const isActive = (path) => {

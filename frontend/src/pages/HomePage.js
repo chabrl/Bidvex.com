@@ -832,9 +832,9 @@ const StorageAuctionsPromo = ({ navigate }) => {
   }, []);
 
   return (
-    <section className="py-14 bg-gradient-to-r from-[#0B2545] to-[#0E2B52] relative overflow-hidden" data-testid="homepage-storage-promo">
-      {/* Subtle particle background */}
-      <div className="absolute inset-0 opacity-30 pointer-events-none">
+    <section className="py-14 bg-sky-50 dark:bg-gradient-to-r dark:from-[#0B2545] dark:to-[#0E2B52] border-t border-sky-100 dark:border-[#0B2545] relative overflow-hidden" data-testid="homepage-storage-promo">
+      {/* Subtle particle background (dark mode only) */}
+      <div className="absolute inset-0 opacity-0 dark:opacity-30 pointer-events-none">
         <div className="absolute top-4 left-10 w-1.5 h-1.5 bg-[#3FB4CB] rounded-full animate-pulse" />
         <div className="absolute top-12 left-1/4 w-1 h-1 bg-[#3FB4CB] rounded-full animate-pulse" style={{ animationDelay: '0.5s' }} />
         <div className="absolute bottom-8 right-1/4 w-1.5 h-1.5 bg-[#3FB4CB] rounded-full animate-pulse" style={{ animationDelay: '1s' }} />
@@ -853,59 +853,59 @@ const StorageAuctionsPromo = ({ navigate }) => {
           </div>
 
           {/* Text content */}
-          <div className="flex-1 text-white">
+          <div className="flex-1 text-[#0B2545] dark:text-white">
             <div
-              className="inline-block bg-[#3FB4CB] text-[#0B2545] text-xs font-bold px-3 py-1 rounded-full mb-3 uppercase tracking-wider"
+              className="inline-block bg-sky-600 dark:bg-[#3FB4CB] text-white dark:text-[#0B2545] text-xs font-bold px-3 py-1 rounded-full mb-3 uppercase tracking-wider"
               data-testid="homepage-storage-promo-badge"
             >
               NEW FEATURE <span className="opacity-75 font-semibold">· NOUVELLE FONCTIONNALITÉ</span>
             </div>
 
-            <h2 className="text-3xl md:text-4xl font-black mb-1" data-testid="homepage-storage-promo-title-en">
+            <h2 className="text-3xl md:text-4xl font-black mb-1 text-[#0B2545] dark:text-white" data-testid="homepage-storage-promo-title-en">
               Storage Unit Auctions
             </h2>
-            <h3 className="text-xl md:text-2xl text-[#3FB4CB] font-bold mb-4 italic" data-testid="homepage-storage-promo-title-fr">
+            <h3 className="text-xl md:text-2xl text-sky-700 dark:text-[#3FB4CB] font-bold mb-4 italic" data-testid="homepage-storage-promo-title-fr">
               Enchères d'unités d'entreposage
             </h3>
 
-            <p className="text-gray-200 mb-1" data-testid="homepage-storage-promo-desc-en">
+            <p className="text-gray-700 dark:text-gray-200 mb-1" data-testid="homepage-storage-promo-desc-en">
               Bid on abandoned storage lockers from verified Canadian facilities. No buyer fees on cash auctions. Real-time proxy bidding. Soft-close protection.
             </p>
-            <p className="text-gray-400 text-sm mb-6 italic" data-testid="homepage-storage-promo-desc-fr">
+            <p className="text-gray-600 dark:text-gray-400 text-sm mb-6 italic" data-testid="homepage-storage-promo-desc-fr">
               Enchérissez sur des casiers abandonnés de facilités canadiennes vérifiées. Aucuns frais acheteur sur les enchères au comptant. Enchères par procuration en temps réel. Protection contre la fermeture anticipée.
             </p>
 
-            {/* Trust badges — dual-language */}
+            {/* Trust badges — dual-language (light-mode friendly) */}
             <div className="flex flex-wrap gap-2.5 mb-6">
-              <span className="bg-emerald-900/60 text-emerald-200 px-3 py-1.5 rounded-full text-xs font-semibold border border-emerald-700/40">
+              <span className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200 px-3 py-1.5 rounded-full text-xs font-semibold border border-emerald-300 dark:border-emerald-700/40">
                 ✅ No Buyer Fees · <em className="opacity-80">Sans frais acheteur</em>
               </span>
-              <span className="bg-blue-900/60 text-blue-200 px-3 py-1.5 rounded-full text-xs font-semibold border border-blue-700/40">
+              <span className="bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300 px-3 py-1.5 rounded-full text-xs font-semibold border border-sky-300 dark:border-sky-700/40">
                 🇨🇦 Canadian Facilities · <em className="opacity-80">Facilités canadiennes</em>
               </span>
-              <span className="bg-purple-900/60 text-purple-200 px-3 py-1.5 rounded-full text-xs font-semibold border border-purple-700/40">
+              <span className="bg-purple-100 text-purple-800 dark:bg-purple-900/60 dark:text-purple-200 px-3 py-1.5 rounded-full text-xs font-semibold border border-purple-300 dark:border-purple-700/40">
                 ⚡ Real-Time Bidding · <em className="opacity-80">Enchères en temps réel</em>
               </span>
             </div>
 
             {/* Live stats inline (if > 0) */}
             {stats && (stats.total_sold > 0 || stats.active_auctions > 0 || stats.active_facilities > 0) && (
-              <div className="flex flex-wrap gap-4 mb-5 text-xs text-gray-300" data-testid="homepage-storage-promo-stats">
+              <div className="flex flex-wrap gap-4 mb-5 text-xs text-gray-700 dark:text-gray-300" data-testid="homepage-storage-promo-stats">
                 {stats.active_auctions > 0 && (
                   <span className="font-semibold">
-                    <span className="text-[#3FB4CB] text-base font-black">{stats.active_auctions}</span>{' '}
+                    <span className="text-sky-700 dark:text-[#3FB4CB] text-base font-black">{stats.active_auctions}</span>{' '}
                     Live Now · <em>En direct</em>
                   </span>
                 )}
                 {stats.active_facilities > 0 && (
                   <span className="font-semibold">
-                    <span className="text-[#3FB4CB] text-base font-black">{stats.active_facilities}</span>{' '}
+                    <span className="text-sky-700 dark:text-[#3FB4CB] text-base font-black">{stats.active_facilities}</span>{' '}
                     Facilities · <em>Facilités</em>
                   </span>
                 )}
                 {stats.total_sold > 0 && (
                   <span className="font-semibold">
-                    <span className="text-[#3FB4CB] text-base font-black">{stats.total_sold}</span>{' '}
+                    <span className="text-sky-700 dark:text-[#3FB4CB] text-base font-black">{stats.total_sold}</span>{' '}
                     Sold · <em>Vendues</em>
                   </span>
                 )}
@@ -917,7 +917,7 @@ const StorageAuctionsPromo = ({ navigate }) => {
               <button
                 type="button"
                 onClick={() => navigate('/storage-auctions')}
-                className="bg-[#3FB4CB] hover:bg-[#2FA0BA] text-[#0B2545] font-bold py-3 px-6 rounded-xl transition-all hover:-translate-y-0.5 hover:shadow-lg"
+                className="bg-sky-600 hover:bg-sky-500 dark:bg-[#3FB4CB] dark:hover:bg-[#2FA0BA] text-white dark:text-[#0B2545] font-bold py-3 px-6 rounded-xl transition-all hover:-translate-y-0.5 hover:shadow-lg"
                 data-testid="homepage-storage-promo-browse-btn"
               >
                 <span className="block leading-tight">Browse Storage Auctions →</span>
@@ -926,7 +926,7 @@ const StorageAuctionsPromo = ({ navigate }) => {
               <button
                 type="button"
                 onClick={() => navigate('/storage-auctions/register-facility')}
-                className="border-2 border-[#3FB4CB] text-[#3FB4CB] hover:bg-[#3FB4CB]/10 font-bold py-3 px-6 rounded-xl transition-all"
+                className="border-2 border-sky-600 dark:border-[#3FB4CB] text-sky-700 dark:text-[#3FB4CB] hover:bg-sky-100 dark:hover:bg-[#3FB4CB]/10 font-bold py-3 px-6 rounded-xl transition-all"
                 data-testid="homepage-storage-promo-register-btn"
               >
                 <span className="block leading-tight">List Your Facility</span>
@@ -1022,17 +1022,17 @@ const HomepageLiveStorage = ({ navigate }) => {
   if (items && items.length === 0) return null;
 
   return (
-    <section className="py-12 bg-[#0E2B52]" data-testid="homepage-live-storage">
+    <section className="py-12 bg-sky-50 dark:bg-[#0E2B52]" data-testid="homepage-live-storage">
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h2 className="text-3xl font-black text-white">🔒 Storage Unit Auctions</h2>
-            <h3 className="text-xl font-bold text-[#3FB4CB] italic">Enchères d'unités d'entreposage</h3>
+            <h2 className="text-3xl font-black text-[#0B2545] dark:text-white">🔒 Storage Unit Auctions</h2>
+            <h3 className="text-xl font-bold text-sky-700 dark:text-[#3FB4CB] italic">Enchères d'unités d'entreposage</h3>
           </div>
           <button
             type="button"
             onClick={() => navigate('/storage-auctions')}
-            className="text-[#3FB4CB] font-semibold hover:underline text-sm"
+            className="text-sky-700 dark:text-[#3FB4CB] font-semibold hover:underline text-sm"
             data-testid="homepage-storage-view-all"
           >
             View All · Voir tout →
@@ -1042,7 +1042,7 @@ const HomepageLiveStorage = ({ navigate }) => {
         {items === null ? (
           <div className="flex gap-4 overflow-x-auto pb-3">
             {[1, 2, 3, 4, 5].map(i => (
-              <div key={i} className="min-w-[260px] h-56 bg-slate-800/50 animate-pulse rounded-xl" />
+              <div key={i} className="min-w-[260px] h-56 bg-slate-200 dark:bg-slate-800/50 animate-pulse rounded-xl" />
             ))}
           </div>
         ) : (
@@ -1050,19 +1050,19 @@ const HomepageLiveStorage = ({ navigate }) => {
             {items.slice(0, 10).map(a => (
               <div
                 key={a.id}
-                className="min-w-[260px] snap-start bg-slate-800 rounded-xl overflow-hidden border border-slate-700 hover:border-[#3FB4CB] transition-all cursor-pointer hover:-translate-y-0.5"
+                className="min-w-[260px] snap-start bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-sky-200 dark:border-slate-700 hover:border-sky-400 dark:hover:border-[#3FB4CB] transition-all cursor-pointer hover:-translate-y-0.5 shadow-sm"
                 onClick={() => navigate(`/storage-auctions/${a.id}`)}
                 data-testid={`homepage-storage-card-${a.id}`}
               >
-                <div className="h-36 bg-slate-700 overflow-hidden flex items-center justify-center text-4xl">
+                <div className="h-36 bg-sky-100 dark:bg-slate-700 overflow-hidden flex items-center justify-center text-4xl">
                   {a.photos?.[0] ? (
                     <img src={a.photos[0]} alt="" loading="lazy" className="w-full h-full object-cover" />
                   ) : '🔒'}
                 </div>
                 <div className="p-3">
-                  <p className="text-xs text-slate-400 truncate">{a.facility_name}</p>
-                  <p className="text-sm font-bold text-white truncate">Unit #{a.unit_number} · {a.unit_size}</p>
-                  <p className="text-lg font-black text-[#3FB4CB] mt-1">${Number(a.current_bid || 0).toLocaleString()}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{a.facility_name}</p>
+                  <p className="text-sm font-bold text-[#0B2545] dark:text-white truncate">Unit #{a.unit_number} · {a.unit_size}</p>
+                  <p className="text-lg font-black text-sky-700 dark:text-[#3FB4CB] mt-1">${Number(a.current_bid || 0).toLocaleString()}</p>
                   <p className="text-[10px] text-slate-500">
                     {a.bid_count || 0} bids · offres
                   </p>

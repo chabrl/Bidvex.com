@@ -43,8 +43,8 @@ export const HowItWorks = () => {
           <Section
             title_en="3. Soft Close"
             title_fr="3. Fermeture progressive (soft close)"
-            body_en="To ensure fairness, any bid placed in the final 10 minutes of an auction extends the auction by 10 minutes. This prevents last-second sniping and gives every bidder a fair opportunity to respond."
-            body_fr="Pour assurer l'équité, toute offre placée dans les 10 dernières minutes d'une enchère prolonge l'enchère de 10 minutes. Cela empêche les offres de dernière seconde et donne à chaque enchérisseur une chance équitable de répondre."
+            body_en="To ensure fairness, any bid placed in the final 2 minutes of an auction extends the auction by 2 minutes. This prevents last-second sniping and gives every bidder a fair opportunity to respond."
+            body_fr="Pour assurer l'équité, toute offre placée dans les 2 dernières minutes d'une enchère prolonge l'enchère de 2 minutes. Cela empêche les offres de dernière seconde et donne à chaque enchérisseur une chance équitable de répondre."
           />
           <Section
             title_en="4. Buyer Fees Depend on Payment Method"

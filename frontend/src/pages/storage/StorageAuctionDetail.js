@@ -86,8 +86,16 @@ const StorageAuctionDetail = () => {
           : (isFr ? 'Offre placée — vous avez été surenchéri' : "Bid placed — you've been outbid by an existing proxy")
       );
       if (res.data.soft_close_extended) {
-        toast.info(isFr ? 'Enchère prolongée de 10 minutes (soft close)' : 'Auction extended by 10 minutes (soft close)');
+        toast.info(isFr ? "Enchère prolongée de 2 minutes (soft close)" : 'Auction extended by 2 minutes (soft close)');
       }
+      // iter179 FIX 4: update current bid IMMEDIATELY from the server response
+      // so the displayed price doesn't lag behind the bid history.
+      setAuction((prev) => prev ? ({
+        ...prev,
+        current_bid: res.data.current_bid ?? prev.current_bid,
+        bid_count: (prev.bid_count || 0) + 1,
+        end_time: res.data.end_time || prev.end_time,
+      }) : prev);
       setMaxBid('');
       fetchData();
     } catch (err) {
@@ -247,7 +255,7 @@ const StorageAuctionDetail = () => {
               {auction.soft_close_enabled && (
                 <div className="text-[11px] bg-blue-50 dark:bg-blue-950/30 text-blue-800 dark:text-blue-300 p-2.5 rounded-md border border-blue-100 dark:border-blue-900/40 mb-4 flex items-start gap-1.5">
                   <Info className="h-3 w-3 mt-0.5 shrink-0" />
-                  <span>{isFr ? "⏰ Une offre dans les 10 dernières minutes prolonge l'enchère de 10 minutes." : '⏰ A bid in the final 10 minutes extends the auction by 10 minutes.'}</span>
+                  <span>{isFr ? "⏰ Une offre dans les 2 dernières minutes prolonge l'enchère de 2 minutes." : '⏰ A bid in the final 2 minutes extends the auction by 2 minutes.'}</span>
                 </div>
               )}
 

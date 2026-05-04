@@ -131,6 +131,9 @@ const StorageAuctionCard = ({ auction }) => {
             </p>
             <p className="text-2xl font-black text-blue-600">
               ${Number(auction.current_bid || 0).toLocaleString()}
+              <span className="ml-1.5 text-[9px] font-bold px-1.5 py-0 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 align-middle" data-testid="storage-currency-badge">
+                CAD
+              </span>
             </p>
             <p className="text-[10px] text-slate-400">
               {auction.bid_count || 0} bids / offres

@@ -233,7 +233,7 @@ const CreateStorageAuctionDialog = ({ open, onOpenChange, facilities, onCreated 
     deposit_amount: 0,
     cleanup_deadline_hours: 72,
     soft_close_enabled: true,
-    soft_close_extension_minutes: 10,
+    soft_close_extension_minutes: 2,
   });
 
   // Reset when opened

@@ -170,7 +170,7 @@ async def place_bid(db, auction_id: str, bidder_id: str, max_bid: float) -> Dict
 
     # ── Soft close ──
     soft_extended = False
-    soft_minutes = int(auction.get("soft_close_extension_minutes", 10) or 10)
+    soft_minutes = int(auction.get("soft_close_extension_minutes", 2) or 2)
     if auction.get("soft_close_enabled", True):
         time_remaining = (end_time - now_dt).total_seconds()
         if 0 < time_remaining < soft_minutes * 60:

@@ -62,7 +62,7 @@ class StorageAuctionCreate(BaseModel):
     start_time: datetime
     end_time: datetime
     soft_close_enabled: bool = True
-    soft_close_extension_minutes: int = Field(default=10, ge=1, le=60)
+    soft_close_extension_minutes: int = Field(default=2, ge=1, le=60)
     cleanup_deadline_hours: int = Field(default=72, ge=24, le=168)
 
     # ── PAYMENT METHOD (single) ──

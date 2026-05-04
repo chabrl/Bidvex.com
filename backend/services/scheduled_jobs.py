@@ -363,8 +363,8 @@ async def send_auction_ending_soon_notifications(db):
 # Storage Auctions — auto-close processor (iter171)
 # Runs every 5 minutes via scheduler.py. For each ACTIVE storage auction whose
 # end_time has passed:
-#   1. If soft_close_enabled and a bid landed in last 10 min → extend end_time
-#      by soft_close_extension_minutes (default 10) instead of closing.
+#   1. If soft_close_enabled and a bid landed in last 2 min → extend end_time
+#      by soft_close_extension_minutes (default 2) instead of closing.
 #   2. Otherwise:
 #      a. Flip status → "sold" if there is a winning bidder, else "unsold"
 #      b. Release held deposits (winner→applied, losers→refunded) via
@@ -409,7 +409,7 @@ async def process_ended_storage_auctions(db):
 
                 # ── Soft-close guard ──
                 if auction.get("soft_close_enabled", True) and bids:
-                    soft_minutes = int(auction.get("soft_close_extension_minutes", 10) or 10)
+                    soft_minutes = int(auction.get("soft_close_extension_minutes", 2) or 2)
                     # Find the most recent bid's placed_at
                     last_bid_time = None
                     for b in bids:

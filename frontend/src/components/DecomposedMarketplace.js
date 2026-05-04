@@ -267,7 +267,10 @@ const DecomposedMarketplace = () => {
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Current Bid:</span>
                     <span className="text-lg font-bold text-primary">
-                      {formatCurrency(item.current_price || 0)}
+                      {formatCurrency(item.current_price || 0, item.currency)}
+                      <span className={`ml-1 text-[9px] font-bold px-1.5 py-0 rounded-full ${item.currency === 'USD' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`} data-testid="listing-currency-badge">
+                        {item.currency || 'CAD'}
+                      </span>
                     </span>
                   </div>
 
