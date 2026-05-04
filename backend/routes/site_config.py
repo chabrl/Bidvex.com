@@ -118,6 +118,7 @@ async def get_public_site_config():
             "homepage_layout": config.get("homepage_layout", DEFAULT_SITE_CONFIG["homepage_layout"]),
             "hero_banners": active_banners,
             "social_links": config.get("social_links", DEFAULT_SITE_CONFIG["social_links"]),
+            "marketing": config.get("marketing", {"fb_pixel_id": "", "gtm_id": "", "google_ads_id": ""}),
         }
     except Exception as e:
         logger.error(f"site-config DB error, returning defaults: {e}")
@@ -126,7 +127,35 @@ async def get_public_site_config():
             "homepage_layout": DEFAULT_SITE_CONFIG["homepage_layout"],
             "hero_banners": [],
             "social_links": DEFAULT_SITE_CONFIG["social_links"],
+            "marketing": {"fb_pixel_id": "", "gtm_id": "", "google_ads_id": ""},
         }
+
+
+# iter178 (FIX 7) — Marketing Integrations (FB Pixel + GTM + Google Ads)
+@site_config_router.put("/admin/site-config/marketing")
+async def update_marketing_integrations(
+    data: Dict,
+    current_user: User = Depends(_require_admin),
+):
+    """
+    Save FB Pixel ID / GTM ID / Google Ads Conversion ID to site_config.marketing
+    so the frontend can dynamically inject the tracking snippets on app boot.
+    """
+    db = get_db()
+    allowed = {"fb_pixel_id", "gtm_id", "google_ads_id"}
+    current = await _get_site_config()
+    old = current.get("marketing") or {}
+    new = {**old}
+    for k in allowed:
+        if k in data:
+            val = (data[k] or "").strip()
+            new[k] = val
+    await db.site_config.update_one(
+        {"id": "site_config"},
+        {"$set": {"marketing": new, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": current_user.email}},
+        upsert=True,
+    )
+    return {"marketing": new}
 
 
 @site_config_router.get("/admin/site-config")

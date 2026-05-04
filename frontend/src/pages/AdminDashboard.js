@@ -54,6 +54,8 @@ import AdminTaxDashboard from './AdminTaxDashboard';
 import AdminStorageDeposits from './admin/AdminStorageDeposits';
 import AdminStorageAuctions from './admin/AdminStorageAuctions';
 import AdminFeatureFlags from './admin/AdminFeatureFlags';
+import AdminFacilities from './admin/AdminFacilities';
+import AdminMarketingIntegrations from './admin/AdminMarketingIntegrations';
 import { 
   Users, Package, Gavel, Shield, TrendingUp, Bell, Settings, FileText, 
   MessageSquare, DollarSign, Search, Image, CreditCard, Megaphone, 
@@ -89,6 +91,7 @@ const SECONDARY_TABS = {
     { id: 'auctions', label: 'Auction Control', icon: '🔨', lucideIcon: Gavel },
     { id: 'storage-deposits', label: 'Storage Deposits', icon: '💰', lucideIcon: DollarSign },
     { id: 'storage-auctions-admin', label: 'Storage Auctions', icon: '📦', lucideIcon: Package },
+    { id: 'facilities', label: 'Facilities', icon: '🏢', lucideIcon: Package },
     { id: 'categories', label: 'Categories', icon: '📂', lucideIcon: Settings },
     { id: 'partner-applications', label: 'Partner Applications', icon: '🏢', lucideIcon: Building2 },
   ],
@@ -108,6 +111,7 @@ const SECONDARY_TABS = {
     { id: 'pricing-engine', label: 'Pricing Engine', icon: '💰', lucideIcon: DollarSign },
     { id: 'coupon-codes', label: 'Coupon Codes', icon: '🎟️', lucideIcon: Ticket },
     { id: 'email-marketing', label: 'Email Marketing', icon: '📤', lucideIcon: Send },
+    { id: 'marketing-integrations', label: 'Marketing Integrations', icon: '📣', lucideIcon: Send },
     { id: 'trust-safety', label: 'Trust & Safety', icon: '🛡️', lucideIcon: Shield },
     { id: 'escrow-manager', label: 'Escrow & Penalties', icon: '🔒', lucideIcon: Lock },
     { id: 'community-moderation', label: 'Community Moderation', icon: '💬', lucideIcon: MessageSquare },
@@ -327,6 +331,7 @@ const AdminDashboard = () => {
           case 'auctions': return <AuctionControl />;
           case 'storage-deposits': return <AdminStorageDeposits />;
           case 'storage-auctions-admin': return <AdminStorageAuctions />;
+          case 'facilities': return <AdminFacilities />;
           case 'categories': return <CategoryManager />;
           case 'partner-applications': return <PartnerManager />;
           default: return <EnhancedUserManager />;
@@ -350,6 +355,7 @@ const AdminDashboard = () => {
           case 'pricing-engine': return <PricingManager />;
           case 'coupon-codes': return <CouponManager />;
           case 'email-marketing': return <EmailMarketingManager />;
+          case 'marketing-integrations': return <AdminMarketingIntegrations />;
           case 'trust-safety': return <TrustSafetyDashboard />;
           case 'escrow-manager': return <AdminEscrowManager />;
           case 'community-moderation': return <CommunityModerationManager />;

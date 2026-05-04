@@ -788,7 +788,50 @@ def init_scheduler(database):
         replace_existing=True,
     )
 
-    logger.info("Scheduler initialized with 12 jobs")
+    # Job 13: Flip `upcoming` auctions whose start_time has passed → `active` (iter178, FIX 4)
+    async def activate_upcoming_auctions_job():
+        if db_instance is None:
+            return
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
+        result = {"storage": 0, "vehicles": 0, "listings": 0}
+        try:
+            r = await db_instance.storage_auctions.update_many(
+                {"status": "upcoming", "start_time": {"$lte": now}},
+                {"$set": {"status": "active"}},
+            )
+            result["storage"] = r.modified_count
+        except Exception as e:
+            logger.error(f"[activate_upcoming] storage failed: {e}")
+        try:
+            r = await db_instance.vehicle_listings.update_many(
+                {"status": "upcoming", "start_time": {"$lte": now}},
+                {"$set": {"status": "active"}},
+            )
+            result["vehicles"] = r.modified_count
+        except Exception as e:
+            logger.error(f"[activate_upcoming] vehicles failed: {e}")
+        try:
+            r = await db_instance.listings.update_many(
+                {"status": "upcoming", "start_time": {"$lte": now}},
+                {"$set": {"status": "active"}},
+            )
+            result["listings"] = r.modified_count
+        except Exception as e:
+            logger.error(f"[activate_upcoming] listings failed: {e}")
+        if sum(result.values()) > 0:
+            logger.info(f"[activate_upcoming] flipped: {result}")
+        return result
+
+    scheduler.add_job(
+        activate_upcoming_auctions_job,
+        IntervalTrigger(minutes=1),
+        id="activate_upcoming_auctions",
+        name="Activate Upcoming Auctions (status: upcoming → active)",
+        replace_existing=True,
+    )
+
+    logger.info("Scheduler initialized with 13 jobs")
     return scheduler
 
 

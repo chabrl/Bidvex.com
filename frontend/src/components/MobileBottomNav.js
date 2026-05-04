@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
-import { Car, Warehouse, Search, Heart, Plus, Package, X, FileText, Layers } from 'lucide-react';
+import { Car, Warehouse, Heart, Plus, Package, X, FileText, Layers } from 'lucide-react';
 
 const MobileBottomNav = () => {
   const navigate = useNavigate();
@@ -13,15 +13,14 @@ const MobileBottomNav = () => {
   const { canCreateMultiLot } = useFeatureFlags();
   const [showSellMenu, setShowSellMenu] = useState(false);
 
-  // iter177 — Replaced Home → Vehicles and Profile → Storage per product request.
-  // Search / Lots / Sell / Watchlist remain untouched.
+  // iter178 — Order: Vehicles | Lots | Storage | Sell | Watchlist
+  // (Search removed — available via navbar search icon.)
   const navItems = [
     { icon: Car,       labelKey: 'mobileNav.vehicles', path: '/vehicle-auctions', key: 'vehicles' },
-    { icon: Search,    labelKey: 'mobileNav.search',   path: '/marketplace',      key: 'search' },
     { icon: Package,   labelKey: 'mobileNav.lots',     path: '/lots',             key: 'lots' },
+    { icon: Warehouse, labelKey: 'mobileNav.storage',  path: '/storage-auctions', key: 'storage' },
     { icon: Plus,      labelKey: 'mobileNav.sell',     path: '/create-listing',   key: 'sell', requireAuth: true, hasMenu: true },
     { icon: Heart,     labelKey: 'mobileNav.watchlist',path: '/watchlist',        key: 'watchlist', requireAuth: true },
-    { icon: Warehouse, labelKey: 'mobileNav.storage',  path: '/storage-auctions', key: 'storage' },
   ];
 
   const isActive = (path) => {

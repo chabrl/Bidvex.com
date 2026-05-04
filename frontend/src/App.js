@@ -17,6 +17,7 @@ import TrendyAnnouncementBar from './components/TrendyAnnouncementBar';
 import MobileBottomNav from './components/MobileBottomNav';
 import ScrollToTop from './components/ScrollToTop';
 import FbPixelTracker from './components/FbPixelTracker';
+import MarketingPixelLoader from './components/MarketingPixelLoader';
 import CookieConsentBanner from './components/CookieConsentBanner';
 import MessageNotificationListener from './components/MessageNotificationListener';
 
@@ -299,6 +300,7 @@ const App = () => {
           <FeatureFlagsProvider>
           <SiteModeProvider>
             <ScrollToTop />
+            <MarketingPixelLoader />
             <FbPixelTracker />
             <CookieConsentBanner />
             <MaintenanceGuard>

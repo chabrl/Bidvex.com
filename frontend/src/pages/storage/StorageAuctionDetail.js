@@ -17,6 +17,8 @@ import StorageCountdown from './StorageCountdown';
 import StorageFooterBanner from './StorageFooterBanner';
 import StorageAutoBidModal from '../../components/StorageAutoBidModal';
 import QuickBidButtons from '../../components/QuickBidButtons';
+import StorageDepositBanner from './StorageDepositBanner';
+import AuctionStatusBadge, { CountdownTimer } from '../../components/AuctionStatusBadge';
 
 const API = API_BASE;
 
@@ -33,6 +35,7 @@ const StorageAuctionDetail = () => {
   const [activePhoto, setActivePhoto] = useState(0);
   const [maxBid, setMaxBid] = useState('');
   const [submittingBid, setSubmittingBid] = useState(false);
+  const [depositPaid, setDepositPaid] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -101,11 +104,16 @@ const StorageAuctionDetail = () => {
 
   const photos = auction.photos || [];
   const minNext = (auction.current_bid || 0) + (auction.bid_increment || 10);
-  const isLive = auction.live_status === 'active';
+  const now = new Date();
+  const startTime = auction.start_time ? new Date(auction.start_time) : null;
+  const endTime = auction.end_time ? new Date(auction.end_time) : null;
+  const isUpcoming = auction.status === 'upcoming' || (startTime && startTime > now);
+  const isLive = !isUpcoming && auction.status === 'active' && (!endTime || endTime > now);
+  const needsDeposit = !!auction.deposit_required && Number(auction.deposit_amount || 0) > 0 && !depositPaid;
   const facility = auction.facility || {};
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-6" data-testid="storage-auction-detail">
+    <div className="min-h-screen bg-sky-50 dark:bg-slate-900 py-6" data-testid="storage-auction-detail">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <Link to="/storage-auctions/browse" className="text-sm text-blue-600 hover:underline">
           ← {isFr ? 'Retour aux enchères' : 'Back to auctions'}
@@ -214,14 +222,13 @@ const StorageAuctionDetail = () => {
           {/* RIGHT — sticky bid box */}
           <aside className="lg:sticky lg:top-4 self-start space-y-4">
             <Card className="p-5">
-              {isLive ? (
-                <Badge className="bg-emerald-500 text-white mb-3">
-                  <span className="w-2 h-2 bg-white rounded-full animate-pulse inline-block mr-1.5" />
-                  LIVE
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="mb-3">{auction.live_status?.toUpperCase()}</Badge>
-              )}
+              <div className="mb-3">
+                <AuctionStatusBadge
+                  status={auction.status}
+                  startTime={auction.start_time}
+                  endTime={auction.end_time}
+                />
+              </div>
               <p className="text-xs uppercase tracking-wider text-muted-foreground">{isFr ? 'Offre actuelle' : 'Current bid'}</p>
               <p className="text-4xl font-black text-blue-600 mb-1" data-testid="current-bid-display">
                 ${Number(auction.current_bid || 0).toLocaleString()}
@@ -244,7 +251,38 @@ const StorageAuctionDetail = () => {
                 </div>
               )}
 
-              {isLive && (
+              {/* Deposit banner (FIX 1) — block bidding until deposit is held */}
+              {isLive && auction.deposit_required && (
+                <StorageDepositBanner
+                  auction={auction}
+                  onStatusChange={setDepositPaid}
+                />
+              )}
+
+              {/* Upcoming state (FIX 4) — show countdown, disable bid button */}
+              {isUpcoming && (
+                <div
+                  data-testid="storage-upcoming-banner"
+                  className="text-center py-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800 mb-4"
+                >
+                  <p className="font-bold text-blue-700 dark:text-blue-300 mb-1">
+                    {isFr ? "L'enchère commence dans:" : 'Auction starts in:'}
+                  </p>
+                  <p className="text-blue-600 dark:text-blue-400 text-xs italic mb-2">
+                    {isFr ? 'Auction starts in:' : "L'enchère commence dans:"}
+                  </p>
+                  <CountdownTimer targetTime={auction.start_time} testId="storage-upcoming-countdown" />
+                  <button
+                    disabled
+                    className="w-full mt-3 bg-gray-300 text-gray-500 cursor-not-allowed font-bold py-3 rounded-xl"
+                    data-testid="storage-bid-disabled-upcoming"
+                  >
+                    {isFr ? 'Enchères pas encore ouvertes · Bidding Not Yet Open' : 'Bidding Not Yet Open · Enchères pas encore ouvertes'}
+                  </button>
+                </div>
+              )}
+
+              {isLive && !needsDeposit && (
                 <>
                   {/* Quick Bid pills (iter175) — one-tap +$X / +$Y / +$Z scaled by bid_increment */}
                   <div className="mb-3">

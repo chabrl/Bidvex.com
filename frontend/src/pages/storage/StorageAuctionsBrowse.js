@@ -78,7 +78,7 @@ const StorageAuctionsBrowse = () => {
   const setFilter = (k, v) => setFilters(p => ({ ...p, [k]: v === '__all' ? '' : v }));
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900" data-testid="storage-browse-page">
+    <div className="min-h-screen bg-sky-50 dark:bg-slate-900" data-testid="storage-browse-page">
       <StorageHero />
 
       {/* ── PUBLIC STATS BAR (iter171) — always bilingual, hides zero cards ── */}

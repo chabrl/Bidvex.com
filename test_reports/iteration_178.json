@@ -1,0 +1,45 @@
+{
+  "summary": "iter178 9-fix batch e2e testing — backend 14/14 new pytest pass + storage regression 90/91 (one old test asserted 11 jobs; iter178 now has 13 — pre-existing test, out of scope). Frontend end-to-end verified for all 9 fixes: deposit banner (required + pay btn + modal), active live badge, upcoming banner+countdown+disabled bid btn+status badge, ended badge, bg-sky-50, mobile bottom nav (vehicles/lots/storage/sell/watchlist, no search), Facilities admin tab with verify/suspend/delete buttons, marketing pixel loader globals (window.bvTrackEvent + fbq + dataLayer), scheduler '13 jobs' log, profile PUT persistence, admin storage-facilities endpoints.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/storage-auctions/{id}/deposit/status",
+        "issue": "When deposit_required=false the response omits the 'status' and 'created_at' keys (returns only has_deposit/deposit_required/deposit_amount). Review-request spec listed 'status' as a required key. Shape is still sensible but inconsistent with the deposit-required branch. Either document this contract difference or always return status:null."
+      },
+      {
+        "endpoint": "Scheduler regression test",
+        "issue": "/app/backend/tests/test_storage_iter172_api.py::TestSchedulerImports::test_scheduler_log_shows_11_jobs now FAILS (expected '11 jobs', actual '13 jobs'). Pre-existing test that should be parameterized or updated to >=11."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter178_batch.py",
+    "/app/test_reports/pytest/iter178_batch.xml",
+    "/app/test_reports/pytest/iter178_storage_regression.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: Update /app/backend/tests/test_storage_iter172_api.py scheduler-log assertion from '11 jobs' to '>=11 jobs' (iter178 brought scheduler up to 13 jobs — test is stale).",
+    "OPTIONAL: Include 'status':null and 'created_at':null keys in GET /storage-auctions/{id}/deposit/status when deposit_required=false, to match spec shape consistency."
+  ],
+  "critical_code_review_comments": [
+    "deposit/status response shape diverges between the two branches (has 3 keys vs 5 keys). Callers relying on destructuring status will get undefined for non-deposit-required auctions — low risk because the UI guards on deposit_required first.",
+    "MarketingPixelLoader injects FB Pixel with 'Invalid PixelID: null' warning on every page load because the site-config.marketing.fb_pixel_id is empty by default. Consider skipping fbq('init', …) when the ID is falsy to avoid console noise.",
+    "AdminDashboard.js primary tab buttons don't have data-testid='admin-tab-{id}' attributes (only secondary tabs do). Adding them would make automated admin-flow testing much more robust."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter178_batch.py (new)"
+  ],
+  "success_rate": {"backend": "100% (14/14 new) + 99% (90/91 storage regression, 1 stale test)", "frontend": "100% (9/9 iter178 fixes verified end-to-end)"},
+  "test_credentials": "Admin charbel911@gmail.com / Anderosli123!@# (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "None beyond transient PUT to /api/admin/site-config/marketing which was reverted to empty strings at end of run. A test buyer (abc@gmail.com) profile.name was updated to 'TEST Buyer {6-digit-ts}' — harmless.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All iter178 fixes verified green. Live storage auctions available for regression: active+no-deposit 7c4c93fe-5abb-4af3-9228-cc0ae3722f47; active+deposit-required fc7f969a-a4eb-48f5-93f8-76fffbd1cf21; upcoming f400073e-a1c6-49d6-b513-45f763ee8e86. The old iter172 scheduler-count assertion (11 jobs) is now permanently stale — update it when touching scheduler tests. Admin primary tabs still have no admin-tab-{id} testids; automation navigates primary via get_by_role button name — works only after cookie banner dismissal.",
+  "rca of the issue": "N/A — all iter178 fixes pass. The 1 failing storage-regression test (test_scheduler_log_shows_11_jobs) is explicitly caused by iter178 correctly adding job 13; fix is to relax the assertion."
+}

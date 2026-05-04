@@ -392,6 +392,39 @@ async def pay_storage_deposit(
     return {"success": True, "deposit": deposit}
 
 
+@storage_router.get("/storage-auctions/{auction_id}/deposit/status")
+async def storage_deposit_status(
+    auction_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Returns whether the current user has a valid deposit for this storage auction."""
+    db = get_db()
+    auction = await db.storage_auctions.find_one(
+        {"id": auction_id},
+        {"_id": 0, "deposit_required": 1, "deposit_amount": 1},
+    )
+    if not auction:
+        raise HTTPException(status_code=404, detail="Auction not found")
+
+    required = bool(auction.get("deposit_required"))
+    amount = float(auction.get("deposit_amount") or 0)
+    if not required or amount <= 0:
+        return {"has_deposit": True, "deposit_required": False, "deposit_amount": 0}
+
+    deposit = await db.storage_deposits.find_one(
+        {"auction_id": auction_id, "buyer_id": current_user.id},
+        {"_id": 0, "status": 1, "amount": 1, "stripe_payment_intent_id": 1, "created_at": 1},
+    )
+    active = deposit and deposit.get("status") in ("held", "authorized", "requires_capture", "succeeded")
+    return {
+        "has_deposit": bool(active),
+        "deposit_required": True,
+        "deposit_amount": amount,
+        "status": deposit.get("status") if deposit else None,
+        "created_at": deposit.get("created_at") if deposit else None,
+    }
+
+
 @storage_router.post("/storage-auctions/{auction_id}/payment")
 async def record_storage_payment(
     auction_id: str,

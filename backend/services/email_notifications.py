@@ -1655,11 +1655,11 @@ async def send_storage_auction_won_email(buyer: dict, auction: dict, facility: d
             qr_bytes = _generate_pickup_qr_png_bytes(pickup_code)
             qr_b64 = _b64.b64encode(qr_bytes).decode("ascii")
             qr_img_tag = (
-                f"<div style='margin:12px auto;display:inline-block;background:#fff;"
-                f"padding:10px;border-radius:8px;border:1px solid #fde68a'>"
-                f"<img src='data:image/png;base64,{qr_b64}' alt='Pickup QR' "
+                f"<div style='margin:12px auto;display:inline-block;background:#FFFFFF;"
+                f"padding:12px;border-radius:8px;border:2px solid #fde68a'>"
+                f"<img src='data:image/png;base64,{qr_b64}' alt='Scan for pickup verification / Scanner pour vérification de ramassage' "
                 f"width='180' height='180' "
-                f"style='display:block;width:180px;height:180px;image-rendering:pixelated'/>"
+                f"style='display:block;width:180px;height:180px;image-rendering:pixelated;background:#FFFFFF'/>"
                 f"</div>"
             )
         except Exception as e:
