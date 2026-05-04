@@ -42,10 +42,11 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 
 from fastapi import (
-    APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, BackgroundTasks
+    APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, BackgroundTasks, Request
 )
 
 from deps import User, get_current_user, get_db
+from rate_limit import limiter as _limiter
 from models.storage_auction import (
     StorageFacilityRegister, StorageAuctionCreate, StorageBidPayload, StorageDepositRequest,
     UNIT_SIZES, UNIT_TYPES, PAYMENT_METHODS, AUCTION_STATUSES, CANADIAN_PROVINCES,
@@ -311,7 +312,9 @@ async def get_facility_profile(facility_id: str):
 # ─────────────────────────────────────────────────────────────
 
 @storage_router.post("/storage-auctions/{auction_id}/bid")
+@_limiter.limit("10/minute")
 async def place_storage_bid(
+    request: Request,
     auction_id: str,
     payload: StorageBidPayload,
     background_tasks: BackgroundTasks,
@@ -1064,19 +1067,25 @@ async def facility_promote_auction(
     try:
         import stripe as _stripe
         _stripe.api_key = os.environ.get("STRIPE_API_KEY")
-        pi = _stripe.PaymentIntent.create(
-            amount=price_cents,
-            currency="cad",
-            automatic_payment_methods={"enabled": True, "allow_redirects": "never"},
-            description=f"BidVex storage promotion: {tier} — auction {auction_id[:8]}",
-            metadata={
-                "type": "storage_promotion",
-                "auction_id": auction_id,
-                "facility_id": facility["id"],
-                "tier": tier,
-                "duration_days": str(spec["duration_days"]),
-            },
+        from services.stripe_circuit_breaker import safe_stripe_call_blocking
+        pi = await safe_stripe_call_blocking(
+            lambda: _stripe.PaymentIntent.create(
+                amount=price_cents,
+                currency="cad",
+                automatic_payment_methods={"enabled": True, "allow_redirects": "never"},
+                description=f"BidVex storage promotion: {tier} — auction {auction_id[:8]}",
+                metadata={
+                    "type": "storage_promotion",
+                    "auction_id": auction_id,
+                    "facility_id": facility["id"],
+                    "tier": tier,
+                    "duration_days": str(spec["duration_days"]),
+                },
+            ),
+            operation_name="storage_promotion_payment_intent_create",
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"[STORAGE_PROMOTION] PI create failed: {e}")
         raise HTTPException(status_code=502, detail=f"Stripe payment init failed: {e}")

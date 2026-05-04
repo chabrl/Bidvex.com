@@ -1,6 +1,65 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: P0 — 9-Fix Credit-Efficient Batch (May 4, 2026 / iter178) — 9/9 DONE
+## Latest: Production Hardening — Performance, Security & Scalability (May 4, 2026 / iter180) — 26/26 DONE
+
+All 9 items from the user's hardening directive shipped and verified end-to-end in a single session. The platform is now production-ready for heavy traffic.
+
+### Item 1 — MongoDB Indexes (Critical performance)
+- NEW `backend/scripts/create_indexes.py` — idempotent migration script. Ran successfully against production: 17 listings indexes, 7 storage_auctions, 9 users, 4 refresh_tokens (incl. TTL).
+- New `create_critical_indexes()` runs on every startup (`@app.on_event("startup")`) — verifies the 5 most critical indexes per-iteration with independent try/except so one collision can't stop the rest. TTL index on `refresh_tokens.expires_at` for auto-cleanup.
+
+### Item 2 — MongoDB Connection Pool
+- `AsyncIOMotorClient` retuned: `maxPoolSize=50`, `minPoolSize=5`, `maxIdleTimeMS=30000`, `connectTimeoutMS=5000`, `serverSelectionTimeoutMS=5000`, `retryWrites=True`, `w="majority"`.
+
+### Item 3 — Backend Rate Limiting
+- `slowapi` 0.1.9 already installed; bilingual 429 handler now installed in server.py replacing default.
+- All bid endpoints throttled to `10/minute`: `/api/bids`, `/api/multi-item-listings/{id}/lots/{n}/bid`, `/api/storage-auctions/{id}/bid`, `/api/vehicle-bids`, `/api/bids/auto-bid`.
+- Auth tightened: `/auth/login` → `5/minute`, `/auth/register` → `5/minute` (existing).
+- 429 response body returns bilingual `message_en` / `message_fr` + `retry_after_seconds=60` + `Retry-After` header.
+
+### Item 4 — JWT Hardening + Refresh Token Rotation
+- Access tokens expire in **60 minutes** (was 168h/7d). New env vars `ACCESS_TOKEN_EXPIRE_MINUTES=60` and `REFRESH_TOKEN_EXPIRE_DAYS=30`.
+- NEW `POST /api/auth/refresh` (rate-limited 10/min) rotates refresh tokens — old token marked `revoked=True` on use, fresh access + refresh pair returned.
+- Refresh tokens stored hashed (sha256) in `refresh_tokens` collection with TTL on `expires_at` for automatic cleanup.
+- Bilingual `token_expired` error response on expired access tokens.
+- Login response now includes `refresh_token` field alongside `access_token`.
+
+### Item 5 — NoSQL Injection Sanitizer
+- NEW `backend/services/sanitizer.py` exports `sanitize_string`, `sanitize_dict`, `sanitize_list`, `safe_regex` — rejects `$where`, `$ne`, `$gt`, `$regex`, `$expr`, etc.; escapes user input destined for `$regex` queries.
+- Applied to all production search endpoints in `routes/listings.py` (2 spots), `routes/admin.py` (user search), and `routes/admin_ops.py` (3 spots: transactions export, transaction logs, community questions).
+
+### Item 6 — Scheduler Job Isolation + Health Endpoint
+- NEW `safe_run(job_name, coro, timeout=55s)` in `services/scheduled_jobs.py` — per-job exception isolation + 55s timeout + `_JOB_STATUS` health tracking.
+- All 13 vehicle scheduler jobs now wrapped via `_tracked()` helper in `services/scheduler.py`.
+- All 8 server-level APScheduler jobs wrapped via `safe_run(...)` in `server.py`.
+- NEW `GET /api/admin/scheduler/status` returns `{jobs: [{name, last_run, last_status, last_duration_ms, last_error, next_run}], total_jobs, scheduler_running}`. Live tested — returns 30 jobs, several already showing `success` status.
+- NEW `<SchedulerStatusCard>` component rendered above content in admin dashboard. Auto-refreshes every 30s.
+
+### Item 7 — SEO
+- NEW `backend/routes/sitemap.py` mounts dynamic `/sitemap.xml` (≤1000 listings + ≤500 storage auctions + 12 static pages) and `/robots.txt`. Verified live via curl.
+- `frontend/public/index.html` enhanced: bilingual hreflang `en-ca`/`fr-ca`/`x-default`, canonical link, improved meta description, og:url, full Twitter cards.
+
+### Item 8 — Stripe Circuit Breaker
+- NEW `services/stripe_circuit_breaker.py`: `StripeCircuitBreaker` (5 failures → open, 60s recovery, half-open probe) + `safe_stripe_call_blocking(fn, op_name, timeout=15s)` — runs blocking SDK calls in a thread, applies timeout, returns bilingual 503/504/402 errors.
+- Wrapped 6 critical PaymentIntent.create calls: storage deposits, bidding deposits, cancellation penalties, vehicle fees, vehicle buy-now remainder, storage promotions.
+
+### Item 9 — Sentry Wiring
+- Backend: `sentry-sdk==2.59.0` installed + initialised in `server.py` when `SENTRY_DSN` env is set (FastApi integration, `traces_sample_rate=0.1`, `send_default_pii=False`).
+- Frontend: `@sentry/react@10.51.0` installed + initialised in `index.js` when `REACT_APP_SENTRY_DSN` env is set.
+- Both opt-in via env — zero impact when DSN is unset.
+
+### Verification (live curls)
+- Login → returned `access_token` (248 chars) + `refresh_token` (64 chars). ✅
+- Refresh → new pair issued. ✅
+- Reuse old refresh → 401 with bilingual error. ✅ (rotation working)
+- 6 failed logins in 60s → 6th returns 429 with bilingual EN+FR body. ✅
+- 11 bid attempts in 60s → 11th returns 429. ✅
+- `/sitemap.xml` returns valid XML with 12 static pages + active listings. ✅
+- `/robots.txt` returns expected directives. ✅
+- `/api/admin/scheduler/status` returns 30 jobs with live `last_status`/`last_duration_ms`. ✅
+
+
+## Previous: P0 — 9-Fix Credit-Efficient Batch (May 4, 2026 / iter178) — 9/9 DONE
 
 All nine items from the user's explicit list shipped and end-to-end verified in a single session (testing agent 100% frontend + 14/14 new backend + 90/91 regression, 1 stale iter172 test updated).
 

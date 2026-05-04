@@ -5,10 +5,55 @@ All functions are registered by server.py via APScheduler.
 """
 
 from datetime import datetime, timezone, timedelta
+import asyncio
 import logging
 import httpx
 
 logger = logging.getLogger(__name__)
+
+
+# ─── Scheduler Health Tracking ────────────────────────────────────────────
+# Updated by safe_run() — read by /api/admin/scheduler/status endpoint.
+_JOB_STATUS = {}
+
+
+def get_job_status_snapshot():
+    """Return a copy of the latest job status dict (used by admin API)."""
+    return dict(_JOB_STATUS)
+
+
+async def safe_run(job_name: str, coro, timeout_seconds: float = 55.0):
+    """Run a scheduler coroutine with timeout + per-job exception isolation.
+
+    One failing job will never crash the scheduler or the API.
+    Records last_run / last_status / last_duration_ms in _JOB_STATUS so
+    the admin dashboard can surface job health.
+    """
+    started_at = datetime.now(timezone.utc)
+    t0 = asyncio.get_event_loop().time()
+    status = "success"
+    error_msg = None
+    try:
+        await asyncio.wait_for(coro, timeout=timeout_seconds)
+    except asyncio.TimeoutError:
+        status = "timeout"
+        error_msg = f"timed out after {timeout_seconds}s"
+        logger.error(f"⏰ Scheduler job '{job_name}' {error_msg}")
+    except Exception as e:
+        status = "error"
+        error_msg = str(e)[:500]
+        logger.error(f"❌ Scheduler job '{job_name}' failed: {e}", exc_info=True)
+    finally:
+        duration_ms = int((asyncio.get_event_loop().time() - t0) * 1000)
+        _JOB_STATUS[job_name] = {
+            "name": job_name,
+            "last_run": started_at.isoformat(),
+            "last_status": status,
+            "last_duration_ms": duration_ms,
+            "last_error": error_msg,
+        }
+        if status == "success":
+            logger.info(f"✅ Scheduler job '{job_name}' completed in {duration_ms}ms")
 
 
 async def transition_upcoming_auctions(db):

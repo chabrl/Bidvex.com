@@ -13,7 +13,9 @@ from datetime import datetime, timezone, timedelta
 from passlib.context import CryptContext
 from jose import jwt, JWTError
 import asyncio
+import hashlib
 import os
+import secrets
 import uuid
 import logging
 import aiohttp
@@ -27,10 +29,13 @@ security = HTTPBearer(auto_error=False)
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# JWT Configuration
+# JWT Configuration — short-lived access tokens + long-lived refresh tokens
 JWT_SECRET = os.environ.get('JWT_SECRET', 'dev-secret-key-change-in-production')
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRATION_HOURS = int(os.environ.get('JWT_EXPIRATION_HOURS', '168'))  # Default 7 days
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get('ACCESS_TOKEN_EXPIRE_MINUTES', '60'))   # 1 hour
+REFRESH_TOKEN_EXPIRE_DAYS = int(os.environ.get('REFRESH_TOKEN_EXPIRE_DAYS', '30'))       # 30 days
+# Backwards-compat env var (older deployments may still set this)
+JWT_EXPIRATION_HOURS = int(os.environ.get('JWT_EXPIRATION_HOURS', str(ACCESS_TOKEN_EXPIRE_MINUTES // 60 or 1)))
 
 # Database connection (will be set from main app)
 db = None
@@ -99,11 +104,26 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def create_access_token(data: dict) -> str:
-    """Create JWT access token"""
+    """Create JWT access token (short-lived, 60 minutes)."""
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS)
-    to_encode.update({"exp": expire})
+    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire, "type": "access"})
     return jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+async def create_refresh_token(user_id: str) -> str:
+    """Create a long-lived (30-day) refresh token, hash-stored in DB for revocation."""
+    token = secrets.token_urlsafe(48)
+    expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    if db is not None:
+        await db.refresh_tokens.insert_one({
+            "user_id": user_id,
+            "token_hash": hashlib.sha256(token.encode()).hexdigest(),
+            "created_at": datetime.now(timezone.utc),
+            "expires_at": expire,
+            "revoked": False,
+        })
+    return token
 
 
 async def get_current_user_from_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -323,7 +343,7 @@ async def register(user_data: UserCreate, request: Request, background_tasks: Ba
 
 
 @auth_router.post("/login")
-@_limiter.limit("10/minute")
+@_limiter.limit("5/minute")
 async def login(credentials: UserLogin, request: Request):
     """
     Authenticate user with email and password.
@@ -400,14 +420,67 @@ async def login(credentials: UserLogin, request: Request):
         "email": user_doc["email"],
         "role": user_doc.get("role", "user"),
     })
-    
+    refresh_token = await create_refresh_token(user_doc["id"])
+
     # Prepare response (exclude password and _id)
     user_response = {k: v for k, v in user_doc.items() if k not in ["password", "_id"]}
     
     return {
         "access_token": token,
+        "refresh_token": refresh_token,
         "token_type": "bearer",
         "user": user_response
+    }
+
+
+# ============= REFRESH TOKEN ENDPOINT =============
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+
+@auth_router.post("/refresh")
+@_limiter.limit("10/minute")
+async def refresh_access_token(request: Request, payload: RefreshTokenRequest):
+    """Exchange a valid refresh token for a new access token (with rotation)."""
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database unavailable")
+
+    token_hash = hashlib.sha256(payload.refresh_token.encode()).hexdigest()
+    stored = await db.refresh_tokens.find_one({
+        "token_hash": token_hash,
+        "revoked": False,
+        "expires_at": {"$gt": datetime.now(timezone.utc)},
+    })
+
+    if not stored:
+        raise HTTPException(status_code=401, detail={
+            "error": "invalid_refresh_token",
+            "message_en": "Invalid or expired refresh token. Please log in again.",
+            "message_fr": "Jeton de rafraîchissement invalide ou expiré. Veuillez vous reconnecter.",
+        })
+
+    # Rotate — invalidate old token, issue new pair
+    await db.refresh_tokens.update_one(
+        {"_id": stored["_id"]},
+        {"$set": {"revoked": True, "rotated_at": datetime.now(timezone.utc)}}
+    )
+
+    user_doc = await db.users.find_one({"id": stored["user_id"]}, {"_id": 0, "password": 0})
+    if not user_doc:
+        raise HTTPException(status_code=401, detail="User no longer exists")
+
+    new_access_token = create_access_token({
+        "sub": user_doc["id"],
+        "email": user_doc["email"],
+        "role": user_doc.get("role", "user"),
+    })
+    new_refresh_token = await create_refresh_token(user_doc["id"])
+
+    return {
+        "access_token": new_access_token,
+        "refresh_token": new_refresh_token,
+        "token_type": "bearer",
     }
 
 
@@ -997,7 +1070,7 @@ async def confirm_email_change(payload: EmailChangeConfirm):
 #           exactly. Configure via the GOOGLE_CALLBACK_URL env var.
 # ============================================================================
 
-import secrets
+import secrets as _secrets_unused  # noqa: F401  (kept for backwards compat; canonical import is at module top)
 from urllib.parse import urlencode
 
 import httpx

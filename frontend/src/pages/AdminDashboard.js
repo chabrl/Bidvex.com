@@ -56,6 +56,7 @@ import AdminStorageAuctions from './admin/AdminStorageAuctions';
 import AdminFeatureFlags from './admin/AdminFeatureFlags';
 import AdminFacilities from './admin/AdminFacilities';
 import AdminMarketingIntegrations from './admin/AdminMarketingIntegrations';
+import SchedulerStatusCard from '../components/SchedulerStatusCard';
 import { 
   Users, Package, Gavel, Shield, TrendingUp, Bell, Settings, FileText, 
   MessageSquare, DollarSign, Search, Image, CreditCard, Megaphone, 
@@ -583,6 +584,10 @@ const AdminDashboard = () => {
         <div className="flex gap-6">
           {/* Main Content */}
           <div className={`flex-1 ${liveControlsOpen ? 'mr-80' : ''}`}>
+            {/* Scheduler Status — production health card */}
+            <div className="mb-6">
+              <SchedulerStatusCard token={token} />
+            </div>
             {renderContent()}
           </div>
         </div>

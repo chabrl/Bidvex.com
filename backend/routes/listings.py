@@ -22,6 +22,7 @@ from utils import (
     get_tax_rates_for_currency,
 )
 from services.image_compression import compress_image_list
+from services.sanitizer import sanitize_string, safe_regex
 
 logger = logging.getLogger(__name__)
 
@@ -277,7 +278,12 @@ async def get_listings(
         else:
             query["current_price"] = {"$lte": max_price}
     if search:
-        query["$or"] = [{"title": {"$regex": search, "$options": "i"}}, {"description": {"$regex": search, "$options": "i"}}]
+        try:
+            search = sanitize_string(search)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid search query")
+        _safe = safe_regex(search)
+        query["$or"] = [{"title": {"$regex": _safe, "$options": "i"}}, {"description": {"$regex": _safe, "$options": "i"}}]
 
     # ── Tax Status filter (partner vs standard listings) ──
     if tax_status == "partner":
@@ -301,7 +307,12 @@ async def get_listings(
     if region:
         multi_query["region"] = region
     if search:
-        multi_query["$or"] = [{"title": {"$regex": search, "$options": "i"}}, {"description": {"$regex": search, "$options": "i"}}]
+        try:
+            search = sanitize_string(search)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid search query")
+        _safe = safe_regex(search)
+        multi_query["$or"] = [{"title": {"$regex": _safe, "$options": "i"}}, {"description": {"$regex": _safe, "$options": "i"}}]
     # Tax Status filter applies to multi-item too
     if tax_status == "partner":
         multi_query["seller_type"] = "partner"
@@ -631,9 +642,14 @@ async def get_multi_item_listings(
             query["seller_id"] = {"$in": ids}
 
     if search:
+        try:
+            search = sanitize_string(search)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid search query")
+        _safe = safe_regex(search)
         query["$or"] = [
-            {"title": {"$regex": search, "$options": "i"}},
-            {"description": {"$regex": search, "$options": "i"}}
+            {"title": {"$regex": _safe, "$options": "i"}},
+            {"description": {"$regex": _safe, "$options": "i"}}
         ]
 
     fetch_limit = min(limit, 50) if has_filters else 100

@@ -43,7 +43,7 @@ def get_db():
 # ========== BID PLACEMENT (Single-Item) ==========
 
 @bids_router.post("/bids")
-@_limiter.limit("30/minute")
+@_limiter.limit("10/minute")
 async def place_bid(request: Request, bid_data: BidCreate, current_user: User = Depends(get_current_user)):
     db = get_db()
 
@@ -711,7 +711,8 @@ async def get_listing_bids(listing_id: str, limit: int = 20):
 # ========== LOT BIDDING (Multi-Item) ==========
 
 @bids_router.post("/multi-item-listings/{listing_id}/lots/{lot_number}/bid")
-async def bid_on_lot(listing_id: str, lot_number: int, data: Dict[str, Any], current_user: User = Depends(get_current_user)):
+@_limiter.limit("10/minute")
+async def bid_on_lot(request: Request, listing_id: str, lot_number: int, data: Dict[str, Any], current_user: User = Depends(get_current_user)):
     db = get_db()
     listing = await db.multi_item_listings.find_one({"id": listing_id}, {"_id": 0})
     if not listing:
@@ -858,7 +859,8 @@ async def bid_on_lot(listing_id: str, lot_number: int, data: Dict[str, Any], cur
 # ========== AUTO-BID ==========
 
 @bids_router.post("/bids/auto-bid")
-async def setup_auto_bid(listing_id: str, max_bid: float, current_user: User = Depends(get_current_user)):
+@_limiter.limit("10/minute")
+async def setup_auto_bid(request: Request, listing_id: str, max_bid: float, current_user: User = Depends(get_current_user)):
     """Setup Auto-Bid Bot (Premium/VIP/Partner only)"""
     db = get_db()
     try:

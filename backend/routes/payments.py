@@ -2011,23 +2011,27 @@ async def vehicle_buy_now_checkout(
 
                 remainder_cents = platform_fee_cents - deposit_cents
                 remainder_amount = round(remainder_cents / 100.0, 2)
-                pi = stripe.PaymentIntent.create(
-                    amount=remainder_cents,
-                    currency="cad",
-                    customer=customer_id,
-                    payment_method=user_doc.get("stripe_default_payment_method"),
-                    off_session=True if user_doc.get("stripe_default_payment_method") else False,
-                    confirm=True if user_doc.get("stripe_default_payment_method") else False,
-                    description=f"BidVex Vehicle Platform Fee Remainder — Listing {data.listing_id}",
-                    metadata={
-                        "type": "vehicle_buy_now_remainder",
-                        "listing_id": data.listing_id,
-                        "buyer_id": current_user.id,
-                        "transaction_id": transaction_id,
-                        "bidvex_role": "platform_intermediary",
-                        "vehicle_price_collected_by_bidvex": "false",
-                        "fee_type": "vehicle_platform_fee_remainder",
-                    },
+                from services.stripe_circuit_breaker import safe_stripe_call_blocking
+                pi = await safe_stripe_call_blocking(
+                    lambda: stripe.PaymentIntent.create(
+                        amount=remainder_cents,
+                        currency="cad",
+                        customer=customer_id,
+                        payment_method=user_doc.get("stripe_default_payment_method"),
+                        off_session=True if user_doc.get("stripe_default_payment_method") else False,
+                        confirm=True if user_doc.get("stripe_default_payment_method") else False,
+                        description=f"BidVex Vehicle Platform Fee Remainder — Listing {data.listing_id}",
+                        metadata={
+                            "type": "vehicle_buy_now_remainder",
+                            "listing_id": data.listing_id,
+                            "buyer_id": current_user.id,
+                            "transaction_id": transaction_id,
+                            "bidvex_role": "platform_intermediary",
+                            "vehicle_price_collected_by_bidvex": "false",
+                            "fee_type": "vehicle_platform_fee_remainder",
+                        },
+                    ),
+                    operation_name="vehicle_buy_now_remainder_payment_intent_create",
                 )
                 card_charged_amount = remainder_amount
                 stripe_actions.append({"action": "card_charge_remainder", "pi": pi.id, "amount": remainder_amount})

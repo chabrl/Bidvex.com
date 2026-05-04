@@ -15,6 +15,7 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime, timezone, timedelta
 from jose import jwt, JWTError
 from deps import User
+from services.sanitizer import sanitize_string, safe_regex
 import logging
 import uuid
 import os
@@ -99,11 +100,16 @@ async def list_users(
 
     query = {}
     if search:
+        try:
+            search = sanitize_string(search)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid search query")
+        _safe = safe_regex(search)
         query["$or"] = [
-            {"name": {"$regex": search, "$options": "i"}},
-            {"email": {"$regex": search, "$options": "i"}},
-            {"phone": {"$regex": search, "$options": "i"}},
-            {"city": {"$regex": search, "$options": "i"}},
+            {"name": {"$regex": _safe, "$options": "i"}},
+            {"email": {"$regex": _safe, "$options": "i"}},
+            {"phone": {"$regex": _safe, "$options": "i"}},
+            {"city": {"$regex": _safe, "$options": "i"}},
         ]
     if role:
         query["role"] = role

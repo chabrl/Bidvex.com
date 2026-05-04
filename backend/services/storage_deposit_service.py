@@ -91,22 +91,28 @@ async def create_deposit_hold(
         logger.info(f"[STORAGE_DEPOSIT] PM.attach noop: {e}")
 
     try:
-        pi = stripe.PaymentIntent.create(
-            amount=int(round(float(amount) * 100)),
-            currency="cad",
-            customer=customer_id,
-            payment_method=payment_method_id,
-            confirm=True,
-            capture_method="manual",
-            off_session=False,
-            automatic_payment_methods={"enabled": True, "allow_redirects": "never"},
-            metadata={
-                "type": "storage_auction_deposit",
-                "auction_id": auction_id,
-                "buyer_id": buyer_id,
-            },
-            description=f"BidVex storage auction deposit — auction {auction_id}",
+        from services.stripe_circuit_breaker import safe_stripe_call_blocking
+        pi = await safe_stripe_call_blocking(
+            lambda: stripe.PaymentIntent.create(
+                amount=int(round(float(amount) * 100)),
+                currency="cad",
+                customer=customer_id,
+                payment_method=payment_method_id,
+                confirm=True,
+                capture_method="manual",
+                off_session=False,
+                automatic_payment_methods={"enabled": True, "allow_redirects": "never"},
+                metadata={
+                    "type": "storage_auction_deposit",
+                    "auction_id": auction_id,
+                    "buyer_id": buyer_id,
+                },
+                description=f"BidVex storage auction deposit — auction {auction_id}",
+            ),
+            operation_name="storage_deposit_payment_intent_create",
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"[STORAGE_DEPOSIT] PI.create failed: {e}")
         raise HTTPException(status_code=402, detail=f"Stripe authorization failed: {e}")

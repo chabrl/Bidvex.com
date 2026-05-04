@@ -486,19 +486,23 @@ async def create_deposit_hold(
         )
 
     # Create a PaymentIntent with manual capture (hold, don't charge)
-    intent = stripe.PaymentIntent.create(
-        amount=amount_cents,
-        currency=currency,
-        customer=customer_id,
-        capture_method="manual",  # Pre-auth: hold only
-        metadata={
-            "user_id": user_id,
-            "listing_id": listing_id,
-            "transaction_type": "bidding_deposit",
-            "platform": "bidvex",
-        },
-        description=f"BidVex Bidding Deposit — Listing {listing_id}",
-        statement_descriptor_suffix="DEPOSIT",
+    from services.stripe_circuit_breaker import safe_stripe_call_blocking
+    intent = await safe_stripe_call_blocking(
+        lambda: stripe.PaymentIntent.create(
+            amount=amount_cents,
+            currency=currency,
+            customer=customer_id,
+            capture_method="manual",  # Pre-auth: hold only
+            metadata={
+                "user_id": user_id,
+                "listing_id": listing_id,
+                "transaction_type": "bidding_deposit",
+                "platform": "bidvex",
+            },
+            description=f"BidVex Bidding Deposit — Listing {listing_id}",
+            statement_descriptor_suffix="DEPOSIT",
+        ),
+        operation_name="bidding_deposit_payment_intent_create",
     )
 
     # Store the hold in DB

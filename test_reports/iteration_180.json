@@ -1,0 +1,45 @@
+{
+  "summary": "Tested hardening sprint: 9 P0 items (indexes, pool, rate limits, /auth/refresh, sanitizer, scheduler status, sitemap/robots, stripe breaker, Sentry). Backend pytest: 9/10 passed. Fixed one frontend bug (SchedulerStatusCard double /api prefix) and updated static robots.txt. One unresolved public-URL-only robots.txt issue requires static asset rebuild/CDN purge.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/robots.txt (public)", "issue": "Served by Express (static /app/frontend/public/robots.txt), not FastAPI dynamic route. Originally missing 'Disallow: /api/'. I updated /app/frontend/public/robots.txt to include it, but preview CDN/Express may still serve old copy until frontend rebuild + Cloudflare purge."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "SchedulerStatusCard.js", "issue": "axios.get built URL `${API_BASE}/api/admin/scheduler/status` but API_BASE already equals `${REACT_APP_BACKEND_URL}/api`, producing `/api/api/admin/scheduler/status` (404). Silent catch swallowed the error so card always showed '0 jobs'. FIXED by T1 (removed duplicate /api).", "selector": "[data-testid='scheduler-status-card']", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "AdminDashboard", "issues": ["Non-blocking React warning: 'Each child in a list should have a unique key prop' in EnhancedUserManager (pre-existing, unrelated to sprint)", "Non-blocking warning: invalid DOM prop 'fetchpriority' (should be 'fetchPriority') appears in multiple places"]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_hardening_iter180.py",
+    "/app/test_reports/pytest/iter180_hardening.xml"
+  ],
+  "action_items": [
+    "Restart frontend / purge Cloudflare cache so updated /app/frontend/public/robots.txt (now containing 'Disallow: /api/') is served on the public URL. Alternatively, configure ingress to route /robots.txt and /sitemap.xml to backend (current ingress only routes /sitemap.xml dynamically; /robots.txt goes to Express static).",
+    "Consider fixing the React 'unique key prop' warning in EnhancedUserManager component (pre-existing, not part of this sprint).",
+    "Consider fixing the 'fetchpriority' -> 'fetchPriority' DOM prop warnings (React casing).",
+    "Verify main agent accepts T1's one-line frontend fix to SchedulerStatusCard.js."
+  ],
+  "critical_code_review_comments": [
+    "SchedulerStatusCard.js had a silent catch block (line 34–36) that hid the 404 — recommend surfacing at least a console.warn so future regressions are visible.",
+    "Dynamic /robots.txt route in backend is effectively unreachable through the public ingress because a static file at /app/frontend/public/robots.txt shadows it. Either remove the static file or reroute /robots.txt to backend.",
+    "API_BASE constant already includes `/api`; several components (confirm via grep) may still be constructing `${API_BASE}/api/...`. Main agent should audit usages."
+  ],
+  "updated_files": [
+    "/app/frontend/src/components/SchedulerStatusCard.js",
+    "/app/frontend/public/robots.txt",
+    "/app/backend/tests/test_hardening_iter180.py"
+  ],
+  "success_rate": {"backend": "90% (9/10)", "frontend": "100% after T1 fix (SchedulerStatusCard now renders 30 jobs, home page loads without blocking errors)"},
+  "test_credentials": "charbel911@gmail.com / Anderosli123!@# (admin) — used successfully",
+  "seed_data_creation": "None",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter180 validated hardening sprint. All backend endpoints verified: /api/health 200, /sitemap.xml has 13 <url> entries, login returns access_token+refresh_token, /api/auth/refresh rotates (new pair) and invalidates old (401 on reuse), login rate limit 429 with bilingual message_en/message_fr, bid POST rate limit hits 429 within 11 tries, /api/admin/scheduler/status returns scheduler_running=true with 30 jobs each having name/last_run/last_status/last_duration_ms/next_run fields, sanitizer rejects $where (400), sanitizer allows normal search (200). Only failing test is /robots.txt public URL (frontend static shadows backend). T1 applied two minor fixes: (1) SchedulerStatusCard double-/api URL; (2) added 'Disallow: /api/' to static robots.txt.",
+  "rca_of_the_issue": "Scheduler card showing 0 jobs: API_BASE in /app/frontend/src/config.js is defined as `${REACT_APP_BACKEND_URL}/api`. SchedulerStatusCard.js then did `${API_BASE}/api/admin/scheduler/status`, producing a double-prefix that returned 404. The axios call used a silent catch, so the failure was invisible in the UI (card showed 'No scheduled jobs reported yet.'). Fix: change to `${API_BASE}/admin/scheduler/status`. Robots.txt issue: Kubernetes ingress routes /robots.txt to the React frontend (port 3000), where Express serves /app/frontend/public/robots.txt (static), which did not contain 'Disallow: /api/'. Backend's dynamic /robots.txt is never reached publicly. Mitigation: update the static file (done) or change ingress routing."
+}

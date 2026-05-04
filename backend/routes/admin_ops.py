@@ -5,6 +5,7 @@ Auto-extracted from server.py during P2 refactoring.
 
 from fastapi import APIRouter, HTTPException, Depends, Request, Query, UploadFile, File, Form, WebSocket, WebSocketDisconnect, BackgroundTasks
 from deps import get_db, get_current_user, get_current_user_optional, require_admin, User
+from services.sanitizer import sanitize_string, safe_regex
 from shared import (
     DEFAULT_EMAIL_TEMPLATES, EMAIL_TEMPLATE_CATEGORIES,
     DEFAULT_MARKETPLACE_SETTINGS, AFFILIATE_COMMISSION_RATE,
@@ -36,6 +37,55 @@ import io
 from starlette.responses import StreamingResponse
 
 admin_ops_router = APIRouter(tags=["Admin Operations"])
+
+
+# ============= SCHEDULER HEALTH (Admin Dashboard) =============
+
+@admin_ops_router.get("/admin/scheduler/status")
+async def get_scheduler_status(current_user: User = Depends(require_admin)):
+    """Show last run time / status / duration for every scheduled job.
+
+    Used by the Admin Dashboard `Scheduler Status` card.
+    """
+    from services.scheduled_jobs import get_job_status_snapshot
+
+    statuses = get_job_status_snapshot()
+
+    # Merge in APScheduler-reported metadata (next_run_time) if available
+    jobs_out = []
+    try:
+        from server import scheduler as ap_scheduler
+        ap_jobs = {j.id: j for j in ap_scheduler.get_jobs()}
+    except Exception:
+        ap_jobs = {}
+
+    # Also include the standalone vehicle scheduler jobs
+    try:
+        from services.scheduler import scheduler as vehicle_scheduler
+        if vehicle_scheduler is not None:
+            for j in vehicle_scheduler.get_jobs():
+                ap_jobs.setdefault(j.id, j)
+    except Exception:
+        pass
+
+    all_job_ids = set(statuses.keys()) | set(ap_jobs.keys())
+    for jid in sorted(all_job_ids):
+        s = statuses.get(jid, {})
+        ap_j = ap_jobs.get(jid)
+        jobs_out.append({
+            "name": jid,
+            "last_run": s.get("last_run"),
+            "last_status": s.get("last_status", "pending"),
+            "last_duration_ms": s.get("last_duration_ms"),
+            "last_error": s.get("last_error"),
+            "next_run": ap_j.next_run_time.isoformat() if ap_j and ap_j.next_run_time else None,
+        })
+
+    return {
+        "jobs": jobs_out,
+        "total_jobs": len(jobs_out),
+        "scheduler_running": bool(ap_jobs),
+    }
 
 
 @admin_ops_router.get("/admin/reports")
@@ -974,11 +1024,16 @@ async def export_transactions_csv(
     if partner_only:
         query["is_partner_transaction"] = True
     if search:
+        try:
+            search = sanitize_string(search)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid search query")
+        _safe = safe_regex(search)
         query["$or"] = [
-            {"listing_title": {"$regex": search, "$options": "i"}},
-            {"buyer_email": {"$regex": search, "$options": "i"}},
-            {"seller_email": {"$regex": search, "$options": "i"}},
-            {"partner_company": {"$regex": search, "$options": "i"}},
+            {"listing_title": {"$regex": _safe, "$options": "i"}},
+            {"buyer_email": {"$regex": _safe, "$options": "i"}},
+            {"seller_email": {"$regex": _safe, "$options": "i"}},
+            {"partner_company": {"$regex": _safe, "$options": "i"}},
         ]
     
     db = get_db()
@@ -1117,11 +1172,16 @@ async def admin_transaction_logs(
     if partner_only:
         query["is_partner_transaction"] = True
     if search:
+        try:
+            search = sanitize_string(search)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid search query")
+        _safe = safe_regex(search)
         query["$or"] = [
-            {"listing_title": {"$regex": search, "$options": "i"}},
-            {"buyer_email": {"$regex": search, "$options": "i"}},
-            {"seller_email": {"$regex": search, "$options": "i"}},
-            {"partner_company": {"$regex": search, "$options": "i"}},
+            {"listing_title": {"$regex": _safe, "$options": "i"}},
+            {"buyer_email": {"$regex": _safe, "$options": "i"}},
+            {"seller_email": {"$regex": _safe, "$options": "i"}},
+            {"partner_company": {"$regex": _safe, "$options": "i"}},
         ]
     
     skip = (page - 1) * limit
@@ -1676,10 +1736,15 @@ async def admin_list_community_questions(
     db = get_db()
     query = {}
     if search:
+        try:
+            search = sanitize_string(search)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid search query")
+        _safe = safe_regex(search)
         query["$or"] = [
-            {"title": {"$regex": search, "$options": "i"}},
-            {"body": {"$regex": search, "$options": "i"}},
-            {"author_name": {"$regex": search, "$options": "i"}},
+            {"title": {"$regex": _safe, "$options": "i"}},
+            {"body": {"$regex": _safe, "$options": "i"}},
+            {"author_name": {"$regex": _safe, "$options": "i"}},
         ]
     total = await db.community_questions.count_documents(query)
     questions = await db.community_questions.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)

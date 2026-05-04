@@ -116,20 +116,24 @@ async def charge_cancellation_penalty(db, seller_id: str, listing_id: str, reaso
         raise HTTPException(status_code=422, detail="No Stripe customer on record")
 
     try:
-        pi = stripe.PaymentIntent.create(
-            amount=PENALTY_AMOUNT_CENTS,
-            currency="cad",
-            customer=user_doc["stripe_customer_id"],
-            payment_method=user_doc.get("default_payment_method_id"),
-            confirm=True,
-            automatic_payment_methods={"enabled": True, "allow_redirects": "never"},
-            description="BidVex Cancellation Penalty — Non-delivery after auction close",
-            metadata={
-                "type": "cancellation_penalty",
-                "seller_id": seller_id,
-                "listing_id": listing_id,
-                "reason": reason,
-            },
+        from services.stripe_circuit_breaker import safe_stripe_call_blocking
+        pi = await safe_stripe_call_blocking(
+            lambda: stripe.PaymentIntent.create(
+                amount=PENALTY_AMOUNT_CENTS,
+                currency="cad",
+                customer=user_doc["stripe_customer_id"],
+                payment_method=user_doc.get("default_payment_method_id"),
+                confirm=True,
+                automatic_payment_methods={"enabled": True, "allow_redirects": "never"},
+                description="BidVex Cancellation Penalty — Non-delivery after auction close",
+                metadata={
+                    "type": "cancellation_penalty",
+                    "seller_id": seller_id,
+                    "listing_id": listing_id,
+                    "reason": reason,
+                },
+            ),
+            operation_name="cancellation_penalty_payment_intent_create",
         )
 
         await db.penalty_log.insert_one({

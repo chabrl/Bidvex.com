@@ -8,7 +8,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timezone
-from jose import jwt, JWTError
+from jose import jwt, JWTError, ExpiredSignatureError
 import os
 import logging
 
@@ -95,6 +95,12 @@ async def get_current_user(request: Request, credentials: Optional[HTTPAuthoriza
         if not user_doc:
             raise HTTPException(status_code=401, detail="User not found")
         return User(**user_doc)
+    except ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail={
+            "error": "token_expired",
+            "message_en": "Your session has expired. Please log in again.",
+            "message_fr": "Votre session a expiré. Veuillez vous reconnecter.",
+        })
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 

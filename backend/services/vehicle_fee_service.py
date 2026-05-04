@@ -97,7 +97,11 @@ async def create_vehicle_fee_charge(
         if buyer_default_payment_method:
             pi_params["payment_method"] = buyer_default_payment_method
 
-        pi = stripe.PaymentIntent.create(**pi_params)
+        from services.stripe_circuit_breaker import safe_stripe_call_blocking
+        pi = await safe_stripe_call_blocking(
+            lambda: stripe.PaymentIntent.create(**pi_params),
+            operation_name="vehicle_fee_payment_intent_create",
+        )
 
         # Store settlement record
         now = datetime.now(timezone.utc).isoformat()

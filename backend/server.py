@@ -47,19 +47,39 @@ stripe_api_key = os.environ.get('STRIPE_API_KEY', '')
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ─── Database (connection pooling) ───
+# ─── Sentry (optional) ───
+try:
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    _sentry_dsn = os.environ.get("SENTRY_DSN", "").strip()
+    if _sentry_dsn:
+        sentry_sdk.init(
+            dsn=_sentry_dsn,
+            integrations=[FastApiIntegration()],
+            traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
+            environment=os.environ.get("SENTRY_ENVIRONMENT", os.environ.get("ENVIRONMENT", "production")),
+            send_default_pii=False,
+        )
+        logger.info(f"Sentry initialized (env={os.environ.get('ENVIRONMENT', 'production')})")
+    else:
+        logger.info("Sentry disabled — SENTRY_DSN not set")
+except Exception as _se:  # pragma: no cover
+    logger.warning(f"Sentry init failed (non-fatal): {_se}")
+
+# ─── Database (connection pooling — production tuned) ───
 try:
     from pymongo import ReadPreference
     client = AsyncIOMotorClient(
         mongo_url,
-        serverSelectionTimeoutMS=5000,
-        maxPoolSize=50,
-        minPoolSize=2,
-        connectTimeoutMS=10000,
+        maxPoolSize=50,                 # Max 50 concurrent connections
+        minPoolSize=5,                  # Keep 5 connections warm
+        maxIdleTimeMS=30000,            # Close idle connections after 30s
+        connectTimeoutMS=5000,          # Fail fast (5s) if can't connect
+        serverSelectionTimeoutMS=5000,  # Don't wait forever for MongoDB
         socketTimeoutMS=20000,
         retryReads=True,
-        retryWrites=True,
-        w="majority",
+        retryWrites=True,               # Auto-retry on transient write errors
+        w="majority",                   # Confirmed by majority of replicas
     )
     db = client[db_name]
     # Use secondary-preferred reads so queries don't wait for a failing primary
@@ -230,13 +250,28 @@ async def error_tracking_middleware(request: Request, call_next):
         ))
         raise
 
-# ─── Rate Limiting ───
+# ─── Rate Limiting (bilingual 429 handler) ───
 from rate_limit import limiter
-from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+async def _bilingual_rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    """Bilingual EN/FR rate limit error response."""
+    return JSONResponse(
+        status_code=429,
+        content={
+            "error": "rate_limit_exceeded",
+            "message_en": "Too many requests. Please wait before trying again.",
+            "message_fr": "Trop de requêtes. Veuillez patienter avant de réessayer.",
+            "retry_after_seconds": 60,
+        },
+        headers={"Retry-After": "60"},
+    )
+
+
+app.add_exception_handler(RateLimitExceeded, _bilingual_rate_limit_handler)
 
 # ─── WebSocket Managers ───
 from ws_managers import ConnectionManager, MessageConnectionManager, MarketplaceConnectionManager
@@ -260,28 +295,37 @@ from services.scheduled_jobs import (
     process_overdue_auction_payments,
     send_review_request_emails,
     keepalive_ping,
+    safe_run,
 )
 
 async def run_process_ended_auctions():
     from routes.auctions import process_ended_auctions
     await process_ended_auctions()
 
-scheduler.add_job(lambda: transition_upcoming_auctions(db), trigger=IntervalTrigger(minutes=5),
-                  id='transition_upcoming_auctions', replace_existing=True)
-scheduler.add_job(run_process_ended_auctions, trigger=IntervalTrigger(minutes=1),
-                  id='process_ended_auctions', replace_existing=True)
-scheduler.add_job(lambda: expire_partner_pro_trials(db), trigger=IntervalTrigger(hours=1),
-                  id='expire_trials', replace_existing=True)
-scheduler.add_job(lambda: send_trial_reminder_emails(db), trigger=IntervalTrigger(hours=1),
-                  id='trial_reminders', replace_existing=True)
-scheduler.add_job(lambda: send_auction_payment_reminders(db), trigger=IntervalTrigger(hours=6),
-                  id='payment_reminders', replace_existing=True)
-scheduler.add_job(lambda: process_overdue_auction_payments(db), trigger=IntervalTrigger(hours=6),
-                  id='overdue_payments', replace_existing=True)
-scheduler.add_job(lambda: send_review_request_emails(db), trigger=IntervalTrigger(hours=1),
-                  id='review_requests', replace_existing=True)
-scheduler.add_job(keepalive_ping, trigger=IntervalTrigger(minutes=4),
-                  id='keepalive_ping', replace_existing=True)
+scheduler.add_job(
+    lambda: safe_run("transition_upcoming_auctions", transition_upcoming_auctions(db)),
+    trigger=IntervalTrigger(minutes=5), id='transition_upcoming_auctions', replace_existing=True)
+scheduler.add_job(
+    lambda: safe_run("process_ended_auctions", run_process_ended_auctions()),
+    trigger=IntervalTrigger(minutes=1), id='process_ended_auctions', replace_existing=True)
+scheduler.add_job(
+    lambda: safe_run("expire_partner_pro_trials", expire_partner_pro_trials(db)),
+    trigger=IntervalTrigger(hours=1), id='expire_trials', replace_existing=True)
+scheduler.add_job(
+    lambda: safe_run("send_trial_reminder_emails", send_trial_reminder_emails(db)),
+    trigger=IntervalTrigger(hours=1), id='trial_reminders', replace_existing=True)
+scheduler.add_job(
+    lambda: safe_run("send_auction_payment_reminders", send_auction_payment_reminders(db)),
+    trigger=IntervalTrigger(hours=6), id='payment_reminders', replace_existing=True)
+scheduler.add_job(
+    lambda: safe_run("process_overdue_auction_payments", process_overdue_auction_payments(db)),
+    trigger=IntervalTrigger(hours=6), id='overdue_payments', replace_existing=True)
+scheduler.add_job(
+    lambda: safe_run("send_review_request_emails", send_review_request_emails(db)),
+    trigger=IntervalTrigger(hours=1), id='review_requests', replace_existing=True)
+scheduler.add_job(
+    lambda: safe_run("keepalive_ping", keepalive_ping()),
+    trigger=IntervalTrigger(minutes=4), id='keepalive_ping', replace_existing=True)
 
 # Watchlist expiry push alerts — check every 2 minutes for items ending within 5 min
 async def run_watchlist_expiry_alerts():
@@ -314,8 +358,9 @@ async def run_watchlist_expiry_alerts():
     except Exception as e:
         logger.warning(f"Watchlist expiry alerts failed: {e}")
 
-scheduler.add_job(run_watchlist_expiry_alerts, trigger=IntervalTrigger(minutes=2),
-                  id='watchlist_expiry_alerts', replace_existing=True)
+scheduler.add_job(
+    lambda: safe_run("watchlist_expiry_alerts", run_watchlist_expiry_alerts()),
+    trigger=IntervalTrigger(minutes=2), id='watchlist_expiry_alerts', replace_existing=True)
 
 # ─── Health Endpoints ───
 @api_router.get("/")
@@ -483,6 +528,10 @@ try:
     from routes.storage_auctions import storage_router
     api_router.include_router(storage_router)
 
+    # SEO: Dynamic sitemap.xml + robots.txt (app-level, not /api)
+    from routes.sitemap import sitemap_router
+    app.include_router(sitemap_router, tags=["SEO"])
+
     @app.on_event("startup")
     async def start_vehicle_auction_scheduler():
         try:
@@ -560,6 +609,30 @@ async def on_startup():
     await init_cloud_storage()
     await seed_categories(db)
     await create_database_indexes(db)
+    await create_critical_indexes(db)
+
+
+async def create_critical_indexes(database):
+    """Run on every startup — idempotent, safe to re-run.
+    Only the most critical indexes for fast cold-start verification.
+    Each index is wrapped independently so one collision doesn't stop the rest.
+    """
+    critical = [
+        ("listings", [("status", 1), ("end_time", 1)], {"background": True}),
+        ("storage_auctions", [("status", 1), ("end_time", 1)], {"background": True}),
+        ("users", [("email", 1)], {"unique": True, "background": True}),
+        ("deposits", [("auction_id", 1), ("status", 1)], {"background": True}),
+        # TTL — auto-deletes expired refresh tokens
+        ("refresh_tokens", [("expires_at", 1)], {"expireAfterSeconds": 0, "background": True}),
+    ]
+    ok = 0
+    for coll, keys, opts in critical:
+        try:
+            await database[coll].create_index(keys, **opts)
+            ok += 1
+        except Exception as e:
+            logger.warning(f"[critical-index] {coll} {keys}: {e}")
+    logger.info(f"✅ Critical database indexes verified ({ok}/{len(critical)} ok)")
 
 @app.on_event("shutdown")
 async def on_shutdown():
@@ -600,15 +673,7 @@ if _frontend_build:
     # Serve public assets from build root (manifest.json, ads.txt, etc.)
     _public_exts = {".xml", ".txt", ".ico", ".png", ".json", ".webmanifest"}
 
-    @app.get("/sitemap.xml", include_in_schema=False)
-    async def serve_sitemap():
-        p = os.path.join(_frontend_build, "sitemap.xml")
-        return FileResponse(p, media_type="application/xml") if os.path.isfile(p) else JSONResponse({"detail": "not found"}, status_code=404)
-
-    @app.get("/robots.txt", include_in_schema=False)
-    async def serve_robots():
-        p = os.path.join(_frontend_build, "robots.txt")
-        return FileResponse(p, media_type="text/plain") if os.path.isfile(p) else JSONResponse({"detail": "not found"}, status_code=404)
+    # Note: /sitemap.xml and /robots.txt are served by routes/sitemap.py (dynamic)
 
     @app.api_route("/{path:path}", methods=["GET"], include_in_schema=False)
     async def spa_catch_all(path: str):

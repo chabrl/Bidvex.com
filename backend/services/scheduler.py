@@ -628,6 +628,18 @@ async def settlement_reminders_job():
 
 
 
+def _tracked(job_id: str, job_func):
+    """Wrap a vehicle scheduler job with the shared safe_run tracker.
+
+    Records last_run/last_status/last_duration_ms in scheduled_jobs._JOB_STATUS
+    so the admin scheduler-status endpoint can surface the data.
+    """
+    async def _wrapper():
+        from services.scheduled_jobs import safe_run
+        return await safe_run(job_id, job_func())
+    return _wrapper
+
+
 def init_scheduler(database):
     """Initialize the background scheduler with all jobs"""
     global scheduler, db_instance
@@ -637,7 +649,7 @@ def init_scheduler(database):
     
     # Job 1: Process ended auctions - every minute
     scheduler.add_job(
-        process_ended_auctions_job,
+        _tracked("process_ended_auctions", process_ended_auctions_job),
         IntervalTrigger(minutes=1),
         id="process_ended_auctions",
         name="Process Ended Auctions",
@@ -646,7 +658,7 @@ def init_scheduler(database):
     
     # Job 2: Activate scheduled auctions - every minute
     scheduler.add_job(
-        activate_scheduled_auctions_job,
+        _tracked("activate_scheduled_auctions", activate_scheduled_auctions_job),
         IntervalTrigger(minutes=1),
         id="activate_scheduled_auctions",
         name="Activate Scheduled Auctions",
@@ -655,7 +667,7 @@ def init_scheduler(database):
     
     # Job 3: Apply late penalties - daily at midnight
     scheduler.add_job(
-        apply_late_penalties_job,
+        _tracked("apply_late_penalties", apply_late_penalties_job),
         CronTrigger(hour=0, minute=5),
         id="apply_late_penalties",
         name="Apply Late Payment Penalties",
@@ -664,7 +676,7 @@ def init_scheduler(database):
     
     # Job 4: Cleanup expired deposits - every hour
     scheduler.add_job(
-        cleanup_expired_deposits_job,
+        _tracked("cleanup_expired_deposits", cleanup_expired_deposits_job),
         IntervalTrigger(hours=1),
         id="cleanup_expired_deposits",
         name="Cleanup Expired Deposits",
@@ -673,7 +685,7 @@ def init_scheduler(database):
     
     # Job 5: Cleanup expired payment sessions - every hour
     scheduler.add_job(
-        cleanup_expired_sessions_job,
+        _tracked("cleanup_expired_sessions", cleanup_expired_sessions_job),
         IntervalTrigger(hours=1),
         id="cleanup_expired_sessions",
         name="Cleanup Expired Sessions",
@@ -682,7 +694,7 @@ def init_scheduler(database):
     
     # Job 6: Daily summary - every day at 11:55 PM
     scheduler.add_job(
-        daily_summary_job,
+        _tracked("daily_summary", daily_summary_job),
         CronTrigger(hour=23, minute=55),
         id="daily_summary",
         name="Daily Summary",
@@ -691,7 +703,7 @@ def init_scheduler(database):
 
     # Job 6b: Vehicle settlement confirmation reminders - daily at 9:00 AM UTC
     scheduler.add_job(
-        settlement_reminders_job,
+        _tracked("settlement_reminders", settlement_reminders_job),
         CronTrigger(hour=9, minute=0),
         id="settlement_reminders",
         name="Vehicle Settlement Confirmation Reminders",
@@ -700,7 +712,7 @@ def init_scheduler(database):
     
     # Job 7: Check subscription expirations - daily at 00:30 UTC
     scheduler.add_job(
-        check_subscription_expirations_job,
+        _tracked("check_subscription_expirations", check_subscription_expirations_job),
         CronTrigger(hour=0, minute=30),
         id="check_subscription_expirations",
         name="Check Subscription Expirations",
@@ -715,7 +727,7 @@ def init_scheduler(database):
         await send_auction_ending_soon_notifications(db_instance)
     
     scheduler.add_job(
-        ending_soon_job,
+        _tracked("auction_ending_soon_notifications", ending_soon_job),
         IntervalTrigger(minutes=5),
         id="auction_ending_soon_notifications",
         name="Auction Ending Soon Notifications",
@@ -724,7 +736,7 @@ def init_scheduler(database):
     
     # Job 8: Send subscription reminders - daily at 01:00 UTC
     scheduler.add_job(
-        send_subscription_reminders_job,
+        _tracked("send_subscription_reminders", send_subscription_reminders_job),
         CronTrigger(hour=1, minute=0),
         id="send_subscription_reminders",
         name="Send Subscription Reminders",
@@ -733,7 +745,7 @@ def init_scheduler(database):
     
     # Job 9: Process scheduled email campaigns - every 5 minutes
     scheduler.add_job(
-        process_scheduled_campaigns_job,
+        _tracked("process_scheduled_campaigns", process_scheduled_campaigns_job),
         IntervalTrigger(minutes=5),
         id="process_scheduled_campaigns",
         name="Process Scheduled Email Campaigns",
@@ -748,7 +760,7 @@ def init_scheduler(database):
         await process_ended_storage_auctions(db_instance)
 
     scheduler.add_job(
-        storage_close_job,
+        _tracked("process_ended_storage_auctions", storage_close_job),
         IntervalTrigger(minutes=5),
         id="process_ended_storage_auctions",
         name="Process Ended Storage Auctions",
@@ -763,7 +775,7 @@ def init_scheduler(database):
         await process_expired_promotions(db_instance)
 
     scheduler.add_job(
-        promotions_downgrade_job,
+        _tracked("process_expired_promotions", promotions_downgrade_job),
         IntervalTrigger(hours=1),
         id="process_expired_promotions",
         name="Downgrade Expired Promotions",
@@ -781,7 +793,7 @@ def init_scheduler(database):
         )
 
     scheduler.add_job(
-        auto_capture_overdue_deposits_job,
+        _tracked("auto_capture_overdue_deposits", auto_capture_overdue_deposits_job),
         IntervalTrigger(hours=6),
         id="auto_capture_overdue_deposits",
         name="Auto-Capture Overdue Vehicle Deposits",
@@ -824,7 +836,7 @@ def init_scheduler(database):
         return result
 
     scheduler.add_job(
-        activate_upcoming_auctions_job,
+        _tracked("activate_upcoming_auctions", activate_upcoming_auctions_job),
         IntervalTrigger(minutes=1),
         id="activate_upcoming_auctions",
         name="Activate Upcoming Auctions (status: upcoming → active)",

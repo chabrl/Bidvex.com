@@ -41,6 +41,7 @@ from models.vehicle_models import (
     validate_vin
 )
 from services.vin_decoder import decode_vin as vin_decode_service
+from rate_limit import limiter as _limiter
 from services.vehicle_pricing import (
     calculate_buyer_pricing,
     calculate_seller_pricing,
@@ -1024,7 +1025,9 @@ async def get_my_vehicle_listings(
 # ============= BIDDING ENDPOINTS =============
 
 @vehicle_router.post("/vehicle-bids")
+@_limiter.limit("10/minute")
 async def place_vehicle_bid(
+    request: Request,
     bid_data: VehicleBidCreate,
     user: dict = Depends(get_current_user)
 ):
