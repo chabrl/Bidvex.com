@@ -16,7 +16,7 @@ export const useInsightsTracker = () => {
     queueRef.current = [];
 
     try {
-      await fetch(`${API_BASE}/api/insights/track-batch`, {
+      await fetch(`${API_BASE}/insights/track-batch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(batch),

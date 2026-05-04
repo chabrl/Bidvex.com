@@ -32,7 +32,8 @@ export const SchedulerStatusCard = ({ token }) => {
       });
       setData(res.data || { jobs: [], total_jobs: 0, scheduler_running: false });
     } catch (e) {
-      // Silent fail — dashboard remains usable
+      // Surface to console for visibility but keep dashboard usable
+      console.warn('[SchedulerStatus] fetch failed:', e?.response?.status || e?.message || e);
     } finally {
       setLoading(false);
       setRefreshing(false);
