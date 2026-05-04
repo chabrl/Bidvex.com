@@ -18,8 +18,11 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '../utils/currencyFormatter';
+import CurrencyBadge from './CurrencyBadge';
 import { useMarketplaceItems } from '../hooks/useMarketplaceItems';
 import { useTranslation } from 'react-i18next';
+
+/**
  * Decomposed Marketplace - Item-Centric Discovery
  * Features:
  * - Individual items from multi-item lots
@@ -268,9 +271,7 @@ const DecomposedMarketplace = () => {
                     <span className="text-sm text-muted-foreground">Current Bid:</span>
                     <span className="text-lg font-bold text-primary">
                       {formatCurrency(item.current_price || 0, item.currency)}
-                      <span className={`ml-1 text-[9px] font-bold px-1.5 py-0 rounded-full ${item.currency === 'USD' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`} data-testid="listing-currency-badge">
-                        {item.currency || 'CAD'}
-                      </span>
+                      <CurrencyBadge currency={item.currency || 'CAD'} size="xs" className="ml-1 align-middle" testid="listing-currency-badge" />
                     </span>
                   </div>
 

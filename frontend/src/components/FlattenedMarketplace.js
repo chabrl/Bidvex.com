@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '../utils/currencyFormatter';
+import CurrencyBadge from './CurrencyBadge';
 import { getLocalized } from '../utils/localization';
 import { useCategories } from '../hooks/useCategories';
 import { useMarketplaceItems } from '../hooks/useMarketplaceItems';
@@ -736,9 +737,7 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
             <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('marketplace.currentBid')}</span>
             <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
               {formatCurrency(item.current_price || item.starting_price || 0, item.currency)}
-              <span className={`ml-1.5 text-[9px] font-bold px-1.5 py-0 rounded-full ${item.currency === 'USD' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`} data-testid="listing-currency-badge">
-                {item.currency || 'CAD'}
-              </span>
+              <CurrencyBadge currency={item.currency || 'CAD'} size="xs" className="ml-1.5 align-middle" testid="listing-currency-badge" />
             </span>
           </div>
 
