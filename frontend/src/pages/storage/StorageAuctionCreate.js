@@ -42,7 +42,7 @@ const StorageAuctionCreate = () => {
     // ── Optional participation deposit ──
     deposit_required: false,
     deposit_amount: '',
-    soft_close_enabled: true, soft_close_extension_minutes: 10,
+    soft_close_enabled: true, soft_close_extension_minutes: 2,
   });
   const [submitting, setSubmitting] = useState(false);
   const [uploadingIdx, setUploadingIdx] = useState(false);
