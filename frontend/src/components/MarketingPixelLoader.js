@@ -27,7 +27,7 @@ const injectFbPixel = (id) => {
   s.parentNode.insertBefore(t,s)}(window, document,'script',
   'https://connect.facebook.net/en_US/fbevents.js');
   /* eslint-enable */
-  try { window.fbq('init', id); window.fbq('track', 'PageView'); } catch (_) {}
+  try { if (id) { window.fbq('init', id); window.fbq('track', 'PageView'); } } catch (_) {}
 };
 
 const injectGtm = (id) => {

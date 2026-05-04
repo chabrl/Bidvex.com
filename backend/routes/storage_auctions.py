@@ -409,7 +409,13 @@ async def storage_deposit_status(
     required = bool(auction.get("deposit_required"))
     amount = float(auction.get("deposit_amount") or 0)
     if not required or amount <= 0:
-        return {"has_deposit": True, "deposit_required": False, "deposit_amount": 0}
+        return {
+            "has_deposit": True,
+            "deposit_required": False,
+            "deposit_amount": 0,
+            "status": None,
+            "created_at": None,
+        }
 
     deposit = await db.storage_deposits.find_one(
         {"auction_id": auction_id, "buyer_id": current_user.id},

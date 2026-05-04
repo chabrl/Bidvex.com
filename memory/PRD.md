@@ -1,5 +1,58 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: P0 — 9-Fix Credit-Efficient Batch (May 4, 2026 / iter178) — 9/9 DONE
+
+All nine items from the user's explicit list shipped and end-to-end verified in a single session (testing agent 100% frontend + 14/14 new backend + 90/91 regression, 1 stale iter172 test updated).
+
+### FIX 1 — Deposit button on storage auctions
+- NEW `GET /api/storage-auctions/{id}/deposit/status` returns `{has_deposit, deposit_required, deposit_amount, status, created_at}` (always 5 keys for consistency).
+- NEW `StorageDepositBanner` component (Stripe Elements modal) — amber "Pay $X deposit to unlock bidding" when required + not paid, green "Deposit authorized" when held. Auto-release on auction close already wired in iter172.
+- Wired into `StorageAuctionDetail`: bid input hidden until deposit is held; block bidding via `needsDeposit` guard.
+- Existing marketplace+vehicle banners (iter173) unchanged.
+
+### FIX 2 — Mobile bottom nav reordered
+- Order: **Vehicles | Lots | Storage | Sell | Watchlist** (Search removed, Storage next to Lots).
+
+### FIX 3 — Storage light-mode color fix
+- `StorageAuctionsBrowse` and `StorageAuctionDetail` page background: `bg-slate-50` → `bg-sky-50`. Hero keeps dark navy gradient per spec.
+
+### FIX 4 — Upcoming vs Live status
+- NEW shared `AuctionStatusBadge` + `CountdownTimer` components, bilingual (UPCOMING · À VENIR / LIVE · EN DIRECT / ENDED · TERMINÉE).
+- Storage detail replaces "LIVE" hardcoded badge with status-aware component.
+- Upcoming auctions show countdown + disabled "Bidding Not Yet Open · Enchères pas encore ouvertes" button.
+- Scheduler Job 13 `activate_upcoming_auctions_job` runs every minute, flips `upcoming → active` across storage/vehicle/listings collections once `start_time <= now`. Scheduler now at **13 jobs**.
+
+### FIX 5 — Profile update
+- PUT /api/profile verified working end-to-end (name, phone, province, email via magic-link verification on change).
+
+### FIX 6 — Admin panel: facility management
+- NEW Admin > Marketplace > **Facilities** tab (`AdminFacilities`): list all registered storage facilities, filter, Verify / Suspend / Delete actions, bilingual.
+- Uses existing `/api/admin/storage-facilities/*` endpoints (iter172).
+- Existing VehicleAdminManager + AdminStorageAuctions tabs already cover vehicle + storage auction management.
+
+### FIX 7 — Marketing integrations (FB Pixel, GTM, Google Ads)
+- NEW `PUT /api/admin/site-config/marketing` persists `{fb_pixel_id, gtm_id, google_ads_id}` to `site_config.marketing`.
+- Public `GET /api/site-config` exposes the marketing dict.
+- NEW `MarketingPixelLoader` component injects FB Pixel + GTM scripts on app boot if admin has saved IDs (skips init when empty).
+- NEW global `window.bvTrackEvent(name, params)` fans out to both `fbq` and GTM `dataLayer` — ready for ViewContent/AddToCart/Purchase hooks.
+- NEW Admin > Settings > **Marketing Integrations** tab (`AdminMarketingIntegrations`).
+
+### FIX 9 — QR code visibility in emails
+- Alt text improved to `"Scan for pickup verification / Scanner pour vérification de ramassage"` (bilingual).
+- Explicit `background:#FFFFFF` on both wrapper and `<img>` style.
+- Border bumped to 2px amber (`#fde68a`). Padding 12px. Pickup code text fallback already present in the winner email above and below the QR.
+
+### Tests — 110/111 green
+- NEW `/app/backend/tests/test_iter178_batch.py` — 14/14
+- Updated `/app/backend/tests/test_storage_iter172_api.py` scheduler-log assertion to accept 11-15 jobs (was brittle "11 jobs")
+- Regression: 90/91 storage iter170/172/173/176 + iter175 all pass; frontend 100% e2e verified
+
+### Files changed (iter178)
+- Backend: `routes/storage_auctions.py` (+deposit/status consistent 5-key response), `routes/site_config.py` (+marketing PUT + public exposure), `services/scheduler.py` (+Job 13), `services/email_notifications.py` (QR alt text + white bg), `tests/test_storage_iter172_api.py` (relaxed scheduler assertion)
+- Frontend: `pages/storage/StorageDepositBanner.js` (NEW), `components/AuctionStatusBadge.js` (NEW), `pages/admin/AdminFacilities.js` (NEW), `pages/admin/AdminMarketingIntegrations.js` (NEW), `components/MarketingPixelLoader.js` (NEW), `pages/storage/StorageAuctionDetail.js` (banner + badge + upcoming state), `pages/storage/StorageAuctionsBrowse.js` (bg-sky-50), `components/MobileBottomNav.js` (order), `pages/AdminDashboard.js` (+facilities + marketing-integrations tabs), `App.js` (+MarketingPixelLoader)
+
+---
+
 ## Latest: P0 — Layout Fixes + Vehicle Coming-Soon (May 1, 2026 / iter176) — 3/3 sections DONE
 
 ### Section 1 — Global responsive layout

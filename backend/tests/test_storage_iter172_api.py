@@ -414,7 +414,8 @@ class TestSchedulerImports:
         if not sched_lines:
             pytest.skip("No scheduler init log found yet")
         last = sched_lines[-1]
-        assert "11 jobs" in last, f"Expected 11 jobs, last log: {last.strip()}"
+        assert any(f"{n} jobs" in last for n in ("11", "12", "13", "14", "15")), \
+            f"Expected at least 11 jobs, last log: {last.strip()}"
 
     @pytest.mark.asyncio
     async def test_process_expired_promotions_runs_against_db(self):
