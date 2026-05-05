@@ -230,6 +230,11 @@ const ListingPromotionModal = ({ listingId, listingTitle, listingType = 'marketp
                 <span>{isFr ? 'Total facturé' : 'Total Charged'}</span>
                 <span data-testid="promo-grand-total">${preview.grand.toFixed(2)} CAD</span>
               </div>
+              <p className="text-[11px] text-gray-500 mt-2 italic">
+                {isFr
+                  ? 'Estimation — le montant exact sera confirmé à la caisse.'
+                  : 'Estimate — final amount will be confirmed at checkout.'}
+              </p>
             </div>
           )}
 

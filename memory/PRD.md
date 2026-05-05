@@ -1,6 +1,63 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: P0 Critical Bug Sprint — 6/6 Fixed (May 5, 2026 / iter181) — Verified 100%
+## Latest: Listing Promotion / Boost Payment System (May 5, 2026 / iter182) — 100% verified
+
+### Bug fix — "Method Not Allowed" on Promote button
+- Root cause: front-end POSTed to `/payments/promote-listing` while backend only registered `/payments/promote`.
+- Fix: new canonical `POST /api/payments/promote-listing` endpoint in `routes/payments_promotions.py` accepts `{listing_id, boost_tier, listing_type, return_url}`, owner-only authorisation, returns Stripe Checkout `checkout_url` + full breakdown.
+- Legacy `/payments/promote` preserved during the deprecation window.
+
+### Full Stripe pricing (Canadian fee stack — single source of truth)
+- Base × {Basic 9.99 · Standard 24.99 · Premium 49.99}
+- + GST 5% on base + QST 9.975% on base
+- + Two-pass `gross_up_stripe_fee(card_type)` Stripe fee (domestic 2.9%/intl 3.9%/conversion 5.9%)
+- Live verified totals (basic / standard / premium): **$12.14 / $29.90 / $59.51 CAD**.
+- The two-pass gross-up is ~$0.30 higher than the spec's single-pass approximation because it also covers Stripe's cut on the GST/QST line (revenue-protection by design).
+
+### Webhook activation (`checkout.session.completed` for `transaction_type=listing_promotion`)
+- New `_handle_listing_promotion_paid()` in `routes/webhooks.py`:
+  - Sets `is_promoted=true`, `is_featured=true`, `promotion_tier`, `promotion_tier_weight`, `promotion_start`, `promotion_end`, `promoted_until`, `promotion_features[]` on the listing in the correct collection (`db.storage_auctions` for storage, `db.listings` for the rest).
+  - Updates the matching `db.promotions` row → `status: active`.
+  - Premium tier inserts a row into `db.social_share_queue` for manual posting.
+  - Sends bilingual confirmation email via new `send_promotion_confirmation_email` (with full receipt: base, GST, QST, Payment Processing, Total Charged).
+
+### Storage Auction promotions
+- Frontend: `pages/storage/StorageAuctionDetail.js` now renders a `data-testid="boost-storage-auction-btn"` for facility owners + admins; opens the same `ListingPromotionModal` with `listingType="storage"`.
+- Backend: same pricing route handles `listing_type="storage"` against `db.storage_auctions`.
+- `routes/storage_auctions.py` list endpoint now sorts `[is_promoted -1, promotion_tier_weight -1, ...]` so promoted auctions surface first.
+
+### Partner Lots promotions
+- `pages/ListingDetailPage.js` mounts the modal with `listingType="lots"` when `listing.is_multi_item || listing.listing_type === "lots"`.
+- Header label for partner/lots: EN "Promote Your Lot Auction" / FR "Promouvoir votre vente aux enchères par lots".
+- Premium adds a "Featured Partner" badge to the feature list.
+- `routes/listings.py` `sort_spec` mirrors storage — promoted first, tier weight tie-breaker.
+
+### Card-type aware Stripe fee
+- `gross_up_stripe_fee(net, card_type)` now supports `"domestic"` (2.9%), `"international"` (3.9%), `"conversion"` (5.9%); defaults to domestic.
+- `payment_intent.succeeded` webhook reads `payment_method.card.country` and writes `card_country` + `actual_stripe_fee` to the transaction record. Non-CA card → logs the delta to a new `stripe_fee_adjustments` collection for manual reconciliation. **Buyer is never re-charged** post-payment.
+
+### Promotion expiry
+- `services/scheduled_jobs.process_expired_promotions` now downgrades both schemas (legacy `promoted_until/promotion_tier` AND new `is_promoted/promotion_end`) across `listings`, `vehicle_listings`, `storage_auctions`. Also flips `db.promotions.status="expired"` for the admin panel.
+- Hourly schedule unchanged.
+
+### Admin Promotions panel (5 new endpoints)
+- `GET /api/admin/promotions?status=active|expired|all` — table of live promotions (enriched with listing_title + seller_name)
+- `POST /api/admin/promotions/{promo_id}/cancel` — flips listing back + marks promo as `cancelled`
+- `GET /api/admin/promotions/social-share-queue` — pending Premium social share queue
+- `POST /api/admin/promotions/social-share-queue/{item_id}/mark-shared` — marks queue item as shared
+- `GET /api/admin/promotions/revenue` — month-to-date + all-time revenue breakdown by tier and listing_type
+
+### Live `/api/fees/estimate` endpoint
+- Public, rate-limited 60/min, supports `card_type` query param; debounced 400 ms hookup in `PriceBreakdown.js`.
+
+### Verification (testing agent iter182)
+- 11/11 backend pytest pass (1 storage-sort skipped — empty collection)
+- Frontend exercise: modal opens, all 3 tier cards render, Standard selection shows $29.90 grand total with `data-testid="promo-stripe-fee-row"` and `data-testid="promo-grand-total"`
+- Webhook simulation flips listing → `is_promoted: true` with full features list; expiry job downgrades correctly
+- All admin endpoints return 200 with correct schema
+
+
+## Previous: P0 Critical Bug Sprint — 6/6 Fixed (May 5, 2026 / iter181) — Verified 100%
 
 ### Bug 1 — Wrong email header (Vehicle Auctions on Marketplace items) ✅
 - Root cause: `_base_template()` hardcoded `🚗 BidVex Vehicle Auctions`. Every email used it regardless of auction source.

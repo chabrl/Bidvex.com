@@ -6,9 +6,14 @@
 - Role: Admin (full access)
 
 ## Test buyer (for vehicle-settlement dispute tests)
+- Email: p0bugtest@example.com
+- Password: TestBuyer123!
+- Role: user (regular buyer); phone_verified=true, id_verified=true
+- Notes: created 2026-05-04 for the iter181 P0 sprint and reused by iter182 promotion tests.
+
+## Legacy test buyer (kept for backward compat — may not log in if password reset on prod)
 - Email: abc@gmail.com
 - Password: TestBuyer123!
-- Role: user (regular buyer)
 
 
 ## Direct Google OAuth 2.0
