@@ -14,7 +14,7 @@ Rules implemented:
 
 from decimal import Decimal, ROUND_HALF_UP
 from dataclasses import dataclass, field, asdict
-from typing import Optional
+from typing import Optional, Dict
 
 from services.vehicle_pricing import calculate_taxes, TaxBreakdown
 
@@ -57,20 +57,50 @@ def stripe_recovery(fees_subtotal: Decimal) -> Decimal:
     return _r(fees_subtotal * STRIPE_PCT + STRIPE_FIXED)
 
 
-def gross_up_stripe_fee(net_amount: Decimal, pct: Decimal = STRIPE_PCT,
+# ─── Stripe fee rates by card type (Canada, CAD merchant) ────────────────
+STRIPE_DOMESTIC_PCT     = Decimal("0.029")   # 2.9%  — Canadian-issued card
+STRIPE_INTERNATIONAL_PCT = Decimal("0.039")  # 3.9%  — non-CA card, CAD charge
+STRIPE_CONVERSION_PCT   = Decimal("0.059")   # 5.9%  — non-CA card + non-CAD
+
+CARD_TYPE_RATES: Dict[str, Decimal] = {
+    "domestic":      STRIPE_DOMESTIC_PCT,
+    "international": STRIPE_INTERNATIONAL_PCT,
+    "conversion":    STRIPE_CONVERSION_PCT,
+}
+
+
+def _resolve_stripe_pct(card_type: Optional[str]) -> Decimal:
+    """Return the Stripe fee percentage for a card_type label. Defaults to
+    domestic when unknown (per the spec: 'If card origin unknown at cost-
+    breakdown time, use domestic rate as the displayed estimate').
+    """
+    return CARD_TYPE_RATES.get((card_type or "domestic").lower(), STRIPE_DOMESTIC_PCT)
+
+
+def gross_up_stripe_fee(net_amount: Decimal,
+                        card_type: Optional[str] = None,
+                        pct: Optional[Decimal] = None,
                         fixed: Decimal = STRIPE_FIXED) -> Decimal:
-    """Gross-up formula (Bug 6) — passes the EXACT Stripe fee through to the buyer.
+    """Gross-up formula — passes the EXACT Stripe fee through to the buyer.
 
         charge_total = (net + fixed) / (1 - pct)
         stripe_fee   = charge_total - net
 
-    Caller supplies `net_amount` = hammer + buyer_premium + taxes (everything
-    BidVex / the seller must receive). Output is the extra dollars to add on
-    top so that after Stripe deducts its cut, the net arrives exactly.
+    Args:
+        net_amount: hammer + buyer_premium + taxes (everything BidVex / the
+            seller must receive after Stripe deducts its cut).
+        card_type: "domestic" (2.9%, default), "international" (3.9%),
+            or "conversion" (5.9%). Ignored if `pct` is explicit.
+        pct: explicit override — takes precedence over `card_type`.
+        fixed: Stripe fixed per-charge fee ($0.30).
+
+    Returns the extra dollars to add on top so that after Stripe deducts,
+    the net arrives exactly.
     """
     if net_amount <= 0:
         return Decimal("0")
-    denom = Decimal("1") - pct
+    effective_pct = pct if pct is not None else _resolve_stripe_pct(card_type)
+    denom = Decimal("1") - effective_pct
     charge_total = (net_amount + fixed) / denom
     fee = charge_total - net_amount
     return _r(fee)

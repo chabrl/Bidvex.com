@@ -170,6 +170,65 @@ async def handle_stripe_webhook(request: Request):
             pi_meta = data.get("metadata", {})
             tx_type = pi_meta.get("transaction_type", "")
 
+            # ─── Card-country detection (Missing 2) ───
+            # Read payment_method.card.country from the PaymentIntent payload.
+            # If the card was international, recalculate the actual Stripe fee
+            # at the 3.9% rate and log the delta to stripe_fee_adjustments for
+            # manual reconciliation. We do NOT re-charge the buyer.
+            _card_country = None
+            try:
+                charges = (data.get("charges") or {}).get("data") or []
+                if charges:
+                    pm_details = (charges[0].get("payment_method_details") or {}).get("card") or {}
+                    _card_country = pm_details.get("country")
+                if not _card_country:
+                    # Fallback — modern Stripe sometimes exposes on data.payment_method_options
+                    pm = data.get("payment_method") or {}
+                    card = pm.get("card") if isinstance(pm, dict) else None
+                    if card:
+                        _card_country = card.get("country")
+            except Exception:
+                _card_country = None
+
+            try:
+                if _card_country and _card_country.upper() != "CA":
+                    from services.pricing_manager import gross_up_stripe_fee
+                    from decimal import Decimal as _D
+                    estimated_fee = float(pi_meta.get("stripe_fee_estimate", 0) or 0)
+                    subtotal = float(pi_meta.get("subtotal", 0) or 0)
+                    if subtotal > 0:
+                        actual_fee = float(gross_up_stripe_fee(_D(str(subtotal)), card_type="international"))
+                        delta = round(actual_fee - estimated_fee, 2)
+                        await db.stripe_fee_adjustments.insert_one({
+                            "payment_intent_id": pi_id,
+                            "item_id": pi_meta.get("item_id") or pi_meta.get("listing_id"),
+                            "estimated_fee": estimated_fee,
+                            "actual_fee": actual_fee,
+                            "delta": delta,
+                            "card_country": _card_country,
+                            "subtotal": subtotal,
+                            "created_at": datetime.now(timezone.utc).isoformat(),
+                        })
+                        logger.warning(
+                            f"[stripe-webhook] International card ({_card_country}) — "
+                            f"fee shortfall of ${delta:.2f} logged for PI {pi_id}"
+                        )
+                # Always update the transaction record with card_country + actual fee
+                _update = {"card_country": _card_country or "unknown"}
+                if _card_country and _card_country.upper() != "CA" and "actual_fee" in locals():
+                    _update["actual_stripe_fee"] = actual_fee
+                await db.payment_transactions.update_one(
+                    {"session_id": pi_meta.get("session_id") or pi_id},
+                    {"$set": _update},
+                )
+                # Vehicle BuyNow transactions live in a separate collection
+                await db.vehicle_buy_now_transactions.update_one(
+                    {"payment_intent_id": pi_id},
+                    {"$set": _update},
+                )
+            except Exception as _cc_err:
+                logger.warning(f"[stripe-webhook] card-country reconciliation failed: {_cc_err}")
+
             if tx_type == "vehicle_platform_fee":
                 from services.vehicle_fee_service import handle_vehicle_fee_succeeded
                 await handle_vehicle_fee_succeeded(db, pi_id)

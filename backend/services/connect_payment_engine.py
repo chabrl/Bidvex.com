@@ -384,6 +384,7 @@ async def create_connect_checkout_session(
     meta = {
         "user_id": buyer_id,
         "listing_id": listing.get("id", ""),
+        "item_id": listing.get("id", ""),
         "seller_id": seller_id or "",
         "transaction_type": payment_type,
         "type": payment_type,
@@ -395,6 +396,14 @@ async def create_connect_checkout_session(
         "seller_commission": str(breakdown["seller_commission"]),
         "gst": str(breakdown["gst"]),
         "qst": str(breakdown["qst"]),
+        "stripe_fee_estimate": str(breakdown.get("stripe_processing_fee", 0)),
+        "subtotal": str(round(
+            float(breakdown["hammer_price"])
+            + float(breakdown["buyer_premium"])
+            + float(breakdown["gst"])
+            + float(breakdown["qst"]),
+            2,
+        )),
         "late_penalty": str(late_penalty),
     }
     if affiliate_id:

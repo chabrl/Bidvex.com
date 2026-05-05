@@ -139,6 +139,10 @@ async def create_checkout_session(
             success_url=f"{origin}/payment/success?session_id={{CHECKOUT_SESSION_ID}}",
             cancel_url=f"{origin}/listing/{data.listing_id}",
             payment_type="listing_purchase",
+            metadata_extra={
+                "transaction_type": transaction_type,
+                "buy_now": "true" if data.buy_now else "false",
+            },
         )
 
         # Record transaction with full breakdown
@@ -1408,11 +1412,18 @@ async def buy_now_checkout(
         "cancel_url": f"{data.return_url}?status=cancelled",
         "metadata": {
             "type": "buy_now",
+            "transaction_type": "buy_it_now",
+            "buy_now": "true",
             "transaction_id": transaction_id,
             "auction_id": data.auction_id,
             "lot_number": str(data.lot_number),
             "buyer_id": current_user.id,
             "is_vehicle": "false",
+            "hammer_price": str(item_total),
+            "buyer_premium": str(bi.fees_subtotal),
+            "stripe_fee_estimate": str(round(bi.total - item_total - bi.fees_subtotal - bi.tax_amount, 2)),
+            "subtotal": str(round(item_total + bi.fees_subtotal + bi.tax_amount, 2)),
+            "item_id": data.auction_id,
         },
     }
 
@@ -2086,11 +2097,18 @@ async def vehicle_buy_now_checkout(
                     cancel_url=f"{os.environ.get('FRONTEND_URL', 'https://bidvex.com')}/vehicle-auctions/{data.listing_id}?buy_now=cancelled",
                     metadata={
                         "type": "vehicle_buy_now",
+                        "transaction_type": "buy_it_now",
+                        "buy_now": "true",
                         "listing_id": data.listing_id,
+                        "item_id": data.listing_id,
                         "buyer_id": current_user.id,
                         "transaction_id": transaction_id,
                         "bidvex_role": "platform_intermediary",
                         "vehicle_price_collected_by_bidvex": "false",
+                        "hammer_price": str(buy_now_price),
+                        "buyer_premium": str(bi.fees_subtotal),
+                        "stripe_fee_estimate": str(bi.stripe_recovery),
+                        "subtotal": str(round(float(bi.fees_subtotal) + float(bi.tax_amount), 2)),
                     },
                 )
                 # Record transaction as pending checkout
@@ -2131,11 +2149,18 @@ async def vehicle_buy_now_checkout(
                 description=f"BidVex Vehicle Platform Fee — Listing {data.listing_id}",
                 metadata={
                     "type": "vehicle_buy_now",
+                    "transaction_type": "buy_it_now",
+                    "buy_now": "true",
                     "listing_id": data.listing_id,
+                    "item_id": data.listing_id,
                     "buyer_id": current_user.id,
                     "transaction_id": transaction_id,
                     "bidvex_role": "platform_intermediary",
                     "vehicle_price_collected_by_bidvex": "false",
+                    "hammer_price": str(buy_now_price),
+                    "buyer_premium": str(bi.fees_subtotal),
+                    "stripe_fee_estimate": str(bi.stripe_recovery),
+                    "subtotal": str(round(float(bi.fees_subtotal) + float(bi.tax_amount), 2)),
                 },
             )
             card_charged_amount = platform_fee_total

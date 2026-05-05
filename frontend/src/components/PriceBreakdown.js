@@ -60,7 +60,7 @@ const PriceBreakdown = ({
       clearTimeout(debounceTimer.current);
     }
 
-    // Set new timer for debounced API call
+    // Set new timer for debounced API call (400ms per the P0 spec)
     debounceTimer.current = setTimeout(async () => {
       setLoading(true);
       setError(null);
@@ -83,7 +83,7 @@ const PriceBreakdown = ({
       } finally {
         setLoading(false);
       }
-    }, 300);
+    }, 400);
 
     // Cleanup on unmount
     return () => {
