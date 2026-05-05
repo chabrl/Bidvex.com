@@ -48,10 +48,32 @@ def _f(v) -> float:
 
 
 def stripe_recovery(fees_subtotal: Decimal) -> Decimal:
-    """Rule 4 — (fees_subtotal × 0.029) + 0.30. Returns $0 if no fees."""
+    """Legacy formula — (fees_subtotal × 0.029) + 0.30. Under-recovers Stripe's
+    actual cost by roughly 3% because Stripe charges on the FULL charge amount.
+    Kept for backward-compat callers; new code should use `gross_up_stripe_fee`.
+    """
     if fees_subtotal <= 0:
         return Decimal("0")
     return _r(fees_subtotal * STRIPE_PCT + STRIPE_FIXED)
+
+
+def gross_up_stripe_fee(net_amount: Decimal, pct: Decimal = STRIPE_PCT,
+                        fixed: Decimal = STRIPE_FIXED) -> Decimal:
+    """Gross-up formula (Bug 6) — passes the EXACT Stripe fee through to the buyer.
+
+        charge_total = (net + fixed) / (1 - pct)
+        stripe_fee   = charge_total - net
+
+    Caller supplies `net_amount` = hammer + buyer_premium + taxes (everything
+    BidVex / the seller must receive). Output is the extra dollars to add on
+    top so that after Stripe deducts its cut, the net arrives exactly.
+    """
+    if net_amount <= 0:
+        return Decimal("0")
+    denom = Decimal("1") - pct
+    charge_total = (net_amount + fixed) / denom
+    fee = charge_total - net_amount
+    return _r(fee)
 
 
 def _tier(raw: str) -> str:
@@ -203,11 +225,14 @@ class PricingManager:
         bp = _r(hp * bp_rate)
         sc = _r(hp * sc_rate)
 
-        # Buyer side — stripe recovery on the FULL charge amount (hammer + BP).
-        # This passes the actual Stripe processing cost back to the buyer because
-        # Stripe charges 2.9% + $0.30 on the FULL charge, not just BidVex fees.
-        b_sr = stripe_recovery(hp + bp)
-        # Tax on BidVex fees only (BP + stripe recovery), never on hammer
+        # ── Bug 6: gross-up Stripe fee so the buyer covers Stripe's EXACT cost.
+        # Step 1: iterate once to size the Stripe fee correctly, since the taxable
+        # base depends on the Stripe fee itself.
+        b_sr = gross_up_stripe_fee(hp + bp)
+        b_taxable = bp + b_sr
+        b_tax = calculate_taxes(b_taxable, buyer_province)
+        # Re-gross so the net recovered covers the TAX piece too
+        b_sr = gross_up_stripe_fee(hp + bp + b_tax.total_tax)
         b_taxable = bp + b_sr
         b_tax = calculate_taxes(b_taxable, buyer_province)
         b_total = _r(hp + bp + b_sr + b_tax.total_tax)

@@ -72,6 +72,15 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
     if listing["status"] != "active":
         raise HTTPException(status_code=400, detail="Listing is not active")
 
+    # ===== Section branding (Bug 1): derive from category =====
+    _cat = (listing.get("category") or "").lower()
+    if any(v in _cat for v in ("vehicle", "car", "auto", "truck", "motorcycle", "suv", "van")):
+        _auction_type = "vehicle"
+    elif listing.get("is_multi_item") or listing.get("listing_type") == "lots":
+        _auction_type = "lots"
+    else:
+        _auction_type = "marketplace"
+
     # ========== HIGH-VALUE DEPOSIT CHECK ($1k hold for >$10k auctions) ==========
     from services.pricing_config import DEPOSIT_THRESHOLD_CAD, DEPOSIT_AMOUNT_DOLLARS
     starting_price = listing.get("starting_price", 0)
@@ -246,7 +255,8 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
                     their_bid=previous_highest_bid,
                     new_high_bid=bid_data.amount,
                     listing_id=bid_data.listing_id,
-                    auction_end_date=listing.get("auction_end_date", "")
+                    auction_end_date=listing.get("auction_end_date", ""),
+                    auction_type=_auction_type,
                 )
         except Exception as email_error:
             logger.warning(f"Outbid email notification failed: {email_error}")
@@ -278,10 +288,33 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
             bid_amount=bid_data.amount,
             listing_id=bid_data.listing_id,
             auction_end_date=new_auction_end.isoformat() if extension_applied else listing.get("auction_end_date", ""),
-            is_leading=True
+            is_leading=True,
+            auction_type=_auction_type,
         )
     except Exception as email_error:
         logger.warning(f"Bid confirmation email failed: {email_error}")
+
+    # Seller: "New Bid on Your Listing" email (Bug 2)
+    try:
+        seller = await db.users.find_one({"id": listing.get("seller_id")}, {"_id": 0, "email": 1, "name": 1})
+        if seller and seller.get("email"):
+            from services.email_notifications import send_seller_bid_received_email
+            # Privacy-preserving bidder alias (first name + last initial)
+            raw_name = (current_user.name or current_user.email.split("@")[0] or "Bidder").strip()
+            parts = raw_name.split()
+            alias = f"{parts[0]} {parts[1][0]}." if len(parts) >= 2 else parts[0]
+            await send_seller_bid_received_email(
+                seller_email=seller["email"],
+                seller_name=seller.get("name", "Seller"),
+                listing_title=listing.get("title", "Item"),
+                listing_id=bid_data.listing_id,
+                bid_amount=bid_data.amount,
+                bidder_alias=alias,
+                auction_end_date=new_auction_end.isoformat() if extension_applied else listing.get("auction_end_date", ""),
+                auction_type=_auction_type,
+            )
+    except Exception as seller_email_err:
+        logger.warning(f"Seller bid-received email failed: {seller_email_err}")
 
     logger.info(f"Bid placed: listing={bid_data.listing_id}, bidder={current_user.id}, amount={bid_data.amount}, extension={extension_applied}")
 

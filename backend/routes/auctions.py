@@ -168,6 +168,79 @@ async def process_ended_auctions():
                         "created_at": now_str
                     })
 
+                    # ===== BUG 5: POST-AUCTION EMAILS =====
+                    # Derive auction_type for consistent branding (Bug 1)
+                    _cat = (listing.get("category") or "").lower()
+                    if any(v in _cat for v in ("vehicle", "car", "auto", "truck", "motorcycle", "suv", "van")):
+                        _auction_type = "vehicle"
+                    else:
+                        _auction_type = "marketplace"
+
+                    final_price = float(listing.get("current_price", 0) or 0)
+
+                    # Winner email (Bug 5A)
+                    try:
+                        if winner and winner.get("email"):
+                            from services.email_notifications import send_auction_won_email
+                            # Seller-held platform fee estimate (best-effort, non-blocking)
+                            _plat_fee = 0.0
+                            try:
+                                from services.pricing_manager import PricingManager
+                                buyer_user = winner if winner else None
+                                buyer_tier = (buyer_user or {}).get("subscription_tier", "free") if buyer_user else "free"
+                                seller_tier = (seller or {}).get("subscription_tier", "free") if seller else "free"
+                                buyer_province = (buyer_user or {}).get("province") if buyer_user else "QC"
+                                pr = PricingManager.non_vehicle_stripe(final_price, buyer_province or "QC", buyer_tier, seller_tier)
+                                _plat_fee = float(pr.buyer_invoice.fees_subtotal or 0)
+                            except Exception:
+                                pass
+                            await send_auction_won_email(
+                                to_email=winner["email"],
+                                to_name=winner.get("name", "Winner"),
+                                item_name=listing.get("title", "Item"),
+                                auction_id=listing_id,
+                                hammer_price=final_price,
+                                platform_fee=_plat_fee,
+                                is_vehicle=(_auction_type == "vehicle"),
+                            )
+                    except Exception as win_err:
+                        logger.warning(f"[auction-end] winner email failed: {win_err}")
+
+                    # Seller sold email (Bug 5B)
+                    try:
+                        if seller and seller.get("email"):
+                            from services.email_notifications import send_seller_auction_sold_email
+                            # Seller commission (best-effort)
+                            _commission = 0.0
+                            _net_payout = final_price
+                            try:
+                                from services.pricing_manager import PricingManager
+                                seller_tier = (seller or {}).get("subscription_tier", "free") if seller else "free"
+                                buyer_province = "QC"
+                                pr2 = PricingManager.non_vehicle_stripe(final_price, buyer_province, "free", seller_tier)
+                                if pr2.seller_invoice:
+                                    _commission = float(pr2.seller_invoice.fees_subtotal or 0)
+                                    _net_payout = float(pr2.seller_invoice.total or (final_price - _commission))
+                            except Exception:
+                                pass
+                            # Privacy-preserving bidder alias
+                            winner_raw = (winner.get("name") if winner else "") or (winner.get("email", "").split("@")[0] if winner else "") or "Winner"
+                            _parts = winner_raw.split()
+                            _alias = f"{_parts[0]} {_parts[1][0]}." if len(_parts) >= 2 else _parts[0]
+                            await send_seller_auction_sold_email(
+                                seller_email=seller["email"],
+                                seller_name=seller.get("name", "Seller"),
+                                listing_title=listing.get("title", "Item"),
+                                listing_id=listing_id,
+                                hammer_price=final_price,
+                                platform_fee=_commission,
+                                net_payout=_net_payout,
+                                winning_bidder_alias=_alias,
+                                auction_type=_auction_type,
+                            )
+                    except Exception as sold_err:
+                        logger.warning(f"[auction-end] seller-sold email failed: {sold_err}")
+
                     # Offline Payment Invoice: if seller chose Cash/E-Transfer, create split invoices
                     payment_method = listing.get("payment_method", "stripe")
                     if payment_method in ("cash", "e-transfer"):
@@ -245,7 +318,29 @@ async def process_ended_auctions():
                         
                 except Exception as e:
                     logger.error(f"Failed to process winner for listing {listing_id}: {e}")
-            
+            else:
+                # ===== BUG 5: No-bid ending email to seller =====
+                try:
+                    if seller_id:
+                        _seller_no_bids = await db.users.find_one(
+                            {"id": seller_id}, {"_id": 0, "name": 1, "email": 1}
+                        )
+                        if _seller_no_bids and _seller_no_bids.get("email"):
+                            _cat_nb = (listing.get("category") or "").lower()
+                            _at_nb = "vehicle" if any(
+                                v in _cat_nb for v in ("vehicle", "car", "auto", "truck", "motorcycle")
+                            ) else "marketplace"
+                            from services.email_notifications import send_seller_auction_no_bids_email
+                            await send_seller_auction_no_bids_email(
+                                seller_email=_seller_no_bids["email"],
+                                seller_name=_seller_no_bids.get("name", "Seller"),
+                                listing_title=listing.get("title", "Item"),
+                                listing_id=listing_id,
+                                auction_type=_at_nb,
+                            )
+                except Exception as nb_err:
+                    logger.warning(f"[auction-end] no-bids seller email failed: {nb_err}")
+
             processed_count += 1
 
         # ========== MULTI-ITEM LISTINGS ==========

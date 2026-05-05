@@ -280,6 +280,7 @@ const ListingDetailPage = () => {
       const response = await axios.post(`${API}/payments/checkout`, {
         listing_id: id,
         origin_url: window.location.origin,
+        buy_now: true,
       });
       
       window.location.href = response.data.url;
@@ -500,22 +501,43 @@ const ListingDetailPage = () => {
                   </div>
                   
                   {/* Bidding status badge */}
-                  {user && bidStatus && bidStatus !== 'VIEWER' && bidStatus !== 'NO_BIDS' && (
-                    <div>
-                      {bidStatus === 'LEADING' && (
-                        <Badge className="bg-green-500 text-white px-4 py-2 text-sm font-bold animate-pulse">
+                  {user && (() => {
+                    const isSeller = user.id === listing.seller_id;
+                    const hasBids = (listing.bid_count ?? 0) > 0 || !!listing.highest_bidder_id;
+                    // BUG 2 FIX — sellers can never be "outbid" on their own listing.
+                    // Show a "Bid Received" badge instead when there's at least one bid.
+                    if (isSeller) {
+                      if (!hasBids) return null;
+                      return (
+                        <Badge
+                          className="bg-sky-500 text-white px-4 py-2 text-sm font-bold"
+                          data-testid="seller-bid-received-badge"
+                        >
                           <CheckCircle2 className="h-4 w-4 mr-1" />
-                          LEADING
+                          Bid Received / Enchère reçue
                         </Badge>
-                      )}
-                      {bidStatus === 'OUTBID' && (
-                        <Badge className="bg-red-500 text-white px-4 py-2 text-sm font-bold">
-                          <AlertCircle className="h-4 w-4 mr-1" />
-                          OUTBID
-                        </Badge>
-                      )}
-                    </div>
-                  )}
+                      );
+                    }
+                    if (bidStatus && bidStatus !== 'VIEWER' && bidStatus !== 'NO_BIDS') {
+                      if (bidStatus === 'LEADING') {
+                        return (
+                          <Badge className="bg-green-500 text-white px-4 py-2 text-sm font-bold animate-pulse" data-testid="bidder-leading-badge">
+                            <CheckCircle2 className="h-4 w-4 mr-1" />
+                            LEADING
+                          </Badge>
+                        );
+                      }
+                      if (bidStatus === 'OUTBID') {
+                        return (
+                          <Badge className="bg-red-500 text-white px-4 py-2 text-sm font-bold" data-testid="bidder-outbid-badge">
+                            <AlertCircle className="h-4 w-4 mr-1" />
+                            OUTBID
+                          </Badge>
+                        );
+                      }
+                    }
+                    return null;
+                  })()}
                 </div>
 
                 {!isAuctionEnded && (

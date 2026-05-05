@@ -98,8 +98,43 @@ async def send_email(
 
 # ===== EMAIL TEMPLATES =====
 
-def _base_template(content: str, title: str = "BidVex Notification") -> str:
-    """Base HTML email template"""
+def _section_label(auction_type: Optional[str] = None) -> Dict[str, str]:
+    """Map an auction's source section to its branded header / icon / color.
+
+    Used by the email base template and every transactional email so the
+    "🚗 BidVex Vehicle Auctions" style header never shows for a Marketplace
+    item (or vice versa).
+
+    Returns dict with keys: name_en, name_fr, icon, color.
+    """
+    at = (auction_type or "").strip().lower()
+    if at in ("marketplace", "general", "single", "listing"):
+        return {"name_en": "BidVex Marketplace", "name_fr": "BidVex Marketplace",
+                "icon": "🏷️", "color": "#0ea5e9"}  # sky blue
+    if at in ("lots", "lot", "multi_item", "multi-item", "multi_item_listing"):
+        return {"name_en": "BidVex Lots Auction", "name_fr": "BidVex Enchères par lots",
+                "icon": "📦", "color": "#8b5cf6"}  # violet
+    if at in ("storage", "storage_auction", "storage_auctions"):
+        return {"name_en": "BidVex Storage Auctions", "name_fr": "BidVex Enchères d'entreposage",
+                "icon": "🔐", "color": "#f59e0b"}  # amber
+    if at in ("vehicle", "vehicles", "vehicle_auction", "vehicle_auctions", "car", "auto"):
+        return {"name_en": "BidVex Vehicle Auctions", "name_fr": "BidVex Enchères de véhicules",
+                "icon": "🚗", "color": "#2563eb"}  # blue
+    # Fallback
+    return {"name_en": "BidVex Auctions", "name_fr": "BidVex Enchères",
+            "icon": "🔨", "color": "#0f172a"}
+
+
+def _base_template(content: str, title: str = "BidVex Notification",
+                   auction_type: Optional[str] = None) -> str:
+    """Base HTML email template with dynamic section branding.
+
+    Pass `auction_type` so the header reflects the item's source section
+    (marketplace / lots / storage / vehicle) instead of a hardcoded value.
+    """
+    label = _section_label(auction_type)
+    header_bg = label["color"]
+    header_text = f'{label["icon"]} {label["name_en"]}'
     return f"""
     <!DOCTYPE html>
     <html>
@@ -115,9 +150,9 @@ def _base_template(content: str, title: str = "BidVex Notification") -> str:
                     <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
                         <!-- Header -->
                         <tr>
-                            <td style="background-color: #2563eb; padding: 30px; border-radius: 12px 12px 0 0;">
+                            <td style="background-color: {header_bg}; padding: 30px; border-radius: 12px 12px 0 0;">
                                 <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: bold;">
-                                    🚗 BidVex Vehicle Auctions
+                                    {header_text}
                                 </h1>
                             </td>
                         </tr>
@@ -762,20 +797,14 @@ async def send_bid_placed_email(
     bid_amount: float,
     listing_id: str,
     auction_end_date: str,
-    is_leading: bool = True
+    is_leading: bool = True,
+    auction_type: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Send confirmation email when user places a bid
-    
-    Args:
-        bidder_email: Email of the bidder
-        bidder_name: Name of the bidder
-        listing_title: Title of the item
-        bid_amount: Amount of the bid placed
-        listing_id: ID of the listing for link
-        auction_end_date: When the auction ends
-        is_leading: Whether this bid is currently leading
+    Send confirmation email when user places a bid.
+    auction_type drives the email header/branding — marketplace / lots / storage / vehicle.
     """
+    label = _section_label(auction_type)
     status_color = "#10b981" if is_leading else "#f59e0b"
     status_text = "You're in the lead!" if is_leading else "Your bid was placed"
     status_message = (
@@ -837,8 +866,73 @@ async def send_bid_placed_email(
     
     return await send_email(
         to_email=bidder_email,
-        subject=f"✓ Bid Confirmed: {_format_currency(bid_amount)} on {listing_title}",
-        html_content=_base_template(content, "Bid Confirmed")
+        subject=f"✓ Bid Confirmed: {_format_currency(bid_amount)} on {listing_title} — {label['name_en']}",
+        html_content=_base_template(content, "Bid Confirmed", auction_type=auction_type)
+    )
+
+
+# ===== SELLER: NEW BID ON YOUR LISTING =====
+
+async def send_seller_bid_received_email(
+    seller_email: str,
+    seller_name: str,
+    listing_title: str,
+    listing_id: str,
+    bid_amount: float,
+    bidder_alias: str,
+    auction_end_date: str,
+    auction_type: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Notify the seller that a new bid was placed on their listing.
+
+    Uses a privacy-preserving alias for the bidder (not full name/email).
+    """
+    label = _section_label(auction_type)
+    content = f"""
+    <h2 style="margin: 0 0 20px 0; color: #0ea5e9;">🔔 New Bid on Your Listing / Nouvelle enchère sur votre annonce</h2>
+
+    <p style="color: #475569; line-height: 1.6;">Hi {seller_name},</p>
+
+    <p style="color: #475569; line-height: 1.6;">
+        A new bid has just been placed on your {label['name_en']} listing.
+    </p>
+
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;">
+      <tr><td style="background-color: #f0f9ff; border: 2px solid #0ea5e9; border-radius: 8px; padding: 25px;">
+        <p style="margin: 0 0 12px 0; color: #0c4a6e; font-size: 18px; font-weight: bold;">{listing_title}</p>
+        <table width="100%" style="font-size: 14px; color: #1e293b;">
+          <tr><td style="padding: 6px 0;"><strong>New Bid:</strong></td>
+              <td style="padding: 6px 0; text-align: right; font-size: 20px; color: #0ea5e9; font-weight: bold;">{_format_currency(bid_amount)}</td></tr>
+          <tr><td style="padding: 6px 0;"><strong>Bidder:</strong></td>
+              <td style="padding: 6px 0; text-align: right; color: #475569;">{bidder_alias}</td></tr>
+          <tr><td style="padding: 6px 0;"><strong>Auction Ends:</strong></td>
+              <td style="padding: 6px 0; text-align: right; color: #dc2626;">{_format_date(auction_end_date)}</td></tr>
+        </table>
+      </td></tr>
+    </table>
+
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
+      <tr><td align="center" style="background-color: #0ea5e9; padding: 14px 30px; border-radius: 8px;">
+        <a href="{FRONTEND_URL}/listing/{listing_id}" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px;">View Your Listing</a>
+      </td></tr>
+    </table>
+
+    <hr style="border:0; border-top:1px solid #e2e8f0; margin: 24px 0;" />
+
+    <p style="color: #475569; line-height: 1.6;">Bonjour {seller_name},</p>
+    <p style="color: #475569; line-height: 1.6;">
+        Une nouvelle enchère vient d'être placée sur votre annonce {label['name_fr']}.
+        L'identifiant de l'enchérisseur est affiché sous forme d'alias pour protéger sa vie privée.
+    </p>
+
+    <p style="color: #64748b; font-size: 13px; line-height: 1.6;">
+        <strong>Tip:</strong> Log in to your seller dashboard to follow live bid activity.
+    </p>
+    """
+    return await send_email(
+        to_email=seller_email,
+        subject=f"🔔 New bid on your listing — {listing_title} | {label['name_en']}",
+        html_content=_base_template(content, "New Bid Received", auction_type=auction_type),
     )
 
 
@@ -849,20 +943,11 @@ async def send_outbid_email(
     their_bid: float,
     new_high_bid: float,
     listing_id: str,
-    auction_end_date: str
+    auction_end_date: str,
+    auction_type: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """
-    Send notification email when user is outbid
-    
-    Args:
-        user_email: Email of the outbid user
-        user_name: Name of the outbid user
-        listing_title: Title of the item
-        their_bid: The user's previous bid amount
-        new_high_bid: The new highest bid
-        listing_id: ID of the listing for link
-        auction_end_date: When the auction ends
-    """
+    """Send notification email when user is outbid (branded per section)."""
+    label = _section_label(auction_type)
     suggested_bid = new_high_bid + 1  # Minimum increment
     
     content = f"""
@@ -921,8 +1006,8 @@ async def send_outbid_email(
     
     return await send_email(
         to_email=user_email,
-        subject=f"🔔 Outbid Alert: {listing_title} - Bid Now!",
-        html_content=_base_template(content, "You've Been Outbid")
+        subject=f"🔔 Outbid: {listing_title} — {label['name_en']}",
+        html_content=_base_template(content, "You've Been Outbid", auction_type=auction_type)
     )
 
 
@@ -1924,3 +2009,103 @@ async def send_vehicle_deposit_captured_email(
         html_content=html,
     )
 
+
+
+# ===== BUG 5: POST-AUCTION EMAILS (Seller) =====
+
+async def send_seller_auction_sold_email(
+    seller_email: str,
+    seller_name: str,
+    listing_title: str,
+    listing_id: str,
+    hammer_price: float,
+    platform_fee: float,
+    net_payout: float,
+    winning_bidder_alias: str,
+    auction_type: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Sent to the seller when their auction ends with at least one bid."""
+    label = _section_label(auction_type)
+    content = f"""
+    <h2 style="margin: 0 0 20px 0; color: #10b981;">🏁 Your auction ended — item sold / Votre enchère est terminée</h2>
+
+    <p style="color: #475569; line-height: 1.6;">Hi {seller_name},</p>
+
+    <p style="color: #475569; line-height: 1.6;">
+        Great news — your {label['name_en']} auction ended and the item has sold.
+    </p>
+
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;">
+      <tr><td style="background-color: #ecfdf5; border: 2px solid #10b981; border-radius: 8px; padding: 25px;">
+        <p style="margin: 0 0 12px 0; color: #065f46; font-size: 18px; font-weight: bold;">{listing_title}</p>
+        <table width="100%" style="font-size: 14px; color: #1e293b;">
+          <tr><td style="padding: 6px 0;">Hammer Price:</td>
+              <td style="padding: 6px 0; text-align: right; font-weight: bold;">{_format_currency(hammer_price)}</td></tr>
+          <tr><td style="padding: 6px 0;">Platform Fee:</td>
+              <td style="padding: 6px 0; text-align: right; color: #dc2626;">−{_format_currency(platform_fee)}</td></tr>
+          <tr><td style="padding: 6px 0; border-top: 1px solid #d1fae5;"><strong>Your Payout (est.):</strong></td>
+              <td style="padding: 6px 0; text-align: right; border-top: 1px solid #d1fae5; font-size: 18px; color: #065f46; font-weight: bold;">{_format_currency(net_payout)}</td></tr>
+          <tr><td style="padding: 6px 0;">Winning Bidder:</td>
+              <td style="padding: 6px 0; text-align: right; color: #475569;">{winning_bidder_alias}</td></tr>
+        </table>
+      </td></tr>
+    </table>
+
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
+      <tr><td align="center" style="background-color: #10b981; padding: 14px 30px; border-radius: 8px;">
+        <a href="{FRONTEND_URL}/dashboard/sales" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px;">Open Seller Dashboard</a>
+      </td></tr>
+    </table>
+
+    <p style="color: #64748b; font-size: 13px; line-height: 1.6;">
+        Your payout will be transferred to your connected Stripe account once the buyer completes payment (typically within 2–5 business days).
+    </p>
+
+    <hr style="border:0;border-top:1px solid #e2e8f0;margin:24px 0;" />
+    <p style="color:#475569;line-height:1.6;">
+        Bonjour {seller_name}, votre enchère {label['name_fr']} s'est terminée et l'article a été vendu pour {_format_currency(hammer_price)}.
+        Votre paiement sera transféré sur votre compte Stripe connecté une fois que l'acheteur aura payé.
+    </p>
+    """
+    return await send_email(
+        to_email=seller_email,
+        subject=f"Your auction ended — {listing_title} sold for {_format_currency(hammer_price)} | {label['name_en']}",
+        html_content=_base_template(content, "Auction Ended — Item Sold", auction_type=auction_type),
+    )
+
+
+async def send_seller_auction_no_bids_email(
+    seller_email: str,
+    seller_name: str,
+    listing_title: str,
+    listing_id: str,
+    auction_type: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Sent to the seller when their auction ends with zero bids."""
+    label = _section_label(auction_type)
+    content = f"""
+    <h2 style="margin: 0 0 20px 0; color: #f59e0b;">Your auction ended — no bids / Votre enchère s'est terminée sans enchères</h2>
+
+    <p style="color: #475569; line-height: 1.6;">Hi {seller_name},</p>
+    <p style="color: #475569; line-height: 1.6;">
+        Your {label['name_en']} auction for <strong>{listing_title}</strong> ended without any bids.
+        You can relist it — sometimes a fresh title, better photos, or a lower starting price makes the difference.
+    </p>
+
+    <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 30px auto;">
+      <tr><td align="center" style="background-color: #0ea5e9; padding: 14px 30px; border-radius: 8px;">
+        <a href="{FRONTEND_URL}/listing/{listing_id}/edit" style="color: #ffffff; text-decoration: none; font-weight: bold; font-size: 16px;">Edit & Relist</a>
+      </td></tr>
+    </table>
+
+    <hr style="border:0;border-top:1px solid #e2e8f0;margin:24px 0;" />
+    <p style="color:#475569;line-height:1.6;">
+        Bonjour {seller_name}, votre enchère {label['name_fr']} pour <strong>{listing_title}</strong> s'est terminée sans enchères.
+        Vous pouvez la republier depuis votre tableau de bord vendeur.
+    </p>
+    """
+    return await send_email(
+        to_email=seller_email,
+        subject=f"Your auction ended with no bids — {listing_title}",
+        html_content=_base_template(content, "Auction Ended — No Bids", auction_type=auction_type),
+    )

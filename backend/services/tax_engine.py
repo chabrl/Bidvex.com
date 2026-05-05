@@ -273,10 +273,14 @@ class GeneralPaymentResult:
     stripe_amount_cents: int
     stripe_application_fee_cents: int  # BidVex fees + BidVex tax
     stripe_transfer_amount_cents: int  # Seller payout + seller tax (if any)
-    
+
+    # Bug 6 — Stripe processing fee passed to buyer (gross-up)
+    stripe_processing_fee: float = 0.0
+    stripe_processing_fee_cents: int = 0
+
     # Invoice line items
     invoice_lines: list = field(default_factory=list)
-    
+
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
@@ -470,11 +474,31 @@ def calculate_general_payment(
     buyer_pays_hammer_tax = hammer_tax_total
     buyer_pays_fees_tax = Decimal(str(fees_tax.total_tax))
     
-    # Note: Buyer's portion of the tax is only on buyer premium
-    buyer_premium_tax = calculate_tax(buyer_premium)
-    buyer_pays_fees_tax = Decimal(str(buyer_premium_tax.total_tax))
+    # ===== BUG 4 FIX =====
+    # Tax must be computed on (buyer_premium + stripe_processing_fee) — the
+    # SAME base Stripe actually charges. Earlier code taxed `buyer_premium`
+    # alone which rounded to $0.00 for small bids (e.g. $0.03 premium → $0
+    # GST / $0 QST) while Stripe showed real tax — that deceived users with
+    # a lower displayed total than the Stripe charge.
+    from services.pricing_manager import gross_up_stripe_fee as _gross_up_stripe
+    # First-pass gross-up on hammer + premium
+    _sr = _gross_up_stripe(hp + buyer_premium)
+    _bp_taxable = buyer_premium + _sr
+    _bp_tax = calculate_tax(_bp_taxable)
+    # Second-pass gross-up once taxes are known so Stripe covers taxes too
+    _sr = _gross_up_stripe(hp + buyer_premium + Decimal(str(_bp_tax.total_tax)))
+    _bp_taxable = buyer_premium + _sr
+    _bp_tax = calculate_tax(_bp_taxable)
+    stripe_processing_fee = _sr
+    buyer_pays_fees_tax = Decimal(str(_bp_tax.total_tax))
     
-    buyer_total = buyer_pays_hammer + buyer_pays_fees + buyer_pays_hammer_tax + buyer_pays_fees_tax
+    buyer_total = (
+        buyer_pays_hammer
+        + buyer_pays_fees
+        + buyer_pays_hammer_tax
+        + buyer_pays_fees_tax
+        + stripe_processing_fee
+    )
     
     # Seller receives
     seller_receives_hammer = hp
@@ -532,14 +556,14 @@ def calculate_general_payment(
             "section": "Platform Service Fees Tax",
             "description": "GST on Platform Fees",
             "rate": "5%",
-            "amount": buyer_premium_tax.gst_amount,
+            "amount": _bp_tax.gst_amount,
             "tax_number": BIDVEX_GST_NUMBER
         },
         {
             "section": "Platform Service Fees Tax",
             "description": "QST on Platform Fees",
             "rate": "9.975%",
-            "amount": buyer_premium_tax.qst_amount,
+            "amount": _bp_tax.qst_amount,
             "tax_number": BIDVEX_QST_NUMBER
         },
     ])
@@ -604,7 +628,11 @@ def calculate_general_payment(
         stripe_amount_cents=stripe_amount_cents,
         stripe_application_fee_cents=stripe_application_fee_cents,
         stripe_transfer_amount_cents=stripe_transfer_amount_cents,
-        
+
+        # Bug 6 — Stripe processing fee (pass-through to buyer, gross-up)
+        stripe_processing_fee=float(stripe_processing_fee),
+        stripe_processing_fee_cents=_to_cents(stripe_processing_fee),
+
         invoice_lines=invoice_lines,
     )
 

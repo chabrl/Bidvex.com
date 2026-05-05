@@ -211,6 +211,21 @@ const PriceBreakdown = ({
             </span>
           </div>
 
+          {/* Payment Processing (Stripe fee passed to buyer — Bug 6) */}
+          {!isVehiclePayment && (breakdown.stripe_processing_fee || 0) > 0 && (
+            <div className="flex justify-between items-center" data-testid="stripe-processing-fee-row">
+              <span className="text-slate-600 dark:text-slate-400">
+                {i18n.language === 'fr' ? 'Frais de traitement (2,9 % + 0,30 $)' : 'Payment Processing (2.9% + $0.30)'}
+                <span className="ml-1" title={i18n.language === 'fr'
+                  ? 'Frais de traitement Stripe — répercutés sans majoration par BidVex.'
+                  : 'Stripe card processing fee — passed directly to you with no markup from BidVex.'}>ℹ️</span>
+              </span>
+              <span className="text-slate-700 dark:text-slate-300">
+                +{formatCurrency(breakdown.stripe_processing_fee)}
+              </span>
+            </div>
+          )}
+
           {/* Tax breakdown tooltip for business sellers */}
           {!isVehiclePayment && breakdown.hammer_tax_applicable && (
             <div className="flex items-start gap-1 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 p-2 rounded">

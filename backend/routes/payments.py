@@ -54,6 +54,9 @@ class CheckoutRequest(BaseModel):
     # Legacy listing checkout fields
     listing_id: Optional[str] = None
     origin_url: Optional[str] = None
+    # Bug 3 fix — when true, use the listing's buy_now_price (BIN) instead
+    # of the latest bid amount as the hammer price for fee calculation.
+    buy_now: bool = False
 
 
 @payments_router.post("/checkout")
@@ -103,8 +106,22 @@ async def create_checkout_session(
         seller_tier = seller.get("subscription_tier", "free") if seller else "free"
         seller_is_partner = bool(seller.get("is_partner") and seller.get("platform_fee_paid")) if seller else False
 
+        # BUG 3 FIX — Buy It Now MUST use the listing's buy_now_price, not the
+        # current highest bid. Without this, clicking "Buy Now" on a $5.00 item
+        # where the last bid is $1.10 would open Stripe for $1.52 instead of
+        # $5.00 + fees.
+        if data.buy_now:
+            bnp = listing.get("buy_now_price")
+            if not bnp or float(bnp) <= 0:
+                raise HTTPException(status_code=400, detail="Buy Now price is not set for this listing")
+            hammer_price = float(bnp)
+            transaction_type = "buy_it_now"
+        else:
+            hammer_price = listing.get("current_price") or listing.get("final_price") or 0
+            transaction_type = "auction_win"
+
         breakdown = calculate_connect_checkout(
-            hammer_price=listing["current_price"],
+            hammer_price=hammer_price,
             category=listing.get("category", "general"),
             buyer_tier=buyer_tier,
             seller_tier=seller_tier,
@@ -132,6 +149,7 @@ async def create_checkout_session(
             "listing_id": data.listing_id,
             "seller_id": listing.get("seller_id", ""),
             "flow_type": breakdown["flow_type"],
+            "transaction_type": transaction_type,
             "amount": breakdown["buyer_total"],
             "hammer_price": breakdown["hammer_price"],
             "buyer_premium": breakdown["buyer_premium"],
