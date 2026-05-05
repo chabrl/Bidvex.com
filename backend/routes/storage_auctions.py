@@ -220,7 +220,9 @@ async def list_storage_auctions(
         "price_low": [("current_bid", 1)],
         "most_bids": [("bid_count", -1)],
     }
-    sort_spec = sort_map.get(sort, sort_map["ending_soon"])
+    base_sort = sort_map.get(sort, sort_map["ending_soon"])
+    # Promoted auctions always surface first; tier weight breaks ties.
+    sort_spec = [("is_promoted", -1), ("promotion_tier_weight", -1)] + base_sort
     cursor = db.storage_auctions.find(query, {"_id": 0}).sort(sort_spec).skip(skip).limit(limit)
     auctions = await cursor.to_list(limit)
     total = await db.storage_auctions.count_documents(query)

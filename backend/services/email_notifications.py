@@ -2109,3 +2109,88 @@ async def send_seller_auction_no_bids_email(
         subject=f"Your auction ended with no bids — {listing_title}",
         html_content=_base_template(content, "Auction Ended — No Bids", auction_type=auction_type),
     )
+
+
+# ===== PROMOTION CONFIRMATION EMAIL =====
+
+async def send_promotion_confirmation_email(
+    seller_email: str,
+    seller_name: str,
+    listing_title: str,
+    listing_id: str,
+    listing_type: str,
+    tier: str,
+    boost_days: int,
+    start_date,
+    end_date,
+    base_price: float,
+    gst: float,
+    qst: float,
+    stripe_fee: float,
+    grand_total: float,
+    features,
+) -> Dict[str, Any]:
+    """Sent after Stripe confirms payment for a listing promotion."""
+    _lt = (listing_type or "marketplace").lower()
+    _brand_type = "lots" if _lt in ("lots", "partner") else ("storage" if _lt == "storage" else "marketplace")
+    label = _section_label(_brand_type)
+
+    feats = "".join([f"<li style='color:#1e293b;padding:2px 0;'>{f}</li>" for f in (features or [])])
+
+    def _fmt(d):
+        try:
+            return d.strftime("%Y-%m-%d")
+        except Exception:
+            return str(d)
+
+    tier_label = {"basic": "Basic Boost", "standard": "Standard Boost", "premium": "Premium Boost"}.get(tier, tier.title())
+
+    content = f"""
+    <h2 style="margin:0 0 20px 0;color:#10b981;">✅ Your listing is now boosted / Votre annonce est propulsée</h2>
+
+    <p style="color:#475569;line-height:1.6;">Hi {seller_name},</p>
+    <p style="color:#475569;line-height:1.6;">
+        Your {label['name_en']} listing has been successfully promoted.
+    </p>
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;">
+      <tr><td style="background:#ecfdf5;border:2px solid #10b981;border-radius:8px;padding:25px;">
+        <p style="margin:0 0 12px 0;color:#065f46;font-size:18px;font-weight:bold;">{listing_title}</p>
+        <table width="100%" style="font-size:14px;color:#1e293b;">
+          <tr><td>Tier:</td><td style="text-align:right;"><strong>{tier_label} ({boost_days} days)</strong></td></tr>
+          <tr><td>Start:</td><td style="text-align:right;">{_fmt(start_date)}</td></tr>
+          <tr><td>End:</td><td style="text-align:right;">{_fmt(end_date)}</td></tr>
+        </table>
+        <p style="margin:16px 0 6px;color:#065f46;font-weight:bold;">Features activated:</p>
+        <ul style="margin:0 0 0 20px;padding:0;">{feats}</ul>
+      </td></tr>
+    </table>
+
+    <h3 style="margin:20px 0 10px;color:#0f172a;">Payment receipt</h3>
+    <table width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;color:#1e293b;">
+      <tr><td>Base price:</td><td style="text-align:right;">{_format_currency(base_price)}</td></tr>
+      <tr><td>GST (5%):</td><td style="text-align:right;">{_format_currency(gst)}</td></tr>
+      <tr><td>QST (9.975%):</td><td style="text-align:right;">{_format_currency(qst)}</td></tr>
+      <tr><td>Payment Processing:</td><td style="text-align:right;">{_format_currency(stripe_fee)}</td></tr>
+      <tr><td style="border-top:1px solid #e2e8f0;padding-top:6px;"><strong>Total Charged:</strong></td>
+          <td style="border-top:1px solid #e2e8f0;padding-top:6px;text-align:right;font-weight:bold;">{_format_currency(grand_total)} CAD</td></tr>
+    </table>
+
+    <table cellpadding="0" cellspacing="0" align="center" style="margin:30px auto;">
+      <tr><td align="center" style="background:#10b981;padding:14px 30px;border-radius:8px;">
+        <a href="{FRONTEND_URL}/listing/{listing_id}" style="color:#fff;text-decoration:none;font-weight:bold;">View Your Listing</a>
+      </td></tr>
+    </table>
+
+    <p style="color:#64748b;font-size:13px;">Questions? <a href="mailto:support@bidvex.ca">support@bidvex.ca</a></p>
+
+    <hr style="border:0;border-top:1px solid #e2e8f0;margin:24px 0;" />
+    <p style="color:#475569;line-height:1.6;">
+        Bonjour {seller_name}, votre annonce {label['name_fr']} a été promue avec succès ({tier_label}, {boost_days} jours).
+    </p>
+    """
+    return await send_email(
+        to_email=seller_email,
+        subject=f"✅ Your listing is now boosted — {listing_title} | {label['name_en']}",
+        html_content=_base_template(content, "Listing Promoted", auction_type=_brand_type),
+    )

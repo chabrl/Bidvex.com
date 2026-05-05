@@ -952,13 +952,16 @@ const ListingDetailPage = () => {
       />
 
       {/* Pay-As-You-Go Promotion Checkout */}
-      <ListingPromotionModal
-        isOpen={showPromoModal}
-        onClose={() => setShowPromoModal(false)}
-        listingId={listing?.id}
-        listingTitle={listing?.title}
-      />
-
+      {showPromoModal && (
+        <ListingPromotionModal
+          onClose={() => setShowPromoModal(false)}
+          listingId={listing?.id}
+          listingTitle={listing?.title}
+          listingType={
+            listing?.is_multi_item || listing?.listing_type === 'lots' ? 'lots' : 'marketplace'
+          }
+        />
+      )}
       {/* Message Seller Modal */}
       {listing && (
         <MessageSellerModal

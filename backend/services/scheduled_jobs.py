@@ -598,6 +598,13 @@ async def process_ended_storage_auctions(db):
 # ─────────────────────────────────────────────────────────────
 
 async def process_expired_promotions(db):
+    """Downgrade listings whose promotion has expired.
+
+    Handles BOTH schemas:
+      - New: is_promoted + promotion_end  (from /payments/promote-listing)
+      - Legacy: promoted_until + promotion_tier + is_featured
+    Runs against listings, vehicle_listings and storage_auctions.
+    """
     try:
         now_iso = datetime.now(timezone.utc).isoformat()
         stats = {}
@@ -606,17 +613,30 @@ async def process_expired_promotions(db):
             result = await coll.update_many(
                 {
                     "$or": [
-                        {"promoted_until": {"$lt": now_iso}, "promotion_tier": {"$nin": [None, ""]}},
-                        {"promoted_until": {"$lt": now_iso}, "is_featured": True},
+                        {"promoted_until":  {"$lt": now_iso}, "promotion_tier": {"$nin": [None, ""]}},
+                        {"promoted_until":  {"$lt": now_iso}, "is_featured": True},
+                        {"promotion_end":   {"$lt": now_iso}, "is_promoted": True},
                     ]
                 },
                 {"$set": {
-                    "promotion_tier": None,
+                    "is_promoted": False,
                     "is_featured": False,
+                    "promotion_tier": None,
+                    "promotion_tier_weight": 0,
                     "promotion_expired_at": now_iso,
                 }},
             )
             stats[coll_name] = result.modified_count
+
+        # Also mark matching promotion rows as expired for the admin panel
+        try:
+            await db.promotions.update_many(
+                {"status": "active", "end_date": {"$lt": now_iso}},
+                {"$set": {"status": "expired", "expired_at": now_iso}},
+            )
+        except Exception:
+            pass
+
         total = sum(stats.values())
         if total:
             logger.info(f"[PROMOTIONS] downgraded {total} expired promotions: {stats}")

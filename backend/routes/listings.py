@@ -296,7 +296,15 @@ async def get_listings(
     sort_order = -1 if sort.startswith("-") else 1
     sort_field = sort.lstrip("-") if not is_geo_sort else "created_at"
 
-    listings = await db.listings.find(query, {"_id": 0}).sort(sort_field, sort_order).skip(skip).limit(limit).to_list(limit)
+    # Promoted listings always surface first — boosted listings beat any
+    # other sort. Tier weight breaks ties (premium > standard > basic).
+    sort_spec = [
+        ("is_promoted", -1),
+        ("promotion_tier_weight", -1),
+        (sort_field, sort_order),
+    ]
+
+    listings = await db.listings.find(query, {"_id": 0}).sort(sort_spec).skip(skip).limit(limit).to_list(limit)
 
     # Also include individual lots from multi-item listings as independent items
     multi_query = {"status": "active"}
@@ -319,7 +327,7 @@ async def get_listings(
     elif tax_status == "standard":
         multi_query["seller_type"] = {"$in": ["individual", "enterprise"]}
 
-    multi_listings = await db.multi_item_listings.find(multi_query, {"_id": 0}).sort(sort_field, sort_order).limit(limit).to_list(limit)
+    multi_listings = await db.multi_item_listings.find(multi_query, {"_id": 0}).sort(sort_spec).limit(limit).to_list(limit)
 
     # Deduplicate: collect parent auction IDs to exclude from standard listings
     multi_parent_ids = {ml["id"] for ml in multi_listings}

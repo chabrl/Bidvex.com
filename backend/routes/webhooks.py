@@ -141,9 +141,12 @@ async def handle_stripe_webhook(request: Request):
 
         # --- Checkout completion ---
         elif event_type == "checkout.session.completed":
-            session_type = data.get("metadata", {}).get("type", "")
+            _meta_all = data.get("metadata", {}) or {}
+            session_type = _meta_all.get("type", "") or _meta_all.get("transaction_type", "")
             if session_type == "subscription_upgrade":
                 pass  # handled by subscription events above
+            elif session_type == "listing_promotion":
+                await _handle_listing_promotion_paid(db, data)
             else:
                 await _handle_checkout_completed(db, data)
 
@@ -729,6 +732,128 @@ async def _handle_auction_payment_succeeded(db, pi_data: dict, meta: dict):
 
     except Exception as aff_err:
         logger.error(f"[AffiliatePayout] Error: {aff_err}")
+
+
+# Feature packs for promoted listings (mirrors /payments/promote-listing)
+PROMOTION_FEATURE_PACK = {
+    "marketplace": {
+        "basic":    ["Homepage highlight", "Search priority"],
+        "standard": ["Homepage highlight", "Search priority", "Category banner"],
+        "premium":  ["Homepage highlight", "Search priority", "Category banner", "Email blast", "Social share"],
+    },
+    "lots": {
+        "basic":    ["Search priority", "Homepage placement"],
+        "standard": ["Search priority", "Homepage placement", "Category banner", "Featured badge"],
+        "premium":  ["Search priority", "Homepage placement", "Category banner", "Featured badge",
+                     "Email blast", "Social share", "Featured Partner badge"],
+    },
+    "storage": {
+        "basic":    ["Homepage highlight", "Search priority"],
+        "standard": ["Homepage highlight", "Search priority", "Category banner on Storage page"],
+        "premium":  ["Homepage highlight", "Search priority", "Category banner on Storage page",
+                     "Email blast to storage waitlist", "Social share"],
+    },
+    "partner": {
+        "basic":    ["Search priority", "Homepage placement"],
+        "standard": ["Search priority", "Homepage placement", "Category banner", "Featured badge"],
+        "premium":  ["Search priority", "Homepage placement", "Category banner", "Featured badge",
+                     "Email blast", "Social share", "Featured Partner badge"],
+    },
+}
+
+
+async def _handle_listing_promotion_paid(db, session):
+    """Activate a listing promotion after Stripe checkout.session.completed."""
+    metadata = session.get("metadata", {}) or {}
+    listing_id = metadata.get("listing_id")
+    listing_type = (metadata.get("listing_type") or "marketplace").lower()
+    tier = (metadata.get("boost_tier") or "basic").lower()
+    seller_id = metadata.get("seller_id")
+    boost_days = int(metadata.get("boost_days") or 7)
+    session_id = session.get("id")
+
+    if not listing_id:
+        logger.warning("[promotion-paid] missing listing_id in metadata")
+        return
+
+    now = datetime.now(timezone.utc)
+    promotion_end = now + timedelta(days=boost_days)
+    tier_weight = {"premium": 3, "standard": 2, "basic": 1}.get(tier, 0)
+
+    listings_coll = db.storage_auctions if listing_type == "storage" else db.listings
+
+    features = PROMOTION_FEATURE_PACK.get(listing_type, PROMOTION_FEATURE_PACK["marketplace"]).get(tier, [])
+    update_doc = {
+        "is_promoted": True,
+        "is_featured": True,
+        "promotion_tier": tier,
+        "promotion_tier_weight": tier_weight,
+        "promotion_start": now.isoformat(),
+        "promotion_end": promotion_end.isoformat(),
+        "promoted_until": promotion_end.isoformat(),
+        "promotion_features": features,
+        "promotion_activated_at": now.isoformat(),
+    }
+    await listings_coll.update_one({"id": listing_id}, {"$set": update_doc})
+
+    try:
+        await db.promotions.update_one(
+            {"session_id": session_id},
+            {"$set": {
+                "status": "active",
+                "payment_status": "paid",
+                "start_date": now.isoformat(),
+                "end_date": promotion_end.isoformat(),
+                "activated_at": now.isoformat(),
+            }},
+        )
+    except Exception as e:
+        logger.warning(f"[promotion-paid] could not update promotions doc: {e}")
+
+    if tier == "premium":
+        try:
+            import uuid as _uuid
+            await db.social_share_queue.insert_one({
+                "id": _uuid.uuid4().hex,
+                "listing_id": listing_id,
+                "listing_type": listing_type,
+                "seller_id": seller_id,
+                "tier": tier,
+                "requested_at": now.isoformat(),
+                "status": "pending",
+            })
+        except Exception as e:
+            logger.warning(f"[promotion-paid] social share queue insert failed: {e}")
+
+    try:
+        listing_doc = await listings_coll.find_one({"id": listing_id}, {"_id": 0})
+        seller_doc = await db.users.find_one({"id": seller_id}, {"_id": 0, "name": 1, "email": 1})
+        if seller_doc and seller_doc.get("email"):
+            from services.email_notifications import send_promotion_confirmation_email
+            await send_promotion_confirmation_email(
+                seller_email=seller_doc["email"],
+                seller_name=seller_doc.get("name", "Seller"),
+                listing_title=(listing_doc or {}).get("title") or "Your listing",
+                listing_id=listing_id,
+                listing_type=listing_type,
+                tier=tier,
+                boost_days=boost_days,
+                start_date=now,
+                end_date=promotion_end,
+                base_price=float(metadata.get("base_price", 0) or 0),
+                gst=float(metadata.get("gst", 0) or 0),
+                qst=float(metadata.get("qst", 0) or 0),
+                stripe_fee=float(metadata.get("stripe_fee", 0) or 0),
+                grand_total=float(metadata.get("grand_total", 0) or 0),
+                features=features,
+            )
+    except Exception as e:
+        logger.warning(f"[promotion-paid] confirmation email failed: {e}")
+
+    logger.info(
+        f"[promotion-paid] listing {listing_id} ({listing_type}) → {tier} until {promotion_end.isoformat()}"
+    )
+
 
 
 

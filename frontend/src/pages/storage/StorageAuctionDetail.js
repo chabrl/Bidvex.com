@@ -19,12 +19,14 @@ import StorageAutoBidModal from '../../components/StorageAutoBidModal';
 import QuickBidButtons from '../../components/QuickBidButtons';
 import StorageDepositBanner from './StorageDepositBanner';
 import AuctionStatusBadge, { CountdownTimer } from '../../components/AuctionStatusBadge';
+import ListingPromotionModal from '../../components/ListingPromotionModal';
+import { TrendingUp } from 'lucide-react';
 
 const API = API_BASE;
 
 const StorageAuctionDetail = () => {
   const { id } = useParams();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { i18n } = useTranslation();
   const isFr = (i18n.language || '').startsWith('fr');
 
@@ -36,6 +38,7 @@ const StorageAuctionDetail = () => {
   const [maxBid, setMaxBid] = useState('');
   const [submittingBid, setSubmittingBid] = useState(false);
   const [depositPaid, setDepositPaid] = useState(false);
+  const [showPromoModal, setShowPromoModal] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -126,6 +129,26 @@ const StorageAuctionDetail = () => {
         <Link to="/storage-auctions/browse" className="text-sm text-blue-600 hover:underline">
           ← {isFr ? 'Retour aux enchères' : 'Back to auctions'}
         </Link>
+
+        {/* Facility-owner-only "Boost Your Auction" CTA */}
+        {user && (auction.facility_owner_id === user.id || user.role === 'admin' || user.role === 'super_admin') && auction.status !== 'ended' && (
+          <div className="mt-3">
+            <Button
+              type="button"
+              data-testid="boost-storage-auction-btn"
+              onClick={() => setShowPromoModal(true)}
+              className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
+            >
+              <TrendingUp className="w-4 h-4 mr-2" />
+              {isFr ? 'Booster votre enchère' : 'Boost Your Auction'}
+            </Button>
+            {auction.is_promoted && (
+              <Badge className="ml-3 bg-amber-100 text-amber-800 border border-amber-300">
+                {isFr ? 'EN VEDETTE' : 'FEATURED'} — {auction.promotion_tier}
+              </Badge>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-6 mt-4">
           {/* LEFT — gallery + details */}
@@ -381,6 +404,15 @@ const StorageAuctionDetail = () => {
         </div>
       </div>
       <StorageFooterBanner />
+
+      {showPromoModal && (
+        <ListingPromotionModal
+          listingId={auction.id}
+          listingTitle={`${isFr ? 'Unité' : 'Unit'} ${auction.unit_number || ''}`.trim() || (auction.facility_name || 'Storage Auction')}
+          listingType="storage"
+          onClose={() => setShowPromoModal(false)}
+        />
+      )}
     </div>
   );
 };

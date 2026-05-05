@@ -95,6 +95,133 @@ async def admin_get_reports(current_user: User = Depends(require_admin)):
     return reports
 
 
+# ============= PROMOTIONS MANAGEMENT =============
+
+@admin_ops_router.get("/admin/promotions")
+async def admin_list_promotions(
+    status: str = "active",
+    current_user: User = Depends(require_admin),
+):
+    """Admin: list active or expired promotions across all listing types."""
+    db = get_db()
+    query = {}
+    if status == "active":
+        query["status"] = "active"
+    elif status == "expired":
+        query["status"] = "expired"
+    elif status == "all":
+        pass
+    promos = await db.promotions.find(query, {"_id": 0}).sort("created_at", -1).limit(500).to_list(500)
+    for p in promos:
+        try:
+            coll = db.storage_auctions if p.get("listing_type") == "storage" else db.listings
+            lst = await coll.find_one({"id": p.get("listing_id")}, {"_id": 0, "title": 1})
+            if lst:
+                p["listing_title"] = lst.get("title", "")
+            u = await db.users.find_one({"id": p.get("seller_id")}, {"_id": 0, "name": 1, "email": 1})
+            if u:
+                p["seller_name"] = u.get("name", "")
+                p["seller_email"] = u.get("email", "")
+        except Exception:
+            pass
+    return promos
+
+
+@admin_ops_router.post("/admin/promotions/{promo_id}/cancel")
+async def admin_cancel_promotion(
+    promo_id: str,
+    current_user: User = Depends(require_admin),
+):
+    db = get_db()
+    p = await db.promotions.find_one({"id": promo_id}, {"_id": 0})
+    if not p:
+        raise HTTPException(status_code=404, detail="Promotion not found")
+    now_iso = datetime.now(timezone.utc).isoformat()
+    listing_type = p.get("listing_type", "marketplace")
+    coll = db.storage_auctions if listing_type == "storage" else db.listings
+    await coll.update_one(
+        {"id": p["listing_id"]},
+        {"$set": {
+            "is_promoted": False, "is_featured": False,
+            "promotion_tier": None, "promotion_tier_weight": 0,
+            "promotion_expired_at": now_iso,
+        }},
+    )
+    await db.promotions.update_one(
+        {"id": promo_id},
+        {"$set": {"status": "cancelled", "cancelled_at": now_iso, "cancelled_by": current_user.id}},
+    )
+    return {"ok": True}
+
+
+@admin_ops_router.get("/admin/promotions/social-share-queue")
+async def admin_social_share_queue(current_user: User = Depends(require_admin)):
+    db = get_db()
+    items = await db.social_share_queue.find({"status": "pending"}, {"_id": 0}).sort("requested_at", 1).limit(200).to_list(200)
+    for it in items:
+        try:
+            coll = db.storage_auctions if it.get("listing_type") == "storage" else db.listings
+            lst = await coll.find_one({"id": it.get("listing_id")}, {"_id": 0, "title": 1})
+            if lst:
+                it["listing_title"] = lst.get("title", "")
+            u = await db.users.find_one({"id": it.get("seller_id")}, {"_id": 0, "name": 1})
+            if u:
+                it["seller_name"] = u.get("name", "")
+        except Exception:
+            pass
+    return items
+
+
+@admin_ops_router.post("/admin/promotions/social-share-queue/{item_id}/mark-shared")
+async def admin_mark_social_shared(
+    item_id: str,
+    current_user: User = Depends(require_admin),
+):
+    db = get_db()
+    r = await db.social_share_queue.update_one(
+        {"id": item_id},
+        {"$set": {
+            "status": "shared",
+            "shared_at": datetime.now(timezone.utc).isoformat(),
+            "shared_by": current_user.id,
+        }},
+    )
+    if r.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Queue item not found")
+    return {"ok": True}
+
+
+@admin_ops_router.get("/admin/promotions/revenue")
+async def admin_promotion_revenue(current_user: User = Depends(require_admin)):
+    db = get_db()
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+    cursor = db.promotions.find(
+        {"status": {"$in": ["active", "expired", "cancelled"]}},
+        {"_id": 0, "grand_total": 1, "created_at": 1, "tier": 1, "listing_type": 1},
+    )
+    rows = await cursor.to_list(10000)
+    total_all = 0.0
+    total_mtd = 0.0
+    by_tier = {"basic": 0.0, "standard": 0.0, "premium": 0.0}
+    by_type = {"marketplace": 0.0, "lots": 0.0, "storage": 0.0, "partner": 0.0}
+    for r in rows:
+        amt = float(r.get("grand_total", 0) or 0)
+        total_all += amt
+        if r.get("created_at", "") >= month_start:
+            total_mtd += amt
+        by_tier[r.get("tier", "basic")] = by_tier.get(r.get("tier", "basic"), 0) + amt
+        by_type[r.get("listing_type", "marketplace")] = by_type.get(r.get("listing_type", "marketplace"), 0) + amt
+    return {
+        "total_all_time": round(total_all, 2),
+        "total_month_to_date": round(total_mtd, 2),
+        "by_tier": {k: round(v, 2) for k, v in by_tier.items()},
+        "by_type": {k: round(v, 2) for k, v in by_type.items()},
+        "count": len(rows),
+    }
+
+
+
 
 
 @admin_ops_router.get("/admin/listings/all")
