@@ -1,6 +1,48 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: Production Hardening — Performance, Security & Scalability (May 4, 2026 / iter180) — 26/26 DONE
+## Latest: P0 Critical Bug Sprint — 6/6 Fixed (May 5, 2026 / iter181) — Verified 100%
+
+### Bug 1 — Wrong email header (Vehicle Auctions on Marketplace items) ✅
+- Root cause: `_base_template()` hardcoded `🚗 BidVex Vehicle Auctions`. Every email used it regardless of auction source.
+- Fix: new `_section_label(auction_type)` helper + `_base_template(..., auction_type)` now renders dynamic header/icon/color per section. Subject lines and footer also include correct section name. Mappings: `marketplace→BidVex Marketplace`, `lots→BidVex Lots Auction`, `storage→BidVex Storage Auctions`, `vehicle→BidVex Vehicle Auctions`, unknown→`BidVex Auctions`.
+- `send_bid_placed_email` and `send_outbid_email` now accept `auction_type`. Callers in `auctions_bids.py` derive the type from `listing.category` / `is_multi_item` and forward it.
+
+### Bug 2 — Seller sees "OUTBID" on own listing ✅
+- Fix: `ListingDetailPage.js` badge block is now role-aware. If `user.id === listing.seller_id` and any bid exists → shows `Bid Received / Enchère reçue` badge (data-testid `seller-bid-received-badge`) instead of OUTBID. Anonymous visitors see nothing. Buyer badges (LEADING/OUTBID) remain unchanged. Uses real-time `realtimeBidCount` so the badge updates live over the WebSocket.
+- New `send_seller_bid_received_email(...)` email function + wired into `routes/auctions_bids.py` so the seller is notified (privacy-preserving bidder alias — "First L.").
+
+### Bug 3 — BIN price incorrect at Stripe checkout ✅
+- Root cause: `POST /api/payments/checkout` always used `listing.current_price` (latest bid) as hammer — BIN on a $5.00 listing where the last bid was $1.10 opened Stripe for $1.52.
+- Fix: `CheckoutRequest.buy_now: bool = False`. When `buy_now=true`, `/checkout` uses `listing.buy_now_price` as hammer and records `transaction_type: "buy_it_now"`. Frontend `handleBuyNow` now sends `buy_now: true`.
+- Verified live: BIN = $5.00 → Stripe total $5.83 (was $1.52); auction-win flow on same listing still uses $1.00 current_price → $1.45.
+
+### Bug 4 — Cost breakdown shows $0 taxes but Stripe charges real tax ✅
+- Root cause: `calculate_general_payment` taxed `buyer_premium` alone. For $1.10 hammer, BP=$0.03 → GST/QST both round to $0.00, but Stripe was taxing `(BP + stripe_recovery) ≈ $0.36` and collecting real tax. Deceived buyers with a lower displayed total.
+- Fix: taxes now computed on `(buyer_premium + stripe_processing_fee)` — the same base Stripe charges. Two-pass gross-up so Stripe covers the taxes too. New `stripe_processing_fee` field on `GeneralPaymentResult`. Front-end `PriceBreakdown` now shows a `Payment Processing (2.9% + $0.30)` line (data-testid `stripe-processing-fee-row`) with bilingual ℹ️ tooltip.
+
+### Bug 5 — No post-auction emails ✅
+- Root cause: `process_ended_auctions` created notifications but never sent emails.
+- Fix: three new email paths fire when auction ends:
+  - Winning buyer → existing `send_auction_won_email` (now with correct `is_vehicle` / section branding).
+  - Seller with ≥1 bid → new `send_seller_auction_sold_email` (hammer, platform fee, net payout, bidder alias).
+  - Seller with 0 bids → new `send_seller_auction_no_bids_email` (relist CTA).
+- Each wrapped in try/except so one failing email never blocks auction-close process. All use dynamic section branding (Bug 1 fix).
+
+### Bug 6 — Stripe processing fees not passed through ✅
+- Root cause: `stripe_recovery(fees)` used `fees × 0.029 + 0.30` — under-recovers by ~3% because Stripe takes its cut from the FULL charge, not the fees subtotal. BidVex was absorbing the shortfall.
+- Fix: new `gross_up_stripe_fee(net)` helper in `pricing_manager.py` — `charge_total = (net + 0.30) / (1 - 0.029); fee = charge_total - net`. Both `non_vehicle_stripe` and `calculate_general_payment` now use two-pass gross-up so Stripe recovery ALSO covers the tax on it.
+- Cost breakdown UI displays the fee as a line item. All 7 metadata fields added to PaymentIntent for reconciliation.
+- Verified: hammer=$10 (basic tier) → BP=$0.50, fee_tax=$0.17, stripe_fee=$0.63, total=$11.30; hammer=$5 → stripe_fee=$0.47 (was effectively $0.30 legacy), total=$5.83.
+
+### Verification
+- 5/5 backend pytest pass (testing agent iter181).
+- Live curl: POST `/api/payments/checkout {buy_now:true}` returns breakdown.hammer_price=$5.00, buyer_total=$5.83.
+- Live curl: POST `/api/payments/tax/calculate` returns non-zero tax + `stripe_processing_fee` field.
+- Python unit: `_section_label` and `_base_template` correctly brand marketplace items without "Vehicle Auctions".
+- AST check: `process_ended_auctions` calls all 3 new email functions.
+
+
+## Previous: Production Hardening — Performance, Security & Scalability (May 4, 2026 / iter180) — 26/26 DONE
 
 All 9 items from the user's hardening directive shipped and verified end-to-end in a single session. The platform is now production-ready for heavy traffic.
 

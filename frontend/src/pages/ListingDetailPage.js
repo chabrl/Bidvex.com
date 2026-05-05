@@ -503,7 +503,8 @@ const ListingDetailPage = () => {
                   {/* Bidding status badge */}
                   {user && (() => {
                     const isSeller = user.id === listing.seller_id;
-                    const hasBids = (listing.bid_count ?? 0) > 0 || !!listing.highest_bidder_id;
+                    // Use real-time bid count first (WebSocket) then fall back to fetched snapshot
+                    const hasBids = (realtimeBidCount ?? listing.bid_count ?? 0) > 0 || !!listing.highest_bidder_id;
                     // BUG 2 FIX — sellers can never be "outbid" on their own listing.
                     // Show a "Bid Received" badge instead when there's at least one bid.
                     if (isSeller) {
