@@ -6,7 +6,6 @@ import { toast } from 'sonner';
 import API_BASE from '../config';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { Badge } from './ui/badge';
 import { Zap, Star, Crown, Loader2, Check, TrendingUp } from 'lucide-react';
 
 const API = API_BASE;
@@ -145,29 +144,31 @@ const ListingPromotionModal = ({ listingId, listingTitle, listingType = 'marketp
   const featuresForType = FEATURES[listingType] || FEATURES.marketplace;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" data-testid="promote-listing-modal">
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl max-w-4xl w-full max-h-[92vh] overflow-y-auto">
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2" data-testid="promote-listing-title">
-              <TrendingUp className="w-6 h-6 text-amber-500" />
-              {headerLabel}
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4" data-testid="promote-listing-modal">
+      <div className="bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-xl shadow-2xl max-w-4xl w-full max-h-[95vh] sm:max-h-[92vh] flex flex-col">
+        {/* Header */}
+        <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0">
+          <div className="min-w-0">
+            <h2 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2" data-testid="promote-listing-title">
+              <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-amber-500 flex-shrink-0" />
+              <span className="truncate">{headerLabel}</span>
             </h2>
             {listingTitle && (
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 truncate max-w-xl">{listingTitle}</p>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1 truncate max-w-xl">{listingTitle}</p>
             )}
           </div>
-          <button type="button" onClick={onClose} className="text-gray-500 hover:text-gray-900 dark:hover:text-white text-2xl leading-none" aria-label="Close">×</button>
+          <button type="button" onClick={onClose} className="text-gray-500 hover:text-gray-900 dark:hover:text-white text-2xl leading-none flex-shrink-0 ml-3" aria-label="Close">×</button>
         </div>
 
-        <div className="p-6">
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+        {/* Scrollable body */}
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1">
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-4">
             {isFr
               ? 'Choisissez un niveau pour augmenter la visibilité et recevoir plus d\u2019enchères.'
               : 'Choose a boost tier to increase visibility and get more bids on your listing.'}
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-stretch">
             {PROMO_TIERS.map((tier) => {
               const Icon = tier.icon;
               const isSelected = selectedTier === tier.key;
@@ -175,34 +176,43 @@ const ListingPromotionModal = ({ listingId, listingTitle, listingType = 'marketp
               return (
                 <Card
                   key={tier.key}
-                  className={`cursor-pointer transition-all ${isSelected ? `border-2 ${tier.border} ${tier.bg} dark:bg-opacity-10` : 'border hover:border-gray-400'}`}
+                  className={`cursor-pointer transition-all flex flex-col h-full ${isSelected ? `border-2 ${tier.border} ${tier.bg} dark:bg-opacity-10 shadow-md` : 'border hover:border-gray-400 hover:shadow'}`}
                   onClick={() => setSelectedTier(tier.key)}
                   data-testid={`tier-${tier.key}`}
                 >
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center justify-between text-base sm:text-lg">
                       <span className="flex items-center gap-2 capitalize">
                         <Icon className="w-5 h-5" />
                         {tier.key}
                       </span>
                       {isSelected && (
-                        <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                        <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
                           <Check className="w-4 h-4 text-white" />
                         </div>
                       )}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="mb-3">
-                      <div className="text-3xl font-bold">${tier.price.toFixed(2)}</div>
-                      <div className="text-xs text-gray-500">CAD (pre-tax)</div>
-                      <Badge variant="secondary" className="mt-1">{tier.duration_days} days</Badge>
+
+                  <CardContent className="flex flex-col flex-1 pt-0">
+                    {/* Price + duration block — identical structure across all 3 tiers */}
+                    <div className="text-center py-3 border-y border-gray-100 dark:border-gray-800">
+                      <div className="text-3xl sm:text-4xl font-bold leading-none">${tier.price.toFixed(2)}</div>
+                      <div className="text-[11px] text-gray-500 mt-1 uppercase tracking-wide">CAD (pre-tax)</div>
+                      <div
+                        className="inline-block mt-3 px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200"
+                        data-testid={`tier-${tier.key}-duration`}
+                      >
+                        {tier.duration_days} {isFr ? 'jours' : 'days'}
+                      </div>
                     </div>
-                    <ul className="space-y-1 text-sm">
+
+                    {/* Features list — pushes button away via flex-1 so all cards align */}
+                    <ul className="space-y-2 text-sm mt-4 flex-1">
                       {feats.map((f, i) => (
                         <li key={i} className="flex items-start gap-2">
                           <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                          <span>{f}</span>
+                          <span className="leading-snug">{f}</span>
                         </li>
                       ))}
                     </ul>
@@ -237,24 +247,25 @@ const ListingPromotionModal = ({ listingId, listingTitle, listingType = 'marketp
               </p>
             </div>
           )}
+        </div>
 
-          <div className="flex gap-3 justify-end pt-6">
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
-              {isFr ? 'Annuler' : 'Cancel'}
-            </Button>
-            <Button
-              type="button"
-              onClick={handlePurchase}
-              disabled={!selectedTier || loading}
-              data-testid="promote-purchase-btn"
-              className="bg-gradient-to-r from-blue-600 to-purple-600 text-white"
-            >
-              {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              {loading
-                ? (isFr ? 'Traitement…' : 'Processing…')
-                : (isFr ? 'Acheter' : `Purchase ${selectedTier ? selectedTier[0].toUpperCase() + selectedTier.slice(1) : ''} Boost`)}
-            </Button>
-          </div>
+        {/* Sticky footer — keeps Purchase button always visible on mobile */}
+        <div className="p-4 sm:p-6 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex flex-col-reverse sm:flex-row gap-3 sm:justify-end flex-shrink-0 rounded-b-xl">
+          <Button type="button" variant="outline" onClick={onClose} disabled={loading} className="w-full sm:w-auto">
+            {isFr ? 'Annuler' : 'Cancel'}
+          </Button>
+          <Button
+            type="button"
+            onClick={handlePurchase}
+            disabled={!selectedTier || loading}
+            data-testid="promote-purchase-btn"
+            className="bg-gradient-to-r from-blue-600 to-purple-600 text-white w-full sm:w-auto"
+          >
+            {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            {loading
+              ? (isFr ? 'Traitement…' : 'Processing…')
+              : (isFr ? 'Acheter' : `Purchase ${selectedTier ? selectedTier[0].toUpperCase() + selectedTier.slice(1) : ''} Boost`)}
+          </Button>
         </div>
       </div>
     </div>
