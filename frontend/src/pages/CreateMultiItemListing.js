@@ -541,6 +541,11 @@ const CreateMultiItemListing = () => {
   // Submit
   const handleSubmit = async () => {
     if (!validateStep(2)) return;
+    // Iter187: enforce CRA Tax Onboarding at submit time, not at form-mount time
+    if (user && !user.tax_onboarding_completed) {
+      toast.error('Please complete your tax declaration before publishing your listing.');
+      return;
+    }
 
     setLoading(true);
     const lotsData = lots.map(lot => ({
@@ -2392,16 +2397,10 @@ const CreateMultiItemListing = () => {
     );
   }
 
-  // Tax Onboarding Gatekeeper - CRA Part XX Compliance
-  if (user && !user.tax_onboarding_completed) {
-    return (
-      <TaxInterviewModal 
-        user={user} 
-        onComplete={() => window.location.reload()}
-        onCancel={() => navigate('/seller/dashboard')}
-      />
-    );
-  }
+  // Tax Onboarding Gatekeeper — CRA Part XX Compliance
+  // Iter187: render form first, mount modal as overlay so testids are reachable
+  // and the modal does not interrupt mid-form. User cannot submit until tax_onboarding_completed.
+  const taxOnboardingPending = !!(user && !user.tax_onboarding_completed);
 
   // Partner Fee Lockdown
   if (user?.is_partner && !user?.platform_fee_paid) {
@@ -2524,6 +2523,16 @@ const CreateMultiItemListing = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Iter187: CRA Tax Declaration mounted as overlay AFTER form mount.
+          Form testids remain reachable; user is blocked from submitting until completed. */}
+      {taxOnboardingPending && (
+        <TaxInterviewModal
+          user={user}
+          onComplete={() => window.location.reload()}
+          onCancel={() => navigate('/seller/dashboard')}
+        />
+      )}
     </div>
   );
 };
