@@ -191,17 +191,44 @@ async def create_checkout_session(
 
 @payments_router.get("/status/{session_id}")
 async def get_checkout_status(session_id: str):
-    """Get checkout session status"""
+    """Get checkout session status + post-sale seller contact info."""
     import stripe
-    
+
     try:
         session = stripe.checkout.Session.retrieve(session_id)
-        return {
+        out = {
             "status": session.status,
             "payment_status": session.payment_status,
             "customer": session.customer,
-            "subscription": session.subscription
+            "subscription": session.subscription,
+            "amount_total": session.amount_total,
         }
+
+        # Surface seller contact when the buyer just paid for a listing.
+        # We look up the matching payment_transactions row → listing → seller.
+        if session.payment_status == "paid":
+            try:
+                txn = await db.payment_transactions.find_one(
+                    {"session_id": session_id},
+                    {"_id": 0, "listing_id": 1, "seller_id": 1},
+                )
+                if txn and txn.get("seller_id"):
+                    seller = await db.users.find_one(
+                        {"id": txn["seller_id"]},
+                        {"_id": 0, "name": 1, "email": 1, "phone": 1},
+                    )
+                    if seller:
+                        out["seller_contact"] = {
+                            "name":  seller.get("name", ""),
+                            "email": seller.get("email", ""),
+                            "phone": seller.get("phone", ""),
+                        }
+                    out["listing_id"] = txn.get("listing_id")
+            except Exception:
+                # Contact-info enrichment is best-effort — never block the success page
+                pass
+
+        return out
     except stripe.StripeError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

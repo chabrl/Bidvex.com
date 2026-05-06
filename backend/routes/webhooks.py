@@ -147,6 +147,13 @@ async def handle_stripe_webhook(request: Request):
                 pass  # handled by subscription events above
             elif session_type == "listing_promotion":
                 await _handle_listing_promotion_paid(db, data)
+            elif session_type == "down_payment":
+                from services.down_payment_service import mark_down_payment_paid
+                await mark_down_payment_paid(
+                    db,
+                    session_id=data.get("id"),
+                    payment_intent_id=data.get("payment_intent"),
+                )
             else:
                 await _handle_checkout_completed(db, data)
 

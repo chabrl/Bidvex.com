@@ -476,6 +476,7 @@ try:
         ("routes.admin_deposits", "admin_deposits_router", None, False),
         ("routes.admin_bulk", "admin_bulk_router", None, False),
         ("routes.admin_listing_edit", "admin_listing_edit_router", None, False),
+        ("routes.down_payments", "down_payments_router", None, False),
     ]
 
     for module_path, router_name, db_setter_name, app_level in SELF_CONTAINED_ROUTERS:

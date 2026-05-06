@@ -528,7 +528,7 @@ async def create_multi_item_listing(
             detail=f"You have reached the maximum limit of {max_active} active auctions. Please wait for current auctions to end."
         )
 
-    max_lots = settings.get("max_lots_per_auction", 50)
+    max_lots = settings.get("max_lots_per_auction", 500)
     if len(listing_data.lots) > max_lots:
         raise HTTPException(
             status_code=400,

@@ -95,6 +95,23 @@ const PaymentSuccessPage = () => {
                   <p><span className="font-medium">{t('common.status', 'Status')}:</span> {paymentInfo.payment_status}</p>
                 </div>
               )}
+
+              {/* Post-Sale Contact Info — Seller (Phase 3, Option A) */}
+              {paymentInfo?.seller_contact && (
+                <div
+                  className="text-left rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 p-4"
+                  data-testid="checkout-seller-contact"
+                >
+                  <p className="text-xs uppercase font-semibold text-blue-800 dark:text-blue-300 mb-2">
+                    Contact Seller / Contacter le vendeur
+                  </p>
+                  <dl className="text-sm space-y-1">
+                    <div className="flex justify-between"><dt className="text-muted-foreground">Name</dt><dd className="font-medium">{paymentInfo.seller_contact.name || '—'}</dd></div>
+                    <div className="flex justify-between"><dt className="text-muted-foreground">Email</dt><dd className="font-medium"><a className="text-blue-600 hover:underline" href={`mailto:${paymentInfo.seller_contact.email}`}>{paymentInfo.seller_contact.email || '—'}</a></dd></div>
+                    <div className="flex justify-between"><dt className="text-muted-foreground">Phone</dt><dd className="font-medium">{paymentInfo.seller_contact.phone ? <a className="text-blue-600 hover:underline" href={`tel:${paymentInfo.seller_contact.phone}`}>{paymentInfo.seller_contact.phone}</a> : '—'}</dd></div>
+                  </dl>
+                </div>
+              )}
               <div className="flex flex-col sm:flex-row gap-3">
                 <Button
                   onClick={() => navigate('/buyer/dashboard')}

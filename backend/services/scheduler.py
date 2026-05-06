@@ -843,7 +843,22 @@ def init_scheduler(database):
         replace_existing=True,
     )
 
-    logger.info("Scheduler initialized with 13 jobs")
+    # Job 14: Expire overdue down payments + promote runner-up — every 30 min
+    async def expire_overdue_down_payments_job():
+        if db_instance is None:
+            return
+        from services.down_payment_service import expire_overdue_and_promote_runner_up
+        return await expire_overdue_and_promote_runner_up(db_instance)
+
+    scheduler.add_job(
+        _tracked("expire_overdue_down_payments", expire_overdue_down_payments_job),
+        IntervalTrigger(minutes=30),
+        id="expire_overdue_down_payments",
+        name="Expire Overdue Down Payments + Promote Runner-Up",
+        replace_existing=True,
+    )
+
+    logger.info("Scheduler initialized with 14 jobs")
     return scheduler
 
 

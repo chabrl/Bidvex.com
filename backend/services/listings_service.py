@@ -229,11 +229,26 @@ def compute_promotion(current_user: User, listing_data) -> Dict[str, Any]:
     }
 
 
+MAX_LOTS_PER_AUCTION = 500  # Hard ceiling — Lot 1 .. Lot 500 (industry standard)
+
+
 def build_lots_with_end_time(lots, auction_end_date) -> list:
-    """Assign staggered lot end times (1 minute apart)."""
+    """Assign staggered lot end times (1 minute apart) AND auto-number lots
+    sequentially starting at 1. Any seller-supplied `lot_number` is overridden
+    so the platform shows a uniform `Lot N` across every multi-item listing.
+
+    Raises ValueError if the auction has more than MAX_LOTS_PER_AUCTION lots.
+    """
+    if len(lots) > MAX_LOTS_PER_AUCTION:
+        raise ValueError(
+            f"Maximum {MAX_LOTS_PER_AUCTION} lots allowed per auction "
+            f"(received {len(lots)})."
+        )
     result = []
     for idx, lot in enumerate(lots):
         lot_dict = lot.model_dump()
+        # Force sequential numbering 1..N
+        lot_dict['lot_number'] = idx + 1
         lot_dict['lot_end_time'] = auction_end_date + timedelta(minutes=idx)
         result.append(lot_dict)
     return result

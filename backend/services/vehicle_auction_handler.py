@@ -248,6 +248,21 @@ async def process_ended_auction(db, vehicle_listing: dict) -> AuctionEndResult:
                 logger.error(f"Platform fee charge FAILED for auction {vehicle_listing['id']}: {fee_result.get('error')}")
         except Exception as fee_err:
             logger.error(f"Platform fee charge exception for auction {vehicle_listing['id']}: {fee_err}")
+
+        # ── DOWN PAYMENT (10% of winning bid, 24h to pay) ──
+        try:
+            from services.down_payment_service import create_down_payment
+            await create_down_payment(
+                db,
+                auction_id=vehicle_listing["id"],
+                auction_type="vehicle",
+                buyer_id=winner_id,
+                seller_id=vehicle_listing.get("seller_id"),
+                winning_bid=float(final_price),
+                listing_title=vehicle_listing.get("title", "Vehicle"),
+            )
+        except Exception as dp_err:
+            logger.error(f"Down payment create failed for auction {vehicle_listing['id']}: {dp_err}")
         
         # ── CROSS-BORDER PURCHASE NOTICE ──
         # Fires when winning bid confirmed AND listing is cross-border

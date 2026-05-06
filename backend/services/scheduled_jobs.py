@@ -517,6 +517,22 @@ async def process_ended_storage_auctions(db):
                 except Exception as e:
                     logger.error(f"[STORAGE_CLOSE] deposit release failed for {auction_id}: {e}")
 
+                # ── Create down payment ($50 flat for storage) ──
+                if new_status == "sold" and winner_id:
+                    try:
+                        from services.down_payment_service import create_down_payment
+                        await create_down_payment(
+                            db,
+                            auction_id=auction_id,
+                            auction_type="storage",
+                            buyer_id=winner_id,
+                            seller_id=auction.get("facility_owner_id"),
+                            winning_bid=current_bid,
+                            listing_title=auction.get("title") or auction.get("unit_number") or "Storage Unit",
+                        )
+                    except Exception as e:
+                        logger.error(f"[STORAGE_CLOSE] down payment create failed for {auction_id}: {e}")
+
                 # ── Fetch facility + buyer ──
                 facility = await db.storage_facilities.find_one(
                     {"id": auction["facility_id"]}, {"_id": 0}
