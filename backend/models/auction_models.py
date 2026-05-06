@@ -36,6 +36,10 @@ class ListingCreate(BaseModel):
     # Seller payment method preference: "stripe", "cash", "e-transfer"
     payment_method: Optional[str] = None
     currency: Optional[str] = None  # CAD or USD; auto-detected from location if omitted
+    # ── Deposit (a.k.a. "Down Payment") — single field, single flow per spec ──
+    requires_deposit: bool = False
+    deposit_amount: Optional[float] = None   # in auction currency
+    deposit_type: Optional[str] = None       # "fixed" | "percentage"
     # i18n: manual overrides (auto-translated if omitted)
     title_en: Optional[str] = None
     title_fr: Optional[str] = None
@@ -78,6 +82,10 @@ class Listing(BaseModel):
     buyers_premium_percent: Optional[float] = None
     payment_method: Optional[str] = None  # "stripe", "cash", "e-transfer"
     currency: str = "CAD"
+    # ── Deposit (Spec Feature 1) ──
+    requires_deposit: bool = False
+    deposit_amount: Optional[float] = None
+    deposit_type: Optional[str] = None  # "fixed" | "percentage"
     # i18n bilingual fields
     title_en: Optional[str] = None
     title_fr: Optional[str] = None
@@ -200,6 +208,10 @@ class MultiItemListingCreate(BaseModel):
     auction_start_date: Optional[datetime] = None
     lots: List[Lot]
     currency: Optional[str] = None
+    payment_method: Optional[str] = None  # "stripe" | "cash" | "e-transfer"
+    requires_deposit: bool = False
+    deposit_amount: Optional[float] = None
+    deposit_type: Optional[str] = None  # "fixed" | "percentage"
     documents: Optional[Dict[str, Any]] = None
     shipping_info: Optional[Dict[str, Any]] = None
     visit_availability: Optional[Dict[str, Any]] = None
@@ -259,6 +271,9 @@ class MultiItemListing(BaseModel):
     shipping_info: Optional[Dict[str, Any]] = None
     visit_availability: Optional[Dict[str, Any]] = None
     payment_method: Optional[str] = None
+    requires_deposit: bool = False
+    deposit_amount: Optional[float] = None
+    deposit_type: Optional[str] = None  # "fixed" | "percentage"
     payment_proof_url: Optional[str] = None
     auction_terms_en: Optional[str] = None
     auction_terms_fr: Optional[str] = None

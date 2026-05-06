@@ -203,6 +203,24 @@ const BuyNowButton = ({ lot, auctionId, onPurchaseComplete }) => {
               </div>
             ) : null}
 
+            {/* Spec Feature 5 — Buy Now Disclaimer */}
+            <div className="bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 rounded-lg p-3" data-testid="buy-now-disclaimer">
+              <p className="text-xs text-rose-900 dark:text-rose-300 leading-relaxed">
+                <strong>EN:</strong> Clicking "Confirm Purchase" will immediately end this auction
+                and charge your card the Buy Now price of{' '}
+                <strong>${Number(buyNowPrice).toFixed(2)} {(preview?.currency || lot.currency || 'CAD').toUpperCase()}</strong>{' '}
+                plus BidVex's buyer commission fee. Any deposit already paid will be deducted from your total.
+                This action is final and cannot be undone. All active bids will be voided and all deposits
+                held from other bidders will be refunded automatically.
+              </p>
+              <p className="text-xs text-rose-900 dark:text-rose-300 mt-2 leading-relaxed">
+                <strong>FR:</strong> En cliquant « Confirmer l'achat », vous mettez fin à cette enchère
+                et votre carte sera immédiatement débitée du prix d'Achat Immédiat plus la commission acheteur BidVex.
+                Tout dépôt déjà versé sera déduit de votre total. Cette action est finale et irréversible.
+                Toutes les enchères actives seront annulées et les dépôts retenus seront remboursés automatiquement.
+              </p>
+            </div>
+
             {/* Info Note */}
             <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
               <div className="flex items-start gap-2">

@@ -362,6 +362,15 @@ scheduler.add_job(
     lambda: safe_run("watchlist_expiry_alerts", run_watchlist_expiry_alerts()),
     trigger=IntervalTrigger(minutes=2), id='watchlist_expiry_alerts', replace_existing=True)
 
+# ─── Deposit refund queue worker (60s SLA — Spec Feature 2) ───
+async def run_deposit_refund_queue():
+    from services.deposit_refund_queue import process_deposit_refund_queue
+    await process_deposit_refund_queue(db)
+
+scheduler.add_job(
+    lambda: safe_run("deposit_refund_queue", run_deposit_refund_queue()),
+    trigger=IntervalTrigger(seconds=10), id='deposit_refund_queue', replace_existing=True)
+
 # ─── Health Endpoints ───
 @api_router.get("/")
 async def root():
@@ -529,6 +538,14 @@ try:
     from routes.storage_auctions import storage_router
     api_router.include_router(storage_router)
 
+    # Admin Payment Charges (strict payment system observability)
+    from routes.admin_charges import admin_charges_router
+    api_router.include_router(admin_charges_router)
+
+    # Strict bidder deposits (Spec Feature 1 — partner-defined deposits)
+    from routes.bidder_deposits import bidder_deposits_router
+    api_router.include_router(bidder_deposits_router)
+
     # SEO: Dynamic sitemap.xml + robots.txt (app-level, not /api)
     from routes.sitemap import sitemap_router
     app.include_router(sitemap_router, tags=["SEO"])
@@ -611,6 +628,15 @@ async def on_startup():
     await seed_categories(db)
     await create_database_indexes(db)
     await create_critical_indexes(db)
+
+    # ── New strict-payment-system indexes (Spec global rules 3 + 4) ──
+    try:
+        from services.payment_idempotency import ensure_payment_charges_indexes
+        from services.deposit_refund_queue import ensure_refund_queue_indexes
+        await ensure_payment_charges_indexes(db)
+        await ensure_refund_queue_indexes(db)
+    except Exception as e:
+        logger.warning(f"Strict payment indexes registration failed (non-fatal): {e}")
 
 
 async def create_critical_indexes(database):

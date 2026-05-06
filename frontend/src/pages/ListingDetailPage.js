@@ -674,7 +674,63 @@ const ListingDetailPage = () => {
                         data-testid="bid-amount-input"
                       />
                     </div>
-                    
+
+                    {/* Spec Feature 1 — Deposit Notice (above bid button) */}
+                    {listing.requires_deposit && listing.deposit_amount > 0 ? (
+                      <div className="p-3 bg-amber-50 border border-amber-300 rounded-md text-xs leading-relaxed" data-testid="bid-deposit-required-notice">
+                        <p className="font-semibold text-amber-900 mb-1">⚠️ Deposit required · Dépôt requis</p>
+                        <p className="text-amber-800">
+                          <strong>EN:</strong> This auction requires a deposit of{' '}
+                          <strong>
+                            {listing.deposit_type === 'percentage'
+                              ? `${listing.deposit_amount}% of starting bid`
+                              : `$${Number(listing.deposit_amount).toFixed(2)} ${listing.currency || 'CAD'}`}
+                          </strong>.
+                          This amount will be charged to your card immediately when you place your first bid.
+                          If you do not win, your deposit will be refunded automatically as soon as the auction ends.
+                          If you win, your deposit will be applied toward your total — you will not be charged twice.
+                        </p>
+                        <p className="text-amber-800 mt-1">
+                          <strong>FR:</strong> Cette enchère exige un dépôt de{' '}
+                          <strong>
+                            {listing.deposit_type === 'percentage'
+                              ? `${listing.deposit_amount}% du prix de départ`
+                              : `${Number(listing.deposit_amount).toFixed(2)} $ ${listing.currency || 'CAD'}`}
+                          </strong>.
+                          Ce montant sera débité immédiatement lors de votre première mise.
+                          Si vous ne gagnez pas, votre dépôt sera remboursé automatiquement dès la fin de l'enchère.
+                          Si vous gagnez, il sera crédité à votre total — vous ne serez jamais débité deux fois.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-slate-500 px-1" data-testid="bid-no-deposit-notice">
+                        No deposit is required to bid on this item · Aucun dépôt requis pour enchérir.
+                      </div>
+                    )}
+
+                    {/* Spec Feature 3 — Payment-method specific buyer notice */}
+                    {(listing.payment_method === 'cash' || listing.payment_method === 'e-transfer') ? (
+                      <div className="p-3 bg-purple-50 border border-purple-200 rounded-md text-xs leading-relaxed" data-testid="bid-cash-payment-notice">
+                        <p className="font-semibold text-purple-900 mb-1">Payment method · Mode de paiement: {listing.payment_method === 'cash' ? 'Cash' : 'E-Transfer / Virement Interac'}</p>
+                        <p className="text-purple-800">
+                          <strong>EN:</strong> This seller collects payment via {listing.payment_method === 'cash' ? 'Cash' : 'E-Transfer'} directly.
+                          BidVex will only charge your saved card our buyer commission fee
+                          (% of the winning bid in <strong>{listing.currency || 'CAD'}</strong>).
+                          You will arrange payment of the item price directly with the seller after winning.
+                          Any deposit you already paid will be applied toward this commission fee.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-xs leading-relaxed" data-testid="bid-stripe-payment-notice">
+                        <p className="font-semibold text-blue-900 mb-1">Payment method · Mode de paiement: Stripe (BidVex)</p>
+                        <p className="text-blue-800">
+                          <strong>EN:</strong> This seller uses BidVex Stripe checkout.
+                          If you win, your card will be charged the full winning bid amount plus BidVex's buyer commission fee in <strong>{listing.currency || 'CAD'}</strong>.
+                          Any deposit you already paid will be deducted from your total — you will not be charged twice.
+                        </p>
+                      </div>
+                    )}
+
                     {/* Real-time Price Breakdown */}
                     <PriceBreakdown
                       bidAmount={parseFloat(bidAmount) || 0}
@@ -1012,6 +1068,11 @@ const ListingDetailPage = () => {
         region={listing?.region || 'QC'}
         loading={placingBid}
         buyersPremiumRate={listing?.custom_buyer_premium_rate}
+        currency={listing?.currency || 'CAD'}
+        paymentMethod={listing?.payment_method || 'stripe'}
+        requiresDeposit={!!listing?.requires_deposit}
+        depositAmount={listing?.deposit_amount || 0}
+        depositType={listing?.deposit_type || 'fixed'}
       />
 
       {/* Cross-Border Bid Intercept Modal */}

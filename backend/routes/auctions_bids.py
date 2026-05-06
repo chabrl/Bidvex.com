@@ -100,6 +100,31 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
     else:
         auction_end = listing["auction_end_date"]
 
+    # ========== STRICT BIDDER DEPOSIT (Spec Feature 1) ==========
+    # Listing-level requires_deposit (partner-defined). Charged on FIRST bid only.
+    if listing.get("requires_deposit") and current_user.role != 'admin':
+        existing_dep = await db.bidding_deposits.find_one({
+            "auction_id": bid_data.listing_id,
+            "user_id": current_user.id,
+            "status": {"$in": ["held", "authorized", "succeeded", "applied"]},
+        })
+        if not existing_dep:
+            try:
+                from routes.bidder_deposits import _charge_deposit_for_user
+                await _charge_deposit_for_user(db, current_user, bid_data.listing_id)
+            except HTTPException as exc:
+                raise exc
+            except Exception as exc:
+                logger.exception(f"Deposit charge failed: {exc}")
+                raise HTTPException(
+                    status_code=402,
+                    detail={
+                        "error": "deposit_charge_failed",
+                        "message_en": "We could not charge your deposit. Please try again.",
+                        "message_fr": "Le dépôt n'a pas pu être débité. Veuillez réessayer.",
+                    },
+                )
+
     now = datetime.now(timezone.utc)
 
     # ========== ANTI-SNIPING LOGIC ==========

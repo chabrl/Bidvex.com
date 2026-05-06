@@ -2194,3 +2194,117 @@ async def send_promotion_confirmation_email(
         subject=f"✅ Your listing is now boosted — {listing_title} | {label['name_en']}",
         html_content=_base_template(content, "Listing Promoted", auction_type=_brand_type),
     )
+
+
+
+# ============================================================
+# Deposit refund / charge / payout notifications (Spec Feature 2 + 3)
+# ============================================================
+
+async def send_deposit_refunded_email(
+    db, *, user_id: str, auction_id: str, amount: float, currency: str = "CAD"
+) -> bool:
+    """Send refund-confirmation email after non-winner deposit is refunded."""
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "email": 1, "name": 1})
+    if not user or not user.get("email"):
+        return False
+    listing = (
+        await db.listings.find_one({"id": auction_id}, {"_id": 0, "title": 1})
+        or await db.multi_item_listings.find_one({"id": auction_id}, {"_id": 0, "title": 1})
+        or await db.storage_auctions.find_one({"id": auction_id}, {"_id": 0, "unit_number": 1})
+        or {}
+    )
+    title = listing.get("title") or listing.get("unit_number") or auction_id
+    cur = (currency or "CAD").upper()
+    name = user.get("name") or user.get("email").split("@")[0]
+    content = f"""
+    <h2 style="color:#1e40af">Your deposit has been refunded · Votre dépôt a été remboursé</h2>
+    <p>Hi {name},</p>
+    <p><strong>EN:</strong> Your deposit of <strong>${amount:,.2f} {cur}</strong> for auction
+    <em>“{title}”</em> has been refunded. It will appear on your statement within 5–7 business days.</p>
+    <p><strong>FR:</strong> Votre dépôt de <strong>{amount:,.2f} $ {cur}</strong> pour
+    l’enchère <em>« {title} »</em> a été remboursé. Il apparaîtra sur votre relevé d’ici 5 à 7 jours ouvrables.</p>
+    <p>— The BidVex Team / L’équipe BidVex</p>
+    """
+    return await send_email(
+        to_email=user["email"],
+        subject=f"Deposit refunded · Dépôt remboursé — ${amount:,.2f} {cur}",
+        html_content=_base_template(content, "Deposit Refunded"),
+    )
+
+
+async def send_charge_confirmation_email(
+    db, *, user_id: str, auction_id: str, amount: float, currency: str = "CAD",
+    charge_type: str = "buyer_commission",
+) -> bool:
+    """Notify user of a successful charge (winner full / commission / seller)."""
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "email": 1, "name": 1})
+    if not user or not user.get("email"):
+        return False
+    listing = (
+        await db.listings.find_one({"id": auction_id}, {"_id": 0, "title": 1})
+        or await db.multi_item_listings.find_one({"id": auction_id}, {"_id": 0, "title": 1})
+        or {}
+    )
+    title = listing.get("title") or auction_id
+    cur = (currency or "CAD").upper()
+    label_en = {
+        "buyer_commission": "BidVex Buyer Commission",
+        "buyer_full_payment": "BidVex Purchase",
+        "buy_now_payment": "Buy Now Purchase",
+        "seller_commission": "BidVex Seller Commission",
+        "seller_payout": "BidVex Sale Payout",
+    }.get(charge_type, "BidVex Charge")
+    label_fr = {
+        "buyer_commission": "Commission acheteur BidVex",
+        "buyer_full_payment": "Achat BidVex",
+        "buy_now_payment": "Achat immédiat",
+        "seller_commission": "Commission vendeur BidVex",
+        "seller_payout": "Paiement vendeur BidVex",
+    }.get(charge_type, "Charge BidVex")
+    name = user.get("name") or user.get("email").split("@")[0]
+    content = f"""
+    <h2 style="color:#1e40af">{label_en} · {label_fr}</h2>
+    <p>Hi {name},</p>
+    <p><strong>EN:</strong> Your card has been charged <strong>${amount:,.2f} {cur}</strong>
+    ({label_en}) for auction <em>“{title}”</em>.</p>
+    <p><strong>FR:</strong> Votre carte a été débitée de <strong>{amount:,.2f} $ {cur}</strong>
+    ({label_fr}) pour l’enchère <em>« {title} »</em>.</p>
+    <p>— The BidVex Team / L’équipe BidVex</p>
+    """
+    return await send_email(
+        to_email=user["email"],
+        subject=f"{label_en} · {label_fr} — ${amount:,.2f} {cur}",
+        html_content=_base_template(content, label_en),
+    )
+
+
+async def send_payout_confirmation_email(
+    db, *, seller_id: str, auction_id: str, amount: float, currency: str = "CAD",
+) -> bool:
+    """Notify seller their Connect payout was initiated."""
+    seller = await db.users.find_one({"id": seller_id}, {"_id": 0, "email": 1, "name": 1})
+    if not seller or not seller.get("email"):
+        return False
+    listing = (
+        await db.listings.find_one({"id": auction_id}, {"_id": 0, "title": 1})
+        or await db.multi_item_listings.find_one({"id": auction_id}, {"_id": 0, "title": 1})
+        or {}
+    )
+    title = listing.get("title") or auction_id
+    cur = (currency or "CAD").upper()
+    name = seller.get("name") or seller.get("email").split("@")[0]
+    content = f"""
+    <h2 style="color:#1e40af">Sale payout initiated · Paiement de vente initié</h2>
+    <p>Hi {name},</p>
+    <p><strong>EN:</strong> Your sale payout of <strong>${amount:,.2f} {cur}</strong> for
+    auction <em>“{title}”</em> has been initiated through Stripe Connect.</p>
+    <p><strong>FR:</strong> Le paiement de votre vente de <strong>{amount:,.2f} $ {cur}</strong>
+    pour l’enchère <em>« {title} »</em> a été initié via Stripe Connect.</p>
+    <p>— The BidVex Team / L’équipe BidVex</p>
+    """
+    return await send_email(
+        to_email=seller["email"],
+        subject=f"Sale payout · Paiement de vente — ${amount:,.2f} {cur}",
+        html_content=_base_template(content, "Payout Initiated"),
+    )

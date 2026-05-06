@@ -45,6 +45,7 @@ import SubscriptionAnalytics from './admin/SubscriptionAnalytics';
 import SiteModeManager from './admin/SiteModeManager';
 import PartnerManager from './admin/PartnerManager';
 import FinanceDashboard from './admin/FinanceDashboard';
+import AdminPaymentChargesPage from './admin/AdminPaymentChargesPage';
 import EmailSettings from './admin/EmailSettings';
 import SystemMonitoringDashboard from './admin/SystemMonitoringDashboard';
 import PlatformCleanupManager from './admin/PlatformCleanupManager';
@@ -130,6 +131,7 @@ const SECONDARY_TABS = {
   ],
   'partners-finance': [
     { id: 'finance-overview', label: 'Finance Dashboard', icon: '📊', lucideIcon: TrendingUp },
+    { id: 'payment-charges', label: 'Strict Payment Charges', icon: '🔒', lucideIcon: Lock },
     { id: 'email-settings', label: 'Email Settings', icon: '✉️', lucideIcon: Mail },
   ],
   team: [
@@ -380,6 +382,7 @@ const AdminDashboard = () => {
       case 'partners-finance':
         switch (secondaryTab) {
           case 'email-settings': return <EmailSettings />;
+          case 'payment-charges': return <AdminPaymentChargesPage />;
           default: return <FinanceDashboard />;
         }
       case 'team':

@@ -223,6 +223,34 @@ async def create_listing(
     if listing_data.payment_method:
         listing_dict["payment_method"] = listing_data.payment_method
 
+    # ── Deposit (Spec Feature 1) — single field, ONE flow ──
+    if listing_data.requires_deposit:
+        if not listing_data.deposit_amount or listing_data.deposit_amount <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "deposit_amount_required",
+                    "message_en": "Deposit amount is required when requires_deposit is true.",
+                    "message_fr": "Le montant du dépôt est requis lorsque le dépôt est activé.",
+                },
+            )
+        if listing_data.deposit_type not in ("fixed", "percentage"):
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "invalid_deposit_type",
+                    "message_en": "deposit_type must be 'fixed' or 'percentage'.",
+                    "message_fr": "deposit_type doit être 'fixed' ou 'percentage'.",
+                },
+            )
+        listing_dict["requires_deposit"] = True
+        listing_dict["deposit_amount"] = float(listing_data.deposit_amount)
+        listing_dict["deposit_type"] = listing_data.deposit_type
+    else:
+        listing_dict["requires_deposit"] = False
+        listing_dict["deposit_amount"] = None
+        listing_dict["deposit_type"] = None
+
     await apply_partner_tags(db, current_user, listing_dict, listing_data.buyers_premium_rate)
 
     # ── Moderation gate for single-item listings ──

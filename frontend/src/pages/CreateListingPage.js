@@ -67,6 +67,11 @@ const CreateListingPage = () => {
   // Seller Payment Method
   const [paymentMethod, setPaymentMethod] = useState('stripe');
 
+  // Deposit (Spec Feature 1) — single field, single flow
+  const [requiresDeposit, setRequiresDeposit] = useState(false);
+  const [depositType, setDepositType] = useState('fixed'); // 'fixed' | 'percentage'
+  const [depositAmount, setDepositAmount] = useState('');
+
   // Shipping & Visit Options
   const [shippingInfo, setShippingInfo] = useState({
     available: false,
@@ -152,6 +157,10 @@ const CreateListingPage = () => {
         // Convert percent → rate (e.g. 15 → 0.15), null if blank (org default applies server-side)
         buyers_premium_rate: buyersPremiumPercent !== '' ? parseFloat(buyersPremiumPercent) / 100 : null,
         payment_method: paymentMethod,
+        // Deposit (spec Feature 1)
+        requires_deposit: requiresDeposit,
+        deposit_amount: requiresDeposit && depositAmount ? parseFloat(depositAmount) : null,
+        deposit_type: requiresDeposit ? depositType : null,
         // Mandatory Binding Agreement
         agreement_accepted: finalAgreementAccepted,
       };
@@ -384,12 +393,91 @@ const CreateListingPage = () => {
                 </div>
                 {(paymentMethod === 'cash' || paymentMethod === 'e-transfer') && (
                   <div className="p-3 bg-amber-50 border border-amber-200 rounded-md" data-testid="payment-legal-notice">
-                    <p className="text-sm text-amber-800 font-medium">Legal Disclosure</p>
+                    <p className="text-sm text-amber-800 font-medium">Legal Disclosure · Divulgation légale</p>
                     <p className="text-xs text-amber-700 mt-1">
-                      BidVex will invoice the seller for the Platform Fee + Buyer's Premium + Applicable Taxes upon sale.
+                      <strong>EN:</strong> Since you selected Cash or E-Transfer, BidVex will charge your saved card our seller commission fee (% of the winning bid + applicable Stripe fees) in {formData.currency} when your auction closes. You are responsible for collecting the item payment directly from the winning buyer.
+                    </p>
+                    <p className="text-xs text-amber-700 mt-1">
+                      <strong>FR:</strong> Comme vous avez choisi Argent comptant ou Virement Interac, BidVex débitera votre carte enregistrée de notre commission vendeur (% du prix gagnant + frais Stripe applicables) en {formData.currency} à la clôture de l'enchère. Vous êtes responsable d'encaisser le prix de l'article directement auprès de l'acheteur gagnant.
                     </p>
                   </div>
                 )}
+                {paymentMethod === 'stripe' && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-md" data-testid="payment-stripe-notice">
+                    <p className="text-sm text-blue-800 font-medium">Stripe Payout Disclosure · Divulgation paiement Stripe</p>
+                    <p className="text-xs text-blue-700 mt-1">
+                      <strong>EN:</strong> BidVex will collect the full payment from the winning buyer on your behalf in {formData.currency}. You will receive the winning bid amount minus our seller commission (based on your subscription plan). Payouts are processed after buyer payment is confirmed.
+                    </p>
+                    <p className="text-xs text-blue-700 mt-1">
+                      <strong>FR:</strong> BidVex encaissera le paiement complet de l'acheteur gagnant pour votre compte en {formData.currency}. Vous recevrez le montant de l'enchère gagnante moins notre commission vendeur (selon votre plan d'abonnement). Les paiements sont traités après confirmation du paiement de l'acheteur.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Deposit (Spec Feature 1) — single field, single flow */}
+              <div className="space-y-3" data-testid="deposit-section">
+                <Label>
+                  Bidder Deposit · Dépôt des enchérisseurs
+                  <InfoTip
+                    en="Optionally require bidders to put down a deposit when they place their first bid. The deposit is held until the auction ends; the winner has it credited toward their total, all other bidders are refunded automatically."
+                    fr="Demander aux enchérisseurs de verser un dépôt lors de leur première mise. Le dépôt est retenu jusqu'à la fin de l'enchère ; il est crédité au gagnant et remboursé automatiquement à tous les autres enchérisseurs."
+                  />
+                </Label>
+                <div className="grid grid-cols-1 gap-2">
+                  <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${!requiresDeposit ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                    <input type="radio" name="deposit_required" checked={!requiresDeposit} onChange={() => setRequiresDeposit(false)} data-testid="deposit-none" />
+                    <div>
+                      <span className="font-medium text-sm">No deposit required · Aucun dépôt requis</span>
+                      <p className="text-xs text-muted-foreground mt-0.5">Bidders can place bids without paying anything upfront.</p>
+                    </div>
+                  </label>
+                  <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${requiresDeposit ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                    <input type="radio" name="deposit_required" checked={requiresDeposit} onChange={() => setRequiresDeposit(true)} data-testid="deposit-required" />
+                    <div>
+                      <span className="font-medium text-sm">Require a deposit · Exiger un dépôt</span>
+                      <p className="text-xs text-muted-foreground mt-0.5">Charged immediately when bidder places their first bid; non-winners refunded automatically; winner credit applied.</p>
+                    </div>
+                  </label>
+                </div>
+                {requiresDeposit && (
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-md space-y-3" data-testid="deposit-amount-block">
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => setDepositType('fixed')} className={`flex-1 px-3 py-2 rounded-md text-sm font-medium ${depositType === 'fixed' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-300 text-slate-700'}`} data-testid="deposit-type-fixed">Fixed amount · Montant fixe</button>
+                      <button type="button" onClick={() => setDepositType('percentage')} className={`flex-1 px-3 py-2 rounded-md text-sm font-medium ${depositType === 'percentage' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-300 text-slate-700'}`} data-testid="deposit-type-percentage">% of starting bid · % du prix de départ</button>
+                    </div>
+                    <div>
+                      <Label htmlFor="deposit_amount">
+                        Deposit {depositType === 'fixed' ? `(${formData.currency})` : '(%)'} · Dépôt
+                      </Label>
+                      <Input id="deposit_amount" type="number" min="0" step={depositType === 'percentage' ? '1' : '0.01'} value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} placeholder={depositType === 'fixed' ? 'e.g. 50' : 'e.g. 10'} data-testid="deposit-amount-input" />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {depositType === 'fixed'
+                          ? `Bidders will be charged ${depositAmount || 'X'} ${formData.currency} when they place their first bid.`
+                          : `Bidders will be charged ${depositAmount || 'X'}% of the starting bid (${formData.currency}) when they place their first bid.`}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Final Listing Disclosure (Spec Feature 6) */}
+              <div className="p-4 bg-slate-100 border border-slate-300 rounded-md text-xs leading-relaxed" data-testid="seller-final-disclosure">
+                <p className="font-semibold text-slate-900 mb-1">Seller Disclosure · Divulgation au vendeur</p>
+                <p className="text-slate-700">
+                  <strong>EN:</strong> By publishing this auction, you agree to BidVex's seller terms.
+                  All amounts are in <strong>{formData.currency}</strong> based on the currency you selected.
+                  If your item sells, BidVex will charge your saved card a seller commission (% of the winning bid based on your subscription plan).
+                  If you selected Cash or E-Transfer as your payment method, this commission is charged to your card automatically at auction close.
+                  You are responsible for honoring the winning bid and collecting payment from the buyer directly.
+                </p>
+                <p className="text-slate-700 mt-1">
+                  <strong>FR:</strong> En publiant cette enchère, vous acceptez les conditions vendeur de BidVex.
+                  Tous les montants sont en <strong>{formData.currency}</strong> selon la devise choisie.
+                  Si votre article se vend, BidVex débitera votre carte d'une commission vendeur (% du prix gagnant selon votre plan).
+                  Si vous avez choisi Argent comptant ou Virement Interac, cette commission est débitée automatiquement à la clôture.
+                  Vous êtes responsable d'honorer l'enchère gagnante et d'encaisser le paiement directement.
+                </p>
               </div>
 
               <LocationSelector
@@ -448,7 +536,12 @@ const CreateListingPage = () => {
                   ))}
                 </div>
                 <p className="text-xs text-slate-500">
-                  {t('currency.selectorHint', 'Select the currency for this auction')}
+                  <strong>EN:</strong> All transactions are processed in CAD by default. You may switch to USD before publishing.
+                  <strong className="text-amber-600"> Currency cannot be changed once your auction is live.</strong>
+                </p>
+                <p className="text-xs text-slate-500">
+                  <strong>FR:</strong> Toutes les transactions sont traitées en CAD par défaut. Vous pouvez choisir USD avant la publication.
+                  <strong className="text-amber-600"> La devise ne peut pas être modifiée une fois l'enchère en ligne.</strong>
                 </p>
               </div>
 

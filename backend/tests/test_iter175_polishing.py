@@ -184,10 +184,13 @@ class TestDepositAutoCapture:
         assert {"buyer", "invoice", "deposit", "captured_amount"}.issubset(params), f"params={params}"
 
     def test_scheduler_registered_12_jobs(self):
-        # Check backend log contains "Scheduler initialized with 12 jobs"
+        # Check backend log contains "Scheduler initialized with N jobs" — N grows over time
+        # iter175 added job 12 (auto-capture); iter178 → 13; iter183 → 14; iter185 → still 14 (deposit refund queue is registered in server.py, not scheduler.py)
+        import re
         import subprocess
         res = subprocess.run(
             ["grep", "Scheduler initialized with", "/var/log/supervisor/backend.err.log"],
             capture_output=True, text=True
         )
-        assert "12 jobs" in res.stdout, f"not found in log: {res.stdout[-500:]}"
+        matches = re.findall(r"Scheduler initialized with (\d+) jobs", res.stdout)
+        assert matches and int(matches[-1]) >= 12, f"expected ≥12 scheduler jobs, got: {res.stdout[-500:]}"

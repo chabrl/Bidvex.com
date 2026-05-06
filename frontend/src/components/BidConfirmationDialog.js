@@ -36,7 +36,13 @@ const BidConfirmationDialog = ({
   sellerTier = 'basic',
   region = 'QC',
   loading = false,
-  buyersPremiumRate = null
+  buyersPremiumRate = null,
+  // Spec Feature 4 — bid disclaimer + deposit notice
+  currency = 'CAD',
+  paymentMethod = 'stripe',
+  requiresDeposit = false,
+  depositAmount = 0,
+  depositType = 'fixed',
 }) => {
   const [costBreakdown, setCostBreakdown] = useState(null);
   const [calculating, setCalculating] = useState(false);
@@ -273,6 +279,27 @@ const BidConfirmationDialog = ({
         {/* Push notification prompt — shown inside bid dialog */}
         <div className="px-1 pb-2">
           <PushNotificationToggle variant="prompt" />
+        </div>
+
+        {/* Spec Feature 4 — Bid Transparency Disclaimer */}
+        <div className="px-1 pb-2">
+          <div className="bg-rose-50 border border-rose-200 rounded-md p-3 text-xs leading-relaxed" data-testid="bid-disclaimer">
+            <p className="font-semibold text-rose-900 mb-1">Bid Disclaimer · Avis d'enchère</p>
+            <p className="text-rose-800">
+              <strong>EN:</strong> By placing a bid, you agree that if you are the winning bidder at auction close, you are legally obligated to complete the purchase. Your card on file will be charged in <strong>{currency}</strong> according to the seller's payment method ({paymentMethod}) and BidVex's fee schedule shown above. Bids cannot be retracted once placed.
+            </p>
+            <p className="text-rose-800 mt-1">
+              <strong>FR:</strong> En plaçant une enchère, vous acceptez que si vous êtes l'enchérisseur gagnant à la clôture, vous êtes légalement tenu de finaliser l'achat. Votre carte sera débitée en <strong>{currency}</strong> selon le mode de paiement du vendeur et la grille tarifaire BidVex ci-dessus. Les offres ne peuvent pas être retirées.
+            </p>
+            {requiresDeposit && depositAmount > 0 && (
+              <p className="text-rose-900 mt-2 font-semibold" data-testid="bid-deposit-notice">
+                ⚠️ Deposit required · Dépôt requis: {depositType === 'percentage'
+                  ? `${depositAmount}% of starting bid`
+                  : `$${Number(depositAmount).toFixed(2)} ${currency}`}
+                {' '}— charged immediately upon placing your first bid on this auction.
+              </p>
+            )}
+          </div>
         </div>
 
         <DialogFooter className="flex gap-2">

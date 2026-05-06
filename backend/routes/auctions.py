@@ -119,7 +119,39 @@ async def process_ended_auctions():
 
             winner_id = listing.get("highest_bidder_id")
             seller_id = listing.get("seller_id")
-            
+
+            # ─── STRICT PAYMENT SYSTEM (Spec Features 1-3) ───
+            # 1) Enqueue non-winner deposit refunds (60s SLA)
+            try:
+                from services.deposit_refund_queue import enqueue_non_winner_refunds
+                deposits_cursor = db.bidding_deposits.find(
+                    {"auction_id": listing_id, "status": {"$in": ["held", "authorized"]}},
+                    {"_id": 0},
+                )
+                deposits_list = await deposits_cursor.to_list(500)
+                if deposits_list:
+                    await enqueue_non_winner_refunds(
+                        db,
+                        auction_id=listing_id,
+                        winner_user_id=winner_id,
+                        deposits=deposits_list,
+                        deposit_collection="bidding_deposits",
+                    )
+            except Exception as ref_err:
+                logger.warning(f"[auction-end] enqueue non-winner refunds failed: {ref_err}")
+
+            # 2) Settle winner via cash-or-stripe fork
+            if winner_id and seller_id:
+                try:
+                    from services.auction_settlement import settle_auction
+                    settle_listing = {**listing, "winner_id": winner_id, "seller_id": seller_id}
+                    settlement = await settle_auction(db, auction_id=listing_id, listing=settle_listing)
+                    logger.info(
+                        f"[auction-settle] {listing_id} → {settlement.get('scenario')}: {settlement}"
+                    )
+                except Exception as settle_err:
+                    logger.exception(f"[auction-settle] failed for {listing_id}: {settle_err}")
+
             if winner_id and seller_id:
                 try:
                     winner = await db.users.find_one({"id": winner_id}, {"_id": 0, "name": 1, "email": 1, "phone": 1})

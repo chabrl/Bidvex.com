@@ -183,12 +183,22 @@ const TrustVerificationCard = ({ onVerified, refreshUser }) => {
           </>
         ) : (
           <>
-            <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/30">
+            <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/30" data-testid="setup-intent-no-silent-charges">
               <Info className="h-4 w-4 text-amber-600" />
-              <AlertDescription className="text-amber-700 dark:text-amber-400">
-                {isFrench 
-                  ? 'Un mode de paiement valide est requis pour enchérir. Votre carte ne sera pas débitée lors de la vérification.'
-                  : 'A valid payment method is required to bid. Your card will not be charged during verification.'}
+              <AlertDescription className="text-amber-700 dark:text-amber-400 text-xs leading-relaxed">
+                <p className="font-semibold mb-1">
+                  {isFrench ? 'Aucun débit silencieux · Pas de frais cachés' : 'No silent charges · No hidden fees'}
+                </p>
+                <p>
+                  <strong>EN:</strong> Your card is saved securely via Stripe. You will <strong>NOT</strong> be charged
+                  until you win an auction, complete a purchase, or voluntarily make a deposit.
+                  Adding a card does not authorize any payment.
+                </p>
+                <p className="mt-1">
+                  <strong>FR:</strong> Votre carte est enregistrée en toute sécurité via Stripe. Aucun débit ne sera
+                  effectué tant que vous n'aurez pas gagné une enchère, complété un achat ou versé volontairement un dépôt.
+                  L'ajout d'une carte n'autorise aucun paiement.
+                </p>
               </AlertDescription>
             </Alert>
             

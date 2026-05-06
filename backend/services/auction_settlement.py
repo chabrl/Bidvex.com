@@ -1,0 +1,631 @@
+"""
+Auction Settlement — single entry point on auction close
+=========================================================
+Forks payment flow based on `listing.payment_method`:
+
+  • "cash" / "etransfer"  → Scenario A
+        Charge BUYER commission only (deposit credited if covers it)
+        Charge SELLER commission separately
+        Buyer pays full hammer to seller offline.
+
+  • "stripe"              → Scenario B
+        Charge BUYER full (hammer + commission - deposit_already_paid)
+        Transfer payout to SELLER via Stripe Connect.
+        Validate winner_user_id matches charge.user_id (WINNER_MISMATCH_BLOCKED).
+
+Used by:
+  • services.scheduled_jobs.process_ended_auctions  (marketplace)
+  • services.scheduled_jobs.process_ended_storage_auctions  (storage)
+  • services.vehicle_auction_handler  (vehicle)
+"""
+from __future__ import annotations
+
+import logging
+import os
+import uuid
+from datetime import datetime, timezone
+from decimal import Decimal
+from typing import Any, Dict, Optional
+
+import stripe
+
+from services.payment_idempotency import (
+    DuplicateChargeBlocked,
+    mark_charge_failed,
+    mark_charge_succeeded,
+    reserve_charge_row,
+    rollback_stripe_charge,
+)
+from services.fee_calculator import FeeCalculator
+
+logger = logging.getLogger(__name__)
+
+
+def _to_cents(amount: float) -> int:
+    return int(round(float(amount) * 100))
+
+
+async def _get_default_pm(db, user_id: str) -> Optional[Dict[str, Any]]:
+    """Find the user's default Stripe payment method on file."""
+    pm = await db.payment_methods.find_one(
+        {"user_id": user_id, "is_default": True}, {"_id": 0}
+    )
+    if not pm:
+        pm = await db.payment_methods.find_one({"user_id": user_id}, {"_id": 0})
+    return pm
+
+
+async def _log_payment_event(db, *, event: str, **payload):
+    payload.update({
+        "id": str(uuid.uuid4()),
+        "event": event,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    await db.payment_events.insert_one(payload)
+
+
+async def _record_charge_with_atomic_rollback(
+    db,
+    *,
+    charge_row: Dict[str, Any],
+    pi: Any,
+    db_writes: Optional[list] = None,
+) -> bool:
+    """
+    Mark charge succeeded + run any extra DB writes inside a try-block.
+    On any DB exception → trigger Stripe rollback (refund/cancel) immediately.
+    """
+    try:
+        await mark_charge_succeeded(
+            db,
+            charge_row["id"],
+            stripe_object_id=pi.id,
+            stripe_object_type="payment_intent",
+        )
+        if db_writes:
+            for op in db_writes:
+                await op
+        return True
+    except Exception as exc:
+        logger.exception(f"DB write after Stripe success failed — rolling back: {exc}")
+        charge_row["stripe_object_id"] = pi.id
+        charge_row["stripe_object_type"] = "payment_intent"
+        await rollback_stripe_charge(charge_row, reason="db_write_failed")
+        await db.payment_charges.update_one(
+            {"id": charge_row["id"]},
+            {"$set": {
+                "status": "rolled_back",
+                "error": f"db_write_failed: {str(exc)[:300]}",
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }},
+        )
+        await _log_payment_event(
+            db,
+            event="ROLLBACK_REFUND",
+            charge_id=charge_row["id"],
+            stripe_payment_intent_id=pi.id,
+            error=str(exc)[:500],
+        )
+        return False
+
+
+async def _charge_card(
+    db,
+    *,
+    customer_id: str,
+    payment_method_id: str,
+    amount_cents: int,
+    currency: str,
+    description: str,
+    statement_descriptor: Optional[str],
+    metadata: Dict[str, Any],
+    idempotency_key: str,
+    transfer_destination: Optional[str] = None,
+    application_fee_amount_cents: Optional[int] = None,
+) -> Any:
+    """Create + confirm a PaymentIntent in one shot using a saved card."""
+    stripe.api_key = os.environ.get("STRIPE_API_KEY", "")
+    kwargs: Dict[str, Any] = dict(
+        amount=amount_cents,
+        currency=currency.lower(),
+        customer=customer_id,
+        payment_method=payment_method_id,
+        confirm=True,
+        off_session=True,
+        description=description[:1000],
+        metadata=metadata,
+    )
+    if statement_descriptor:
+        # Stripe limits to 22 chars
+        kwargs["statement_descriptor_suffix"] = statement_descriptor[:22]
+    if transfer_destination:
+        kwargs["transfer_data"] = {"destination": transfer_destination}
+        if application_fee_amount_cents is not None:
+            kwargs["application_fee_amount"] = application_fee_amount_cents
+    return stripe.PaymentIntent.create(idempotency_key=idempotency_key, **kwargs)
+
+
+# ============================================================
+# Scenario A — Cash / E-Transfer (commission only)
+# ============================================================
+
+async def settle_cash_or_etransfer(
+    db,
+    *,
+    auction_id: str,
+    listing: Dict[str, Any],
+    winner_user_id: str,
+    seller_id: str,
+    hammer_price: float,
+    currency: str,
+    auction_end_ts: int,
+) -> Dict[str, Any]:
+    """
+    Cash/E-Transfer settlement:
+      • Buyer charged COMMISSION ONLY (deposit credited).
+      • Seller charged COMMISSION ONLY.
+      • Buyer pays seller full hammer offline.
+    """
+    currency = (currency or "CAD").upper()
+    result = {"buyer_charge": None, "seller_charge": None, "warnings": []}
+
+    # ---- BUYER COMMISSION ----
+    buyer = await db.users.find_one({"id": winner_user_id})
+    buyer_tier = (buyer or {}).get("subscription_tier", "free")
+    seller = await db.users.find_one({"id": seller_id})
+    seller_tier = (seller or {}).get("subscription_tier", "free")
+
+    region = listing.get("region", "QC")
+    breakdown = FeeCalculator.calculate_full_transaction(
+        Decimal(str(hammer_price)),
+        buyer_tier=buyer_tier,
+        seller_tier=seller_tier,
+        region=region,
+        seller_is_business=bool((seller or {}).get("is_tax_registered", False)),
+    )
+    buyer_commission = float(breakdown["buyer"]["buyer_premium"]) + float(breakdown["buyer"]["tax"])
+    seller_commission = float(breakdown["seller"]["seller_commission"])
+
+    # --- Deposit credit lookup (winner's deposit, if any) ---
+    deposit_doc = await db.bidding_deposits.find_one(
+        {"auction_id": auction_id, "user_id": winner_user_id, "status": {"$in": ["held", "authorized", "succeeded"]}},
+        {"_id": 0},
+    )
+    if not deposit_doc:
+        deposit_doc = await db.storage_deposits.find_one(
+            {"auction_id": auction_id, "user_id": winner_user_id, "status": {"$in": ["held", "authorized", "succeeded"]}},
+            {"_id": 0},
+        )
+
+    deposit_amount = float(deposit_doc.get("amount", 0)) if deposit_doc else 0.0
+    remaining_buyer = max(0.0, round(buyer_commission - deposit_amount, 2))
+
+    if deposit_amount >= buyer_commission and deposit_amount > 0 and deposit_doc:
+        # Full deposit covers commission → capture deposit, no extra charge
+        try:
+            stripe.api_key = os.environ.get("STRIPE_API_KEY", "")
+            stripe.PaymentIntent.capture(
+                deposit_doc["stripe_payment_intent_id"],
+                amount_to_capture=_to_cents(buyer_commission),
+                idempotency_key=f"deposit_capture_{auction_id}_{winner_user_id}_{auction_end_ts}",
+            )
+            await db.bidding_deposits.update_one(
+                {"id": deposit_doc["id"]},
+                {"$set": {
+                    "status": "applied",
+                    "applied_amount": buyer_commission,
+                    "applied_at": datetime.now(timezone.utc).isoformat(),
+                }},
+            )
+            result["buyer_charge"] = {"applied_from_deposit": buyer_commission, "extra_charge": 0}
+            await _log_payment_event(
+                db,
+                event="BUYER_COMMISSION_FROM_DEPOSIT",
+                auction_id=auction_id, user_id=winner_user_id,
+                amount=buyer_commission, currency=currency,
+            )
+        except Exception as exc:
+            logger.error(f"deposit capture failed: {exc}")
+            result["warnings"].append(f"deposit_capture_failed: {exc}")
+    elif remaining_buyer > 0:
+        # Reserve charge row + execute Stripe call for remainder
+        try:
+            charge_row = await reserve_charge_row(
+                db,
+                auction_id=auction_id,
+                user_id=winner_user_id,
+                charge_type="buyer_commission",
+                currency=currency,
+                amount=remaining_buyer,
+                auction_end_ts=auction_end_ts,
+                metadata={
+                    "listing_title": listing.get("title", ""),
+                    "hammer_price": hammer_price,
+                    "deposit_credit": deposit_amount,
+                    "scenario": "cash_or_etransfer",
+                },
+            )
+        except DuplicateChargeBlocked as exc:
+            await _log_payment_event(
+                db, event="DUPLICATE_CHARGE_BLOCKED",
+                auction_id=auction_id, user_id=winner_user_id,
+                charge_type="buyer_commission",
+            )
+            result["warnings"].append(str(exc))
+        else:
+            pm = await _get_default_pm(db, winner_user_id)
+            if not pm:
+                await mark_charge_failed(db, charge_row["id"], error="no_payment_method_on_file")
+                result["warnings"].append("buyer_no_pm")
+            else:
+                try:
+                    pi = await _charge_card(
+                        db,
+                        customer_id=buyer.get("stripe_customer_id"),
+                        payment_method_id=pm["stripe_payment_method_id"],
+                        amount_cents=_to_cents(remaining_buyer),
+                        currency=currency,
+                        description=f"BidVex Buyer Commission – {listing.get('title','')[:60]} – {currency}",
+                        statement_descriptor="BIDVEX-COMM",
+                        metadata={
+                            "type": "buyer_commission",
+                            "auction_id": auction_id,
+                            "winner_user_id": winner_user_id,
+                            "scenario": "cash_or_etransfer",
+                        },
+                        idempotency_key=charge_row["idempotency_key"],
+                    )
+                    db_writes = []
+                    if deposit_doc and deposit_amount > 0:
+                        # Capture the deposit + remaining charged separately
+                        try:
+                            stripe.PaymentIntent.capture(
+                                deposit_doc["stripe_payment_intent_id"],
+                                amount_to_capture=_to_cents(deposit_amount),
+                                idempotency_key=f"deposit_capture_{auction_id}_{winner_user_id}_{auction_end_ts}",
+                            )
+                            db_writes.append(db.bidding_deposits.update_one(
+                                {"id": deposit_doc["id"]},
+                                {"$set": {"status": "applied", "applied_amount": deposit_amount,
+                                          "applied_at": datetime.now(timezone.utc).isoformat()}},
+                            ))
+                        except Exception as exc:
+                            logger.warning(f"deposit capture warn: {exc}")
+                    await _record_charge_with_atomic_rollback(
+                        db, charge_row=charge_row, pi=pi, db_writes=db_writes,
+                    )
+                    result["buyer_charge"] = {
+                        "applied_from_deposit": deposit_amount,
+                        "extra_charge": remaining_buyer,
+                        "stripe_pi": pi.id,
+                    }
+                    try:
+                        from services.email_notifications import send_charge_confirmation_email
+                        await send_charge_confirmation_email(
+                            db, user_id=winner_user_id, auction_id=auction_id,
+                            amount=remaining_buyer, currency=currency,
+                            charge_type="buyer_commission",
+                        )
+                    except Exception:
+                        pass
+                except stripe.error.StripeError as exc:
+                    await mark_charge_failed(db, charge_row["id"], error=str(exc))
+                    result["warnings"].append(f"buyer_charge_failed: {exc}")
+
+    # ---- SELLER COMMISSION ----
+    if seller_commission > 0:
+        try:
+            seller_charge_row = await reserve_charge_row(
+                db,
+                auction_id=auction_id,
+                user_id=seller_id,
+                charge_type="seller_commission",
+                currency=currency,
+                amount=seller_commission,
+                auction_end_ts=auction_end_ts,
+                metadata={
+                    "listing_title": listing.get("title", ""),
+                    "hammer_price": hammer_price,
+                    "scenario": "cash_or_etransfer",
+                },
+            )
+        except DuplicateChargeBlocked:
+            seller_charge_row = None
+        if seller_charge_row:
+            seller_pm = await _get_default_pm(db, seller_id)
+            if not seller_pm:
+                await mark_charge_failed(db, seller_charge_row["id"], error="no_payment_method_on_file")
+                result["warnings"].append("seller_no_pm")
+            else:
+                try:
+                    pi = await _charge_card(
+                        db,
+                        customer_id=seller.get("stripe_customer_id"),
+                        payment_method_id=seller_pm["stripe_payment_method_id"],
+                        amount_cents=_to_cents(seller_commission),
+                        currency=currency,
+                        description=f"BidVex Seller Commission – {listing.get('title','')[:60]} – {currency}",
+                        statement_descriptor="BIDVEX-SELL",
+                        metadata={
+                            "type": "seller_commission",
+                            "auction_id": auction_id,
+                            "seller_id": seller_id,
+                            "scenario": "cash_or_etransfer",
+                        },
+                        idempotency_key=seller_charge_row["idempotency_key"],
+                    )
+                    await _record_charge_with_atomic_rollback(
+                        db, charge_row=seller_charge_row, pi=pi,
+                    )
+                    result["seller_charge"] = {"amount": seller_commission, "stripe_pi": pi.id}
+                    try:
+                        from services.email_notifications import send_charge_confirmation_email
+                        await send_charge_confirmation_email(
+                            db, user_id=seller_id, auction_id=auction_id,
+                            amount=seller_commission, currency=currency,
+                            charge_type="seller_commission",
+                        )
+                    except Exception:
+                        pass
+                except stripe.error.StripeError as exc:
+                    await mark_charge_failed(db, seller_charge_row["id"], error=str(exc))
+                    result["warnings"].append(f"seller_charge_failed: {exc}")
+
+    return result
+
+
+# ============================================================
+# Scenario B — Stripe (full payment + Connect payout)
+# ============================================================
+
+async def settle_stripe_full(
+    db,
+    *,
+    auction_id: str,
+    listing: Dict[str, Any],
+    winner_user_id: str,
+    seller_id: str,
+    hammer_price: float,
+    currency: str,
+    auction_end_ts: int,
+) -> Dict[str, Any]:
+    """
+    Stripe scenario:
+      • Validate winner_user_id matches DB winner (else WINNER_MISMATCH_BLOCKED).
+      • Charge buyer (hammer + commission - deposit_already_paid).
+      • Transfer seller payout via Connect (winning_bid - seller_commission).
+    """
+    currency = (currency or "CAD").upper()
+    result = {"buyer_charge": None, "seller_payout": None, "warnings": []}
+
+    # WINNER VALIDATION
+    db_winner = listing.get("winner_id") or listing.get("winning_bidder_id") or listing.get("highest_bidder_id")
+    if db_winner and db_winner != winner_user_id:
+        await _log_payment_event(
+            db, event="WINNER_MISMATCH_BLOCKED",
+            auction_id=auction_id,
+            requested_winner=winner_user_id, db_winner=db_winner,
+        )
+        return {"error": "WINNER_MISMATCH_BLOCKED", "warnings": ["winner_id_mismatch"]}
+
+    buyer = await db.users.find_one({"id": winner_user_id})
+    seller = await db.users.find_one({"id": seller_id})
+    buyer_tier = (buyer or {}).get("subscription_tier", "free")
+    seller_tier = (seller or {}).get("subscription_tier", "free")
+    region = listing.get("region", "QC")
+
+    breakdown = FeeCalculator.calculate_full_transaction(
+        Decimal(str(hammer_price)),
+        buyer_tier=buyer_tier,
+        seller_tier=seller_tier,
+        region=region,
+        seller_is_business=bool((seller or {}).get("is_tax_registered", False)),
+    )
+    buyer_total = float(breakdown["buyer"]["total"])
+    seller_payout = float(breakdown["seller"]["net_payout"])
+
+    # Deposit credit
+    deposit_doc = await db.bidding_deposits.find_one(
+        {"auction_id": auction_id, "user_id": winner_user_id, "status": {"$in": ["held", "authorized"]}},
+        {"_id": 0},
+    )
+    deposit_amount = float(deposit_doc.get("amount", 0)) if deposit_doc else 0.0
+    final_charge = max(0.0, round(buyer_total - deposit_amount, 2))
+
+    # Reserve charge row
+    try:
+        charge_row = await reserve_charge_row(
+            db,
+            auction_id=auction_id,
+            user_id=winner_user_id,
+            charge_type="buyer_full_payment",
+            currency=currency,
+            amount=final_charge,
+            auction_end_ts=auction_end_ts,
+            metadata={
+                "hammer_price": hammer_price,
+                "buyer_total_before_deposit": buyer_total,
+                "deposit_credit": deposit_amount,
+                "scenario": "stripe_full",
+            },
+        )
+    except DuplicateChargeBlocked as exc:
+        result["warnings"].append(str(exc))
+        return result
+
+    seller_connect_id = (seller or {}).get("stripe_connect_account_id")
+    pm = await _get_default_pm(db, winner_user_id)
+
+    if not pm:
+        await mark_charge_failed(db, charge_row["id"], error="no_payment_method_on_file")
+        result["warnings"].append("buyer_no_pm")
+        return result
+
+    try:
+        application_fee_cents = _to_cents(buyer_total - seller_payout) if seller_connect_id else None
+
+        if final_charge > 0:
+            pi = await _charge_card(
+                db,
+                customer_id=buyer.get("stripe_customer_id"),
+                payment_method_id=pm["stripe_payment_method_id"],
+                amount_cents=_to_cents(final_charge),
+                currency=currency,
+                description=f"BidVex Purchase – {listing.get('title','')[:60]} – {currency}",
+                statement_descriptor="BIDVEX-WIN",
+                metadata={
+                    "type": "buyer_full_payment",
+                    "auction_id": auction_id,
+                    "winner_user_id": winner_user_id,
+                    "hammer_price": str(hammer_price),
+                    "deposit_credit": str(deposit_amount),
+                    "scenario": "stripe_full",
+                },
+                idempotency_key=charge_row["idempotency_key"],
+                transfer_destination=seller_connect_id,
+                application_fee_amount_cents=application_fee_cents,
+            )
+            db_writes = []
+            if deposit_doc:
+                try:
+                    stripe.PaymentIntent.capture(
+                        deposit_doc["stripe_payment_intent_id"],
+                        amount_to_capture=_to_cents(deposit_amount),
+                        idempotency_key=f"deposit_capture_{auction_id}_{winner_user_id}_{auction_end_ts}",
+                    )
+                    db_writes.append(db.bidding_deposits.update_one(
+                        {"id": deposit_doc["id"]},
+                        {"$set": {"status": "applied", "applied_amount": deposit_amount,
+                                  "applied_at": datetime.now(timezone.utc).isoformat()}},
+                    ))
+                except Exception as exc:
+                    logger.warning(f"deposit capture warn: {exc}")
+            ok = await _record_charge_with_atomic_rollback(
+                db, charge_row=charge_row, pi=pi, db_writes=db_writes,
+            )
+            if ok:
+                result["buyer_charge"] = {
+                    "amount": final_charge, "stripe_pi": pi.id,
+                    "deposit_credit": deposit_amount,
+                }
+                try:
+                    from services.email_notifications import send_charge_confirmation_email
+                    await send_charge_confirmation_email(
+                        db, user_id=winner_user_id, auction_id=auction_id,
+                        amount=final_charge, currency=currency,
+                        charge_type="buyer_full_payment",
+                    )
+                except Exception:
+                    pass
+
+        if seller_connect_id:
+            result["seller_payout"] = {
+                "amount": seller_payout,
+                "method": "stripe_connect_destination_charge",
+                "destination": seller_connect_id,
+            }
+            try:
+                from services.email_notifications import send_payout_confirmation_email
+                await send_payout_confirmation_email(
+                    db, seller_id=seller_id, auction_id=auction_id,
+                    amount=seller_payout, currency=currency,
+                )
+            except Exception:
+                pass
+        else:
+            await db.payout_queue.insert_one({
+                "id": str(uuid.uuid4()),
+                "auction_id": auction_id,
+                "seller_id": seller_id,
+                "amount": seller_payout,
+                "currency": currency,
+                "status": "pending_connect_setup",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+            await _log_payment_event(
+                db, event="PAYOUT_QUEUED_NO_CONNECT",
+                auction_id=auction_id, seller_id=seller_id,
+                amount=seller_payout, currency=currency,
+            )
+            result["warnings"].append("seller_no_connect_account")
+    except stripe.error.StripeError as exc:
+        await mark_charge_failed(db, charge_row["id"], error=str(exc))
+        result["warnings"].append(f"buyer_charge_failed: {exc}")
+
+    return result
+
+
+# ============================================================
+# Public entry point
+# ============================================================
+
+async def settle_auction(
+    db,
+    *,
+    auction_id: str,
+    listing: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Single entry point — choose flow based on listing.payment_method.
+    Spec: payment_method ∈ {"stripe", "cash", "etransfer", "e-transfer"}
+    """
+    payment_method = (listing.get("payment_method") or "stripe").lower().replace("-", "")
+    winner_user_id = (
+        listing.get("winner_id")
+        or listing.get("winning_bidder_id")
+        or listing.get("highest_bidder_id")
+    )
+    seller_id = listing.get("seller_id")
+    hammer_price = float(
+        listing.get("final_price")
+        or listing.get("current_price")
+        or listing.get("starting_price", 0)
+    )
+    currency = (listing.get("currency") or "CAD").upper()
+    end_dt = listing.get("auction_end_date") or listing.get("end_time") or datetime.now(timezone.utc)
+    if isinstance(end_dt, str):
+        try:
+            end_dt = datetime.fromisoformat(end_dt.replace("Z", "+00:00"))
+        except Exception:
+            end_dt = datetime.now(timezone.utc)
+    auction_end_ts = int(end_dt.timestamp())
+
+    if not winner_user_id:
+        return {"settled": False, "reason": "no_winner"}
+    if not seller_id:
+        return {"settled": False, "reason": "no_seller"}
+    if hammer_price <= 0:
+        return {"settled": False, "reason": "invalid_hammer_price"}
+
+    if payment_method in ("cash", "etransfer", "etransfere"):
+        out = await settle_cash_or_etransfer(
+            db,
+            auction_id=auction_id,
+            listing=listing,
+            winner_user_id=winner_user_id,
+            seller_id=seller_id,
+            hammer_price=hammer_price,
+            currency=currency,
+            auction_end_ts=auction_end_ts,
+        )
+        out["scenario"] = "cash_or_etransfer"
+    else:
+        out = await settle_stripe_full(
+            db,
+            auction_id=auction_id,
+            listing=listing,
+            winner_user_id=winner_user_id,
+            seller_id=seller_id,
+            hammer_price=hammer_price,
+            currency=currency,
+            auction_end_ts=auction_end_ts,
+        )
+        out["scenario"] = "stripe_full"
+
+    out["settled"] = True
+    out["currency"] = currency
+    out["auction_id"] = auction_id
+    return out
+
+
+__all__ = ["settle_auction", "settle_cash_or_etransfer", "settle_stripe_full"]
