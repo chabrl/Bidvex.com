@@ -290,6 +290,18 @@ const BuyerDashboard = () => {
                               <Badge variant="outline">{listing?.bid_count || 0} bids</Badge>
                               {isEnded && <Badge className="bg-green-600 text-white">Won!</Badge>}
                             </div>
+
+                            {/* Post-Sale Contact Info — Seller */}
+                            {listing?.status === 'sold' && listing?.seller_contact && (
+                              <div className="mt-2 p-4 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800" data-testid={`contact-seller-${listing.id}`}>
+                                <p className="text-xs uppercase font-semibold text-blue-800 dark:text-blue-300 mb-2">Contact Seller / Contacter le vendeur</p>
+                                <dl className="text-sm space-y-1">
+                                  <div className="flex justify-between"><dt className="text-muted-foreground">Name</dt><dd className="font-medium">{listing.seller_contact.name || '—'}</dd></div>
+                                  <div className="flex justify-between"><dt className="text-muted-foreground">Email</dt><dd className="font-medium"><a className="text-blue-600 hover:underline" href={`mailto:${listing.seller_contact.email}`}>{listing.seller_contact.email || '—'}</a></dd></div>
+                                  <div className="flex justify-between"><dt className="text-muted-foreground">Phone</dt><dd className="font-medium">{listing.seller_contact.phone ? <a className="text-blue-600 hover:underline" href={`tel:${listing.seller_contact.phone}`}>{listing.seller_contact.phone}</a> : '—'}</dd></div>
+                                </dl>
+                              </div>
+                            )}
                           </CardContent>
                           <CardFooter className="p-4 pt-0 flex-col sm:flex-row gap-2">
                             <Button className="w-full sm:flex-1" variant="outline" onClick={() => navigate(`/listing/${bid.listing_id}`)}>

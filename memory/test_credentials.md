@@ -17,10 +17,12 @@
 
 
 ## Direct Google OAuth 2.0
-- Pixel ID / Google Cloud Project: configured per `/app/backend/.env`
+- Google Cloud Project: configured per `/app/backend/.env`
   - `GOOGLE_CLIENT_ID=<REDACTED — see /app/backend/.env>`
-  - `GOOGLE_CALLBACK_URL=https://api.bidvex.com/auth/google/callback`
-- Authorized JavaScript Origin (Google Console): `https://bidvex.com`
-- Authorized Redirect URIs (Google Console): `https://api.bidvex.com/auth/google/callback`
-  - For preview testing, ALSO add: `https://prod-verify-2.preview.emergentagent.com/api/auth/google/callback`
-- Test the flow by clicking "Continue with Google" → backend `/api/auth/google` → Google consent → backend `/api/auth/google/callback` → frontend `/auth/google/finish#token=…` → `/marketplace`
+- **Authorized Redirect URIs (Google Console — verified by user 2026-05-05):**
+  - Production: `https://bidvex.com/api/auth/google/callback`
+  - Preview:    `https://prod-verify-2.preview.emergentagent.com/api/auth/google/callback`
+- **Required env var per environment:**
+  - Preview `.env`: `GOOGLE_CALLBACK_URL=https://prod-verify-2.preview.emergentagent.com/api/auth/google/callback` (currently set)
+  - Production deploy: `GOOGLE_CALLBACK_URL=https://bidvex.com/api/auth/google/callback`
+- Test flow: click "Continue with Google" → backend `/api/auth/google` → Google consent → backend `/api/auth/google/callback` → frontend `/auth/google/finish#token=…` → `/marketplace`

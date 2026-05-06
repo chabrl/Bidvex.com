@@ -557,6 +557,18 @@ const SellerDashboard = () => {
                           {t('dashboard.seller.requestDeletion', 'Request Deletion')}
                         </Button>
                       </div>
+
+                      {/* Post-Sale Contact Info — Buyer */}
+                      {listing.status === 'sold' && listing.buyer_contact && (
+                        <div className="mt-3 p-4 rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-950 dark:border-emerald-800" data-testid={`contact-buyer-${listing.id}`}>
+                          <p className="text-xs uppercase font-semibold text-emerald-800 dark:text-emerald-300 mb-2">Contact Buyer / Contacter l'acheteur</p>
+                          <dl className="text-sm space-y-1">
+                            <div className="flex justify-between"><dt className="text-muted-foreground">Name</dt><dd className="font-medium">{listing.buyer_contact.name || '—'}</dd></div>
+                            <div className="flex justify-between"><dt className="text-muted-foreground">Email</dt><dd className="font-medium"><a className="text-emerald-700 hover:underline" href={`mailto:${listing.buyer_contact.email}`}>{listing.buyer_contact.email || '—'}</a></dd></div>
+                            <div className="flex justify-between"><dt className="text-muted-foreground">Phone</dt><dd className="font-medium">{listing.buyer_contact.phone ? <a className="text-emerald-700 hover:underline" href={`tel:${listing.buyer_contact.phone}`}>{listing.buyer_contact.phone}</a> : '—'}</dd></div>
+                          </dl>
+                        </div>
+                      )}
                     </div>
                   </div>
                   );

@@ -66,6 +66,27 @@ async def get_seller_dashboard(
     sold_listings = [l for l in all_listings if l["status"] == "sold"]
     draft_listings = [l for l in all_listings if l["status"] == "draft"]
 
+    # Post-sale Contact Info — enrich every sold/ended listing with the
+    # buyer's contact details so the seller can complete the transaction.
+    # Only sold (transaction confirmed) — no info leaked for active listings.
+    buyer_ids = {l.get("highest_bidder_id") or l.get("winner_id") for l in sold_listings if l.get("highest_bidder_id") or l.get("winner_id")}
+    buyer_lookup = {}
+    if buyer_ids:
+        buyer_docs = await rdb.users.find(
+            {"id": {"$in": list(buyer_ids)}},
+            {"_id": 0, "id": 1, "name": 1, "email": 1, "phone": 1},
+        ).to_list(len(buyer_ids))
+        buyer_lookup = {u["id"]: u for u in buyer_docs}
+    for l in sold_listings:
+        bid = l.get("highest_bidder_id") or l.get("winner_id")
+        b = buyer_lookup.get(bid) if bid else None
+        if b:
+            l["buyer_contact"] = {
+                "name":  b.get("name", ""),
+                "email": b.get("email", ""),
+                "phone": b.get("phone", ""),
+            }
+
     total_sales = sum(l.get("current_price", 0) for l in sold_listings)
 
     return {
@@ -108,6 +129,32 @@ async def get_buyer_dashboard(
         {"id": {"$in": watchlist_listing_ids}, "status": {"$ne": "deleted"}},
         {"_id": 0},
     ).to_list(100)
+
+    # Post-sale Contact Info — for each WON listing (user is the highest bidder
+    # AND status is sold/ended), surface the seller's contact details so the
+    # buyer can complete the transaction. Pulled from existing user profile;
+    # no info leaked for active listings.
+    won_listings = [
+        l for l in listings
+        if l.get("status") == "sold"
+        and (l.get("highest_bidder_id") == current_user.id or l.get("winner_id") == current_user.id)
+    ]
+    seller_ids = {l.get("seller_id") for l in won_listings if l.get("seller_id")}
+    seller_lookup = {}
+    if seller_ids:
+        seller_docs = await rdb.users.find(
+            {"id": {"$in": list(seller_ids)}},
+            {"_id": 0, "id": 1, "name": 1, "email": 1, "phone": 1},
+        ).to_list(len(seller_ids))
+        seller_lookup = {u["id"]: u for u in seller_docs}
+    for l in won_listings:
+        s = seller_lookup.get(l.get("seller_id"))
+        if s:
+            l["seller_contact"] = {
+                "name":  s.get("name", ""),
+                "email": s.get("email", ""),
+                "phone": s.get("phone", ""),
+            }
 
     return {
         "total_bids": len(bids),
