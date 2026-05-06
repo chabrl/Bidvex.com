@@ -1,6 +1,74 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: 3-Feature Sprint — Lot Numbering + Down Payments + Post-Sale Contact (May 6, 2026 / iter183-184) — 100% verified
+## Latest: Strict Production Payment System (May 6, 2026 / iter185) — 26/26 unit + 9/10 API verified
+
+User-driven architectural overhaul mandating zero duplicate charges, idempotent Stripe ops, atomic DB+Stripe transactions, 60-second deposit refund SLA, dynamic CAD/USD currency, and forked Cash/E-Transfer vs Stripe settlement flows.
+
+### Foundation services (NEW)
+- **`services/payment_idempotency.py`** — `build_idempotency_key(charge_type, auction_id, user_id, unix_ts)` per spec format. `reserve_charge_row()` blocks on existing succeeded charge → raises `DuplicateChargeBlocked` and logs `DUPLICATE_CHARGE_BLOCKED` to `payment_events`. `rollback_stripe_charge()` issues immediate Stripe refund/cancel on DB write failure → logs `ROLLBACK_REFUND`. Currency whitelist CAD/USD; charge_type whitelist: deposit, buyer_commission, buyer_full_payment, buy_now_payment, seller_commission, seller_payout. Indexes ensured at startup.
+- **`services/deposit_refund_queue.py`** — 60s SLA worker. `enqueue_non_winner_refunds(winner_user_id, deposits)` skips winner. Worker tick every **10 seconds** (registered in `server.py` scheduler). Per-job retry with exponential backoff [10s, 30s, 90s], max 3 attempts → permanent failure logged + alert event. Async parallel processing via `asyncio.gather`.
+- **`services/auction_settlement.py`** — single entry point `settle_auction(db, auction_id, listing)` forks by `listing.payment_method`:
+  - `cash` / `etransfer` → buyer charged commission only (deposit credited if covers it); seller charged commission separately
+  - `stripe` → buyer charged hammer + commission − deposit_already_paid; payout via Connect destination charge (winning_bid − seller_commission); falls back to `payout_queue` collection when seller has no Connect account
+  - **WINNER_MISMATCH_BLOCKED** validation: any Stripe-flow buyer charge aborts if `winner_user_id != listing.winner_id`
+
+### New routes
+- **`POST /api/bidder-deposits/charge`** — partner-defined deposit charging (Spec Feature 1). Idempotent + atomic. Auto-fired on first bid via `place_bid()` when `listing.requires_deposit=true`.
+- **`GET /api/bidder-deposits/check/{auction_id}`** — buyer-side status check
+- **`GET /api/admin/payment-charges` + `/events` + `/refund-queue`** — admin-only observability dashboard
+
+### Schema additions (Spec Feature 1)
+- `listings.requires_deposit` (bool), `deposit_amount` (decimal in auction currency), `deposit_type` ("fixed" | "percentage")
+- Same fields added to `multi_item_listings` (Lots auctions)
+- New collection `payment_charges` — every Stripe charge tracked with idempotency_key, status, currency
+- New collection `deposit_refund_queue` — 60s SLA jobs with retry state
+- New collection `payment_events` — DUPLICATE_CHARGE_BLOCKED / ROLLBACK_REFUND / WINNER_MISMATCH_BLOCKED / DEPOSIT_REFUND_PERMANENT_FAILURE / PAYOUT_QUEUED_NO_CONNECT
+
+### Hooked into existing flows
+- `routes/auctions.py::process_ended_auctions` now (1) enqueues non-winner refunds, then (2) calls `settle_auction()` for the winner — replacing ad-hoc per-auction settlement
+- `routes/auctions_bids.py::place_bid` charges the bidder's deposit on FIRST bid for partner-defined `requires_deposit=true` listings (idempotent — duplicates return `already_charged`)
+- `routes/listings.py::create_listing` validates deposit fields + persists them; rejects `requires_deposit=true` without `deposit_amount` or invalid `deposit_type` with bilingual error
+
+### Frontend (Spec Features 1, 4, 5, 6 + Global Rules 1 & 2)
+- **`pages/CreateListingPage.js`** — added Deposit section (radios: No deposit / Require deposit; type toggle: Fixed amount / % of starting bid; amount input). Added bilingual seller disclosure (Feature 6) + currency-locked-after-publish notice. Existing CAD/USD selector retained.
+- **`pages/ListingDetailPage.js`** — added bilingual notices ABOVE bid input:
+  - `bid-deposit-required-notice` / `bid-no-deposit-notice` (Feature 1 buyer-facing)
+  - `bid-stripe-payment-notice` / `bid-cash-payment-notice` (Feature 3 buyer-facing copy)
+- **`components/BidConfirmationDialog.js`** — added `bid-disclaimer` block (Feature 4) with deposit notice when applicable; accepts new props `currency` / `paymentMethod` / `requiresDeposit` / `depositAmount` / `depositType`
+- **`components/BuyNowButton.js`** — added `buy-now-disclaimer` block (Feature 5) — full bilingual EN/FR copy
+- **`components/TrustVerification.js`** — replaced single-line notice with full `setup-intent-no-silent-charges` block (Global Rule 2) — bilingual EN/FR
+- **`components/MoneyLabel.js`** — `formatMoney(amount, currency)` helper renders `$X.XX CUR` everywhere (Global Rule 1)
+- **Admin dashboard** — `Partners & Finance → Strict Payment Charges` tab loads `AdminPaymentChargesPage` with 3 sub-tabs (charges / events / refund-queue)
+
+### Email notifications (NEW helpers in `services/email_notifications.py`)
+- `send_deposit_refunded_email` — auto-fired by refund queue worker on success
+- `send_charge_confirmation_email` — fired by `auction_settlement` after each successful buyer/seller commission charge
+- `send_payout_confirmation_email` — fired when Connect payout initiated
+
+### Verification
+- `/app/test_reports/iteration_185.json`: **26/26 backend unit pass** (11 new + 15 iter175 regression). **9/10 backend API pass** (1 skipped, non-blocking). Frontend: CreateListingPage + AdminPaymentChargesPage testids confirmed. ListingDetail/BidConfirmation/BuyNow notices verified in code path; testing harness couldn't reach a live listing for E2E click-through (not a regression).
+- New `tests/test_strict_payments_iter185.py` covers: idempotency key format / charge_type whitelist / DuplicateChargeBlocked event / CAD/USD-only / refund queue skip-winner / refund worker success path / cash↔stripe flow routing / WINNER_MISMATCH_BLOCKED / Listing deposit validation / Listing default currency=CAD.
+- Scheduler now reports 14 jobs (was 13); `deposit_refund_queue` tick visible in admin Scheduler Status panel.
+
+### Spec checklist — all items closed
+- ✅ Default currency CAD; ✅ currency code passed to every Stripe call (`auction_currency.lower()`); ✅ MoneyLabel shows "$X.XX CUR" — no bare `$`; ✅ currency locked after publish (not in `update_listing` allowed_fields)
+- ✅ Single "Deposit" terminology — no "down payment" introduced; legacy `down_payments` collection untouched (separate $50 storage / 10% vehicle flow stays)
+- ✅ SetupIntent only for card capture — TrustVerification + payment-methods endpoints already used SetupIntent before iter185; new copy enforces "no silent charges" notice
+- ✅ Duplicate-charge guard via `payment_charges` table + DuplicateChargeBlocked event
+- ✅ Idempotency keys on every Stripe call routed through `reserve_charge_row` + `_charge_card`
+- ✅ Atomic DB+Stripe with rollback (verified test_settle_auction)
+- ✅ 60s deposit refund queue (10s tick × 3 retries × asyncio.gather batch)
+- ✅ Winner deposit credited toward final charge (auction_settlement.py uses `final_charge = buyer_total - deposit_amount`)
+- ✅ Winner-mismatch validation
+- ✅ Cash/E-Transfer: commission-only charges (no full hammer)
+- ✅ Stripe scenario: full hammer + commission − deposit; Connect payout = winning_bid − seller_commission
+- ✅ All bilingual disclaimers (Bid / Buy Now / Sell / Card-save)
+- ✅ Admin charge log dashboard
+- ✅ Email notifications wired
+
+---
+
+## Previous: 3-Feature Sprint — Lot Numbering + Down Payments + Post-Sale Contact (May 6, 2026 / iter183-184) — 100% verified
 
 ### Feature 1 — Automated Lot Numbering ✅
 - `services/listings_service.build_lots_with_end_time()` now overrides any seller-supplied `lot_number` and assigns sequential **Lot 1..N** at create time. Hard cap **500 lots/auction** (industry standard); creates raise 400 above the limit.
