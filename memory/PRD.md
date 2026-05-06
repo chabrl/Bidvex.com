@@ -1,6 +1,44 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: Listing Promotion / Boost Payment System (May 5, 2026 / iter182) — 100% verified
+## Latest: 3-Feature Sprint — Lot Numbering + Down Payments + Post-Sale Contact (May 6, 2026 / iter183-184) — 100% verified
+
+### Feature 1 — Automated Lot Numbering ✅
+- `services/listings_service.build_lots_with_end_time()` now overrides any seller-supplied `lot_number` and assigns sequential **Lot 1..N** at create time. Hard cap **500 lots/auction** (industry standard); creates raise 400 above the limit.
+- Migration: `backend/scripts/backfill_lot_numbers.py` rewrites `lot_number = idx+1` on every existing `multi_item_listings` document. Idempotent, ran cleanly (0 docs in current DB).
+- Surfaces already render: `DecomposedMarketplace.js` shows `Lot #N/total` on cards; `MultiItemListingDetailPage.js:1155` shows `Lot #{lot.lot_number}` on detail rows.
+
+### Feature 2 — Post-Auction Down Payments ✅
+- New `services/down_payment_service.py` — single source of truth. Storage = **flat $50 CAD**, Vehicle = **10% of winning bid**, **24 h** to pay or auto-forfeit + promote runner-up.
+- New router `routes/down_payments.py`:
+  - `GET /api/down-payments/me` — buyer's open DPs (rate-limited 60/min)
+  - `GET /api/down-payments/{auction_id}` — buyer/seller/admin status incl. `seconds_left` + `is_overdue`
+  - `POST /api/down-payments/{auction_id}/checkout` — Stripe Checkout session (rate-limited 10/min)
+- Auction-end hooks already create the DP row:
+  - Storage: `services/scheduled_jobs.process_ended_storage_auctions` after `release_deposits_on_close`
+  - Vehicle: `services/vehicle_auction_handler` after `create_vehicle_fee_charge`
+- Stripe webhook `checkout.session.completed` with `metadata.transaction_type=down_payment` calls `mark_down_payment_paid()` → flips both the DP row and the auction's `down_payment_status` to `paid`.
+- New cron job #14: `services/scheduler.expire_overdue_down_payments` runs **every 30 min** → marks expired, forfeits `bidding_deposits.status: held|authorized → forfeited`, finds runner-up bidder, transfers `auction.highest_bidder_id` + `current_bid`, creates a fresh 24 h DP for the new winner, and emails them via `send_auction_won_email`.
+- Idempotent `create_down_payment` (calling twice with same auction_id+buyer_id returns the same id — verified in unit harness).
+- Total scheduler jobs now **14** (was 13).
+
+### Feature 3 — Post-Sale Contact Surfacing ✅ (Option A — defer Option B messaging to next sprint)
+- `routes/payments.py GET /payments/status/{session_id}`:
+  - Now uses `_db = get_db()` inside try-block (fixed P0 NameError caught in iter183)
+  - **Optional Bearer auth** + PII gate — only buyer / seller / admin sees `seller_contact{name,email,phone}`. Anonymous callers still get `status/payment_status/amount_total` (no PII leak).
+  - Best-effort enrichment: failed lookups log warnings (instead of swallowing) so future regressions are observable.
+- `frontend/src/pages/PaymentSuccessPage.js`:
+  - Sends `Authorization: Bearer <token>` so PII gate matches
+  - Renders blue contact card (`data-testid="checkout-seller-contact"`) with name/email/phone when present.
+- Dashboard panels (`SellerDashboard.js → buyer_contact`, `BuyerDashboard.js → seller_contact`) from iter182 remain in place.
+- **Option B (in-app messaging thread)** intentionally deferred to next sprint per user direction.
+
+### Verification
+- `/app/test_reports/iteration_183.json`: 9/12 pass — caught the `db not defined` P0
+- `/app/test_reports/iteration_184.json`: **12/12 pass** post-fix. Full PII gate matrix (anon, buyer, seller, admin, stranger) + 2 edge cases (missing txn, missing seller) covered with mocked Stripe + seeded `payment_transactions`.
+- Manual python harness: storage flat $50, vehicle 10%, idempotent create, expire+promote-runner-up cron — all green.
+
+
+## Previous: Listing Promotion / Boost Payment System (May 5, 2026 / iter182) — 100% verified
 
 ### Bug fix — "Method Not Allowed" on Promote button
 - Root cause: front-end POSTed to `/payments/promote-listing` while backend only registered `/payments/promote`.
