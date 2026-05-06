@@ -1,6 +1,37 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: Strict Payment System Hardening (May 6, 2026 / iter186) — 4 P0/P1 gaps closed
+## Latest: iter187/188 — 4 user-prioritized items + critical regression fix (May 6, 2026)
+
+User-driven follow-up after iter186 sign-off. All 4 priorities closed + 1 critical regression fixed mid-test.
+
+### P0 — Promotion Bug Confirmed Fixed ✅
+- All 3 promote endpoints verified via curl:
+  - `POST /api/payments/promote-listing` → **HTTP 200** with valid Stripe checkout URL (marketplace + lots)
+  - `POST /api/payments/promote` → 404 (expected — endpoint mounted, not 405)
+  - `POST /api/storage-auctions/{id}/promote` → 403 (admin not facility — endpoint mounted, not 405)
+- The legacy `/api/listings/{id}/promote` path (not used by any frontend code) returns 405 by design.
+
+### P1 — Lots/Multi-Item Deposit Field Parity ✅
+- **`pages/CreateMultiItemListing.js`** — added `requiresDeposit`/`depositType`/`depositAmount` state; persisted in payload. Full UI block with 8 testids: `multi-deposit-section` / `multi-deposit-none` / `multi-deposit-required` / `multi-deposit-amount-block` / `multi-deposit-type-fixed` / `multi-deposit-type-percentage` / `multi-deposit-amount-input` / `multi-payment-method-section`.
+- **`routes/listings.py::create_multi_item_listing`** — wires `payment_method`, `requires_deposit`, `deposit_amount`, `deposit_type` into `MultiItemListing` constructor + validates with bilingual 400 errors **BEFORE** sticky-card guard.
+- All 4 auction types (marketplace, vehicle, storage, lots) now have full parity.
+
+### P1 — /auth Cookie Consent Banner Fix ✅
+- **`pages/AuthPage.js`** — `py-12` → `pt-12 pb-40 sm:pb-48` on both render branches. Sign In submit visible at 1920×1080.
+
+### P1 — CRA Tax Declaration Modal Timing Fix ✅
+- **`pages/CreateListingPage.js`** + **`pages/CreateMultiItemListing.js`** — replaced early-return gatekeeper with `taxOnboardingPending` boolean. Form mounts normally; `TaxInterviewModal` renders as overlay on top. Submit blocked via `toast.error` if onboarding pending. Both single-item + multi-item create pages now expose all testids on first paint.
+
+### iter188 — Critical Regression Fix
+- 🔴 **`GET /api/listings` returned HTTP 500** because the synthesized `lot_listing` dict in multi-item expansion was missing `location` (required by `Listing` model). Fixed by adding fallback `"location": ml.get("location") or ", ".join([city, region]) or "—"`. Marketplace browsing returns HTTP 200 with 3 listings restored.
+
+### Verification
+- `/app/test_reports/iteration_187.json` + `iteration_188.json`: backend strict-payment **12/12 unit pass** · iter186 regression **5/5 pass** · iter187/188 active **6/7 pass** (1 happy-path skipped behind sticky-card guard, covered by GET-side seed data) · frontend testid live coverage **100%**.
+- Pre-seeded multi-item listing `269a9f90-6741-46ea-b29d-e7126b172f35` confirms persistence: `currency:CAD`, `payment_method:cash`, `requires_deposit:True`, `deposit_amount:75`, `deposit_type:fixed`.
+
+---
+
+## Previous: iter186 — Strict Payment System Hardening (May 6, 2026) — 4 P0/P1 gaps closed
 
 User-driven hardening pass on the iter185 strict payment system, closing 4 remaining gaps to reach full production parity.
 

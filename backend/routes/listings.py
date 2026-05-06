@@ -374,6 +374,7 @@ async def get_listings(
                 "images": lot.get("images", ml.get("images", [])),
                 "seller_id": ml.get("seller_id", ""),
                 "status": "active",
+                "location": ml.get("location") or ", ".join(filter(None, [ml.get("city", ""), ml.get("region", "")])) or "—",
                 "city": ml.get("city", ""),
                 "region": ml.get("region", ""),
                 "country": ml.get("country", "CA"),
