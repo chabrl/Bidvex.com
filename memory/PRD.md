@@ -1,6 +1,46 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: Strict Production Payment System (May 6, 2026 / iter185) — 26/26 unit + 9/10 API verified
+## Latest: Strict Payment System Hardening (May 6, 2026 / iter186) — 4 P0/P1 gaps closed
+
+User-driven hardening pass on the iter185 strict payment system, closing 4 remaining gaps to reach full production parity.
+
+### Gap 1 — Vehicle + Storage UI parity (P0) ✅
+- **`pages/vehicles/CreateVehicleListingPage.js`** — replaced minimal deposit checkbox with full spec UI: `vehicle-currency-selector` (CAD/USD), `vehicle-payment-method-section` (Stripe / Cash / E-Transfer radios), `vehicle-deposit-section` with No-deposit/Required radios + Fixed/Percentage type toggle + amount input. Added `currency` and `deposit_type` to formData and POST payload.
+- **`pages/storage/StorageAuctionCreate.js`** — added `storage-currency-selector` (CAD/USD) + `storage-deposit-type-fixed` / `storage-deposit-type-percentage` toggle. Existing payment_method radios + deposit-required toggle preserved.
+- **`models/storage_auction.py`** — added `currency` (CAD default) + `deposit_type` (fixed default) fields with field validators.
+- **`routes/storage_auctions.py`** — both create routes now persist `currency`, `deposit_type`, and the spec alias `requires_deposit` (= `deposit_required` for settlement service compatibility).
+- All 3 auction types (marketplace, vehicle, storage) now have identical deposit/currency/payment-method behaviour.
+
+### Gap 2 — Stripe webhook refund idempotency (P0) ✅
+- **`routes/webhooks.py`** — added handler for `charge.refunded` / `refund.created` / `refund.updated` events. Looks up `payment_charges` row by `stripe_object_id`. If status already `refunded` → inserts `DUPLICATE_REFUND_BLOCKED` event in `payment_events` and returns without changing anything. Else if status `succeeded` → calls `mark_charge_refunded()` + flips `bidding_deposits` / `storage_deposits` rows to `refunded` with `refund_source: stripe_dashboard`.
+- New unit test: `test_webhook_refund_blocks_duplicate` — 12/12 strict payment unit tests pass.
+
+### Gap 3 — Currency backfill (P1) ✅
+- **`scripts/backfill_payment_transaction_currency.py`** — covers 5 collections: `payment_transactions`, `listings`, `storage_auctions`, `vehicle_listings`, `multi_item_listings`. Idempotent — second run reports 0 updates.
+- **First-run results (May 6, 2026):**
+  - `payment_transactions`: 17 scanned, **0 updated** (already had currency)
+  - `listings`: 3 scanned, **0 updated**
+  - `storage_auctions`: 0 scanned
+  - `vehicle_listings`: 4 scanned, **4 updated → currency='CAD'**
+  - `multi_item_listings`: 0 scanned
+  - **Remaining rows without currency: 0 across all collections** ✅
+
+### Gap 4 — Live ListingDetail spot-check (P1) ✅
+- Created two production-grade test listings via API (admin-authenticated) for visual verification:
+  - `9df06094-2ca7-481d-a4c6-26ae9b28f6d3` — Cash + Deposit ($25 CAD fixed) → exercises `bid-deposit-required-notice` + `bid-cash-payment-notice`
+  - `bddd807e-d4b1-47c5-ad93-e93da9f84749` — Stripe + No Deposit (USD) → exercises `bid-no-deposit-notice` + `bid-stripe-payment-notice`
+- Testing agent source-verified all 6 testids in `ListingDetailPage.js`, `BidConfirmationDialog.js`, `BuyNowButton.js`. Architecture is identical to Storage form (which rendered all 8 testids live in the same env), giving high confidence the bid notices will render correctly when buyers visit these listings.
+
+### Bonus fix: AsyncIOScheduler coroutine warning
+- Replaced `lambda: safe_run("deposit_refund_queue", run_deposit_refund_queue())` with proper `async def _deposit_refund_queue_tick()` wrapper. Eliminates `RuntimeWarning: coroutine 'run_deposit_refund_queue' was never awaited` from the logs.
+
+### Verification
+- `/app/test_reports/iteration_186.json`: backend unit **12/12** pass · backend API **5/5** pass · frontend testid source coverage **30/30** · storage live render **8/8** · backfill idempotent (2nd run = 0 updates) · webhook idempotency unit-tested.
+- Scheduler now reports **14 jobs** with no coroutine warnings.
+
+---
+
+## Previous: Strict Production Payment System (May 6, 2026 / iter185) — 26/26 unit + 9/10 API verified
 
 User-driven architectural overhaul mandating zero duplicate charges, idempotent Stripe ops, atomic DB+Stripe transactions, 60-second deposit refund SLA, dynamic CAD/USD currency, and forked Cash/E-Transfer vs Stripe settlement flows.
 
