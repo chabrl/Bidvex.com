@@ -652,8 +652,13 @@ async def create_storage_auction(
         # Optional participation deposit
         "deposit_required": bool(payload.deposit_required),
         "deposit_amount": float(payload.deposit_amount) if payload.deposit_amount else 0.0,
+        "deposit_type": (payload.deposit_type or "fixed") if payload.deposit_required else None,
+        # Spec compatibility — settlement reads listing.requires_deposit
+        "requires_deposit": bool(payload.deposit_required),
         "deposit_description_en": payload.deposit_description_en,
         "deposit_description_fr": payload.deposit_description_fr,
+        # Currency (Spec Global Rule 1)
+        "currency": (payload.currency or "CAD").upper(),
         "cleanup_deadline": cleanup_deadline.isoformat(),
         "created_at": _now().isoformat(),
         "updated_at": _now().isoformat(),
@@ -963,6 +968,9 @@ async def admin_create_storage_auction(
         "payment_status": "pending",
         "deposit_required": bool(payload.deposit_required),
         "deposit_amount": float(payload.deposit_amount) if payload.deposit_amount else 0.0,
+        "deposit_type": (payload.deposit_type or "fixed") if payload.deposit_required else None,
+        "requires_deposit": bool(payload.deposit_required),
+        "currency": (payload.currency or "CAD").upper(),
         "cleanup_deadline": cleanup_deadline.isoformat(),
         "created_by_admin": current_user.id,
         "created_at": _now().isoformat(),

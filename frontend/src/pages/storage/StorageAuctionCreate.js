@@ -39,9 +39,12 @@ const StorageAuctionCreate = () => {
     cleanup_deadline_hours: 72,
     // ── Payment method (single) ──
     payment_method: 'stripe',
+    // ── Currency (Spec Global Rule 1) ──
+    currency: 'CAD',
     // ── Optional participation deposit ──
     deposit_required: false,
     deposit_amount: '',
+    deposit_type: 'fixed',  // "fixed" | "percentage" (Spec Feature 1)
     soft_close_enabled: true, soft_close_extension_minutes: 2,
   });
   const [submitting, setSubmitting] = useState(false);
@@ -91,6 +94,8 @@ const StorageAuctionCreate = () => {
         cleanup_deadline_hours: parseInt(form.cleanup_deadline_hours) || 72,
         deposit_amount: form.deposit_required && form.deposit_amount
           ? parseFloat(form.deposit_amount) : null,
+        deposit_type: form.deposit_required ? form.deposit_type : null,
+        currency: (form.currency || 'CAD').toUpperCase(),
         start_time: new Date(form.start_time).toISOString(),
         end_time: new Date(form.end_time).toISOString(),
       };
@@ -224,9 +229,35 @@ const StorageAuctionCreate = () => {
                 </Label>
               </div>
 
+              {/* Currency Selector (Spec Global Rule 1) */}
+              <div className="space-y-2 pt-2" data-testid="storage-currency-section">
+                <Label className="text-sm">{isFr ? 'Devise · Currency' : 'Currency · Devise'}</Label>
+                <div className="flex gap-2" data-testid="storage-currency-selector">
+                  {['CAD', 'USD'].map((cur) => (
+                    <button
+                      key={cur}
+                      type="button"
+                      onClick={() => set('currency', cur)}
+                      className={`flex-1 py-2 px-3 rounded-lg border-2 text-sm font-semibold ${
+                        form.currency === cur
+                          ? 'border-blue-600 bg-blue-100/60 dark:bg-blue-900/30'
+                          : 'border-slate-200 hover:border-blue-400'
+                      }`}
+                      data-testid={`storage-currency-${cur.toLowerCase()}`}
+                    >
+                      {cur === 'CAD' ? '🇨🇦 CAD' : '🇺🇸 USD'}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-500">
+                  {isFr
+                    ? 'Toutes les transactions sont en CAD par défaut. La devise ne peut pas être modifiée une fois l\'enchère en ligne.'
+                    : 'All transactions are processed in CAD by default. Currency cannot be changed once your auction is live.'}
+                </p>
+              </div>
+
               <Label className="text-sm">{isFr ? 'Mode de paiement' : 'Payment Method'}</Label>
-              <div className="grid grid-cols-1 gap-2" data-testid="payment-method-selector">
-                {[
+              <div className="grid grid-cols-1 gap-2" data-testid="payment-method-selector">                {[
                   { v: 'stripe', emoji: '💳',
                     label_en: 'Online Payment (Stripe)',
                     label_fr: 'Paiement en ligne (Stripe)',
@@ -304,15 +335,27 @@ const StorageAuctionCreate = () => {
                       : 'Bidders must authorize this amount before their first bid. Refunded for losers. Captured if winner fails to pay.'}
                   </p>
                   {form.deposit_required && (
-                    <div className="mt-2">
-                      <Label className="text-xs">{isFr ? 'Montant du dépôt (CAD)' : 'Deposit Amount (CAD)'}</Label>
+                    <div className="mt-2 space-y-2" data-testid="storage-deposit-amount-block">
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => set('deposit_type', 'fixed')} className={`flex-1 px-2 py-1.5 rounded text-xs font-medium ${form.deposit_type === 'fixed' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-300 text-slate-700'}`} data-testid="storage-deposit-type-fixed">
+                          {isFr ? 'Montant fixe' : 'Fixed amount'}
+                        </button>
+                        <button type="button" onClick={() => set('deposit_type', 'percentage')} className={`flex-1 px-2 py-1.5 rounded text-xs font-medium ${form.deposit_type === 'percentage' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-300 text-slate-700'}`} data-testid="storage-deposit-type-percentage">
+                          {isFr ? '% du prix de départ' : '% of starting bid'}
+                        </button>
+                      </div>
+                      <Label className="text-xs">
+                        {form.deposit_type === 'fixed'
+                          ? `${isFr ? 'Montant du dépôt' : 'Deposit Amount'} (${form.currency})`
+                          : `${isFr ? 'Pourcentage du dépôt' : 'Deposit Percentage'} (%)`}
+                      </Label>
                       <Input
                         type="number"
-                        min="1"
-                        step="1"
+                        min={form.deposit_type === 'percentage' ? '1' : '1'}
+                        step={form.deposit_type === 'percentage' ? '1' : '0.01'}
                         value={form.deposit_amount}
                         onChange={e => set('deposit_amount', e.target.value)}
-                        placeholder={isFr ? 'ex: 100' : 'e.g. 100'}
+                        placeholder={form.deposit_type === 'fixed' ? (isFr ? 'ex: 100' : 'e.g. 100') : (isFr ? 'ex: 10' : 'e.g. 10')}
                         data-testid="deposit-amount-input"
                       />
                     </div>

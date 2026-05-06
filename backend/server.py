@@ -367,8 +367,13 @@ async def run_deposit_refund_queue():
     from services.deposit_refund_queue import process_deposit_refund_queue
     await process_deposit_refund_queue(db)
 
+async def _deposit_refund_queue_tick():
+    """AsyncIOScheduler-friendly wrapper: must be a coroutine, not a sync lambda
+    returning a coroutine, otherwise apscheduler's default executor never awaits it."""
+    await safe_run("deposit_refund_queue", run_deposit_refund_queue())
+
 scheduler.add_job(
-    lambda: safe_run("deposit_refund_queue", run_deposit_refund_queue()),
+    _deposit_refund_queue_tick,
     trigger=IntervalTrigger(seconds=10), id='deposit_refund_queue', replace_existing=True)
 
 # ─── Health Endpoints ───

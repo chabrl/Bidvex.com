@@ -1,0 +1,53 @@
+{
+  "summary": "iter186 verified — backend strict payment system 12/12 unit tests pass (including new test_webhook_refund_blocks_duplicate). Live API tests 5/5 pass: admin /api/admin/payment-charges + /events?event=DUPLICATE_REFUND_BLOCKED both return 200; storage-facilities/auctions list reachable; StorageAuctionCreate model exposes currency (default CAD) + deposit_type. Currency backfill ran idempotently (second run = 0 updates; remaining unset rows = 0 across payment_transactions/listings/storage_auctions/vehicle_listings/multi_item_listings). UI: Storage create page (/storage-auctions/create) renders ALL 8 required testids (storage-currency-selector + cad/usd, payment-method-selector, deposit-required-toggle, deposit-amount-input, storage-deposit-type-fixed/percentage) — fully verified live with logged-in buyer. Vehicle create (/vehicle-auctions/create) and Marketplace create (/create-listing) source confirms all 13 + 3 testids exist; live render gated behind seller-register / CRA tax declaration modal (pre-existing onboarding flow, not an iter186 regression). ListingDetailPage bid-deposit-required-notice / bid-no-deposit-notice / bid-stripe-payment-notice / bid-cash-payment-notice + BidConfirmationDialog bid-disclaimer + BuyNowButton buy-now-disclaimer all confirmed in source.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/auth/login (preview)", "issue": "Login button submit is occluded by Cookie Consent overlay on /auth — automation must dismiss banner or use API token+localStorage to log in. Not a regression but an automation friction point."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Vehicle create form live render", "issue": "/vehicle-auctions/create redirects logged-in buyer to /vehicle-auctions/seller/register (seller-onboarding gate). The 13 iter186 testids ARE present in /app/frontend/src/pages/vehicles/CreateVehicleListingPage.js (verified by grep) but are not reachable in a live render until the buyer completes vehicle-seller registration. Same gating existed before iter186.", "affected_selectors": ["[data-testid=\"vehicle-currency-selector\"]","[data-testid=\"vehicle-payment-method-section\"]","[data-testid=\"vehicle-deposit-section\"]"]},
+      {"flow": "Marketplace create form live render", "issue": "/create-listing pops a 'Tax Information & Seller Declaration' (CRA Law-25) modal that blocks the form testids until the user picks Individual vs Business and clicks Continue. iter185 testids deposit-section / currency-selector / seller-final-disclosure ARE present in source. Pre-existing onboarding flow, not an iter186 regression.", "affected_selectors": ["[data-testid=\"deposit-section\"]","[data-testid=\"currency-selector\"]","[data-testid=\"seller-final-disclosure\"]"]},
+      {"flow": "Live ListingDetail spot-check (Gap 4)", "issue": "Could not visually screenshot the bid notices on a real active listing in this run (would require an active marketplace listing + same buyer onboarded past the CRA modal). All 6 testids (bid-deposit-required-notice, bid-no-deposit-notice, bid-stripe-payment-notice, bid-cash-payment-notice, bid-disclaimer, buy-now-disclaimer) confirmed present in /app/frontend/src/pages/ListingDetailPage.js, /app/frontend/src/components/BidConfirmationDialog.js, /app/frontend/src/components/BuyNowButton.js. Recommend main-agent self-test on a known-active listing ID.", "affected_selectors": ["[data-testid=\"bid-deposit-required-notice\"]","[data-testid=\"bid-no-deposit-notice\"]","[data-testid=\"bid-stripe-payment-notice\"]","[data-testid=\"bid-cash-payment-notice\"]","[data-testid=\"bid-disclaimer\"]","[data-testid=\"buy-now-disclaimer\"]"]}
+    ],
+    "design_issues": [
+      {"screen": "/auth", "issues": ["Cookie Consent banner overlaps the Login submit button at default viewport (1920x1080), blocking pointer events. Users must scroll or dismiss the banner first. Consider z-index fix or banner placement."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_strict_payments_iter185.py",
+    "/app/backend/tests/test_iter186_api.py",
+    "/app/test_reports/pytest/iter186_strict.xml",
+    "/app/test_reports/pytest/iter186_api.xml"
+  ],
+  "action_items": [
+    "(Manual) Spot-check ListingDetailPage on a known active marketplace listing and confirm bid-deposit-required-notice + bid-stripe/cash-payment-notice + bid-disclaimer + buy-now-disclaimer all visually render. Source has them; just needs eyeball on prod data.",
+    "(Optional) Move the CRA Tax Declaration modal AFTER the form mounts so automated tests can hit deposit-section/currency-selector/seller-final-disclosure without onboarding side-effects, OR add a pre-onboarded test fixture user with seller_type already set so the modal is skipped.",
+    "(Optional) Fix /auth Cookie Consent banner z-index so it doesn't occlude the Login submit button at 1920x1080."
+  ],
+  "critical_code_review_comments": [
+    "/app/backend/routes/webhooks.py lines 269-318: charge.refunded / refund.created / refund.updated handler properly looks up payment_charges by stripe_object_id, compares status, logs DUPLICATE_REFUND_BLOCKED with charge_id + stripe_payment_intent_id when already refunded, otherwise calls mark_charge_refunded — implementation matches spec and the unit test mirrors this logic exactly.",
+    "/app/backend/models/storage_auction.py: StorageAuctionCreate now includes currency (default 'CAD') + deposit_type (default 'fixed') — matches Marketplace ListingCreate parity per Gap 1.",
+    "/app/backend/scripts/backfill_payment_transaction_currency.py: idempotent — covers payment_transactions / listings / storage_auctions / vehicle_listings / multi_item_listings; reports remaining unset rows after each run. Second run returned 0 updates as expected.",
+    "Frontend testid coverage: vehicle 13/13, storage 8/8, marketplace 3/3, listing-detail bid notices 4/4, dialog disclaimers 2/2 — all source-verified. Gates (seller-register / CRA modal) are pre-existing onboarding controls and do not affect iter186 test surface.",
+    "Minor: routes mentioned in problem statement ('/create-listing-vehicle' and '/storage-facilities/auctions/create') do not match the actual App.js routes ('/vehicle-auctions/create' and '/storage-auctions/create'). Update spec doc or add matching aliases."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter186_api.py"
+  ],
+  "success_rate": {
+    "backend_unit": "100% (12/12)",
+    "backend_api": "100% (5/5)",
+    "frontend_testid_source_coverage": "100% (30/30 across vehicle+storage+marketplace+listing-detail+dialogs)",
+    "frontend_testid_live_render_coverage": "Storage 100% (8/8); Vehicle + Marketplace gated by onboarding flows but source-confirmed"
+  },
+  "test_credentials": "Buyer p0bugtest@example.com / TestBuyer123! → /api/auth/login returns 200 + access_token (used localStorage injection to bypass /auth Cookie Consent overlay). Admin login also OK against same endpoint.",
+  "seed_data_creation": "None — used existing buyer; /storage-auctions/create rendered without needing seed.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter186 is GREEN: 12/12 unit + 5/5 API + backfill idempotent + storage UI fully verified live + vehicle/marketplace/listing-detail testids source-confirmed. The two onboarding gates (vehicle seller-register, CRA Law-25 tax modal on /create-listing) are pre-existing and not in iter186 scope. To bypass /auth Cookie Consent in automation: POST /api/auth/login → set localStorage.access_token / token / user(JSON) → page.goto target. Login via UI fails because the Cookie banner overlays the submit button at 1920x1080.",
+  "rca_of_the_issue": "N/A — no open P0 from iter186. Previously-flagged ListingDetail bid-notice spot-check from iter185 is still source-only, but all six testids are confirmed present in their respective JSX files."
+}

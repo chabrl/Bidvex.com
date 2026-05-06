@@ -266,6 +266,88 @@ async def handle_stripe_webhook(request: Request):
                 )
                 logger.info(f"Bidding deposit released: {pi_id}")
 
+        elif event_type in ("charge.refunded", "refund.created", "refund.updated"):
+            # ── Refund webhook idempotency (Spec Global Rule 3 — extended to webhooks) ──
+            from datetime import timezone as _tz
+            now_iso = datetime.now(_tz.utc).isoformat()
+            # Refund object can arrive in either "charge.refunded" (top-level Charge) or "refund.*" (Refund object).
+            if event_type == "charge.refunded":
+                pi_id = data.get("payment_intent")
+                charge_id = data.get("id")
+                refund_obj = (data.get("refunds", {}).get("data") or [{}])[0]
+                refund_id = refund_obj.get("id")
+                refund_status = refund_obj.get("status") or "succeeded"
+            else:
+                pi_id = data.get("payment_intent")
+                charge_id = data.get("charge")
+                refund_id = data.get("id")
+                refund_status = data.get("status") or "succeeded"
+
+            if not pi_id and not charge_id:
+                logger.warning(f"Refund webhook missing pi_id/charge_id: event={event_type} data={str(data)[:200]}")
+            else:
+                # Look up the original payment_charges row by Stripe object id
+                existing = await db.payment_charges.find_one(
+                    {"$or": [
+                        {"stripe_object_id": pi_id},
+                        {"stripe_object_id": charge_id},
+                    ]},
+                    {"_id": 0},
+                )
+                if existing and existing.get("status") == "refunded":
+                    # Already refunded → DUPLICATE_REFUND_BLOCKED
+                    import uuid as _uuid
+                    await db.payment_events.insert_one({
+                        "id": str(_uuid.uuid4()),
+                        "event": "DUPLICATE_REFUND_BLOCKED",
+                        "auction_id": existing.get("auction_id"),
+                        "user_id": existing.get("user_id"),
+                        "charge_type": existing.get("charge_type"),
+                        "stripe_payment_intent_id": pi_id,
+                        "stripe_charge_id": charge_id,
+                        "stripe_refund_id": refund_id,
+                        "existing_charge_id": existing.get("id"),
+                        "created_at": now_iso,
+                    })
+                    logger.warning(
+                        f"DUPLICATE_REFUND_BLOCKED charge={existing.get('id')} pi={pi_id} refund={refund_id}"
+                    )
+                elif existing and refund_status == "succeeded":
+                    # Mark the charge refunded (atomic single-document update)
+                    from services.payment_idempotency import mark_charge_refunded
+                    await mark_charge_refunded(
+                        db,
+                        existing["id"],
+                        reason=f"webhook_{event_type}",
+                    )
+                    # Also flip downstream deposit row if applicable
+                    await db.bidding_deposits.update_one(
+                        {"stripe_payment_intent_id": pi_id},
+                        {"$set": {
+                            "status": "refunded",
+                            "refunded_at": now_iso,
+                            "stripe_refund_id": refund_id,
+                            "refund_source": "stripe_dashboard",
+                        }},
+                    )
+                    await db.storage_deposits.update_one(
+                        {"stripe_payment_intent_id": pi_id},
+                        {"$set": {
+                            "status": "refunded",
+                            "refunded_at": now_iso,
+                            "stripe_refund_id": refund_id,
+                            "refund_source": "stripe_dashboard",
+                        }},
+                    )
+                    logger.info(
+                        f"Refund webhook applied: charge={existing['id']} pi={pi_id} refund={refund_id}"
+                    )
+                else:
+                    # Unknown / non-strict-system charge — log for triage
+                    logger.info(
+                        f"Refund webhook for non-strict charge: pi={pi_id} charge={charge_id} status={refund_status}"
+                    )
+
         else:
             logger.info(f"Unhandled Stripe event: {event_type}")
 

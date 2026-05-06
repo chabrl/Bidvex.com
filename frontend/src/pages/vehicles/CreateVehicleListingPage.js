@@ -171,6 +171,9 @@ const CreateVehicleListingPage = () => {
     bid_increment: '100',
     requires_deposit: true,
     deposit_amount: '500',
+    deposit_type: 'fixed',
+    currency: 'CAD',
+    payment_method: 'stripe',
     
     // Description
     title: '',
@@ -341,7 +344,10 @@ const CreateVehicleListingPage = () => {
         buy_now_price: formData.buy_now_price ? parseFloat(formData.buy_now_price) : null,
         bid_increment: parseFloat(formData.bid_increment),
         requires_deposit: formData.requires_deposit,
-        deposit_amount: parseFloat(formData.deposit_amount),
+        deposit_amount: formData.requires_deposit && formData.deposit_amount ? parseFloat(formData.deposit_amount) : null,
+        deposit_type: formData.requires_deposit ? formData.deposit_type : null,
+        currency: formData.currency,
+        payment_method: formData.payment_method,
         title: formData.title,
         description: formData.description,
         features: formData.features,
@@ -955,25 +961,89 @@ const CreateVehicleListingPage = () => {
               </div>
             </div>
             
-            {/* Deposit */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 bg-slate-50 rounded-lg">
-              <Checkbox
-                checked={formData.requires_deposit}
-                onCheckedChange={(checked) => updateField('requires_deposit', checked)}
-              />
-              <div className="flex-1">
-                <Label className="cursor-pointer">{t('vehicleListing.requireDeposit', 'Require Bid Deposit')}</Label>
-                <p className="text-sm text-slate-500">{t('vehicleListing.depositDescription', 'Bidders must pay a refundable deposit before bidding')}</p>
+            {/* Currency Selector (Spec Global Rule 1) */}
+            <div className="space-y-2 p-4 bg-slate-50 rounded-lg" data-testid="vehicle-currency-section">
+              <Label>Listing Currency · Devise de l'enchère</Label>
+              <div className="flex gap-2" data-testid="vehicle-currency-selector">
+                {['CAD', 'USD'].map((cur) => (
+                  <button
+                    key={cur}
+                    type="button"
+                    onClick={() => updateField('currency', cur)}
+                    className={`flex-1 py-2.5 px-4 rounded-lg border-2 text-sm font-semibold transition-all ${
+                      formData.currency === cur
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                    }`}
+                    data-testid={`vehicle-currency-${cur.toLowerCase()}`}
+                  >
+                    {cur === 'CAD' ? '🇨🇦 CAD' : '🇺🇸 USD'}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-slate-500">
+                <strong>EN:</strong> All transactions are processed in CAD by default. You may switch to USD before publishing.
+                <strong className="text-amber-600"> Currency cannot be changed once your auction is live.</strong>
+              </p>
+              <p className="text-xs text-slate-500">
+                <strong>FR:</strong> Toutes les transactions sont en CAD par défaut. Vous pouvez passer à USD avant publication.
+                <strong className="text-amber-600"> La devise ne peut pas être modifiée une fois en ligne.</strong>
+              </p>
+            </div>
+
+            {/* Payment Method (Spec Feature 3) */}
+            <div className="space-y-2 p-4 bg-slate-50 rounded-lg" data-testid="vehicle-payment-method-section">
+              <Label>Payment Method · Mode de paiement</Label>
+              <div className="grid grid-cols-1 gap-2">
+                {[
+                  { v: 'stripe', label: 'Stripe (BidVex)', sub: 'Recommended — automated payout via Stripe Connect' },
+                  { v: 'cash', label: 'Cash', sub: 'BidVex charges seller commission only at auction close' },
+                  { v: 'e-transfer', label: 'E-Transfer (Interac)', sub: 'BidVex charges seller commission only at auction close' },
+                ].map((opt) => (
+                  <label key={opt.v} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer ${formData.payment_method === opt.v ? 'border-blue-500 bg-blue-50' : 'border-slate-200'}`}>
+                    <input type="radio" name="vehicle_payment_method" value={opt.v} checked={formData.payment_method === opt.v} onChange={(e) => updateField('payment_method', e.target.value)} data-testid={`vehicle-pm-${opt.v}`} />
+                    <div>
+                      <span className="font-medium text-sm">{opt.label}</span>
+                      <p className="text-xs text-slate-500">{opt.sub}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Deposit (Spec Feature 1) */}
+            <div className="space-y-3 p-4 bg-slate-50 rounded-lg" data-testid="vehicle-deposit-section">
+              <Label>Bidder Deposit · Dépôt des enchérisseurs</Label>
+              <div className="grid grid-cols-1 gap-2">
+                <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer ${!formData.requires_deposit ? 'border-blue-500 bg-blue-50' : 'border-slate-200'}`}>
+                  <input type="radio" name="vehicle_deposit_required" checked={!formData.requires_deposit} onChange={() => updateField('requires_deposit', false)} data-testid="vehicle-deposit-none" />
+                  <div>
+                    <span className="font-medium text-sm">No deposit required · Aucun dépôt requis</span>
+                  </div>
+                </label>
+                <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer ${formData.requires_deposit ? 'border-blue-500 bg-blue-50' : 'border-slate-200'}`}>
+                  <input type="radio" name="vehicle_deposit_required" checked={formData.requires_deposit} onChange={() => updateField('requires_deposit', true)} data-testid="vehicle-deposit-required" />
+                  <div>
+                    <span className="font-medium text-sm">Require a deposit · Exiger un dépôt</span>
+                    <p className="text-xs text-slate-500">Charged immediately on first bid; non-winners refunded automatically; winner credited toward total.</p>
+                  </div>
+                </label>
               </div>
               {formData.requires_deposit && (
-                <Input
-                  type="number"
-                  inputMode="decimal"
-                  value={formData.deposit_amount}
-                  onChange={(e) => updateField('deposit_amount', e.target.value)}
-                  className="w-full sm:w-32 min-h-[48px]"
-                  placeholder="500"
-                />
+                <div className="space-y-3" data-testid="vehicle-deposit-amount-block">
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => updateField('deposit_type', 'fixed')} className={`flex-1 px-3 py-2 rounded-md text-sm font-medium ${formData.deposit_type === 'fixed' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-300 text-slate-700'}`} data-testid="vehicle-deposit-type-fixed">Fixed amount · Montant fixe</button>
+                    <button type="button" onClick={() => updateField('deposit_type', 'percentage')} className={`flex-1 px-3 py-2 rounded-md text-sm font-medium ${formData.deposit_type === 'percentage' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-300 text-slate-700'}`} data-testid="vehicle-deposit-type-percentage">% of starting bid · % du prix de départ</button>
+                  </div>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    value={formData.deposit_amount}
+                    onChange={(e) => updateField('deposit_amount', e.target.value)}
+                    placeholder={formData.deposit_type === 'fixed' ? `e.g. 500 ${formData.currency}` : 'e.g. 10'}
+                    data-testid="vehicle-deposit-amount-input"
+                  />
+                </div>
               )}
             </div>
           </div>

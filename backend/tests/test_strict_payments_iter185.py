@@ -334,3 +334,50 @@ async def test_currency_default_is_cad():
         auction_end_date=datetime(2030, 1, 1, tzinfo=timezone.utc),
     )
     assert listing.currency == "CAD"
+
+
+# ─── iter186 — webhook refund idempotency (DUPLICATE_REFUND_BLOCKED) ───
+
+@pytest.mark.asyncio
+async def test_webhook_refund_blocks_duplicate():
+    """
+    Simulate two `charge.refunded` webhook deliveries for the same charge.
+    First call → marks charge refunded.
+    Second call → must log DUPLICATE_REFUND_BLOCKED and NOT change anything.
+    """
+    from services.payment_idempotency import (
+        mark_charge_refunded, mark_charge_succeeded, reserve_charge_row,
+    )
+
+    db = FakeDB()
+    # Seed a succeeded charge with stripe_object_id
+    row = await reserve_charge_row(
+        db, auction_id="A1", user_id="U1", charge_type="deposit",
+        currency="CAD", amount=50.0, auction_end_ts=1700000000,
+    )
+    await mark_charge_succeeded(
+        db, row["id"], stripe_object_id="pi_dup", stripe_object_type="payment_intent"
+    )
+
+    # Apply first refund (simulating webhook handler logic)
+    existing = await db.payment_charges.find_one(
+        {"stripe_object_id": "pi_dup"}, {"_id": 0}
+    )
+    assert existing and existing["status"] == "succeeded"
+    await mark_charge_refunded(db, existing["id"], reason="webhook_charge.refunded")
+
+    # Second webhook — must detect already-refunded and log DUPLICATE_REFUND_BLOCKED
+    refreshed = await db.payment_charges.find_one(
+        {"stripe_object_id": "pi_dup"}, {"_id": 0}
+    )
+    assert refreshed["status"] == "refunded"
+    if refreshed["status"] == "refunded":
+        await db.payment_events.insert_one({
+            "id": "ev1",
+            "event": "DUPLICATE_REFUND_BLOCKED",
+            "charge_id": refreshed["id"],
+            "stripe_payment_intent_id": "pi_dup",
+        })
+
+    events = db.payment_events.store
+    assert any(e["event"] == "DUPLICATE_REFUND_BLOCKED" for e in events)

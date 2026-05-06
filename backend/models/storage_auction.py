@@ -71,8 +71,12 @@ class StorageAuctionCreate(BaseModel):
     # ── PARTICIPATION DEPOSIT (optional) ──
     deposit_required: bool = False
     deposit_amount: Optional[float] = Field(default=None, ge=0)
+    deposit_type: Optional[str] = Field(default="fixed")  # "fixed" | "percentage" (Spec Feature 1)
     deposit_description_en: Optional[str] = None
     deposit_description_fr: Optional[str] = None
+
+    # ── CURRENCY (Spec Global Rule 1) ──
+    currency: str = Field(default="CAD")  # "CAD" | "USD"
 
     @field_validator("payment_method")
     @classmethod
