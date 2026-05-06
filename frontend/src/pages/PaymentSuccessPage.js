@@ -39,7 +39,9 @@ const PaymentSuccessPage = () => {
       }
 
       try {
-        const response = await axios.get(`${API}/payments/status/${sessionId}`);
+        const token = localStorage.getItem('token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const response = await axios.get(`${API}/payments/status/${sessionId}`, { headers });
         const data = response.data;
         setPaymentInfo(data);
 

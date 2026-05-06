@@ -190,9 +190,25 @@ async def create_checkout_session(
 
 
 @payments_router.get("/status/{session_id}")
-async def get_checkout_status(session_id: str):
-    """Get checkout session status + post-sale seller contact info."""
+async def get_checkout_status(
+    session_id: str,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+):
+    """Get checkout session status + post-sale seller contact info.
+
+    Seller PII (name/email/phone) is only surfaced when the caller is the
+    buyer who paid for that session, the seller themselves, or an admin.
+    Anonymous callers still get status/payment_status/amount fields.
+    """
     import stripe
+
+    # Optional auth — try to identify caller, fall back to anonymous
+    current_user = None
+    if credentials:
+        try:
+            current_user = await _auth(credentials)
+        except Exception:
+            current_user = None
 
     try:
         session = stripe.checkout.Session.retrieve(session_id)
@@ -204,29 +220,33 @@ async def get_checkout_status(session_id: str):
             "amount_total": session.amount_total,
         }
 
-        # Surface seller contact when the buyer just paid for a listing.
-        # We look up the matching payment_transactions row → listing → seller.
         if session.payment_status == "paid":
             try:
-                txn = await db.payment_transactions.find_one(
+                _db = get_db()
+                txn = await _db.payment_transactions.find_one(
                     {"session_id": session_id},
-                    {"_id": 0, "listing_id": 1, "seller_id": 1},
+                    {"_id": 0, "listing_id": 1, "seller_id": 1, "user_id": 1},
                 )
                 if txn and txn.get("seller_id"):
-                    seller = await db.users.find_one(
-                        {"id": txn["seller_id"]},
-                        {"_id": 0, "name": 1, "email": 1, "phone": 1},
-                    )
-                    if seller:
-                        out["seller_contact"] = {
-                            "name":  seller.get("name", ""),
-                            "email": seller.get("email", ""),
-                            "phone": seller.get("phone", ""),
-                        }
                     out["listing_id"] = txn.get("listing_id")
-            except Exception:
-                # Contact-info enrichment is best-effort — never block the success page
-                pass
+                    is_authorized = bool(current_user) and (
+                        current_user.id == txn.get("user_id")
+                        or current_user.id == txn.get("seller_id")
+                        or getattr(current_user, "role", None) in ("admin", "super_admin")
+                    )
+                    if is_authorized:
+                        seller = await _db.users.find_one(
+                            {"id": txn["seller_id"]},
+                            {"_id": 0, "name": 1, "email": 1, "phone": 1},
+                        )
+                        if seller:
+                            out["seller_contact"] = {
+                                "name":  seller.get("name", ""),
+                                "email": seller.get("email", ""),
+                                "phone": seller.get("phone", ""),
+                            }
+            except Exception as e:
+                logger.warning(f"[/payments/status] seller_contact enrichment failed: {e}")
 
         return out
     except stripe.StripeError as e:

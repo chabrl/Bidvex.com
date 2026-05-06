@@ -39,12 +39,12 @@ STORAGE_FLAT_DOWN_PAYMENT_CAD = Decimal("50.00")
 VEHICLE_DOWN_PAYMENT_PCT = Decimal("0.10")  # 10 %
 
 
-def _calculate_down_payment(auction_type: str, winning_bid: float) -> Decimal:
-    """Return the post-auction down payment due (in CAD dollars)."""
+def _calculate_down_payment(auction_type: str, winning_bid: float) -> float:
+    """Return the post-auction down payment due in CAD dollars (always a float)."""
     if auction_type == "storage":
-        return STORAGE_FLAT_DOWN_PAYMENT_CAD
+        return float(STORAGE_FLAT_DOWN_PAYMENT_CAD)
     if auction_type == "vehicle":
-        return (Decimal(str(winning_bid)) * VEHICLE_DOWN_PAYMENT_PCT).quantize(Decimal("0.01"))
+        return float((Decimal(str(winning_bid)) * VEHICLE_DOWN_PAYMENT_PCT).quantize(Decimal("0.01")))
     raise ValueError(f"Down payments not supported for auction_type={auction_type}")
 
 
