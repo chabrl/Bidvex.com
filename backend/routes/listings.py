@@ -611,7 +611,32 @@ async def create_multi_item_listing(
         title_fr=listing_data.title_fr,
         description_en=listing_data.description_en,
         description_fr=listing_data.description_fr,
+        payment_method=listing_data.payment_method or "stripe",
+        requires_deposit=bool(listing_data.requires_deposit),
+        deposit_amount=float(listing_data.deposit_amount) if (listing_data.requires_deposit and listing_data.deposit_amount) else None,
+        deposit_type=(listing_data.deposit_type or "fixed") if listing_data.requires_deposit else None,
     )
+
+    # Validate deposit fields (Spec Feature 1)
+    if listing_data.requires_deposit:
+        if not listing_data.deposit_amount or float(listing_data.deposit_amount) <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "deposit_amount_required",
+                    "message_en": "Deposit amount is required when requires_deposit is true.",
+                    "message_fr": "Le montant du dépôt est requis lorsque le dépôt est activé.",
+                },
+            )
+        if listing_data.deposit_type not in ("fixed", "percentage"):
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "invalid_deposit_type",
+                    "message_en": "deposit_type must be 'fixed' or 'percentage'.",
+                    "message_fr": "deposit_type doit être 'fixed' ou 'percentage'.",
+                },
+            )
 
     listing_dict = listing.model_dump()
     listing_dict["agreement_metadata"] = agreement_metadata

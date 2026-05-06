@@ -78,6 +78,10 @@ const CreateMultiItemListing = () => {
   const [promotionTier, setPromotionTier] = useState('standard'); // 'standard', 'premium', 'elite'
   const [promotionPaymentComplete, setPromotionPaymentComplete] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('stripe');
+  // Deposit (Spec Feature 1) — Lots/Multi-Item parity with Marketplace + Vehicle + Storage
+  const [requiresDeposit, setRequiresDeposit] = useState(false);
+  const [depositType, setDepositType] = useState('fixed');  // "fixed" | "percentage"
+  const [depositAmount, setDepositAmount] = useState('');
   const [buyersPremiumPercent, setBuyersPremiumPercent] = useState('');
   const isPartner = user?.is_partner === true || user?.role === 'partner' || user?.role === 'admin';
 
@@ -607,6 +611,10 @@ const CreateMultiItemListing = () => {
         // Payment method & Buyer's Premium
         payment_method: paymentMethod,
         buyers_premium_rate: isPartner && buyersPremiumPercent !== '' ? parseFloat(buyersPremiumPercent) / 100 : null,
+        // Deposit (Spec Feature 1)
+        requires_deposit: requiresDeposit,
+        deposit_amount: requiresDeposit && depositAmount ? parseFloat(depositAmount) : null,
+        deposit_type: requiresDeposit ? depositType : null,
       };
       const response = await axios.post(`${API}/multi-item-listings`, payload);
       toast.success(t('createListing.listingCreated'));
@@ -848,10 +856,59 @@ const CreateMultiItemListing = () => {
         </div>
         {(paymentMethod === 'cash' || paymentMethod === 'e-transfer') && (
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-md" data-testid="multi-payment-legal-notice">
-            <p className="text-sm text-amber-800 font-medium">Legal Disclosure</p>
+            <p className="text-sm text-amber-800 font-medium">Legal Disclosure · Divulgation légale</p>
             <p className="text-xs text-amber-700 mt-1">
-              BidVex will invoice the seller for the Platform Fee + Buyer's Premium + Applicable Taxes upon sale.
+              <strong>EN:</strong> Since you selected Cash or E-Transfer, BidVex will charge your saved card our seller commission fee (% of the winning bid + applicable Stripe fees) in {formData.currency || 'CAD'} when your auction closes. You are responsible for collecting the item payment directly from the winning buyer.
             </p>
+            <p className="text-xs text-amber-700 mt-1">
+              <strong>FR:</strong> Comme vous avez choisi Argent comptant ou Virement Interac, BidVex débitera votre carte de notre commission vendeur (% du prix gagnant + frais Stripe applicables) en {formData.currency || 'CAD'} à la clôture de l'enchère. Vous êtes responsable d'encaisser directement le paiement de l'article auprès de l'acheteur gagnant.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Deposit (Spec Feature 1) — Multi-Item / Lots parity */}
+      <div className="space-y-3" data-testid="multi-deposit-section">
+        <Label>
+          Bidder Deposit · Dépôt des enchérisseurs
+          <InfoTip
+            en="Optionally require bidders to put down a deposit when they place their first bid on any lot in this auction. The deposit is held until the auction ends; the winner has it credited toward their total, all other bidders are refunded automatically."
+            fr="Optionnellement, demandez aux enchérisseurs un dépôt lors de leur première mise sur un lot. Le dépôt est retenu jusqu'à la fin ; il est crédité au gagnant et remboursé à tous les autres."
+          />
+        </Label>
+        <div className="grid grid-cols-1 gap-2">
+          <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${!requiresDeposit ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
+            <input type="radio" name="multi_deposit_required" checked={!requiresDeposit} onChange={() => setRequiresDeposit(false)} data-testid="multi-deposit-none" />
+            <div>
+              <span className="font-medium text-sm">No deposit required · Aucun dépôt requis</span>
+              <p className="text-xs text-muted-foreground mt-0.5">Bidders can place bids without paying anything upfront.</p>
+            </div>
+          </label>
+          <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${requiresDeposit ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
+            <input type="radio" name="multi_deposit_required" checked={requiresDeposit} onChange={() => setRequiresDeposit(true)} data-testid="multi-deposit-required" />
+            <div>
+              <span className="font-medium text-sm">Require a deposit · Exiger un dépôt</span>
+              <p className="text-xs text-muted-foreground mt-0.5">Charged immediately when bidder places their first bid; non-winners refunded automatically; winner credit applied.</p>
+            </div>
+          </label>
+        </div>
+        {requiresDeposit && (
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-md space-y-3" data-testid="multi-deposit-amount-block">
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setDepositType('fixed')} className={`flex-1 px-3 py-2 rounded-md text-sm font-medium ${depositType === 'fixed' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-300 text-slate-700'}`} data-testid="multi-deposit-type-fixed">Fixed amount · Montant fixe</button>
+              <button type="button" onClick={() => setDepositType('percentage')} className={`flex-1 px-3 py-2 rounded-md text-sm font-medium ${depositType === 'percentage' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-300 text-slate-700'}`} data-testid="multi-deposit-type-percentage">% of starting bid · % du prix de départ</button>
+            </div>
+            <div>
+              <Label htmlFor="multi_deposit_amount">
+                Deposit {depositType === 'fixed' ? `(${formData.currency || 'CAD'})` : '(%)'} · Dépôt
+              </Label>
+              <Input id="multi_deposit_amount" type="number" min="0" step={depositType === 'percentage' ? '1' : '0.01'} value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} placeholder={depositType === 'fixed' ? 'e.g. 50' : 'e.g. 10'} data-testid="multi-deposit-amount-input" />
+              <p className="text-xs text-muted-foreground mt-1">
+                {depositType === 'fixed'
+                  ? `Bidders will be charged ${depositAmount || 'X'} ${formData.currency || 'CAD'} when they place their first bid on any lot.`
+                  : `Bidders will be charged ${depositAmount || 'X'}% of the lot's starting bid (${formData.currency || 'CAD'}) when they place their first bid.`}
+              </p>
+            </div>
           </div>
         )}
       </div>

@@ -1,0 +1,48 @@
+{
+  "summary": "iter187 verified — backend 4/4 active API tests pass + 12/12 strict-payment regression + 5/5 iter186 regression. Promotion endpoints (P0): /api/payments/promote-listing, /api/payments/promote, /api/storage-auctions/{id}/promote all mounted correctly (no 405). Multi-item listing deposit fields: pre-seeded listing 269a9f90-6741-46ea-b29d-e7126b172f35 confirmed via GET to persist all 5 fields (currency=CAD, payment_method=cash, requires_deposit=True, deposit_amount=75.0, deposit_type=fixed). Deposit validation tests via live POST blocked by sticky-card guard (test buyer has no saved card → 402) — code path verified by source review at routes/listings.py:621-639 (raises 400 with bilingual deposit_amount_required / invalid_deposit_type). Frontend (P1): /auth at 1920×1080 — Sign In button visible at y=623, bottom y=663; cookie banner starts at y=689 → NO overlap, button is clickable (trial click OK). /create-listing fix: deposit-section + currency-selector + seller-final-disclosure ALL present in DOM AND TaxInterviewModal renders as visible overlay on top of mounted form — exactly the iter187 spec. Multi-deposit testids confirmed source-only (8/8 in CreateMultiItemListing.js lines 835-911) but live render gated because the multi-item page still uses the OLD early-return gatekeeper pattern (line 2396) — iter187 fix was applied only to CreateListingPage.js, not CreateMultiItemListing.js.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/multi-item-listings", "issue": "Sticky Card Guard (validate_payment_method_for_listing) runs BEFORE the deposit_amount/deposit_type validators. Test buyer p0bugtest@example.com has no saved card → 402 returned before deposit validation can be reached via live API. Persistence validated via pre-seeded listing 269a9f90 instead. Recommend either: (a) seed a card on the test buyer, or (b) move deposit validation BEFORE the sticky card guard so 400-with-bilingual-error is reachable in negative-path tests."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Multi-item create form live render", "issue": "CreateMultiItemListing.js still uses the OLD pre-iter187 gatekeeper pattern — `if (user && !user.tax_onboarding_completed) return <TaxInterviewModal ...>` at lines 2396-2404. This means the 8 multi-deposit testids (multi-deposit-section / multi-deposit-none / multi-deposit-required / multi-deposit-amount-block / multi-deposit-type-fixed / multi-deposit-type-percentage / multi-deposit-amount-input / multi-payment-method-section) cannot be reached via live render until the buyer completes CRA tax onboarding. iter187 should also apply the form-mount + modal-overlay fix to this page for parity with CreateListingPage.js.", "affected_selectors": ["[data-testid=\"multi-deposit-section\"]", "[data-testid=\"multi-deposit-required\"]", "[data-testid=\"multi-deposit-amount-input\"]", "[data-testid=\"multi-payment-method-section\"]"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter187_api.py",
+    "/app/test_reports/pytest/iter187_api.xml",
+    "/app/test_reports/pytest/iter187_strict_regression.xml",
+    "/app/test_reports/pytest/iter187_iter186_regression.xml"
+  ],
+  "action_items": [
+    "(P1) Apply the iter187 form-mount-with-modal-overlay fix to /app/frontend/src/pages/CreateMultiItemListing.js (mirror what was done in CreateListingPage.js — replace early-return at line 2396 with `taxOnboardingPending` boolean + mount TaxInterviewModal as overlay at end of JSX + block handleSubmit with toast.error). This will allow live automated verification of all 8 multi-deposit testids.",
+    "(P2 Optional) Either seed a card on test buyer p0bugtest@example.com OR move the deposit_amount/deposit_type validators BEFORE the sticky-card guard in routes/listings.py:create_multi_item_listing so live-API negative-path tests for invalid deposit fields are reachable (currently they return 402 before hitting the 400 deposit validators)."
+  ],
+  "critical_code_review_comments": [
+    "/app/backend/routes/listings.py:506-639 — multi-item-listing deposit fields are correctly wired through MultiItemListing constructor (lines 614-617) and validated with bilingual 400 errors (lines 621-639). Note: validator runs AFTER the constructor; since MultiItemListing.deposit_type is a free-form Optional[str], 'bogus' values flow through the constructor and get caught by the explicit string check on line 631 — correct behaviour.",
+    "/app/backend/routes/payments_promotions.py — both /promote-listing and /promote endpoints confirmed mounted (no 405 in any test). Storage promote endpoint also reachable.",
+    "/app/frontend/src/pages/AuthPage.js lines 128 & 234 — both render branches use `pt-12 pb-40 sm:pb-48` correctly. Verified live: Sign In bottom at y=663, cookie banner top at y=689 → 26px gap, no overlap.",
+    "/app/frontend/src/pages/CreateListingPage.js lines 148-149, 187-188, 755-756 — taxOnboardingPending boolean + handleSubmit toast.error guard + TaxInterviewModal rendered as overlay at end of JSX. Verified live: form testids present in DOM AND modal visible on top.",
+    "/app/frontend/src/pages/CreateMultiItemListing.js lines 2396-2404 — REGRESSION/MISS: still uses OLD early-return gatekeeper pattern. iter187 form-mount fix was NOT applied here, only to CreateListingPage.js. Multi-item create cannot be verified live until tax onboarding is done by the test user."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter187_api.py"
+  ],
+  "success_rate": {
+    "backend_iter187_active": "100% (4/4 — promotion endpoints + seeded multi-item GET; 3 deposit-create tests skipped due to sticky-card guard)",
+    "backend_iter185_regression": "100% (12/12)",
+    "backend_iter186_regression": "100% (5/5)",
+    "frontend_iter187_active": "Auth padding fix 100% verified live; CreateListingPage modal-overlay fix 100% verified live (deposit-section + currency-selector + seller-final-disclosure all in DOM with modal overlay on top); CreateMultiItemListing 8/8 testids source-confirmed but live render still gated by CRA modal (iter187 fix not applied to this page)"
+  },
+  "test_credentials": "Buyer p0bugtest@example.com / TestBuyer123! (login OK; no saved card → multi-item POST returns 402 before reaching deposit validators). Admin charbel911@gmail.com / Anderosli123!@# (login OK).",
+  "seed_data_creation": "None new — used pre-seeded multi-item listing 269a9f90-6741-46ea-b29d-e7126b172f35 created by main agent.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter187 P0 promotion endpoints CONFIRMED green (no 405). iter187 P1 auth padding CONFIRMED green at 1920x1080. iter187 P1 CreateListingPage modal-overlay CONFIRMED green. The ONE open gap: CreateMultiItemListing.js still uses early-return gatekeeper at line 2396; main agent should apply the same fix as CreateListingPage.js (taxOnboardingPending + modal at end of JSX + handleSubmit guard). After that, the 8 multi-deposit testids can be verified live. Backend regression 17/17 (12 strict + 5 iter186) all green. To bypass /auth Cookie Consent in automation, POST /api/auth/login → inject access_token / token / user JSON into localStorage → page.goto target.",
+  "rca_of_the_issue": "Multi-item create page miss: iter187 spec called for moving the CRA Tax modal AFTER form mount, but the change was only applied to CreateListingPage.js. CreateMultiItemListing.js (a separate page reached via /create-multi-item-listing) still has the original gatekeeper-return pattern at lines 2396-2404. Mitigation: mirror the iter187 CreateListingPage.js change in CreateMultiItemListing.js — declare `const taxOnboardingPending = !!(user && !user.tax_onboarding_completed)`, remove the early-return, render `<TaxInterviewModal ...>` at the end of the main JSX inside `{taxOnboardingPending && (...)}`, and add `if (taxOnboardingPending) { toast.error(...); return; }` to the submit handler."
+}

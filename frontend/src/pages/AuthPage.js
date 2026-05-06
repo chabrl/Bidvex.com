@@ -125,7 +125,7 @@ const AuthPage = () => {
   // Forced Password Reset Form
   if (showForceReset) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 py-12" data-testid="force-reset-page">
+      <div className="min-h-screen flex items-center justify-center px-4 pt-12 pb-40 sm:pb-48" data-testid="force-reset-page">
         <Card className="w-full max-w-md glassmorphism">
           <CardHeader className="space-y-4">
             <div className="flex justify-center">
@@ -231,7 +231,7 @@ const AuthPage = () => {
 
   // Regular Login/Register Form
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-12" data-testid="auth-page">
+    <div className="min-h-screen flex items-center justify-center px-4 pt-12 pb-40 sm:pb-48" data-testid="auth-page">
       <Card className="w-full max-w-md glassmorphism">
         <CardHeader className="space-y-4">
           {/* BidVex Icon */}
