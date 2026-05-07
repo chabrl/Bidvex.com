@@ -963,7 +963,7 @@ const CreateVehicleListingPage = () => {
             
             {/* Currency Selector (Spec Global Rule 1) */}
             <div className="space-y-2 p-4 bg-slate-50 rounded-lg" data-testid="vehicle-currency-section">
-              <Label>Listing Currency · Devise de l'enchère</Label>
+              <Label>{t('createListing.currencyLabel')}</Label>
               <div className="flex gap-2" data-testid="vehicle-currency-selector">
                 {['CAD', 'USD'].map((cur) => (
                   <button
@@ -982,23 +982,18 @@ const CreateVehicleListingPage = () => {
                 ))}
               </div>
               <p className="text-xs text-slate-500">
-                <strong>EN:</strong> All transactions are processed in CAD by default. You may switch to USD before publishing.
-                <strong className="text-amber-600"> Currency cannot be changed once your auction is live.</strong>
-              </p>
-              <p className="text-xs text-slate-500">
-                <strong>FR:</strong> Toutes les transactions sont en CAD par défaut. Vous pouvez passer à USD avant publication.
-                <strong className="text-amber-600"> La devise ne peut pas être modifiée une fois en ligne.</strong>
+                {t('createListing.currencyImmutableWarn')}
               </p>
             </div>
 
             {/* Payment Method (Spec Feature 3) */}
             <div className="space-y-2 p-4 bg-slate-50 rounded-lg" data-testid="vehicle-payment-method-section">
-              <Label>Payment Method · Mode de paiement</Label>
+              <Label>{t('createListing.paymentMethodLabel')}</Label>
               <div className="grid grid-cols-1 gap-2">
                 {[
-                  { v: 'stripe', label: 'Stripe (BidVex)', sub: 'Recommended — automated payout via Stripe Connect' },
-                  { v: 'cash', label: 'Cash', sub: 'BidVex charges seller commission only at auction close' },
-                  { v: 'e-transfer', label: 'E-Transfer (Interac)', sub: 'BidVex charges seller commission only at auction close' },
+                  { v: 'stripe',     label: t('createListing.paymentMethodStripe'),     sub: t('createListing.paymentMethodStripeBadge') + ' — ' + t('createListing.paymentMethodStripeHelp') },
+                  { v: 'cash',       label: t('createListing.paymentMethodCash'),       sub: t('createListing.paymentMethodCashHelp') },
+                  { v: 'e-transfer', label: t('createListing.paymentMethodETransfer'),  sub: t('createListing.paymentMethodETransferHelp') },
                 ].map((opt) => (
                   <label key={opt.v} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer ${formData.payment_method === opt.v ? 'border-blue-500 bg-blue-50' : 'border-slate-200'}`}>
                     <input type="radio" name="vehicle_payment_method" value={opt.v} checked={formData.payment_method === opt.v} onChange={(e) => updateField('payment_method', e.target.value)} data-testid={`vehicle-pm-${opt.v}`} />
@@ -1013,34 +1008,34 @@ const CreateVehicleListingPage = () => {
 
             {/* Deposit (Spec Feature 1) */}
             <div className="space-y-3 p-4 bg-slate-50 rounded-lg" data-testid="vehicle-deposit-section">
-              <Label>Bidder Deposit · Dépôt des enchérisseurs</Label>
+              <Label>{t('createListing.bidderDepositLabel')}</Label>
               <div className="grid grid-cols-1 gap-2">
                 <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer ${!formData.requires_deposit ? 'border-blue-500 bg-blue-50' : 'border-slate-200'}`}>
                   <input type="radio" name="vehicle_deposit_required" checked={!formData.requires_deposit} onChange={() => updateField('requires_deposit', false)} data-testid="vehicle-deposit-none" />
                   <div>
-                    <span className="font-medium text-sm">No deposit required · Aucun dépôt requis</span>
+                    <span className="font-medium text-sm">{t('createListing.bidderNoDeposit')}</span>
                   </div>
                 </label>
                 <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer ${formData.requires_deposit ? 'border-blue-500 bg-blue-50' : 'border-slate-200'}`}>
                   <input type="radio" name="vehicle_deposit_required" checked={formData.requires_deposit} onChange={() => updateField('requires_deposit', true)} data-testid="vehicle-deposit-required" />
                   <div>
-                    <span className="font-medium text-sm">Require a deposit · Exiger un dépôt</span>
-                    <p className="text-xs text-slate-500">Charged immediately on first bid; non-winners refunded automatically; winner credited toward total.</p>
+                    <span className="font-medium text-sm">{t('createListing.bidderRequireDeposit')}</span>
+                    <p className="text-xs text-slate-500">{t('createListing.bidderRequireDepositHelpVehicle')}</p>
                   </div>
                 </label>
               </div>
               {formData.requires_deposit && (
                 <div className="space-y-3" data-testid="vehicle-deposit-amount-block">
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => updateField('deposit_type', 'fixed')} className={`flex-1 px-3 py-2 rounded-md text-sm font-medium ${formData.deposit_type === 'fixed' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-300 text-slate-700'}`} data-testid="vehicle-deposit-type-fixed">Fixed amount · Montant fixe</button>
-                    <button type="button" onClick={() => updateField('deposit_type', 'percentage')} className={`flex-1 px-3 py-2 rounded-md text-sm font-medium ${formData.deposit_type === 'percentage' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-300 text-slate-700'}`} data-testid="vehicle-deposit-type-percentage">% of starting bid · % du prix de départ</button>
+                    <button type="button" onClick={() => updateField('deposit_type', 'fixed')} className={`flex-1 px-3 py-2 rounded-md text-sm font-medium ${formData.deposit_type === 'fixed' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-300 text-slate-700'}`} data-testid="vehicle-deposit-type-fixed">{t('createListing.depositTypeFixed')}</button>
+                    <button type="button" onClick={() => updateField('deposit_type', 'percentage')} className={`flex-1 px-3 py-2 rounded-md text-sm font-medium ${formData.deposit_type === 'percentage' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-300 text-slate-700'}`} data-testid="vehicle-deposit-type-percentage">{t('createListing.depositTypePercent')}</button>
                   </div>
                   <Input
                     type="number"
                     inputMode="decimal"
                     value={formData.deposit_amount}
                     onChange={(e) => updateField('deposit_amount', e.target.value)}
-                    placeholder={formData.deposit_type === 'fixed' ? `e.g. 500 ${formData.currency}` : 'e.g. 10'}
+                    placeholder={formData.deposit_type === 'fixed' ? `${t('createListing.depositPlaceholderFixed')} ${formData.currency}` : t('createListing.depositPlaceholderPercent')}
                     data-testid="vehicle-deposit-amount-input"
                   />
                 </div>

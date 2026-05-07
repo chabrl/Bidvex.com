@@ -231,7 +231,7 @@ const StorageAuctionCreate = () => {
 
               {/* Currency Selector (Spec Global Rule 1) */}
               <div className="space-y-2 pt-2" data-testid="storage-currency-section">
-                <Label className="text-sm">{isFr ? 'Devise · Currency' : 'Currency · Devise'}</Label>
+                <Label className="text-sm">{isFr ? 'Devise' : 'Currency'}</Label>
                 <div className="flex gap-2" data-testid="storage-currency-selector">
                   {['CAD', 'USD'].map((cur) => (
                     <button

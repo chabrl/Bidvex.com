@@ -826,47 +826,44 @@ const CreateMultiItemListing = () => {
               data-testid="multi-buyers-premium-input"
             />
             <p className="text-xs text-muted-foreground">
-              Partner Exclusive: Set Buyer's Premium from 0% to 25%.
+              {t('createListing.buyersPremiumPartnerHelp')}
             </p>
           </>
         ) : (
           <p className="text-sm text-muted-foreground bg-slate-50 px-3 py-2 rounded" data-testid="multi-bp-locked-notice">
-            Buyer's Premium is a Partner-exclusive feature. Become a partner to set custom premiums.
+            {t('createListing.buyersPremiumLockedNotice')}
           </p>
         )}
       </div>
 
       {/* Payment Method Selection */}
       <div className="space-y-3" data-testid="multi-payment-method-section">
-        <Label>Payment Method
-          <InfoTip en="Choose how buyers will pay. Stripe is the most secure and automated option." fr="Choisissez comment les acheteurs paieront. Stripe est l'option la plus sécurisée et automatisée." />
+        <Label>{t('createListing.paymentMethodLabel')}
+          <InfoTip en={t('createListing.paymentMethodInfo', { lng: 'en' })} fr={t('createListing.paymentMethodInfo', { lng: 'fr' })} />
         </Label>
         <div className="grid grid-cols-1 gap-2">
           <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${paymentMethod === 'stripe' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
             <input type="radio" name="multi_payment_method" value="stripe" checked={paymentMethod === 'stripe'} onChange={(e) => setPaymentMethod(e.target.value)} className="text-blue-600" data-testid="multi-payment-stripe" />
             <div>
-              <span className="font-medium text-sm">Stripe (BidVex)</span>
-              <span className="ml-2 text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">Recommended</span>
-              <p className="text-xs text-muted-foreground mt-0.5">More secure and automated for both parties.</p>
+              <span className="font-medium text-sm">{t('createListing.paymentMethodStripe')}</span>
+              <span className="ml-2 text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">{t('createListing.paymentMethodStripeBadge')}</span>
+              <p className="text-xs text-muted-foreground mt-0.5">{t('createListing.paymentMethodStripeHelp')}</p>
             </div>
           </label>
           <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${paymentMethod === 'cash' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
             <input type="radio" name="multi_payment_method" value="cash" checked={paymentMethod === 'cash'} onChange={(e) => setPaymentMethod(e.target.value)} data-testid="multi-payment-cash" />
-            <span className="font-medium text-sm">Cash</span>
+            <span className="font-medium text-sm">{t('createListing.paymentMethodCash')}</span>
           </label>
           <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${paymentMethod === 'e-transfer' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
             <input type="radio" name="multi_payment_method" value="e-transfer" checked={paymentMethod === 'e-transfer'} onChange={(e) => setPaymentMethod(e.target.value)} data-testid="multi-payment-etransfer" />
-            <span className="font-medium text-sm">E-Transfer (Interac)</span>
+            <span className="font-medium text-sm">{t('createListing.paymentMethodETransfer')}</span>
           </label>
         </div>
         {(paymentMethod === 'cash' || paymentMethod === 'e-transfer') && (
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-md" data-testid="multi-payment-legal-notice">
-            <p className="text-sm text-amber-800 font-medium">Legal Disclosure · Divulgation légale</p>
+            <p className="text-sm text-amber-800 font-medium">{t('createListing.legalDisclosureTitle')}</p>
             <p className="text-xs text-amber-700 mt-1">
-              <strong>EN:</strong> Since you selected Cash or E-Transfer, BidVex will charge your saved card our seller commission fee (% of the winning bid + applicable Stripe fees) in {formData.currency || 'CAD'} when your auction closes. You are responsible for collecting the item payment directly from the winning buyer.
-            </p>
-            <p className="text-xs text-amber-700 mt-1">
-              <strong>FR:</strong> Comme vous avez choisi Argent comptant ou Virement Interac, BidVex débitera votre carte de notre commission vendeur (% du prix gagnant + frais Stripe applicables) en {formData.currency || 'CAD'} à la clôture de l'enchère. Vous êtes responsable d'encaisser directement le paiement de l'article auprès de l'acheteur gagnant.
+              {t('createListing.legalDisclosureCash', { currency: formData.currency || 'CAD' })}
             </p>
           </div>
         )}
@@ -875,43 +872,45 @@ const CreateMultiItemListing = () => {
       {/* Deposit (Spec Feature 1) — Multi-Item / Lots parity */}
       <div className="space-y-3" data-testid="multi-deposit-section">
         <Label>
-          Bidder Deposit · Dépôt des enchérisseurs
+          {t('createListing.bidderDepositLabel')}
           <InfoTip
-            en="Optionally require bidders to put down a deposit when they place their first bid on any lot in this auction. The deposit is held until the auction ends; the winner has it credited toward their total, all other bidders are refunded automatically."
-            fr="Optionnellement, demandez aux enchérisseurs un dépôt lors de leur première mise sur un lot. Le dépôt est retenu jusqu'à la fin ; il est crédité au gagnant et remboursé à tous les autres."
+            en={t('createListing.bidderDepositInfoMulti', { lng: 'en' })}
+            fr={t('createListing.bidderDepositInfoMulti', { lng: 'fr' })}
           />
         </Label>
         <div className="grid grid-cols-1 gap-2">
           <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${!requiresDeposit ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
             <input type="radio" name="multi_deposit_required" checked={!requiresDeposit} onChange={() => setRequiresDeposit(false)} data-testid="multi-deposit-none" />
             <div>
-              <span className="font-medium text-sm">No deposit required · Aucun dépôt requis</span>
-              <p className="text-xs text-muted-foreground mt-0.5">Bidders can place bids without paying anything upfront.</p>
+              <span className="font-medium text-sm">{t('createListing.bidderNoDeposit')}</span>
+              <p className="text-xs text-muted-foreground mt-0.5">{t('createListing.bidderNoDepositHelp')}</p>
             </div>
           </label>
           <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${requiresDeposit ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
             <input type="radio" name="multi_deposit_required" checked={requiresDeposit} onChange={() => setRequiresDeposit(true)} data-testid="multi-deposit-required" />
             <div>
-              <span className="font-medium text-sm">Require a deposit · Exiger un dépôt</span>
-              <p className="text-xs text-muted-foreground mt-0.5">Charged immediately when bidder places their first bid; non-winners refunded automatically; winner credit applied.</p>
+              <span className="font-medium text-sm">{t('createListing.bidderRequireDeposit')}</span>
+              <p className="text-xs text-muted-foreground mt-0.5">{t('createListing.bidderRequireDepositHelp')}</p>
             </div>
           </label>
         </div>
         {requiresDeposit && (
           <div className="p-4 bg-slate-50 border border-slate-200 rounded-md space-y-3" data-testid="multi-deposit-amount-block">
             <div className="flex gap-2">
-              <button type="button" onClick={() => setDepositType('fixed')} className={`flex-1 px-3 py-2 rounded-md text-sm font-medium ${depositType === 'fixed' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-300 text-slate-700'}`} data-testid="multi-deposit-type-fixed">Fixed amount · Montant fixe</button>
-              <button type="button" onClick={() => setDepositType('percentage')} className={`flex-1 px-3 py-2 rounded-md text-sm font-medium ${depositType === 'percentage' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-300 text-slate-700'}`} data-testid="multi-deposit-type-percentage">% of starting bid · % du prix de départ</button>
+              <button type="button" onClick={() => setDepositType('fixed')} className={`flex-1 px-3 py-2 rounded-md text-sm font-medium ${depositType === 'fixed' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-300 text-slate-700'}`} data-testid="multi-deposit-type-fixed">{t('createListing.depositTypeFixed')}</button>
+              <button type="button" onClick={() => setDepositType('percentage')} className={`flex-1 px-3 py-2 rounded-md text-sm font-medium ${depositType === 'percentage' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-300 text-slate-700'}`} data-testid="multi-deposit-type-percentage">{t('createListing.depositTypePercent')}</button>
             </div>
             <div>
               <Label htmlFor="multi_deposit_amount">
-                Deposit {depositType === 'fixed' ? `(${formData.currency || 'CAD'})` : '(%)'} · Dépôt
+                {depositType === 'fixed'
+                  ? t('createListing.depositLabelFixed', { currency: formData.currency || 'CAD' })
+                  : t('createListing.depositLabelPercent')}
               </Label>
-              <Input id="multi_deposit_amount" type="number" min="0" step={depositType === 'percentage' ? '1' : '0.01'} value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} placeholder={depositType === 'fixed' ? 'e.g. 50' : 'e.g. 10'} data-testid="multi-deposit-amount-input" />
+              <Input id="multi_deposit_amount" type="number" min="0" step={depositType === 'percentage' ? '1' : '0.01'} value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} placeholder={depositType === 'fixed' ? t('createListing.depositPlaceholderFixed') : t('createListing.depositPlaceholderPercent')} data-testid="multi-deposit-amount-input" />
               <p className="text-xs text-muted-foreground mt-1">
                 {depositType === 'fixed'
-                  ? `Bidders will be charged ${depositAmount || 'X'} ${formData.currency || 'CAD'} when they place their first bid on any lot.`
-                  : `Bidders will be charged ${depositAmount || 'X'}% of the lot's starting bid (${formData.currency || 'CAD'}) when they place their first bid.`}
+                  ? t('createListing.depositHelpFixedMulti', { amount: depositAmount || 'X', currency: formData.currency || 'CAD' })
+                  : t('createListing.depositHelpPercentMulti', { amount: depositAmount || 'X', currency: formData.currency || 'CAD' })}
               </p>
             </div>
           </div>

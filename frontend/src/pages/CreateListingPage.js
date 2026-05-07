@@ -357,58 +357,52 @@ const CreateListingPage = () => {
                       data-testid="buyers-premium-input"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Partner Exclusive: Set Buyer's Premium from 0% to 25%.
+                      {t('createListing.buyersPremiumPartnerHelp')}
                     </p>
                   </>
                 ) : (
                   <p className="text-sm text-muted-foreground bg-slate-50 px-3 py-2 rounded" data-testid="bp-locked-notice">
-                    Buyer's Premium is a Partner-exclusive feature. Become a partner to set custom premiums.
+                    {t('createListing.buyersPremiumLockedNotice')}
                   </p>
                 )}
               </div>
 
               {/* Payment Method Selection */}
               <div className="space-y-3" data-testid="payment-method-section">
-                <Label>Payment Method
-                  <InfoTip en="Choose how you want to receive your payment after a successful sale." fr="Choisissez comment vous souhaitez recevoir votre paiement après une vente réussie." />
+                <Label>{t('createListing.paymentMethodLabel')}
+                  <InfoTip en={t('createListing.paymentMethodInfo', { lng: 'en' })} fr={t('createListing.paymentMethodInfo', { lng: 'fr' })} />
                 </Label>
                 <div className="grid grid-cols-1 gap-2">
                   <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${paymentMethod === 'stripe' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
                     <input type="radio" name="payment_method" value="stripe" checked={paymentMethod === 'stripe'} onChange={(e) => setPaymentMethod(e.target.value)} className="text-blue-600" data-testid="payment-stripe" />
                     <div>
-                      <span className="font-medium text-sm">Stripe (BidVex)</span>
-                      <span className="ml-2 text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">Recommended</span>
-                      <p className="text-xs text-muted-foreground mt-0.5">More secure and automated for both parties.</p>
+                      <span className="font-medium text-sm">{t('createListing.paymentMethodStripe')}</span>
+                      <span className="ml-2 text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">{t('createListing.paymentMethodStripeBadge')}</span>
+                      <p className="text-xs text-muted-foreground mt-0.5">{t('createListing.paymentMethodStripeHelp')}</p>
                     </div>
                   </label>
                   <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${paymentMethod === 'cash' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
                     <input type="radio" name="payment_method" value="cash" checked={paymentMethod === 'cash'} onChange={(e) => setPaymentMethod(e.target.value)} data-testid="payment-cash" />
-                    <span className="font-medium text-sm">Cash</span>
+                    <span className="font-medium text-sm">{t('createListing.paymentMethodCash')}</span>
                   </label>
                   <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${paymentMethod === 'e-transfer' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
                     <input type="radio" name="payment_method" value="e-transfer" checked={paymentMethod === 'e-transfer'} onChange={(e) => setPaymentMethod(e.target.value)} data-testid="payment-etransfer" />
-                    <span className="font-medium text-sm">E-Transfer (Interac)</span>
+                    <span className="font-medium text-sm">{t('createListing.paymentMethodETransfer')}</span>
                   </label>
                 </div>
                 {(paymentMethod === 'cash' || paymentMethod === 'e-transfer') && (
                   <div className="p-3 bg-amber-50 border border-amber-200 rounded-md" data-testid="payment-legal-notice">
-                    <p className="text-sm text-amber-800 font-medium">Legal Disclosure · Divulgation légale</p>
+                    <p className="text-sm text-amber-800 font-medium">{t('createListing.legalDisclosureTitle')}</p>
                     <p className="text-xs text-amber-700 mt-1">
-                      <strong>EN:</strong> Since you selected Cash or E-Transfer, BidVex will charge your saved card our seller commission fee (% of the winning bid + applicable Stripe fees) in {formData.currency} when your auction closes. You are responsible for collecting the item payment directly from the winning buyer.
-                    </p>
-                    <p className="text-xs text-amber-700 mt-1">
-                      <strong>FR:</strong> Comme vous avez choisi Argent comptant ou Virement Interac, BidVex débitera votre carte enregistrée de notre commission vendeur (% du prix gagnant + frais Stripe applicables) en {formData.currency} à la clôture de l'enchère. Vous êtes responsable d'encaisser le prix de l'article directement auprès de l'acheteur gagnant.
+                      {t('createListing.legalDisclosureCash', { currency: formData.currency })}
                     </p>
                   </div>
                 )}
                 {paymentMethod === 'stripe' && (
                   <div className="p-3 bg-blue-50 border border-blue-200 rounded-md" data-testid="payment-stripe-notice">
-                    <p className="text-sm text-blue-800 font-medium">Stripe Payout Disclosure · Divulgation paiement Stripe</p>
+                    <p className="text-sm text-blue-800 font-medium">{t('createListing.stripeDisclosureTitle')}</p>
                     <p className="text-xs text-blue-700 mt-1">
-                      <strong>EN:</strong> BidVex will collect the full payment from the winning buyer on your behalf in {formData.currency}. You will receive the winning bid amount minus our seller commission (based on your subscription plan). Payouts are processed after buyer payment is confirmed.
-                    </p>
-                    <p className="text-xs text-blue-700 mt-1">
-                      <strong>FR:</strong> BidVex encaissera le paiement complet de l'acheteur gagnant pour votre compte en {formData.currency}. Vous recevrez le montant de l'enchère gagnante moins notre commission vendeur (selon votre plan d'abonnement). Les paiements sont traités après confirmation du paiement de l'acheteur.
+                      {t('createListing.stripeDisclosureBody', { currency: formData.currency })}
                     </p>
                   </div>
                 )}
@@ -417,43 +411,45 @@ const CreateListingPage = () => {
               {/* Deposit (Spec Feature 1) — single field, single flow */}
               <div className="space-y-3" data-testid="deposit-section">
                 <Label>
-                  Bidder Deposit · Dépôt des enchérisseurs
+                  {t('createListing.bidderDepositLabel')}
                   <InfoTip
-                    en="Optionally require bidders to put down a deposit when they place their first bid. The deposit is held until the auction ends; the winner has it credited toward their total, all other bidders are refunded automatically."
-                    fr="Demander aux enchérisseurs de verser un dépôt lors de leur première mise. Le dépôt est retenu jusqu'à la fin de l'enchère ; il est crédité au gagnant et remboursé automatiquement à tous les autres enchérisseurs."
+                    en={t('createListing.bidderDepositInfo', { lng: 'en' })}
+                    fr={t('createListing.bidderDepositInfo', { lng: 'fr' })}
                   />
                 </Label>
                 <div className="grid grid-cols-1 gap-2">
                   <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${!requiresDeposit ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
                     <input type="radio" name="deposit_required" checked={!requiresDeposit} onChange={() => setRequiresDeposit(false)} data-testid="deposit-none" />
                     <div>
-                      <span className="font-medium text-sm">No deposit required · Aucun dépôt requis</span>
-                      <p className="text-xs text-muted-foreground mt-0.5">Bidders can place bids without paying anything upfront.</p>
+                      <span className="font-medium text-sm">{t('createListing.bidderNoDeposit')}</span>
+                      <p className="text-xs text-muted-foreground mt-0.5">{t('createListing.bidderNoDepositHelp')}</p>
                     </div>
                   </label>
                   <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${requiresDeposit ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
                     <input type="radio" name="deposit_required" checked={requiresDeposit} onChange={() => setRequiresDeposit(true)} data-testid="deposit-required" />
                     <div>
-                      <span className="font-medium text-sm">Require a deposit · Exiger un dépôt</span>
-                      <p className="text-xs text-muted-foreground mt-0.5">Charged immediately when bidder places their first bid; non-winners refunded automatically; winner credit applied.</p>
+                      <span className="font-medium text-sm">{t('createListing.bidderRequireDeposit')}</span>
+                      <p className="text-xs text-muted-foreground mt-0.5">{t('createListing.bidderRequireDepositHelp')}</p>
                     </div>
                   </label>
                 </div>
                 {requiresDeposit && (
                   <div className="p-4 bg-slate-50 border border-slate-200 rounded-md space-y-3" data-testid="deposit-amount-block">
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => setDepositType('fixed')} className={`flex-1 px-3 py-2 rounded-md text-sm font-medium ${depositType === 'fixed' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-300 text-slate-700'}`} data-testid="deposit-type-fixed">Fixed amount · Montant fixe</button>
-                      <button type="button" onClick={() => setDepositType('percentage')} className={`flex-1 px-3 py-2 rounded-md text-sm font-medium ${depositType === 'percentage' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-300 text-slate-700'}`} data-testid="deposit-type-percentage">% of starting bid · % du prix de départ</button>
+                      <button type="button" onClick={() => setDepositType('fixed')} className={`flex-1 px-3 py-2 rounded-md text-sm font-medium ${depositType === 'fixed' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-300 text-slate-700'}`} data-testid="deposit-type-fixed">{t('createListing.depositTypeFixed')}</button>
+                      <button type="button" onClick={() => setDepositType('percentage')} className={`flex-1 px-3 py-2 rounded-md text-sm font-medium ${depositType === 'percentage' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-300 text-slate-700'}`} data-testid="deposit-type-percentage">{t('createListing.depositTypePercent')}</button>
                     </div>
                     <div>
                       <Label htmlFor="deposit_amount">
-                        Deposit {depositType === 'fixed' ? `(${formData.currency})` : '(%)'} · Dépôt
+                        {depositType === 'fixed'
+                          ? t('createListing.depositLabelFixed', { currency: formData.currency })
+                          : t('createListing.depositLabelPercent')}
                       </Label>
-                      <Input id="deposit_amount" type="number" min="0" step={depositType === 'percentage' ? '1' : '0.01'} value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} placeholder={depositType === 'fixed' ? 'e.g. 50' : 'e.g. 10'} data-testid="deposit-amount-input" />
+                      <Input id="deposit_amount" type="number" min="0" step={depositType === 'percentage' ? '1' : '0.01'} value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} placeholder={depositType === 'fixed' ? t('createListing.depositPlaceholderFixed') : t('createListing.depositPlaceholderPercent')} data-testid="deposit-amount-input" />
                       <p className="text-xs text-muted-foreground mt-1">
                         {depositType === 'fixed'
-                          ? `Bidders will be charged ${depositAmount || 'X'} ${formData.currency} when they place their first bid.`
-                          : `Bidders will be charged ${depositAmount || 'X'}% of the starting bid (${formData.currency}) when they place their first bid.`}
+                          ? t('createListing.depositHelpFixed', { amount: depositAmount || 'X', currency: formData.currency })
+                          : t('createListing.depositHelpPercent', { amount: depositAmount || 'X', currency: formData.currency })}
                       </p>
                     </div>
                   </div>
@@ -462,20 +458,9 @@ const CreateListingPage = () => {
 
               {/* Final Listing Disclosure (Spec Feature 6) */}
               <div className="p-4 bg-slate-100 border border-slate-300 rounded-md text-xs leading-relaxed" data-testid="seller-final-disclosure">
-                <p className="font-semibold text-slate-900 mb-1">Seller Disclosure · Divulgation au vendeur</p>
+                <p className="font-semibold text-slate-900 mb-1">{t('createListing.sellerDisclosureTitle')}</p>
                 <p className="text-slate-700">
-                  <strong>EN:</strong> By publishing this auction, you agree to BidVex's seller terms.
-                  All amounts are in <strong>{formData.currency}</strong> based on the currency you selected.
-                  If your item sells, BidVex will charge your saved card a seller commission (% of the winning bid based on your subscription plan).
-                  If you selected Cash or E-Transfer as your payment method, this commission is charged to your card automatically at auction close.
-                  You are responsible for honoring the winning bid and collecting payment from the buyer directly.
-                </p>
-                <p className="text-slate-700 mt-1">
-                  <strong>FR:</strong> En publiant cette enchère, vous acceptez les conditions vendeur de BidVex.
-                  Tous les montants sont en <strong>{formData.currency}</strong> selon la devise choisie.
-                  Si votre article se vend, BidVex débitera votre carte d'une commission vendeur (% du prix gagnant selon votre plan).
-                  Si vous avez choisi Argent comptant ou Virement Interac, cette commission est débitée automatiquement à la clôture.
-                  Vous êtes responsable d'honorer l'enchère gagnante et d'encaisser le paiement directement.
+                  {t('createListing.sellerDisclosureBody', { currency: formData.currency })}
                 </p>
               </div>
 
@@ -535,12 +520,7 @@ const CreateListingPage = () => {
                   ))}
                 </div>
                 <p className="text-xs text-slate-500">
-                  <strong>EN:</strong> All transactions are processed in CAD by default. You may switch to USD before publishing.
-                  <strong className="text-amber-600"> Currency cannot be changed once your auction is live.</strong>
-                </p>
-                <p className="text-xs text-slate-500">
-                  <strong>FR:</strong> Toutes les transactions sont traitées en CAD par défaut. Vous pouvez choisir USD avant la publication.
-                  <strong className="text-amber-600"> La devise ne peut pas être modifiée une fois l'enchère en ligne.</strong>
+                  {t('createListing.currencyImmutableWarn')}
                 </p>
               </div>
 

@@ -1,6 +1,45 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter191 — Navbar FR Visual Collision Fix (Feb 7, 2026) ✅
+## Latest: iter192 — Mixed-Language Cleanup on Create-Listing Pages (Feb 7, 2026) ✅
+
+User reported the "Stripe Payout Disclosure", "Seller Disclosure", "Bidder Deposit", "Currency", and other form labels rendered both EN + FR text simultaneously on the create-listing pages — a mix of `EN · FR` bilingual buttons + `<strong>EN:</strong>...<strong>FR:</strong>...` paragraphs that ignored the global language toggle.
+
+### Root cause
+24 hardcoded mixed-language strings across 4 create-listing pages:
+- `CreateListingPage.js` (Marketplace) — 9 mixed strings + 3 bilingual disclosure paragraphs
+- `CreateMultiItemListing.js` (Lots) — 7 mixed strings + 1 bilingual paragraph
+- `vehicles/CreateVehicleListingPage.js` — 7 mixed strings + 2 bilingual paragraphs
+- `storage/StorageAuctionCreate.js` — 1 mixed string
+
+### Fix
+- Added 37 new keys per language under `createListing.*` namespace in `locales/en.json` + `locales/fr.json`:
+  - `currencyLabel`, `currencyImmutableWarn`
+  - `paymentMethodLabel`, `paymentMethodInfo`, `paymentMethod{Stripe|Cash|ETransfer}`, `paymentMethod*Help`
+  - `legalDisclosureTitle`, `legalDisclosureCash` (with `{{currency}}` interpolation)
+  - `stripeDisclosureTitle`, `stripeDisclosureBody`
+  - `sellerDisclosureTitle`, `sellerDisclosureBody`
+  - `bidderDepositLabel`, `bidderDepositInfo` / `bidderDepositInfoMulti`, `bidderNoDeposit*`, `bidderRequireDeposit*`
+  - `depositTypeFixed`, `depositTypePercent`, `depositLabelFixed`, `depositLabelPercent`, `depositHelpFixed{Multi}`, `depositHelpPercent{Multi}`, `depositPlaceholder*`
+  - `buyersPremiumPartnerHelp`, `buyersPremiumLockedNotice`
+- Replaced all hardcoded strings with `t()` calls. Disclosure paragraphs interpolate `{{currency}}` from form state. `i18next` selects only the active language.
+
+### Verification
+End-to-end smoke test on preview env: 4 pages × 2 languages × forbidden-marker + cross-language-leak detection = **8/8 pass**. Zero ` · ` separators, zero `<strong>EN:</strong>` prefixes, zero French words in EN mode, zero English words in FR mode.
+
+### Files changed (iter192)
+- `frontend/src/locales/en.json` (+37 keys)
+- `frontend/src/locales/fr.json` (+37 keys)
+- `frontend/src/pages/CreateListingPage.js` — 9 strings + 3 paragraphs migrated to `t()`
+- `frontend/src/pages/CreateMultiItemListing.js` — 7 strings + 1 paragraph migrated
+- `frontend/src/pages/vehicles/CreateVehicleListingPage.js` — 7 strings + 2 paragraphs migrated
+- `frontend/src/pages/storage/StorageAuctionCreate.js` — 1 string fixed
+
+### Note on language detection
+The user's `preferred_language` (stored on backend) is the dominant authority — AuthContext calls `i18n.changeLanguage(user.preferred_language)` on login, overriding any localStorage value. Clicking the EN/FR pill in the navbar updates both i18n state AND the user's profile preference (`updateUserPreferences({ preferred_language: lng })`). This existing behavior was not modified.
+
+---
+
+## Earlier: iter191 — Navbar FR Visual Collision Fix (Feb 7, 2026) ✅
 
 User shared a follow-up screenshot showing the Sell button ("Vendre") visually colliding with the EN/FR language pill at 1366px in FR + logged-in. Even though my iter190 fix made the items technically fit (no body overflow), `flex-shrink + min-w-0` on the desktop-nav container was letting the Vendre button OVERFLOW its parent box and visually overlap the right-side actions area (gap measured -13px → items literally on top of each other).
 
