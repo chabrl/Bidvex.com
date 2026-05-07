@@ -24,7 +24,7 @@ const TYPES = [
 ];
 
 const StorageAuctionCreate = () => {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { token } = useAuth();
   const navigate = useNavigate();
   const isFr = (i18n.language || '').startsWith('fr');
@@ -76,11 +76,11 @@ const StorageAuctionCreate = () => {
     e.preventDefault();
     if (!form.start_time || !form.end_time) { toast.error('Set start & end times'); return; }
     if (new Date(form.start_time) >= new Date(form.end_time)) {
-      toast.error(isFr ? 'L\'heure de fin doit être après le début' : 'End time must be after start time');
+      toast.error(t('storage.create.endTimeMustBeAfterStartTime'));
       return;
     }
     if (form.deposit_required && (!form.deposit_amount || parseFloat(form.deposit_amount) <= 0)) {
-      toast.error(isFr ? 'Définissez un montant de dépôt > 0' : 'Set a deposit amount > 0');
+      toast.error(t('storage.create.setADepositAmount0'));
       return;
     }
     setSubmitting(true);
@@ -102,7 +102,7 @@ const StorageAuctionCreate = () => {
       const res = await axios.post(`${API}/storage-facilities/auctions`, payload, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      toast.success(isFr ? 'Enchère créée' : 'Auction created');
+      toast.success(t('storage.create.auctionCreated'));
       navigate(`/storage-auctions/${res.data.id}`);
     } catch (err) {
       const detail = err?.response?.data?.detail;
@@ -116,24 +116,24 @@ const StorageAuctionCreate = () => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-8" data-testid="storage-auction-create">
       <div className="max-w-3xl mx-auto px-4">
-        <h1 className="text-2xl font-bold mb-1">{isFr ? 'Nouvelle enchère' : 'Create New Auction'}</h1>
-        <p className="text-sm text-muted-foreground mb-6">{isFr ? 'Liste un nouveau casier d\'entreposage' : 'List a new storage unit for auction'}</p>
+        <h1 className="text-2xl font-bold mb-1">{t('storage.create.createNewAuction')}</h1>
+        <p className="text-sm text-muted-foreground mb-6">{t('storage.create.listANewStorageUnitForAuction')}</p>
         <Card className="p-6">
           <form onSubmit={submit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <Label>{isFr ? 'Numéro d\'unité' : 'Unit Number'} *</Label>
+                <Label>{t('storage.create.unitNumber')} *</Label>
                 <Input required value={form.unit_number} onChange={e => set('unit_number', e.target.value)} placeholder="A-12" />
               </div>
               <div>
-                <Label>{isFr ? 'Taille' : 'Size'} *</Label>
+                <Label>{t('storage.create.size')} *</Label>
                 <Select value={form.unit_size} onValueChange={v => set('unit_size', v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{SIZES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div>
-                <Label>{isFr ? 'Type' : 'Type'} *</Label>
+                <Label>{t('storage.create.type')} *</Label>
                 <Select value={form.unit_type} onValueChange={v => set('unit_type', v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{TYPES.map(t => <SelectItem key={t.v} value={t.v}>{isFr ? t.fr : t.en}</SelectItem>)}</SelectContent>
@@ -144,10 +144,10 @@ const StorageAuctionCreate = () => {
             <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg">
               <Checkbox checked={form.is_lien_unit} onCheckedChange={v => set('is_lien_unit', v === true)} className="mt-0.5" />
               <div className="flex-1">
-                <Label className="cursor-pointer">{isFr ? 'Unité sous droit de rétention' : 'Lien Unit'}</Label>
-                <p className="text-[11px] text-muted-foreground">{isFr ? 'Locataire en défaut de paiement.' : 'Tenant in default of payment.'}</p>
+                <Label className="cursor-pointer">{t('storage.create.lienUnit')}</Label>
+                <p className="text-[11px] text-muted-foreground">{t('storage.create.tenantInDefaultOfPayment')}</p>
                 {form.is_lien_unit && (
-                  <Input className="mt-2" type="number" step="0.01" placeholder={isFr ? 'Solde dû' : 'Past due balance'}
+                  <Input className="mt-2" type="number" step="0.01" placeholder={t('storage.create.pastDueBalance')}
                     value={form.past_due_balance} onChange={e => set('past_due_balance', e.target.value)} />
                 )}
               </div>
@@ -155,18 +155,18 @@ const StorageAuctionCreate = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label>{isFr ? 'Description (EN)' : 'Description (EN)'} *</Label>
+                <Label>{t('storage.create.descriptionEn')} *</Label>
                 <Textarea required rows={3} value={form.description_en} onChange={e => set('description_en', e.target.value)} />
               </div>
               <div>
-                <Label>{isFr ? 'Description (FR)' : 'Description (FR)'}</Label>
+                <Label>{t('storage.create.descriptionFr')}</Label>
                 <Textarea rows={3} value={form.description_fr} onChange={e => set('description_fr', e.target.value)} />
               </div>
             </div>
 
             {/* Photos */}
             <div>
-              <Label>{isFr ? 'Photos (max 10)' : 'Photos (max 10)'}</Label>
+              <Label>{t('storage.create.photosMax10')}</Label>
               <div className="flex gap-2 flex-wrap mt-2">
                 {form.photos.map((url, i) => (
                   <div key={i} className="relative w-20 h-20 rounded-lg overflow-hidden border">
@@ -186,38 +186,38 @@ const StorageAuctionCreate = () => {
             </div>
 
             <div>
-              <Label>{isFr ? 'URL vidéo (optionnel)' : 'Video URL (optional)'}</Label>
+              <Label>{t('storage.create.videoUrlOptional')}</Label>
               <Input type="url" value={form.video_url} onChange={e => set('video_url', e.target.value)} />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <Label>{isFr ? 'Prix de départ' : 'Starting Price'} *</Label>
+                <Label>{t('storage.create.startingPrice')} *</Label>
                 <Input type="number" step="0.01" required value={form.starting_price} onChange={e => set('starting_price', e.target.value)} />
               </div>
               <div>
-                <Label>{isFr ? 'Prix de réserve' : 'Reserve Price'}</Label>
+                <Label>{t('storage.create.reservePrice')}</Label>
                 <Input type="number" step="0.01" value={form.reserve_price} onChange={e => set('reserve_price', e.target.value)} />
               </div>
               <div>
-                <Label>{isFr ? 'Incrément' : 'Bid Increment'}</Label>
+                <Label>{t('storage.create.bidIncrement')}</Label>
                 <Input type="number" step="1" value={form.bid_increment} onChange={e => set('bid_increment', e.target.value)} />
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label>{isFr ? 'Début' : 'Start time'} *</Label>
+                <Label>{t('storage.create.startTime')} *</Label>
                 <Input type="datetime-local" required value={form.start_time} onChange={e => set('start_time', e.target.value)} />
               </div>
               <div>
-                <Label>{isFr ? 'Fin' : 'End time'} *</Label>
+                <Label>{t('storage.create.endTime')} *</Label>
                 <Input type="datetime-local" required value={form.end_time} onChange={e => set('end_time', e.target.value)} />
               </div>
             </div>
 
             <div>
-              <Label>{isFr ? 'Délai de nettoyage (heures après fin)' : 'Cleanup deadline (hours after end)'}</Label>
+              <Label>{t('storage.create.cleanupDeadlineHoursAfterEnd')}</Label>
               <Input type="number" min="24" max="168" value={form.cleanup_deadline_hours} onChange={e => set('cleanup_deadline_hours', e.target.value)} />
             </div>
 
@@ -225,13 +225,13 @@ const StorageAuctionCreate = () => {
             <div className="space-y-3 p-4 border rounded-lg bg-blue-50/40 dark:bg-blue-950/20">
               <div className="flex items-center justify-between">
                 <Label className="text-base font-semibold">
-                  {isFr ? 'Paramètres de paiement' : 'Payment Settings'}
+                  {t('storage.create.paymentSettings')}
                 </Label>
               </div>
 
               {/* Currency Selector (Spec Global Rule 1) */}
               <div className="space-y-2 pt-2" data-testid="storage-currency-section">
-                <Label className="text-sm">{isFr ? 'Devise' : 'Currency'}</Label>
+                <Label className="text-sm">{t('storage.create.currency')}</Label>
                 <div className="flex gap-2" data-testid="storage-currency-selector">
                   {['CAD', 'USD'].map((cur) => (
                     <button
@@ -250,13 +250,11 @@ const StorageAuctionCreate = () => {
                   ))}
                 </div>
                 <p className="text-xs text-slate-500">
-                  {isFr
-                    ? 'Toutes les transactions sont en CAD par défaut. La devise ne peut pas être modifiée une fois l\'enchère en ligne.'
-                    : 'All transactions are processed in CAD by default. Currency cannot be changed once your auction is live.'}
+                  {t('storage.create.allTransactionsAreProcessedInCadByDefaul')}
                 </p>
               </div>
 
-              <Label className="text-sm">{isFr ? 'Mode de paiement' : 'Payment Method'}</Label>
+              <Label className="text-sm">{t('storage.create.paymentMethod')}</Label>
               <div className="grid grid-cols-1 gap-2" data-testid="payment-method-selector">                {[
                   { v: 'stripe', emoji: '💳',
                     label_en: 'Online Payment (Stripe)',
@@ -299,20 +297,16 @@ const StorageAuctionCreate = () => {
                 {form.payment_method === 'stripe' ? (
                   <p>
                     👤 <strong>
-                      {isFr ? 'L\'acheteur paie:' : 'Buyer pays:'}
+                      {t('storage.create.buyerPays')}
                     </strong>{' '}
-                    {isFr
-                      ? 'Prix marteau + 5% frais + Stripe + taxes. Vous recevez: Prix marteau complet.'
-                      : 'Hammer price + 5% fee + Stripe + taxes. You receive: Full hammer price.'}
+                    {t('storage.create.hammerPrice5FeeStripeTaxesYouReceiveFull')}
                   </p>
                 ) : (
                   <p>
                     👤 <strong>
-                      {isFr ? 'L\'acheteur vous paie:' : 'Buyer pays you:'}
+                      {t('storage.create.buyerPaysYou')}
                     </strong>{' '}
-                    {isFr
-                      ? 'Le prix marteau directement. BidVex vous facture: 5% + Stripe + taxes.'
-                      : 'Hammer price directly. BidVex invoices you: 5% + Stripe + taxes.'}
+                    {t('storage.create.hammerPriceDirectlyBidvexInvoicesYou5Str')}
                   </p>
                 )}
               </div>
@@ -327,27 +321,25 @@ const StorageAuctionCreate = () => {
                 />
                 <div className="flex-1">
                   <Label className="cursor-pointer text-sm">
-                    {isFr ? 'Exiger un dépôt pour participer' : 'Require a deposit to participate'}
+                    {t('storage.create.requireADepositToParticipate')}
                   </Label>
                   <p className="text-[11px] text-muted-foreground">
-                    {isFr
-                      ? 'Les enchérisseurs doivent autoriser ce montant avant leur première offre. Refundé pour les perdants. Capturé en cas de défaut de paiement du gagnant.'
-                      : 'Bidders must authorize this amount before their first bid. Refunded for losers. Captured if winner fails to pay.'}
+                    {t('storage.create.biddersMustAuthorizeThisAmountBeforeThei')}
                   </p>
                   {form.deposit_required && (
                     <div className="mt-2 space-y-2" data-testid="storage-deposit-amount-block">
                       <div className="flex gap-2">
                         <button type="button" onClick={() => set('deposit_type', 'fixed')} className={`flex-1 px-2 py-1.5 rounded text-xs font-medium ${form.deposit_type === 'fixed' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-300 text-slate-700'}`} data-testid="storage-deposit-type-fixed">
-                          {isFr ? 'Montant fixe' : 'Fixed amount'}
+                          {t('storage.create.fixedAmount')}
                         </button>
                         <button type="button" onClick={() => set('deposit_type', 'percentage')} className={`flex-1 px-2 py-1.5 rounded text-xs font-medium ${form.deposit_type === 'percentage' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-300 text-slate-700'}`} data-testid="storage-deposit-type-percentage">
-                          {isFr ? '% du prix de départ' : '% of starting bid'}
+                          {t('storage.create.ofStartingBid')}
                         </button>
                       </div>
                       <Label className="text-xs">
                         {form.deposit_type === 'fixed'
-                          ? `${isFr ? 'Montant du dépôt' : 'Deposit Amount'} (${form.currency})`
-                          : `${isFr ? 'Pourcentage du dépôt' : 'Deposit Percentage'} (%)`}
+                          ? `${t('storage.create.depositAmount')} (${form.currency})`
+                          : `${t('storage.create.depositPercentage')} (%)`}
                       </Label>
                       <Input
                         type="number"
@@ -355,7 +347,7 @@ const StorageAuctionCreate = () => {
                         step={form.deposit_type === 'percentage' ? '1' : '0.01'}
                         value={form.deposit_amount}
                         onChange={e => set('deposit_amount', e.target.value)}
-                        placeholder={form.deposit_type === 'fixed' ? (isFr ? 'ex: 100' : 'e.g. 100') : (isFr ? 'ex: 10' : 'e.g. 10')}
+                        placeholder={form.deposit_type === 'fixed' ? (t('storage.create.eG100')) : (t('storage.create.eG10'))}
                         data-testid="deposit-amount-input"
                       />
                     </div>
@@ -366,7 +358,7 @@ const StorageAuctionCreate = () => {
 
             <Button type="submit" disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 text-white" data-testid="create-auction-submit">
               {submitting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
-              {isFr ? 'Publier l\'enchère' : 'Publish auction'}
+              {t('storage.create.publishAuction')}
             </Button>
           </form>
         </Card>

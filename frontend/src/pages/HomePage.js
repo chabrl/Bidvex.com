@@ -818,9 +818,9 @@ const HowItWorksSection = ({ navigate }) => {
   );
 };
 
-// ========== STORAGE AUCTIONS PROMO (iter171) ==========
-// Always renders EN + FR simultaneously (Bill 96).
+// ========== STORAGE AUCTIONS PROMO (iter171, fully i18n iter193) ==========
 const StorageAuctionsPromo = ({ navigate }) => {
+  const { t } = useTranslation();
   const [stats, setStats] = React.useState(null);
 
   React.useEffect(() => {
@@ -858,33 +858,27 @@ const StorageAuctionsPromo = ({ navigate }) => {
               className="inline-block bg-sky-600 dark:bg-[#3FB4CB] text-white dark:text-[#0B2545] text-xs font-bold px-3 py-1 rounded-full mb-3 uppercase tracking-wider"
               data-testid="homepage-storage-promo-badge"
             >
-              NEW FEATURE <span className="opacity-75 font-semibold">· NOUVELLE FONCTIONNALITÉ</span>
+              {t('home.storagePromo.badge')}
             </div>
 
-            <h2 className="text-3xl md:text-4xl font-black mb-1 text-[#0B2545] dark:text-white" data-testid="homepage-storage-promo-title-en">
-              Storage Unit Auctions
+            <h2 className="text-3xl md:text-4xl font-black mb-4 text-[#0B2545] dark:text-white" data-testid="homepage-storage-promo-title">
+              {t('home.storagePromo.title')}
             </h2>
-            <h3 className="text-xl md:text-2xl text-sky-700 dark:text-[#3FB4CB] font-bold mb-4 italic" data-testid="homepage-storage-promo-title-fr">
-              Enchères d'unités d'entreposage
-            </h3>
 
-            <p className="text-gray-700 dark:text-gray-200 mb-1" data-testid="homepage-storage-promo-desc-en">
-              Bid on abandoned storage lockers from verified Canadian facilities. No buyer fees on cash auctions. Real-time proxy bidding. Soft-close protection.
-            </p>
-            <p className="text-gray-600 dark:text-gray-400 text-sm mb-6 italic" data-testid="homepage-storage-promo-desc-fr">
-              Enchérissez sur des casiers abandonnés de facilités canadiennes vérifiées. Aucuns frais acheteur sur les enchères au comptant. Enchères par procuration en temps réel. Protection contre la fermeture anticipée.
+            <p className="text-gray-700 dark:text-gray-200 mb-6" data-testid="homepage-storage-promo-desc">
+              {t('home.storagePromo.description')}
             </p>
 
-            {/* Trust badges — dual-language (light-mode friendly) */}
+            {/* Trust badges — single language, follows global toggle */}
             <div className="flex flex-wrap gap-2.5 mb-6">
               <span className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200 px-3 py-1.5 rounded-full text-xs font-semibold border border-emerald-300 dark:border-emerald-700/40">
-                ✅ No Buyer Fees · <em className="opacity-80">Sans frais acheteur</em>
+                ✅ {t('home.storagePromo.noBuyerFees')}
               </span>
               <span className="bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300 px-3 py-1.5 rounded-full text-xs font-semibold border border-sky-300 dark:border-sky-700/40">
-                🇨🇦 Canadian Facilities · <em className="opacity-80">Facilités canadiennes</em>
+                🇨🇦 {t('home.storagePromo.canadianFacilities')}
               </span>
               <span className="bg-purple-100 text-purple-800 dark:bg-purple-900/60 dark:text-purple-200 px-3 py-1.5 rounded-full text-xs font-semibold border border-purple-300 dark:border-purple-700/40">
-                ⚡ Real-Time Bidding · <em className="opacity-80">Enchères en temps réel</em>
+                ⚡ {t('home.storagePromo.realTimeBidding')}
               </span>
             </div>
 
@@ -894,19 +888,19 @@ const StorageAuctionsPromo = ({ navigate }) => {
                 {stats.active_auctions > 0 && (
                   <span className="font-semibold">
                     <span className="text-sky-700 dark:text-[#3FB4CB] text-base font-black">{stats.active_auctions}</span>{' '}
-                    Live Now · <em>En direct</em>
+                    {t('home.storagePromo.liveNow')}
                   </span>
                 )}
                 {stats.active_facilities > 0 && (
                   <span className="font-semibold">
                     <span className="text-sky-700 dark:text-[#3FB4CB] text-base font-black">{stats.active_facilities}</span>{' '}
-                    Facilities · <em>Facilités</em>
+                    {t('home.storagePromo.facilities')}
                   </span>
                 )}
                 {stats.total_sold > 0 && (
                   <span className="font-semibold">
                     <span className="text-sky-700 dark:text-[#3FB4CB] text-base font-black">{stats.total_sold}</span>{' '}
-                    Sold · <em>Vendues</em>
+                    {t('home.storagePromo.sold')}
                   </span>
                 )}
               </div>
@@ -920,8 +914,7 @@ const StorageAuctionsPromo = ({ navigate }) => {
                 className="bg-sky-600 hover:bg-sky-500 dark:bg-[#3FB4CB] dark:hover:bg-[#2FA0BA] text-white dark:text-[#0B2545] font-bold py-3 px-6 rounded-xl transition-all hover:-translate-y-0.5 hover:shadow-lg"
                 data-testid="homepage-storage-promo-browse-btn"
               >
-                <span className="block leading-tight">Browse Storage Auctions →</span>
-                <span className="block text-xs opacity-80 italic font-semibold">Parcourir les enchères →</span>
+                {t('home.storagePromo.browseStorageBtn')}
               </button>
               <button
                 type="button"
@@ -929,8 +922,7 @@ const StorageAuctionsPromo = ({ navigate }) => {
                 className="border-2 border-sky-600 dark:border-[#3FB4CB] text-sky-700 dark:text-[#3FB4CB] hover:bg-sky-100 dark:hover:bg-[#3FB4CB]/10 font-bold py-3 px-6 rounded-xl transition-all"
                 data-testid="homepage-storage-promo-register-btn"
               >
-                <span className="block leading-tight">List Your Facility</span>
-                <span className="block text-xs opacity-80 italic font-semibold">Lister votre facilité</span>
+                {t('home.storagePromo.listFacilityBtn')}
               </button>
             </div>
           </div>
@@ -940,8 +932,9 @@ const StorageAuctionsPromo = ({ navigate }) => {
   );
 };
 
-// ========== HOMEPAGE LIVE VEHICLE AUCTIONS (iter172) ==========
+// ========== HOMEPAGE LIVE VEHICLE AUCTIONS (iter172, fully i18n iter193) ==========
 const HomepageLiveVehicles = ({ navigate }) => {
+  const { t } = useTranslation();
   const [items, setItems] = React.useState(null);
   React.useEffect(() => {
     const API = (process.env.REACT_APP_BACKEND_URL || '') + '/api';
@@ -958,8 +951,7 @@ const HomepageLiveVehicles = ({ navigate }) => {
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h2 className="text-3xl font-black text-white">Live Vehicle Auctions</h2>
-            <h3 className="text-xl font-bold text-[#3FB4CB] italic">Enchères de véhicules en direct</h3>
+            <h2 className="text-3xl font-black text-white">{t('home.liveVehicles.title')}</h2>
           </div>
           <button
             type="button"
@@ -967,7 +959,7 @@ const HomepageLiveVehicles = ({ navigate }) => {
             className="text-[#3FB4CB] font-semibold hover:underline text-sm"
             data-testid="homepage-vehicles-view-all"
           >
-            View All · Voir tout →
+            {t('home.viewAllArrow')}
           </button>
         </div>
 
@@ -996,7 +988,7 @@ const HomepageLiveVehicles = ({ navigate }) => {
                   <p className="text-sm font-bold text-white truncate">{v.model}</p>
                   <p className="text-lg font-black text-[#3FB4CB] mt-1">${Number(v.current_bid || 0).toLocaleString()}</p>
                   <p className="text-[10px] text-slate-500">
-                    {v.bid_count || 0} bids · offres
+                    {t('home.bidsCount', { count: v.bid_count || 0 })}
                   </p>
                 </div>
               </div>
@@ -1008,8 +1000,9 @@ const HomepageLiveVehicles = ({ navigate }) => {
   );
 };
 
-// ========== HOMEPAGE LIVE STORAGE LOTS (iter172) ==========
+// ========== HOMEPAGE LIVE STORAGE LOTS (iter172, fully i18n iter193) ==========
 const HomepageLiveStorage = ({ navigate }) => {
+  const { t } = useTranslation();
   const [items, setItems] = React.useState(null);
   React.useEffect(() => {
     const API = (process.env.REACT_APP_BACKEND_URL || '') + '/api';
@@ -1026,8 +1019,7 @@ const HomepageLiveStorage = ({ navigate }) => {
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h2 className="text-3xl font-black text-[#0B2545] dark:text-white">🔒 Storage Unit Auctions</h2>
-            <h3 className="text-xl font-bold text-sky-700 dark:text-[#3FB4CB] italic">Enchères d'unités d'entreposage</h3>
+            <h2 className="text-3xl font-black text-[#0B2545] dark:text-white">🔒 {t('home.liveStorage.title')}</h2>
           </div>
           <button
             type="button"
@@ -1035,7 +1027,7 @@ const HomepageLiveStorage = ({ navigate }) => {
             className="text-sky-700 dark:text-[#3FB4CB] font-semibold hover:underline text-sm"
             data-testid="homepage-storage-view-all"
           >
-            View All · Voir tout →
+            {t('home.viewAllArrow')}
           </button>
         </div>
 
@@ -1061,10 +1053,10 @@ const HomepageLiveStorage = ({ navigate }) => {
                 </div>
                 <div className="p-3">
                   <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{a.facility_name}</p>
-                  <p className="text-sm font-bold text-[#0B2545] dark:text-white truncate">Unit #{a.unit_number} · {a.unit_size}</p>
+                  <p className="text-sm font-bold text-[#0B2545] dark:text-white truncate">#{a.unit_number} • {a.unit_size}</p>
                   <p className="text-lg font-black text-sky-700 dark:text-[#3FB4CB] mt-1">${Number(a.current_bid || 0).toLocaleString()}</p>
                   <p className="text-[10px] text-slate-500">
-                    {a.bid_count || 0} bids · offres
+                    {t('home.bidsCount', { count: a.bid_count || 0 })}
                   </p>
                 </div>
               </div>

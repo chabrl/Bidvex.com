@@ -1,6 +1,52 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter192 — Mixed-Language Cleanup on Create-Listing Pages (Feb 7, 2026) ✅
+## Latest: iter193 — Deep i18n Migration (Storage + Homepage + Legal Shield) (Feb 7, 2026) ✅
+
+User requested 100% i18n coverage for HomePage, all Storage pages, and the Legal Shield block in CreateMultiItemListing. No bilingual `EN · FR` mashups, no `<strong>EN:</strong>...<strong>FR:</strong>` paragraphs. Strict single-language rendering tied to the global toggle.
+
+### Scope migrated
+- **HomePage.js** — 11 mashups removed; StoragePromo/LiveVehicles/LiveStorage now use `t()` for all labels; bullet between Unit number and size changed to neutral `•`
+- **Storage components (auto-migrated 164 strings):**
+  - StorageAuctionDetail (30), StorageAuctionsBrowse (15+8), StorageAuctionCreate (37), StorageDashboard (13), StorageFacilityRegister (39), MyStorageDeposits (4), StorageDepositBanner (11), StorageAutoBidModal (23), PromoteAuctionModal (full rewrite, 14)
+- **StorageHero.js** — full rewrite to render single language
+- **StoragePolicies.js** — full rewrite. Generic Section component now renders `title_fr/body_fr` when `isFr`, else EN. 18 sections (HowItWorks × 6 + Terms × 6 + ForFacilities × 3) all language-aware.
+- **CreateMultiItemListing.js Legal Shield block** (lines 2070-2147) — fully translated. 12 new keys under `legalShield.*` namespace covering "Why This Agreement Matters", 3 examples (Logistics/Refunds/Removal), and Seller Commitment checkbox with full FR translation.
+
+### Translation keys added: 343 per language (686 total)
+- `home.*` (15 keys)
+- `storage.detail.*` (40), `storage.browse.*` (35), `storage.dashboard.*` (16), `storage.depositBanner.*` (15), `storage.myDeposits.*` (10), `storage.autoBid.*` (24), `storage.promoteModal.*` (18), `storage.policies.*` (5), `storage.facilityRegister.*` (45), `storage.hero.*` (10), `storage.create.*` + `storage.detail.lien*` (auto-generated)
+- `legalShield.*` (12)
+
+### Auto-migration tooling (`/tmp/iter193_migrate.py`)
+Wrote a one-shot Python script that:
+1. Parses each file with regex for `isFr ? 'FR' : 'EN'` ternary patterns
+2. Auto-generates camelCase keys via `slugify(en_text)` with collision detection
+3. Persists EN canonical text under `en.json` + FR translation under `fr.json`
+4. Replaces inline ternaries with `t('storage.namespace.key')`
+5. Also handles JSX bullet mashups `>EN text · FR text<` heuristically (skips data-only patterns)
+
+This handled 164 mechanical migrations in a single pass; the remaining ~30 with template literals or complex props were hand-fixed.
+
+### Verification: 18/18 pages PASS
+9 pages × EN + FR with zero JS errors, zero `<strong>EN:</strong>` markers, zero cross-language word leaks:
+- Homepage, StorageBrowse, StorageHowItWorks, StorageTerms, StorageForFacilities, StorageRegister, About, HowItWorks (main), Lots Create (LegalShield)
+
+Visual screenshots confirm pure-French rendering on the Homepage hero ("Découvrez. Misez. Gagnez."), Storage Hero ("Trésors cachés. Révélés."), and Storage Browse banner ("Frais transparents.")
+
+### Files changed (iter193)
+- `frontend/src/pages/HomePage.js` — StoragePromo/LiveVehicles/LiveStorage rewritten with t()
+- `frontend/src/pages/storage/StorageAuctionDetail.js`, `StorageAuctionsBrowse.js`, `StorageAuctionCreate.js`, `StorageDashboard.js`, `StorageFacilityRegister.js`, `MyStorageDeposits.js`, `StorageDepositBanner.js`, `StorageHero.js`, `StoragePolicies.js`, `PromoteAuctionModal.js` (full rewrites)
+- `frontend/src/components/StorageAutoBidModal.js`
+- `frontend/src/pages/CreateMultiItemListing.js` (Legal Shield block lines 2070-2147)
+- `frontend/src/locales/en.json` (+343 keys)
+- `frontend/src/locales/fr.json` (+343 keys)
+
+### Out of scope (separate i18n debt — to schedule later if needed)
+- Cookie Consent banner (Quebec Law 25 wording — currently English-only)
+
+---
+
+## Earlier: iter192 — Mixed-Language Cleanup on Create-Listing Pages (Feb 7, 2026) ✅
 
 User reported the "Stripe Payout Disclosure", "Seller Disclosure", "Bidder Deposit", "Currency", and other form labels rendered both EN + FR text simultaneously on the create-listing pages — a mix of `EN · FR` bilingual buttons + `<strong>EN:</strong>...<strong>FR:</strong>...` paragraphs that ignored the global language toggle.
 

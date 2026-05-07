@@ -2077,11 +2077,11 @@ const CreateMultiItemListing = () => {
                   </div>
                   <div>
                     <h4 className="font-bold text-indigo-900 dark:text-indigo-200 text-lg mb-1">
-                      🛡️ Why This Agreement Matters
+                      🛡️ {t('legalShield.whyThisAgreementMatters')}
                     </h4>
                     <p className="text-sm text-indigo-700 dark:text-indigo-300">
-                      <strong>Important:</strong> This agreement serves as your legal contract with the buyer. 
-                      Providing accurate details protects you from disputes and ensures a smooth payout.
+                      <strong>{t('legalShield.important')}</strong>{' '}
+                      {t('legalShield.importantContractIntro')}
                     </p>
                   </div>
                 </div>
@@ -2090,25 +2090,22 @@ const CreateMultiItemListing = () => {
                 <div className="space-y-3 pl-12">
                   <div className="p-3 bg-white dark:bg-slate-800 rounded-lg border-l-4 border-blue-500">
                     <p className="text-sm text-slate-700 dark:text-slate-300">
-                      <strong className="text-blue-700 dark:text-blue-400">📦 Logistics Example:</strong> If you state 
-                      &quot;Forklift Available&quot; and cannot provide one at pickup, you may be liable for the 
-                      buyer&apos;s specialized transport costs.
+                      <strong className="text-blue-700 dark:text-blue-400">📦 {t('legalShield.logisticsExampleLabel')}</strong>{' '}
+                      {t('legalShield.logisticsExampleBody')}
                     </p>
                   </div>
-                  
+
                   <div className="p-3 bg-white dark:bg-slate-800 rounded-lg border-l-4 border-red-500">
                     <p className="text-sm text-slate-700 dark:text-slate-300">
-                      <strong className="text-red-700 dark:text-red-400">💰 Refunds Example:</strong> Explicitly marking 
-                      an item &quot;Non-Refundable&quot; protects your sale if a buyer has &quot;buyer&apos;s remorse&quot; 
-                      after winning.
+                      <strong className="text-red-700 dark:text-red-400">💰 {t('legalShield.refundsExampleLabel')}</strong>{' '}
+                      {t('legalShield.refundsExampleBody')}
                     </p>
                   </div>
-                  
+
                   <div className="p-3 bg-white dark:bg-slate-800 rounded-lg border-l-4 border-orange-500">
                     <p className="text-sm text-slate-700 dark:text-slate-300">
-                      <strong className="text-orange-700 dark:text-orange-400">📅 Removal Example:</strong> Setting a 
-                      7-day removal deadline allows you to legally charge storage fees or relist the item if the 
-                      buyer fails to pick it up on time.
+                      <strong className="text-orange-700 dark:text-orange-400">📅 {t('legalShield.removalExampleLabel')}</strong>{' '}
+                      {t('legalShield.removalExampleBody')}
                     </p>
                   </div>
                 </div>
@@ -2126,20 +2123,18 @@ const CreateMultiItemListing = () => {
                   />
                   <div>
                     <p className="font-bold text-lg text-blue-900 dark:text-blue-200 mb-2">
-                      ✅ Seller Commitment *
+                      ✅ {t('legalShield.sellerCommitmentTitle')}
                     </p>
                     <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-                      By listing this item, I certify that all location, logistics, and refund information 
-                      provided is <strong>accurate and binding</strong>. I understand that providing false or 
-                      misleading information may result in penalties, dispute liability, and removal from the platform.
+                      {t('legalShield.sellerCommitmentBody')}
                     </p>
                   </div>
                 </label>
-                
+
                 {!sellerObligations.sellerAgreementConfirmed && (
                   <p className="mt-3 text-sm text-amber-700 dark:text-amber-400 flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4" />
-                    You must confirm the seller commitment to proceed
+                    {t('legalShield.mustConfirmSellerCommitment')}
                   </p>
                 )}
               </div>

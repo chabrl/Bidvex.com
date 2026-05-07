@@ -27,7 +27,7 @@ const API = API_BASE;
 const StorageAuctionDetail = () => {
   const { id } = useParams();
   const { token, user } = useAuth();
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isFr = (i18n.language || '').startsWith('fr');
 
   const [auction, setAuction] = useState(null);
@@ -52,7 +52,7 @@ const StorageAuctionDetail = () => {
       setHistory(h.data?.bids || []);
       setPricing(p.data);
     } catch (err) {
-      toast.error(isFr ? 'Enchère introuvable' : 'Auction not found');
+      toast.error(t('storage.detail.auctionNotFound'));
     } finally {
       setLoading(false);
     }
@@ -69,11 +69,11 @@ const StorageAuctionDetail = () => {
   const handlePlaceBid = async (overrideAmount) => {
     const amt = parseFloat(overrideAmount ?? maxBid);
     if (!Number.isFinite(amt) || amt <= 0) {
-      toast.error(isFr ? "Entrez une offre maximale valide" : 'Enter a valid max bid');
+      toast.error(t('storage.detail.enterAValidMaxBid'));
       return;
     }
     if (!token) {
-      toast.error(isFr ? 'Connectez-vous pour enchérir' : 'Sign in to place a bid');
+      toast.error(t('storage.detail.signInToPlaceABid'));
       return;
     }
     setSubmittingBid(true);
@@ -86,10 +86,10 @@ const StorageAuctionDetail = () => {
       toast.success(
         res.data.you_are_winning
           ? (isFr ? `Vous êtes en tête à ${res.data.current_bid} $` : `You are winning at $${res.data.current_bid}`)
-          : (isFr ? 'Offre placée — vous avez été surenchéri' : "Bid placed — you've been outbid by an existing proxy")
+          : (t('storage.detail.bidPlacedYouVeBeenOutbidByAnExistingProx'))
       );
       if (res.data.soft_close_extended) {
-        toast.info(isFr ? "Enchère prolongée de 2 minutes (soft close)" : 'Auction extended by 2 minutes (soft close)');
+        toast.info(t('storage.detail.auctionExtendedBy2MinutesSoftClose'));
       }
       // iter179 FIX 4: update current bid IMMEDIATELY from the server response
       // so the displayed price doesn't lag behind the bid history.
@@ -127,7 +127,7 @@ const StorageAuctionDetail = () => {
     <div className="min-h-screen bg-sky-50 dark:bg-slate-900 py-6" data-testid="storage-auction-detail">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <Link to="/storage-auctions/browse" className="text-sm text-blue-600 hover:underline">
-          ← {isFr ? 'Retour aux enchères' : 'Back to auctions'}
+          ← {t('storage.detail.backToAuctions')}
         </Link>
 
         {/* Facility-owner-only "Boost Your Auction" CTA */}
@@ -140,11 +140,11 @@ const StorageAuctionDetail = () => {
               className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
             >
               <TrendingUp className="w-4 h-4 mr-2" />
-              {isFr ? 'Booster votre enchère' : 'Boost Your Auction'}
+              {t('storage.detail.boostYourAuction')}
             </Button>
             {auction.is_promoted && (
               <Badge className="ml-3 bg-amber-100 text-amber-800 border border-amber-300">
-                {isFr ? 'EN VEDETTE' : 'FEATURED'} — {auction.promotion_tier}
+                {t('storage.detail.featured')} — {auction.promotion_tier}
               </Badge>
             )}
           </div>
@@ -179,7 +179,7 @@ const StorageAuctionDetail = () => {
 
             {auction.video_url && (
               <Card className="p-4">
-                <p className="font-semibold mb-2">{isFr ? 'Vidéo de l\'unité' : 'Unit video'}</p>
+                <p className="font-semibold mb-2">{t('storage.detail.unitVideo')}</p>
                 <video src={auction.video_url} controls className="w-full rounded-lg" />
               </Card>
             )}
@@ -193,24 +193,21 @@ const StorageAuctionDetail = () => {
                 <Badge variant="outline" className="capitalize">{(auction.unit_type || '').replace(/_/g, ' ')}</Badge>
                 {auction.is_lien_unit && (
                   <Badge variant="outline" className="border-amber-400 text-amber-700 bg-amber-50">
-                    {isFr ? 'Sous droit de rétention' : 'Lien Unit'}
+                    {t('storage.detail.lienUnit')}
                   </Badge>
                 )}
                 <Badge variant="outline">📍 {auction.facility_city}, {auction.facility_province}</Badge>
               </div>
               <div className="prose prose-sm max-w-none dark:prose-invert">
-                <p><strong>EN:</strong> {auction.description_en}</p>
-                <hr/>
-                <p><strong>FR:</strong> {auction.description_fr}</p>
+                <p>{isFr ? auction.description_fr : auction.description_en}</p>
               </div>
               {auction.is_lien_unit && (
                 <div className="mt-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 text-xs">
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-semibold text-amber-900 dark:text-amber-200 mb-1">⚠️ Lien Unit Notice / Avis d'unité sous droit de rétention</p>
-                      <p className="text-amber-900 dark:text-amber-200 mb-1"><strong>EN:</strong> This unit contains the personal property of a delinquent tenant. The storage facility is solely responsible for compliance with provincial lien laws and proper tenant notification procedures. BidVex is a technology platform only and is not an auctioneer. All bids are final.</p>
-                      <p className="text-amber-900 dark:text-amber-200"><strong>FR:</strong> Cette unité contient les biens personnels d'un locataire délinquant. La facilité d'entreposage est seule responsable. BidVex est une plateforme technologique uniquement et n'est pas un encanteur. Toutes les offres sont finales.</p>
+                      <p className="font-semibold text-amber-900 dark:text-amber-200 mb-1">⚠️ {t('storage.detail.lienNoticeTitle')}</p>
+                      <p className="text-amber-900 dark:text-amber-200">{t('storage.detail.lienNoticeBody')}</p>
                     </div>
                   </div>
                 </div>
@@ -223,7 +220,7 @@ const StorageAuctionDetail = () => {
                 <ShieldCheck className="h-4 w-4 text-emerald-600" />
                 {facility.company_name || auction.facility_name}
                 {facility.verified && (
-                  <Badge className="bg-emerald-600 text-white text-[10px]">✓ {isFr ? 'Vérifiée' : 'Verified'}</Badge>
+                  <Badge className="bg-emerald-600 text-white text-[10px]">✓ {t('storage.detail.verified')}</Badge>
                 )}
               </h3>
               <p className="text-sm text-muted-foreground flex items-center gap-1">
@@ -233,9 +230,9 @@ const StorageAuctionDetail = () => {
 
             {/* Bid history */}
             <Card className="p-5">
-              <h3 className="font-semibold mb-3">{isFr ? "Historique des offres" : 'Bid history'} ({history.length})</h3>
+              <h3 className="font-semibold mb-3">{t('storage.detail.bidHistory')} ({history.length})</h3>
               {history.length === 0 ? (
-                <p className="text-sm text-muted-foreground italic">{isFr ? 'Aucune offre encore' : 'No bids yet'}</p>
+                <p className="text-sm text-muted-foreground italic">{t('storage.detail.noBidsYet')}</p>
               ) : (
                 <div className="divide-y">
                   {history.slice().reverse().map((b, i) => (
@@ -260,17 +257,17 @@ const StorageAuctionDetail = () => {
                   endTime={auction.end_time}
                 />
               </div>
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">{isFr ? 'Offre actuelle' : 'Current bid'}</p>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground">{t('storage.detail.currentBid2')}</p>
               <p className="text-4xl font-black text-blue-600 mb-1" data-testid="current-bid-display">
                 ${Number(auction.current_bid || 0).toLocaleString()}
               </p>
               <p className="text-xs text-muted-foreground mb-3">
-                {auction.bid_count || 0} {isFr ? 'offres' : 'bids'}
+                {auction.bid_count || 0} {t('storage.detail.bids')}
               </p>
 
               <div className="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-3 text-center mb-4">
                 <p className="text-[10px] uppercase text-muted-foreground mb-1 flex items-center justify-center gap-1">
-                  <Clock className="h-3 w-3" /> {isFr ? 'Reste' : 'Time remaining'}
+                  <Clock className="h-3 w-3" /> {t('storage.detail.timeRemaining')}
                 </p>
                 <StorageCountdown endTime={auction.end_time} />
               </div>
@@ -278,7 +275,7 @@ const StorageAuctionDetail = () => {
               {auction.soft_close_enabled && (
                 <div className="text-[11px] bg-blue-50 dark:bg-blue-950/30 text-blue-800 dark:text-blue-300 p-2.5 rounded-md border border-blue-100 dark:border-blue-900/40 mb-4 flex items-start gap-1.5">
                   <Info className="h-3 w-3 mt-0.5 shrink-0" />
-                  <span>{isFr ? "⏰ Une offre dans les 2 dernières minutes prolonge l'enchère de 2 minutes." : '⏰ A bid in the final 2 minutes extends the auction by 2 minutes.'}</span>
+                  <span>{t('storage.detail.aBidInTheFinal2MinutesExtendsTheAuctionB')}</span>
                 </div>
               )}
 
@@ -297,10 +294,10 @@ const StorageAuctionDetail = () => {
                   className="text-center py-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800 mb-4"
                 >
                   <p className="font-bold text-blue-700 dark:text-blue-300 mb-1">
-                    {isFr ? "L'enchère commence dans:" : 'Auction starts in:'}
+                    {t('storage.detail.auctionStartsIn')}
                   </p>
                   <p className="text-blue-600 dark:text-blue-400 text-xs italic mb-2">
-                    {isFr ? 'Auction starts in:' : "L'enchère commence dans:"}
+                    {t('storage.detail.lEnchReCommenceDans')}
                   </p>
                   <CountdownTimer targetTime={auction.start_time} testId="storage-upcoming-countdown" />
                   <button
@@ -308,7 +305,7 @@ const StorageAuctionDetail = () => {
                     className="w-full mt-3 bg-gray-300 text-gray-500 cursor-not-allowed font-bold py-3 rounded-xl"
                     data-testid="storage-bid-disabled-upcoming"
                   >
-                    {isFr ? 'Enchères pas encore ouvertes · Bidding Not Yet Open' : 'Bidding Not Yet Open · Enchères pas encore ouvertes'}
+                    {t('storage.detail.biddingNotYetOpenEnchResPasEncoreOuverte')}
                   </button>
                 </div>
               )}
@@ -331,7 +328,7 @@ const StorageAuctionDetail = () => {
                   </div>
 
                   <label className="text-xs font-medium mb-1 block">
-                    {isFr ? 'Votre offre · Your bid' : 'Your bid · Votre offre'} (≥ ${minNext.toFixed(2)})
+                    {t('storage.detail.yourBidVotreOffre')} (≥ ${minNext.toFixed(2)})
                   </label>
                   <div className="flex gap-2">
                     <Input
@@ -345,7 +342,7 @@ const StorageAuctionDetail = () => {
                       data-testid="max-bid-input"
                     />
                     <Button onClick={handlePlaceBid} disabled={submittingBid} className="bg-blue-600 hover:bg-blue-700 text-white" data-testid="place-bid-btn">
-                      {submittingBid ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Gavel className="h-4 w-4 mr-1" /> {isFr ? 'Enchérir · Bid' : 'Bid · Enchérir'}</>}
+                      {submittingBid ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Gavel className="h-4 w-4 mr-1" /> {t('storage.detail.bidEnchRir')}</>}
                     </Button>
                   </div>
 
@@ -365,24 +362,22 @@ const StorageAuctionDetail = () => {
             {/* No buyer fees notice */}
             <Card className="p-4 bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/40">
               <p className="text-sm font-bold text-emerald-800 dark:text-emerald-200 mb-1">
-                ✅ {isFr ? 'Aucuns frais acheteur' : 'No Buyer Fees'}
+                ✅ {t('storage.detail.noBuyerFees')}
               </p>
               <p className="text-xs text-emerald-800 dark:text-emerald-300">
-                {isFr
-                  ? "BidVex ne facture AUCUNS frais. Vous ne payez que le montant de l'offre gagnante à la facilité."
-                  : 'BidVex charges ZERO fees. You only pay the winning bid amount to the facility.'}
+                {t('storage.detail.bidvexChargesZeroFeesYouOnlyPayTheWinnin')}
               </p>
             </Card>
 
             {/* Payment methods */}
             <Card className="p-4">
-              <p className="text-xs font-semibold mb-2 uppercase tracking-wider">{isFr ? 'Modes de paiement acceptés' : 'Payment methods accepted'}</p>
+              <p className="text-xs font-semibold mb-2 uppercase tracking-wider">{t('storage.detail.paymentMethodsAccepted')}</p>
               <div className="flex flex-wrap gap-2 text-xs">
                 {(auction.payment_methods_accepted || []).includes('stripe') && (
                   <Badge variant="outline"><CreditCard className="h-3 w-3 mr-1" />Stripe</Badge>
                 )}
                 {(auction.payment_methods_accepted || []).includes('cash') && (
-                  <Badge variant="outline"><Banknote className="h-3 w-3 mr-1" />{isFr ? 'Comptant' : 'Cash'}</Badge>
+                  <Badge variant="outline"><Banknote className="h-3 w-3 mr-1" />{t('storage.detail.cash')}</Badge>
                 )}
                 {(auction.payment_methods_accepted || []).includes('etransfer') && (
                   <Badge variant="outline"><Send className="h-3 w-3 mr-1" />E-Transfer</Badge>
@@ -390,15 +385,15 @@ const StorageAuctionDetail = () => {
               </div>
               {pricing && (
                 <p className="text-[10px] text-muted-foreground mt-2">
-                  {isFr ? 'Si Stripe : frais de traitement (~2,9% + 0,30 $) en plus.' : 'If Stripe: ~2.9% + $0.30 processing fee added on top.'}
+                  {t('storage.detail.ifStripe29030ProcessingFeeAddedOnTop')}
                 </p>
               )}
             </Card>
 
             <div className="text-[10px] text-center text-muted-foreground">
-              <Link to="/storage-auctions/terms" className="underline">{isFr ? 'Conditions' : 'Terms'}</Link>
+              <Link to="/storage-auctions/terms" className="underline">{t('storage.detail.terms')}</Link>
               {' • '}
-              <Link to="/storage-auctions/how-it-works" className="underline">{isFr ? 'Comment ça marche' : 'How it works'}</Link>
+              <Link to="/storage-auctions/how-it-works" className="underline">{t('storage.detail.howItWorks')}</Link>
             </div>
           </aside>
         </div>
@@ -408,7 +403,7 @@ const StorageAuctionDetail = () => {
       {showPromoModal && (
         <ListingPromotionModal
           listingId={auction.id}
-          listingTitle={`${isFr ? 'Unité' : 'Unit'} ${auction.unit_number || ''}`.trim() || (auction.facility_name || 'Storage Auction')}
+          listingTitle={`${t('storage.detail.unit')} ${auction.unit_number || ''}`.trim() || (auction.facility_name || 'Storage Auction')}
           listingType="storage"
           onClose={() => setShowPromoModal(false)}
         />

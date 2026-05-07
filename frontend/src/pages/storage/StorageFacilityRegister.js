@@ -18,7 +18,7 @@ const API = API_BASE;
 const PROVINCES = ['AB', 'BC', 'MB', 'NB', 'NL', 'NS', 'ON', 'PE', 'QC', 'SK', 'NT', 'NU', 'YT'];
 
 const StorageFacilityRegister = () => {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { token } = useAuth();
   const navigate = useNavigate();
   const isFr = (i18n.language || '').startsWith('fr');
@@ -38,28 +38,28 @@ const StorageFacilityRegister = () => {
 
   const validateStep1 = () => {
     if (!form.company_name || form.company_name.length < 2) {
-      toast.error(isFr ? 'Nom de l\'entreprise requis' : 'Company name required');
+      toast.error(t('storage.facilityRegister.companyNameRequired'));
       return false;
     }
     if (!form.contact_name) {
-      toast.error(isFr ? 'Nom du contact requis' : 'Contact name required');
+      toast.error(t('storage.facilityRegister.contactNameRequired'));
       return false;
     }
     if (!form.email || !form.phone) {
-      toast.error(isFr ? 'Courriel et téléphone requis' : 'Email and phone required');
+      toast.error(t('storage.facilityRegister.emailAndPhoneRequired'));
       return false;
     }
     if (!form.address || !form.city || !form.postal_code) {
-      toast.error(isFr ? 'Adresse complète requise' : 'Full address required');
+      toast.error(t('storage.facilityRegister.fullAddressRequired'));
       return false;
     }
     return true;
   };
 
   const handleSubmit = async () => {
-    if (!token) { toast.error(isFr ? 'Connectez-vous d\'abord' : 'Sign in first'); return; }
+    if (!token) { toast.error(t('storage.facilityRegister.signInFirst')); return; }
     if (!form.accepted_terms) {
-      toast.error(isFr ? 'Acceptez les conditions' : 'Accept the terms');
+      toast.error(t('storage.facilityRegister.acceptTheTerms'));
       return;
     }
     setSubmitting(true);
@@ -72,7 +72,7 @@ const StorageFacilityRegister = () => {
     } catch (err) {
       const detail = err?.response?.data?.detail;
       const msg = (typeof detail === 'object' && detail) ? (isFr ? detail.message_fr : detail.message_en) : detail;
-      toast.error(msg || (isFr ? 'Échec de l\'inscription' : 'Registration failed'));
+      toast.error(msg || (t('storage.facilityRegister.registrationFailed')));
     } finally {
       setSubmitting(false);
     }
@@ -86,7 +86,7 @@ const StorageFacilityRegister = () => {
           <Card className="max-w-md p-8 text-center" data-testid="register-success">
             <ShieldCheck className="h-16 w-16 mx-auto text-emerald-500 mb-4" />
             <h2 className="text-2xl font-bold mb-2">
-              {isFr ? 'Demande reçue' : 'Application Received'}
+              {t('storage.facilityRegister.applicationReceived')}
             </h2>
             <p className="text-sm text-muted-foreground mb-4">
               {isFr ? result.message_fr : result.message_en}
@@ -98,11 +98,11 @@ const StorageFacilityRegister = () => {
                 data-testid="stripe-onboarding-link"
               >
                 <ExternalLink className="h-4 w-4 mr-1" />
-                {isFr ? 'Continuer avec Stripe' : 'Continue with Stripe'}
+                {t('storage.facilityRegister.continueWithStripe')}
               </Button>
             )}
             <Button variant="outline" onClick={() => navigate('/storage-auctions')} className="w-full">
-              {isFr ? 'Retour aux enchères' : 'Back to auctions'}
+              {t('storage.facilityRegister.backToAuctions')}
             </Button>
           </Card>
         </div>
@@ -139,15 +139,13 @@ const StorageFacilityRegister = () => {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-10" data-testid="storage-register-page">
       <div className="max-w-2xl mx-auto px-4">
         <h1 className="text-3xl font-bold mb-2">
-          {isFr ? 'Lister votre facilité' : 'List Your Facility'}
+          {t('storage.facilityRegister.listYourFacility')}
         </h1>
         <p className="text-sm text-muted-foreground mb-2">
-          {isFr ? 'Inscription pour facilités d\'entreposage canadiennes' : 'Registration for Canadian storage facilities'}
+          {t('storage.facilityRegister.registrationForCanadianStorageFacilities')}
         </p>
         <p className="text-xs text-emerald-700 dark:text-emerald-400 mb-6">
-          ✅ {isFr
-            ? 'Commission de 5% seulement — pas d\'abonnement mensuel.'
-            : '5% commission only — no monthly subscription.'}
+          ✅ {t('storage.facilityRegister.k5CommissionOnlyNoMonthlySubscription')}
         </p>
 
         <Card className="p-6">
@@ -157,48 +155,48 @@ const StorageFacilityRegister = () => {
           {step === 1 && (
             <div className="space-y-4" data-testid="step-1-content">
               <h3 className="font-bold text-lg">
-                {isFr ? 'Étape 1 : Informations sur la facilité' : 'Step 1: Facility Info'}
+                {t('storage.facilityRegister.step1FacilityInfo')}
               </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label>{isFr ? 'Nom de l\'entreprise (EN)' : 'Company Name (EN)'} *</Label>
+                  <Label>{t('storage.facilityRegister.companyNameEn')} *</Label>
                   <Input value={form.company_name} onChange={e => set('company_name', e.target.value)} data-testid="reg-company-name" />
                 </div>
                 <div>
-                  <Label>{isFr ? 'Nom en français' : 'Company Name (FR)'}</Label>
+                  <Label>{t('storage.facilityRegister.companyNameFr')}</Label>
                   <Input value={form.company_name_fr} onChange={e => set('company_name_fr', e.target.value)} />
                 </div>
               </div>
 
               <div>
-                <Label>{isFr ? 'Nom du contact' : 'Contact Name'} *</Label>
+                <Label>{t('storage.facilityRegister.contactName')} *</Label>
                 <Input value={form.contact_name} onChange={e => set('contact_name', e.target.value)} data-testid="reg-contact-name" />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label>{isFr ? 'Courriel' : 'Email'} *</Label>
+                  <Label>{t('storage.facilityRegister.email')} *</Label>
                   <Input type="email" value={form.email} onChange={e => set('email', e.target.value)} />
                 </div>
                 <div>
-                  <Label>{isFr ? 'Téléphone' : 'Phone'} *</Label>
+                  <Label>{t('storage.facilityRegister.phone')} *</Label>
                   <Input value={form.phone} onChange={e => set('phone', e.target.value)} />
                 </div>
               </div>
 
               <div>
-                <Label>{isFr ? 'Adresse' : 'Address'} *</Label>
+                <Label>{t('storage.facilityRegister.address2')} *</Label>
                 <Input value={form.address} onChange={e => set('address', e.target.value)} />
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div>
-                  <Label>{isFr ? 'Ville' : 'City'} *</Label>
+                  <Label>{t('storage.facilityRegister.city')} *</Label>
                   <Input value={form.city} onChange={e => set('city', e.target.value)} />
                 </div>
                 <div>
-                  <Label>{isFr ? 'Province' : 'Province'} *</Label>
+                  <Label>{t('storage.facilityRegister.province')} *</Label>
                   <Select value={form.province} onValueChange={v => set('province', v)}>
                     <SelectTrigger data-testid="reg-province"><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -207,14 +205,14 @@ const StorageFacilityRegister = () => {
                   </Select>
                 </div>
                 <div>
-                  <Label>{isFr ? 'Code postal' : 'Postal Code'} *</Label>
+                  <Label>{t('storage.facilityRegister.postalCode')} *</Label>
                   <Input value={form.postal_code} onChange={e => set('postal_code', e.target.value)} />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label>{isFr ? 'Unités disponibles' : 'Units Available'}</Label>
+                  <Label>{t('storage.facilityRegister.unitsAvailable')}</Label>
                   <Input
                     type="number" min="0"
                     value={form.units_available}
@@ -222,7 +220,7 @@ const StorageFacilityRegister = () => {
                   />
                 </div>
                 <div>
-                  <Label>{isFr ? 'Comment avez-vous entendu parler ?' : 'How did you hear about us?'}</Label>
+                  <Label>{t('storage.facilityRegister.howDidYouHearAboutUs')}</Label>
                   <Input value={form.referral_source} onChange={e => set('referral_source', e.target.value)} />
                 </div>
               </div>
@@ -234,7 +232,7 @@ const StorageFacilityRegister = () => {
                   className="bg-blue-600 hover:bg-blue-700 text-white"
                   data-testid="step-1-next-btn"
                 >
-                  {isFr ? 'Suivant' : 'Next'} <ArrowRight className="h-4 w-4 ml-1" />
+                  {t('storage.facilityRegister.next')} <ArrowRight className="h-4 w-4 ml-1" />
                 </Button>
               </div>
             </div>
@@ -244,19 +242,17 @@ const StorageFacilityRegister = () => {
           {step === 2 && (
             <div className="space-y-4" data-testid="step-2-content">
               <h3 className="font-bold text-lg">
-                {isFr ? 'Étape 2 : Identifiants commerciaux' : 'Step 2: Business Credentials'}
+                {t('storage.facilityRegister.step2BusinessCredentials')}
               </h3>
               <p className="text-xs text-muted-foreground">
-                {isFr
-                  ? 'Optionnel mais recommandé. Aide à accélérer la vérification.'
-                  : 'Optional but recommended. Helps speed up verification.'}
+                {t('storage.facilityRegister.optionalButRecommendedHelpsSpeedUpVerifi')}
               </p>
 
               <div>
                 <Label>
-                  {isFr ? 'Numéro d\'enregistrement d\'entreprise' : 'Business Registration Number'}
+                  {t('storage.facilityRegister.businessRegistrationNumber')}
                   {form.province === 'QC' && (
-                    <span className="ml-1 text-xs text-muted-foreground">({isFr ? 'NEQ pour QC' : 'NEQ for QC'})</span>
+                    <span className="ml-1 text-xs text-muted-foreground">({t('storage.facilityRegister.neqForQc')})</span>
                   )}
                 </Label>
                 <Input
@@ -268,30 +264,26 @@ const StorageFacilityRegister = () => {
 
               {form.province === 'QC' && (
                 <div>
-                  <Label>{isFr ? 'Numéro de permis OPC (Québec)' : 'OPC Permit Number (Quebec)'}</Label>
+                  <Label>{t('storage.facilityRegister.opcPermitNumberQuebec')}</Label>
                   <Input
                     value={form.opc_permit_number}
                     onChange={e => set('opc_permit_number', e.target.value)}
-                    placeholder={isFr ? 'optionnel' : 'optional'}
+                    placeholder={t('storage.facilityRegister.optional')}
                     data-testid="reg-opc-permit"
                   />
                   <p className="text-[10px] text-muted-foreground mt-1">
-                    {isFr
-                      ? "Si vous opérez au Québec et avez un permis de l'OPC, fournissez-le pour accélérer la vérification."
-                      : 'If you operate in Quebec and have an OPC permit, provide it to speed up verification.'}
+                    {t('storage.facilityRegister.ifYouOperateInQuebecAndHaveAnOpcPermitPr')}
                   </p>
                 </div>
               )}
 
               <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 p-3 text-xs text-amber-800 dark:text-amber-300">
-                ⚠️ {isFr
-                  ? 'Vous serez seul responsable du respect des lois provinciales sur les droits de rétention applicables à chaque enchère.'
-                  : 'You will be solely responsible for compliance with provincial lien laws applicable to each auction.'}
+                ⚠️ {t('storage.facilityRegister.youWillBeSolelyResponsibleForComplianceW')}
               </div>
 
               <div className="flex justify-between pt-3">
                 <Button type="button" variant="outline" onClick={() => setStep(1)} data-testid="step-2-back-btn">
-                  <ArrowLeft className="h-4 w-4 mr-1" /> {isFr ? 'Retour' : 'Back'}
+                  <ArrowLeft className="h-4 w-4 mr-1" /> {t('storage.facilityRegister.back')}
                 </Button>
                 <Button
                   type="button"
@@ -299,7 +291,7 @@ const StorageFacilityRegister = () => {
                   className="bg-blue-600 hover:bg-blue-700 text-white"
                   data-testid="step-2-next-btn"
                 >
-                  {isFr ? 'Suivant' : 'Next'} <ArrowRight className="h-4 w-4 ml-1" />
+                  {t('storage.facilityRegister.next')} <ArrowRight className="h-4 w-4 ml-1" />
                 </Button>
               </div>
             </div>
@@ -309,28 +301,22 @@ const StorageFacilityRegister = () => {
           {step === 3 && (
             <div className="space-y-4" data-testid="step-3-content">
               <h3 className="font-bold text-lg">
-                {isFr ? 'Étape 3 : Configuration Stripe' : 'Step 3: Stripe Setup'}
+                {t('storage.facilityRegister.step3StripeSetup')}
               </h3>
 
               <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 p-4 text-sm border border-blue-200 dark:border-blue-900/40">
                 <p className="font-semibold mb-2">
-                  💳 {isFr ? 'Pourquoi Stripe Connect ?' : 'Why Stripe Connect?'}
+                  💳 {t('storage.facilityRegister.whyStripeConnect')}
                 </p>
                 <ul className="space-y-1.5 text-xs ml-4 list-disc">
                   <li>
-                    {isFr
-                      ? 'Pour les enchères payées par Stripe, BidVex transfère le prix marteau directement à votre compte Stripe.'
-                      : 'For Stripe-payment auctions, BidVex transfers the hammer price directly to your Stripe account.'}
+                    {t('storage.facilityRegister.forStripePaymentAuctionsBidvexTransfersT')}
                   </li>
                   <li>
-                    {isFr
-                      ? 'Pour les enchères au comptant ou par virement Interac, BidVex facture votre compte Stripe pour la commission de 5%.'
-                      : 'For cash or e-transfer auctions, BidVex charges your Stripe account for the 5% commission.'}
+                    {t('storage.facilityRegister.forCashOrETransferAuctionsBidvexChargesY')}
                   </li>
                   <li>
-                    {isFr
-                      ? 'Stripe vérifie votre identité (KYC) — un processus standard de 5–10 minutes.'
-                      : 'Stripe verifies your identity (KYC) — a standard 5–10 minute process.'}
+                    {t('storage.facilityRegister.stripeVerifiesYourIdentityKycAStandard51')}
                   </li>
                 </ul>
               </div>
@@ -353,7 +339,7 @@ const StorageFacilityRegister = () => {
 
               <div className="flex justify-between pt-3">
                 <Button type="button" variant="outline" onClick={() => setStep(2)} data-testid="step-3-back-btn">
-                  <ArrowLeft className="h-4 w-4 mr-1" /> {isFr ? 'Retour' : 'Back'}
+                  <ArrowLeft className="h-4 w-4 mr-1" /> {t('storage.facilityRegister.back')}
                 </Button>
                 <Button
                   type="button"
@@ -363,7 +349,7 @@ const StorageFacilityRegister = () => {
                   data-testid="reg-submit-btn"
                 >
                   {submitting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-                  {isFr ? 'Soumettre la demande' : 'Submit Application'}
+                  {t('storage.facilityRegister.submitApplication')}
                 </Button>
               </div>
             </div>

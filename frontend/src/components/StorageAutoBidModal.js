@@ -19,6 +19,7 @@
 import API_BASE from '../config';
 import React, { useState } from 'react';
 import { Bot } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
 import {
@@ -37,6 +38,7 @@ const API = API_BASE;
 const PREMIUM_TIERS = ['premium', 'vip', 'vip_elite', 'partner_pro', 'business'];
 
 const StorageAutoBidModal = ({ auctionId, currentBid, bidIncrement = 10, onActivated }) => {
+  const { t } = useTranslation();
   const { user, token } = useAuth();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
@@ -52,7 +54,7 @@ const StorageAutoBidModal = ({ auctionId, currentBid, bidIncrement = 10, onActiv
   const handleActivate = async () => {
     const amount = parseFloat(maxBid);
     if (!Number.isFinite(amount) || amount < minNext) {
-      toast.error(`Min bid: ${formatCurrency(minNext)} · Offre min : ${formatCurrency(minNext)}`);
+      toast.error(t('storage.autoBid.minBidToast', { amount: formatCurrency(minNext) }));
       return;
     }
     setLoading(true);
@@ -64,14 +66,14 @@ const StorageAutoBidModal = ({ auctionId, currentBid, bidIncrement = 10, onActiv
       );
       toast.success(
         res.data?.you_are_winning
-          ? `Auto-Bid active — leading at ${formatCurrency(res.data.current_bid)} · Auto-Enchère active — en tête`
-          : `Auto-Bid set — outbid by an existing proxy · Auto-Enchère placée — surenchéri`,
+          ? t('storage.autoBid.leadingToast', { amount: formatCurrency(res.data.current_bid) })
+          : t('storage.autoBid.outbidToast'),
       );
       setIsOpen(false);
       setMaxBid('');
       onActivated?.(res.data);
     } catch (error) {
-      toast.error(extractErrorMessage(error) || 'Failed to activate Auto-Bid · Échec de l\'activation');
+      toast.error(extractErrorMessage(error) || t('storage.autoBid.failedToActivate'));
     } finally {
       setLoading(false);
     }
@@ -86,7 +88,7 @@ const StorageAutoBidModal = ({ auctionId, currentBid, bidIncrement = 10, onActiv
         data-testid="storage-setup-autobid-btn"
       >
         <Bot className="h-4 w-4 mr-2" />
-        Setup Auto-Bid · Configurer Auto-Enchère
+        {t('storage.autoBid.setupBtn')}
         {!isPremium && (
           <Badge className="ml-2 bg-purple-500 text-white text-xs" data-testid="storage-autobid-premium-badge">
             Premium
@@ -99,16 +101,11 @@ const StorageAutoBidModal = ({ auctionId, currentBid, bidIncrement = 10, onActiv
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Bot className="h-5 w-5 text-green-600" />
-              Auto-Bid Bot Setup · Configuration de l'Auto-Enchère
+              {t('storage.autoBid.modalTitle')}
             </DialogTitle>
             <DialogDescription asChild>
               <div>
-                <p>
-                  Set a maximum bid and let the bot automatically bid for you.
-                </p>
-                <p className="italic text-xs mt-1">
-                  Définissez une offre maximale et laissez le robot enchérir automatiquement.
-                </p>
+                <p>{t('storage.autoBid.modalDesc')}</p>
               </div>
             </DialogDescription>
           </DialogHeader>
@@ -120,12 +117,9 @@ const StorageAutoBidModal = ({ auctionId, currentBid, bidIncrement = 10, onActiv
                 data-testid="storage-autobid-upsell"
               >
                 <p className="text-sm text-purple-800 leading-snug">
-                  🔒 <strong>Premium Feature · Fonctionnalité Premium :</strong>
+                  🔒 <strong>{t('storage.autoBid.premiumFeature')}</strong>
                   <br />
-                  Auto-Bid Bot is available for Premium and VIP members.
-                </p>
-                <p className="italic text-xs text-purple-700 mt-1 leading-snug">
-                  Le robot d'auto-enchère est réservé aux membres Premium et VIP.
+                  {t('storage.autoBid.premiumOnlyDesc')}
                 </p>
                 <Button
                   size="sm"
@@ -133,24 +127,24 @@ const StorageAutoBidModal = ({ auctionId, currentBid, bidIncrement = 10, onActiv
                   onClick={() => { setIsOpen(false); navigate('/subscription'); }}
                   data-testid="storage-autobid-upgrade-btn"
                 >
-                  Upgrade to Premium · Passer à Premium
+                  {t('storage.autoBid.upgradeToPremiumBtn')}
                 </Button>
               </div>
             </div>
           ) : (
             <div className="space-y-4 py-4">
               <div className="space-y-1">
-                <Label>Current Bid · Offre actuelle</Label>
+                <Label>{t('storage.autoBid.currentBid')}</Label>
                 <div className="text-2xl font-bold text-primary">
                   {formatCurrency(currentBid || 0)}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Bot increments · Incréments du robot : {formatCurrency(bidIncrement)}
+                  {t('storage.autoBid.botIncrements', { amount: formatCurrency(bidIncrement) })}
                 </p>
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="storage-max-bid-amount">Max Bid Amount · Offre maximale</Label>
+                <Label htmlFor="storage-max-bid-amount">{t('storage.autoBid.maxBidAmount')}</Label>
                 <Input
                   id="storage-max-bid-amount"
                   type="number"
@@ -158,24 +152,24 @@ const StorageAutoBidModal = ({ auctionId, currentBid, bidIncrement = 10, onActiv
                   min={minNext}
                   value={maxBid}
                   onChange={(e) => setMaxBid(e.target.value)}
-                  placeholder={`Enter max bid · min ${formatCurrency(minNext)}`}
+                  placeholder={t('storage.autoBid.maxBidPlaceholder', { amount: formatCurrency(minNext) })}
                   className="text-lg"
                   data-testid="storage-autobid-max-input"
                 />
-                <p className="text-[11px] text-muted-foreground italic">
-                  Le robot enchérira par tranches jusqu'à ce montant. Vous ne paierez pas plus.
+                <p className="text-[11px] text-muted-foreground">
+                  {t('storage.autoBid.botWillBidStepByStep')}
                 </p>
               </div>
 
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-md space-y-2">
                 <p className="text-sm font-semibold text-blue-800">
-                  How Auto-Bid Works · Comment fonctionne l'auto-enchère :
+                  {t('storage.autoBid.howAutoBidWorks')}
                 </p>
                 <ul className="text-xs text-blue-700 space-y-1 list-none">
-                  <li>• Bot will bid for you automatically when outbid · Le robot enchérit pour vous lorsque surenchéri</li>
-                  <li>• Follows the auction's increment of {formatCurrency(bidIncrement)} · Suit l'incrément de l'enchère ({formatCurrency(bidIncrement)})</li>
-                  <li>• Stops when your max bid is reached · S'arrête à votre offre maximale</li>
-                  <li>• You only pay the minimum needed to win · Vous ne payez que le minimum requis pour gagner</li>
+                  <li>• {t('storage.autoBid.botWillBidForYouAutomaticallyWhenOutbid')}</li>
+                  <li>• {t('storage.autoBid.followsAuctionIncrement', { amount: formatCurrency(bidIncrement) })}</li>
+                  <li>• {t('storage.autoBid.stopsWhenYourMaxBidIsReached')}</li>
+                  <li>• {t('storage.autoBid.youOnlyPayTheMinimumNeededToWin')}</li>
                 </ul>
               </div>
             </div>
@@ -187,7 +181,7 @@ const StorageAutoBidModal = ({ auctionId, currentBid, bidIncrement = 10, onActiv
               onClick={() => setIsOpen(false)}
               data-testid="storage-autobid-cancel-btn"
             >
-              Cancel · Annuler
+              {t('storage.autoBid.cancelBtn')}
             </Button>
             {isPremium && (
               <Button
@@ -197,11 +191,11 @@ const StorageAutoBidModal = ({ auctionId, currentBid, bidIncrement = 10, onActiv
                 data-testid="storage-autobid-activate-btn"
               >
                 {loading ? (
-                  <>Processing... · Traitement...</>
+                  <>{t('storage.autoBid.processing')}</>
                 ) : (
                   <>
                     <Bot className="h-4 w-4 mr-2" />
-                    Activate Auto-Bid · Activer
+                    {t('storage.autoBid.activateBtn')}
                   </>
                 )}
               </Button>

@@ -13,6 +13,7 @@ import API_BASE from '../../config';
 import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { useAuth } from '../../contexts/AuthContext';
@@ -28,6 +29,7 @@ const API = API_BASE;
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
 const StorageDepositBanner = ({ auction, onStatusChange }) => {
+  const { t } = useTranslation();
   const { token, user } = useAuth();
   const [status, setStatus] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -64,10 +66,7 @@ const StorageDepositBanner = ({ auction, onStatusChange }) => {
       >
         <p className="text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1">
           <CheckCircle2 className="h-4 w-4" />
-          ✅ Deposit Authorized — ${amount.toFixed(2)} hold on your card
-        </p>
-        <p className="text-emerald-600 dark:text-emerald-500 text-xs italic mt-1">
-          Retenue autorisée — {amount.toFixed(2)} $ réservés sur votre carte
+          ✅ {t('storage.depositBanner.depositAuthorizedFmt', { amount: amount.toFixed(2) })}
         </p>
       </div>
     );
@@ -79,29 +78,19 @@ const StorageDepositBanner = ({ auction, onStatusChange }) => {
         data-testid="storage-deposit-required-banner"
         className="bg-amber-50 dark:bg-amber-900/30 border-2 border-amber-400 rounded-xl p-4 mb-4"
       >
-        <p className="font-bold text-amber-800 dark:text-amber-300 mb-1 flex items-center gap-1">
+        <p className="font-bold text-amber-800 dark:text-amber-300 mb-3 flex items-center gap-1">
           <Lock className="h-4 w-4" />
-          🔐 Security Deposit Required to Bid
+          🔐 {t('storage.depositBanner.securityDepositRequired')}
         </p>
-        <p className="font-bold text-amber-700 dark:text-amber-400 mb-3 text-sm italic">
-          Dépôt de sécurité requis pour enchérir
-        </p>
-        <p className="text-sm text-amber-700 dark:text-amber-400 mb-1">
-          This auction requires a refundable deposit of ${amount.toFixed(2)} to place bids. Your deposit will be automatically released if you do not win.
-        </p>
-        <p className="text-xs text-amber-600 dark:text-amber-500 mb-4 italic">
-          Cette enchère nécessite un dépôt remboursable de {amount.toFixed(2)} $ pour enchérir. Votre dépôt sera automatiquement libéré si vous ne gagnez pas.
+        <p className="text-sm text-amber-700 dark:text-amber-400 mb-4">
+          {t('storage.depositBanner.depositInfoFmt', { amount: amount.toFixed(2) })}
         </p>
         <button
           onClick={() => setModalOpen(true)}
           className="w-full bg-amber-500 hover:bg-amber-400 text-white font-bold py-3 px-6 rounded-xl transition-colors text-lg"
           data-testid="storage-deposit-pay-btn"
         >
-          💳 Pay ${amount.toFixed(2)} Deposit to Unlock Bidding
-          <br />
-          <span className="text-sm font-normal opacity-90">
-            Payer {amount.toFixed(2)} $ de dépôt pour débloquer les enchères
-          </span>
+          💳 {t('storage.depositBanner.payDepositBtnFmt', { amount: amount.toFixed(2) })}
         </button>
       </div>
 
@@ -121,6 +110,7 @@ const StorageDepositBanner = ({ auction, onStatusChange }) => {
 };
 
 const StorageDepositDialog = ({ auctionId, amount, open, onClose, onSuccess }) => {
+  const { t } = useTranslation();
   const stripe = useStripe();
   const elements = useElements();
   const { token } = useAuth();
@@ -142,13 +132,13 @@ const StorageDepositDialog = ({ auctionId, amount, open, onClose, onSuccess }) =
         { payment_method_id: pmRes.paymentMethod.id },
         { headers: { Authorization: `Bearer ${token}` } },
       );
-      toast.success(`Deposit held · Dépôt retenu — $${amount.toFixed(2)}`);
+      toast.success(t('storage.depositBanner.depositHeldToast', { amount: amount.toFixed(2) }));
       onSuccess?.();
     } catch (err) {
       const detail = err?.response?.data?.detail;
       const msg = typeof detail === 'object'
         ? (detail.message_en || JSON.stringify(detail))
-        : (detail || 'Deposit authorization failed · Échec');
+        : (detail || t('storage.depositBanner.depositAuthorizationFailed'));
       toast.error(msg);
     } finally {
       setProcessing(false);
@@ -161,18 +151,18 @@ const StorageDepositDialog = ({ auctionId, amount, open, onClose, onSuccess }) =
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-amber-600" />
-            Authorize ${amount.toFixed(2)} Hold · Autoriser {amount.toFixed(2)} $
+            {t('storage.depositBanner.authorizeHoldDialogFmt', { amount: amount.toFixed(2) })}
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
-            <p className="font-semibold">Pre-authorization, not a charge · Pré-autorisation, pas un débit</p>
-            <p className="mt-1">Your card is held for ${amount.toFixed(2)}. Released automatically if you don't win. · Votre carte est retenue pour {amount.toFixed(2)} $. Libérée automatiquement si vous ne gagnez pas.</p>
+            <p className="font-semibold">{t('storage.depositBanner.preAuthorizationNotACharge')}</p>
+            <p className="mt-1">{t('storage.depositBanner.preAuthInfoFmt', { amount: amount.toFixed(2) })}</p>
           </div>
           <div className="rounded-md border border-slate-300 bg-white p-3">
             <label className="text-xs font-medium mb-2 block flex items-center gap-1">
               <CreditCard className="h-3 w-3" />
-              Card details · Détails de la carte
+              {t('storage.depositBanner.cardDetailsLabel')}
             </label>
             <CardElement
               options={{
@@ -186,7 +176,7 @@ const StorageDepositDialog = ({ auctionId, amount, open, onClose, onSuccess }) =
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={processing} data-testid="storage-deposit-cancel-btn">
-            Cancel · Annuler
+            {t('storage.depositBanner.cancelBtn')}
           </Button>
           <Button
             onClick={handleSubmit}
@@ -195,7 +185,7 @@ const StorageDepositDialog = ({ auctionId, amount, open, onClose, onSuccess }) =
             data-testid="storage-deposit-submit-btn"
           >
             {processing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Lock className="h-4 w-4 mr-1" />}
-            Authorize ${amount.toFixed(2)} · Autoriser {amount.toFixed(2)} $
+            {t('storage.depositBanner.authorizeAmountBtnFmt', { amount: amount.toFixed(2) })}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,6 +1,7 @@
 import API_BASE from '../../config';
 import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -32,6 +33,8 @@ const STATUS_COLOR = {
  * Always bilingual EN + FR (Bill 96).
  */
 const MyStorageDeposits = () => {
+  const { t, i18n } = useTranslation();
+  const isFr = (i18n.language || '').startsWith('fr');
   const { token, user } = useAuth();
   const navigate = useNavigate();
   const [data, setData] = useState({ total: 0, deposits: [] });
@@ -60,7 +63,7 @@ const MyStorageDeposits = () => {
         <Card className="max-w-md p-8 text-center">
           <p className="mb-1">Please sign in to view your deposits.</p>
           <p className="italic text-sm text-muted-foreground mb-4">Connectez-vous pour voir vos dépôts.</p>
-          <Button onClick={() => navigate('/auth')}>Sign In · Se connecter</Button>
+          <Button onClick={() => navigate('/auth')}>{t('storage.myDeposits.signIn')}</Button>
         </Card>
       </div>
     );
@@ -71,17 +74,13 @@ const MyStorageDeposits = () => {
       <div className="max-w-5xl mx-auto px-4">
         <h1 className="text-3xl font-bold flex items-center gap-2">
           <DollarSign className="h-7 w-7 text-emerald-500" />
-          My Deposits
+          {t('storage.myDeposits.title')}
         </h1>
-        <p className="italic text-muted-foreground mb-6">Mes dépôts</p>
 
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">
-              Storage Auction Deposits
-              <span className="text-sm italic font-normal text-muted-foreground ml-2">
-                · Dépôts d'enchères d'entreposage
-              </span>
+              {t('storage.myDeposits.title')}
               <Badge variant="outline" className="ml-2">{data.total}</Badge>
             </CardTitle>
           </CardHeader>
@@ -92,17 +91,17 @@ const MyStorageDeposits = () => {
               </div>
             ) : data.deposits.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">
-                No deposits yet · Aucun dépôt pour l'instant
+                {t('storage.myDeposits.noActiveDeposits')}
               </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm" data-testid="my-deposits-table">
                   <thead>
                     <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
-                      <th className="pb-2 pr-3">Auction<div className="text-[10px] italic font-normal">Enchère</div></th>
-                      <th className="pb-2 pr-3 text-right">Amount<div className="text-[10px] italic font-normal">Montant</div></th>
-                      <th className="pb-2 pr-3">Status<div className="text-[10px] italic font-normal">Statut</div></th>
-                      <th className="pb-2 pr-3">Date</th>
+                      <th className="pb-2 pr-3">{t('storage.myDeposits.facility')}</th>
+                      <th className="pb-2 pr-3 text-right">{t('storage.myDeposits.amount')}</th>
+                      <th className="pb-2 pr-3">{t('storage.myDeposits.status')}</th>
+                      <th className="pb-2 pr-3">{t('storage.myDeposits.date')}</th>
                       <th className="pb-2 pr-3">Action</th>
                     </tr>
                   </thead>
@@ -110,19 +109,16 @@ const MyStorageDeposits = () => {
                     {data.deposits.map((d, i) => (
                       <tr key={d.auction_id + ':' + i} className="border-b hover:bg-slate-50 dark:hover:bg-slate-800/40">
                         <td className="py-3 pr-3">
-                          <div className="font-medium">Unit #{d.auction_unit_number}</div>
+                          <div className="font-medium">#{d.auction_unit_number}</div>
                           <div className="text-xs text-muted-foreground">
-                            {d.facility_name} · {d.facility_city}, {d.facility_province}
+                            {d.facility_name} • {d.facility_city}, {d.facility_province}
                           </div>
                         </td>
                         <td className="py-3 pr-3 text-right font-semibold">${Number(d.amount).toFixed(2)} CAD</td>
                         <td className="py-3 pr-3">
                           <Badge className={STATUS_COLOR[d.status] || ''}>
-                            {STATUS_EN[d.status] || d.status}
+                            {(isFr ? STATUS_FR : STATUS_EN)[d.status] || d.status}
                           </Badge>
-                          <div className="text-[10px] italic text-muted-foreground mt-1">
-                            {STATUS_FR[d.status] || d.status}
-                          </div>
                         </td>
                         <td className="py-3 pr-3 text-xs text-muted-foreground">
                           {d.created_at ? new Date(d.created_at).toLocaleDateString() : '—'}

@@ -30,7 +30,7 @@ const SORT_OPTIONS = [
 ];
 
 const StorageAuctionsBrowse = () => {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isFr = (i18n.language || '').startsWith('fr');
 
   const [data, setData] = useState({ total: 0, auctions: [] });
@@ -81,7 +81,7 @@ const StorageAuctionsBrowse = () => {
     <div className="min-h-screen bg-sky-50 dark:bg-slate-900" data-testid="storage-browse-page">
       <StorageHero />
 
-      {/* ── PUBLIC STATS BAR (iter171) — always bilingual, hides zero cards ── */}
+      {/* ── PUBLIC STATS BAR (iter171, iter193 single-language) ── */}
       {stats && (stats.total_sold > 0 || stats.active_facilities > 0 || stats.active_auctions > 0) && (
         <div className="bg-[#0B2545] border-b border-[#1a3a5c] py-4" data-testid="storage-public-stats">
           <div className="container mx-auto px-4">
@@ -89,29 +89,25 @@ const StorageAuctionsBrowse = () => {
               {stats.total_sold > 0 && (
                 <div className="text-center" data-testid="stat-total-sold">
                   <p className="text-2xl md:text-3xl font-black text-[#3FB4CB]">{stats.total_sold}</p>
-                  <p className="text-xs text-gray-300">Units Sold</p>
-                  <p className="text-[11px] italic text-[#3FB4CB]/70">Unités vendues</p>
+                  <p className="text-xs text-gray-300">{t('storage.browse.unitsSold')}</p>
                 </div>
               )}
               {stats.active_facilities > 0 && (
                 <div className="text-center" data-testid="stat-active-facilities">
                   <p className="text-2xl md:text-3xl font-black text-[#3FB4CB]">{stats.active_facilities}</p>
-                  <p className="text-xs text-gray-300">Verified Facilities</p>
-                  <p className="text-[11px] italic text-[#3FB4CB]/70">Facilités vérifiées</p>
+                  <p className="text-xs text-gray-300">{t('storage.browse.verifiedFacilities')}</p>
                 </div>
               )}
               {stats.active_auctions > 0 && (
                 <div className="text-center" data-testid="stat-active-auctions">
                   <p className="text-2xl md:text-3xl font-black text-[#3FB4CB]">{stats.active_auctions}</p>
-                  <p className="text-xs text-gray-300">Live Now</p>
-                  <p className="text-[11px] italic text-[#3FB4CB]/70">En direct maintenant</p>
+                  <p className="text-xs text-gray-300">{t('storage.browse.liveNowStat')}</p>
                 </div>
               )}
               {stats.total_bids_placed > 0 && (
                 <div className="text-center" data-testid="stat-total-bids">
                   <p className="text-2xl md:text-3xl font-black text-[#3FB4CB]">{stats.total_bids_placed.toLocaleString()}</p>
-                  <p className="text-xs text-gray-300">Bids Placed</p>
-                  <p className="text-[11px] italic text-[#3FB4CB]/70">Offres placées</p>
+                  <p className="text-xs text-gray-300">{t('storage.browse.bidsPlaced')}</p>
                 </div>
               )}
             </div>
@@ -119,18 +115,12 @@ const StorageAuctionsBrowse = () => {
         </div>
       )}
 
-      {/* Pricing transparency banner — always bilingual (Bill 96) */}
+      {/* Pricing transparency banner — single language (iter193) */}
       <div className="bg-emerald-50 dark:bg-emerald-950/30 border-y border-emerald-200 dark:border-emerald-900/40 py-3 text-center text-xs text-emerald-800 dark:text-emerald-300">
-        💰 <strong>Transparent fees.</strong>{' '}
-        No buyer fees on cash or e-transfer auctions. Stripe fee + taxes apply on Stripe-payment auctions.
+        💰 <strong>{t('storage.browse.transparentFees')}</strong>{' '}
+        {t('storage.browse.transparentFeesBody')}
         {' • '}
-        <Link to="/storage-auctions/how-it-works" className="underline hover:no-underline">How it works</Link>
-        <br className="md:hidden" />
-        <em className="opacity-80 block mt-0.5 md:inline md:ml-2">
-          <strong>Frais transparents.</strong> Aucuns frais acheteur sur les enchères au comptant ou par virement Interac. Frais Stripe et taxes appliqués sur les enchères Stripe.
-          {' • '}
-          <Link to="/storage-auctions/how-it-works" className="underline hover:no-underline">Comment ça marche</Link>
-        </em>
+        <Link to="/storage-auctions/how-it-works" className="underline hover:no-underline">{t('storage.browse.howItWorksLink')}</Link>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
@@ -139,18 +129,18 @@ const StorageAuctionsBrowse = () => {
           <Card className="p-4 sticky top-4">
             <div className="flex items-center gap-2 mb-4 text-sm font-bold">
               <Filter className="h-4 w-4 text-blue-600" />
-              {isFr ? 'Filtrer' : 'Filters'}
+              {t('storage.browse.filters')}
             </div>
 
             <div className="space-y-3">
               <div>
                 <label className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1 block flex items-center gap-1">
-                  <MapPin className="h-3 w-3" /> {isFr ? 'Province' : 'Province'}
+                  <MapPin className="h-3 w-3" /> {t('storage.browse.province')}
                 </label>
                 <Select value={filters.province || '__all'} onValueChange={v => setFilter('province', v)}>
                   <SelectTrigger data-testid="filter-province"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__all">{isFr ? 'Toutes les provinces' : 'All provinces'}</SelectItem>
+                    <SelectItem value="__all">{t('storage.browse.allProvinces')}</SelectItem>
                     {provinces.map(p => (
                       <SelectItem key={p.province} value={p.province}>
                         {p.province} ({p.count})
@@ -162,12 +152,12 @@ const StorageAuctionsBrowse = () => {
 
               <div>
                 <label className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1 block">
-                  {isFr ? "Taille d'unité" : 'Unit Size'}
+                  {t('storage.browse.unitSize')}
                 </label>
                 <Select value={filters.unit_size || '__all'} onValueChange={v => setFilter('unit_size', v)}>
                   <SelectTrigger data-testid="filter-unit-size"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__all">{isFr ? 'Toutes' : 'All sizes'}</SelectItem>
+                    <SelectItem value="__all">{t('storage.browse.allSizes')}</SelectItem>
                     {UNIT_SIZES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -175,12 +165,12 @@ const StorageAuctionsBrowse = () => {
 
               <div>
                 <label className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1 block">
-                  {isFr ? "Type d'unité" : 'Unit Type'}
+                  {t('storage.browse.unitType')}
                 </label>
                 <Select value={filters.unit_type || '__all'} onValueChange={v => setFilter('unit_type', v)}>
                   <SelectTrigger data-testid="filter-unit-type"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__all">{isFr ? 'Tous les types' : 'All types'}</SelectItem>
+                    <SelectItem value="__all">{t('storage.browse.allTypes')}</SelectItem>
                     {UNIT_TYPES.map(t => (
                       <SelectItem key={t.v} value={t.v}>{isFr ? t.fr : t.en}</SelectItem>
                     ))}
@@ -190,21 +180,21 @@ const StorageAuctionsBrowse = () => {
 
               <div>
                 <label className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1 block">
-                  {isFr ? 'Statut' : 'Status'}
+                  {t('storage.browse.status')}
                 </label>
                 <Select value={filters.status || '__all'} onValueChange={v => setFilter('status', v)}>
                   <SelectTrigger data-testid="filter-status"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__all">{isFr ? 'Toutes' : 'All'}</SelectItem>
-                    <SelectItem value="ending_soon">{isFr ? 'Se termine bientôt (1h)' : 'Ending Soon (<1h)'}</SelectItem>
-                    <SelectItem value="upcoming">{isFr ? 'À venir' : 'Upcoming'}</SelectItem>
+                    <SelectItem value="__all">{t('storage.browse.all')}</SelectItem>
+                    <SelectItem value="ending_soon">{t('storage.browse.endingSoon1h')}</SelectItem>
+                    <SelectItem value="upcoming">{t('storage.browse.upcoming')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div>
                 <label className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1 block">
-                  {isFr ? 'Type juridique' : 'Lien Status'}
+                  {t('storage.browse.lienStatus')}
                 </label>
                 <Select
                   value={filters.is_lien_unit === '' ? '__all' : String(filters.is_lien_unit)}
@@ -212,9 +202,9 @@ const StorageAuctionsBrowse = () => {
                 >
                   <SelectTrigger data-testid="filter-lien"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__all">{isFr ? 'Toutes' : 'All'}</SelectItem>
-                    <SelectItem value="true">{isFr ? 'Unités sous rétention' : 'Lien Units'}</SelectItem>
-                    <SelectItem value="false">{isFr ? 'Sans rétention' : 'Non-Lien'}</SelectItem>
+                    <SelectItem value="__all">{t('storage.browse.all')}</SelectItem>
+                    <SelectItem value="true">{t('storage.browse.lienUnits')}</SelectItem>
+                    <SelectItem value="false">{t('storage.browse.nonLien')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -229,7 +219,7 @@ const StorageAuctionsBrowse = () => {
                 data-testid="filter-clear"
               >
                 <RefreshCw className="h-3.5 w-3.5 mr-1" />
-                {isFr ? 'Réinitialiser' : 'Clear filters'}
+                {t('storage.browse.clearFilters')}
               </Button>
             </div>
           </Card>
@@ -238,10 +228,8 @@ const StorageAuctionsBrowse = () => {
             <div className="flex items-start gap-2 text-slate-600 dark:text-slate-400">
               <ShieldCheck className="h-3.5 w-3.5 text-blue-600 shrink-0 mt-0.5" />
               <p>
-                {isFr
-                  ? 'BidVex est une plateforme technologique. La facilité d\'entreposage est l\'encanteur officiel.'
-                  : 'BidVex is a technology platform. The storage facility is the official auctioneer.'}
-                {' '}<Link to="/storage-auctions/terms" className="underline">{isFr ? 'Conditions' : 'Terms'}</Link>
+                {t('storage.browse.bidvexIsATechnologyPlatformTheStorageFac')}
+                {' '}<Link to="/storage-auctions/terms" className="underline">{t('storage.browse.terms')}</Link>
               </p>
             </div>
           </Card>
@@ -268,15 +256,13 @@ const StorageAuctionsBrowse = () => {
           ) : data.auctions.length === 0 ? (
             <Card className="p-12 text-center" data-testid="storage-browse-empty">
               <Layers className="h-12 w-12 mx-auto mb-3 text-slate-400 opacity-50" />
-              <p className="font-semibold text-lg">{isFr ? 'Aucune enchère active' : 'No active storage auctions yet'}</p>
+              <p className="font-semibold text-lg">{t('storage.browse.noActiveStorageAuctionsYet')}</p>
               <p className="text-sm text-muted-foreground mt-1">
-                {isFr
-                  ? 'Revenez bientôt — nos facilités partenaires ajoutent constamment de nouvelles enchères.'
-                  : 'Check back soon — our partner facilities are constantly adding new auctions.'}
+                {t('storage.browse.checkBackSoonOurPartnerFacilitiesAreCons')}
               </p>
               <div className="mt-5">
                 <Link to="/storage-auctions/register-facility">
-                  <Button>{isFr ? 'Vous êtes une facilité ?' : 'Are you a storage facility?'}</Button>
+                  <Button>{t('storage.browse.areYouAStorageFacility')}</Button>
                 </Link>
               </div>
             </Card>
