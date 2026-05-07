@@ -1,6 +1,40 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter190 — FR Navbar Clipping Fix (Feb 7, 2026) ✅
+## Latest: iter191 — Navbar FR Visual Collision Fix (Feb 7, 2026) ✅
+
+User shared a follow-up screenshot showing the Sell button ("Vendre") visually colliding with the EN/FR language pill at 1366px in FR + logged-in. Even though my iter190 fix made the items technically fit (no body overflow), `flex-shrink + min-w-0` on the desktop-nav container was letting the Vendre button OVERFLOW its parent box and visually overlap the right-side actions area (gap measured -13px → items literally on top of each other).
+
+### Root cause
+- `min-w-0 flex-shrink` on the desktop-nav block let it shrink below its content's natural width when content (FR labels) didn't fit.
+- `whitespace-nowrap` on each link prevented text wrapping → links overflowed the shrunken parent.
+- `justify-between` on the parent container distributed leftover space evenly between siblings, but with overflow it produced **negative space** between Vendre and the language pill.
+
+### Fix
+- Removed `min-w-0 flex-shrink` from desktop-nav → block takes its natural width.
+- Added explicit `mr-2 lg:mr-3 xl:mr-4 2xl:mr-6` on desktop-nav to guarantee minimum gap to right-actions.
+- **At lg breakpoint (1024-1279px)**: show **icon-only nav links** (`<span className="hidden xl:inline">{label}</span>`) with `aria-label` + `title` tooltip. FR labels (~225px each) don't fit at 1024 even with all paddings stripped.
+- **At xl+ (≥1280px)**: full text labels.
+- Sell button: icon-only at lg-xl (`hidden 2xl:inline` for label), full at 2xl+ (≥1536).
+- Container padding: `lg:px-3 xl:px-6 2xl:px-8` to fine-tune at each breakpoint.
+
+### Verification — 24 combinations PASS
+6 viewports (1024, 1280, 1366, 1440, 1536, 1920) × EN+FR × logged-in/out: **zero clipping**. Vendre→language-pill gap is healthy **96-302px** at all viewports (was -13px before fix).
+
+| Viewport | EN logged | FR logged | EN guest | FR guest |
+|----------|-----------|-----------|----------|----------|
+| 1024     | ✅        | ✅        | ✅       | ✅       |
+| 1280     | ✅        | ✅        | ✅       | ✅       |
+| 1366     | ✅        | ✅        | ✅       | ✅       |
+| 1440     | ✅        | ✅        | ✅       | ✅       |
+| 1536     | ✅        | ✅        | ✅       | ✅       |
+| 1920     | ✅        | ✅        | ✅       | ✅       |
+
+### Files changed (iter191)
+- `frontend/src/components/Navbar.js` — full breakpoint retune
+
+---
+
+## Earlier: iter190 — FR Navbar Clipping Fix (Feb 7, 2026) ✅
 
 User reported navbar items (notification bell, avatar, FR language pill) clipped past the right edge at 100% zoom on 1366×768 / 1440×900 laptops, specifically in FR + logged-in state. The body's `overflow-x: hidden` (iter176) was masking the issue but icons were still pushed off-screen.
 

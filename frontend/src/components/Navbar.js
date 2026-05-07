@@ -78,8 +78,8 @@ const Navbar = () => {
         }`}
         data-testid="main-navbar"
       >
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-4 xl:px-8">
-          <div className="flex justify-between items-center h-14 sm:h-16 gap-1 lg:gap-2">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-3 xl:px-6 2xl:px-8">
+          <div className="flex justify-between items-center h-14 sm:h-16">
             {/* Logo */}
             <Link 
               to="/" 
@@ -97,23 +97,25 @@ const Navbar = () => {
             </Link>
 
             {/* Desktop Navigation — visible at lg+ to avoid tablet overflow */}
-            <div className="hidden lg:flex items-center space-x-0 xl:space-x-1 min-w-0 flex-shrink">
+            <div className="hidden lg:flex items-center space-x-0 xl:space-x-1 mr-2 lg:mr-3 xl:mr-4 2xl:mr-6">
               {navLinks.map((link) => (
                 <Link key={link.path} to={link.path} data-testid={`nav-${link.path.replace('/', '') || 'home'}-link`}>
                   <Button 
                     variant="ghost" 
                     size="sm"
-                    className={`text-sm font-medium transition-all duration-200 whitespace-nowrap px-2 lg:px-2.5 xl:px-3 ${
+                    aria-label={link.label}
+                    title={link.label}
+                    className={`text-sm font-medium transition-all duration-200 whitespace-nowrap px-2 lg:px-2 xl:px-2.5 2xl:px-3 ${
                       isActive(link.path) 
                         ? 'text-primary bg-primary/10' 
                         : 'text-foreground/80 hover:text-foreground hover:bg-accent'
                     }`}
                   >
-                    <link.icon className="w-4 h-4 mr-1 lg:mr-1.5" />
-                    {link.label}
+                    <link.icon className="w-4 h-4 lg:mr-0 xl:mr-1.5" />
+                    <span className="hidden xl:inline">{link.label}</span>
                     {link.comingSoon && (
                       <span
-                        className="ml-1.5 inline-flex items-center rounded-full bg-cyan-500/15 border border-cyan-500/40 text-cyan-700 dark:text-cyan-300 px-1.5 py-[1px] font-bold"
+                        className="ml-1.5 hidden xl:inline-flex items-center rounded-full bg-cyan-500/15 border border-cyan-500/40 text-cyan-700 dark:text-cyan-300 px-1.5 py-[1px] font-bold"
                         style={{ fontSize: '10px', lineHeight: 1.2, letterSpacing: '0.5px' }}
                         data-testid="nav-vehicle-coming-soon-badge"
                       >
@@ -127,21 +129,23 @@ const Navbar = () => {
                 <Button 
                   variant="ghost" 
                   size="sm"
-                  className="hidden xl:inline-flex text-sm font-medium text-foreground/80 hover:text-foreground hover:bg-accent whitespace-nowrap px-2 lg:px-2.5 xl:px-3"
+                  className="hidden lg:inline-flex text-sm font-medium text-foreground/80 hover:text-foreground hover:bg-accent whitespace-nowrap px-2 lg:px-2 xl:px-2.5 2xl:px-3"
                   onClick={() => setSellModalOpen(true)}
                   data-testid="nav-sell-button"
+                  aria-label={t('nav.sell')}
+                  title={t('nav.sell')}
                 >
-                  <DollarSign className="w-4 h-4 mr-1 lg:mr-1.5" />
-                  {t('nav.sell')}
+                  <DollarSign className="w-4 h-4 lg:mr-0 2xl:mr-1.5" />
+                  <span className="hidden 2xl:inline">{t('nav.sell')}</span>
                 </Button>
               )}
             </div>
 
             {/* Right Side Actions */}
             <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
-              {/* Messages — hide on small mobile + on lg laptops to save FR navbar space (moved to user dropdown for those) */}
+              {/* Messages — hide on small mobile, available in nav at lg+ */}
               {user && (
-                <Link to="/messages" data-testid="messages-link" className="hidden xl:block">
+                <Link to="/messages" data-testid="messages-link" className="hidden lg:block">
                   <Button 
                     variant="ghost" 
                     size="icon" 
@@ -152,14 +156,14 @@ const Navbar = () => {
                 </Link>
               )}
 
-              {/* Theme Toggle — hide on very small screens, also on lg in FR to keep nav fitting */}
+              {/* Theme Toggle — hide on small mobile, available in nav at lg+ */}
               <Button 
                 variant="ghost" 
                 size="icon" 
                 onClick={toggleTheme} 
                 data-testid="theme-toggle-btn"
                 aria-label="Toggle theme"
-                className="hidden sm:max-lg:inline-flex xl:inline-flex transition-transform hover:scale-110 hover:bg-slate-100 dark:hover:bg-slate-800 navbar-icon-btn h-8 w-8 lg:h-9 lg:w-9"
+                className="hidden sm:inline-flex transition-transform hover:scale-110 hover:bg-slate-100 dark:hover:bg-slate-800 navbar-icon-btn h-8 w-8 lg:h-9 lg:w-9"
               >
                 {theme === 'light' ? (
                   <Moon className="h-4 w-4 sm:h-5 sm:w-5 navbar-icon text-slate-900" />
@@ -231,7 +235,7 @@ const Navbar = () => {
                     </div>
                     {/* Always-available shortcuts (Messages, Theme, Sell) — also accessible from main navbar at certain breakpoints */}
                     <div className="py-1 border-b border-border">
-                      <DropdownMenuItem onClick={() => { setSellModalOpen(true); }} className="cursor-pointer xl:hidden" data-testid="dropdown-sell-link">
+                      <DropdownMenuItem onClick={() => { setSellModalOpen(true); }} className="cursor-pointer lg:hidden" data-testid="dropdown-sell-link">
                         <DollarSign className="mr-3 h-4 w-4 text-muted-foreground" />
                         {t('nav.sell')}
                       </DropdownMenuItem>
