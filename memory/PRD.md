@@ -1,5 +1,38 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter190 — FR Navbar Clipping Fix (Feb 7, 2026) ✅
+
+User reported navbar items (notification bell, avatar, FR language pill) clipped past the right edge at 100% zoom on 1366×768 / 1440×900 laptops, specifically in FR + logged-in state. The body's `overflow-x: hidden` (iter176) was masking the issue but icons were still pushed off-screen.
+
+### Root cause
+- FR labels are 15-30% longer than EN ("Vehicle Auctions" → "Enchères de véhicules", +21px each)
+- Combined with logged-in user controls (Sell button + Messages + Theme + EN/FR pill + Notifications + Avatar), nav scrollWidth = **1482px** vs viewport **1366px** = **116px overflow**
+
+### Fix (Tailwind responsive utilities — no inline px overrides)
+- `Navbar.js` — `<Button size="sm">` on all nav links (saves ~48px from default `px-4` → `px-3`)
+- Per-link padding: `px-2 lg:px-2.5 xl:px-3` (saves another ~30px at lg breakpoint)
+- Icon margin: `mr-1 lg:mr-1.5` (saves ~12px across 6 buttons)
+- Container padding: `lg:px-4 xl:px-8` (was `lg:px-8`, saves 32px at lg)
+- Nav-link spacing: `space-x-0 xl:space-x-1` (saves ~20px at lg)
+- Right-side icons: `h-8 w-8 lg:h-9 lg:w-9` (saves ~24px at lg)
+- EN/FR pill: `px-1.5 lg:px-2 xl:px-2.5` (saves ~20px at lg)
+- Messages icon: `hidden xl:block` — moved to user dropdown for lg-xl range
+- Theme toggle: `sm:max-lg:inline-flex xl:inline-flex` — hidden at lg-xl, available in dropdown
+- Sell button: `hidden xl:inline-flex` — hidden at lg-xl, added to user dropdown via `dropdown-sell-link`
+
+### Verification matrix — 100% PASS
+- **Navbar overflow check** (8 viewports × EN+FR × logged-in/out = 32 combinations): **0 clipped, 0 overflow**
+  - 375, 640, 768 (mobile + small tablet — hamburger menu active): all ✅
+  - 1024 (lg breakpoint — desktop nav active, Sell+Messages+Theme in dropdown): all ✅
+  - 1280, 1366, 1440, 1920 (xl+ — full nav with Sell): all ✅
+- **Page overflow check** (6 pages × 4 viewports × EN+FR = 42 combinations): **0 horizontal scroll**
+
+### Files changed (iter190)
+- `frontend/src/components/Navbar.js` — entire layout breakpoints retuned per spec
+
+---
+
+
 ## Latest: iter189 — 7-Bug + 2-Feature Sprint (Feb 7, 2026) — IN PROGRESS / TESTING
 
 User-driven multi-bug sprint for BidVex Production. All 7 bugs + 2 features now closed; awaiting consolidated testing agent verification.

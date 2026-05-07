@@ -78,8 +78,8 @@ const Navbar = () => {
         }`}
         data-testid="main-navbar"
       >
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
-          <div className="flex justify-between items-center h-14 sm:h-16">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-4 xl:px-8">
+          <div className="flex justify-between items-center h-14 sm:h-16 gap-1 lg:gap-2">
             {/* Logo */}
             <Link 
               to="/" 
@@ -97,18 +97,19 @@ const Navbar = () => {
             </Link>
 
             {/* Desktop Navigation — visible at lg+ to avoid tablet overflow */}
-            <div className="hidden lg:flex items-center space-x-1">
+            <div className="hidden lg:flex items-center space-x-0 xl:space-x-1 min-w-0 flex-shrink">
               {navLinks.map((link) => (
                 <Link key={link.path} to={link.path} data-testid={`nav-${link.path.replace('/', '') || 'home'}-link`}>
                   <Button 
                     variant="ghost" 
-                    className={`text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+                    size="sm"
+                    className={`text-sm font-medium transition-all duration-200 whitespace-nowrap px-2 lg:px-2.5 xl:px-3 ${
                       isActive(link.path) 
                         ? 'text-primary bg-primary/10' 
                         : 'text-foreground/80 hover:text-foreground hover:bg-accent'
                     }`}
                   >
-                    <link.icon className="w-4 h-4 mr-1.5" />
+                    <link.icon className="w-4 h-4 mr-1 lg:mr-1.5" />
                     {link.label}
                     {link.comingSoon && (
                       <span
@@ -125,39 +126,40 @@ const Navbar = () => {
               {user && (
                 <Button 
                   variant="ghost" 
-                  className="text-sm font-medium text-foreground/80 hover:text-foreground hover:bg-accent whitespace-nowrap"
+                  size="sm"
+                  className="hidden xl:inline-flex text-sm font-medium text-foreground/80 hover:text-foreground hover:bg-accent whitespace-nowrap px-2 lg:px-2.5 xl:px-3"
                   onClick={() => setSellModalOpen(true)}
                   data-testid="nav-sell-button"
                 >
-                  <DollarSign className="w-4 h-4 mr-1.5" />
+                  <DollarSign className="w-4 h-4 mr-1 lg:mr-1.5" />
                   {t('nav.sell')}
                 </Button>
               )}
             </div>
 
             {/* Right Side Actions */}
-            <div className="flex items-center gap-0.5 sm:gap-1">
-              {/* Messages — hide on small mobile */}
+            <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
+              {/* Messages — hide on small mobile + on lg laptops to save FR navbar space (moved to user dropdown for those) */}
               {user && (
-                <Link to="/messages" data-testid="messages-link" className="hidden sm:block">
+                <Link to="/messages" data-testid="messages-link" className="hidden xl:block">
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="relative hover:bg-slate-100 dark:hover:bg-slate-800 navbar-icon-btn h-9 w-9"
+                    className="relative hover:bg-slate-100 dark:hover:bg-slate-800 navbar-icon-btn h-8 w-8 lg:h-9 lg:w-9"
                   >
                     <MessageCircle className="h-4 w-4 sm:h-5 sm:w-5 navbar-icon text-slate-900 dark:text-slate-100" />
                   </Button>
                 </Link>
               )}
 
-              {/* Theme Toggle — hide on very small screens */}
+              {/* Theme Toggle — hide on very small screens, also on lg in FR to keep nav fitting */}
               <Button 
                 variant="ghost" 
                 size="icon" 
                 onClick={toggleTheme} 
                 data-testid="theme-toggle-btn"
                 aria-label="Toggle theme"
-                className="hidden sm:inline-flex transition-transform hover:scale-110 hover:bg-slate-100 dark:hover:bg-slate-800 navbar-icon-btn h-9 w-9"
+                className="hidden sm:max-lg:inline-flex xl:inline-flex transition-transform hover:scale-110 hover:bg-slate-100 dark:hover:bg-slate-800 navbar-icon-btn h-8 w-8 lg:h-9 lg:w-9"
               >
                 {theme === 'light' ? (
                   <Moon className="h-4 w-4 sm:h-5 sm:w-5 navbar-icon text-slate-900" />
@@ -174,7 +176,7 @@ const Navbar = () => {
                 <button
                   onClick={() => changeLanguage('en')}
                   data-testid="language-en-btn"
-                  className={`px-2 py-1 sm:px-2.5 sm:py-1.5 text-xs font-semibold transition-all duration-200 ${
+                  className={`px-1.5 py-1 lg:px-2 lg:py-1 xl:px-2.5 xl:py-1.5 text-xs font-semibold transition-all duration-200 ${
                     i18n.language === 'en' || i18n.language?.startsWith('en')
                       ? 'bg-primary text-white'
                       : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -186,7 +188,7 @@ const Navbar = () => {
                 <button
                   onClick={() => changeLanguage('fr')}
                   data-testid="language-fr-btn"
-                  className={`px-2 py-1 sm:px-2.5 sm:py-1.5 text-xs font-semibold transition-all duration-200 ${
+                  className={`px-1.5 py-1 lg:px-2 lg:py-1 xl:px-2.5 xl:py-1.5 text-xs font-semibold transition-all duration-200 ${
                     i18n.language === 'fr' || i18n.language?.startsWith('fr')
                       ? 'bg-primary text-white'
                       : 'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -207,7 +209,7 @@ const Navbar = () => {
                       variant="ghost" 
                       size="icon" 
                       data-testid="user-menu-btn"
-                      className="relative hover:bg-slate-100 dark:hover:bg-slate-800 h-9 w-9"
+                      className="relative hover:bg-slate-100 dark:hover:bg-slate-800 h-8 w-8 lg:h-9 lg:w-9"
                     >
                       {user.picture ? (
                         <img 
@@ -227,8 +229,12 @@ const Navbar = () => {
                       <p className="font-semibold text-foreground">{user.name}</p>
                       <p className="text-sm text-muted-foreground truncate">{user.email}</p>
                     </div>
-                    {/* Mobile-only items: Messages & Theme */}
-                    <div className="sm:hidden py-1 border-b border-border">
+                    {/* Always-available shortcuts (Messages, Theme, Sell) — also accessible from main navbar at certain breakpoints */}
+                    <div className="py-1 border-b border-border">
+                      <DropdownMenuItem onClick={() => { setSellModalOpen(true); }} className="cursor-pointer xl:hidden" data-testid="dropdown-sell-link">
+                        <DollarSign className="mr-3 h-4 w-4 text-muted-foreground" />
+                        {t('nav.sell')}
+                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => navigate('/messages')} className="cursor-pointer">
                         <MessageCircle className="mr-3 h-4 w-4 text-muted-foreground" />
                         Messages
