@@ -1,6 +1,72 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter195 — Dealer License Admin Operationalization (Feb 7, 2026) ✅
+## Latest: iter196 — In-App Messaging Transaction Gate + Admin Pending-Reviews Card (Feb 7, 2026) ✅
+
+User requested **Option B** from roadmap — In-App Messaging — gated to post-transaction parties only, with offline email alerts and a bonus admin-dashboard widget for pending dealer-license reviews.
+
+### P0 — Messaging Transaction Gate ✅
+**`POST /api/messages`** now enforces a strict gate via `_can_open_thread()` in `routes/messages.py`:
+
+| Scenario | Result |
+|---|---|
+| Admin (any) | ✅ allowed |
+| Existing conversation reply | ✅ allowed (no re-check) |
+| No `listing_id` (regular user) | 🔒 403 `thread_requires_listing_context` |
+| Listing not found | 🔒 403 `listing_not_found` |
+| Marketplace/Lots/Storage, auction not yet ended | 🔒 403 `auction_not_ended` |
+| Marketplace/Lots/Storage, ended, sender = winner or seller | ✅ allowed |
+| Marketplace/Lots/Storage, ended, sender ≠ either party | 🔒 403 `not_party_to_transaction` |
+| Vehicle, `unlock_paid_at` is null | 🔒 403 `vehicle_unlock_fee_unpaid` |
+| Vehicle, paid, winner ↔ seller | ✅ allowed |
+| Vehicle, paid, winner → not the seller | 🔒 403 `must_message_seller` |
+
+All 6 error codes return `{detail: {code, message_en, message_fr}}` for bilingual surfacing.
+
+### P0 — Offline SendGrid Email Alerts ✅
+- `ws_managers.py::ConnectionManager.is_user_online(user_id)` — checks if any active WebSocket session exists for the user.
+- `services/email_notifications.py::send_new_message_email()` — bilingual EN/FR template ("💬 New message from {sender} · Nouveau message"), 200-char preview, deep-link CTA `/messages?conversation={id}`.
+- Wiring in `routes/messages.py::send_message()` line 256-270 — when the recipient is **not** in any WS session at message-send time, it fires the email. Wrapped in try/except so SendGrid failures never break the message flow.
+- **Live verified**: SendGrid logged `status_code=202` for offline recipient `iter196seller@test.com`.
+
+### P0 — Admin Dashboard "Pending Reviews" Card + Vehicles Red Dot ✅
+- `AdminDashboard.js` polls `GET /api/admin/dealer-licenses?status=pending` every 60s into `pendingDealerLicenses` state.
+- **KPI card** (top stats row): Renders ONLY when count > 0 (per user's Option B). Red styling, `ShieldAlert` icon, `animate-pulse`, click → jumps to `Vehicles → Dealer Licenses`. `data-testid="admin-pending-reviews-card"` / `admin-pending-reviews-count`.
+- **Red dot** on the Vehicles primary tab — shows count up to 99+, identical hide-when-zero behavior, `data-testid="admin-vehicles-pending-dot"`.
+- Both share the same state — single fetch, no duplicate API calls.
+
+### P1 — Frontend Bilingual Error Toast ✅
+- `MessageSellerModal.js` — wired `useTranslation()`, extracts `detail.message_en` / `detail.message_fr` from the 403 response, falls back to string-shape detail for legacy errors. Locale resolved from `i18n.language`. No more `[object Object]`.
+- `MessagesPage.js` — added `extractGateError()` helper used in both `startNewConversation()` and `sendMessage()` catch blocks. 6-second toast duration so users have time to read the gating reason.
+
+### Verification — 14/14 PASS
+- **Unit suite** (`tests/test_messaging_gate_iter196.py`) — 8 tests covering all gate paths + admin bypass + existing-conversation reply.
+- **HTTP suite** (`tests/test_messaging_gate_iter196_http.py`, created by testing agent) — 6 tests against the live preview endpoint.
+- New `tests/conftest.py` — auto-adds `/app/backend` to `sys.path` so pytest works without explicit `PYTHONPATH`.
+- **Visual smoke** — admin home with 2 seeded pending licenses shows the red KPI card (count=2) + red dot on Vehicles tab (count=2). After deleting both, both elements disappear (count=0 → null).
+
+### Files changed (iter196)
+- **Backend**:
+  - `routes/messages.py` (+ ~140 lines: `_can_open_thread()` gate, bilingual error map, offline-email trigger)
+  - `ws_managers.py` (+ `is_user_online()` on global `ConnectionManager`)
+  - `services/email_notifications.py` (+ `send_new_message_email()` ~50 lines, bilingual template)
+  - `tests/conftest.py` (NEW — pytest path auto-config)
+  - `tests/test_messaging_gate_iter196.py` (NEW — 8 unit tests)
+  - `tests/test_messaging_gate_iter196_http.py` (NEW — 6 HTTP tests, by testing agent)
+- **Frontend**:
+  - `pages/AdminDashboard.js` (+ pendingDealerLicenses state + 60s polling + conditional KPI card + red dot)
+  - `components/MessageSellerModal.js` (bilingual error extraction)
+  - `pages/MessagesPage.js` (`extractGateError()` helper + bilingual toasts in both send paths)
+
+### Operational outcome
+- Buyers and sellers can ONLY exchange messages through the platform once the auction has ended (or for vehicles, once the 2.5% unlock fee has been paid). Anyone else gets a clean bilingual error toast.
+- Offline recipients receive a SendGrid email pointing them to `/messages` so no message is missed.
+- Admins see at-a-glance on the home dashboard exactly how many dealer licenses are awaiting review — and the badge persists on the Vehicles tab everywhere they navigate.
+
+⚠️ **Production note**: All changes are in PREVIEW. Redeploy from Emergent dashboard to push to https://bidvex.com.
+
+---
+
+## Earlier: iter195 — Dealer License Admin Operationalization (Feb 7, 2026) ✅
 
 User asked for 3 P0/P1 items to make the iter194 dealer-license flow fully operational from a browser without API calls.
 
