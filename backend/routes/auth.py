@@ -764,8 +764,10 @@ async def change_password(
         if not user_doc:
             raise HTTPException(status_code=404, detail="User not found")
 
-        # Verify current password
-        if not verify_password(request.current_password, user_doc.get("password", "")):
+        # Verify current password — admin-created accounts store the hash under
+        # `password_hash`; regular signup uses `password`. Mirror the login flow.
+        stored_password = user_doc.get("password") or user_doc.get("password_hash", "")
+        if not stored_password or not verify_password(request.current_password, stored_password):
             raise HTTPException(status_code=400, detail="Current password is incorrect")
 
         # Validate new password strength
@@ -780,15 +782,20 @@ async def change_password(
         if request.current_password == new_pw:
             raise HTTPException(status_code=400, detail="New password must be different from the current one")
 
-        # Hash and save
+        # Hash and save — write to canonical `password` field, drop legacy `password_hash`,
+        # and clear the forced-reset flag for admin-created accounts.
         hashed = hash_password(new_pw)
         await db.users.update_one(
             {"id": current_user["id"]},
-            {"$set": {
-                "password": hashed,
-                "password_changed_at": datetime.now(timezone.utc).isoformat(),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }}
+            {
+                "$set": {
+                    "password": hashed,
+                    "password_changed_at": datetime.now(timezone.utc).isoformat(),
+                    "password_reset_required": False,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                },
+                "$unset": {"password_hash": ""},
+            }
         )
 
         # Send confirmation email (raw HTML — bypasses broken SendGrid template)
