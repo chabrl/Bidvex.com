@@ -9,7 +9,13 @@
 - Email: p0bugtest@example.com
 - Password: TestBuyer123!
 - Role: user (regular buyer); phone_verified=true, id_verified=true
-- Notes: created 2026-05-04 for the iter181 P0 sprint and reused by iter182 promotion tests.
+- Notes: created 2026-05-04 for the iter181 P0 sprint. ⚠️ iter189 testing agent found this login returns 401 on the preview env — password may have rotated. Use the replacement below if it fails.
+
+## iter189 Test buyer (replacement — works on preview env)
+- Email: iter189buyer@test.com
+- Password: TestBuyer123!
+- Role: user; terms_accepted + ai_disclosure_accepted
+- Notes: created 2026-02-07 during iter189 consolidated test (id 93aa21c2-4e41-4235-a382-d4b8c8836d41).
 
 ## Legacy test buyer (kept for backward compat — may not log in if password reset on prod)
 - Email: abc@gmail.com
