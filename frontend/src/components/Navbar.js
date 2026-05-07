@@ -6,7 +6,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { 
   Moon, Sun, User, LogOut, LayoutDashboard, 
   MessageCircle, DollarSign, Shield, Lock, Menu, X,
-  Home, ShoppingBag, Gavel, ChevronDown, Car, Building2
+  ShoppingBag, Gavel, ChevronDown, Car, Building2
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -61,7 +61,6 @@ const Navbar = () => {
   const showVehicleComingSoon = vehicleEnabled === false;
 
   const navLinks = [
-    { path: '/', label: t('nav.home'), icon: Home },
     { path: '/marketplace', label: t('nav.marketplace'), icon: ShoppingBag },
     { path: '/lots', label: t('nav.lotsAuction'), icon: Gavel },
     { path: '/storage-auctions', label: t('nav.storageAuctions', 'Storage Auctions'), icon: Lock },
@@ -129,14 +128,12 @@ const Navbar = () => {
                 <Button 
                   variant="ghost" 
                   size="sm"
-                  className="hidden lg:inline-flex text-sm font-medium text-foreground/80 hover:text-foreground hover:bg-accent whitespace-nowrap px-2 lg:px-2 xl:px-2.5 2xl:px-3"
+                  className="hidden lg:inline-flex text-sm font-medium text-foreground/80 hover:text-foreground hover:bg-accent whitespace-nowrap px-2 lg:px-2.5 xl:px-3"
                   onClick={() => setSellModalOpen(true)}
                   data-testid="nav-sell-button"
-                  aria-label={t('nav.sell')}
-                  title={t('nav.sell')}
                 >
-                  <DollarSign className="w-4 h-4 lg:mr-0 2xl:mr-1.5" />
-                  <span className="hidden 2xl:inline">{t('nav.sell')}</span>
+                  <DollarSign className="w-4 h-4 mr-1 lg:mr-1.5" />
+                  {t('nav.sell')}
                 </Button>
               )}
             </div>
