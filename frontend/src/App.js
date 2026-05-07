@@ -87,6 +87,8 @@ const ResubscribePage = lazy(() => import('./pages/ResubscribePage'));
 const VehicleAuctionsRoute = lazy(() => import('./pages/vehicles/VehicleAuctionsRoute'));
 const VehicleDetailPage = lazy(() => import('./pages/vehicles/VehicleDetailPage'));
 const CreateVehicleListingPage = lazy(() => import('./pages/vehicles/CreateVehicleListingPage'));
+const DealerLicenseVerificationPage = lazy(() => import('./pages/vehicles/DealerLicenseVerificationPage'));
+const VehicleUnlockPage = lazy(() => import('./pages/vehicles/VehicleUnlockPage'));
 const SellerRegistrationPage = lazy(() => import('./pages/vehicles/SellerRegistrationPage'));
 const MyVehicleListingsPage = lazy(() => import('./pages/vehicles/MyVehicleListingsPage'));
 const VehicleInvoicesPage = lazy(() => import('./pages/vehicles/VehicleInvoicesPage'));
@@ -403,6 +405,12 @@ const App = () => {
           <Route path="/vehicle-auctions/:id" element={<VehicleDetailPage />} />
           <Route path="/vehicle-auctions/create" element={
             <ProtectedRoute><CreateVehicleListingPage /></ProtectedRoute>
+          } />
+          <Route path="/vehicle-auctions/dealer-license" element={
+            <ProtectedRoute><DealerLicenseVerificationPage /></ProtectedRoute>
+          } />
+          <Route path="/vehicle-auctions/:id/unlock" element={
+            <ProtectedRoute><VehicleUnlockPage /></ProtectedRoute>
           } />
           <Route path="/vehicle-auctions/seller/register" element={
             <ProtectedRoute><SellerRegistrationPage /></ProtectedRoute>

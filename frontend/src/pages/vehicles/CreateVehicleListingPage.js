@@ -163,6 +163,8 @@ const CreateVehicleListingPage = () => {
     // Auction
     auction_type: 'timed',
     visibility: 'public',
+    auction_access: 'public_individual',  // iter194 — Public | Licensed Only
+    run_status: 'run_and_drive',          // iter194 — Run & Drive | Starts Only | Non-Operational
     start_time: '',
     end_time: '',
     starting_price: '',
@@ -173,7 +175,7 @@ const CreateVehicleListingPage = () => {
     deposit_amount: '500',
     deposit_type: 'fixed',
     currency: 'CAD',
-    payment_method: 'stripe',
+    // payment_method removed — iter194: dealer transactions are off-platform; BidVex only collects unlock fee from buyer at win
     
     // Description
     title: '',
@@ -347,7 +349,9 @@ const CreateVehicleListingPage = () => {
         deposit_amount: formData.requires_deposit && formData.deposit_amount ? parseFloat(formData.deposit_amount) : null,
         deposit_type: formData.requires_deposit ? formData.deposit_type : null,
         currency: formData.currency,
-        payment_method: formData.payment_method,
+        // payment_method removed (iter194)
+        auction_access: formData.auction_access,
+        run_status: formData.run_status,
         title: formData.title,
         description: formData.description,
         features: formData.features,
@@ -986,23 +990,81 @@ const CreateVehicleListingPage = () => {
               </p>
             </div>
 
-            {/* Payment Method (Spec Feature 3) */}
-            <div className="space-y-2 p-4 bg-slate-50 rounded-lg" data-testid="vehicle-payment-method-section">
-              <Label>{t('createListing.paymentMethodLabel')}</Label>
-              <div className="grid grid-cols-1 gap-2">
+            {/* iter194 — Auction Access Type (Public vs Licensed Only) */}
+            <div className="space-y-2 p-4 bg-slate-50 rounded-lg" data-testid="vehicle-auction-access-section">
+              <Label className="text-sm font-semibold">{t('vehicleDealer.auctionAccessTitle')}</Label>
+              <p className="text-xs text-slate-500">{t('vehicleDealer.auctionAccessDesc')}</p>
+              <div className="grid grid-cols-1 gap-2 mt-2">
                 {[
-                  { v: 'stripe',     label: t('createListing.paymentMethodStripe'),     sub: t('createListing.paymentMethodStripeBadge') + ' — ' + t('createListing.paymentMethodStripeHelp') },
-                  { v: 'cash',       label: t('createListing.paymentMethodCash'),       sub: t('createListing.paymentMethodCashHelp') },
-                  { v: 'e-transfer', label: t('createListing.paymentMethodETransfer'),  sub: t('createListing.paymentMethodETransferHelp') },
+                  { v: 'public_individual', label: t('vehicleDealer.accessPublic'), desc: t('vehicleDealer.accessPublicDesc') },
+                  { v: 'licensed_only',     label: t('vehicleDealer.accessLicensed'), desc: t('vehicleDealer.accessLicensedDesc') },
                 ].map((opt) => (
-                  <label key={opt.v} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer ${formData.payment_method === opt.v ? 'border-blue-500 bg-blue-50' : 'border-slate-200'}`}>
-                    <input type="radio" name="vehicle_payment_method" value={opt.v} checked={formData.payment_method === opt.v} onChange={(e) => updateField('payment_method', e.target.value)} data-testid={`vehicle-pm-${opt.v}`} />
+                  <label
+                    key={opt.v}
+                    className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${formData.auction_access === opt.v ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}
+                  >
+                    <input
+                      type="radio"
+                      name="vehicle_auction_access"
+                      value={opt.v}
+                      checked={formData.auction_access === opt.v}
+                      onChange={(e) => updateField('auction_access', e.target.value)}
+                      data-testid={`vehicle-access-${opt.v.replace('_', '-')}`}
+                      className="mt-0.5"
+                    />
                     <div>
                       <span className="font-medium text-sm">{opt.label}</span>
-                      <p className="text-xs text-slate-500">{opt.sub}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{opt.desc}</p>
                     </div>
                   </label>
                 ))}
+              </div>
+            </div>
+
+            {/* iter194 — Vehicle Start/Run Status */}
+            <div className="space-y-2 p-4 bg-slate-50 rounded-lg" data-testid="vehicle-run-status-section">
+              <Label className="text-sm font-semibold">{t('vehicleDealer.runStatusTitle')}</Label>
+              <p className="text-xs text-slate-500">{t('vehicleDealer.runStatusDesc')}</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2">
+                {[
+                  { v: 'run_and_drive',   label: t('vehicleDealer.runDrive'),       desc: t('vehicleDealer.runDriveDesc'),       icon: '🟢' },
+                  { v: 'starts_only',     label: t('vehicleDealer.startsOnly'),     desc: t('vehicleDealer.startsOnlyDesc'),     icon: '🟡' },
+                  { v: 'non_operational', label: t('vehicleDealer.nonOperational'), desc: t('vehicleDealer.nonOperationalDesc'), icon: '🔴' },
+                ].map((opt) => (
+                  <label
+                    key={opt.v}
+                    className={`flex flex-col gap-1 p-3 rounded-lg border cursor-pointer transition-colors ${formData.run_status === opt.v ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="vehicle_run_status"
+                        value={opt.v}
+                        checked={formData.run_status === opt.v}
+                        onChange={(e) => updateField('run_status', e.target.value)}
+                        data-testid={`vehicle-run-${opt.v.replace(/_/g, '-')}`}
+                      />
+                      <span className="text-xl">{opt.icon}</span>
+                      <span className="font-medium text-sm">{opt.label}</span>
+                    </div>
+                    <p className="text-xs text-slate-500 ml-6">{opt.desc}</p>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* iter194 — Direct Transaction Policy notice (replaces payment method picker) */}
+            <div className="p-4 rounded-lg border-2 border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800" data-testid="vehicle-direct-transaction-notice">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-sm text-amber-900 dark:text-amber-200 mb-1">
+                    {t('vehicleDealer.directTransactionTitle')}
+                  </p>
+                  <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
+                    {t('vehicleDealer.directTransactionBody')}
+                  </p>
+                </div>
               </div>
             </div>
 

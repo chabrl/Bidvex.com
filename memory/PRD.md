@@ -1,6 +1,94 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter193 — Deep i18n Migration (Storage + Homepage + Legal Shield) (Feb 7, 2026) ✅
+## Latest: iter194 — Vehicle Dealer Listing Flow Upgrade (Feb 7, 2026) ✅
+
+User requested 4 enhancements to the vehicle listing flow for licensed dealers + a 2.5% net unlock-fee model for buyer access to dealer contact info.
+
+### Backend (new + modified)
+**Models** (`vehicle_models.py`):
+- 3 new enums: `AuctionAccessType` (public_individual | licensed_only), `VehicleRunStatus` (run_and_drive | starts_only | non_operational), `DealerLicenseVerificationStatus` (none | pending | approved | rejected | expired)
+- `VehicleListingCreate` + `VehicleListing` got `auction_access` + `run_status` fields
+- `VehicleListing` got `unlock_required` + `unlock_paid_at` + `unlock_payment_intent_id` + `unlock_amount_charged` + `unlock_platform_net`
+- 4 new request/response models: `DealerLicenseSubmit`, `DealerLicense`, `DealerLicenseAdminAction`, `UnlockFeeQuote`, `UnlockFeeIntent`, `DealerContactReveal`
+
+**New routes** (`/app/backend/routes/vehicle_dealer_extras.py`):
+- `GET /api/dealer-licenses/me` — buyer fetches verification status
+- `POST /api/dealer-licenses` — submit (license #, jurisdiction, expiry, document URL)
+- `GET /api/admin/dealer-licenses` — admin list pending/all
+- `POST /api/admin/dealer-licenses/{id}/decision` — approve / reject
+- `GET /api/vehicles/{id}/unlock-quote` — fee breakdown (winner only)
+- `POST /api/vehicles/{id}/unlock-fee/checkout` — Stripe PaymentIntent creation
+- `POST /api/vehicles/{id}/unlock-fee/confirm` — verify Stripe success → flip `unlock_paid_at`
+- `GET /api/vehicles/{id}/dealer-contact` — gated by `unlock_paid_at` (returns 402 if unpaid)
+
+**Modified `/api/vehicles` (POST)**:
+- Validates `auction_access` + `run_status`; rejects 403 if private seller tries `licensed_only`
+
+**Modified `/api/vehicle-bids` (POST)**:
+- Adds licensed-only gate. If listing.auction_access=`licensed_only`, checks dealer_licenses collection for status=`approved` AND non-expired; otherwise returns 403 with bilingual error.
+
+**2.5% Net Revenue Math** (the "platform always gets full 2.5%"):
+```
+total_charged_to_buyer = (winning_bid * 2.5% + 0.30) / (1 - 0.029)
+stripe_fee  = total_charged_to_buyer - net
+platform_net = winning_bid * 2.5%   (always)
+```
+Verified: $1k bid → $25 net + $1.06 Stripe = $26.06; $50k bid → $1,250 net + $37.64 Stripe = $1,287.64. BidVex receives the full 2.5% in every case.
+
+**Background migration** runs once on server startup — backfills `auction_access='public_individual'` + `run_status='run_and_drive'` on any pre-iter194 listings.
+
+### Frontend (new + modified)
+**Modified `CreateVehicleListingPage.js`** (Step 5: Auction Settings):
+- Removed Payment Method picker (Stripe/Cash/E-Transfer) — gone entirely
+- Added 2-option Auction Access selector (Public — Individuals & Dealers / Licensed Dealers Only)
+- Added 3-option Vehicle Start/Run Status selector (Run & Drive / Starts Only / Non-Operational, with 🟢🟡🔴 indicators)
+- Added Direct Transaction Policy notice (yellow alert box) explaining off-platform settlement
+
+**New page `DealerLicenseVerificationPage.js`** (`/vehicle-auctions/dealer-license`):
+- Form: license #, jurisdiction, expiry date, document upload (PDF/JPG)
+- Status dashboard: pending / approved / rejected / expired with badges
+- Allows resubmit if rejected or expired
+
+**New page `VehicleUnlockPage.js`** (`/vehicle-auctions/:id/unlock`):
+- Winner sees fee breakdown card (winning bid + 2.5% net + Stripe fee = total)
+- Mandatory bilingual disclosure: "This fee covers the BidVex platform service only..."
+- Stripe Elements card form
+- After successful payment, page swaps to ContactReveal showing dealer name, phone, email, business name, full pickup address
+
+**Modified `VehicleDetailPage.js`** (bid gate):
+- Disables "Place Bid" button when `auction_access=licensed_only` AND user license !== `approved`
+- Shows "Verify My Dealer License" CTA in a notice card linking to verification page
+
+**i18n** — 62 new keys per language under `vehicleDealer.*` namespace (EN + FR), including the legally-required mandatory bilingual unlock-fee disclosure text from spec.
+
+### Files changed (iter194)
+- **Backend**:
+  - `models/vehicle_models.py` (+87 lines: 3 enums + 6 models + new fields on existing models)
+  - `routes/vehicles.py` (+licensed-only enforcement + new fields on listing creation)
+  - `routes/vehicle_dealer_extras.py` (NEW, ~270 lines)
+  - `server.py` (router registration + startup migration hook)
+- **Frontend**:
+  - `App.js` (+2 lazy routes)
+  - `pages/vehicles/CreateVehicleListingPage.js` (Payment Method → Auction Access + Run Status + Direct Transaction Notice)
+  - `pages/vehicles/VehicleDetailPage.js` (license-only bid gate + verification CTA)
+  - `pages/vehicles/DealerLicenseVerificationPage.js` (NEW, ~270 lines)
+  - `pages/vehicles/VehicleUnlockPage.js` (NEW, ~270 lines)
+  - `locales/en.json` + `locales/fr.json` (+62 keys each)
+
+### Verification
+- ✅ Backend dealer-license submit → admin approve → status flips to "approved" — full E2E flow
+- ✅ License submit with already-expired date returns 400 with bilingual error
+- ✅ Vehicle POST accepts new `auction_access` + `run_status` enum values
+- ✅ Unlock-quote endpoint exists; returns 404 for invalid IDs (not 500)
+- ✅ Math gross-up verified: 5 bid amounts $1k → $50k all preserve full 2.5% platform net
+- ✅ All 3 new pages render in EN + FR with zero JS errors and zero compile problems
+- ✅ Background migration runs idempotently on startup
+
+⚠️ **Production note:** All changes are in PREVIEW only. Redeploy from Emergent dashboard to push to https://bidvex.com.
+
+---
+
+## Earlier: iter193 — Deep i18n Migration (Storage + Homepage + Legal Shield) (Feb 7, 2026) ✅
 
 User requested 100% i18n coverage for HomePage, all Storage pages, and the Legal Shield block in CreateMultiItemListing. No bilingual `EN · FR` mashups, no `<strong>EN:</strong>...<strong>FR:</strong>` paragraphs. Strict single-language rendering tied to the global toggle.
 

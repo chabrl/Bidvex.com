@@ -32,12 +32,16 @@ from models.vehicle_models import (
     VehicleAuctionType, VehicleAuctionVisibility, BidStatus,
     VehicleBodyType, TransmissionType, FuelType, DrivetrainType,
     TitleStatus, OwnershipStatus, LienStatus,
+    # iter194 — dealer access + run status + license verification
+    AuctionAccessType, VehicleRunStatus, DealerLicenseVerificationStatus,
     # Models
     VehicleSellerCreate, VehicleSeller, VehicleSellerDocument,
     VehicleListingCreate, VehicleListing, VehicleMedia, VehicleConditionReport,
     VehicleBidCreate, VehicleBid, VehicleBidDeposit,
     VehicleInvoice, VehicleInvoiceLineItem,
     LegalAcceptance, VehicleAuditLog,
+    DealerLicenseSubmit, DealerLicense, DealerLicenseAdminAction,
+    UnlockFeeQuote, UnlockFeeIntent, DealerContactReveal,
     validate_vin
 )
 from services.vin_decoder import decode_vin as vin_decode_service
@@ -588,6 +592,16 @@ async def create_vehicle_listing(
             status_code=403,
             detail="Private sellers can only create public auctions"
         )
+
+    # iter194: Only licensed dealers can restrict bidder access to licensed-only
+    if (
+        listing_data.auction_access == AuctionAccessType.LICENSED_ONLY
+        and seller["seller_type"] != "dealer"
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Only licensed dealers can create licensed-only auctions"
+        )
     
     # Decode VIN
     vin_result = await vin_decode_service(listing_data.vin)
@@ -645,6 +659,8 @@ async def create_vehicle_listing(
         # Auction Settings
         "auction_type": listing_data.auction_type.value,
         "visibility": listing_data.visibility.value,
+        "auction_access": listing_data.auction_access.value,    # iter194
+        "run_status": listing_data.run_status.value,            # iter194
         "start_time": listing_data.start_time,
         "end_time": listing_data.end_time,
         "original_end_time": listing_data.end_time,
@@ -1058,6 +1074,40 @@ async def place_vehicle_bid(
         seller = await db.vehicle_sellers.find_one({"user_id": user["id"]})
         if not seller or seller["seller_type"] != "dealer":
             raise HTTPException(status_code=403, detail="This auction is for licensed dealers only")
+
+    # iter194: Licensed-only auction gate — buyer must have approved dealer license verification
+    if listing.get("auction_access") == AuctionAccessType.LICENSED_ONLY.value:
+        license_doc = await db.dealer_licenses.find_one(
+            {"user_id": user["id"]},
+            {"_id": 0, "status": 1, "expiry_date": 1}
+        )
+        is_approved = license_doc and license_doc.get("status") == DealerLicenseVerificationStatus.APPROVED.value
+        if not is_approved:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "dealer_license_required",
+                    "message_en": "This auction is restricted to licensed dealers. Please complete dealer-license verification.",
+                    "message_fr": "Cette enchère est réservée aux concessionnaires agréés. Veuillez compléter la vérification de votre permis.",
+                }
+            )
+        # Check expiry
+        expiry = license_doc.get("expiry_date") if license_doc else None
+        if expiry:
+            if isinstance(expiry, str):
+                try:
+                    expiry = datetime.fromisoformat(expiry.replace('Z', '+00:00'))
+                except Exception:
+                    expiry = None
+            if expiry and expiry < datetime.now(timezone.utc):
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "code": "dealer_license_expired",
+                        "message_en": "Your dealer license has expired. Please re-verify before bidding.",
+                        "message_fr": "Votre permis de concessionnaire a expiré. Veuillez le renouveler avant d'enchérir.",
+                    }
+                )
     
     # Check auction timing
     now = datetime.now(timezone.utc)

@@ -549,6 +549,20 @@ try:
     from routes.vehicle_settlement import vehicle_settlement_router
     api_router.include_router(vehicle_settlement_router)
 
+    # iter194 — Vehicle dealer license + 2.5% unlock fee
+    from routes.vehicle_dealer_extras import router as vehicle_dealer_router, migrate_existing_vehicle_listings
+    api_router.include_router(vehicle_dealer_router)
+
+    # Run one-shot migration to backfill auction_access + run_status on existing listings
+    @app.on_event("startup")
+    async def _vehicle_dealer_migration():
+        try:
+            modified = await migrate_existing_vehicle_listings()
+            if modified:
+                logger.info(f"[iter194] backfilled auction_access/run_status on {modified} vehicle listings")
+        except Exception as e:
+            logger.warning(f"[iter194] migration failed: {e}")
+
     from routes.storage_auctions import storage_router
     api_router.include_router(storage_router)
 

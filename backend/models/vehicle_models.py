@@ -6,7 +6,7 @@ Completely separate from general marketplace
 
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Optional, List, Dict, Any, Literal
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 import re
 
@@ -121,6 +121,28 @@ class VehicleAuctionVisibility(str, Enum):
     PUBLIC = "public"
     DEALER_ONLY = "dealer_only"
     AUCTIONEER_ONLY = "auctioneer_only"
+
+
+class AuctionAccessType(str, Enum):
+    """iter194 — Dealer-controlled bidder access."""
+    PUBLIC_INDIVIDUAL = "public_individual"  # Open to all verified buyers
+    LICENSED_ONLY = "licensed_only"          # Restricted to licensed_dealer-verified buyers
+
+
+class VehicleRunStatus(str, Enum):
+    """iter194 — Mechanical operational state (Copart-style)."""
+    RUN_AND_DRIVE = "run_and_drive"      # Starts, shifts, drives
+    STARTS_ONLY = "starts_only"          # Engine starts but does not drive
+    NON_OPERATIONAL = "non_operational"  # Does not start / major mechanical failure
+
+
+class DealerLicenseVerificationStatus(str, Enum):
+    """iter194 — Buyer dealer-license verification workflow."""
+    NONE = "none"
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    EXPIRED = "expired"
 
 
 class BidStatus(str, Enum):
@@ -329,6 +351,9 @@ class VehicleListingCreate(BaseModel):
     # Auction Settings
     auction_type: VehicleAuctionType
     visibility: VehicleAuctionVisibility = VehicleAuctionVisibility.PUBLIC
+    # iter194 — Dealer access controls (mandatory for dealer listings)
+    auction_access: AuctionAccessType = AuctionAccessType.PUBLIC_INDIVIDUAL
+    run_status: VehicleRunStatus = VehicleRunStatus.RUN_AND_DRIVE
     start_time: datetime
     end_time: datetime
     starting_price: float
@@ -426,6 +451,9 @@ class VehicleListing(BaseModel):
     # Auction Settings
     auction_type: VehicleAuctionType
     visibility: VehicleAuctionVisibility
+    # iter194 — Dealer access controls
+    auction_access: AuctionAccessType = AuctionAccessType.PUBLIC_INDIVIDUAL
+    run_status: VehicleRunStatus = VehicleRunStatus.RUN_AND_DRIVE
     start_time: datetime
     end_time: datetime
     original_end_time: datetime  # For tracking extensions
@@ -462,7 +490,14 @@ class VehicleListing(BaseModel):
     winner_id: Optional[str] = None
     final_price: Optional[float] = None
     sold_at: Optional[datetime] = None
-    
+
+    # iter194 — Buyer Unlock Flow (dealer contact gating)
+    unlock_required: bool = True
+    unlock_paid_at: Optional[datetime] = None
+    unlock_payment_intent_id: Optional[str] = None
+    unlock_amount_charged: Optional[float] = None    # Total charged to buyer (gross)
+    unlock_platform_net: Optional[float] = None      # 2.5% net to BidVex (excludes Stripe fees)
+
     # Fees
     buyer_premium_percent: float = 5.0  # 5% buyer premium
     platform_fee_percent: float = 2.5   # 2.5% platform fee
@@ -610,3 +645,72 @@ class VehicleAuditLog(BaseModel):
     reason: Optional[str] = None
     
     created_at: datetime = Field(default_factory=lambda: datetime.now())
+
+
+
+# ============= DEALER LICENSE VERIFICATION (iter194) =============
+
+class DealerLicenseSubmit(BaseModel):
+    """Buyer submits proof of dealer license to access licensed-only auctions."""
+    license_number: str = Field(..., min_length=2, max_length=64)
+    jurisdiction: str = Field(..., min_length=2, max_length=64)  # e.g. "QC", "ON", "BC"
+    expiry_date: datetime
+    document_url: str  # uploaded file path (use existing media upload endpoint)
+
+
+class DealerLicense(BaseModel):
+    """Dealer license verification record (one per user)."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    user_id: str
+    license_number: str
+    jurisdiction: str
+    expiry_date: datetime
+    document_url: str
+    status: DealerLicenseVerificationStatus = DealerLicenseVerificationStatus.PENDING
+    rejection_reason: Optional[str] = None
+    reviewed_by: Optional[str] = None
+    reviewed_at: Optional[datetime] = None
+    submitted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class DealerLicenseAdminAction(BaseModel):
+    """Admin approve/reject decision."""
+    decision: str  # "approve" | "reject"
+    rejection_reason: Optional[str] = None
+
+
+# ============= UNLOCK FEE (iter194) =============
+
+class UnlockFeeQuote(BaseModel):
+    """Returned by GET /api/vehicles/{id}/unlock-quote — buyer sees full breakdown."""
+    listing_id: str
+    winning_bid: float
+    platform_fee_percent: float = 2.5
+    platform_fee_net: float          # 2.5% of winning bid (BidVex's net revenue)
+    stripe_processing_fee: float     # Stripe's cut (so BidVex gets full 2.5% net)
+    total_charge_to_buyer: float     # platform_fee_net + stripe_processing_fee
+    currency: str = "CAD"
+
+
+class UnlockFeeIntent(BaseModel):
+    """Returned by POST /api/vehicles/{id}/unlock-fee/checkout."""
+    listing_id: str
+    payment_intent_id: str
+    client_secret: str
+    publishable_key: str
+    quote: UnlockFeeQuote
+
+
+class DealerContactReveal(BaseModel):
+    """Post-unlock dealer contact details (only returned after unlock_paid_at is set)."""
+    seller_name: str
+    seller_phone: Optional[str] = None
+    seller_email: Optional[str] = None
+    seller_business_name: Optional[str] = None
+    pickup_address: str
+    pickup_city: str
+    pickup_province: str
+    pickup_postal_code: str
+    additional_notes: Optional[str] = None

@@ -188,6 +188,21 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
   const [buyNowPreview, setBuyNowPreview] = useState(null);
   const [buyNowLoading, setBuyNowLoading] = useState(false);
   const [buyNowProcessing, setBuyNowProcessing] = useState(false);
+  // iter194 — Dealer license verification status (for licensed_only auctions)
+  const [dealerLicenseStatus, setDealerLicenseStatus] = useState(null);
+
+  // Fetch dealer license status if needed
+  useEffect(() => {
+    if (!user || !vehicle || vehicle.auction_access !== 'licensed_only') return;
+    axios.get(`${API}/dealer-licenses/me`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+    })
+      .then((r) => setDealerLicenseStatus(r.data?.status || 'none'))
+      .catch(() => setDealerLicenseStatus('none'));
+  }, [user, vehicle]);
+
+  const isLicensedOnly = vehicle?.auction_access === 'licensed_only';
+  const isLicenseVerified = dealerLicenseStatus === 'approved';
   
   // Real-time bidding data
   const { 
@@ -413,7 +428,7 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
               
               <Button 
                 onClick={handleBid}
-                disabled={bidding || !user || ((vehicle?.starting_price || 0) >= 10000 && !depositAuthorized)}
+                disabled={bidding || !user || ((vehicle?.starting_price || 0) >= 10000 && !depositAuthorized) || (isLicensedOnly && !isLicenseVerified)}
                 className="w-full h-14 text-lg bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
                 style={i18n.language === 'fr' ? { letterSpacing: '-0.02em' } : {}}
                 data-testid="place-bid-btn"
@@ -422,6 +437,11 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
                   <>{t('common.processing', 'Processing...')}</>
                 ) : !user ? (
                   <>{t("auction.loginToBid")}</>
+                ) : (isLicensedOnly && !isLicenseVerified) ? (
+                  <span className="flex items-center gap-2" data-testid="bid-btn-license-required">
+                    <Shield className="h-5 w-5" />
+                    {t('vehicleDealer.licenseRequired')}
+                  </span>
                 ) : ((vehicle?.starting_price || 0) >= 10000 && !depositAuthorized) ? (
                   <span className="flex flex-col items-center justify-center gap-0.5 leading-tight py-1" data-testid="bid-btn-deposit-required">
                     <span className="flex items-center gap-2">
@@ -437,6 +457,24 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
                   </>
                 )}
               </Button>
+
+              {/* iter194 — Licensed-only gate: prompt verification if not approved */}
+              {isLicensedOnly && !isLicenseVerified && user && (
+                <div className="mt-2 p-3 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 text-xs" data-testid="licensed-only-gate">
+                  <p className="font-semibold text-amber-900 dark:text-amber-200 mb-1 flex items-center gap-1">
+                    🔒 {t('vehicleDealer.licensedOnlyBadge')}
+                  </p>
+                  <p className="text-amber-800 dark:text-amber-300 mb-2">{t('vehicleDealer.licensedOnlyTooltip')}</p>
+                  <Button
+                    size="sm"
+                    onClick={() => navigate('/vehicle-auctions/dealer-license')}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    data-testid="verify-dealer-license-btn"
+                  >
+                    {t('vehicleDealer.verifyMyLicense')}
+                  </Button>
+                </div>
+              )}
               
               {/* Buy Now */}
               {vehicle?.buy_now_price && displayBid < vehicle.buy_now_price && (
