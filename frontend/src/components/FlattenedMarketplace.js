@@ -216,17 +216,20 @@ const FlattenedMarketplace = ({
   const handleQuickBidSubmit = () => {
     const amount = parseFloat(bidAmount);
     if (isNaN(amount) || amount <= 0) {
-      toast.error('Please enter a valid bid amount');
+      toast.error(isFrench ? 'Veuillez entrer un montant valide' : 'Please enter a valid bid amount');
       return;
     }
-    
+
     if (amount <= (selectedItem?.current_price || 0)) {
-      toast.error('Bid must be higher than current price');
+      toast.error(isFrench ? "L'offre doit être supérieure au prix actuel" : 'Bid must be higher than current price');
       return;
     }
-    
-    // Show cost breakdown confirmation
-    setBidConfirmOpen(true);
+
+    // BUG FIX (Bug 2): Close the QuickBid modal FIRST to prevent two Radix Dialog
+    // overlays from stacking and producing a black screen. The BidConfirmation
+    // dialog then opens cleanly with a single overlay.
+    setQuickBidOpen(false);
+    setTimeout(() => setBidConfirmOpen(true), 0);
   };
 
   const confirmBid = async () => {
@@ -462,7 +465,11 @@ const FlattenedMarketplace = ({
       {selectedItem && (
         <BidConfirmationDialog
           isOpen={bidConfirmOpen}
-          onClose={() => setBidConfirmOpen(false)}
+          onClose={() => {
+            // BUG FIX (Bug 2): full state cleanup so no stale overlay/pointer-events lingers
+            setBidConfirmOpen(false);
+            setPlacingBid(false);
+          }}
           onConfirm={confirmBid}
           bidAmount={parseFloat(bidAmount) || 0}
           listingTitle={selectedItem && getLocalized(selectedItem, 'title')}

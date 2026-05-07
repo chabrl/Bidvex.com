@@ -61,6 +61,11 @@ const FEATURES = {
     standard: ['Search priority', 'Homepage placement', 'Category banner', 'Featured badge'],
     premium:  ['Search priority', 'Homepage placement', 'Category banner', 'Featured badge', 'Email blast', 'Social share', 'Featured Partner badge'],
   },
+  vehicle: {
+    basic:    ['Vehicle search priority', 'Homepage placement'],
+    standard: ['Vehicle search priority', 'Homepage placement', 'Vehicle category banner', 'Featured badge'],
+    premium:  ['Vehicle search priority', 'Homepage placement', 'Vehicle category banner', 'Featured badge', 'Email blast to vehicle waitlist', 'Social share'],
+  },
 };
 
 const HEADER_EN = {
@@ -68,12 +73,14 @@ const HEADER_EN = {
   lots: 'Promote Your Lot Auction',
   storage: 'Promote Your Storage Auction',
   partner: 'Promote Your Lot Auction',
+  vehicle: 'Promote Your Vehicle Auction',
 };
 const HEADER_FR = {
   marketplace: 'Promouvoir votre annonce',
   lots: 'Promouvoir votre vente aux enchères par lots',
   storage: 'Promouvoir votre enchère d\u2019entreposage',
   partner: 'Promouvoir votre vente aux enchères par lots',
+  vehicle: 'Promouvoir votre enchère de véhicule',
 };
 
 /**

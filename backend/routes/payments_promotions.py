@@ -50,6 +50,12 @@ PROMOTION_FEATURES = {
         "premium":  ["Search priority", "Homepage placement", "Category banner", "Featured badge",
                      "Email blast", "Social share", "Featured Partner badge"],
     },
+    "vehicle": {
+        "basic":    ["Vehicle search priority", "Homepage placement"],
+        "standard": ["Vehicle search priority", "Homepage placement", "Vehicle category banner", "Featured badge"],
+        "premium":  ["Vehicle search priority", "Homepage placement", "Vehicle category banner", "Featured badge",
+                     "Email blast to vehicle waitlist", "Social share"],
+    },
 }
 
 

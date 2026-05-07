@@ -74,6 +74,7 @@ import {
 } from '../../components/vehicles/AuctionRulesDisplay';
 import { formatListingPrice } from '../../utils/currencyFormatter';
 import SecurityDepositBanner from '../../components/SecurityDepositBanner';
+import ListingPromotionModal from '../../components/ListingPromotionModal';
 
 const API = API_BASE;
 
@@ -678,11 +679,13 @@ const VehicleBuyNowBody = ({ vehicle, preview, setPreview, loading, setLoading, 
 const VehicleDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const { user } = useAuth();
   const [vehicle, setVehicle] = useState(null);
   const [seller, setSeller] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showPromoModal, setShowPromoModal] = useState(false);
 
   const fetchVehicle = useCallback(async () => {
     try {
@@ -772,6 +775,26 @@ const VehicleDetailPage = () => {
                 totalSold={seller?.total_sold}
               />
             </div>
+
+            {/* iter189 Feature 2 — Vehicle Promote Button (owner-only, unpromoted only) */}
+            {user && vehicle?.seller_user_id === user.id && !vehicle?.is_promoted && (
+              <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="promote-vehicle-section">
+                <Button
+                  size="sm"
+                  onClick={() => setShowPromoModal(true)}
+                  className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white border-0"
+                  data-testid="promote-vehicle-btn"
+                >
+                  <TrendingUp className="mr-2 h-4 w-4" />
+                  {i18n.language === 'fr' ? 'Promouvoir ce véhicule' : 'Promote This Vehicle'}
+                </Button>
+                <span className="text-xs text-slate-500">
+                  {i18n.language === 'fr'
+                    ? 'Augmentez la visibilité auprès des acheteurs.'
+                    : 'Boost visibility and reach more buyers.'}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1236,6 +1259,16 @@ const VehicleDetailPage = () => {
           </div>
         </div>
       </div>
+
+      {/* iter189 Feature 2 — Vehicle Promotion Modal */}
+      {showPromoModal && vehicle && (
+        <ListingPromotionModal
+          onClose={() => setShowPromoModal(false)}
+          listingId={vehicle.id}
+          listingTitle={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+          listingType="vehicle"
+        />
+      )}
     </div>
   );
 };

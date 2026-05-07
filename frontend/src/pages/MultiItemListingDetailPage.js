@@ -34,6 +34,7 @@ import BidErrorGuide from '../components/BidErrorGuide';
 import VerificationRequiredModal from '../components/VerificationRequiredModal';
 import PrivateSaleBadge, { BusinessSellerBadge } from '../components/PrivateSaleBadge';
 import PublicBidHistory from '../components/PublicBidHistory';
+import ListingPromotionModal from '../components/ListingPromotionModal';
 import { HighStakesIndicator, HighStakesTimer, getHighStakesCardStyles, isHighStakes } from '../components/HighStakesBidCard';
 import { TrustScoreDisplay, TrustBadge } from '../components/SellerTrustScore';
 import { SellerReputationCard, SellerReviewsList } from '../components/SellerReputation';
@@ -61,6 +62,7 @@ const MultiItemListingDetailPage = () => {
   const [activeLotId, setActiveLotId] = useState(null);
   const [incrementInfo, setIncrementInfo] = useState(null);
   const [messageModalOpen, setMessageModalOpen] = useState(false);
+  const [showPromoModal, setShowPromoModal] = useState(false);
   const [ratingModalOpen, setRatingModalOpen] = useState(false);
   const [autoBidModalOpen, setAutoBidModalOpen] = useState(false);
   const [selectedLot, setSelectedLot] = useState(null);
@@ -531,6 +533,34 @@ const MultiItemListingDetailPage = () => {
                         >
                           View all reviews &rarr;
                         </Link>
+
+                        {/* iter189 Feature 2 — Lots Promote Button (owner-only, unpromoted only) */}
+                        {user && user.id === listing.seller_id && !listing.is_promoted && (
+                          <div className="mt-4 p-4 rounded-lg border-2 border-amber-200 dark:border-amber-800 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30" data-testid="promote-lots-section">
+                            <div className="flex items-start gap-3">
+                              <TrendingUp className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-sm text-amber-900 dark:text-amber-100 mb-1">
+                                  {i18n.language === 'fr' ? 'Boostez votre vente aux enchères par lots' : 'Boost Your Lot Auction'}
+                                </h4>
+                                <p className="text-xs text-amber-800 dark:text-amber-200 mb-3">
+                                  {i18n.language === 'fr'
+                                    ? 'Augmentez la visibilité et attirez plus d’acheteurs potentiels sur tous vos lots.'
+                                    : 'Increase visibility and reach more potential buyers across all your lots.'}
+                                </p>
+                                <Button
+                                  size="sm"
+                                  onClick={() => setShowPromoModal(true)}
+                                  className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white border-0"
+                                  data-testid="promote-lots-btn"
+                                >
+                                  <TrendingUp className="mr-2 h-4 w-4" />
+                                  {i18n.language === 'fr' ? 'Promouvoir cette vente' : 'Promote This Auction'}
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -1699,6 +1729,16 @@ const MultiItemListingDetailPage = () => {
           sellerId={listing.seller_id}
           listingId={listing.id}
           listingTitle={getLocalized(listing, 'title')}
+        />
+      )}
+
+      {/* iter189 Feature 2 — Lots Promotion Modal */}
+      {showPromoModal && listing && (
+        <ListingPromotionModal
+          onClose={() => setShowPromoModal(false)}
+          listingId={listing.id}
+          listingTitle={getLocalized(listing, 'title')}
+          listingType="lots"
         />
       )}
 

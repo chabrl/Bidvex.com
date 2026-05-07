@@ -24,12 +24,22 @@ axios.interceptors.response.use(
   async (error) => {
     const original = error.config;
     const status = error.response?.status;
-    const detail = error.response?.data;
+    const detail = error.response?.data?.detail;
     const alreadyRetried = original?._retry;
-    const isRefreshCall = original?.url?.includes('/auth/refresh');
-    const looksExpired = status === 401 && !alreadyRetried && !isRefreshCall;
-
-    if (!looksExpired) return Promise.reject(error);
+    const url = original?.url || '';
+    // Never recurse on the refresh call itself, nor on login/register/logout which return
+    // their own 401s for credential failures (not token expiry).
+    const isAuthExempt = /\/auth\/(refresh|login|register|logout|google)/.test(url);
+    // Prefer the backend's "token_expired" marker, but fall back to any 401 with a refresh
+    // token present — matches the iter180 bilingual error response shape.
+    const detailStr = typeof detail === 'string' ? detail : (detail?.error || detail?.code || '');
+    const isTokenExpired = status === 401 && (
+      detailStr === 'token_expired' || detailStr === 'Token expired' || detailStr === 'expired'
+      || !detailStr // generic 401 with empty detail → attempt refresh
+    );
+    if (!isTokenExpired || alreadyRetried || isAuthExempt) {
+      return Promise.reject(error);
+    }
 
     const refreshToken = localStorage.getItem('refresh_token');
     if (!refreshToken) return Promise.reject(error);

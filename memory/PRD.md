@@ -1,5 +1,59 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter189 — 7-Bug + 2-Feature Sprint (Feb 7, 2026) — IN PROGRESS / TESTING
+
+User-driven multi-bug sprint for BidVex Production. All 7 bugs + 2 features now closed; awaiting consolidated testing agent verification.
+
+### Bug 2 — Quick Bid Black Screen on Marketplace ✅ (FIXED)
+- **Root cause:** `FlattenedMarketplace.handleQuickBidSubmit` opened `BidConfirmationDialog` without closing the Quick Bid `Dialog` first → two Radix Portal overlays stacked + body.pointer-events=none locked → black screen.
+- **Fix:** `setQuickBidOpen(false); setTimeout(() => setBidConfirmOpen(true), 0)` so the first dialog fully unmounts before the second mounts. Also full state cleanup on BidConfirmationDialog.onClose (reset `placingBid`). Bilingual toast messages for validation failures (EN + FR).
+- **Verified live:** open dialog count dropped from 2 → 1; body pointer-events correctly scoped to single dialog.
+
+### Bug 5 — Global Silent Token Refresh ✅ (HARDENED)
+- **State:** Interceptor already installed at module-load in `AuthContext.js` (before app mount), covers all axios requests via default instance.
+- **Hardening:** scoped to `token_expired` detail (or generic 401 with empty detail); skips `/auth/refresh`, `/auth/login`, `/auth/register`, `/auth/logout`, `/auth/google` so login-credential failures don't incorrectly trigger refresh. Concurrent requests queued during in-flight refresh. Failure broadcasts `bidvex:auth:logout` event → AuthProvider clears state.
+- **Verified:** backend `/auth/refresh` returns new access + refresh pair; token rotation works (reused refresh token → 401).
+
+### Bug 1 — Full Site Responsiveness & 100% Zoom ✅ (ALREADY FIXED, VERIFIED)
+- Swept 4 viewports (1024, 1280, 1366, 1440) × 4 pages (/, /marketplace, /auth, /lots/:id) → **zero horizontal overflow** on all 16 combinations.
+- iter176 CSS guardrails (`max-width: 100vw` + `overflow-x: hidden` on html+body, `img { max-width: 100% }`) working as intended. No new code changes required.
+
+### Bug 3 — Marketplace Default Filter State ✅ (VERIFIED)
+- `MarketplacePage` resets `sidebarFilters` on fresh navigation (no query string, no preserveFilters state).
+- `MarketplaceSidebar` initializes all filter arrays empty; `/api/marketplace/items` (no params) returns all 3 active listings sorted correctly.
+
+### Bugs 4, 6, 7 ✅ (closed in earlier part of sprint — see handoff)
+- Bug 4: removed stale `currency_locked` in `ProfileUpdate` schema.
+- Bug 6: standardized `user.is_verified` across `payments.py` + `auctions_bids.py`.
+- Bug 7: deposit button injected into `MultiItemListingDetailPage.js`.
+
+### Feature 1 — Automated Promotion Activation ✅ (BACKEND COMPLETE)
+- `POST /api/payments/promote-listing` → Stripe checkout → `checkout.session.completed` webhook → `_handle_listing_promotion_paid` activates promotion fields on the correct collection.
+- Premium tier enqueues `social_share_queue` + `promotion_email_blast_queue` (24h delay) rows.
+- Scheduler runs `_promotion_email_blast_tick` every 5 min; `process_expired_promotions` downgrades expired boosts across all 4 collections hourly.
+
+### Feature 2 — Promotions Across All 4 Auction Types ✅
+- Added `vehicle` + `multi_item` keys to `PROMOTION_FEATURES` (frontend modal) + `PROMOTION_FEATURE_PACK` (backend webhook).
+- New UI triggers:
+  - **MultiItemListingDetailPage** (`/lots/:id`) — owner-only Promote block with `data-testid="promote-lots-section"` / `promote-lots-btn`. Renders `ListingPromotionModal` with `listingType="lots"`.
+  - **VehicleDetailPage** (`/vehicle-auctions/:id`) — owner-only Promote button (`promote-vehicle-btn`) in Seller Trust section. Renders `ListingPromotionModal` with `listingType="vehicle"`.
+  - Existing: `ListingDetailPage` (marketplace + lots-multi) + `StorageAuctionDetail` (storage).
+- Vehicle Auctions are currently behind Coming-Soon feature flag (iter176). When admin flips `vehicle_auctions_enabled` ON, the promote button becomes accessible via `VehicleAuctionsRoute` → `VehicleAuctionsPage` → `VehicleDetailPage`. Feature flag gate sits in route, not inside the detail page, so button IS present when flag is ON.
+
+### Files changed (iter189)
+- **Frontend:**
+  - `components/FlattenedMarketplace.js` — Bug 2 fix (close QB modal before BidConfirm, state cleanup)
+  - `contexts/AuthContext.js` — Bug 5 interceptor hardened (scoped error detail + auth route exemption)
+  - `pages/MultiItemListingDetailPage.js` — Feature 2 (Lots promote block + modal)
+  - `pages/vehicles/VehicleDetailPage.js` — Feature 2 (Vehicle promote button + modal + useAuth)
+  - `components/ListingPromotionModal.js` — Feature 2 (+vehicle features, EN/FR headers)
+- **Backend:**
+  - `routes/payments_promotions.py` — Feature 2 (+vehicle in PROMOTION_FEATURES)
+  - `routes/webhooks.py` — Feature 2 (+vehicle + multi_item in PROMOTION_FEATURE_PACK)
+
+---
+
+
 ## Latest: iter187/188 — 4 user-prioritized items + critical regression fix (May 6, 2026)
 
 User-driven follow-up after iter186 sign-off. All 4 priorities closed + 1 critical regression fixed mid-test.
