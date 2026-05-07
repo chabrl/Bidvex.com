@@ -369,7 +369,10 @@ class VehicleListingCreate(BaseModel):
     title: str
     description: str
     features: List[str] = []
-    
+
+    # iter198 — Pilot conversion attribution (e.g. "pilot-welcome-banner")
+    utm_source: Optional[str] = None
+
     @field_validator('vin')
     @classmethod
     def validate_vin_format(cls, v):

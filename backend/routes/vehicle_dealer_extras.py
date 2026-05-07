@@ -109,6 +109,28 @@ async def admin_list_dealer_licenses(
     return {"items": items, "total": len(items)}
 
 
+# iter198 — Pilot conversion attribution counter
+@router.get("/admin/pilot-conversions")
+async def admin_pilot_conversions(
+    utm_source: str = "pilot-welcome-banner",
+    user: dict = Depends(get_current_user),
+):
+    """
+    Admin: count vehicle listings sourced from a specific utm_source (default = pilot welcome banner).
+    Returns total and a sample of the most recent 25 listings (id, title, seller_id, created_at).
+    """
+    if user.get("role") not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    db = _get_db()
+    query = {"utm_source": utm_source}
+    total = await db.vehicle_listings.count_documents(query)
+    sample = await db.vehicle_listings.find(
+        query,
+        {"_id": 0, "id": 1, "title": 1, "seller_id": 1, "seller_user_id": 1, "created_at": 1, "status": 1},
+    ).sort("created_at", -1).limit(25).to_list(25)
+    return {"utm_source": utm_source, "total": total, "sample": sample}
+
+
 @router.post("/admin/dealer-licenses/{license_id}/decision")
 async def admin_decide_dealer_license(
     license_id: str,
@@ -141,6 +163,55 @@ async def admin_decide_dealer_license(
             "reviewed_at": datetime.now(timezone.utc),
         }}
     )
+
+    # iter198 — Auto-create draft vehicle_sellers record on approval (pre-fills license fields).
+    # This skips the registration form and lets the dealer go straight from approval → listing.
+    if decision.decision == "approve":
+        try:
+            existing_seller = await db.vehicle_sellers.find_one({"user_id": doc["user_id"]})
+            if not existing_seller:
+                seller_doc = {
+                    "id": str(uuid.uuid4()),
+                    "user_id": doc["user_id"],
+                    "seller_type": "dealer",
+                    "verification_status": "approved",  # license already verified
+                    # Business info — empty; dealer can fill in later if needed
+                    "business_name": None,
+                    "business_address": None,
+                    "business_phone": None,
+                    # Licensing — pre-filled from the dealer license
+                    "license_number": doc.get("license_number"),
+                    "license_province": doc.get("jurisdiction"),
+                    "license_expiry": doc.get("expiry_date"),
+                    "tax_id": None,
+                    # Profile
+                    "website": None,
+                    "description": None,
+                    "logo_url": None,
+                    # Documents
+                    "documents": [],
+                    # Stats
+                    "total_listings": 0,
+                    "total_sold": 0,
+                    "total_revenue": 0.0,
+                    "average_rating": 0.0,
+                    "review_count": 0,
+                    # Limits — full dealer monthly limit
+                    "monthly_listing_count": 0,
+                    "monthly_listing_limit": 500,
+                    "current_month": datetime.now(timezone.utc).strftime("%Y-%m"),
+                    # Timestamps
+                    "created_at": datetime.now(timezone.utc),
+                    "updated_at": None,
+                    "approved_at": datetime.now(timezone.utc),
+                    "approved_by": user["id"],
+                    "rejection_reason": None,
+                    "auto_created_from_license": True,  # audit flag
+                }
+                await db.vehicle_sellers.insert_one(seller_doc)
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning(f"[iter198] auto-create vehicle_seller failed: {exc}")
 
     # iter195 — Send transactional email to the buyer
     try:

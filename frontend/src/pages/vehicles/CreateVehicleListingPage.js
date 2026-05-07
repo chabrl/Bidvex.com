@@ -11,6 +11,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
+import confetti from 'canvas-confetti';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -92,7 +93,15 @@ const CONDITIONS = ['excellent', 'good', 'fair', 'poor', 'unknown'];
 // Create Vehicle Listing Page Component
 const CreateVehicleListingPage = () => {
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  // iter198 — Capture pilot attribution (URL param wins over stored value)
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const utm = params.get('utm_source');
+      if (utm) localStorage.setItem('bidvex.utm_source', utm.slice(0, 100));
+    } catch (_e) {}
+  }, []);
+  const { t, i18n } = useTranslation();
   const { token, user } = useAuth();
   const geo = useGeoLocation();
   const [currentStep, setCurrentStep] = useState(0);
@@ -355,6 +364,10 @@ const CreateVehicleListingPage = () => {
         title: formData.title,
         description: formData.description,
         features: formData.features,
+        // iter198 — Pilot attribution
+        utm_source: (() => {
+          try { return localStorage.getItem('bidvex.utm_source') || null; } catch (_e) { return null; }
+        })(),
       };
       
       // Create listing
@@ -384,8 +397,35 @@ const CreateVehicleListingPage = () => {
           );
         }
       }
-      
-      toast.success('Vehicle listing created successfully!');
+
+      // iter198 — Pilot success celebration: confetti + warm toast on a pilot dealer's FIRST listing
+      const isPilot = listingData.utm_source === 'pilot-welcome-banner';
+      const isFirstListing = (sellerProfile?.total_listings || 0) === 0;
+      if (isPilot && isFirstListing) {
+        try {
+          // Center burst
+          confetti({
+            particleCount: 120,
+            spread: 75,
+            origin: { y: 0.6 },
+            colors: ['#06B6D4', '#2563EB', '#6366F1', '#FFFFFF'],
+          });
+          // Side bursts for extra polish
+          setTimeout(() => confetti({ particleCount: 60, angle: 60, spread: 55, origin: { x: 0 } }), 250);
+          setTimeout(() => confetti({ particleCount: 60, angle: 120, spread: 55, origin: { x: 1 } }), 400);
+        } catch (_e) {}
+        const isFr = (i18n?.language || 'en').toLowerCase().startsWith('fr');
+        toast.success(
+          isFr
+            ? "🎉 Bravo ! Votre tout premier véhicule est en ligne. Bienvenue dans la famille BidVex Pilote."
+            : "🎉 Congrats! Your very first vehicle is live. Welcome to the BidVex Pilot family.",
+          { duration: 8000 }
+        );
+        // Clear the attribution flag so the celebration only fires once
+        try { localStorage.removeItem('bidvex.utm_source'); } catch (_e) {}
+      } else {
+        toast.success('Vehicle listing created successfully!');
+      }
       navigate(`/vehicle-auctions/my-listings`);
       
     } catch (error) {

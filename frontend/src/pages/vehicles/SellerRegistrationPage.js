@@ -68,6 +68,13 @@ const SellerRegistrationPage = () => {
 
   // Check if already registered
   useEffect(() => {
+    // iter198 — Pilot attribution: capture ?utm_source=… from the URL
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const utm = params.get('utm_source');
+      if (utm) localStorage.setItem('bidvex.utm_source', utm.slice(0, 100));
+    } catch (_e) {}
+
     const checkExisting = async () => {
       if (!token) {
         navigate('/auth');

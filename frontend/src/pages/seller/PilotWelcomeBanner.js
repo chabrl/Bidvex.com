@@ -118,7 +118,14 @@ const PilotWelcomeBanner = ({ user, token }) => {
         <div className="flex-shrink-0">
           <Button
             size="lg"
-            onClick={() => navigate('/vehicle-auctions/seller/register')}
+            onClick={() => {
+              // iter198 — Persist attribution so the listing creation can record it,
+              // even if the user pauses at the registration step.
+              try {
+                localStorage.setItem('bidvex.utm_source', 'pilot-welcome-banner');
+              } catch (_e) {}
+              navigate('/vehicle-auctions/seller/register?utm_source=pilot-welcome-banner');
+            }}
             className="bg-white text-blue-700 hover:bg-cyan-50 hover:text-blue-800 font-semibold shadow-md w-full sm:w-auto"
             data-testid="pilot-welcome-cta-btn"
           >

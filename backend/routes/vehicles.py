@@ -678,6 +678,9 @@ async def create_vehicle_listing(
         "title": listing_data.title,
         "description": listing_data.description,
         "features": listing_data.features,
+
+        # iter198 — Pilot attribution
+        "utm_source": (listing_data.utm_source or "").strip()[:100] or None,
         
         # Media (to be added separately)
         "media": [],
