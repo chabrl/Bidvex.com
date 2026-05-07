@@ -2467,3 +2467,53 @@ async def send_dealer_license_expired_email(user: dict, license_doc: dict) -> bo
         ),
     )
 
+
+
+# ============= NEW MESSAGE EMAIL (iter196) =============
+
+async def send_new_message_email(
+    recipient: dict,
+    sender_name: str,
+    preview: str,
+    listing_id: str = None,
+    conversation_id: str = None,
+) -> bool:
+    """
+    Send a bilingual notification when an offline user receives a new in-app message.
+    """
+    if not recipient or not recipient.get("email"):
+        return False
+
+    safe_preview = (preview or "").strip().replace("<", "&lt;").replace(">", "&gt;")
+    if len(safe_preview) > 200:
+        safe_preview = safe_preview[:200] + "…"
+
+    cta_url = "https://bidvex.com/messages"
+    if conversation_id:
+        cta_url += f"?conversation={conversation_id}"
+
+    body_en = (
+        f"<strong>{sender_name}</strong> sent you a message on BidVex:<br/><br/>"
+        f"<em style='border-left:3px solid #2563eb;padding-left:10px;display:block;margin:10px 0;color:#475569;'>"
+        f"{safe_preview}</em>"
+        f"<br/>Reply directly inside BidVex to keep your conversation secure."
+    )
+    body_fr = (
+        f"<strong>{sender_name}</strong> vous a envoyé un message sur BidVex :<br/><br/>"
+        f"<em style='border-left:3px solid #2563eb;padding-left:10px;display:block;margin:10px 0;color:#475569;'>"
+        f"{safe_preview}</em>"
+        f"<br/>Répondez directement dans BidVex pour garder votre conversation sécurisée."
+    )
+
+    return await send_email(
+        to_email=recipient["email"],
+        subject=f"💬 New message from {sender_name} · Nouveau message",
+        html_content=_storage_panel(
+            "You have a new message", "Vous avez un nouveau message",
+            body_en, body_fr,
+            cta_url=cta_url,
+            cta_en="Open Conversation",
+            cta_fr="Ouvrir la conversation",
+        ),
+    )
+

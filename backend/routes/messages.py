@@ -25,6 +25,109 @@ logger = logging.getLogger(__name__)
 
 messages_router = APIRouter(tags=["Messaging"])
 
+
+# ---------------------------------------------------------------------------
+# iter196 — Thread unlock gate
+# ---------------------------------------------------------------------------
+
+async def _can_open_thread(
+    sender_id: str,
+    receiver_id: str,
+    listing_id: Optional[str],
+    is_admin: bool = False,
+) -> Optional[str]:
+    """
+    Returns None if the thread can be opened; otherwise an error code.
+    Rules:
+      • Admins always allowed.
+      • Existing conversation? Allow replies (no re-check).
+      • Vehicle listing: sender must be `winner_id` AND `unlock_paid_at` set,
+        OR sender must be the seller and the buyer is `winner_id`.
+      • Marketplace / Lots / Storage listings: auction must have ended AND
+        sender must be the winner or the seller.
+      • Listing-less ad-hoc messages (no listing_id) are allowed only for admins.
+    """
+    if is_admin:
+        return None
+
+    # Allow replies on existing conversations
+    conv_id = "_".join(sorted([sender_id, receiver_id]))
+    existing = await db.conversations.find_one({"id": conv_id}, {"_id": 0})
+    if existing:
+        return None
+
+    if not listing_id:
+        # New ad-hoc thread without a listing context — block per spec
+        return "thread_requires_listing_context"
+
+    # Vehicle listing
+    vehicle = await db.vehicle_listings.find_one(
+        {"id": listing_id},
+        {"_id": 0, "winner_id": 1, "seller_id": 1, "unlock_paid_at": 1},
+    )
+    if vehicle:
+        seller_user_id = None
+        if vehicle.get("seller_id"):
+            seller_doc = await db.vehicle_sellers.find_one(
+                {"id": vehicle["seller_id"]}, {"_id": 0, "user_id": 1}
+            )
+            seller_user_id = seller_doc.get("user_id") if seller_doc else None
+        winner_id = vehicle.get("winner_id")
+        unlock_paid = bool(vehicle.get("unlock_paid_at"))
+
+        # Winner can message seller only after paying unlock fee
+        if sender_id == winner_id:
+            if not unlock_paid:
+                return "vehicle_unlock_fee_unpaid"
+            if receiver_id != seller_user_id:
+                return "must_message_seller"
+            return None
+        # Seller can message winner only after winner has paid
+        if sender_id == seller_user_id:
+            if not unlock_paid or receiver_id != winner_id:
+                return "vehicle_unlock_fee_unpaid"
+            return None
+        return "not_party_to_transaction"
+
+    # Marketplace / Lots / Storage / Multi-item — single common check: auction ended
+    # + sender is winner or seller
+    for coll in ("listings", "multi_item_listings", "storage_auctions"):
+        doc = await db[coll].find_one(
+            {"id": listing_id},
+            {"_id": 0, "winner_id": 1, "seller_id": 1, "user_id": 1, "status": 1, "ended_at": 1, "end_time": 1},
+        )
+        if doc:
+            now = datetime.now(timezone.utc)
+            ended = doc.get("status") in ("ended", "sold", "completed")
+            if not ended:
+                # check end_time
+                et = doc.get("end_time") or doc.get("ended_at")
+                if isinstance(et, str):
+                    try:
+                        et = datetime.fromisoformat(et.replace("Z", "+00:00"))
+                    except Exception:
+                        et = None
+                if et and et.tzinfo is None:
+                    et = et.replace(tzinfo=timezone.utc)
+                ended = bool(et and et < now)
+            if not ended:
+                return "auction_not_ended"
+
+            seller_user_id = doc.get("seller_id") or doc.get("user_id")
+            winner_id = doc.get("winner_id")
+            allowed_pair = {seller_user_id, winner_id} - {None}
+            if sender_id not in allowed_pair or receiver_id not in allowed_pair:
+                return "not_party_to_transaction"
+            return None
+
+    # Listing not found — block defensively
+    return "listing_not_found"
+
+
+# ---------------------------------------------------------------------------
+# Lazy db (set by server.py)
+# ---------------------------------------------------------------------------
+
 # Injected at startup from server.py
 db = None
 message_manager = None   # MessageConnectionManager (conversation rooms)
@@ -50,6 +153,44 @@ def set_message_managers(msg_manager, global_manager):
 @messages_router.post("/messages")
 async def send_message(msg: MessageCreate, current_user: User = Depends(get_current_user)):
     """Send a text message to another user."""
+    # iter196 — gate thread creation
+    is_admin = (current_user.role or "").lower() in ("admin", "superadmin") if hasattr(current_user, "role") else False
+    gate_error = await _can_open_thread(current_user.id, msg.receiver_id, msg.listing_id, is_admin)
+    if gate_error:
+        ERROR_DETAILS = {
+            "thread_requires_listing_context": {
+                "code": "thread_requires_listing_context",
+                "message_en": "Messages must be tied to a specific listing or auction.",
+                "message_fr": "Les messages doivent être liés à une annonce ou enchère spécifique.",
+            },
+            "vehicle_unlock_fee_unpaid": {
+                "code": "vehicle_unlock_fee_unpaid",
+                "message_en": "The platform unlock fee must be paid before messaging the dealer.",
+                "message_fr": "Les frais de plateforme doivent être payés avant de contacter le concessionnaire.",
+            },
+            "auction_not_ended": {
+                "code": "auction_not_ended",
+                "message_en": "Messaging is only available after the auction ends.",
+                "message_fr": "La messagerie n'est disponible qu'après la fin de l'enchère.",
+            },
+            "not_party_to_transaction": {
+                "code": "not_party_to_transaction",
+                "message_en": "Only the winning bidder and the seller can open this thread.",
+                "message_fr": "Seuls l'enchérisseur gagnant et le vendeur peuvent ouvrir ce fil.",
+            },
+            "must_message_seller": {
+                "code": "must_message_seller",
+                "message_en": "Vehicle messages must be sent to the seller of this listing.",
+                "message_fr": "Les messages de véhicule doivent être envoyés au vendeur de cette annonce.",
+            },
+            "listing_not_found": {
+                "code": "listing_not_found",
+                "message_en": "Listing not found.",
+                "message_fr": "Annonce introuvable.",
+            },
+        }
+        raise HTTPException(status_code=403, detail=ERROR_DETAILS.get(gate_error, {"code": gate_error}))
+
     conversation_id = "_".join(sorted([current_user.id, msg.receiver_id]))
 
     message = Message(
@@ -85,6 +226,7 @@ async def send_message(msg: MessageCreate, current_user: User = Depends(get_curr
     )
 
     sender_info = {"id": current_user.id, "name": current_user.name, "picture": current_user.picture}
+    recipient_online = False
     if message_manager:
         await message_manager.send_to_conversation(
             conversation_id,
@@ -97,7 +239,8 @@ async def send_message(msg: MessageCreate, current_user: User = Depends(get_curr
             exclude_user=current_user.id
         )
 
-        if not message_manager.is_user_in_conversation(conversation_id, msg.receiver_id):
+        recipient_online = message_manager.is_user_in_conversation(conversation_id, msg.receiver_id)
+        if not recipient_online:
             if ws_manager:
                 await ws_manager.send_to_user(msg.receiver_id, {
                     "type": "new_message_notification",
@@ -108,6 +251,23 @@ async def send_message(msg: MessageCreate, current_user: User = Depends(get_curr
                     "message": msg_dict,
                     "timestamp": datetime.now(timezone.utc).isoformat()
                 })
+
+    # iter196 — Send email if recipient is offline (not in any websocket session)
+    try:
+        recipient_globally_online = ws_manager.is_user_online(msg.receiver_id) if ws_manager and hasattr(ws_manager, "is_user_online") else recipient_online
+        if not recipient_globally_online:
+            recipient = await db.users.find_one({"id": msg.receiver_id}, {"_id": 0, "email": 1, "name": 1, "preferred_language": 1})
+            if recipient and recipient.get("email"):
+                from services.email_notifications import send_new_message_email
+                await send_new_message_email(
+                    recipient=recipient,
+                    sender_name=current_user.name,
+                    preview=msg.content[:140],
+                    listing_id=msg.listing_id,
+                    conversation_id=conversation_id,
+                )
+    except Exception as exc:
+        logger.warning(f"[iter196] new-message email failed: {exc}")
 
     return message
 

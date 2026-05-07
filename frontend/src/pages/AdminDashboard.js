@@ -188,6 +188,27 @@ const AdminDashboard = () => {
   });
   const [loading, setLoading] = useState(true);
 
+  // iter196 — Pending dealer license count for red-dot badge + home card
+  const [pendingDealerLicenses, setPendingDealerLicenses] = useState(0);
+
+  useEffect(() => {
+    if (!user || !token) return;
+    const fetchPendingCount = async () => {
+      try {
+        const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/admin/dealer-licenses?status=pending`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const d = await res.json();
+          setPendingDealerLicenses(d.total || 0);
+        }
+      } catch (_) {}
+    };
+    fetchPendingCount();
+    const id = setInterval(fetchPendingCount, 60000); // 1 min refresh
+    return () => clearInterval(id);
+  }, [user, token]);
+
   useEffect(() => {
     if (!user) {
       navigate('/auth');
@@ -495,18 +516,29 @@ const AdminDashboard = () => {
             {PRIMARY_TABS.map((tab) => {
               const Icon = tab.lucideIcon;
               const isActive = primaryTab === tab.id;
+              const showDot = tab.id === 'vehicles' && pendingDealerLicenses > 0;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setPrimaryTab(tab.id)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-full font-medium transition-all whitespace-nowrap ${
+                  className={`relative flex items-center gap-2 px-4 py-2.5 rounded-full font-medium transition-all whitespace-nowrap ${
                     isActive 
                       ? 'bg-primary text-white shadow-lg' 
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
+                  data-testid={`admin-primary-tab-${tab.id}`}
                 >
                   <span className="text-lg">{tab.icon}</span>
                   <span>{tab.label}</span>
+                  {showDot && (
+                    <span
+                      className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-red-600 text-white text-[10px] font-bold ring-2 ring-white animate-pulse"
+                      data-testid="admin-vehicles-pending-dot"
+                      title={`${pendingDealerLicenses} pending dealer license review${pendingDealerLicenses === 1 ? '' : 's'}`}
+                    >
+                      {pendingDealerLicenses > 99 ? '99+' : pendingDealerLicenses}
+                    </span>
+                  )}
                 </button>
               );
             })}

@@ -140,6 +140,10 @@ class ConnectionManager:
                 except ValueError:
                     pass
 
+    def is_user_online(self, user_id: str) -> bool:
+        """iter196 — used for offline-email gating."""
+        return user_id in self.user_connections and len(self.user_connections[user_id]) > 0
+
 
 class MessageConnectionManager:
     def __init__(self):
