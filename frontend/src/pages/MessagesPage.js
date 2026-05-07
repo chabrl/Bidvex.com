@@ -398,7 +398,20 @@ const ConversationItem = ({ convo, isSelected, onClick, otherUserOnline }) => (
 
 // ========== MAIN MESSAGES PAGE ==========
 const MessagesPage = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isFr = (i18n.language || 'en').toLowerCase().startsWith('fr');
+
+  // iter196 — extract bilingual gate error from backend (detail = {code,message_en,message_fr})
+  const extractGateError = (err, fallback) => {
+    const detail = err?.response?.data?.detail;
+    if (detail && typeof detail === 'object') {
+      return isFr
+        ? (detail.message_fr || detail.message_en || detail.code || fallback)
+        : (detail.message_en || detail.message_fr || detail.code || fallback);
+    }
+    if (typeof detail === 'string') return detail;
+    return fallback;
+  };
   const { user, token } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -563,7 +576,10 @@ const MessagesPage = () => {
       toast.success('Conversation started!');
     } catch (error) {
       console.error('Failed to start conversation:', error);
-      toast.error(error.response?.data?.detail || 'Failed to start conversation');
+      toast.error(
+        extractGateError(error, isFr ? 'Échec du démarrage de la conversation' : 'Failed to start conversation'),
+        { duration: 6000 }
+      );
     }
   };
 
@@ -607,7 +623,10 @@ const MessagesPage = () => {
       
       await fetchMessages(selectedConversation.id);
     } catch (error) {
-      toast.error('Failed to send message');
+      toast.error(
+        extractGateError(error, isFr ? "Échec de l'envoi du message" : 'Failed to send message'),
+        { duration: 6000 }
+      );
       setInitialMessages(messages.filter(m => m.id !== optimisticMessage.id));
     } finally {
       setSending(false);

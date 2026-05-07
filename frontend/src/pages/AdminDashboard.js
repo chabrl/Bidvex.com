@@ -476,7 +476,7 @@ const AdminDashboard = () => {
       {/* Quick Stats Row */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="grid grid-cols-4 gap-4">
+          <div className={`grid gap-4 ${pendingDealerLicenses > 0 ? 'grid-cols-5' : 'grid-cols-4'}`}>
             <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
               <Users className="h-8 w-8 text-blue-600" />
               <div>
@@ -505,6 +505,23 @@ const AdminDashboard = () => {
                 <p className="text-xs text-amber-600">Revenue</p>
               </div>
             </div>
+            {pendingDealerLicenses > 0 && (
+              <button
+                type="button"
+                onClick={() => { setPrimaryTab('vehicles'); setSecondaryTab('dealer-licenses'); }}
+                className="flex items-center gap-3 p-3 bg-red-50 hover:bg-red-100 rounded-lg ring-2 ring-red-300 transition-all text-left animate-pulse"
+                data-testid="admin-pending-reviews-card"
+                title="Click to review pending dealer licenses"
+              >
+                <ShieldAlert className="h-8 w-8 text-red-600" />
+                <div>
+                  <p className="text-2xl font-bold text-red-700" data-testid="admin-pending-reviews-count">
+                    {pendingDealerLicenses.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-red-600 font-medium">Pending Reviews</p>
+                </div>
+              </button>
+            )}
           </div>
         </div>
       </div>

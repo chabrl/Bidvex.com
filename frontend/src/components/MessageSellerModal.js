@@ -1,5 +1,6 @@
 import API_BASE from '../config';
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -12,13 +13,15 @@ import { Send, Loader2 } from 'lucide-react';
 const API = API_BASE;
 
 const MessageSellerModal = ({ isOpen, onClose, sellerId, listingId, listingTitle }) => {
+  const { i18n } = useTranslation();
+  const isFr = (i18n.language || 'en').toLowerCase().startsWith('fr');
   const [subject, setSubject] = useState(`Inquiry about: ${listingTitle || 'Auction'}`);
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
 
   const handleSend = async () => {
     if (!message.trim()) {
-      toast.error('Please enter a message');
+      toast.error(isFr ? 'Veuillez saisir un message' : 'Please enter a message');
       return;
     }
 
@@ -37,13 +40,25 @@ const MessageSellerModal = ({ isOpen, onClose, sellerId, listingId, listingTitle
         }
       );
 
-      toast.success('Message sent successfully!');
+      toast.success(isFr ? 'Message envoyé avec succès !' : 'Message sent successfully!');
       setMessage('');
       setSubject(`Inquiry about: ${listingTitle || 'Auction'}`);
       onClose();
     } catch (error) {
       console.error('Failed to send message:', error);
-      toast.error(error.response?.data?.detail || 'Failed to send message');
+      // iter196 — backend gate returns detail = { code, message_en, message_fr }
+      const detail = error?.response?.data?.detail;
+      let msg;
+      if (detail && typeof detail === 'object') {
+        msg = isFr
+          ? (detail.message_fr || detail.message_en || detail.code)
+          : (detail.message_en || detail.message_fr || detail.code);
+      } else if (typeof detail === 'string') {
+        msg = detail;
+      } else {
+        msg = isFr ? "Échec de l'envoi du message" : 'Failed to send message';
+      }
+      toast.error(msg, { duration: 6000 });
     } finally {
       setSending(false);
     }
