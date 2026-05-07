@@ -1,6 +1,74 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter196 — In-App Messaging Transaction Gate + Admin Pending-Reviews Card (Feb 7, 2026) ✅
+## Latest: iter197 — Project Pilote Launch Sprint (Feb 7, 2026) ✅
+
+User wants a "red carpet" experience for the first batch of approved dealers + a single-pane-of-glass triage view for the admin team ahead of the *Project Pilote* launch.
+
+### P0 — Pilot Welcome Banner ✅
+**New component**: `pages/seller/PilotWelcomeBanner.js` (~135 lines).
+
+- Self-fetches `GET /api/dealer-licenses/me` once on mount.
+- Renders only when ALL of: `license.status === "approved"` AND `reviewed_at` is within the last 7 days AND user has not dismissed it.
+- Computes `daysLeft = ceil(7 - elapsedDays)` and shows a friendly status line.
+- Bilingual EN/FR via `dashboard.seller.pilotWelcome*` i18n keys (8 keys × 2 locales).
+- Gradient cyan→indigo→blue background with grain overlay, white pill-shaped CTA, and a top-right `X` dismiss that writes `localStorage.bidvex.pilot_welcome.dismissed = "1"`.
+- CTA "List Your First Vehicle" / "Inscrire mon premier véhicule" → `/vehicle-auctions/seller/register` (the registration page handles already-registered users gracefully — no bounce, no error toast).
+- Mounted as the first child of the SellerDashboard container so it sits above the page title.
+- testids: `pilot-welcome-banner` / `pilot-welcome-badge` / `pilot-welcome-title` / `pilot-welcome-days-left` / `pilot-welcome-cta-btn` / `pilot-welcome-dismiss-btn`.
+
+### P1 — Vehicle Detail Page Messaging Parity ✅
+- `routes/vehicles.py:1006` — `vehicle_sellers` projection now includes `user_id` (needed by the frontend to know whom to message).
+- `pages/vehicles/VehicleDetailPage.js`:
+  - Imports `MessageSellerModal` + `MessageSquare` icon.
+  - New `showMessageModal` state + modal mount at the root of the page.
+  - In the **Seller tab**, a blue notice card with "Coordinate your pickup" / "Coordonnez votre ramassage" copy and a "Message Dealer" / "Écrire au concessionnaire" button.
+  - 4-clause AND gate: visible **only** when `user && vehicle.winner_id === user.id && vehicle.unlock_paid_at && seller.user_id`.
+  - Bilingual error toast extraction is inherited from MessageSellerModal (already iter196-hardened).
+
+### P2 — Admin Triage Cards ✅
+**Two new lightweight counter endpoints**:
+- `GET /api/admin/vehicles/disputed-settlements/count` → `{total: N}` (`vehicle_settlement.py`)
+- `GET /api/admin/currency-appeals/pending-count` → `{total: N}` (`misc.py`)
+
+**Frontend `AdminDashboard.js`** now polls 3 counters every 60 s and renders 3 conditional KPI cards in the Quick Stats Row:
+- 🔴 **Pending Reviews** (existing iter196) → click → `Vehicles → Dealer Licenses`.
+- 🟠 **Disputes** (NEW, orange) → click → `Marketplace → Disputed Settlements`.
+- 🟡 **Currency Appeals** (NEW, yellow) → click → cross-cutting `Currency Appeals` tab.
+- All 3 cards hide-when-zero per Option B from iter196.
+- Grid is `grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7` so it gracefully reflows on smaller screens.
+- testids: `admin-pending-reviews-card` / `admin-pending-disputes-card` / `admin-pending-appeals-card` (+ matching `*-count` ids).
+
+### Verification — 21/21 PASS
+- **Backend**: 7 new pytest assertions on the counter endpoints (admin 200 / non-admin 403 / unauth 401 / total reflects actual collection counts) + 14/14 iter196 messaging-gate regression.
+- **Frontend (testing agent + main agent)**:
+  - Banner FR title + days-left + CTA copy verified live ("Bienvenue au pilote BidVex, Iter189 !", "6 jours restants…", "Inscrire mon premier véhicule").
+  - Dismiss button writes `localStorage.bidvex.pilot_welcome.dismissed='1'`; banner stays hidden after reload.
+  - All 3 admin KPI cards visible+colored when count=1 each; ALL hidden when counts=0.
+  - CTA navigation now lands on `/vehicle-auctions/seller/register` and the page renders cleanly (handles both already-registered and new-dealer cases).
+- **Integration concern fixed**: testing agent flagged that the original `/vehicle-auctions/create` destination would have bounced freshly-approved dealers because they have no `vehicle_sellers` record yet — main agent rerouted the CTA to the registration page, which is the natural one-time business-info step before they can list.
+
+### Files changed (iter197)
+- **Backend**:
+  - `routes/vehicles.py` (+1 line — `user_id` in vehicle_sellers projection)
+  - `routes/vehicle_settlement.py` (+8 lines — disputed-settlements/count endpoint)
+  - `routes/misc.py` (+9 lines — currency-appeals/pending-count endpoint)
+- **Frontend**:
+  - `pages/seller/PilotWelcomeBanner.js` (NEW, ~135 lines)
+  - `pages/SellerDashboard.js` (+ import + mount banner above page header)
+  - `pages/vehicles/VehicleDetailPage.js` (+ MessageSellerModal import, state, button block, modal mount)
+  - `pages/AdminDashboard.js` (+ disputes/appeals state, fetchTriageCounts polling, 2 new KPI cards, regrouped grid)
+  - `locales/en.json` + `locales/fr.json` (+8 pilotWelcome* keys per locale)
+
+### Operational outcome
+- A freshly-approved pilot dealer logs into BidVex and is greeted with a warm bilingual banner that auto-disappears after 7 days. The CTA takes them straight into the dealer-business registration step — no bouncing, no surprises.
+- Buyers who have paid the unlock fee on a vehicle can now message the dealer directly from the vehicle detail page, with the same gate logic and bilingual error handling already proven in iter196.
+- The admin team's home dashboard is now a proper triage view — Pending Reviews + Disputes + Currency Appeals all surface as soon as anything needs attention, and disappear the moment the queue is empty.
+
+⚠️ **Production note**: All changes are in PREVIEW. Redeploy from Emergent dashboard to push to https://bidvex.com.
+
+---
+
+## Earlier: iter196 — In-App Messaging Transaction Gate + Admin Pending-Reviews Card (Feb 7, 2026) ✅
 
 User requested **Option B** from roadmap — In-App Messaging — gated to post-transaction parties only, with offline email alerts and a bonus admin-dashboard widget for pending dealer-license reviews.
 
