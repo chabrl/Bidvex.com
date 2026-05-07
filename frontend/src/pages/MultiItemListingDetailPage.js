@@ -1403,6 +1403,49 @@ const MultiItemListingDetailPage = () => {
 
                         {!isPreviewMode && !auctionEnded && (
                           <div className="space-y-3 mt-4">
+                            {/* iter189 Bug 7 — Deposit notice on Lots auction (Spec Feature 1) */}
+                            {listing.requires_deposit && listing.deposit_amount > 0 ? (
+                              <div className="p-3 bg-amber-50 border border-amber-300 rounded-md text-xs leading-relaxed" data-testid="multi-bid-deposit-required-notice">
+                                <p className="font-semibold text-amber-900 mb-1">⚠️ Deposit required · Dépôt requis</p>
+                                <p className="text-amber-800">
+                                  <strong>EN:</strong> A deposit of{' '}
+                                  <strong>
+                                    {listing.deposit_type === 'percentage'
+                                      ? `${listing.deposit_amount}% of the lot's starting bid`
+                                      : `$${Number(listing.deposit_amount).toFixed(2)} ${listing.currency || 'CAD'}`}
+                                  </strong>{' '}
+                                  is required to bid on this auction. It is charged to your card immediately on your first bid; refunded automatically if you do not win; credited toward your total if you win.
+                                </p>
+                                <p className="text-amber-800 mt-1">
+                                  <strong>FR:</strong> Un dépôt de{' '}
+                                  <strong>
+                                    {listing.deposit_type === 'percentage'
+                                      ? `${listing.deposit_amount}% du prix de départ`
+                                      : `${Number(listing.deposit_amount).toFixed(2)} $ ${listing.currency || 'CAD'}`}
+                                  </strong>{' '}
+                                  est requis pour enchérir. Il est débité immédiatement lors de votre première mise, remboursé si vous ne gagnez pas, crédité si vous gagnez.
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="text-xs text-slate-500 px-1" data-testid="multi-bid-no-deposit-notice">
+                                No deposit is required to bid on this auction · Aucun dépôt requis.
+                              </div>
+                            )}
+                            {/* Payment method notice */}
+                            {(listing.payment_method === 'cash' || listing.payment_method === 'e-transfer') ? (
+                              <div className="p-3 bg-purple-50 border border-purple-200 rounded-md text-xs leading-relaxed" data-testid="multi-bid-cash-payment-notice">
+                                <p className="text-purple-900">
+                                  <strong>EN:</strong> This seller collects payment via {listing.payment_method === 'cash' ? 'Cash' : 'E-Transfer'} directly. BidVex will only charge your saved card our buyer commission fee in <strong>{listing.currency || 'CAD'}</strong>.
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-xs leading-relaxed" data-testid="multi-bid-stripe-payment-notice">
+                                <p className="text-blue-900">
+                                  <strong>EN:</strong> This seller uses BidVex Stripe checkout. Any deposit you already paid will be deducted from your winning total in <strong>{listing.currency || 'CAD'}</strong>.
+                                </p>
+                              </div>
+                            )}
+
                             {/* Increment Info */}
                             <div className="flex items-center gap-2 text-xs text-muted-foreground bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-md">
                               <Info className="h-3 w-3" />

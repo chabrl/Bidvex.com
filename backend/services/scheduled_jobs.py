@@ -624,8 +624,28 @@ async def process_expired_promotions(db):
     try:
         now_iso = datetime.now(timezone.utc).isoformat()
         stats = {}
-        for coll_name in ("listings", "vehicle_listings", "storage_auctions"):
+        expired_listings = []
+        for coll_name in ("listings", "vehicle_listings", "storage_auctions", "multi_item_listings"):
             coll = db[coll_name]
+            # First capture ids + seller_id for expiry notification emails (iter189)
+            docs_to_expire = await coll.find(
+                {
+                    "$or": [
+                        {"promoted_until":  {"$lt": now_iso}, "promotion_tier": {"$nin": [None, ""]}},
+                        {"promoted_until":  {"$lt": now_iso}, "is_featured": True},
+                        {"promotion_end":   {"$lt": now_iso}, "is_promoted": True},
+                    ]
+                },
+                {"_id": 0, "id": 1, "seller_id": 1, "title": 1, "promotion_tier": 1},
+            ).to_list(200)
+            for d in docs_to_expire:
+                d["listing_type"] = {
+                    "listings": "marketplace",
+                    "vehicle_listings": "vehicle",
+                    "storage_auctions": "storage",
+                    "multi_item_listings": "lots",
+                }.get(coll_name, "marketplace")
+                expired_listings.append(d)
             result = await coll.update_many(
                 {
                     "$or": [
@@ -652,6 +672,29 @@ async def process_expired_promotions(db):
             )
         except Exception:
             pass
+
+        # Send expiry notification emails (iter189 Feature 1 — fire-and-forget, batch)
+        if expired_listings:
+            try:
+                from services.email_notifications import send_promotion_expired_email
+                for d in expired_listings[:50]:  # cap to avoid scheduler overruns
+                    try:
+                        seller = await db.users.find_one(
+                            {"id": d.get("seller_id")}, {"_id": 0, "email": 1, "name": 1}
+                        )
+                        if seller and seller.get("email"):
+                            await send_promotion_expired_email(
+                                seller_email=seller["email"],
+                                seller_name=seller.get("name", "Seller"),
+                                listing_title=d.get("title", "Your listing"),
+                                listing_id=d.get("id"),
+                                listing_type=d.get("listing_type"),
+                                tier=d.get("promotion_tier", "basic"),
+                            )
+                    except Exception as notify_err:
+                        logger.warning(f"[PROMOTIONS] expiry email error: {notify_err}")
+            except ImportError:
+                logger.info("[PROMOTIONS] send_promotion_expired_email not available — skip notifications")
 
         total = sum(stats.values())
         if total:

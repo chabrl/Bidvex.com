@@ -54,11 +54,15 @@ PROMOTION_FEATURES = {
 
 
 def _listing_collection(db, listing_type: str):
-    """Map listing_type → the right MongoDB collection."""
+    """Map listing_type → the right MongoDB collection (iter189: all 4 types)."""
     lt = (listing_type or "marketplace").lower()
     if lt == "storage":
         return db.storage_auctions, "storage"
-    # marketplace / lots / partner all live in db.listings
+    if lt == "vehicle":
+        return db.vehicle_listings, "vehicle"
+    if lt in ("lots", "multi_item", "partner"):
+        return db.multi_item_listings, lt
+    # marketplace default
     return db.listings, lt
 
 
@@ -94,7 +98,7 @@ async def promote_listing(
 
     if tier not in ("basic", "standard", "premium"):
         raise HTTPException(status_code=400, detail="Invalid boost_tier")
-    if listing_type not in ("marketplace", "lots", "storage", "partner"):
+    if listing_type not in ("marketplace", "lots", "storage", "partner", "vehicle", "multi_item"):
         raise HTTPException(status_code=400, detail="Invalid listing_type")
 
     # Lookup listing in the correct collection

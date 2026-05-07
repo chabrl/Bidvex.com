@@ -112,7 +112,14 @@ const ProfileSettingsPage = () => {
       await updateUserPreferences(profileData);
       toast.success(t('profile.changesSaved'));
     } catch (error) {
-      toast.error(t('common.error'));
+      // iter189 Bug 4: Surface specific error from API instead of generic toast
+      const detail = error?.response?.data?.detail;
+      let msg = t('common.error');
+      if (typeof detail === 'string') msg = detail;
+      else if (detail?.message) msg = detail.message;
+      else if (detail?.message_en) msg = detail.message_en;
+      else if (error?.response?.data?.message) msg = error.response.data.message;
+      toast.error(msg);
     } finally {
       setLoading(false);
     }

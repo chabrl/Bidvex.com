@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import FlattenedMarketplace from '../components/FlattenedMarketplace';
 import MarketplaceSidebar from '../components/MarketplaceSidebar';
@@ -7,7 +8,16 @@ import { ShoppingBag, Sparkles, User, Zap } from 'lucide-react';
 
 const MarketplacePage = () => {
   const { t } = useTranslation();
+  const location = useLocation();
   const [sidebarFilters, setSidebarFilters] = useState({});
+
+  // iter189 Bug 3: Reset filters on fresh navigation to /marketplace.
+  // Prevents stale filter state from hiding listings when user re-enters the page.
+  useEffect(() => {
+    if (!location.search && !location.state?.preserveFilters) {
+      setSidebarFilters({});
+    }
+  }, [location.key, location.search, location.state]);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900" data-testid="marketplace-page">

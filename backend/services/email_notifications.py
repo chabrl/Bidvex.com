@@ -2308,3 +2308,63 @@ async def send_payout_confirmation_email(
         subject=f"Sale payout · Paiement de vente — ${amount:,.2f} {cur}",
         html_content=_base_template(content, "Payout Initiated"),
     )
+
+
+# ============================================================
+# iter189 — Promotion expiry + email blast notifications
+# ============================================================
+
+async def send_promotion_expired_email(
+    *, seller_email: str, seller_name: str, listing_title: str,
+    listing_id: str, listing_type: str, tier: str = "basic",
+) -> bool:
+    """Notify seller their boost expired and prompt them to renew."""
+    renew_path = {
+        "marketplace": f"/listing/{listing_id}",
+        "lots": f"/lots-auction/{listing_id}",
+        "vehicle": f"/vehicle-auctions/{listing_id}",
+        "storage": f"/storage-auctions/{listing_id}",
+    }.get(listing_type, f"/listing/{listing_id}")
+    tier_label = {"basic": "Basic", "standard": "Standard", "premium": "Premium"}.get(tier, tier.title())
+    content = f"""
+    <h2 style="color:#1e40af">Your boost has ended · Votre promotion est terminée</h2>
+    <p>Hi {seller_name or 'Seller'},</p>
+    <p><strong>EN:</strong> Your <strong>{tier_label}</strong> boost for
+    <em>"{listing_title}"</em> has ended. Your listing is no longer featured —
+    <a href="https://bidvex.com{renew_path}" style="color:#2563eb">renew to stay featured</a>.</p>
+    <p><strong>FR:</strong> Votre promotion <strong>{tier_label}</strong> pour
+    <em>« {listing_title} »</em> est terminée. Votre annonce n'est plus en vedette —
+    <a href="https://bidvex.com{renew_path}" style="color:#2563eb">renouvelez pour rester en vedette</a>.</p>
+    <p>— The BidVex Team / L'équipe BidVex</p>
+    """
+    return await send_email(
+        to_email=seller_email,
+        subject=f"Your boost ended · Votre promotion est terminée — {listing_title}",
+        html_content=_base_template(content, "Boost Ended"),
+    )
+
+
+async def send_promotion_email_blast(
+    *, to_email: str, listing_title: str, listing_id: str,
+    listing_type: str, category: str = "",
+) -> bool:
+    """T+24h email blast to category subscribers for premium-boosted listings."""
+    path = {
+        "marketplace": f"/listing/{listing_id}",
+        "lots": f"/lots-auction/{listing_id}",
+        "vehicle": f"/vehicle-auctions/{listing_id}",
+        "storage": f"/storage-auctions/{listing_id}",
+    }.get(listing_type, f"/listing/{listing_id}")
+    content = f"""
+    <h2 style="color:#1e40af">Featured · En vedette : {listing_title}</h2>
+    <p><strong>EN:</strong> Don't miss this featured auction —
+    <a href="https://bidvex.com{path}" style="color:#2563eb">view auction</a>.</p>
+    <p><strong>FR:</strong> Ne manquez pas cette enchère en vedette —
+    <a href="https://bidvex.com{path}" style="color:#2563eb">voir l'enchère</a>.</p>
+    <p>— The BidVex Team / L'équipe BidVex</p>
+    """
+    return await send_email(
+        to_email=to_email,
+        subject=f"Featured: {listing_title} — Don't Miss This Auction · En vedette : Ne manquez pas",
+        html_content=_base_template(content, "Featured Auction"),
+    )

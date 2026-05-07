@@ -5,6 +5,79 @@ import i18n from '../i18n';
 
 const AuthContext = createContext(null);
 
+// ─── iter189 Bug 5: Global 401→refresh interceptor ───
+// Installed once at module load. On any 401 with "token_expired" response,
+// swap a fresh access token via /auth/refresh and retry the original request.
+// Only logout if the refresh itself fails.
+let _isRefreshing = false;
+let _pendingQueue = [];
+const _flushQueue = (err, newToken) => {
+  _pendingQueue.forEach(({ resolve, reject }) => {
+    if (err) reject(err);
+    else resolve(newToken);
+  });
+  _pendingQueue = [];
+};
+
+axios.interceptors.response.use(
+  (r) => r,
+  async (error) => {
+    const original = error.config;
+    const status = error.response?.status;
+    const detail = error.response?.data;
+    const alreadyRetried = original?._retry;
+    const isRefreshCall = original?.url?.includes('/auth/refresh');
+    const looksExpired = status === 401 && !alreadyRetried && !isRefreshCall;
+
+    if (!looksExpired) return Promise.reject(error);
+
+    const refreshToken = localStorage.getItem('refresh_token');
+    if (!refreshToken) return Promise.reject(error);
+
+    original._retry = true;
+
+    if (_isRefreshing) {
+      // Queue up concurrent requests until the in-flight refresh resolves
+      return new Promise((resolve, reject) => {
+        _pendingQueue.push({
+          resolve: (tok) => {
+            original.headers = original.headers || {};
+            original.headers.Authorization = `Bearer ${tok}`;
+            resolve(axios(original));
+          },
+          reject,
+        });
+      });
+    }
+
+    _isRefreshing = true;
+    try {
+      const resp = await axios.post(`${API_BASE}/auth/refresh`, { refresh_token: refreshToken });
+      const newAccess = resp.data?.access_token;
+      const newRefresh = resp.data?.refresh_token;
+      if (!newAccess) throw new Error('No access token in refresh response');
+      localStorage.setItem('token', newAccess);
+      if (newRefresh) localStorage.setItem('refresh_token', newRefresh);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${newAccess}`;
+      _flushQueue(null, newAccess);
+      original.headers = original.headers || {};
+      original.headers.Authorization = `Bearer ${newAccess}`;
+      return axios(original);
+    } catch (refreshErr) {
+      _flushQueue(refreshErr, null);
+      // Refresh failed → full logout
+      localStorage.removeItem('token');
+      localStorage.removeItem('refresh_token');
+      delete axios.defaults.headers.common['Authorization'];
+      // Let any top-level auth provider clear user state (non-fatal)
+      try { window.dispatchEvent(new CustomEvent('bidvex:auth:logout', { detail: { reason: 'refresh_failed' } })); } catch (_) {}
+      return Promise.reject(error);
+    } finally {
+      _isRefreshing = false;
+    }
+  }
+);
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -48,12 +121,13 @@ export const AuthProvider = ({ children }) => {
     console.log('Attempting login for:', email);
     try {
       const response = await axios.post(`${API}/auth/login`, { email, password });
-      const { access_token, user: userData } = response.data;
+      const { access_token, refresh_token, user: userData } = response.data;
       console.log('Login successful. User:', userData);
       console.log('Token received:', access_token ? 'yes' : 'no');
       setToken(access_token);
       setUser(userData);
       localStorage.setItem('token', access_token);
+      if (refresh_token) localStorage.setItem('refresh_token', refresh_token);
       axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
       
       // Sync language preference with i18next
@@ -82,10 +156,11 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (userData) => {
     const response = await axios.post(`${API}/auth/register`, userData);
-    const { access_token, user: newUser } = response.data;
+    const { access_token, refresh_token, user: newUser } = response.data;
     setToken(access_token);
     setUser(newUser);
     localStorage.setItem('token', access_token);
+    if (refresh_token) localStorage.setItem('refresh_token', refresh_token);
     axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
     return newUser;
   };
@@ -120,8 +195,19 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
     setUser(null);
     localStorage.removeItem('token');
+    localStorage.removeItem('refresh_token');
     delete axios.defaults.headers.common['Authorization'];
   };
+
+  // iter189 Bug 5: Listen for interceptor-initiated logout (refresh failed)
+  useEffect(() => {
+    const handler = () => {
+      setToken(null);
+      setUser(null);
+    };
+    window.addEventListener('bidvex:auth:logout', handler);
+    return () => window.removeEventListener('bidvex:auth:logout', handler);
+  }, []);
 
   // Refresh user data (used after phone verification)
   const refreshUser = async () => {

@@ -376,6 +376,15 @@ scheduler.add_job(
     _deposit_refund_queue_tick,
     trigger=IntervalTrigger(seconds=10), id='deposit_refund_queue', replace_existing=True)
 
+# ─── Promotion email blast worker (iter189 Feature 1 — T+24h premium blasts) ───
+async def _promotion_email_blast_tick():
+    from services.promotion_email_blast import process_promotion_email_blast_queue
+    await safe_run("promotion_email_blast", process_promotion_email_blast_queue(db))
+
+scheduler.add_job(
+    _promotion_email_blast_tick,
+    trigger=IntervalTrigger(minutes=5), id='promotion_email_blast', replace_existing=True)
+
 # ─── Health Endpoints ───
 @api_router.get("/")
 async def root():
@@ -638,8 +647,10 @@ async def on_startup():
     try:
         from services.payment_idempotency import ensure_payment_charges_indexes
         from services.deposit_refund_queue import ensure_refund_queue_indexes
+        from services.promotion_email_blast import ensure_email_blast_queue_indexes
         await ensure_payment_charges_indexes(db)
         await ensure_refund_queue_indexes(db)
+        await ensure_email_blast_queue_indexes(db)
     except Exception as e:
         logger.warning(f"Strict payment indexes registration failed (non-fatal): {e}")
 

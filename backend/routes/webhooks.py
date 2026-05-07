@@ -869,7 +869,17 @@ async def _handle_listing_promotion_paid(db, session):
     promotion_end = now + timedelta(days=boost_days)
     tier_weight = {"premium": 3, "standard": 2, "basic": 1}.get(tier, 0)
 
-    listings_coll = db.storage_auctions if listing_type == "storage" else db.listings
+    # Route to the correct collection per listing type (iter189: lots + vehicle parity).
+    listings_coll_map = {
+        "marketplace": db.listings,
+        "listing": db.listings,
+        "lots": db.multi_item_listings,
+        "multi_item": db.multi_item_listings,
+        "partner": db.multi_item_listings,
+        "vehicle": db.vehicle_listings,
+        "storage": db.storage_auctions,
+    }
+    listings_coll = listings_coll_map.get(listing_type, db.listings)
 
     features = PROMOTION_FEATURE_PACK.get(listing_type, PROMOTION_FEATURE_PACK["marketplace"]).get(tier, [])
     update_doc = {
@@ -913,6 +923,22 @@ async def _handle_listing_promotion_paid(db, session):
             })
         except Exception as e:
             logger.warning(f"[promotion-paid] social share queue insert failed: {e}")
+
+        # Schedule email blast 24h after activation (iter189 Feature 1)
+        try:
+            import uuid as _uuid2
+            await db.promotion_email_blast_queue.insert_one({
+                "id": _uuid2.uuid4().hex,
+                "listing_id": listing_id,
+                "listing_type": listing_type,
+                "seller_id": seller_id,
+                "tier": tier,
+                "scheduled_for": (now + timedelta(hours=24)).isoformat(),
+                "status": "pending",
+                "created_at": now.isoformat(),
+            })
+        except Exception as e:
+            logger.warning(f"[promotion-paid] email blast queue insert failed: {e}")
 
     try:
         listing_doc = await listings_coll.find_one({"id": listing_id}, {"_id": 0})

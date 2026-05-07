@@ -176,13 +176,15 @@ async def update_user_me(
     if "preferred_currency" in update_data:
         if update_data["preferred_currency"] not in ["CAD", "USD"]:
             raise HTTPException(status_code=400, detail="Currency must be 'CAD' or 'USD'")
-        if current_user.currency_locked and update_data["preferred_currency"] != current_user.enforced_currency:
+        currency_locked = bool(getattr(current_user, "currency_locked", False))
+        enforced_currency = getattr(current_user, "enforced_currency", None)
+        if currency_locked and enforced_currency and update_data["preferred_currency"] != enforced_currency:
             raise HTTPException(
                 status_code=403,
                 detail={
                     "error": "currency_locked",
                     "message": "Currency is determined by your location to comply with local tax rules.",
-                    "enforced_currency": current_user.enforced_currency,
+                    "enforced_currency": enforced_currency,
                     "appeal_link": "/api/currency-appeal",
                 },
             )

@@ -466,6 +466,23 @@ async def get_trust_status(
     trust_status = user.get("trust_status", "unverified")
     has_payment_method = user.get("has_payment_method", False)
     phone_verified = user.get("phone_verified", False)
+
+    # Bug 6 fix: Standardize verification gate across the whole app.
+    # Accept ANY of these as verified: trust_status="verified" OR is_verified=True OR email_verified=True.
+    # This unblocks users who verified email/phone but whose trust_status was never migrated.
+    is_email_verified = bool(user.get("is_verified") or user.get("email_verified"))
+    is_trust_verified = trust_status == "verified"
+    effective_verified = is_trust_verified or is_email_verified
+    # Heal the DB once: if the user is email/trust-verified but trust_status is stale, self-heal.
+    if effective_verified and not is_trust_verified:
+        trust_status = "verified"
+        try:
+            await db.users.update_one(
+                {"id": current_user.id},
+                {"$set": {"trust_status": "verified", "is_verified": True}},
+            )
+        except Exception:
+            pass
     
     # Get default payment method
     payment_method = None
@@ -488,12 +505,12 @@ async def get_trust_status(
     
     return {
         "trust_status": trust_status,
-        "is_verified": trust_status == "verified",
+        "is_verified": effective_verified,
         "has_payment_method": has_payment_method,
         "phone_verified": phone_verified,
         "payment_method": payment_method,
         "trust_verified_at": user.get("trust_verified_at"),
-        "can_bid": trust_status == "verified"
+        "can_bid": effective_verified
     }
 
 
