@@ -1,6 +1,75 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter197 — Project Pilote Launch Sprint (Feb 7, 2026) ✅
+## Latest: iter198 — Project Pilote Final Loop (Feb 7, 2026) ✅
+
+User-driven micro-sprint to close the loop on the *Project Pilote* dealer onboarding journey ahead of launch.
+
+### P1 — Pilot Conversion Tracking ✅
+**Banner CTA → URL + localStorage**: `pages/seller/PilotWelcomeBanner.js` now writes `localStorage.bidvex.utm_source='pilot-welcome-banner'` before navigating, AND appends `?utm_source=pilot-welcome-banner` to the destination URL.
+
+**Defense-in-depth capture**: Both `SellerRegistrationPage.js` and `CreateVehicleListingPage.js` parse `URLSearchParams.utm_source` on mount and persist into localStorage (URL takes priority over stored value).
+
+**Backend persistence**: `models/vehicle_models.py::VehicleListingCreate` now has `utm_source: Optional[str] = None`. `routes/vehicles.py::create_vehicle_listing` stores it on the listing document with a 100-char cap.
+
+**Admin attribution counter**: New `GET /api/admin/pilot-conversions?utm_source=...` (default `pilot-welcome-banner`) returns `{utm_source, total, sample[]}` — total count + 25 most-recent matching listings (id/title/seller/timestamp). Admin-only (403 for buyers).
+
+### P1 — Success Celebration ✅
+**Confetti + bilingual toast**: After a successful POST `/api/vehicles` AND photo upload, `CreateVehicleListingPage.js` checks `utm_source==='pilot-welcome-banner' && sellerProfile.total_listings===0` and:
+- Fires `canvas-confetti` 3-burst sequence (center + left + right) in BidVex brand colours.
+- Shows an 8-second bilingual toast: 🎉 *"Bravo ! Votre tout premier véhicule est en ligne. Bienvenue dans la famille BidVex Pilote."* / *"Congrats! Your very first vehicle is live. Welcome to the BidVex Pilot family."*
+- Clears the localStorage flag so the celebration only fires once per dealer.
+
+### P2 — Auto-Draft Seller Record ✅
+**Trigger**: `POST /api/admin/dealer-licenses/{id}/decision` with `decision=approve`.
+- Checks `vehicle_sellers.find_one({user_id})`.
+- If none exists, inserts a complete draft with:
+  - `seller_type: 'dealer'`, `verification_status: 'approved'` (license is already verified)
+  - `license_number`, `license_province` (from `jurisdiction`), `license_expiry` (from `expiry_date`) all pre-filled from the dealer license
+  - `monthly_listing_limit: 500`, `monthly_listing_count: 0`
+  - `auto_created_from_license: true` audit flag
+  - All other fields default null/empty
+- Wrapped in try/except — auto-create failure cannot block license approval.
+- **Result**: Freshly-approved dealers no longer hit the registration form. They click the pilot CTA and land directly on `/vehicle-auctions/seller/register` which immediately renders the "Already approved → List a Vehicle" CTA card.
+
+### Verification — 24/24 PASS
+- **Backend pytest**:
+  - `tests/test_iter198_pilot.py` — 3 tests (model accepts utm_source / approval auto-creates seller / pilot-conversions endpoint counts)
+  - Regression: iter196 messaging-gate 14/14 + iter197 admin counters 7/7 = 24 passing total.
+- **Frontend Playwright**:
+  - CTA click → `localStorage.bidvex.utm_source='pilot-welcome-banner'` confirmed AND URL contains `?utm_source=pilot-welcome-banner`.
+  - Deep-link to `/vehicle-auctions/seller/register?utm_source=deep-link-test` correctly captures the param into localStorage.
+  - Code review confirmed celebration logic gating + bilingual toast wiring.
+- **Live curl chain (main agent)**:
+  - License approval → `vehicle_sellers` doc auto-created with all fields correct ✓
+  - Vehicle listing with `utm_source` → `GET /api/admin/pilot-conversions` returns total=1 with the listing in `sample[]` ✓
+  - Non-admin → 403 on `/api/admin/pilot-conversions` ✓
+
+### Files changed (iter198)
+- **Backend**:
+  - `models/vehicle_models.py` (+ `utm_source: Optional[str] = None` on `VehicleListingCreate`)
+  - `routes/vehicles.py` (+ persist `utm_source` in listing dict)
+  - `routes/vehicle_dealer_extras.py` (+ ~50 lines: auto-create vehicle_sellers on approve + new `/admin/pilot-conversions` endpoint)
+  - `tests/test_iter198_pilot.py` (NEW — 3 pytest assertions)
+- **Frontend**:
+  - `pages/seller/PilotWelcomeBanner.js` (+ localStorage write + ?utm_source URL param)
+  - `pages/vehicles/SellerRegistrationPage.js` (+ URL utm capture in mount effect)
+  - `pages/vehicles/CreateVehicleListingPage.js` (+ canvas-confetti import, URL utm capture, listingData.utm_source from LS, post-success celebration with confetti+bilingual toast)
+
+### Operational outcome
+A pilot dealer's day-1 journey on BidVex now flows like this:
+1. Receives "✅ Dealer License Verified" email (iter195).
+2. Logs into the seller dashboard and is greeted by the Pilot Welcome Banner (iter197).
+3. Clicks the CTA — already registered as a dealer (auto-draft from iter198), so they land directly on a green "Approved → List a Vehicle" card.
+4. Lists their first vehicle. On submit: confetti rains 🎉 and they see *"Welcome to the BidVex Pilot family"*.
+5. Admin sees the conversion under `/api/admin/pilot-conversions` for revenue attribution.
+
+The platform is **Project Pilote launch-ready**.
+
+⚠️ **Production note**: All changes are in PREVIEW. Redeploy from Emergent dashboard to push to https://bidvex.com.
+
+---
+
+## Earlier: iter197 — Project Pilote Launch Sprint (Feb 7, 2026) ✅
 
 User wants a "red carpet" experience for the first batch of approved dealers + a single-pane-of-glass triage view for the admin team ahead of the *Project Pilote* launch.
 
