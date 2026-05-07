@@ -2368,3 +2368,102 @@ async def send_promotion_email_blast(
         subject=f"Featured: {listing_title} — Don't Miss This Auction · En vedette : Ne manquez pas",
         html_content=_base_template(content, "Featured Auction"),
     )
+
+
+# ============= DEALER LICENSE VERIFICATION EMAILS (iter195) =============
+
+async def send_dealer_license_approved_email(user: dict, license_doc: dict) -> bool:
+    """Notify a buyer their dealer-license verification is approved."""
+    if not user or not user.get("email"):
+        return False
+    license_no = license_doc.get("license_number", "")[:32]
+    jurisdiction = license_doc.get("jurisdiction", "")
+    body_en = (
+        f"Your dealer license has been verified. You can now bid on licensed-only vehicle "
+        f"auctions on BidVex.<br/><br/>"
+        f"License #: <strong>{license_no}</strong> ({jurisdiction})<br/>"
+        f"Status: <strong style='color:#059669;'>Approved</strong>"
+    )
+    body_fr = (
+        f"Votre permis de concessionnaire a été vérifié. Vous pouvez maintenant enchérir "
+        f"sur les enchères de véhicules réservées aux concessionnaires sur BidVex.<br/><br/>"
+        f"N° de permis : <strong>{license_no}</strong> ({jurisdiction})<br/>"
+        f"Statut : <strong style='color:#059669;'>Approuvé</strong>"
+    )
+    return await send_email(
+        to_email=user["email"],
+        subject="✅ Dealer License Verified · Permis de concessionnaire vérifié",
+        html_content=_storage_panel(
+            "Dealer License Approved", "Permis de concessionnaire approuvé",
+            body_en, body_fr,
+            cta_url="https://bidvex.com/vehicle-auctions",
+            cta_en="Browse Vehicle Auctions",
+            cta_fr="Parcourir les enchères de véhicules",
+        ),
+    )
+
+
+async def send_dealer_license_rejected_email(user: dict, license_doc: dict, reason: str = "") -> bool:
+    """Notify a buyer their dealer-license verification was rejected."""
+    if not user or not user.get("email"):
+        return False
+    license_no = license_doc.get("license_number", "")[:32]
+    reason_en = reason or "Please contact support for more information."
+    reason_fr = reason or "Veuillez contacter le support pour plus d'informations."
+    body_en = (
+        f"Your dealer license submission was reviewed and unfortunately could not be approved.<br/><br/>"
+        f"License #: <strong>{license_no}</strong><br/>"
+        f"Reason: <em>{reason_en}</em><br/><br/>"
+        f"You may resubmit a corrected license at any time."
+    )
+    body_fr = (
+        f"Votre soumission de permis de concessionnaire a été examinée et n'a malheureusement pas pu être approuvée.<br/><br/>"
+        f"N° de permis : <strong>{license_no}</strong><br/>"
+        f"Raison : <em>{reason_fr}</em><br/><br/>"
+        f"Vous pouvez soumettre à nouveau un permis corrigé à tout moment."
+    )
+    return await send_email(
+        to_email=user["email"],
+        subject="Dealer License Verification — Action Required · Action requise",
+        html_content=_storage_panel(
+            "License Verification Rejected", "Vérification du permis rejetée",
+            body_en, body_fr,
+            cta_url="https://bidvex.com/vehicle-auctions/dealer-license",
+            cta_en="Resubmit Dealer License",
+            cta_fr="Resoumettre le permis",
+        ),
+    )
+
+
+async def send_dealer_license_expired_email(user: dict, license_doc: dict) -> bool:
+    """Notify a buyer their dealer-license verification has expired."""
+    if not user or not user.get("email"):
+        return False
+    license_no = license_doc.get("license_number", "")[:32]
+    expiry = license_doc.get("expiry_date", "")
+    if hasattr(expiry, "strftime"):
+        expiry = expiry.strftime("%Y-%m-%d")
+    body_en = (
+        f"Your dealer license on file has expired. To continue bidding on licensed-only "
+        f"vehicle auctions, please submit your renewed license.<br/><br/>"
+        f"License #: <strong>{license_no}</strong><br/>"
+        f"Expired on: <strong>{expiry}</strong>"
+    )
+    body_fr = (
+        f"Votre permis de concessionnaire enregistré a expiré. Pour continuer à enchérir "
+        f"sur les enchères réservées aux concessionnaires, veuillez soumettre votre permis renouvelé.<br/><br/>"
+        f"N° de permis : <strong>{license_no}</strong><br/>"
+        f"Expiré le : <strong>{expiry}</strong>"
+    )
+    return await send_email(
+        to_email=user["email"],
+        subject="⚠️ Dealer License Expired · Permis de concessionnaire expiré",
+        html_content=_storage_panel(
+            "Dealer License Expired", "Permis expiré",
+            body_en, body_fr,
+            cta_url="https://bidvex.com/vehicle-auctions/dealer-license",
+            cta_en="Renew License",
+            cta_fr="Renouveler le permis",
+        ),
+    )
+

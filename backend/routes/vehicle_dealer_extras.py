@@ -115,7 +115,7 @@ async def admin_decide_dealer_license(
     decision: DealerLicenseAdminAction,
     user: dict = Depends(get_current_user),
 ):
-    """Admin approves or rejects a license."""
+    """Admin approves or rejects a license. Sends bilingual email to user on status change."""
     if user.get("role") not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     db = _get_db()
@@ -141,6 +141,25 @@ async def admin_decide_dealer_license(
             "reviewed_at": datetime.now(timezone.utc),
         }}
     )
+
+    # iter195 — Send transactional email to the buyer
+    try:
+        target_user = await db.users.find_one({"id": doc["user_id"]}, {"_id": 0, "email": 1, "name": 1})
+        if target_user and target_user.get("email"):
+            from services.email_notifications import (
+                send_dealer_license_approved_email,
+                send_dealer_license_rejected_email,
+            )
+            updated_doc = {**doc, "status": new_status, "rejection_reason": decision.rejection_reason}
+            if decision.decision == "approve":
+                await send_dealer_license_approved_email(target_user, updated_doc)
+            else:
+                await send_dealer_license_rejected_email(target_user, updated_doc, decision.rejection_reason or "")
+    except Exception as exc:
+        # Email failure must not break the decision endpoint
+        import logging
+        logging.getLogger(__name__).warning(f"[iter195] dealer-license decision email failed: {exc}")
+
     return {"success": True, "status": new_status}
 
 

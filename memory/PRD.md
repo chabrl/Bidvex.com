@@ -1,6 +1,67 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter194 — Vehicle Dealer Listing Flow Upgrade (Feb 7, 2026) ✅
+## Latest: iter195 — Dealer License Admin Operationalization (Feb 7, 2026) ✅
+
+User asked for 3 P0/P1 items to make the iter194 dealer-license flow fully operational from a browser without API calls.
+
+### P0 — Admin License Management UI ✅
+**New page**: `/admin` → Vehicles → Dealer Licenses tab (component: `AdminDealerLicenses.js`).
+
+Features:
+- 5 status tabs (Pending / Approved / Rejected / Expired / All) with live count after each action
+- Search box (license #, jurisdiction, user id)
+- Table columns: License #, Jurisdiction, Expiry, Submitted, User ID, Status, Actions
+- "View Document" button opens uploaded license file in new tab
+- "Approve" button → POST decision=approve, fires email, refreshes table
+- "Reject" button → opens dialog with optional reason textarea, fires email with reason
+- Toast confirmation on every action ("License approved — buyer notified by email")
+
+### P1 — Automated Email Notifications ✅
+**New SendGrid email helpers** in `services/email_notifications.py`:
+- `send_dealer_license_approved_email` — bilingual subject "✅ Dealer License Verified · Permis de concessionnaire vérifié" + CTA "Browse Vehicle Auctions"
+- `send_dealer_license_rejected_email` — bilingual subject + reason interpolated into body + CTA "Resubmit Dealer License"
+- `send_dealer_license_expired_email` — bilingual subject + CTA "Renew License"
+
+Hooked into `POST /api/admin/dealer-licenses/{id}/decision` with try/except wrap so email failure can never block the decision.
+
+### P1 — Expiry Automation ✅
+**New scheduled job**: `process_expired_dealer_licenses` runs every 6 hours via APScheduler.
+- Finds all `status=approved` licenses where `expiry_date < now`
+- Bulk-updates them to `status=expired` + records `expired_at` timestamp
+- Sends transactional email to each affected user
+- Idempotent — won't re-flip already-expired records
+
+### Verification (all PASS)
+- ✅ Backend approve/reject endpoints fire emails (SendGrid 202 confirmed in logs)
+- ✅ Expiry job correctly transitions approved licenses with past expiry → expired
+- ✅ Admin page renders without JS errors, table displays pending license, all 5 tabs accessible
+- ✅ Approve button click → toast "License approved — buyer notified by email" → row removed from Pending tab
+- ✅ Both apscheduler jobs (`promotion_email_blast`, `dealer_license_expiry`) registered in startup logs
+
+### Files changed (iter195)
+- **Backend**:
+  - `services/email_notifications.py` (+98 lines: 3 dealer-license email helpers)
+  - `services/scheduled_jobs.py` (+58 lines: `process_expired_dealer_licenses`)
+  - `routes/vehicle_dealer_extras.py` (admin decision endpoint now sends email)
+  - `server.py` (+8 lines: register `dealer_license_expiry` apscheduler job, every 6h)
+- **Frontend**:
+  - `pages/admin/AdminDealerLicenses.js` (NEW, ~290 lines)
+  - `pages/AdminDashboard.js` (+ Dealer Licenses sub-tab in Vehicles category)
+
+### Operational outcome
+You can now manage the entire dealer onboarding process from `/admin → Vehicles → Dealer Licenses`:
+1. Pending licenses appear automatically as buyers submit
+2. Click "View" to inspect the uploaded document
+3. Click "Approve" or "Reject" (with optional reason)
+4. Buyer receives email automatically — no further admin action needed
+
+Approved licenses auto-flip to `expired` status when their expiry date passes (every 6h), with a renewal email sent.
+
+⚠️ **Production note:** All changes are in PREVIEW. Redeploy from Emergent dashboard to push to https://bidvex.com.
+
+---
+
+## Earlier: iter194 — Vehicle Dealer Listing Flow Upgrade (Feb 7, 2026) ✅
 
 User requested 4 enhancements to the vehicle listing flow for licensed dealers + a 2.5% net unlock-fee model for buyer access to dealer contact info.
 

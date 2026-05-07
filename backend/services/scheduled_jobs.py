@@ -703,3 +703,64 @@ async def process_expired_promotions(db):
     except Exception as e:
         logger.error(f"[PROMOTIONS] downgrade error: {e}")
         return {"error": str(e)}
+
+
+
+# ============= DEALER LICENSE EXPIRY (iter195) =============
+
+async def process_expired_dealer_licenses(db):
+    """Mark approved dealer licenses as 'expired' once their expiry_date passes.
+
+    Sends a transactional email to the user notifying them to renew. Runs daily.
+    """
+    try:
+        now = datetime.now(timezone.utc)
+        # Find approved licenses whose expiry has passed (handles both ISO string + datetime)
+        candidates = await db.dealer_licenses.find(
+            {"status": "approved"},
+            {"_id": 0}
+        ).to_list(length=1000)
+
+        expired_ids = []
+        for d in candidates:
+            exp = d.get("expiry_date")
+            if isinstance(exp, str):
+                try:
+                    exp = datetime.fromisoformat(exp.replace("Z", "+00:00"))
+                except Exception:
+                    exp = None
+            if exp and exp.tzinfo is None:
+                exp = exp.replace(tzinfo=timezone.utc)
+            if exp and exp < now:
+                expired_ids.append(d)
+
+        if not expired_ids:
+            return {"expired": 0}
+
+        ids_to_update = [d["id"] for d in expired_ids]
+        result = await db.dealer_licenses.update_many(
+            {"id": {"$in": ids_to_update}},
+            {"$set": {"status": "expired", "expired_at": now}},
+        )
+
+        # Send notification emails
+        try:
+            from services.email_notifications import send_dealer_license_expired_email
+            for lic in expired_ids:
+                try:
+                    target_user = await db.users.find_one(
+                        {"id": lic["user_id"]},
+                        {"_id": 0, "email": 1, "name": 1},
+                    )
+                    if target_user and target_user.get("email"):
+                        await send_dealer_license_expired_email(target_user, lic)
+                except Exception as notify_err:
+                    logger.warning(f"[DEALER-LICENSE] expiry email error: {notify_err}")
+        except ImportError:
+            logger.info("[DEALER-LICENSE] expired-email helper not available — skip notifications")
+
+        logger.info(f"[DEALER-LICENSE] expired {result.modified_count} licenses")
+        return {"expired": result.modified_count}
+    except Exception as e:
+        logger.error(f"[DEALER-LICENSE] expiry error: {e}")
+        return {"error": str(e)}

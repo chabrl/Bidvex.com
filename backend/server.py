@@ -385,6 +385,15 @@ scheduler.add_job(
     _promotion_email_blast_tick,
     trigger=IntervalTrigger(minutes=5), id='promotion_email_blast', replace_existing=True)
 
+# ─── Dealer License Expiry sweep (iter195 — daily) ───
+async def _dealer_license_expiry_tick():
+    from services.scheduled_jobs import process_expired_dealer_licenses
+    await safe_run("dealer_license_expiry", process_expired_dealer_licenses(db))
+
+scheduler.add_job(
+    _dealer_license_expiry_tick,
+    trigger=IntervalTrigger(hours=6), id='dealer_license_expiry', replace_existing=True)
+
 # ─── Health Endpoints ───
 @api_router.get("/")
 async def root():
