@@ -190,6 +190,9 @@ const AdminDashboard = () => {
 
   // iter196 — Pending dealer license count for red-dot badge + home card
   const [pendingDealerLicenses, setPendingDealerLicenses] = useState(0);
+  // iter197 — Triage counters for the Admin Home (hidden when 0)
+  const [pendingDisputes, setPendingDisputes] = useState(0);
+  const [pendingCurrencyAppeals, setPendingCurrencyAppeals] = useState(0);
 
   useEffect(() => {
     if (!user || !token) return;
@@ -204,8 +207,30 @@ const AdminDashboard = () => {
         }
       } catch (_) {}
     };
+    const fetchTriageCounts = async () => {
+      const headers = { Authorization: `Bearer ${token}` };
+      const root = process.env.REACT_APP_BACKEND_URL;
+      try {
+        const r = await fetch(`${root}/api/admin/vehicles/disputed-settlements/count`, { headers });
+        if (r.ok) {
+          const d = await r.json();
+          setPendingDisputes(d.total || 0);
+        }
+      } catch (_) {}
+      try {
+        const r = await fetch(`${root}/api/admin/currency-appeals/pending-count`, { headers });
+        if (r.ok) {
+          const d = await r.json();
+          setPendingCurrencyAppeals(d.total || 0);
+        }
+      } catch (_) {}
+    };
     fetchPendingCount();
-    const id = setInterval(fetchPendingCount, 60000); // 1 min refresh
+    fetchTriageCounts();
+    const id = setInterval(() => {
+      fetchPendingCount();
+      fetchTriageCounts();
+    }, 60000); // 1 min refresh
     return () => clearInterval(id);
   }, [user, token]);
 
@@ -476,7 +501,7 @@ const AdminDashboard = () => {
       {/* Quick Stats Row */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className={`grid gap-4 ${pendingDealerLicenses > 0 ? 'grid-cols-5' : 'grid-cols-4'}`}>
+          <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7">
             <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
               <Users className="h-8 w-8 text-blue-600" />
               <div>
@@ -519,6 +544,40 @@ const AdminDashboard = () => {
                     {pendingDealerLicenses.toLocaleString()}
                   </p>
                   <p className="text-xs text-red-600 font-medium">Pending Reviews</p>
+                </div>
+              </button>
+            )}
+            {pendingDisputes > 0 && (
+              <button
+                type="button"
+                onClick={() => { setPrimaryTab('marketplace'); setSecondaryTab('disputed-settlements'); }}
+                className="flex items-center gap-3 p-3 bg-orange-50 hover:bg-orange-100 rounded-lg ring-2 ring-orange-300 transition-all text-left animate-pulse"
+                data-testid="admin-pending-disputes-card"
+                title="Click to review disputed settlements"
+              >
+                <AlertTriangle className="h-8 w-8 text-orange-600" />
+                <div>
+                  <p className="text-2xl font-bold text-orange-700" data-testid="admin-pending-disputes-count">
+                    {pendingDisputes.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-orange-600 font-medium">Disputes</p>
+                </div>
+              </button>
+            )}
+            {pendingCurrencyAppeals > 0 && (
+              <button
+                type="button"
+                onClick={() => { setSecondaryTab('currency-appeals'); }}
+                className="flex items-center gap-3 p-3 bg-yellow-50 hover:bg-yellow-100 rounded-lg ring-2 ring-yellow-300 transition-all text-left animate-pulse"
+                data-testid="admin-pending-appeals-card"
+                title="Click to review currency appeals"
+              >
+                <DollarSign className="h-8 w-8 text-yellow-600" />
+                <div>
+                  <p className="text-2xl font-bold text-yellow-700" data-testid="admin-pending-appeals-count">
+                    {pendingCurrencyAppeals.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-yellow-600 font-medium">Currency Appeals</p>
                 </div>
               </button>
             )}

@@ -1006,7 +1006,7 @@ async def get_vehicle_detail(vehicle_id: str, request: Request):
     # Get seller info
     seller = await db.vehicle_sellers.find_one(
         {"id": listing["seller_id"]},
-        {"_id": 0, "id": 1, "seller_type": 1, "business_name": 1, 
+        {"_id": 0, "id": 1, "user_id": 1, "seller_type": 1, "business_name": 1,
          "average_rating": 1, "total_sold": 1}
     )
     listing["seller"] = seller

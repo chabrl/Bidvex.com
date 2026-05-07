@@ -616,6 +616,16 @@ async def get_user_appeals(current_user: User = Depends(get_current_user)):
 
 
 
+@misc_router.get("/admin/currency-appeals/pending-count")
+async def admin_currency_appeals_pending_count(current_user: User = Depends(get_current_user)):
+    """iter197 — Lightweight pending counter for the Admin Home triage card."""
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    db = get_db()
+    total = await db.currency_appeals.count_documents({"status": "pending"})
+    return {"total": total}
+
+
 @misc_router.post("/admin/currency-appeals/{appeal_id}/review")
 async def review_currency_appeal(
     appeal_id: str,

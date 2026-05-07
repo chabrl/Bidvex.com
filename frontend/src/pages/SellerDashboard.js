@@ -15,6 +15,7 @@ import SellerAnalyticsDashboard from '../components/SellerAnalyticsDashboard';
 import SellerEarningsDashboard from '../components/SellerEarningsDashboard';
 import { SellerEscrowPanel } from '../components/EscrowPickupPanel';
 import VehicleSettlements from './seller/VehicleSettlements';
+import PilotWelcomeBanner from './seller/PilotWelcomeBanner';
 import { formatCurrency, formatPercent } from '../utils/currencyFormatter';
 import { LoadingTimeout } from '../components/LoadingTimeout';
 import InfoTip from '../components/InfoTip';
@@ -101,6 +102,9 @@ const SellerDashboard = () => {
   return (
     <div className="min-h-screen py-4 sm:py-8 px-3 sm:px-4 pb-24 lg:pb-8" data-testid="seller-dashboard">
       <div className="max-w-7xl mx-auto space-y-5 sm:space-y-8">
+        {/* iter197 — Pilot Welcome Banner (auto-hides after 7 days post-approval or on dismiss) */}
+        <PilotWelcomeBanner user={user} token={token} />
+
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
           <div className="w-full sm:w-auto">
             <div className="flex items-center gap-3 mb-2 flex-wrap">

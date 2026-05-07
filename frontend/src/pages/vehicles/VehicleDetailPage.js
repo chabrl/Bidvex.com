@@ -36,6 +36,8 @@ import {
 } from 'lucide-react';
 import useVehicleBidding from '../../hooks/useVehicleBidding';
 import { PricingEstimate } from '../../components/vehicles/PricingBreakdown';
+import MessageSellerModal from '../../components/MessageSellerModal';
+import { MessageSquare } from 'lucide-react';
 
 // Trust & Legal Components
 import {
@@ -724,6 +726,8 @@ const VehicleDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showPromoModal, setShowPromoModal] = useState(false);
+  // iter197 — Message Seller modal (winner-only after unlock fee paid)
+  const [showMessageModal, setShowMessageModal] = useState(false);
 
   const fetchVehicle = useCallback(async () => {
     try {
@@ -1196,6 +1200,44 @@ const VehicleDetailPage = () => {
                             </div>
                           )}
                         </div>
+
+                        {/* iter197 — Message Seller (gated to winner who paid unlock fee) */}
+                        {(() => {
+                          const canMessage = !!user
+                            && vehicle?.winner_id === user.id
+                            && !!vehicle?.unlock_paid_at
+                            && !!seller?.user_id;
+                          if (!canMessage) return null;
+                          return (
+                            <div
+                              className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:bg-blue-950/30 dark:border-blue-800"
+                              data-testid="vehicle-message-seller-section"
+                            >
+                              <div className="flex items-start gap-3">
+                                <MessageSquare className="h-5 w-5 mt-0.5 text-blue-600 flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                                    {i18n.language === 'fr' ? 'Coordonnez votre ramassage' : 'Coordinate your pickup'}
+                                  </p>
+                                  <p className="text-xs text-blue-800/80 dark:text-blue-200/80 mt-0.5">
+                                    {i18n.language === 'fr'
+                                      ? 'Les frais de plateforme étant payés, vous pouvez écrire directement au concessionnaire pour organiser le ramassage.'
+                                      : 'With the platform fee paid, you can message the dealer directly to arrange pickup.'}
+                                  </p>
+                                  <Button
+                                    size="sm"
+                                    className="mt-3 bg-blue-600 hover:bg-blue-700 text-white"
+                                    onClick={() => setShowMessageModal(true)}
+                                    data-testid="vehicle-message-seller-btn"
+                                  >
+                                    <MessageSquare className="mr-2 h-4 w-4" />
+                                    {i18n.language === 'fr' ? 'Écrire au concessionnaire' : 'Message Dealer'}
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     ) : (
                       <p className="text-slate-500">Seller information not available</p>
@@ -1305,6 +1347,17 @@ const VehicleDetailPage = () => {
           listingId={vehicle.id}
           listingTitle={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
           listingType="vehicle"
+        />
+      )}
+
+      {/* iter197 — Message Seller modal (winner-only after unlock fee paid) */}
+      {showMessageModal && seller?.user_id && (
+        <MessageSellerModal
+          isOpen={showMessageModal}
+          onClose={() => setShowMessageModal(false)}
+          sellerId={seller.user_id}
+          listingId={vehicle.id}
+          listingTitle={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
         />
       )}
     </div>

@@ -645,6 +645,14 @@ async def admin_disputed_settlements(current_user: User = Depends(_require_admin
     return {"total": len(disputes), "disputes": disputes}
 
 
+@vehicle_settlement_router.get("/admin/vehicles/disputed-settlements/count")
+async def admin_disputed_settlements_count(current_user: User = Depends(_require_admin)):
+    """iter197 — Lightweight counter for the Admin Home triage card."""
+    db = get_db()
+    total = await db.vehicle_settlements.count_documents({"settlement_status": "DISPUTED"})
+    return {"total": total}
+
+
 @vehicle_settlement_router.post("/admin/vehicles/{vehicle_id}/resolve")
 async def admin_resolve_settlement(
     vehicle_id: str,
