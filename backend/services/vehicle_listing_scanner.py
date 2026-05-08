@@ -191,6 +191,18 @@ async def scan_listing_for_vehicles(
         "title": (listing.get("title") or "")[:160],
         "timestamp": datetime.now(timezone.utc).isoformat(),
     })
+    # iter205 — admin notification (non-blocking)
+    try:
+        from .compliance_notifier import notify_admins_of_violation
+        await notify_admins_of_violation(
+            db,
+            kind="paused_by_ai",
+            listing=listing,
+            signals=[f"ai_reason:{r}" for r in (reasons or [])][:5],
+            extra={"collection": collection, "ai_confidence": confidence},
+        )
+    except Exception as e:
+        logger.error("[ai_scanner] notification dispatch failed: %s", e)
     logger.warning(
         "[vehicle_scanner] PAUSED listing=%s seller=%s confidence=%s reasons=%s",
         listing_id, listing.get("seller_id"), confidence, reasons,

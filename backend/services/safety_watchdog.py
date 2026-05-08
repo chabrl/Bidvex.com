@@ -78,6 +78,20 @@ async def _pause_listing(
         listing_id, collection_name, listing.get("seller_id"), signals,
     )
 
+    # iter205 P0 — Admin notification dispatch (non-blocking, best-effort)
+    try:
+        from services.compliance_notifier import notify_admins_of_violation
+        await notify_admins_of_violation(
+            db,
+            kind="paused_by_watchdog",
+            listing=listing,
+            signals=signals,
+            seller_email=seller_user_doc.get("email"),
+            extra={"collection": collection_name, "triggered_by": triggered_by},
+        )
+    except Exception as e:
+        logger.error("[safety_watchdog] notification dispatch failed: %s", e)
+
 
 async def _scan_collection(db, collection_name: str, triggered_by: str) -> dict:
     """Generic scanner used for both `listings` and `multi_item_listings`.

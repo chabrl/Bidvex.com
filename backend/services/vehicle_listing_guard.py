@@ -83,6 +83,74 @@ VEHICLE_BODY_TOKENS: frozenset[str] = frozenset({
     "berline", "berlinette", "cabriolet", "familiale",
 })
 
+# iter205 P0 — Specific model identifiers. ANY of these in the title or
+# description IS sufficient on its own to flag the listing — these are
+# unambiguous vehicle model names that don't appear in any non-vehicle
+# context. This closes the "ford f150" / "honda civic" gap where the user
+# omitted the model year.
+VEHICLE_MODEL_TOKENS: tuple[str, ...] = (
+    # Ford
+    "f-150", "f150", "f-250", "f250", "f-350", "f350", "f-450", "f450",
+    "mustang", "ranger", "explorer", "escape", "edge", "expedition",
+    "bronco", "maverick", "transit",
+    # Chevrolet / GMC
+    "silverado", "sierra", "colorado", "canyon", "camaro", "corvette",
+    "tahoe", "suburban", "yukon", "blazer", "equinox", "trailblazer",
+    "malibu", "impala", "trax",
+    # Ram / Dodge
+    "ram 1500", "ram 2500", "ram 3500", "ram1500", "ram2500", "ram3500",
+    "ram-1500", "charger", "challenger", "durango", "journey", "caravan",
+    # Jeep
+    "wrangler", "grand cherokee", "cherokee", "compass", "patriot",
+    "renegade", "gladiator",
+    # Toyota
+    "tacoma", "tundra", "tacoma trd", "rav4", "rav 4", "highlander",
+    "4runner", "land cruiser", "sequoia", "corolla", "camry", "avalon",
+    "prius", "sienna", "venza", "matrix", "yaris",
+    # Honda
+    "civic", "accord", "cr-v", "crv", "cr v", "hr-v", "hrv", "passport",
+    "pilot", "ridgeline", "odyssey", "fit", "insight",
+    # Hyundai / Kia
+    "elantra", "sonata", "tucson", "santa fe", "santafe", "kona",
+    "palisade", "veloster",
+    "rio", "forte", "soul", "sportage", "sorento", "telluride", "stinger",
+    "carnival",
+    # Nissan / Infiniti
+    "altima", "maxima", "sentra", "versa", "leaf", "rogue", "murano",
+    "pathfinder", "frontier", "titan", "armada", "kicks", "qashqai",
+    "qx50", "qx60", "qx80",
+    # Mazda / Subaru / Mitsubishi
+    "mazda3", "mazda 3", "mazda6", "mazda 6", "cx-3", "cx-30", "cx-5",
+    "cx-9", "cx-50", "miata", "mx-5",
+    "outback", "forester", "impreza", "legacy", "ascent", "wrx", "sti",
+    "lancer", "outlander", "eclipse cross", "rvr",
+    # Volkswagen / Audi / BMW / Mercedes
+    "jetta", "passat", "golf", "tiguan", "atlas", "taos", "id.4", "gli",
+    "gti",
+    "a3", "a4", "a5", "a6", "a7", "a8", "q3", "q5", "q7", "q8", "rs5", "rs7",
+    "320i", "330i", "335i", "340i", "m3", "m4", "m5", "x1", "x3", "x5",
+    "x7", "330e", "i3", "i4", "i7",
+    "c-class", "c300", "c-300", "e-class", "e350", "e-350", "s-class",
+    "glc", "gle", "glk", "gla", "amg",
+    # Lexus / Acura / Volvo / Tesla / Cadillac / Lincoln
+    "rx350", "rx 350", "nx300", "is300", "is350", "es350", "gs350",
+    "gx460", "lx570",
+    "tlx", "rdx", "mdx", "ilx", "nsx",
+    "xc40", "xc60", "xc90", "s60", "s90", "v60", "v90",
+    "model 3", "model y", "model s", "model x", "cybertruck",
+    "escalade", "cts", "ats", "xt4", "xt5", "xt6",
+    "navigator", "aviator", "nautilus", "corsair",
+    # Pickup truck quick patterns (super common in marketplace abuse)
+    "1500", "2500", "3500",  # paired with brand → strong
+    # Powersports / motorcycles common models
+    "ninja", "cbr", "yzf", "r1", "r6", "z900", "mt-07", "mt-09",
+    "harley", "softail", "sportster", "fat boy", "road king", "street glide",
+    "vulcan", "shadow", "rebel",
+    "polaris rzr", "rzr", "ranger 1000", "ranger 570",
+    "ski-doo", "renegade", "summit", "skandic",
+    "sea-doo", "rxt", "rxp", "gtx", "spark",
+)
+
 # Strong content tokens that on their own indicate a vehicle listing,
 # regardless of category. Title or description match → flagged.
 VEHICLE_STRONG_TOKENS: tuple[str, ...] = (
@@ -124,9 +192,12 @@ def is_vehicle_listing(
 
     Detection rules (additive strength score):
       • Category match               → +5  (auto-flag on its own)
-      • Strong content token         → +5  (auto-flag)
-      • Year + brand combined        → +5  (auto-flag)
-      • Brand alone                  → +2
+      • Strong content token         → +5  (auto-flag — VIN / odometer / etc.)
+      • Year + brand combined        → +5  (auto-flag — "2018 Honda Civic")
+      • Brand + model token combined → +5  (auto-flag — "ford f150" with no year)
+      • Specific model token alone   → +5  (auto-flag — VIN-like uniqueness)
+      • Brand in TITLE alone         → +3  (raised in iter205 from +2)
+      • Brand in description alone   → +2
       • Body type alone              → +1
 
     A listing is flagged when total strength ≥ `threshold` (default 4).
@@ -160,6 +231,14 @@ def is_vehicle_listing(
         signals.append(f"strong:{strong_hit.strip()}")
         strength += 5
 
+    # iter205 P0 — Specific model identifiers (closes the "ford f150" gap).
+    # Match in TITLE or DESCRIPTION. A model identifier is unambiguous —
+    # nobody titles a non-vehicle "f-150" or "silverado".
+    model_hit = _haystack_contains(haystack, VEHICLE_MODEL_TOKENS)
+    if model_hit:
+        signals.append(f"model:{model_hit.strip()}")
+        strength += 5
+
     # Year + brand co-occurrence in title/description
     year_match = _YEAR_RE.search(haystack)
     brand_match = _haystack_contains(haystack, VEHICLE_BRAND_TOKENS)
@@ -167,8 +246,15 @@ def is_vehicle_listing(
         signals.append(f"year:{year_match.group()}+brand:{brand_match}")
         strength += 5
     elif brand_match:
-        signals.append(f"brand:{brand_match}")
-        strength += 2
+        # iter205 — brand-in-title is a stronger signal than brand-in-description.
+        # "ford" or "honda" appearing in the TITLE almost always means a vehicle;
+        # whereas in description it could be incidental ("comes with Honda generator").
+        if brand_match in title_n:
+            signals.append(f"brand-in-title:{brand_match}")
+            strength += 3
+        else:
+            signals.append(f"brand:{brand_match}")
+            strength += 2
 
     # Body style alone
     body_hit = _haystack_contains(haystack, VEHICLE_BODY_TOKENS)
@@ -185,10 +271,12 @@ def is_vehicle_listing(
 async def check_user_is_verified_dealer(db, user_id: Optional[str]) -> tuple[bool, dict]:
     """Return (is_verified_dealer, user_projection).
 
-    A user qualifies if any of the following are true:
-      • dealer_license_verified == True            (iter201 canonical)
-      • opc_permit_verified     == True            (legacy, kept for back-compat)
-      • role in {admin, super_admin}                (admins bypass)
+    iter205 P0 — STRICT compliance policy: a user qualifies as a verified
+    dealer ONLY if they hold a verified provincial dealer licence. Admin
+    role does NOT bypass this check — staff who want to list vehicles must
+    verify a real dealer licence through the same pipeline as everyone
+    else. Closes the loophole the user reported (their own admin account
+    bypassing the gate).
     """
     if not user_id:
         return False, {}
@@ -208,7 +296,6 @@ async def check_user_is_verified_dealer(db, user_id: Optional[str]) -> tuple[boo
     is_dealer = bool(
         user_doc.get("dealer_license_verified")
         or user_doc.get("opc_permit_verified")
-        or (user_doc.get("role") in ("admin", "super_admin"))
     )
     return is_dealer, user_doc
 

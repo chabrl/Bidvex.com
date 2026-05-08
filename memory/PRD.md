@@ -1,5 +1,68 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter205 — P0 "ford f150" Detection Gap Closure (Feb 8, 2026) ✅
+
+**User-reported critical failure on production**: An admin (charbel911@gmail.com) listed `title="ford f150"` in the marketplace and the listing went live for 2 hours. Three root causes — all closed in this iteration:
+
+### Root Cause #1 — Detection-vocabulary gap
+**Symptom**: `is_vehicle_listing("Heavy Equipment", "ford f150", "")` returned `False` (strength=2, threshold=4)
+**Why**: iter203 logic required a **4-digit year** to flag a brand. Without "2018", "ford f150" only scored +2 (brand alone) — below the threshold.
+**Fix** (`services/vehicle_listing_guard.py`):
+- Added `VEHICLE_MODEL_TOKENS` (110+ specific model identifiers): F-150, F250, Civic, Camry, Silverado, Ram 1500, Wrangler, RAV4, Mustang, Charger, Tacoma, Ninja, RZR, etc.
+- Brand + model combo → +5 (auto-flag)
+- Specific model token alone → +5 (auto-flag — "f-150" is unambiguous)
+- Brand in TITLE → bumped from +2 to +3 (titles are stronger signals than descriptions)
+- Now `is_vehicle_listing("Heavy Equipment", "ford f150", "")` → **strength=8** (model:f150 + brand-in-title:ford)
+
+### Root Cause #2 — Admin-role auto-bypass loophole
+**Symptom**: Even after the detection caught "ford f150", the watchdog still didn't pause it. Why? Because the seller was an admin, and `check_user_is_verified_dealer` had `role in {"admin", "super_admin"}` as a free pass.
+**Fix**: Removed the admin auto-bypass. **Strict compliance**: every account, regardless of role, must hold a real `dealer_license_verified=True` flag to list vehicles. Staff who legitimately need to demo vehicle listings must verify a real provincial dealer licence through the same pipeline as everyone else.
+
+### Root Cause #3 — KPI false-negative blindness
+**Symptom**: Admin Home KPI showed GREEN despite a known active "ford f150" violation, because the KPI only watched the watchdog's self-reported `total_paused` counter — if the watchdog missed something, the KPI never knew.
+**Fix** (`routes/admin_ops.py`): Added independent **suspicious_active_count** counter that re-runs `is_vehicle_listing()` against every active listing on each KPI fetch (with permissive `threshold=2` — flag any single brand/model/year hit). KPI bands now also fire on:
+- 1+ suspicious active listing → YELLOW (detection drift)
+- 3+ suspicious active listings → RED (safety net obviously broken)
+- Watchdog hasn't run in 75-240 min → YELLOW (missed schedule)
+- Watchdog hasn't run in 240+ min → RED (broken cron)
+
+### Root Cause #4 — Missing admin notifications
+**Symptom**: Even when watchdog DID pause something, admins received nothing — only an audit log row.
+**Fix** (new `services/compliance_notifier.py`): `notify_admins_of_violation()` now:
+1. Inserts a row into `admin_notifications` collection (visible on Admin Home)
+2. Dispatches a SendGrid email to every admin/super-admin with detection signals + listing details (severity HIGH for watchdog pause, WARNING for AI scanner pause, INFO for gate blocks)
+3. Wired into both `safety_watchdog._pause_listing()` and `vehicle_listing_scanner.scan_listing_for_vehicles()`
+
+### Live demonstration on preview
+Located the EXACT failing listing: `id=c3890fb2-89ab-4340-ab63-53a0e9cabfac, title='ford f150', category='Engines & Components', seller=charbel911@gmail.com (admin)`. Ran cleanup script. Result:
+- Listing → `status="pending_review"`
+- `paused_by="cleanup_script"`
+- `compliance_signals=['model:f150', 'brand-in-title:ford']`
+- `compliance_strength=8`
+- Audit log entry written
+- Admin notification dispatched (severity=HIGH)
+- KPI flipped: `suspicious_active_count: 0`
+
+### Tests
+- 26 new in `tests/test_iter205_ford_f150_gap.py`:
+  - The exact `("Heavy Equipment", "ford f150", "")` case across 5 categories + FR
+  - 14-case parametrised cohort for short brand+model titles (honda civic, toyota camry, chevy silverado, ram 1500, jeep wrangler, tesla model 3, etc.)
+  - 6-case false-positive guard (Honda generator, Yamaha keyboard, Toyota production system handbook)
+  - End-to-end watchdog pause + admin notification dispatch
+  - KPI false-negative independent observability test
+- 1 updated in `test_iter203_compliance_guard.py` — renamed `test_check_user_admin_treated_as_dealer` → `test_check_user_admin_NOT_treated_as_dealer` (asserts the new strict policy) + added `test_admin_with_verified_dealer_license_passes`
+- **Cumulative: 100+ tests passing, 0 regressions**
+
+### Files of reference
+- `/app/backend/services/vehicle_listing_guard.py` — VEHICLE_MODEL_TOKENS + raised brand-in-title weight + admin-bypass removed
+- `/app/backend/services/compliance_notifier.py` — NEW (admin_notifications + SendGrid)
+- `/app/backend/services/safety_watchdog.py` — wired notifier
+- `/app/backend/services/vehicle_listing_scanner.py` — wired notifier
+- `/app/backend/routes/admin_ops.py` — KPI false-negative observability
+- `/app/backend/tests/test_iter205_ford_f150_gap.py` — 26 new tests + live demo proof
+
+---
+
 ## Latest: iter204 — Compliance Health KPI + Marketplace Toast Polish (Feb 8, 2026) ✅
 
 ### A. Compliance Health Traffic-Light KPI (Admin Home)

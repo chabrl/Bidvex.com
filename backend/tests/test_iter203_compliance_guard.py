@@ -169,16 +169,40 @@ async def test_check_user_is_verified_dealer_dealer(db):
 
 
 @pytest.mark.asyncio
-async def test_check_user_admin_treated_as_dealer(db):
-    user_id = "iter203-test-admin"
+async def test_check_user_admin_NOT_treated_as_dealer(db):
+    """iter205 P0 — admin role does NOT bypass the dealer requirement.
+    This was the loophole the user reported: their own admin account
+    listed a "ford f150" because admins were auto-treated as verified
+    dealers. Strict compliance: every account must hold a real
+    dealer_license_verified=True flag, regardless of role.
+    """
+    user_id = "iter203-test-admin-no-bypass"
     await db.users.update_one(
         {"id": user_id},
-        {"$set": {"id": user_id, "role": "admin"}},
+        {"$set": {"id": user_id, "role": "admin",
+                  "dealer_license_verified": False, "opc_permit_verified": False}},
         upsert=True,
     )
     try:
         is_dealer, _ = await check_user_is_verified_dealer(db, user_id)
-        assert is_dealer is True, "Admins must bypass the gate"
+        assert is_dealer is False, "iter205: admins must NOT bypass the dealer requirement"
+    finally:
+        await db.users.delete_one({"id": user_id})
+
+
+@pytest.mark.asyncio
+async def test_admin_with_verified_dealer_license_passes(db):
+    """An admin who ALSO has a verified dealer licence is allowed (correct path)."""
+    user_id = "iter203-test-admin-with-license"
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"id": user_id, "role": "admin",
+                  "dealer_license_verified": True}},
+        upsert=True,
+    )
+    try:
+        is_dealer, _ = await check_user_is_verified_dealer(db, user_id)
+        assert is_dealer is True
     finally:
         await db.users.delete_one({"id": user_id})
 

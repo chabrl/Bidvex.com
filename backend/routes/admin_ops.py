@@ -2051,6 +2051,44 @@ async def admin_compliance_health(current_user: User = Depends(require_admin)):
     else:
         minutes_since_run = None
 
+    # iter205 P0 — False-negative scan: detect active listings that LOOK
+    # like vehicles (any brand/model/strong signal hit) but were never paused.
+    # This catches the case where the watchdog ran but its detection logic
+    # missed a violation (e.g. "ford f150" before the iter205 vocabulary
+    # update). It is the KPI's independent observability layer — it does NOT
+    # share code with the watchdog, so it can flag a drift between detection
+    # rules and reality.
+    # Implementation: re-run the latest is_vehicle_listing() against every
+    # active listing, with a permissive threshold (2 — any single signal).
+    from services.vehicle_listing_guard import is_vehicle_listing
+    suspicious_active: list[dict] = []
+    cursor = db.listings.find(
+        {"status": {"$in": ["active", "upcoming"]}},
+        {"_id": 0, "id": 1, "seller_id": 1, "category": 1, "title": 1,
+         "description": 1, "compliance_signals": 1},
+    ).limit(2000)
+    async for listing in cursor:
+        is_v, signals, strength = is_vehicle_listing(
+            listing.get("category"),
+            listing.get("title"),
+            listing.get("description"),
+            threshold=2,  # permissive — flag anything with ANY brand/model/year hit
+        )
+        if not is_v:
+            continue
+        # If the listing was already flagged during a watchdog pause but
+        # somehow remained active, surface it. Otherwise, also surface fresh
+        # detections — these are exactly the slip-throughs the user reported.
+        suspicious_active.append({
+            "id": listing.get("id"),
+            "seller_id": listing.get("seller_id"),
+            "title": (listing.get("title") or "")[:120],
+            "category": listing.get("category"),
+            "signals": signals,
+            "strength": strength,
+        })
+    suspicious_active_count = len(suspicious_active)
+
     # Determine traffic-light status
     reasons: list[str] = []
     status = "green"
@@ -2068,15 +2106,30 @@ async def admin_compliance_health(current_user: User = Depends(require_admin)):
     if ai_unavailable_last_hour >= 3:
         reasons.append(f"{ai_unavailable_last_hour} AI scanner failures in the last hour")
         status = "red"
+    # iter205 — false-negative / drift detection
+    if suspicious_active_count >= 1:
+        reasons.append(
+            f"⚠️ {suspicious_active_count} active listing(s) match vehicle signals but were "
+            "NOT paused — possible detection drift (run cleanup script)"
+        )
+        # 1+ suspicious active = at least yellow; 3+ = red because the safety
+        # net has clearly missed something blatant
+        status = "red" if suspicious_active_count >= 3 else (status if status == "red" else "yellow")
+    # iter205 — watchdog "missed run" detection (interval is 60 min — if last
+    # run was more than 75 minutes ago AND scheduler should have ticked, that's
+    # a missed run — yellow at minimum, escalates to red the longer it goes)
+    if minutes_since_run is not None and 75 <= minutes_since_run <= 240:
+        reasons.append(f"Watchdog missed scheduled run ({minutes_since_run} min ago, expected ≤60)")
+        status = "red" if status == "red" else "yellow"
 
     # YELLOW conditions (only escalate if not already red)
     if status != "red":
         if pending_review >= 1:
             reasons.append(f"{pending_review} listing(s) awaiting human review")
             status = "yellow"
-        if minutes_since_run is not None and minutes_since_run > 90:
-            reasons.append(f"Watchdog overdue (last run {minutes_since_run} min ago)")
-            status = "yellow"
+        if minutes_since_run is not None and 75 < minutes_since_run <= 240:
+            # Already covered above, but kept for clarity
+            pass
         if ai_unavailable_last_hour >= 1:
             reasons.append(f"{ai_unavailable_last_hour} AI scanner error(s) in the last hour")
             status = "yellow"
@@ -2099,6 +2152,9 @@ async def admin_compliance_health(current_user: User = Depends(require_admin)):
         "ai_unavailable_last_hour": ai_unavailable_last_hour,
         "last_watchdog_run": last_watchdog_run_iso,
         "minutes_since_last_watchdog": minutes_since_run,
+        # iter205 — false-negative / detection-drift observability
+        "suspicious_active_count": suspicious_active_count,
+        "suspicious_active_samples": suspicious_active[:5],
         "checked_at": now.isoformat(),
     }
 
