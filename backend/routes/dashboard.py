@@ -174,3 +174,38 @@ async def get_buyer_dashboard(
         "listings": listings,
         "watchlist": watchlist_listings,
     }
+
+
+# iter206 — Seller-facing compliance notifications (pause / approval / rejection)
+@dashboard_router.get("/seller/notifications")
+async def get_seller_notifications(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    if not credentials:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    current_user = await _get_current_user(credentials)
+    rdb = _db_read if _db_read is not None else _db
+    notifications = await rdb.seller_notifications.find(
+        {"seller_id": current_user.id},
+        {"_id": 0},
+    ).sort("created_at", -1).to_list(50)
+    unread = sum(1 for n in notifications if not n.get("read"))
+    return {"notifications": notifications, "unread": unread}
+
+
+@dashboard_router.post("/seller/notifications/{notification_kind}/mark-read")
+async def mark_seller_notification_read(
+    notification_kind: str,  # "all" or a specific kind
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    if not credentials:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=401, detail="Authentication required")
+    current_user = await _get_current_user(credentials)
+    query = {"seller_id": current_user.id}
+    if notification_kind != "all":
+        query["kind"] = notification_kind
+    res = await _db.seller_notifications.update_many(query, {"$set": {"read": True}})
+    return {"ok": True, "marked": res.modified_count}

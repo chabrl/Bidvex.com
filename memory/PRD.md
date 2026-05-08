@@ -1,5 +1,51 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter206 — Approve/Reject Toolbar + Seller Notifications (Feb 8, 2026) ✅
+
+### A. Pending-Review Moderation Queue (Admin)
+- **Backend**: `GET /api/admin/compliance-alerts` extended with `pending_review_queue[]` — every auto-paused listing (single + multi-item) with seller email/dealer-status, image, price, location, detection signals, pause metadata
+- **Backend**: `POST /api/admin/compliance/listings/{id}/approve` — admin override; restores listing to `previous_status`, writes `compliance_signals_overridden` audit log with admin id + signals + note (regulator evidence trail), resolves admin_notifications, emails seller approval notice
+- **Backend**: `POST /api/admin/compliance/listings/{id}/reject` — terminal `status=rejected`, audit log, admin_notifications resolved, seller emailed rejection notice with admin's note
+- **Backend**: `POST /api/admin/compliance/run-cleanup` — one-click on-demand watchdog scan (same code path as the 60-min cron)
+- **Frontend** (`AdminComplianceAlerts.js`): new top section "Pending Review — Auto-Paused Vehicle Listings" with rich `<PendingReviewCard>` per entry showing photo thumb, title/category/location/price, seller email + verified-dealer badge, detection-signal chips (`model:f150`, `brand-in-title:ford`, …), pause metadata, **Approve / Reject** buttons that reveal an inline note textarea before submission, plus "View listing →" link and a top-of-card "Run Cleanup" button
+
+### B. Seller-Facing Notifications
+- **New service** `services/compliance_notifier.py` — `_dispatch_seller_pause_notification()` runs alongside admin notification on every pause (watchdog + AI scanner):
+  - In-app row in new `seller_notifications` collection
+  - Bilingual SendGrid email (auto EN/FR by `preferred_language`) with regulator list + "Verify dealer licence" CTA + "Browse Vehicle Auctions" CTA + "Reply if false flag" support path
+- `notify_seller_of_resolution()` — fires when admin approves/rejects, sending follow-up bilingual email + writing seller_notifications row
+- **New endpoints** `GET /api/dashboard/seller/notifications` + `POST /api/dashboard/seller/notifications/{kind}/mark-read` (paginated, includes unread count)
+- **Frontend** `SellerDashboard.js` — every paused listing now shows an inline rose-coloured banner explaining: "This listing was paused for compliance review" + bilingual full description of provincial dealer licensing + detected signals (monospace) + "Verify dealer licence →" deep link. Rejected listings show a slate banner with the moderator's note.
+
+### C. Email System Verification
+- SendGrid wired via existing `services/email_notifications.send_email`
+- `SENDGRID_API_KEY` confirmed present in `/app/backend/.env`
+- `_admin_recipients()` queries `users.role ∈ {admin, super_admin}` so admin email always reaches all admins
+- Best-effort dispatch: any SendGrid failure is logged but never blocks the pause flow
+
+### Live demonstration on preview
+- Seeded 3 demo paused listings (ford f150, Toyota Camry, Honda Civic) + the user's real `ford f150` from `charbel911@gmail.com` (paused by iter205 cleanup)
+- Compliance Alerts tab now shows the 4-card queue with photo thumbs, signal chips, seller info, pause metadata
+- Admin Home KPI card "Compliance Alerts" badge updated to **4**
+- Compliance Health KPI dropped from "ALL CLEAR" → "WATCH" (yellow) because of pending_review > 0
+- Approve action via API verified live: `demo-paused-001` → `status="active"`, `compliance_overridden=true`, audit log + admin_notifications resolved + seller_notifications approval row written
+- Reject action via API verified live: `demo-paused-002` → `status="rejected"`, audit log + seller rejection email queued
+
+### Tests — **68 passing across 4 compliance test files, 0 regressions**
+- 10 new in `tests/test_iter206_moderation_toolbar.py` (queue surfaced, count includes queue, approve/reject end-to-end with audit + notifications, 404/400 edge cases, manual cleanup runner, seller pause notification dispatched, seller dashboard notifications endpoint)
+- All pre-existing iter203 (27), iter204 (5), iter205 (26) still green
+- Token-caching added to iter204 + iter206 to avoid auth rate-limit during batch runs
+
+### Files of reference
+- `/app/backend/routes/admin_ops.py` — pending_review_queue + approve + reject + run-cleanup endpoints
+- `/app/backend/routes/dashboard.py` — seller notifications endpoint
+- `/app/backend/services/compliance_notifier.py` — seller dispatch + resolution emails (bilingual)
+- `/app/frontend/src/pages/admin/AdminComplianceAlerts.js` — full rebuild with PendingReviewCard + toolbar
+- `/app/frontend/src/pages/SellerDashboard.js` — paused/rejected status banners with full reason
+- `/app/backend/tests/test_iter206_moderation_toolbar.py` — 10 new tests
+
+---
+
 ## Latest: iter205 — P0 "ford f150" Detection Gap Closure (Feb 8, 2026) ✅
 
 **User-reported critical failure on production**: An admin (charbel911@gmail.com) listed `title="ford f150"` in the marketplace and the listing went live for 2 hours. Three root causes — all closed in this iteration:

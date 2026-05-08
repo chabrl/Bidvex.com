@@ -522,10 +522,62 @@ const SellerDashboard = () => {
                             <p className="text-xs text-muted-foreground">{itemCount} {t('dashboard.seller.lots')}</p>
                           )}
                         </div>
-                        <Badge variant={listing.status === 'active' ? 'default' : 'secondary'}>
+                        <Badge
+                          variant={listing.status === 'active' ? 'default' : listing.status === 'pending_review' ? 'destructive' : 'secondary'}
+                          data-testid={`listing-status-${listing.id}`}
+                        >
                           {t(`dashboard.seller.status${listing.status.charAt(0).toUpperCase() + listing.status.slice(1)}`, listing.status)}
                         </Badge>
                       </div>
+
+                      {/* iter206 — Surface compliance pause reason directly to the seller */}
+                      {listing.status === 'pending_review' && (listing.compliance_signals || listing.paused_reason) && (
+                        <div
+                          className="mb-2 rounded-md border border-rose-300 bg-rose-50 p-2.5 text-xs"
+                          data-testid={`listing-pause-reason-${listing.id}`}
+                        >
+                          <div className="flex items-start gap-2">
+                            <span className="text-rose-600 font-bold">⛔</span>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-rose-900">
+                                {t('dashboard.seller.pausedTitle', 'This listing was paused for compliance review')}
+                              </p>
+                              <p className="text-rose-700 mt-0.5">
+                                {listing.paused_reason === 'vehicle_listing_by_non_dealer'
+                                  ? t('dashboard.seller.pausedVehicleNonDealer',
+                                      'Vehicle listings are restricted to verified provincial dealers (OMVIC, AMVIC, VSA, SAAQ, FCAA, etc.). Please verify your dealer licence or wait for an admin to approve this listing.')
+                                  : (listing.paused_reason || t('dashboard.seller.pausedGeneric', 'A moderator is reviewing this listing.'))}
+                              </p>
+                              {listing.compliance_signals && listing.compliance_signals.length > 0 && (
+                                <p className="text-[10px] font-mono text-rose-600 mt-1">
+                                  {t('dashboard.seller.detected', 'Detected')}: {listing.compliance_signals.slice(0, 5).join(', ')}
+                                </p>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => navigate('/vehicle-auctions/dealer-license')}
+                                className="mt-1.5 text-[11px] font-semibold text-rose-700 hover:text-rose-900 underline"
+                                data-testid={`listing-verify-license-${listing.id}`}
+                              >
+                                {t('dashboard.seller.verifyLicence', 'Verify dealer licence →')}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {listing.status === 'rejected' && (
+                        <div className="mb-2 rounded-md border border-slate-300 bg-slate-50 p-2.5 text-xs"
+                             data-testid={`listing-rejected-${listing.id}`}>
+                          <p className="font-semibold text-slate-800">
+                            ❌ {t('dashboard.seller.rejectedTitle', 'Listing rejected by moderator')}
+                          </p>
+                          {listing.rejection_note && (
+                            <p className="text-slate-600 mt-0.5">{listing.rejection_note}</p>
+                          )}
+                        </div>
+                      )}
+
                       <div className="flex flex-wrap gap-4 text-sm mb-2">
                         <span className="text-green-600 font-semibold">
                           <DollarSign className="h-3 w-3 inline mr-1" />

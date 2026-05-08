@@ -37,14 +37,17 @@ def db():
 
 
 async def _admin_token() -> str:
-    """Login as the admin user from test_credentials.md."""
+    """Cached admin login — avoids hitting the auth/login rate limit."""
+    if "_cached" in _admin_token.__dict__:
+        return _admin_token._cached  # type: ignore[attr-defined]
     async with httpx.AsyncClient(timeout=10) as h:
         r = await h.post(
             f"{BACKEND_URL}/auth/login",
             json={"email": "charbel911@gmail.com", "password": "Anderosli123!@#"},
         )
     r.raise_for_status()
-    return r.json()["access_token"]
+    _admin_token._cached = r.json()["access_token"]  # type: ignore[attr-defined]
+    return _admin_token._cached  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------

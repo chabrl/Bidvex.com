@@ -1959,13 +1959,200 @@ async def admin_compliance_alerts(current_user: User = Depends(require_admin)):
     ).sort("timestamp", -1).limit(50):
         territory_bids.append(log)
 
+    # iter206 — Pending-review moderation queue (auto-paused vehicle listings)
+    # Surfaces every listing the watchdog/scanner/cleanup auto-paused so admins
+    # can approve or reject from the UI without DB queries.
+    pending_review_queue = []
+    seller_cache: dict = {}
+    for collection_name in ("listings", "multi_item_listings"):
+        async for doc in db[collection_name].find(
+            {"status": "pending_review"},
+            {"_id": 0, "id": 1, "title": 1, "category": 1, "seller_id": 1,
+             "compliance_signals": 1, "compliance_strength": 1, "paused_by": 1,
+             "paused_at": 1, "paused_reason": 1, "previous_status": 1,
+             "images": 1, "starting_price": 1, "current_price": 1,
+             "location_city": 1, "location_province": 1, "created_at": 1},
+        ).sort("paused_at", -1).limit(100):
+            seller_id = doc.get("seller_id")
+            if seller_id and seller_id not in seller_cache:
+                seller_cache[seller_id] = await db.users.find_one(
+                    {"id": seller_id},
+                    {"_id": 0, "id": 1, "email": 1, "name": 1,
+                     "seller_type": 1, "dealer_license_verified": 1,
+                     "dealer_license_province": 1},
+                ) or {}
+            seller = seller_cache.get(seller_id, {})
+            pending_review_queue.append({
+                "listing_id": doc["id"],
+                "collection": collection_name,
+                "title": doc.get("title"),
+                "category": doc.get("category"),
+                "first_image": (doc.get("images") or [None])[0],
+                "starting_price": doc.get("starting_price"),
+                "current_price": doc.get("current_price"),
+                "city": doc.get("location_city"),
+                "province": doc.get("location_province"),
+                "seller_id": seller_id,
+                "seller_email": seller.get("email"),
+                "seller_name": seller.get("name"),
+                "seller_type": seller.get("seller_type"),
+                "seller_dealer_verified": bool(seller.get("dealer_license_verified")),
+                "compliance_signals": doc.get("compliance_signals") or [],
+                "compliance_strength": doc.get("compliance_strength"),
+                "paused_by": doc.get("paused_by"),
+                "paused_at": doc.get("paused_at"),
+                "paused_reason": doc.get("paused_reason"),
+                "previous_status": doc.get("previous_status"),
+                "created_at": doc.get("created_at"),
+            })
+
     return {
         "expired": expired,
         "high_fraud_score": high_fraud,
         "unreviewed_manual_review": unreviewed,
         "territory_bids": territory_bids,
+        # iter206
+        "pending_review_queue": pending_review_queue,
         "checked_at": now.isoformat(),
     }
+
+
+# ============= iter206 — MODERATION ACTIONS (Approve / Reject) ==========
+class ModerationActionRequest(BaseModel):
+    note: Optional[str] = None  # admin's reason for the override
+
+
+@admin_ops_router.post("/admin/compliance/listings/{listing_id}/approve")
+async def admin_approve_paused_listing(
+    listing_id: str,
+    payload: ModerationActionRequest,
+    current_user: User = Depends(require_admin),
+):
+    """iter206 — Admin override: re-publishes a `pending_review` listing.
+
+    Used in two contexts:
+      • A false-positive (the listing wasn't actually a vehicle)
+      • An override the admin is willing to take responsibility for
+    Always writes a `compliance_signals_overridden` audit log with the
+    admin user_id, signals that fired, and the optional note — preserving
+    full evidence for any future regulator audit.
+    """
+    db = get_db()
+    for collection in ("listings", "multi_item_listings"):
+        listing = await db[collection].find_one({"id": listing_id}, {"_id": 0})
+        if not listing:
+            continue
+        if listing.get("status") != "pending_review":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Listing is in status='{listing.get('status')}', not pending_review",
+            )
+        previous_status = listing.get("previous_status") or "active"
+        await db[collection].update_one(
+            {"id": listing_id},
+            {"$set": {
+                "status": previous_status,
+                "approved_at": datetime.now(timezone.utc).isoformat(),
+                "approved_by": current_user.id,
+                "approval_note": (payload.note or "")[:500],
+                "compliance_overridden": True,
+            }, "$unset": {"paused_at": "", "paused_reason": "", "paused_by": ""}},
+        )
+        await db.audit_logs.insert_one({
+            "action": "compliance_signals_overridden",
+            "decision": "approved",
+            "collection": collection,
+            "listing_id": listing_id,
+            "admin_id": current_user.id,
+            "admin_email": current_user.email,
+            "previous_status": previous_status,
+            "compliance_signals": listing.get("compliance_signals") or [],
+            "compliance_strength": listing.get("compliance_strength"),
+            "note": payload.note,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+        await db.admin_notifications.update_many(
+            {"listing_id": listing_id, "resolved": False},
+            {"$set": {"resolved": True, "resolved_by": current_user.id,
+                      "resolved_at": datetime.now(timezone.utc).isoformat(),
+                      "resolution": "approved"}},
+        )
+        # Notify the seller — listing back online
+        try:
+            from services.compliance_notifier import notify_seller_of_resolution
+            await notify_seller_of_resolution(
+                db, listing=listing, decision="approved",
+                admin_email=current_user.email, note=payload.note,
+                collection=collection,
+            )
+        except Exception:
+            pass
+        return {"ok": True, "decision": "approved", "listing_id": listing_id, "restored_status": previous_status}
+    raise HTTPException(status_code=404, detail="Listing not found")
+
+
+@admin_ops_router.post("/admin/compliance/listings/{listing_id}/reject")
+async def admin_reject_paused_listing(
+    listing_id: str,
+    payload: ModerationActionRequest,
+    current_user: User = Depends(require_admin),
+):
+    """iter206 — Admin confirms the violation: status → 'rejected' (terminal)."""
+    db = get_db()
+    for collection in ("listings", "multi_item_listings"):
+        listing = await db[collection].find_one({"id": listing_id}, {"_id": 0})
+        if not listing:
+            continue
+        await db[collection].update_one(
+            {"id": listing_id},
+            {"$set": {
+                "status": "rejected",
+                "rejected_at": datetime.now(timezone.utc).isoformat(),
+                "rejected_by": current_user.id,
+                "rejection_note": (payload.note or "")[:500],
+            }},
+        )
+        await db.audit_logs.insert_one({
+            "action": "compliance_listing_rejected",
+            "decision": "rejected",
+            "collection": collection,
+            "listing_id": listing_id,
+            "admin_id": current_user.id,
+            "admin_email": current_user.email,
+            "compliance_signals": listing.get("compliance_signals") or [],
+            "compliance_strength": listing.get("compliance_strength"),
+            "note": payload.note,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+        await db.admin_notifications.update_many(
+            {"listing_id": listing_id, "resolved": False},
+            {"$set": {"resolved": True, "resolved_by": current_user.id,
+                      "resolved_at": datetime.now(timezone.utc).isoformat(),
+                      "resolution": "rejected"}},
+        )
+        try:
+            from services.compliance_notifier import notify_seller_of_resolution
+            await notify_seller_of_resolution(
+                db, listing=listing, decision="rejected",
+                admin_email=current_user.email, note=payload.note,
+                collection=collection,
+            )
+        except Exception:
+            pass
+        return {"ok": True, "decision": "rejected", "listing_id": listing_id}
+    raise HTTPException(status_code=404, detail="Listing not found")
+
+
+# iter206 — One-click cleanup runner (admin-only) so the user can trigger
+# the watchdog from the browser instead of SSHing into the server.
+@admin_ops_router.post("/admin/compliance/run-cleanup")
+async def admin_run_compliance_cleanup(current_user: User = Depends(require_admin)):
+    """Trigger an on-demand watchdog scan (same code path as the 60-min cron).
+    Useful right after deploying a detection-vocabulary update."""
+    db = get_db()
+    from services.safety_watchdog import cleanup_existing_violations
+    summary = await cleanup_existing_violations(db)
+    return summary
 
 
 @admin_ops_router.get("/admin/compliance-alerts/count")
@@ -1976,6 +2163,7 @@ async def admin_compliance_alerts_count(current_user: User = Depends(require_adm
         len(data.get("expired") or [])
         + len(data.get("high_fraud_score") or [])
         + len(data.get("unreviewed_manual_review") or [])
+        + len(data.get("pending_review_queue") or [])  # iter206
     )}
 
 
