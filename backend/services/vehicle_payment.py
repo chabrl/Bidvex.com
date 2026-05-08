@@ -163,7 +163,8 @@ class PaymentService:
         cancel_url = f"{origin_url}/vehicle-auctions/{vehicle_id}?deposit=cancelled"
         
         # Create Stripe checkout session directly
-        # IMPORTANT (OPC compliance): Use manual capture so the $500 deposit is
+        # LEGACY: opc_permit → migrated to dealer_license_* — do not expose to users.
+        # IMPORTANT (provincial dealer compliance): Use manual capture so the $500 deposit is
         # only a HOLD (authorization) on the buyer's card, not an immediate
         # charge. The hold is RELEASED when the auction ends (winner or loser)
         # and is only CAPTURED if the winning buyer fails to pay the separate
@@ -373,7 +374,7 @@ class PaymentService:
         """
         Release a bid deposit hold.
 
-        OPC-compliant flow: deposits are manual-capture PaymentIntents, so
+        Dealer-compliant flow (LEGACY: opc_permit → dealer_license_*): deposits are manual-capture PaymentIntents, so
         "refund" means CANCELLING the authorization (no funds ever moved).
         This is called both for non-winners AND for the winner once their
         platform fee invoice is paid.

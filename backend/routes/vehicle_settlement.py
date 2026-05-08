@@ -185,7 +185,8 @@ async def confirm_card_verification(current_user: User = Depends(get_current_use
 # After the buyer pays the 2.5% BidVex fee, the vehicle enters the
 # "AWAITING_DEALER_CONFIRMATION" state. The dealer must then attest that the
 # vehicle has been paid for in full AND delivered. This creates an on-platform
-# audit trail for OPC compliance — even though BidVex never custodied the
+# LEGACY: opc_permit → migrated to dealer_license_* (iter201) — do not expose to users.
+# audit trail for provincial-dealer compliance — even though BidVex never custodied the
 # vehicle price itself.
 #
 # State transitions:

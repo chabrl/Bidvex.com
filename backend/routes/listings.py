@@ -159,28 +159,38 @@ async def create_listing(
 
     await validate_seller(db, current_user, listing_data.agreement_accepted)
 
-    # Category restriction: OPC-verified dealers only for vehicle listings
+    # iter201 — Vehicle category restriction: licensed dealer required.
+    # LEGACY: opc_permit_verified is silently re-read here for back-compat with pre-iter201 data.
     if listing_data.category and listing_data.category.lower() in ["vehicle", "vehicles", "vehicle parts", "road_vehicles"]:
         user_id = getattr(current_user, 'id', None)
-        user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "seller_type": 1, "opc_permit_verified": 1})
-        seller_type = (user_doc or {}).get("seller_type", "individual")
-        opc_verified = (user_doc or {}).get("opc_permit_verified", False)
-        
-        if seller_type == "individual" or not opc_verified:
+        user_doc = await db.users.find_one(
+            {"id": user_id},
+            {"_id": 0, "seller_type": 1, "opc_permit_verified": 1, "dealer_license_verified": 1, "dealer_license_province": 1}
+        ) or {}
+        seller_type = user_doc.get("seller_type", "individual")
+        # New field wins; fall back to legacy opc_permit_verified
+        dealer_verified = bool(
+            user_doc.get("dealer_license_verified")
+            or user_doc.get("opc_permit_verified")
+        )
+
+        if seller_type == "individual" or not dealer_verified:
             # Log blocked attempt
             await db.audit_logs.insert_one({
                 "action": "vehicle_listing_blocked",
                 "user_id": user_id,
                 "category": listing_data.category,
                 "seller_type": seller_type,
-                "opc_permit_verified": opc_verified,
+                "dealer_license_verified": dealer_verified,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             })
             raise HTTPException(
                 status_code=403,
                 detail=(
-                    "Vehicle listings require a verified OPC permit. Individual sellers are not permitted to list road vehicles on BidVex. "
-                    "/ Les annonces de véhicules nécessitent un permis OPC vérifié. Les vendeurs individuels ne sont pas autorisés à lister des véhicules routiers sur BidVex."
+                    "Vehicle listings require a verified provincial dealer licence (e.g. OMVIC in ON, AMVIC in AB, VSA in BC, SAAQ in QC). "
+                    "Individual sellers are not permitted to list road vehicles on BidVex. "
+                    "/ Les annonces de véhicules nécessitent une licence de concessionnaire provinciale vérifiée (p. ex. OMVIC en ON, AMVIC en AB, VSA en C.-B., SAAQ au QC). "
+                    "Les vendeurs individuels ne sont pas autorisés à lister des véhicules routiers sur BidVex."
                 )
             )
 
@@ -209,11 +219,12 @@ async def create_listing(
     )
     listing_dict = listing.model_dump()
 
-    # OPC certification: check seller and apply BP to listing
+    # LEGACY: opc_permit → migrated to dealer_license_* (iter201). Field kept for back-compat.
+    # Dealer-certified seller check + buyer-premium rate
     seller_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0, "is_opc_certified": 1})
     if seller_doc and seller_doc.get("is_opc_certified"):
         listing_dict["is_opc_certified"] = True
-        # OPC sellers can set BP rate (0-25%), stored as percent on listing
+        # Dealer-certified sellers can set BP rate (0-25%), stored as percent on listing
         if listing_data.buyers_premium_rate is not None:
             listing_dict["buyers_premium_percent"] = min(listing_data.buyers_premium_rate * 100, 25)
         else:

@@ -169,7 +169,8 @@ async def process_ended_auction(db, vehicle_listing: dict) -> AuctionEndResult:
         )
         
         # ── Release WINNER's deposit hold ──
-        # OPC compliance: the $500 deposit is a Stripe manual-capture hold.
+        # LEGACY: opc_permit → migrated to dealer_license_* — do not expose to users.
+        # Dealer compliance: the $500 deposit is a Stripe manual-capture hold.
         # When the auction ends successfully, we RELEASE the winner's hold
         # (cancel the PaymentIntent) — we do NOT apply it as credit toward the
         # platform fee. The 2.5% platform fee is charged separately via

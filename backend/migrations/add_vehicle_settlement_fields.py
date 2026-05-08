@@ -37,7 +37,9 @@ async def migrate():
     )
     print(f"Updated {result2.modified_count} users with ai_disclosure_consent field")
 
-    # 3. Add opc_permit fields to existing users who don't have them
+    # LEGACY: opc_permit → migrated to dealer_license_* (iter201) — do not expose to users.
+    # Kept for backwards-compat read-side migration only; new code uses dealer_license_* fields.
+    # 3. Add legacy opc_permit fields to existing users who don't have them
     result3 = await db.users.update_many(
         {"opc_permit_number": {"$exists": False}},
         {"$set": {
@@ -45,7 +47,7 @@ async def migrate():
             "opc_permit_verified": False,
         }}
     )
-    print(f"Updated {result3.modified_count} users with OPC permit fields")
+    print(f"Updated {result3.modified_count} users with legacy opc_permit fields (read-only since iter201)")
 
     # 4. Create index on vehicle_settlements
     await db.vehicle_settlements.create_index(

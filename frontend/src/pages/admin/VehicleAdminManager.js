@@ -183,12 +183,12 @@ const SellerCard = ({ seller, onApprove, onReject, onViewDetails, onToggleOpc, a
               </div>
             </div>
             
-            {/* OPC Permit Verification (vehicle sellers) */}
-            <div className={`rounded-lg p-3 border ${opcVerified ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`} data-testid={`opc-panel-${seller.id}`}>
+            {/* iter201 — Dealer Licence Verification (vehicle sellers; legacy field id retained for back-compat) */}
+            <div className={`rounded-lg p-3 border ${opcVerified ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`} data-testid={`dealer-license-panel-${seller.id}`}>
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
                   <p className="text-sm font-semibold flex items-center gap-2">
-                    OPC Permit Verification
+                    Dealer Licence Verification
                     {opcVerified ? (
                       <Badge className="bg-green-600 text-white text-[10px]">VERIFIED</Badge>
                     ) : (
@@ -196,17 +196,17 @@ const SellerCard = ({ seller, onApprove, onReject, onViewDetails, onToggleOpc, a
                     )}
                   </p>
                   <p className="text-[11px] text-slate-500">
-                    Quebec Consumer Protection permit (dealers must register). / Permis OPC requis pour les concessionnaires du Québec.
+                    Provincial dealer licence required (e.g. OMVIC ON, AMVIC AB, VSA BC, SAAQ QC). / Licence de concessionnaire provinciale requise (p. ex. OMVIC, AMVIC, VSA, SAAQ).
                   </p>
                 </div>
               </div>
               <div className="flex gap-2 mt-2 items-center">
                 <Input
-                  placeholder="OPC permit number"
+                  placeholder="Dealer licence number"
                   value={opcNumber}
                   onChange={(e) => setOpcNumber(e.target.value)}
                   className="h-8 text-sm max-w-xs"
-                  data-testid={`opc-number-input-${seller.id}`}
+                  data-testid={`dealer-license-number-input-${seller.id}`}
                 />
                 <Button
                   size="sm"
@@ -214,7 +214,7 @@ const SellerCard = ({ seller, onApprove, onReject, onViewDetails, onToggleOpc, a
                   className={opcVerified ? '' : 'bg-green-600 hover:bg-green-700 text-white'}
                   disabled={actionBusy === `opc-${seller.id}`}
                   onClick={() => onToggleOpc(seller, !opcVerified, opcNumber)}
-                  data-testid={`opc-toggle-btn-${seller.id}`}
+                  data-testid={`dealer-license-toggle-btn-${seller.id}`}
                 >
                   {actionBusy === `opc-${seller.id}` ? 'Saving…' : (opcVerified ? 'Un-verify' : 'Mark Verified')}
                 </Button>
@@ -547,19 +547,20 @@ const VehicleAdminManager = () => {
       return;
     }
     if (enable && !permitNumber?.trim()) {
-      toast.error('Enter the OPC permit number before marking verified / Saisissez le numéro de permis OPC');
+      toast.error('Enter the dealer licence number before marking verified / Saisissez le numéro de licence avant de vérifier');
       return;
     }
     setActionBusy(`opc-${seller.id}`);
     try {
+      // iter201 — Endpoint name remains for back-compat. Backend writes both legacy + new fields.
       await axios.put(`${API}/admin/users/${userId}/opc-verify`, {
         opc_permit_verified: enable,
         opc_permit_number: permitNumber || null,
       }, { headers: { Authorization: `Bearer ${token}` } });
-      toast.success(enable ? 'OPC permit marked verified' : 'OPC verification removed');
+      toast.success(enable ? 'Dealer licence marked verified' : 'Dealer-licence verification removed');
       fetchData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to update OPC permit');
+      toast.error(error.response?.data?.detail || 'Failed to update dealer-licence verification');
     } finally {
       setActionBusy(null);
     }

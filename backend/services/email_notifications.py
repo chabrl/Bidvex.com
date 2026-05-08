@@ -2517,3 +2517,61 @@ async def send_new_message_email(
         ),
     )
 
+
+async def send_listing_requires_action_email(
+    recipient: dict,
+    listing_title: str,
+    listing_id: str,
+    reason_code: str = "iter201_phase2_compliance_fields_required",
+) -> bool:
+    """
+    iter201 — Phase 2 — Notify a seller that one of their pre-existing vehicle
+    listings has been flagged `requires_seller_action` because new mandatory
+    compliance fields (category, condition matrix, accident/lien/use, payment
+    methods) need to be filled in before the listing can return to the
+    public marketplace.
+    """
+    if not recipient or not recipient.get("email"):
+        return False
+
+    safe_title = (listing_title or "Untitled vehicle").strip().replace("<", "&lt;").replace(">", "&gt;")
+    cta_url = f"https://bidvex.com/vehicle-auctions/edit/{listing_id}"
+
+    body_en = (
+        f"BidVex has updated its vehicle listing requirements to comply with provincial dealer regulations across Canada. "
+        f"Your existing listing <strong>{safe_title}</strong> needs a few additional fields filled in before it can return to the public marketplace.<br/><br/>"
+        f"<strong>What's needed (≈2 minutes):</strong>"
+        f"<ul style='margin:8px 0 8px 20px;padding:0;'>"
+        f"<li>Vehicle category (cars, SUVs, trucks, etc.)</li>"
+        f"<li>Condition (Excellent / Good / Fair / Salvage / Parts)</li>"
+        f"<li>Accident history, lien status, previous use</li>"
+        f"<li>Payment methods accepted, deposit requirement</li>"
+        f"</ul>"
+        f"Until then, your listing has been hidden from public view but is preserved as a draft."
+    )
+    body_fr = (
+        f"BidVex a mis à jour ses exigences de listing de véhicules pour se conformer aux règlements provinciaux des concessionnaires partout au Canada. "
+        f"Votre annonce existante <strong>{safe_title}</strong> nécessite quelques champs supplémentaires avant de pouvoir réapparaître publiquement.<br/><br/>"
+        f"<strong>Ce qu'il faut faire (≈2 minutes) :</strong>"
+        f"<ul style='margin:8px 0 8px 20px;padding:0;'>"
+        f"<li>Catégorie du véhicule (voitures, VUS, camionnettes, etc.)</li>"
+        f"<li>État (Excellent / Bon / Moyen / Récupération / Pièces)</li>"
+        f"<li>Historique d'accidents, privilèges, usage antérieur</li>"
+        f"<li>Modes de paiement acceptés, exigence de dépôt</li>"
+        f"</ul>"
+        f"En attendant, votre annonce est masquée du public mais conservée en tant que brouillon."
+    )
+
+    return await send_email(
+        to_email=recipient["email"],
+        subject="🛠️ Action required: update your BidVex vehicle listing · Mise à jour requise",
+        html_content=_storage_panel(
+            "Action required on your vehicle listing",
+            "Action requise sur votre annonce de véhicule",
+            body_en, body_fr,
+            cta_url=cta_url,
+            cta_en="Update Listing",
+            cta_fr="Mettre à jour l'annonce",
+        ),
+    )
+

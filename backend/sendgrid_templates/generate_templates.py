@@ -172,7 +172,7 @@ TEMPLATES.append(("01_welcome_en", wrap(
         '<div style="height:8px;"></div>' +
         icon_row([
             ("&#127760;", "Bilingual &amp; Cross-Border", "Seamlessly buy or sell across Canada and the US."),
-            ("&#128274;", "Secure &amp; Compliant", "OPC-verified sellers, Law 25 compliant, Stripe payments."),
+            ("&#128274;", "Secure &amp; Compliant", "Province-verified dealer sellers, Law 25 compliant, Stripe payments."),
         ]) +
         '<div style="height:8px;"></div>' +
         p("Your account is ready. Start exploring the marketplace today.") +
@@ -194,7 +194,7 @@ TEMPLATES.append(("01_welcome_fr", wrap(
         '<div style="height:8px;"></div>' +
         icon_row([
             ("&#127760;", "Bilingue et transfrontalier", "Achetez ou vendez partout au Canada et aux États-Unis."),
-            ("&#128274;", "Sécurisé et conforme", "Vendeurs vérifiés OPC, conforme Loi 25, paiements Stripe."),
+            ("&#128274;", "Sécurisé et conforme", "Vendeurs concessionnaires vérifiés par province, conforme Loi 25, paiements Stripe."),
         ]) +
         '<div style="height:8px;"></div>' +
         p("Votre compte est prêt. Commencez à explorer le marché dès aujourd'hui.") +

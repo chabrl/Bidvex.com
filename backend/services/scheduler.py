@@ -558,7 +558,7 @@ async def _send_settlement_reminder_emails():
         <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;">
           <h2 style="color:#F59E0B;">Action needed — Confirm Vehicle Settlement</h2>
           <p>The buyer paid the BidVex platform fee 7 days ago for vehicle <strong>#{vehicle_id[:8]}</strong>.</p>
-          <p>Please visit your <a href="https://www.bidvex.com/seller-dashboard?tab=vehicle-settlements" style="color:#2186C6;">Vehicle Settlements dashboard</a> and confirm the transaction is complete — this keeps our audit trail intact for the OPC.</p>
+          <p>Please visit your <a href="https://www.bidvex.com/seller-dashboard?tab=vehicle-settlements" style="color:#2186C6;">Vehicle Settlements dashboard</a> and confirm the transaction is complete — this keeps our audit trail intact for the relevant provincial regulator.</p>
           <hr style="border:none;border-top:1px solid #eee;"/>
           <p><strong>FR :</strong> L'acheteur a payé les frais de plateforme BidVex il y a 7 jours pour le véhicule <strong>#{vehicle_id[:8]}</strong>. Veuillez confirmer la transaction dans votre <a href="https://www.bidvex.com/seller-dashboard?tab=vehicle-settlements" style="color:#2186C6;">tableau de bord</a>.</p>
         </div>

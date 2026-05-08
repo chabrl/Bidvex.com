@@ -373,6 +373,14 @@ class VehicleListingCreate(BaseModel):
     # iter198 — Pilot conversion attribution (e.g. "pilot-welcome-banner")
     utm_source: Optional[str] = None
 
+    # iter201 — Phase 2 — Vehicle category taxonomy (CEO 15-category spec)
+    category_id: Optional[str] = None
+    subcategory_id: Optional[str] = None
+
+    # iter201 — Phase 2 — Quebec bilingual fields (FR mandatory when location_province=QC)
+    title_fr: Optional[str] = None
+    description_fr: Optional[str] = None
+
     @field_validator('vin')
     @classmethod
     def validate_vin_format(cls, v):

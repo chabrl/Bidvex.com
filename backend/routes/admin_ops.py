@@ -1728,40 +1728,50 @@ async def admin_get_categories(current_user: User = Depends(require_admin)):
 
 
 
-# ============= OPC PERMIT VERIFICATION (Admin) ========================
+# ============= DEALER LICENCE VERIFICATION (Admin) =====================
+# iter201 — Renamed from "OPC PERMIT VERIFICATION" to province-aware language.
+# LEGACY: opc_permit → migrated to dealer_license_* — kept for back-compat only.
 
 class OPCVerificationUpdate(BaseModel):
+    """LEGACY name retained for client back-compat. Maps to dealer_license_verified."""
     opc_permit_number: Optional[str] = None
     opc_permit_verified: bool
 
+
 @admin_ops_router.put("/admin/users/{user_id}/opc-verify")
 async def admin_opc_verify(user_id: str, data: OPCVerificationUpdate, current_user: User = Depends(require_admin)):
-    """Admin: Toggle OPC permit verification for a seller."""
+    """Admin: Toggle dealer-licence verification for a seller (legacy endpoint name; rebuilt in iter202 Phase 3)."""
     db = get_db()
     user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "email": 1, "name": 1})
     if not user_doc:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
+    # iter201 — Write to BOTH legacy and new fields so callers reading either path see the same truth.
     update_fields = {
-        "opc_permit_verified": data.opc_permit_verified,
+        "opc_permit_verified": data.opc_permit_verified,            # LEGACY
+        "dealer_license_verified": data.opc_permit_verified,        # NEW
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     if data.opc_permit_number is not None:
-        update_fields["opc_permit_number"] = data.opc_permit_number
-    
+        update_fields["opc_permit_number"] = data.opc_permit_number     # LEGACY
+        update_fields["dealer_license_number"] = data.opc_permit_number # NEW
+
     await db.users.update_one({"id": user_id}, {"$set": update_fields})
-    
+
     await db.audit_logs.insert_one({
-        "action": "opc_permit_verification",
+        "action": "dealer_license_verification",  # iter201 — renamed
         "admin_id": current_user.id,
         "target_user_id": user_id,
         "target_email": user_doc.get("email"),
-        "opc_permit_verified": data.opc_permit_verified,
-        "opc_permit_number": data.opc_permit_number,
+        "dealer_license_verified": data.opc_permit_verified,
+        "dealer_license_number": data.opc_permit_number,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     })
-    
-    return {"success": True, "message": f"OPC verification {'enabled' if data.opc_permit_verified else 'disabled'} for {user_doc.get('email', user_id)}"}
+
+    return {
+        "success": True,
+        "message": f"Dealer-licence verification {'enabled' if data.opc_permit_verified else 'disabled'} for {user_doc.get('email', user_id)}",
+    }
 
 
 # ============= CFIA SOIL DECLARATION CATEGORIES ========================

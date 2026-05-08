@@ -152,7 +152,7 @@ const VehicleSettlements = () => {
             Vehicle Settlements
           </h2>
           <p className="text-muted-foreground text-sm mt-1">
-            After the buyer pays the BidVex platform fee, confirm that the vehicle has been paid for in full and delivered. This creates the OPC audit trail.
+            After the buyer pays the BidVex platform fee, confirm that the vehicle has been paid for in full and delivered. This creates the provincial-dealer compliance audit trail.
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => fetchData(true)} disabled={refreshing} data-testid="refresh-settlements-btn">
@@ -312,7 +312,7 @@ const VehicleSettlements = () => {
                   Selected: {proofFile.name} ({Math.round(proofFile.size / 1024)} KB)
                 </p>
               )}
-              <p className="text-[11px] text-muted-foreground mt-1">Max 10 MB. Optional but strongly recommended for OPC audit trail.</p>
+              <p className="text-[11px] text-muted-foreground mt-1">Max 10 MB. Optional but strongly recommended for the provincial-dealer compliance audit trail.</p>
             </div>
             <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded">
               <Checkbox
@@ -323,7 +323,7 @@ const VehicleSettlements = () => {
                 data-testid="attestation-checkbox"
               />
               <label htmlFor="attestation" className="text-xs leading-snug text-amber-900 dark:text-amber-200 cursor-pointer">
-                <strong>I legally attest</strong> that this vehicle has been paid for in full and delivered to the buyer. I understand this attestation is recorded in BidVex's audit trail and may be used in OPC compliance reviews.
+                <strong>I legally attest</strong> that this vehicle has been paid for in full and delivered to the buyer. I understand this attestation is recorded in BidVex's audit trail and may be used in provincial dealer-licensing compliance reviews.
                 <br/><span className="text-[10px]">Je atteste légalement que ce véhicule a été payé en totalité et livré à l'acheteur.</span>
               </label>
             </div>

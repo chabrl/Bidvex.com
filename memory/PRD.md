@@ -1,6 +1,51 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter198 — Project Pilote Final Loop (Feb 7, 2026) ✅
+## Latest: iter201 — Vehicle Auctions Canadian Legal Compliance Rebuild — Phases 1 & 2 (Feb 8, 2026) ✅
+
+CEO-driven P0 rebuild of the Vehicle Auctions section under Canadian federal + provincial legislation. Sprint scope was 3 phases — Phases 1 & 2 shipped in this session, Phase 3 (buyer gate + admin queue) is next session.
+
+### Phase 1 — Foundation & Data Model ✅
+- **`province_regulations` collection** seeded with all 13 jurisdictions (BC, AB, SK, MB, ON, QC, NB, NS, PE, NL, YT, NT, NU). Idempotent upsert via `migrations/seed_province_regulations.py`. Each doc has bilingual name, regulatory body, license type EN/FR, license-verification URL, `individual_buyers_allowed`, `requires_bilingual_listings` (QC + NB), tax structure (GST/PST_QST/HST), and bilingual buyer-gate + seller-notice copy.
+- **Quebec Q1=(c)** wired: `individual_buyers_allowed: true` + `individual_buyers_require_disclosure_ack: true` + `primary_listing_language: "fr"`.
+- **Restricted provinces** (ON/NB/NS/PE/NL): individuals blocked. **Open** (BC/AB/SK/MB): no gate. **Territories** (YT/NT/NU): `requires_admin_review: true`.
+- **Schema extended on `users`**: `dealer_license_number`, `dealer_license_verified`, `dealer_license_province`, `dealer_license_type`, `neq` (Quebec), `vehicle_buyer_verification`. New users initialized via `routes/auth.py`; existing users silently backfilled from `opc_permit_*` via `migrations/migrate_dealer_license_fields.py` (Q2=a). Legacy fields **preserved**.
+- **OPC user-facing scrub** — automated test `test_no_user_facing_opc_strings_in_vehicle_scope` enforces zero `\bOPC\b` in vehicle-scope user-facing files. Comments retained the term **only** with `LEGACY: opc_permit → migrated to dealer_license_*` tags. Out-of-scope refs (Storage facility OPC field, Pricing page Quebec law) untouched per constraint #4.
+- **New public API**: `GET /api/vehicles/province-regulations` and `/api/vehicles/province-regulations/{code}`.
+- **Legacy admin endpoint** `PUT /api/admin/users/{id}/opc-verify` now writes BOTH legacy `opc_permit_*` AND new `dealer_license_*` and emits `dealer_license_verification` audit event.
+
+### Phase 2 — Seller & Listing UI ✅
+- **15-category icon grid** per CEO spec (`services/vehicle_categories.py` + `components/vehicles/VehicleCategoryGrid.js`):
+  - 3-col desktop / 2-col mobile responsive layout
+  - Click → expand subcategory dropdown
+  - Selected pill with X to clear
+  - Bilingual labels (15 cats + 80 subcats × EN/FR)
+  - **Constraint #3**: `parts_accessories` is the **only** category open to non-dealers — surfaces a green "OPEN" badge on its card. Backend `category_requires_dealer_license()` defaults to True for unknown ids (safe).
+- **Province-aware seller notice** (`components/vehicles/ProvinceSellerNotice.js`) — renders dynamic license type, regulatory body, additional requirements, tax breakdown, and "Verify licence ↗" link based on the listing's chosen province.
+- **Bilingual Legal Footer** (`components/vehicles/VehicleLegalFooter.js`) — CEO Part 4 disclaimer in EN/FR with a "View other language" toggle. Mounted on `CreateVehicleListingPage` and `VehicleDetailPage`.
+- **Dealer-Verified badge** — emerald card with masked license number (`****123`) + province-specific regulator name (OMVIC/AMVIC/VSA/SAAQ/FCAA) on `VehicleDetailPage`'s seller tab.
+- **Listing form additions**:
+  - `category_id` + `subcategory_id` fields wired into `VehicleListingCreate` model + `routes/vehicles.py` create endpoint.
+  - **CEO constraint #2**: Quebec French-language enforcement — both frontend (form-level toast) and backend (`qc_french_title_required` / `qc_french_description_required` 400 errors) require either `title_fr`+`description_fr` OR French accents present in `title`/`description`.
+- **Existing 4 listings** — marked `requires_seller_action: true` + `visibility_hidden_at` per Q4=b. Two emails sent successfully via SendGrid (`send_listing_requires_action_email` — bilingual, "≈2 minutes" copy, deep-link CTA). Two demo vehicles with orphaned `seller_id` left hidden.
+- **New public API**: `GET /api/vehicles/categories` returns the 15-category catalog.
+
+### Verification — 31/31 PASS
+- **Phase 1 (7 tests)**: seed idempotency, QC disclosure-ack flag, restricted-province blocking, open-province permission, territories admin-review, legacy `opc_permit_*` → `dealer_license_*` silent migration, automated user-facing OPC scrub.
+- **Phase 2 (6 tests)**: 15-category presence, schema integrity, only-parts-open-to-individuals, helper functions, unique IDs across categories+subcategories, model field acceptance.
+- **Regression (18 tests)**: iter196 messaging gate (8) + iter196 HTTP (6) + iter197 admin counters (4) + iter198 pilot (3) — all pass.
+- **Smoke screenshot (Playwright)**: `/vehicle-auctions/create` renders the 15-card grid, click → selected pill + subcategory dropdown, parts card shows "OPEN" badge.
+
+### Phase 3 — Buyer Gate + Admin Queue (NEXT SESSION)
+- Province-aware buyer gate modal (block individuals in ON/QC/NB/NS/PE/NL with the alternative-suggestion copy + LPC disclosure-ack flow for QC per Q1=c)
+- Dealer Verification admin tab (Pending / Approved / Buyer Verifications / Compliance Alerts)
+- Expired-license cron alerts
+- Verification checklist runner — automated test that re-runs every box CEO listed
+
+⚠️ **Production note**: All changes are in PREVIEW. Redeploy from Emergent dashboard to push to https://bidvex.com.
+
+---
+
+## Earlier: iter198 — Project Pilote Final Loop (Feb 7, 2026) ✅
 
 User-driven micro-sprint to close the loop on the *Project Pilote* dealer onboarding journey ahead of launch.
 

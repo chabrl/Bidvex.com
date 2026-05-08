@@ -78,7 +78,11 @@ class Listing(BaseModel):
     visit_availability: Optional[Dict[str, Any]] = None
     custom_buyer_premium_rate: Optional[float] = None
     is_partner_listing: bool = False
+    # LEGACY: opc_permit → migrated to dealer_license_* (iter201).
+    # Field name retained for backward compatibility with pre-iter201 listings.
+    # New code should set is_dealer_certified instead and read both fields.
     is_opc_certified: bool = False
+    is_dealer_certified: bool = False  # iter201 — replaces is_opc_certified going forward
     buyers_premium_percent: Optional[float] = None
     payment_method: Optional[str] = None  # "stripe", "cash", "e-transfer"
     currency: str = "CAD"

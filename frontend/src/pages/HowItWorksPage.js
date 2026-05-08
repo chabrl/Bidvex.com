@@ -85,10 +85,10 @@ const HowItWorks = () => {
       bg: 'bg-red-50 dark:bg-red-950',
       border: 'border-red-200 dark:border-red-800',
       title: fr ? 'Vendeur de véhicules' : 'Become a Vehicle Seller',
-      subtitle: fr ? 'Réservé aux commerçants autorisés (OPC)' : 'Licensed dealers only (OPC compliance)',
+      subtitle: fr ? 'Concessionnaires licenciés par province' : 'Province-licensed dealers',
       steps: [
-        { icon: <Shield className="h-5 w-5" />, en: 'Vehicle listings require a valid OPC dealer license (Quebec regulation).', fr: 'Les annonces de véhicules nécessitent un permis de commerçant OPC valide (réglementation québécoise).' },
-        { icon: <Lock className="h-5 w-5" />, en: 'Submit your dealer license number for verification by BidVex.', fr: 'Soumettez votre numéro de permis pour vérification par BidVex.' },
+        { icon: <Shield className="h-5 w-5" />, en: 'Vehicle listings require a valid provincial dealer licence (e.g. OMVIC in ON, AMVIC in AB, VSA in BC, SAAQ in QC).', fr: 'Les annonces de véhicules nécessitent une licence de concessionnaire provinciale valide (p. ex. OMVIC en ON, AMVIC en AB, VSA en C.-B., SAAQ au QC).' },
+        { icon: <Lock className="h-5 w-5" />, en: 'Submit your dealer licence number for verification by BidVex.', fr: 'Soumettez votre numéro de licence pour vérification par BidVex.' },
         { icon: <Car className="h-5 w-5" />, en: 'Once verified, list vehicles with VIN, condition, and inspection reports.', fr: 'Une fois vérifié, publiez des véhicules avec NIV, condition et rapports d\'inspection.' },
         { icon: <DollarSign className="h-5 w-5" />, en: 'Buyers pay a 2.5% platform fee. Seller pays $0 — the hammer price is settled directly.', fr: 'Les acheteurs paient 2,5% de frais de plateforme. Le vendeur ne paie rien — le prix marteau est réglé directement.' },
       ],
@@ -131,7 +131,7 @@ const HowItWorks = () => {
     { q: fr ? 'BidVex est-il sécuritaire?' : 'Is BidVex safe?', a: fr ? 'Oui. Tous les paiements sont traités par Stripe avec chiffrement SSL. Les vendeurs sont vérifiés et nous utilisons la détection de fraude par IA.' : 'Yes. All payments are processed by Stripe with SSL encryption. Sellers are verified and we use AI-powered fraud detection.' },
     { q: fr ? 'Quels sont les frais?' : 'What are the fees?', a: fr ? 'Acheteurs: prime de 5% (standard). Vendeurs: commission de 4%. Les véhicules: 2,5% de frais de plateforme à l\'acheteur seulement.' : 'Buyers: 5% premium (standard). Sellers: 4% commission. Vehicles: 2.5% platform fee to buyer only.' },
     { q: fr ? 'Comment fonctionne le paiement?' : 'How does payment work?', a: fr ? 'Les paiements sont traités automatiquement via Stripe. Les vendeurs reçoivent leurs fonds dans les 2-7 jours ouvrables.' : 'Payments are processed automatically via Stripe. Sellers receive their funds within 2-7 business days.' },
-    { q: fr ? 'Puis-je vendre des véhicules?' : 'Can I sell vehicles?', a: fr ? 'Seuls les commerçants de véhicules d\'occasion autorisés par l\'OPC peuvent publier des véhicules. Postulez via la page "Devenir vendeur de véhicules".' : 'Only licensed vehicle dealers (OPC-approved) can list vehicles. Apply via the "Become a Vehicle Seller" page.' },
+    { q: fr ? 'Puis-je vendre des véhicules?' : 'Can I sell vehicles?', a: fr ? 'Seuls les concessionnaires de véhicules licenciés par leur province (OMVIC, AMVIC, VSA, SAAQ, etc.) peuvent publier des véhicules. Postulez via la page "Devenir vendeur de véhicules".' : 'Only province-licensed vehicle dealers (OMVIC, AMVIC, VSA, SAAQ, etc.) can list vehicles. Apply via the "Become a Vehicle Seller" page.' },
     { q: fr ? 'Comment fonctionne le programme d\'affiliation?' : 'How does the affiliate program work?', a: fr ? 'Partagez votre lien unique. Vous gagnez 10% des frais BidVex sur chaque vente d\'un utilisateur référé. Les paiements sont automatiques.' : 'Share your unique link. You earn 10% of BidVex platform fees on every sale from a referred user. Payments are automatic.' },
     { q: fr ? 'Que se passe-t-il si je suis surenchéri?' : 'What happens if I\'m outbid?', a: fr ? 'Vous recevez une notification instantanée par courriel et dans l\'application. Vous pouvez immédiatement placer une nouvelle enchère.' : 'You receive an instant notification by email and in-app. You can immediately place a new bid.' },
     { q: fr ? 'BidVex livre-t-il les articles?' : 'Does BidVex deliver items?', a: fr ? 'BidVex est une plateforme d\'enchères. L\'expédition est arrangée entre l\'acheteur et le vendeur. Nous recommandons d\'utiliser un service de livraison avec suivi.' : 'BidVex is an auction platform. Shipping is arranged between buyer and seller. We recommend using a tracked delivery service.' },
@@ -188,7 +188,7 @@ const HowItWorks = () => {
           </div>
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-cyan-600" />
-            <span>{fr ? 'Conforme OPC / Loi 25' : 'OPC / Law 25 Compliant'}</span>
+            <span>{fr ? 'Conforme Loi 25 (Québec)' : 'Quebec Law 25 Compliant'}</span>
           </div>
         </div>
       </section>

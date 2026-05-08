@@ -12,6 +12,9 @@ import axios from 'axios';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
+import VehicleCategoryGrid from '../../components/vehicles/VehicleCategoryGrid';
+import ProvinceSellerNotice from '../../components/vehicles/ProvinceSellerNotice';
+import VehicleLegalFooter from '../../components/vehicles/VehicleLegalFooter';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -121,6 +124,10 @@ const CreateVehicleListingPage = () => {
   
   // Form data
   const [formData, setFormData] = useState({
+    // iter201 — Vehicle category (CEO 15-category taxonomy)
+    category_id: '',
+    subcategory_id: '',
+
     // VIN & Basic
     vin: '',
     year: '',
@@ -364,12 +371,38 @@ const CreateVehicleListingPage = () => {
         title: formData.title,
         description: formData.description,
         features: formData.features,
+        // iter201 — Phase 2 — Vehicle category (CEO 15-category taxonomy)
+        category_id: formData.category_id || null,
+        subcategory_id: formData.subcategory_id || null,
         // iter198 — Pilot attribution
         utm_source: (() => {
           try { return localStorage.getItem('bidvex.utm_source') || null; } catch (_e) { return null; }
         })(),
       };
-      
+
+      // iter201 — Phase 2 — Validate category required (CEO constraint #3)
+      if (!listingData.category_id) {
+        toast.error(i18n.language?.startsWith('fr')
+          ? 'Veuillez sélectionner une catégorie de véhicule'
+          : 'Please select a vehicle category');
+        setLoading(false);
+        return;
+      }
+      // iter201 — Phase 2 — Quebec French-language enforcement (CEO constraint #2)
+      if ((listingData.location_province || '').toUpperCase() === 'QC') {
+        const fr = (s) => typeof s === 'string' && s.trim().length > 0;
+        if (!fr(listingData.title_fr) && !fr(listingData.title)) {
+          toast.error("Quebec listings must include a French title (Charter of the French Language). / Les annonces québécoises doivent inclure un titre en français.");
+          setLoading(false);
+          return;
+        }
+        if (!fr(listingData.description_fr) && !fr(listingData.description)) {
+          toast.error("Quebec listings must include a French description. / Les annonces québécoises doivent inclure une description en français.");
+          setLoading(false);
+          return;
+        }
+      }
+
       // Create listing
       const createResponse = await axios.post(`${API}/vehicles`, listingData, {
         headers: { Authorization: `Bearer ${token}` }
@@ -448,6 +481,28 @@ const CreateVehicleListingPage = () => {
       case 'vin':
         return (
           <div className="space-y-6">
+            {/* iter201 — Vehicle Category Grid (CEO 15-category taxonomy) */}
+            <div className="space-y-2">
+              <Label className="text-base font-semibold">
+                {t('vehicleListing.category', 'Vehicle Category')} *
+              </Label>
+              <p className="text-sm text-slate-500">
+                {t('vehicleListing.categoryHint', 'Pick the category that best matches your vehicle. "Vehicle Parts & Accessories" is open to all sellers — every other category requires a verified provincial dealer licence.')}
+              </p>
+              <VehicleCategoryGrid
+                selectedCategoryId={formData.category_id}
+                selectedSubcategoryId={formData.subcategory_id}
+                onChange={(catId, subId) => {
+                  setFormData((p) => ({ ...p, category_id: catId || '', subcategory_id: subId || '' }));
+                }}
+              />
+            </div>
+
+            {/* iter201 — Province-aware seller notice based on the listing's province */}
+            {formData.location_province && (
+              <ProvinceSellerNotice provinceCode={formData.location_province} />
+            )}
+
             {/* VIN Input */}
             <div className="space-y-4">
               <div>
@@ -1323,6 +1378,8 @@ const CreateVehicleListingPage = () => {
           )}
         </div>
       </div>
+      {/* iter201 — Phase 2 — Bilingual legal footer (CEO Part 4) */}
+      <VehicleLegalFooter />
     </div>
   );
 };

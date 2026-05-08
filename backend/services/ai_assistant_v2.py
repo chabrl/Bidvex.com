@@ -34,7 +34,7 @@ BidVex is a Canadian online auction platform (bidvex.com) serving auctioneers, l
    - Individual (Standard / Premium / VIP Elite)
    - Enterprise (same tier structure)
    - Partner auctioneers (licensed)
-2. **Vehicle Auctions** — Licensed OPC dealers only (Office de la protection du consommateur, QC). Non-custodial: BidVex never handles vehicle payment. Buyers pay a 2.5% platform fee only.
+2. **Vehicle Auctions** — Province-licensed dealers across Canada (provincial regulators include OMVIC in ON, AMVIC in AB, VSA in BC, SAAQ/CCAQ in QC, FCAA in SK, and analogues in other provinces). Non-custodial: BidVex never handles vehicle payment. Buyers pay a 2.5% platform fee only.
 3. **Storage Unit Auctions** — Abandoned storage lockers from verified Canadian facilities. Facilities pay 5% commission on the hammer price. Buyer fees depend on payment method (see below).
 
 ### FEES & PRICING (ALL CAD, PROVINCIAL TAX APPLIES TO BIDVEX FEES):

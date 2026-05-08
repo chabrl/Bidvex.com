@@ -265,6 +265,14 @@ async def register(user_data: UserCreate, request: Request, background_tasks: Ba
         "ai_disclosure_consent": True,
         "ai_consent_timestamp": now.isoformat(),
         "ai_consent_ip": client_ip,
+        # iter201 — Dealer-license fields (province-aware). Legacy opc_permit_* mirrored for back-compat.
+        "dealer_license_number": None,
+        "dealer_license_verified": False,
+        "dealer_license_province": None,
+        "dealer_license_type": None,
+        "neq": None,  # Quebec Enterprise Number — required only for QC dealers
+        "vehicle_buyer_verification": None,  # set on first restricted-province bid attempt
+        # LEGACY (preserved for back-compat — do not expose to users; new code reads dealer_license_*)
         "opc_permit_number": None,
         "opc_permit_verified": False,
         "created_at": now.isoformat(),

@@ -20,7 +20,7 @@ const tocEN = [
   { id: 'modifications', label: '11. Modifications' },
   { id: 'governing', label: '12. Governing Law' },
   { id: 'contact', label: '13. Contact Information' },
-  { id: 'vehicle-opc', label: '14. Vehicle Auctions & OPC' },
+  { id: 'vehicle-opc', label: '14. Vehicle Auctions & Provincial Dealer Compliance' },
 ];
 
 const tocFR = [
@@ -40,7 +40,7 @@ const tocFR = [
   { id: 'modifications', label: '11. Modifications' },
   { id: 'governing', label: '12. Loi applicable' },
   { id: 'contact', label: '13. Contact' },
-  { id: 'vehicle-opc', label: '14. Véhicules et OPC' },
+  { id: 'vehicle-opc', label: '14. Véhicules et conformité concessionnaires provinciaux' },
 ];
 
 const Badge = ({ n }) => (
@@ -152,7 +152,7 @@ const TermsOfServicePage = () => {
             <h3 className="text-base font-semibold mt-4">4.1 Marketplace Platform Sellers</h3>
             <p>Platform Sellers must provide accurate descriptions, respond to buyer inquiries, and deliver items as described.</p>
             <h3 className="text-base font-semibold mt-4">4.2 Vehicle Auction Licensed Sellers</h3>
-            <p>Vehicle listings are restricted to licensed sellers with a verified OPC (Office de la protection du consommateur) permit.</p>
+            <p>Vehicle listings are restricted to sellers holding a verified provincial dealer licence (e.g. OMVIC in Ontario, AMVIC in Alberta, VSA in British Columbia, SAAQ road-vehicle dealer licence in Quebec, and analogues in other provinces).</p>
 
             <SH id="fees" n="5">Fees, Terms and Payment Structure</SH>
             <p>Upon registration, users are assigned to a specific tier. This tier determines the buyer's premium and seller commission applicable to transactions.</p>
@@ -243,9 +243,9 @@ const TermsOfServicePage = () => {
             <SH id="contact" n="13">Contact Information</SH>
             <GreenBox><p><strong>BidVex Legal Department</strong><br />Email: <a href="mailto:support@bidvex.com" className="text-blue-600 underline">support@bidvex.com</a></p></GreenBox>
 
-            <SH id="vehicle-opc" n="14">Vehicle Auctions — Platform Role &amp; OPC Compliance</SH>
-            <p>BidVex is a technology platform and auction facilitator only. BidVex is not a vendor, dealer, or party to vehicle sale contracts. Only licensed sellers with verified OPC permits may list road vehicles.</p>
-            <BlueBox><p>By listing vehicles on BidVex, dealers represent that they hold valid OPC permits and comply with all applicable consumer protection laws.</p></BlueBox>
+            <SH id="vehicle-opc" n="14">Vehicle Auctions — Platform Role &amp; Provincial Dealer Compliance</SH>
+            <p>BidVex is a technology platform and auction facilitator only. BidVex is not a vendor, dealer, or party to vehicle sale contracts. Only sellers holding a verified provincial dealer licence (OMVIC, AMVIC, VSA, SAAQ, FCAA, MVSDA or the analogous regulator in their province) may list road vehicles.</p>
+            <BlueBox><p>By listing vehicles on BidVex, dealers represent that they hold a valid provincial dealer licence and comply with all applicable federal and provincial consumer-protection and motor-vehicle-dealer laws.</p></BlueBox>
 
             <p className="text-xs text-slate-400 mt-10">&copy; 2026 BidVex Inc. All rights reserved.</p>
           </>) : (<>
@@ -353,9 +353,9 @@ const TermsOfServicePage = () => {
             <SH id="contact" n="13">Contact</SH>
             <GreenBox><p><strong>Département juridique BidVex</strong><br />Courriel : <a href="mailto:support@bidvex.com" className="text-blue-600 underline">support@bidvex.com</a></p></GreenBox>
 
-            <SH id="vehicle-opc" n="14">Enchères de véhicules — Rôle de la plateforme et conformité OPC</SH>
-            <p>BidVex est une plateforme technologique et un facilitateur d'enchères uniquement. Seuls les vendeurs licenciés avec un permis OPC vérifié peuvent lister des véhicules routiers.</p>
-            <BlueBox><p>En listant des véhicules sur BidVex, les concessionnaires déclarent détenir des permis OPC valides et se conformer à toutes les lois de protection du consommateur applicables.</p></BlueBox>
+            <SH id="vehicle-opc" n="14">Enchères de véhicules — Rôle de la plateforme et conformité concessionnaires provinciaux</SH>
+            <p>BidVex est une plateforme technologique et un facilitateur d'enchères uniquement. Seuls les vendeurs détenant une licence de concessionnaire provinciale vérifiée (OMVIC, AMVIC, VSA, SAAQ, FCAA, MVSDA ou le régulateur analogue de leur province) peuvent lister des véhicules routiers.</p>
+            <BlueBox><p>En listant des véhicules sur BidVex, les concessionnaires déclarent détenir une licence de concessionnaire provinciale valide et se conformer à toutes les lois fédérales et provinciales applicables en matière de protection du consommateur et de concessionnaires de véhicules.</p></BlueBox>
 
             <p className="text-xs text-slate-400 mt-10">&copy; 2026 BidVex Inc. Tous droits réservés.</p>
           </>)}

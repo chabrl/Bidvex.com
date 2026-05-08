@@ -37,7 +37,8 @@ import {
 import useVehicleBidding from '../../hooks/useVehicleBidding';
 import { PricingEstimate } from '../../components/vehicles/PricingBreakdown';
 import MessageSellerModal from '../../components/MessageSellerModal';
-import { MessageSquare } from 'lucide-react';
+import { MessageSquare, ShieldCheck } from 'lucide-react';
+import VehicleLegalFooter from '../../components/vehicles/VehicleLegalFooter';
 
 // Trust & Legal Components
 import {
@@ -663,7 +664,7 @@ const VehicleBuyNowBody = ({ vehicle, preview, setPreview, loading, setLoading, 
           <span className="font-bold">{formatPrice(preview.buy_now_price, vehicle?.currency)}</span>
         </div>
         <p className="text-[11px] text-muted-foreground mt-1">
-          {t('vehicle.hammerDirect', 'Not charged by BidVex. The licensed OPC seller collects this.')}
+          {t('vehicle.hammerDirect', 'Not charged by BidVex. The province-licensed dealer collects this directly.')}
         </p>
       </div>
 
@@ -1201,6 +1202,44 @@ const VehicleDetailPage = () => {
                           )}
                         </div>
 
+                        {/* iter201 — Phase 2 — Province-licensed dealer badge with masked licence */}
+                        {seller.seller_type === 'dealer' && (seller.license_number || seller.dealer_license_number) && (
+                          <div
+                            className="mt-3 rounded-lg border-2 border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-800 p-3 flex items-start gap-3"
+                            data-testid="dealer-verified-badge"
+                          >
+                            <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                                {i18n.language === 'fr' ? 'Concessionnaire vérifié' : 'Verified Dealer'}
+                              </p>
+                              {(() => {
+                                const lic = seller.dealer_license_number || seller.license_number || '';
+                                const masked = lic.length > 4 ? `****${lic.slice(-3)}` : lic;
+                                const province = seller.dealer_license_province || seller.license_province;
+                                const regBody = (
+                                  province === 'ON' ? 'OMVIC'
+                                  : province === 'AB' ? 'AMVIC'
+                                  : province === 'BC' ? 'VSA'
+                                  : province === 'QC' ? 'SAAQ'
+                                  : province === 'SK' ? 'FCAA'
+                                  : province ? `${province} dealer authority` : 'Provincial dealer authority'
+                                );
+                                return (
+                                  <p className="text-sm font-mono text-emerald-900 dark:text-emerald-100 mt-0.5" data-testid="dealer-license-masked">
+                                    {regBody} #{masked}
+                                  </p>
+                                );
+                              })()}
+                              <p className="text-[11px] text-emerald-700/80 dark:text-emerald-300/80 mt-1">
+                                {i18n.language === 'fr'
+                                  ? 'Licence vérifiée par BidVex avec le régulateur provincial.'
+                                  : 'Licence verified with the provincial regulator by BidVex.'}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
                         {/* iter197 — Message Seller (gated to winner who paid unlock fee) */}
                         {(() => {
                           const canMessage = !!user
@@ -1360,6 +1399,8 @@ const VehicleDetailPage = () => {
           listingTitle={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
         />
       )}
+      {/* iter201 — Phase 2 — Bilingual legal footer (CEO Part 4) */}
+      <VehicleLegalFooter />
     </div>
   );
 };

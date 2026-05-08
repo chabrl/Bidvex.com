@@ -235,6 +235,39 @@ async def get_vehicle_system_status():
     }
 
 
+# iter201 — Phase 2 — Vehicle category taxonomy (15 categories per CEO spec).
+@vehicle_router.get("/vehicles/categories")
+async def list_vehicle_categories():
+    """Public — returns the 15 BidVex vehicle categories with bilingual labels + subcategories.
+
+    CEO constraint #3: `parts_accessories` does NOT require dealer licence.
+    """
+    from services.vehicle_categories import VEHICLE_CATEGORIES
+    return {"total": len(VEHICLE_CATEGORIES), "items": VEHICLE_CATEGORIES}
+
+
+# iter201 — Phase 1 — Province regulations registry (public read-only).
+# Used by the province-aware seller onboarding wizard and buyer gate.
+@vehicle_router.get("/vehicles/province-regulations")
+async def list_province_regulations():
+    """List all 13 jurisdictions seeded in `province_regulations`.
+
+    Public — no auth required. Frontend caches this for the seller and buyer flows.
+    """
+    docs = await db.province_regulations.find({}, {"_id": 0}).sort("province_code", 1).to_list(50)
+    return {"total": len(docs), "items": docs}
+
+
+@vehicle_router.get("/vehicles/province-regulations/{province_code}")
+async def get_province_regulation(province_code: str):
+    """Fetch one province/territory by 2-letter code (BC/AB/SK/MB/ON/QC/NB/NS/PE/NL/YT/NT/NU)."""
+    code = (province_code or "").strip().upper()
+    doc = await db.province_regulations.find_one({"province_code": code}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail=f"Unknown province code: {code}")
+    return doc
+
+
 @vehicle_router.post("/vehicle-admin/system/toggle-auctions")
 async def admin_toggle_vehicle_auctions(
     enabled: bool,
@@ -602,7 +635,59 @@ async def create_vehicle_listing(
             status_code=403,
             detail="Only licensed dealers can create licensed-only auctions"
         )
-    
+
+    # iter201 — Phase 2 — Vehicle category validation (CEO 15-category spec)
+    from services.vehicle_categories import (
+        get_category as _get_cat,
+        get_subcategory as _get_subcat,
+        category_requires_dealer_license as _cat_needs_lic,
+    )
+    if not listing_data.category_id:
+        raise HTTPException(status_code=400, detail={
+            "code": "category_required",
+            "message_en": "A vehicle category is required.",
+            "message_fr": "Une catégorie de véhicule est requise.",
+        })
+    cat_doc = _get_cat(listing_data.category_id)
+    if not cat_doc:
+        raise HTTPException(status_code=400, detail={
+            "code": "category_invalid",
+            "message_en": f"Unknown vehicle category '{listing_data.category_id}'.",
+            "message_fr": f"Catégorie de véhicule inconnue : « {listing_data.category_id} ».",
+        })
+    if listing_data.subcategory_id and not _get_subcat(listing_data.category_id, listing_data.subcategory_id):
+        raise HTTPException(status_code=400, detail={
+            "code": "subcategory_invalid",
+            "message_en": f"Unknown subcategory '{listing_data.subcategory_id}' for category '{listing_data.category_id}'.",
+            "message_fr": "Sous-catégorie inconnue.",
+        })
+    # CEO constraint #3 — only `parts_accessories` is open to non-dealers.
+    if _cat_needs_lic(listing_data.category_id) and seller["seller_type"] != "dealer":
+        raise HTTPException(status_code=403, detail={
+            "code": "category_requires_dealer_license",
+            "message_en": "This vehicle category requires a verified provincial dealer licence. Only Vehicle Parts & Accessories is open to individual sellers.",
+            "message_fr": "Cette catégorie de véhicule nécessite une licence de concessionnaire provinciale vérifiée. Seules les pièces et accessoires sont ouverts aux vendeurs individuels.",
+        })
+
+    # iter201 — Phase 2 — Quebec French-language enforcement (CEO constraint #2)
+    if (listing_data.location_province or "").upper() == "QC":
+        title_fr = (listing_data.title_fr or "").strip()
+        description_fr = (listing_data.description_fr or "").strip()
+        # If the seller didn't provide a French field, use the main title/description as French only
+        # when its language is plausibly French (very lightweight heuristic — accent presence).
+        if not title_fr and not any(c in (listing_data.title or "") for c in "àâçéèêëîïôûùüÿ"):
+            raise HTTPException(status_code=400, detail={
+                "code": "qc_french_title_required",
+                "message_en": "Quebec listings must include a French title (Charter of the French Language).",
+                "message_fr": "Les annonces québécoises doivent inclure un titre en français (Charte de la langue française).",
+            })
+        if not description_fr and not any(c in (listing_data.description or "") for c in "àâçéèêëîïôûùüÿ"):
+            raise HTTPException(status_code=400, detail={
+                "code": "qc_french_description_required",
+                "message_en": "Quebec listings must include a French description.",
+                "message_fr": "Les annonces québécoises doivent inclure une description en français.",
+            })
+
     # Decode VIN
     vin_result = await vin_decode_service(listing_data.vin)
     vin_decoded = vin_result.get("success", False)
@@ -681,6 +766,12 @@ async def create_vehicle_listing(
 
         # iter198 — Pilot attribution
         "utm_source": (listing_data.utm_source or "").strip()[:100] or None,
+
+        # iter201 — Phase 2 — Vehicle category + Quebec bilingual fields
+        "category_id": listing_data.category_id,
+        "subcategory_id": listing_data.subcategory_id or None,
+        "title_fr": (listing_data.title_fr or "").strip() or None,
+        "description_fr": (listing_data.description_fr or "").strip() or None,
         
         # Media (to be added separately)
         "media": [],
@@ -1010,7 +1101,10 @@ async def get_vehicle_detail(vehicle_id: str, request: Request):
     seller = await db.vehicle_sellers.find_one(
         {"id": listing["seller_id"]},
         {"_id": 0, "id": 1, "user_id": 1, "seller_type": 1, "business_name": 1,
-         "average_rating": 1, "total_sold": 1}
+         "average_rating": 1, "total_sold": 1,
+         # iter201 — Phase 2 — Province-licensed dealer badge fields
+         "license_number": 1, "license_province": 1,
+         "dealer_license_number": 1, "dealer_license_province": 1, "dealer_license_type": 1}
     )
     listing["seller"] = seller
     
