@@ -110,6 +110,20 @@ const ProfileSettingsPage = () => {
     setLoading(true);
     try {
       await updateUserPreferences(profileData);
+      // iter201 — Phase 3 mirror: keep the structured `province` field in sync
+      // so the vehicle-auction buyer gate reads the same value the user just saved.
+      if (profileData.province) {
+        try {
+          const token = localStorage.getItem('token');
+          await axios.post(
+            `${API}/vehicles/buyer-province`,
+            { province: profileData.province },
+            { headers: { Authorization: `Bearer ${token}` } },
+          );
+        } catch (_e) {
+          // Non-fatal — main profile save already succeeded
+        }
+      }
       toast.success(t('profile.changesSaved'));
     } catch (error) {
       // iter189 Bug 4: Surface specific error from API instead of generic toast

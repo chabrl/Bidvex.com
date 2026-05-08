@@ -360,6 +360,9 @@ const App = () => {
           <Route path="/settings" element={
             <ProtectedRoute><ProfileSettingsPage /></ProtectedRoute>
           } />
+          {/* iter201 — Phase 3 / 3A — Alias so /profile/settings deep-links resolve */}
+          <Route path="/profile/settings" element={<Navigate to="/settings" replace />} />
+          <Route path="/profile/verification" element={<Navigate to="/settings" replace />} />
           <Route path="/affiliate" element={
             <ProtectedRoute><AffiliateDashboard /></ProtectedRoute>
           } />

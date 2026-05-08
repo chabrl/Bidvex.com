@@ -1879,6 +1879,7 @@ async def admin_decide_buyer_verification(
             decision=decision.decision,
             province=bv.get("province"),
             rejection_reason=bv.get("rejection_reason"),
+            verification_type=bv.get("type"),
         )
     except Exception:
         pass

@@ -102,7 +102,7 @@ const VehicleBuyerGateModal = ({ open, onClose, listingId, onVerified }) => {
 
   // ───────── Submission handlers ─────────
   const handleSetProvince = (code) => {
-    navigate('/profile/settings');
+    navigate('/settings');
   };
 
   const handleQcAck = async () => {

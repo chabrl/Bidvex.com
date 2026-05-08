@@ -228,18 +228,14 @@ async def acknowledge_qc_lpc_disclosure(payload: QCDisclosureAck, current_user: 
 async def my_buyer_verification(listing_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     """
     Returns the buyer's current province + verification state and tells the
-    frontend exactly what to show: open / qc_disclosure / restricted_gate /
-    territory_advisory / province_required / pending_review / verified.
-
-    If `listing_id` is provided, also reports whether the QC-LPC ack has
-    been recorded for THAT listing.
+    frontend exactly what to show.
     """
     user_id = current_user["id"] if isinstance(current_user, dict) else current_user.id
     user_doc = await _db().users.find_one(
         {"id": user_id},
-        {"_id": 0, "province": 1, "vehicle_buyer_verification": 1},
+        {"_id": 0, "id": 1, "province": 1, "vehicle_buyer_verification": 1},
     )
-    if not user_doc:
+    if user_doc is None:
         raise HTTPException(status_code=404, detail="User not found")
 
     province = _get_buyer_province(user_doc)

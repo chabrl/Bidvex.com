@@ -197,6 +197,8 @@ const AdminDashboard = () => {
   // iter197 — Triage counters for the Admin Home (hidden when 0)
   const [pendingDisputes, setPendingDisputes] = useState(0);
   const [pendingCurrencyAppeals, setPendingCurrencyAppeals] = useState(0);
+  // iter201 Phase 3 — Compliance alerts KPI (expired/expiring licences + high-fraud + unreviewed)
+  const [pendingComplianceAlerts, setPendingComplianceAlerts] = useState(0);
 
   useEffect(() => {
     if (!user || !token) return;
@@ -226,6 +228,13 @@ const AdminDashboard = () => {
         if (r.ok) {
           const d = await r.json();
           setPendingCurrencyAppeals(d.total || 0);
+        }
+      } catch (_) {}
+      try {
+        const r = await fetch(`${root}/api/admin/compliance-alerts/count`, { headers });
+        if (r.ok) {
+          const d = await r.json();
+          setPendingComplianceAlerts(d.total || 0);
         }
       } catch (_) {}
     };
@@ -584,6 +593,23 @@ const AdminDashboard = () => {
                     {pendingCurrencyAppeals.toLocaleString()}
                   </p>
                   <p className="text-xs text-yellow-600 font-medium">Currency Appeals</p>
+                </div>
+              </button>
+            )}
+            {pendingComplianceAlerts > 0 && (
+              <button
+                type="button"
+                onClick={() => { setPrimaryTab('vehicles'); setSecondaryTab('compliance-alerts'); }}
+                className="flex items-center gap-3 p-3 bg-rose-50 hover:bg-rose-100 rounded-lg ring-2 ring-rose-400 transition-all text-left animate-pulse"
+                data-testid="admin-compliance-alerts-card"
+                title="Click to review compliance alerts"
+              >
+                <ShieldAlert className="h-8 w-8 text-rose-600" />
+                <div>
+                  <p className="text-2xl font-bold text-rose-700" data-testid="admin-compliance-alerts-count">
+                    {pendingComplianceAlerts.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-rose-600 font-medium">Compliance Alerts</p>
                 </div>
               </button>
             )}

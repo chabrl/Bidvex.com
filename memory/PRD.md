@@ -1,6 +1,43 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter201 — Vehicle Auctions Canadian Legal Compliance Rebuild — Phase 3 (Feb 8, 2026) ✅
+## Latest: iter201 — Vehicle Auctions Compliance — Pre-Deploy Polish (Feb 8, 2026) ✅
+
+CEO required 3 items before deploy + 8-item smoke test. **All 8/8 smoke tests pass on preview.**
+
+### Pre-Deploy Changes (this session, post-Phase-3)
+- **Province dropdown on `/settings`** ✅ — already existed in `ProfileSettingsPage.js` with all 13 jurisdictions; `handleProfileUpdate` now ALSO calls `POST /api/vehicles/buyer-province` so the structured `province` field stays in sync with the buyer-gate state machine. `/profile/settings` and `/profile/verification` deep-links now redirect to `/settings` via `<Navigate replace>` so emails and modal nav both resolve.
+- **Compliance Alerts KPI card** on Admin Home ✅ — red, hide-when-zero, click → Vehicles → Compliance Alerts. Live verified showing count=1 with seeded expired-licence record.
+- **Buyer verification approval email polish** ✅ — replaced generic helper with bilingual template matching `send_dealer_license_approved_email` style: structured body, regulator-aware province name (Ontario / Québec / Colombie-Britannique), action-oriented CTA, masked status callouts. Approval CTA → `/vehicle-auctions`; rejection CTA → `/settings`.
+- **Bug fix** — `/api/vehicles/buyer-verification/me` returned 404 when user had no `province` or `vehicle_buyer_verification` (empty projection became falsy `{}`). Fixed by including `id` in the projection.
+
+### 8-Item Pre-Deploy Smoke Test — 8/8 PASS
+| # | Test | Result |
+|---|---|---|
+| 1 | BC buyer → no gate, `gate_state=open` | ✅ |
+| 2 | ON buyer → `gate_state=restricted_gate` (Option C blocks via UI) | ✅ |
+| 3 | QC buyer → `gate_state=qc_disclosure` → ack → `qc_disclosure_acked` | ✅ |
+| 4 | No province → `gate_state=province_required` (after bug fix) | ✅ |
+| 5 | Admin Vehicles tab shows: Vehicle Admin · Dealer Licenses · Buyer Verifications · Compliance Alerts | ✅ |
+| 6 | Legacy `/opc-verify` alias responds + `WARNING: DEPRECATED: opc-verify called` in logs | ✅ |
+| 7 | `parts_accessories.requires_dealer_license=False` (gate exempt) | ✅ |
+| 8 | `check_expired_dealer_licences` job in scheduler, next run 5/9/2026 09:00 UTC | ✅ |
+
+**Regression — 49/49 tests passing** (iter196: 14, iter197: 4+1 skipped, iter198: 3, Phase 1: 7, Phase 2: 6, Phase 3 buyer gate: 8, Phase 3 checklist: 10). Zero regressions from the 3 pre-deploy changes.
+
+### Files changed (pre-deploy)
+- `routes/vehicle_buyer_verification.py` — `/me` endpoint 404-on-empty-projection bug fix
+- `services/email_notifications.py` — `send_buyer_verification_decision_email` polished bilingual template
+- `routes/admin_ops.py` — passes `verification_type` to email helper
+- `pages/ProfileSettingsPage.js` — `/api/vehicles/buyer-province` mirror save
+- `pages/AdminDashboard.js` — Compliance Alerts KPI card (5th card, red, hide-when-zero)
+- `components/vehicles/VehicleBuyerGateModal.js` — navigate target updated to `/settings`
+- `App.js` — `/profile/settings` and `/profile/verification` redirect aliases
+
+⚠️ **All changes are in PREVIEW.** I cannot push to production myself — please redeploy from the Emergent dashboard.
+
+---
+
+## Earlier: iter201 — Vehicle Auctions Canadian Legal Compliance Rebuild — Phase 3 (Feb 8, 2026) ✅
 
 CEO-driven P0 rebuild — **all 3 phases shipped** in the same session series. **49/49 tests passing** including 8 new Phase 3 tests + 10 verification-checklist runner tests + full Phase 1+2+iter196-198 regression.
 

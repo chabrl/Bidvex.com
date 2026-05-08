@@ -2581,30 +2581,82 @@ async def send_buyer_verification_decision_email(
     decision: str,            # "approve" | "reject"
     province: Optional[str] = None,
     rejection_reason: Optional[str] = None,
+    verification_type: Optional[str] = None,  # "dealer" | "dealer_representative"
 ) -> bool:
-    """iter201 — Phase 3 / 3B — Notify a buyer that their dealer-verification submission was approved or rejected."""
+    """iter201 — Phase 3 / 3B — Bilingual buyer-verification decision email.
+
+    Mirrors the polish of `send_dealer_license_approved_email` /
+    `send_dealer_license_rejected_email`: structured body, regulator-aware
+    province name, action-oriented CTA, masked status callouts.
+    """
     if not recipient or not recipient.get("email"):
         return False
-    province = (province or "your province").upper()
+    province_code = (province or "your province").upper()
+    province_label_en = {
+        "ON": "Ontario", "NB": "New Brunswick", "NS": "Nova Scotia",
+        "PE": "Prince Edward Island", "NL": "Newfoundland and Labrador",
+        "BC": "British Columbia", "AB": "Alberta", "SK": "Saskatchewan",
+        "MB": "Manitoba", "QC": "Quebec",
+        "YT": "Yukon", "NT": "Northwest Territories", "NU": "Nunavut",
+    }.get(province_code, province_code)
+    province_label_fr = {
+        "ON": "Ontario", "NB": "Nouveau-Brunswick", "NS": "Nouvelle-Écosse",
+        "PE": "Île-du-Prince-Édouard", "NL": "Terre-Neuve-et-Labrador",
+        "BC": "Colombie-Britannique", "AB": "Alberta", "SK": "Saskatchewan",
+        "MB": "Manitoba", "QC": "Québec",
+        "YT": "Yukon", "NT": "Territoires du Nord-Ouest", "NU": "Nunavut",
+    }.get(province_code, province_code)
+    type_label_en = "Dealer Representative" if verification_type == "dealer_representative" else "Licensed Dealer"
+    type_label_fr = "Représentant de concessionnaire" if verification_type == "dealer_representative" else "Concessionnaire licencié"
+
     if decision == "approve":
-        subject = "✅ Buyer verification approved — BidVex · Vérification approuvée"
-        body_en = f"You are now verified to bid on vehicle auctions in {province}. Welcome aboard."
-        body_fr = f"Vous êtes maintenant autorisé à enchérir sur les enchères de véhicules en {province}. Bienvenue."
-        cta_en, cta_fr = "Browse Vehicles", "Parcourir les véhicules"
+        subject = "✅ Buyer Verification Approved · Vérification d'acheteur approuvée"
+        body_en = (
+            f"Your buyer verification for <strong>{province_label_en}</strong> has been approved. "
+            f"You can now bid on dealer vehicle auctions in {province_label_en}.<br/><br/>"
+            f"Verification type: <strong>{type_label_en}</strong><br/>"
+            f"Status: <strong style='color:#059669;'>Approved</strong>"
+        )
+        body_fr = (
+            f"Votre vérification d'acheteur pour <strong>{province_label_fr}</strong> a été approuvée. "
+            f"Vous pouvez maintenant enchérir sur les enchères de véhicules de concessionnaires en {province_label_fr}.<br/><br/>"
+            f"Type de vérification : <strong>{type_label_fr}</strong><br/>"
+            f"Statut : <strong style='color:#059669;'>Approuvé</strong>"
+        )
+        cta_en, cta_fr = "Browse Vehicle Auctions", "Parcourir les enchères de véhicules"
+        cta_url = "https://bidvex.com/vehicle-auctions"
+        title_en, title_fr = "Buyer Verification Approved", "Vérification d'acheteur approuvée"
     else:
-        reason = (rejection_reason or "").strip() or "Documents could not be verified."
-        subject = "❌ Buyer verification update — BidVex · Mise à jour de la vérification"
-        body_en = f"Your buyer-verification submission for {province} could not be approved.<br/><strong>Reason:</strong> {reason}<br/><br/>You may resubmit with updated documents at any time."
-        body_fr = f"Votre demande de vérification d'acheteur pour {province} n'a pas pu être approuvée.<br/><strong>Raison :</strong> {reason}<br/><br/>Vous pouvez resoumettre avec des documents mis à jour à tout moment."
+        reason = (rejection_reason or "").strip() or (
+            "Documents could not be verified."
+        )
+        reason_fr = (rejection_reason or "").strip() or (
+            "Les documents n'ont pas pu être vérifiés."
+        )
+        subject = "❌ Buyer Verification Update · Mise à jour de la vérification"
+        body_en = (
+            f"Your buyer-verification submission for <strong>{province_label_en}</strong> was reviewed "
+            f"and unfortunately could not be approved at this time.<br/><br/>"
+            f"Reason: <em>{reason}</em><br/><br/>"
+            f"You may resubmit with updated documents at any time."
+        )
+        body_fr = (
+            f"Votre demande de vérification d'acheteur pour <strong>{province_label_fr}</strong> a été examinée "
+            f"et n'a malheureusement pas pu être approuvée pour le moment.<br/><br/>"
+            f"Raison : <em>{reason_fr}</em><br/><br/>"
+            f"Vous pouvez resoumettre avec des documents mis à jour à tout moment."
+        )
         cta_en, cta_fr = "Resubmit Verification", "Resoumettre la vérification"
+        cta_url = "https://bidvex.com/profile/verification"
+        title_en, title_fr = "Buyer Verification Update", "Mise à jour de la vérification d'acheteur"
+
     return await send_email(
         to_email=recipient["email"],
         subject=subject,
         html_content=_storage_panel(
-            "Buyer verification update",
-            "Mise à jour de la vérification d'acheteur",
+            title_en, title_fr,
             body_en, body_fr,
-            cta_url="https://bidvex.com/profile/verification",
+            cta_url=cta_url,
             cta_en=cta_en,
             cta_fr=cta_fr,
         ),
