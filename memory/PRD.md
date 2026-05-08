@@ -1,5 +1,41 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter202 — Vehicle Auctions Buyer Experience Rebuild (Feb 8, 2026) ✅
+
+CEO Sprint scope: Hero, Category Filter Bar, Sidebar Drawer, Listings Grid, Detail Page redesign, Empty States, Homepage Carousel — all behind the existing `vehicle_auctions_enabled` flag.
+
+### Phase A — Hero / Category Bar / Grid / Empty States (iter202 Phase A) ✅
+- New: `VehicleHero` (dark-navy gradient, search, 4 trust chips, **5 live stats** wired to new `GET /api/vehicles/stats`)
+- New: `VehicleCategoryPills` (horizontally-scrollable bar with all 15 categories + subcategory chips)
+- New: `VehicleListingCard` (rich card; explicit width/height + lazy/decoding; CLS=0)
+- New: `VehicleEmptyState` (3 variants: zero-listings · filtered-no-results · error)
+- New hook: `useVehicleCountdown` — single global setInterval per page (sprint constraint #4)
+- Backend: extended `GET /api/vehicles` with `category_id`, `subcategory_id`, `promoted_first` params
+- Tests: 8 new (`tests/test_iter202_phase_a_buyer_grid.py`)
+
+### Phase B — Sidebar / Detail Page / Homepage Carousel (iter202 Phase B) ✅
+- New: `VehicleSidebar` — desktop 280px sticky panel + mobile/tablet slide-in drawer (ESC+backdrop close, body-scroll lock); category-conditional filter groups (Vehicle Details / Boat / Powersport / Heavy Equipment); URL ↔ state sync (deep-linkable); debounce sliders 300ms / text 500ms / checkboxes immediate
+- New: `HomepageVehicleCarousel` — replaces legacy `HomepageLiveVehicles`; positioned **after StorageAuctionsPromo, before HotItemsSection (Tendances)**; pure CSS scroll-snap (no library); 4 / 2.5 / 1.2 cards per breakpoint; renders null when flag OFF or zero listings; dealer CTA strip below
+- New: `VehicleDetailPieces` (`VehicleBreadcrumb`, `VehiclePhotoGallery` with fullscreen lightbox & ←/→/ESC/swipe nav, `VehicleAcquisitionCost` with gross-up math, `RelatedVehicles` carousel, `formatVin`/`calculateAcquisitionCost` helpers)
+- Detail page: 60/40 grid (5-col), sticky bid panel `lg:top-20`, mobile fixed bottom bid bar w/ IntersectionObserver, breadcrumb, gallery+lightbox, **+$100 / +$500 / +$1,000 quick-bid chips**, transparent acquisition-cost breakdown (Quebec example: $10,000 bid → $296.33 total → $250 platform net), VIN masked as `WBA***1234` with bilingual full-VIN-on-win disclosure, "Message Dealer" disabled with bilingual "coming soon" tooltip, related-vehicles section (hidden if <2)
+- Compact card variant: same `VehicleListingCard` reused with `compact={true}` (no separate component)
+- Backend: extended `GET /api/vehicles` with `exclude_id`, `auction_status`, `condition`, `max_mileage`, `transmission`, `fuel_type`, `drivetrain`, `title_status`, `seller_type` params
+- Tests: 12 new (`tests/test_iter202_phase_b_buyer_experience.py`)
+- Locales: ~150 new bilingual keys (EN+FR) — zero English-only strings, validated JSON
+
+### Reuse honored (sprint constraint #3)
+- `VehicleLegalFooter` (Phase 2)
+- `/api/vehicles/categories` + `/api/vehicles/province-regulations`
+- `VehicleBuyerGateModal` (Phase 3)
+- `PartnerBadge`, `VINVerifiedBadge` (mask format updated to 3+***+4 + bilingual disclosure)
+- `formatListingPrice` from `utils/currencyFormatter`
+- `useFeatureFlag` hook
+
+### Test totals
+- 63 baseline + 8 Phase A + 12 Phase B = **75 passing tests, 0 regressions**
+
+---
+
 ## Latest: iter201 — Vehicle Auctions Compliance — Pre-Deploy Polish (Feb 8, 2026) ✅
 
 CEO required 3 items before deploy + 8-item smoke test. **All 8/8 smoke tests pass on preview.**

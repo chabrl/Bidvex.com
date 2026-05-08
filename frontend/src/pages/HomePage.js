@@ -19,6 +19,10 @@ import SEO from '../components/SEO';
 import SwipeableCardRow from '../components/SwipeableCardRow';
 import { useTopSellers, useHotItems, useEndingSoon, useFeatured, useNewListings, useRecentlySold } from '../hooks/useHomePageData';
 import useMarketplaceSync from '../hooks/useMarketplaceSync';
+// iter202 Phase B — Replaces legacy HomepageLiveVehicles with the new carousel.
+// Position constraint: AFTER StorageAuctionsPromo, BEFORE HotItemsSection (Tendances).
+// Visibility constraint: hidden when feature flag OFF or zero active listings.
+import HomepageVehicleCarousel from '../components/vehicles/HomepageVehicleCarousel';
 
 // Smart routing: vehicles go to /vehicle-auctions/:id, everything else to /listing/:id
 const getItemDetailPath = (item) => {
@@ -288,8 +292,10 @@ const HomePage = () => {
       {/* ========== STORAGE AUCTIONS PROMO (iter171 — always bilingual) ========== */}
       <StorageAuctionsPromo navigate={navigate} />
 
-      {/* ========== LIVE VEHICLE AUCTIONS (iter172) ========== */}
-      <HomepageLiveVehicles navigate={navigate} />
+      {/* iter202 Phase B — VEHICLE AUCTIONS CAROUSEL ==================== */}
+      {/* Position: AFTER Storage Unit Auctions, BEFORE Tendances/Trending  */}
+      {/* Visibility: hidden when flag OFF or zero active listings (B3)    */}
+      <HomepageVehicleCarousel />
 
       {/* ========== LIVE STORAGE LOTS (iter172) ========== */}
       <HomepageLiveStorage navigate={navigate} />

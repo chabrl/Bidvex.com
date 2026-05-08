@@ -178,7 +178,8 @@ export const VINVerifiedBadge = ({ vinData, vin }) => {
             data-testid="vin-badge"
           >
             <FileCheck className="h-4 w-4" />
-            VIN: {vin?.slice(0, 8)}...{vin?.slice(-4)}
+            {/* iter202 Phase B — Mask: first 3 + *** + last 4 (full VIN to winning buyer only) */}
+            VIN: {vin ? `${vin.slice(0, 3)}***${vin.slice(-4)}` : '—'}
           </Badge>
         </TooltipTrigger>
         <TooltipContent className="max-w-sm">
@@ -189,6 +190,11 @@ export const VINVerifiedBadge = ({ vinData, vin }) => {
               ) : (
                 <><Info className="h-4 w-4" /> VIN Not Decoded</>
               )}
+            </p>
+            {/* iter202 Phase B — full VIN reveal disclosure (bilingual) */}
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              EN: Full VIN provided to winning buyer.<br />
+              FR: NVI complet fourni à l'acheteur gagnant.
             </p>
             {isVerified && vinData && (
               <div className="text-sm space-y-1">

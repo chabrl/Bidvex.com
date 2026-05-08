@@ -983,7 +983,18 @@ async def list_vehicles(
     # iter202 Phase A — taxonomy-aware filter + promoted-first ordering
     category_id: str = None,
     subcategory_id: str = None,
-    promoted_first: bool = False
+    promoted_first: bool = False,
+    # iter202 Phase B — related-vehicles support (exclude current listing on detail page)
+    exclude_id: str = None,
+    # iter202 Phase B — sidebar filter additions
+    auction_status: str = None,
+    condition: str = None,
+    max_mileage: int = None,
+    transmission: str = None,
+    fuel_type: str = None,
+    drivetrain: str = None,
+    title_status: str = None,
+    seller_type: str = None
 ):
     """
     List public vehicle auctions
@@ -1015,6 +1026,26 @@ async def list_vehicles(
         query["category_id"] = category_id
     if subcategory_id:
         query["subcategory_id"] = subcategory_id
+    # iter202 Phase B — exclude a specific listing (for related-vehicles)
+    if exclude_id:
+        query["id"] = {"$ne": exclude_id}
+    # iter202 Phase B — sidebar filters
+    if auction_status:
+        query["auction_type"] = auction_status if auction_status != "scheduled" else "scheduled"
+    if condition:
+        query["condition_status"] = condition
+    if max_mileage is not None:
+        query["mileage"] = {"$lte": int(max_mileage)}
+    if transmission:
+        query["transmission"] = transmission
+    if fuel_type:
+        query["fuel_type"] = fuel_type
+    if drivetrain:
+        query["drivetrain"] = drivetrain
+    if title_status:
+        query["title_status"] = title_status
+    if seller_type:
+        query["seller.seller_type"] = seller_type
     
     # Sort
     sort_dir = 1 if sort_order == "asc" else -1

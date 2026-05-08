@@ -37,14 +37,14 @@ const formatMileage = (mileage, isFr) => {
   return `${formatter.format(n)} km`;
 };
 
-const VehicleListingCard = ({ vehicle, countdown, onClick, onQuickView }) => {
+const VehicleListingCard = ({ vehicle, countdown, onClick, onQuickView, compact = false }) => {
   const { t, i18n } = useTranslation();
   const isFr = (i18n.language || 'en').toLowerCase().startsWith('fr');
   const [imgError, setImgError] = useState(false);
 
   const mainImage = (vehicle.media && (
     vehicle.media.find((m) => m.category === 'front')?.url || vehicle.media[0]?.url
-  )) || vehicle.image_url || null;
+  )) || vehicle.image_url || (vehicle.photos && vehicle.photos[0]) || null;
 
   const titleEn = vehicle.title_en || vehicle.title || '';
   const titleFr = vehicle.title_fr || titleEn;
@@ -67,6 +67,90 @@ const VehicleListingCard = ({ vehicle, countdown, onClick, onQuickView }) => {
   const currency = vehicle.currency || 'CAD';
   const mileageText = formatMileage(vehicle.mileage, isFr);
 
+  // ---------------------------------------------------------------------------
+  // Compact variant — used by the homepage carousel (B3). Smaller, simplified.
+  // Fields: photo (4:3), Year/Make/Model, City+Province, current bid,
+  // time remaining, "Bid Now →" CTA, small verified-dealer badge.
+  // ---------------------------------------------------------------------------
+  if (compact) {
+    return (
+      <article
+        className="group flex flex-col rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
+        data-testid={`vehicle-card-compact-${vehicle.id}`}
+      >
+        <button
+          type="button"
+          onClick={onClick}
+          className="relative block aspect-[4/3] w-full bg-slate-100 dark:bg-slate-800 overflow-hidden text-left"
+          aria-label={cardTitle}
+        >
+          {mainImage && !imgError ? (
+            <img
+              src={mainImage}
+              alt={cardTitle}
+              width="480"
+              height="360"
+              loading="lazy"
+              decoding="async"
+              onError={() => setImgError(true)}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <Car className="h-12 w-12 text-slate-300 dark:text-slate-700" />
+            </div>
+          )}
+          {dealerVerified && (
+            <span className="absolute top-2 left-2 inline-flex items-center gap-1 rounded-md bg-blue-600 text-white text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 shadow">
+              <BadgeCheck className="h-2.5 w-2.5" />
+              {t('vehicleCard.dealerVerified', 'Verified dealer')}
+            </span>
+          )}
+          {isPromoted && (
+            <span className="absolute top-2 right-2 inline-flex items-center gap-0.5 rounded-md bg-amber-500 text-white text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 shadow">
+              {t('vehicleCard.promoted', 'Featured')}
+            </span>
+          )}
+        </button>
+        <div className="p-3 flex flex-col flex-1 gap-1.5">
+          <h4 className="text-sm font-bold text-slate-900 dark:text-white line-clamp-1">
+            {cardTitle}
+          </h4>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 line-clamp-1">
+            <MapPin className="h-3 w-3 flex-shrink-0" />
+            {[vehicle.location_city, province].filter(Boolean).join(', ') || '—'}
+          </p>
+          <div className="flex items-end justify-between mt-auto pt-1.5">
+            <div className="min-w-0">
+              <p className="text-[9px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                {t('vehicleCard.currentBid', 'Current bid')}
+              </p>
+              <p className="text-base font-black text-[#0B2545] dark:text-cyan-300 leading-none mt-0.5 truncate">
+                {formatListingPrice(currentBid, currency)}
+              </p>
+            </div>
+            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+              <Clock className="h-3 w-3" />
+              {countdown?.label || '—'}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onClick}
+            className="mt-1 inline-flex items-center justify-center gap-1 rounded-md bg-[#0B2545] hover:bg-[#0E2B52] text-white font-semibold text-xs px-3 py-1.5 transition-colors"
+            data-testid={`vehicle-card-compact-cta-${vehicle.id}`}
+          >
+            {t('vehicleCard.bidNowCta', 'Bid Now')}
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </article>
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Full (default) card — used by VehicleAuctionsPage grid.
+  // ---------------------------------------------------------------------------
   return (
     <article
       className="group relative flex flex-col rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 overflow-hidden focus-within:ring-2 focus-within:ring-cyan-500"

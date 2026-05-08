@@ -40,6 +40,13 @@ import MessageSellerModal from '../../components/MessageSellerModal';
 import { MessageSquare, ShieldCheck } from 'lucide-react';
 import VehicleLegalFooter from '../../components/vehicles/VehicleLegalFooter';
 import VehicleBuyerGateModal from '../../components/vehicles/VehicleBuyerGateModal';
+// iter202 Phase B — new detail-page primitives (breadcrumb, gallery+lightbox, acq-cost, related)
+import {
+  VehicleBreadcrumb,
+  VehiclePhotoGallery,
+  VehicleAcquisitionCost,
+  RelatedVehicles,
+} from '../../components/vehicles/VehicleDetailPieces';
 
 // Trust & Legal Components
 import {
@@ -302,7 +309,8 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
       
       toast.success(`Bid placed: ${formatPrice(amount, vehicle?.currency)}`);
       onBidPlaced?.(response.data);
-      setBidAmount((amount + (vehicle?.bid_increment || 100)).toString());
+      // iter202 Phase B — auto-set the next bid amount using +$100 vehicle increment
+      setBidAmount((amount + 100).toString());
       
     } catch (error) {
       const detail = error.response?.data?.detail;
@@ -338,7 +346,8 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
 
   return (
     <>
-      <Card className="sticky top-4 border-2 border-blue-100 dark:border-blue-900 shadow-xl">
+      {/* iter202 Phase B — sticky on desktop (top: 80px per spec) */}
+      <Card className="lg:sticky lg:top-20 border-2 border-blue-100 dark:border-blue-900 shadow-xl">
         <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
           <div className="flex items-center justify-between">
             <div>
@@ -436,15 +445,43 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
                     onChange={(e) => setBidAmount(e.target.value)}
                     className="pl-10 text-lg font-semibold"
                     min={minBid}
-                    step={vehicle?.bid_increment || 100}
+                    step={100}
                     disabled={(vehicle?.starting_price || 0) >= 10000 && !depositAuthorized}
                     data-testid="bid-input"
                   />
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
-                  Minimum bid: {formatPrice(minBid, vehicle?.currency)} (increment: {formatPrice(vehicle?.bid_increment || 100, vehicle?.currency)})
+                  Minimum bid: {formatPrice(minBid, vehicle?.currency)} (increment: {formatPrice(100, vehicle?.currency)})
                 </p>
               </div>
+
+              {/* iter202 Phase B — Quick-bid increments (+$100 / +$500 / +$1,000) */}
+              <div className="flex gap-2" data-testid="bid-quick-chips">
+                {[100, 500, 1000].map((inc) => (
+                  <button
+                    key={inc}
+                    type="button"
+                    onClick={() => {
+                      const base = parseFloat(bidAmount || minBid || 0);
+                      const next = (Number.isFinite(base) ? base : minBid) + inc;
+                      setBidAmount(String(Math.round(next)));
+                    }}
+                    className="flex-1 text-sm font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-cyan-500 hover:text-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-950/40 py-2 transition-colors"
+                    data-testid={`bid-quick-plus-${inc}`}
+                  >
+                    +${inc.toLocaleString()}
+                  </button>
+                ))}
+              </div>
+
+              {/* iter202 Phase B — Total Acquisition Cost (gross-up estimate) */}
+              {bidAmount && parseFloat(bidAmount) > 0 && (
+                <VehicleAcquisitionCost
+                  bid={parseFloat(bidAmount)}
+                  currency={vehicle?.currency || 'CAD'}
+                  province={vehicle?.location_province || 'ON'}
+                />
+              )}
               
               {/* Pricing Breakdown */}
               {user && bidAmount && parseFloat(bidAmount) > 0 && (
@@ -742,6 +779,62 @@ const VehicleBuyNowBody = ({ vehicle, preview, setPreview, loading, setLoading, 
 
 
 
+// iter202 Phase B — Mobile fixed-bottom bid bar
+// Hidden on desktop. On mobile, becomes invisible when the full BidPanel is in view.
+const MobileBidBar = ({ vehicle, onBidClick }) => {
+  const { t } = useTranslation();
+  const [hidden, setHidden] = React.useState(false);
+
+  React.useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') return;
+    // Sentinel = the bid input inside the desktop bid panel
+    const sentinel = document.querySelector('[data-testid="vehicle-detail-bid-column"]') ||
+                     document.querySelector('[data-testid="bid-input"]');
+    if (!sentinel) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        // When 25%+ of the bid column is visible → hide the mobile bar
+        setHidden(entries.some((e) => e.isIntersecting && e.intersectionRatio > 0.25));
+      },
+      { threshold: [0, 0.25, 0.5, 1] }
+    );
+    io.observe(sentinel);
+    return () => io.disconnect();
+  }, [vehicle?.id]);
+
+  const currentBid = vehicle?.current_bid > 0 ? vehicle.current_bid : (vehicle?.starting_price || 0);
+  const currency = vehicle?.currency || 'CAD';
+
+  return (
+    <div
+      className={`lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shadow-2xl transition-transform ${hidden ? 'translate-y-full' : 'translate-y-0'}`}
+      data-testid="mobile-bid-bar"
+      aria-hidden={hidden}
+    >
+      <div className="px-4 py-3 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            {t('vehicleCard.currentBid', 'Current bid')}
+          </p>
+          <p className="text-base font-black text-[#0B2545] dark:text-cyan-300 leading-none mt-0.5 truncate">
+            {formatListingPrice(currentBid, currency)}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onBidClick}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-[#0B2545] hover:bg-[#0E2B52] text-white font-semibold text-sm px-4 py-2.5"
+          data-testid="mobile-bid-bar-cta"
+        >
+          <Gavel className="h-4 w-4" />
+          {t('bid.placeBid', 'Place Bid')}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+
 // Main Page Component
 const VehicleDetailPage = () => {
   const { id } = useParams();
@@ -799,12 +892,21 @@ const VehicleDetailPage = () => {
   }
 
   const condition = vehicle.condition_report || {};
+  // iter202 Phase B — derive isEnded at top-level for the mobile fixed bar
+  const isEnded = vehicle.end_time && new Date(vehicle.end_time) < new Date();
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950" data-testid="vehicle-detail-page">
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 border-b">
         <div className="max-w-7xl mx-auto px-4 py-4">
+          {/* iter202 Phase B — Breadcrumb (Home › Vehicle Auctions › Category › YMM) */}
+          <div className="mb-3">
+            <VehicleBreadcrumb
+              category={vehicle.category_id ? { id: vehicle.category_id, label_en: vehicle.category_label_en, label_fr: vehicle.category_label_fr } : null}
+              vehicle={vehicle}
+            />
+          </div>
           <Button 
             variant="ghost" 
             onClick={() => navigate('/vehicle-auctions')}
@@ -872,12 +974,16 @@ const VehicleDetailPage = () => {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Left Column - Images & Details */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Image Gallery */}
-            <ImageGallery media={vehicle.media} />
+      <div className="max-w-7xl mx-auto px-4 py-8 pb-24 lg:pb-8">
+        {/* iter202 Phase B — 60/40 split (5-col grid: 3 left + 2 right) */}
+        <div className="grid lg:grid-cols-5 gap-8">
+          {/* Left Column - Images & Details (60%) */}
+          <div className="lg:col-span-3 space-y-6">
+            {/* iter202 Phase B — VehiclePhotoGallery with lightbox (← → ESC swipe) */}
+            <VehiclePhotoGallery
+              media={(vehicle.media || []).filter(m => !m.type || m.type === 'photo')}
+              title={`${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim()}
+            />
             
             {/* Tabs */}
             <Tabs defaultValue="details">
@@ -1294,12 +1400,13 @@ const VehicleDetailPage = () => {
                                   </p>
                                   <Button
                                     size="sm"
-                                    className="mt-3 bg-blue-600 hover:bg-blue-700 text-white"
-                                    onClick={() => setShowMessageModal(true)}
+                                    className="mt-3 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                                    disabled
+                                    title={i18n.language === 'fr' ? 'Messagerie bientôt disponible' : 'Messaging coming soon'}
                                     data-testid="vehicle-message-seller-btn"
                                   >
                                     <MessageSquare className="mr-2 h-4 w-4" />
-                                    {i18n.language === 'fr' ? 'Écrire au concessionnaire' : 'Message Dealer'}
+                                    {i18n.language === 'fr' ? 'Messagerie bientôt' : 'Messaging coming soon'}
                                   </Button>
                                 </div>
                               </div>
@@ -1372,8 +1479,8 @@ const VehicleDetailPage = () => {
             </Tabs>
           </div>
 
-          {/* Right Column - Bidding Panel */}
-          <div className="space-y-4">
+          {/* Right Column - Bidding Panel (40% — sticky on scroll) */}
+          <div className="lg:col-span-2 space-y-4" data-testid="vehicle-detail-bid-column">
             <BiddingPanel 
               vehicle={vehicle} 
               onBidPlaced={fetchVehicle}
@@ -1406,7 +1513,26 @@ const VehicleDetailPage = () => {
             <LegalFooter />
           </div>
         </div>
+
+        {/* iter202 Phase B — Similar Vehicles section */}
+        {vehicle.category_id && (
+          <RelatedVehicles categoryId={vehicle.category_id} excludeId={vehicle.id} />
+        )}
       </div>
+
+      {/* iter202 Phase B — Mobile fixed bid bar (hidden when full panel in view via IO) */}
+      {!isEnded && (
+        <MobileBidBar
+          vehicle={vehicle}
+          onBidClick={() => {
+            const el = document.querySelector('[data-testid="bid-input"]');
+            if (el) {
+              el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+              setTimeout(() => el.focus?.(), 400);
+            }
+          }}
+        />
+      )}
 
       {/* iter189 Feature 2 — Vehicle Promotion Modal */}
       {showPromoModal && vehicle && (
