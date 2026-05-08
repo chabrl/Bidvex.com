@@ -47,6 +47,14 @@ export const extractErrorMessage = (error) => {
     return field ? `${field}: ${data.detail.msg}` : data.detail.msg;
   }
 
+  // Case 3b (iter203): Custom server error envelope { error, message, signals }
+  // Used by the vehicle-listing compliance gate. Return the bilingual message
+  // so any catch site that doesn't have a custom handler still gets a clean
+  // user-facing string instead of a raw JSON dump.
+  if (typeof data?.detail === 'object' && data.detail.error && data.detail.message) {
+    return data.detail.message;
+  }
+
   // Case 4: Error message at root level
   if (data?.message) {
     return data.message;

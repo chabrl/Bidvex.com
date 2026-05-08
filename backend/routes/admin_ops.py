@@ -1979,6 +1979,130 @@ async def admin_compliance_alerts_count(current_user: User = Depends(require_adm
     )}
 
 
+# ============= iter203 — COMPLIANCE HEALTH KPI ==========================
+@admin_ops_router.get("/admin/compliance/health")
+async def admin_compliance_health(current_user: User = Depends(require_admin)):
+    """iter203 — Compliance Health traffic-light KPI for Admin Home.
+
+    Status bands (green / yellow / red) reflect the health of the three-layer
+    vehicle-listing defence system:
+
+      • green  → All systems nominal: 0 pending_review, AI scanner healthy in
+                 the last hour, watchdog ran in the last 90 minutes
+      • yellow → 1+ pending_review awaiting moderator OR watchdog hasn't run
+                 in 90+ minutes (still under 4 h)
+      • red    → 5+ pending_review (queue is backing up) OR watchdog hasn't
+                 run in 4+ hours OR AI scanner has failed 3+ times in the last
+                 hour (Gemini outage / quota exhausted)
+
+    Counters returned:
+      • pending_review            — listings waiting for human review
+      • blocked_today             — vehicle_listing_blocked audit-log entries today
+      • paused_by_ai_today        — AI-scanner-paused listings today
+      • paused_by_watchdog_today  — watchdog-paused listings today
+      • ai_unavailable_last_hour  — AI scanner failures in the last 60 min
+      • last_watchdog_run         — ISO timestamp + minutes since
+      • status                    — green | yellow | red
+      • status_reasons            — list of human-readable reasons (admin tooltip)
+    """
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    one_hour_ago = now - timedelta(hours=1)
+    db = get_db()
+
+    # Pending review (single + multi-item listings) — both require admin action
+    pending_single = await db.listings.count_documents({"status": "pending_review"})
+    pending_multi = await db.multi_item_listings.count_documents({"status": "pending_review"})
+    pending_review = pending_single + pending_multi
+
+    # Today's audit log counters
+    blocked_today = await db.audit_logs.count_documents({
+        "action": "vehicle_listing_blocked",
+        "timestamp": {"$gte": today_start.isoformat()},
+    })
+    paused_by_ai_today = await db.audit_logs.count_documents({
+        "action": "vehicle_listing_paused_by_ai_scanner",
+        "timestamp": {"$gte": today_start.isoformat()},
+    })
+    paused_by_watchdog_today = await db.audit_logs.count_documents({
+        "action": "vehicle_listing_paused_by_watchdog",
+        "timestamp": {"$gte": today_start.isoformat()},
+    })
+
+    # AI scanner failures (last 60 min) — flag if too many
+    ai_unavailable_last_hour = await db.listing_scans.count_documents({
+        "status": "ai_unavailable",
+        "scanned_at": {"$gte": one_hour_ago.isoformat()},
+    })
+
+    # Last watchdog run
+    last_run_doc = await db.audit_logs.find_one(
+        {"action": "watchdog_run"},
+        {"_id": 0, "timestamp": 1, "total_examined": 1, "total_paused": 1, "triggered_by": 1},
+        sort=[("timestamp", -1)],
+    )
+    last_watchdog_run_iso = last_run_doc.get("timestamp") if last_run_doc else None
+    if last_watchdog_run_iso:
+        try:
+            ts = datetime.fromisoformat(last_watchdog_run_iso.replace("Z", "+00:00"))
+            minutes_since_run = max(0, int((now - ts).total_seconds() / 60))
+        except Exception:
+            minutes_since_run = None
+    else:
+        minutes_since_run = None
+
+    # Determine traffic-light status
+    reasons: list[str] = []
+    status = "green"
+
+    # RED conditions (worst tier wins)
+    if pending_review >= 5:
+        reasons.append(f"{pending_review} listings stuck in pending_review")
+        status = "red"
+    if minutes_since_run is None:
+        reasons.append("Watchdog has never run on this deployment")
+        status = "red"
+    elif minutes_since_run > 240:
+        reasons.append(f"Watchdog hasn't run in {minutes_since_run} minutes (>4h)")
+        status = "red"
+    if ai_unavailable_last_hour >= 3:
+        reasons.append(f"{ai_unavailable_last_hour} AI scanner failures in the last hour")
+        status = "red"
+
+    # YELLOW conditions (only escalate if not already red)
+    if status != "red":
+        if pending_review >= 1:
+            reasons.append(f"{pending_review} listing(s) awaiting human review")
+            status = "yellow"
+        if minutes_since_run is not None and minutes_since_run > 90:
+            reasons.append(f"Watchdog overdue (last run {minutes_since_run} min ago)")
+            status = "yellow"
+        if ai_unavailable_last_hour >= 1:
+            reasons.append(f"{ai_unavailable_last_hour} AI scanner error(s) in the last hour")
+            status = "yellow"
+
+    # Green default
+    if status == "green" and not reasons:
+        reasons.append("All systems nominal")
+
+    return {
+        "status": status,
+        "status_reasons": reasons,
+        "pending_review": pending_review,
+        "pending_review_breakdown": {
+            "single_listings": pending_single,
+            "multi_item_listings": pending_multi,
+        },
+        "blocked_today": blocked_today,
+        "paused_by_ai_today": paused_by_ai_today,
+        "paused_by_watchdog_today": paused_by_watchdog_today,
+        "ai_unavailable_last_hour": ai_unavailable_last_hour,
+        "last_watchdog_run": last_watchdog_run_iso,
+        "minutes_since_last_watchdog": minutes_since_run,
+        "checked_at": now.isoformat(),
+    }
+
+
 # ============= CFIA SOIL DECLARATION CATEGORIES ========================
 
 CFIA_TRIGGER_CATEGORIES = [

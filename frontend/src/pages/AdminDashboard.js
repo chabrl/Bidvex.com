@@ -65,7 +65,7 @@ import {
   Users, Package, Gavel, Shield, TrendingUp, Bell, Settings, FileText, 
   MessageSquare, DollarSign, Search, Image, CreditCard, Megaphone, 
   Activity, AlertTriangle, ChevronRight, Power, Zap, Eye, History,
-  ToggleLeft, ToggleRight, Clock, Mail, Sliders, Car, Send, Bot, Ticket, BarChart3, Globe, Building2, BarChart2, ShieldAlert, Lock
+  ToggleLeft, ToggleRight, Clock, Mail, Sliders, Car, Send, Bot, Ticket, BarChart3, Globe, Building2, BarChart2, ShieldAlert, ShieldCheck, Lock
 } from 'lucide-react';
 
 const API = API_BASE;
@@ -199,6 +199,8 @@ const AdminDashboard = () => {
   const [pendingCurrencyAppeals, setPendingCurrencyAppeals] = useState(0);
   // iter201 Phase 3 — Compliance alerts KPI (expired/expiring licences + high-fraud + unreviewed)
   const [pendingComplianceAlerts, setPendingComplianceAlerts] = useState(0);
+  // iter203 — Compliance Health traffic-light KPI (vehicle gate / AI scanner / watchdog)
+  const [complianceHealth, setComplianceHealth] = useState(null);
 
   useEffect(() => {
     if (!user || !token) return;
@@ -235,6 +237,14 @@ const AdminDashboard = () => {
         if (r.ok) {
           const d = await r.json();
           setPendingComplianceAlerts(d.total || 0);
+        }
+      } catch (_) {}
+      // iter203 — Compliance Health KPI traffic light
+      try {
+        const r = await fetch(`${root}/api/admin/compliance/health`, { headers });
+        if (r.ok) {
+          const d = await r.json();
+          setComplianceHealth(d || null);
         }
       } catch (_) {}
     };
@@ -613,6 +623,44 @@ const AdminDashboard = () => {
                 </div>
               </button>
             )}
+            {/* iter203 — Compliance Health KPI traffic light (always visible) */}
+            {complianceHealth && (() => {
+              const s = complianceHealth.status || 'green';
+              const palette = {
+                green:  { bg: 'bg-emerald-50 hover:bg-emerald-100', ring: 'ring-emerald-300', icon: 'text-emerald-600', label: 'text-emerald-700', dot: 'bg-emerald-500' },
+                yellow: { bg: 'bg-amber-50 hover:bg-amber-100',     ring: 'ring-amber-400',   icon: 'text-amber-600',   label: 'text-amber-700',   dot: 'bg-amber-500' },
+                red:    { bg: 'bg-rose-50 hover:bg-rose-100',       ring: 'ring-rose-500',    icon: 'text-rose-600',    label: 'text-rose-700',    dot: 'bg-rose-500 animate-pulse' },
+              }[s];
+              const tooltip = (complianceHealth.status_reasons || []).join(' • ');
+              return (
+                <button
+                  type="button"
+                  onClick={() => { setPrimaryTab('vehicles'); setSecondaryTab('compliance-alerts'); }}
+                  className={`flex items-center gap-3 p-3 ${palette.bg} rounded-lg ring-2 ${palette.ring} transition-all text-left`}
+                  data-testid="admin-compliance-health-card"
+                  data-status={s}
+                  title={`Compliance Health: ${s.toUpperCase()} — ${tooltip}`}
+                >
+                  <div className="relative">
+                    <ShieldCheck className={`h-8 w-8 ${palette.icon}`} />
+                    <span className={`absolute -top-1 -right-1 inline-block w-3 h-3 rounded-full ${palette.dot} ring-2 ring-white`} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className={`text-base font-bold ${palette.label} uppercase tracking-wide leading-tight`} data-testid="admin-compliance-health-status">
+                      {s === 'green' ? 'All clear' : s === 'yellow' ? 'Watch' : 'Action required'}
+                    </p>
+                    <p className="text-[11px] text-slate-600 leading-tight truncate max-w-[180px]">
+                      {(complianceHealth.pending_review || 0) === 0
+                        ? `Watchdog: ${complianceHealth.minutes_since_last_watchdog ?? '—'} min ago`
+                        : `${complianceHealth.pending_review} pending review`}
+                    </p>
+                    <p className="text-[10px] text-slate-500 leading-tight">
+                      Today: {complianceHealth.blocked_today || 0} blocked · {(complianceHealth.paused_by_ai_today || 0) + (complianceHealth.paused_by_watchdog_today || 0)} paused
+                    </p>
+                  </div>
+                </button>
+              );
+            })()}
           </div>
         </div>
       </div>

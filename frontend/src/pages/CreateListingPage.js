@@ -35,7 +35,7 @@ const CFIA_TRIGGER_CATEGORIES = [
 ];
 
 const CreateListingPage = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const geo = useGeoLocation();
@@ -175,6 +175,30 @@ const CreateListingPage = () => {
       navigate(`/listing/${response.data.id}`);
     } catch (error) {
       console.error('Failed to create listing:', error);
+      // iter203 — Vehicle compliance gate: show clean bilingual toast with action
+      const detail = error?.response?.data?.detail;
+      if (detail && typeof detail === 'object' && detail.error === 'vehicle_listing_dealer_required') {
+        const isFr = (i18n.language || 'en').toLowerCase().startsWith('fr');
+        const headline = isFr
+          ? "Annonce de véhicule refusée"
+          : "Vehicle listing not allowed";
+        const body = isFr
+          ? "Les annonces de véhicules sont réservées aux concessionnaires licenciés (OMVIC, AMVIC, VSA, SAAQ, FCAA, etc.). Veuillez basculer vers l'onglet Enchères de véhicules ou faire vérifier votre licence de concessionnaire."
+          : "Vehicle listings are restricted to licensed dealers only (OMVIC, AMVIC, VSA, SAAQ, FCAA, etc.). Please switch to the Vehicle Auctions section or get your dealer licence verified.";
+        toast.error(headline, {
+          description: body,
+          duration: 12000,
+          action: {
+            label: isFr ? 'Vérifier ma licence' : 'Verify dealer licence',
+            onClick: () => navigate('/vehicle-auctions/dealer-license'),
+          },
+          cancel: {
+            label: isFr ? 'Voir les enchères de véhicules' : 'Go to Vehicle Auctions',
+            onClick: () => navigate('/vehicle-auctions'),
+          },
+        });
+        return;
+      }
       const errorMessage = extractErrorMessage(error);
       toast.error(errorMessage || 'Failed to create listing');
     } finally {

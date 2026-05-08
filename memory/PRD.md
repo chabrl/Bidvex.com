@@ -1,5 +1,46 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter204 — Compliance Health KPI + Marketplace Toast Polish (Feb 8, 2026) ✅
+
+### A. Compliance Health Traffic-Light KPI (Admin Home)
+- **Backend**: new `GET /api/admin/compliance/health` (`/app/backend/routes/admin_ops.py`)
+  - Returns `status` (green/yellow/red), `status_reasons[]`, `pending_review` + breakdown by collection, `blocked_today`, `paused_by_ai_today`, `paused_by_watchdog_today`, `ai_unavailable_last_hour`, `last_watchdog_run` ISO + `minutes_since_last_watchdog`
+  - **Status bands**:
+    - 🟢 green — 0 pending_review, watchdog ran <90 min ago, AI scanner healthy
+    - 🟡 yellow — 1+ pending_review awaiting moderator OR watchdog overdue 90-240 min OR 1-2 AI failures in the hour
+    - 🔴 red — 5+ pending_review (queue backing up) OR watchdog hasn't run in 4+ h OR 3+ AI scanner failures in the hour OR watchdog has never run
+- **Frontend**: KPI card on `/app/frontend/src/pages/AdminDashboard.js` (next to the existing red Compliance Alerts card)
+  - Always visible (status indicator, not alert) — green/yellow/red ring around `<ShieldCheck>` icon with pulsing dot, uppercase status label, sub-label showing watchdog freshness OR pending count, tertiary today's blocked + paused counts, full reason list in the title tooltip
+  - 60-second auto-refresh via existing `fetchPendingCounters` interval
+  - Click → routes to Vehicles → Compliance Alerts tab for triage
+
+### B. Marketplace 403 Bilingual Toast Polish
+- `/app/frontend/src/pages/CreateListingPage.js` — when the iter203 vehicle gate returns `403 + detail.error === "vehicle_listing_dealer_required"`, the page now shows a clean `sonner` toast:
+  - Headline (EN/FR based on `i18n.language`): "Vehicle listing not allowed" / "Annonce de véhicule refusée"
+  - Description with provincial regulator list (OMVIC, AMVIC, VSA, SAAQ, FCAA, etc.)
+  - Action button: "Verify dealer licence" / "Vérifier ma licence" → `/vehicle-auctions/dealer-license`
+  - Cancel button: "Go to Vehicle Auctions" / "Voir les enchères de véhicules" → `/vehicle-auctions`
+  - 12-second duration (long enough to read both buttons)
+- `/app/frontend/src/utils/errorHandler.js` — `extractErrorMessage` now recognises the `{error, message, signals}` envelope shape so any other catch site that doesn't have a custom handler still gets a clean string instead of raw JSON
+
+### Tests
+- 5 new in `/app/backend/tests/test_iter204_compliance_health.py`:
+  - admin-only auth required (401/403 without token)
+  - response shape contract (all expected keys present, status ∈ {green, yellow, red})
+  - yellow band fires with 1+ pending_review (with watchdog seeded recent)
+  - red band fires with 5+ pending_review
+  - red band fires when watchdog has never run
+- **Cumulative: 93+ tests passing, 0 regressions** (88 prior + 5 new)
+
+### Files of reference
+- `/app/backend/routes/admin_ops.py` (new endpoint)
+- `/app/backend/tests/test_iter204_compliance_health.py` (5 new tests)
+- `/app/frontend/src/pages/AdminDashboard.js` (KPI card + state hook + fetch)
+- `/app/frontend/src/pages/CreateListingPage.js` (bilingual toast handler)
+- `/app/frontend/src/utils/errorHandler.js` (envelope-shape support)
+
+---
+
 ## Latest: iter203 — P0 Vehicle Listing Compliance Hardening (Feb 8, 2026) ✅
 
 **Critical user-reported bug**: An individual user listed a car in the general Marketplace and the legacy "AI Scanner" (which only existed as an admin-triggered manual endpoint) failed to catch it. The narrow legacy whitelist (`["vehicle", "vehicles", "vehicle parts", "road_vehicles"]`) missed any seller who picked "Cars", "Auto", "Truck", or any French/disguised category. Three layers of defence shipped:
