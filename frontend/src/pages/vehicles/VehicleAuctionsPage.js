@@ -1,616 +1,381 @@
-import API_BASE from '../../config';
 /**
- * Vehicle Auctions Marketplace Page
- * Main browse page for vehicle auctions - Automotive-inspired design
+ * iter202 Phase A — Vehicle Auctions Buyer Experience
+ * ====================================================
+ * Replaces the old VehicleAuctionsPage with the new buyer-focused layout:
+ *
+ *   ┌──────────────────────────────────────────────────────┐
+ *   │ HERO          — VehicleHero (dark navy, stats strip) │
+ *   │ CATEGORY BAR  — VehicleCategoryPills (15 cats)       │
+ *   │ TOOLBAR       — sort dropdown, view toggle, count    │
+ *   │ GRID          — 3-col VehicleListingCard rich cards  │
+ *   │ EMPTY STATES  — zero / filtered / error variants     │
+ *   │ LEGAL FOOTER  — bilingual disclaimer (reused Phase 2)│
+ *   └──────────────────────────────────────────────────────┘
+ *
+ * Sprint constraints honoured:
+ *   #2 Feature flag — gated upstream by VehicleAuctionsRoute
+ *   #3 Reuse        — VehicleLegalFooter, /api/vehicles/categories
+ *   #4 Single timer — useVehicleCountdown drives all card countdowns
+ *   #6 Quick bid    — bid increments deferred to Phase B (detail page)
+ *   #8 Image dims   — explicit aspect-[16/10] + width/height attrs on <img>
+ *   #9 Bilingual    — every string via useTranslation()
+ *  #10 Empty states — VehicleEmptyState handles zero / filtered / error
+ *
+ * Sidebar drawer (Phase B) deliberately not wired here — only the category
+ * pills + sort dropdown ship in Phase A. The sidebar arrives in Phase B.
  */
-
-import React, { useState, useEffect, useCallback } from 'react';
+import API_BASE from '../../config';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useAuth } from '../../contexts/AuthContext';
 import axios from 'axios';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Card, CardContent } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Badge } from '../../components/ui/badge';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../../components/ui/select';
-import {
-  Car, Search, Filter, Grid, List, Clock, MapPin, Gauge,
-  Fuel, Settings2, Calendar, DollarSign, ChevronRight,
-  Award, Shield, Zap, TrendingUp, Eye, Heart, RefreshCw,
-  ChevronDown, X, SlidersHorizontal, Sparkles, FileText,
-  CheckCircle, BadgeCheck, Building2, User, AlertTriangle,
-  PlusCircle, Gavel, ArrowRight, Star
+  Loader2, Grid3x3, List as ListIcon, ArrowDownUp, ChevronDown,
+  Building2, PlusCircle, User, DollarSign, Car,
 } from 'lucide-react';
-import VehicleFilterModern from '../../components/VehicleFilterModern';
-import { TrustIndicators } from '../../components/vehicles/TrustBadges';
-import PartnerBadge from '../../components/PartnerBadge';
+import VehicleHero from '../../components/vehicles/VehicleHero';
+import VehicleCategoryPills from '../../components/vehicles/VehicleCategoryPills';
+import VehicleListingCard from '../../components/vehicles/VehicleListingCard';
+import VehicleEmptyState from '../../components/vehicles/VehicleEmptyState';
+import VehicleLegalFooter from '../../components/vehicles/VehicleLegalFooter';
+import useVehicleCountdown from '../../hooks/useVehicleCountdown';
 
 const API = API_BASE;
 
-// Vehicle body type icons
-const bodyTypeIcons = {
-  sedan: '🚗',
-  suv: '🚙',
-  truck: '🛻',
-  coupe: '🏎️',
-  convertible: '🏎️',
-  van: '🚐',
-  motorcycle: '🏍️',
-  other: '🚘',
-};
+const SORT_OPTIONS = [
+  { value: 'end_time-asc',     labelKey: 'vehiclePage.sort.endingSoon',  defaultLabel: 'Ending soon' },
+  { value: 'end_time-desc',    labelKey: 'vehiclePage.sort.endingLater', defaultLabel: 'Ending later' },
+  { value: 'created_at-desc',  labelKey: 'vehiclePage.sort.newest',      defaultLabel: 'Newest listings' },
+  { value: 'current_bid-desc', labelKey: 'vehiclePage.sort.priceHigh',   defaultLabel: 'Price: high to low' },
+  { value: 'current_bid-asc',  labelKey: 'vehiclePage.sort.priceLow',    defaultLabel: 'Price: low to high' },
+  { value: 'mileage-asc',      labelKey: 'vehiclePage.sort.mileageLow',  defaultLabel: 'Lowest mileage' },
+];
 
-import { formatListingPrice } from '../../utils/currencyFormatter';
-
-// Format price — uses listing currency
-const formatPrice = (price, currency = 'CAD') => {
-  return formatListingPrice(price, currency);
-};
-
-// Format mileage
-const formatMileage = (mileage) => {
-  return new Intl.NumberFormat('en-CA').format(mileage) + ' km';
-};
-
-// Time remaining formatter
-const formatTimeRemaining = (endTime) => {
-  if (!endTime) return 'N/A';
-  const end = new Date(endTime);
-  const now = new Date();
-  const diff = end - now;
-  
-  if (diff <= 0) return 'Ended';
-  
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  
-  if (days > 0) return `${days}d ${hours}h`;
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m`;
-};
-
-// Vehicle Card Component
-const VehicleCard = ({ vehicle, onClick }) => {
-  const [imageError, setImageError] = useState(false);
-  const mainImage = vehicle.media?.find(m => m.category === 'front')?.url || 
-                    vehicle.media?.[0]?.url;
-  
-  // Check for ending soon (within 1 hour)
-  const isEndingSoon = vehicle.end_time && (() => {
-    const end = new Date(vehicle.end_time);
-    const now = new Date();
-    const hoursLeft = (end - now) / (1000 * 60 * 60);
-    return hoursLeft > 0 && hoursLeft < 1;
-  })();
-  
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -4 }}
-      transition={{ duration: 0.2 }}
-    >
-      <Card 
-        className="overflow-hidden cursor-pointer group bg-white dark:bg-slate-900 border-0 shadow-lg hover:shadow-2xl transition-all duration-300"
-        onClick={onClick}
-        data-testid={`vehicle-card-${vehicle.id}`}
-      >
-        {/* Image Container */}
-        <div className="relative aspect-[16/10] bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 overflow-hidden">
-          {mainImage && !imageError ? (
-            <img
-              src={mainImage}
-              alt={vehicle.title}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              onError={() => setImageError(true)}
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Car className="h-16 w-16 text-slate-300" />
-            </div>
-          )}
-          
-          {/* Overlay Badges - Top Left */}
-          <div className="absolute top-3 left-3 flex flex-col gap-1.5">
-            {vehicle.auction_type === 'live' && (
-              <Badge className="bg-red-500 text-white animate-pulse text-xs">
-                <Zap className="h-3 w-3 mr-1" /> LIVE
-              </Badge>
-            )}
-            {isEndingSoon && (
-              <Badge className="bg-orange-500 text-white animate-pulse text-xs">
-                <Clock className="h-3 w-3 mr-1" /> Ending Soon
-              </Badge>
-            )}
-            {!vehicle.reserve_price && (
-              <Badge className="bg-purple-500 text-white text-xs">
-                <Award className="h-3 w-3 mr-1" /> No Reserve
-              </Badge>
-            )}
-            {vehicle.reserve_met && (
-              <Badge className="bg-green-500 text-white text-xs">
-                <CheckCircle className="h-3 w-3 mr-1" /> Reserve Met
-              </Badge>
-            )}
-          </div>
-          
-          {/* Trust Badges - Top Right */}
-          <div className="absolute top-3 right-3 flex flex-col gap-1.5">
-            {vehicle.title_status === 'clean' && (
-              <Badge className="bg-emerald-500 text-white text-xs">
-                <Shield className="h-3 w-3 mr-1" /> Clean Title
-              </Badge>
-            )}
-            {vehicle.title_status === 'salvage' && (
-              <Badge className="bg-red-500 text-white text-xs">
-                <AlertTriangle className="h-3 w-3 mr-1" /> Salvage
-              </Badge>
-            )}
-            {vehicle.seller?.verification_status === 'approved' && (
-              <Badge className="bg-blue-500 text-white text-xs">
-                <BadgeCheck className="h-3 w-3 mr-1" /> Verified
-              </Badge>
-            )}
-          </div>
-          
-          {/* Time Remaining */}
-          <div className="absolute bottom-3 right-3">
-            <Badge variant="secondary" className="bg-black/70 text-white backdrop-blur-sm">
-              <Clock className="h-3 w-3 mr-1" />
-              {formatTimeRemaining(vehicle.end_time)}
-            </Badge>
-          </div>
-          
-          {/* Bid Count */}
-          <div className="absolute bottom-3 left-3">
-            <Badge variant="secondary" className="bg-white/90 text-slate-900 backdrop-blur-sm">
-              <TrendingUp className="h-3 w-3 mr-1" />
-              {vehicle.bid_count || 0} bids
-            </Badge>
-          </div>
-        </div>
-        
-        {/* Content */}
-        <CardContent className="p-4 space-y-3">
-          {/* Year Make Model */}
-          <div>
-            <h3 className="font-bold text-lg text-slate-900 dark:text-white group-hover:text-blue-600 transition-colors line-clamp-1">
-              {vehicle.year} {vehicle.make} {vehicle.model}
-            </h3>
-            {vehicle.trim && (
-              <p className="text-sm text-slate-500">{vehicle.trim}</p>
-            )}
-          </div>
-          
-          {/* Running Status & Seller Type Badges */}
-          <div className="flex flex-wrap gap-1.5">
-            {vehicle.condition_report?.is_running ? (
-              <Badge className="bg-green-100 text-green-700 text-xs gap-1">
-                <CheckCircle className="h-3 w-3" /> Running
-              </Badge>
-            ) : (
-              <Badge className="bg-red-100 text-red-700 text-xs gap-1">
-                <AlertTriangle className="h-3 w-3" /> Non-Running
-              </Badge>
-            )}
-            {vehicle.seller?.seller_type === 'dealer' && (
-              <Badge className="bg-slate-100 text-slate-600 text-xs gap-1">
-                <Building2 className="h-3 w-3" /> Dealer
-              </Badge>
-            )}
-            {vehicle.seller?.seller_type === 'private' && (
-              <Badge className="bg-slate-100 text-slate-600 text-xs gap-1">
-                <User className="h-3 w-3" /> Private
-              </Badge>
-            )}
-            {vehicle.seller_id && <PartnerBadge sellerId={vehicle.seller_id} size="sm" />}
-          </div>
-          
-          {/* Specs Grid */}
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400">
-              <Gauge className="h-4 w-4" />
-              <span>{formatMileage(vehicle.mileage)}</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400">
-              <Fuel className="h-4 w-4" />
-              <span className="capitalize">{vehicle.fuel_type}</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400">
-              <Settings2 className="h-4 w-4" />
-              <span className="capitalize">{vehicle.transmission}</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400">
-              <MapPin className="h-4 w-4" />
-              <span>{vehicle.location_city}, {vehicle.location_province}</span>
-            </div>
-          </div>
-          
-          {/* Price Section */}
-          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-end justify-between">
-            <div>
-              <p className="text-xs text-slate-500 uppercase tracking-wide">Current Bid</p>
-              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                {vehicle.current_bid > 0 ? formatPrice(vehicle.current_bid, vehicle.currency) : formatPrice(vehicle.starting_price, vehicle.currency)}
-              </p>
-            </div>
-            <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
-              Bid Now <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
-  );
-};
-
-// Main Page Component
 const VehicleAuctionsPage = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  
-  const [vehicles, setVehicles] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [viewMode, setViewMode] = useState('grid');
-  const [vehicleAuctionsEnabled, setVehicleAuctionsEnabled] = useState(false);
-  
-  // Filters
-  const [filters, setFilters] = useState({
-    make: searchParams.get('make') || '',
-    year_min: searchParams.get('year_min') || '',
-    year_max: searchParams.get('year_max') || '',
-    price_min: searchParams.get('price_min') || '',
-    price_max: searchParams.get('price_max') || '',
-    body_type: searchParams.get('body_type') || '',
-    province: searchParams.get('province') || '',
-    sort_by: searchParams.get('sort_by') || 'end_time',
-    sort_order: searchParams.get('sort_order') || 'asc',
-    auction_status: searchParams.get('auction_status') || '',
-    max_mileage: searchParams.get('max_mileage') || '',
-    transmission: searchParams.get('transmission') || '',
-  });
-  
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
 
-  // Check if vehicle auctions are enabled globally
+  // Categories (loaded once)
+  const [categories, setCategories] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+
+  // Listings state
+  const [vehicles, setVehicles] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [page, setPage] = useState(1);
+
+  // Filters
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || searchParams.get('make') || '');
+  const [activeMakeFilter, setActiveMakeFilter] = useState(searchParams.get('make') || '');
+  const [categoryId, setCategoryId] = useState(searchParams.get('category_id') || null);
+  const [subcategoryId, setSubcategoryId] = useState(searchParams.get('subcategory_id') || null);
+  const [sort, setSort] = useState(searchParams.get('sort') || 'end_time-asc');
+  const [viewMode, setViewMode] = useState('grid');
+
+  // Shared countdown — single timer per page (sprint constraint #4)
+  const { format: formatCountdown } = useVehicleCountdown();
+
+  // Load categories once
   useEffect(() => {
-    const checkVehicleAuctionsStatus = async () => {
+    let cancelled = false;
+    (async () => {
       try {
-        const response = await axios.get(`${API}/vehicles/system/status`);
-        setVehicleAuctionsEnabled(response.data.vehicle_auctions_enabled || false);
-      } catch (error) {
-        // Default to disabled if can't reach endpoint
-        setVehicleAuctionsEnabled(false);
+        const res = await axios.get(`${API}/vehicles/categories`);
+        if (!cancelled) setCategories(res.data?.items || []);
+      } catch (e) {
+        // Non-fatal — pills will render empty/skeleton
+      } finally {
+        if (!cancelled) setCategoriesLoading(false);
       }
-    };
-    checkVehicleAuctionsStatus();
+    })();
+    return () => { cancelled = true; };
   }, []);
+
+  // Sync filters to URL
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (activeMakeFilter) next.set('make', activeMakeFilter);
+    if (categoryId) next.set('category_id', categoryId);
+    if (subcategoryId) next.set('subcategory_id', subcategoryId);
+    if (sort && sort !== 'end_time-asc') next.set('sort', sort);
+    setSearchParams(next, { replace: true });
+  }, [activeMakeFilter, categoryId, subcategoryId, sort, setSearchParams]);
 
   const fetchVehicles = useCallback(async () => {
     setLoading(true);
+    setError(false);
     try {
       const params = new URLSearchParams();
-      params.set('page', page.toString());
+      params.set('page', String(page));
       params.set('limit', '12');
-      
-      Object.entries(filters).forEach(([key, value]) => {
-        // Skip "all" placeholder values and empty values
-        if (value && value !== 'all') params.set(key, value);
-      });
-      
-      const response = await axios.get(`${API}/vehicles?${params}`);
-      setVehicles(response.data.vehicles || []);
-      setTotal(response.data.total || 0);
-    } catch (error) {
-      console.error('Failed to fetch vehicles:', error);
+      params.set('promoted_first', 'true');
+      const [sortBy, sortOrder] = sort.split('-');
+      params.set('sort_by', sortBy);
+      params.set('sort_order', sortOrder);
+      if (activeMakeFilter) params.set('make', activeMakeFilter);
+      if (categoryId) params.set('category_id', categoryId);
+      if (subcategoryId) params.set('subcategory_id', subcategoryId);
+      const res = await axios.get(`${API}/vehicles?${params.toString()}`);
+      setVehicles(res.data?.vehicles || []);
+      setTotal(res.data?.total || 0);
+    } catch (e) {
+      setError(true);
+      setVehicles([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
-  }, [page, filters]);
+  }, [page, sort, activeMakeFilter, categoryId, subcategoryId]);
 
-  useEffect(() => {
-    fetchVehicles();
-  }, [fetchVehicles]);
+  useEffect(() => { fetchVehicles(); }, [fetchVehicles]);
 
-  const handleFilterChange = (key, value) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(total / 12)), [total]);
+
+  const handleSearch = (q) => {
+    setActiveMakeFilter((q || '').trim());
     setPage(1);
   };
 
-  const clearFilters = () => {
-    setFilters({
-      make: '',
-      year_min: '',
-      year_max: '',
-      price_min: '',
-      price_max: '',
-      body_type: '',
-      province: '',
-      sort_by: 'end_time',
-      sort_order: 'asc',
-    });
+  const handleCategoryChange = (cId, scId /* , catObj */) => {
+    setCategoryId(cId || null);
+    setSubcategoryId(scId || null);
+    setPage(1);
+  };
+
+  const clearAllFilters = () => {
+    setActiveMakeFilter('');
     setSearchQuery('');
+    setCategoryId(null);
+    setSubcategoryId(null);
+    setSort('end_time-asc');
     setPage(1);
   };
+
+  const hasFilters = !!(activeMakeFilter || categoryId || subcategoryId);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950" data-testid="vehicle-auctions-page">
-      {/* Hero Header */}
-      <div className="relative bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 text-white overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute inset-0" style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-          }} />
-        </div>
-        
-        <div className="relative max-w-7xl mx-auto px-4 py-16">
-          <div className="flex items-center gap-3 mb-4">
-            <Car className="h-10 w-10 text-blue-400" />
-            <Badge className="bg-blue-500/20 text-blue-300 border-blue-400/30">
-              {t('vehicleAuctions.badge', 'Vehicle Auctions')}
-            </Badge>
-          </div>
-          
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 text-white" data-testid="vehicle-auctions-header">
-            {t('vehicleAuctions.title', 'Vehicle Auctions')}
-          </h1>
-          <p className="text-xl text-blue-200 max-w-2xl mb-8">
-            {t('vehicleAuctions.subtitle', 'Professional automotive auctions for dealers, auctioneers, and private buyers. Verified sellers. Clean titles. Transparent bidding.')}
-          </p>
-          
-          {/* Search Bar */}
-          <div className="flex flex-col sm:flex-row gap-4 max-w-2xl">
-            <div className="relative flex-1">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-              <Input
-                type="text"
-                placeholder={t('vehicleAuctions.searchPlaceholder', 'Search by make, model, or VIN...')}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-12 h-14 bg-white/10 border-white/20 text-white placeholder:text-slate-400 focus:bg-white/20"
-                data-testid="vehicle-search-input"
-              />
-            </div>
-            <Button 
-              size="lg" 
-              className="h-14 px-8 bg-blue-500 hover:bg-blue-600 text-white"
-              onClick={() => handleFilterChange('make', searchQuery)}
-            >
-              {t('common.search', 'Search')}
-            </Button>
-          </div>
-          
-          {/* Quick Stats */}
-          <div className="flex flex-wrap gap-6 mt-8">
-            <div className="flex items-center gap-2">
-              <Eye className="h-5 w-5 text-blue-400" />
-              <span className="text-slate-300">{total} {t('vehicleAuctions.activeAuctions', 'Active Auctions')}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-green-400" />
-              <span className="text-slate-300">{t('vehicleAuctions.verifiedSellers', 'Verified Sellers')}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Award className="h-5 w-5 text-yellow-400" />
-              <span className="text-slate-300">{t('vehicleAuctions.titleGuarantee', 'Title Guarantee')}</span>
-            </div>
-          </div>
-          
-          {/* System Status Notice - View Only Mode */}
-          {!vehicleAuctionsEnabled && (
-            <div className="mt-6 p-4 bg-amber-500/20 border border-amber-500/40 rounded-xl">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-amber-500/30 rounded-full flex items-center justify-center">
-                  <Eye className="h-5 w-5 text-amber-300" />
-                </div>
-                <div>
-                  <h4 className="text-amber-200 font-semibold">{t('vehicleAuctions.discoveryMode', 'Discovery Mode')}</h4>
-                  <p className="text-amber-300/80 text-sm">
-                    {t('vehicleAuctions.discoveryModeDesc', 'Vehicle auctions are currently in preview mode. Browse and discover vehicles while we finalize permits.')}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* HERO */}
+      <VehicleHero
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        onSearch={handleSearch}
+      />
 
-      {/* Seller CTA Section */}
-      <div className="bg-gradient-to-r from-emerald-600 to-teal-600 dark:from-emerald-700 dark:to-teal-700 py-5" data-testid="seller-cta-section">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
-            {/* Left Side - Message */}
-            <div className="flex items-center gap-4 text-white text-center lg:text-left">
-              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                <DollarSign className="h-6 w-6" />
+      {/* SELLER CTA STRIP */}
+      <div className="bg-gradient-to-r from-emerald-600 to-teal-600 dark:from-emerald-700 dark:to-teal-700 py-4" data-testid="seller-cta-section">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3 text-white">
+              <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                <DollarSign className="h-5 w-5" />
               </div>
               <div>
-                <h3 className="text-lg font-bold">Want to Sell Your Vehicle?</h3>
-                <p className="text-emerald-100 text-sm">
-                  Join our verified sellers network. Private, Dealer, or Auctioneer.
+                <h3 className="text-base sm:text-lg font-bold">
+                  {t('vehiclePage.sellerCtaTitle', 'Want to sell your vehicle?')}
+                </h3>
+                <p className="text-emerald-100 text-xs sm:text-sm">
+                  {t('vehiclePage.sellerCtaBody', 'Join our verified seller network — Private, Dealer, or Auctioneer.')}
                 </p>
               </div>
             </div>
-            
-            {/* Right Side - Buttons */}
-            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-              <Button
+            <div className="flex flex-wrap gap-2 w-full sm:w-auto justify-center">
+              <button
                 onClick={() => navigate('/vehicle-auctions/seller/register')}
-                className="bg-white text-emerald-700 hover:bg-emerald-50 dark:bg-white dark:text-emerald-700 dark:hover:bg-emerald-50 font-semibold px-5 h-10 rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-white text-emerald-700 hover:bg-emerald-50 font-semibold text-xs sm:text-sm px-3 py-2"
                 data-testid="btn-seller-register"
               >
-                <User className="h-4 w-4 mr-2" />
-                {t('sellerActions.becomeSeller')}
-              </Button>
-              <Button
+                <User className="h-4 w-4" />
+                {t('vehiclePage.becomeSeller', 'Become a seller')}
+              </button>
+              <button
                 onClick={() => navigate('/vehicle-auctions/create')}
-                className="bg-transparent border-2 border-white text-white hover:bg-white/20 dark:border-white dark:text-white dark:hover:bg-white/20 font-semibold px-5 h-10 rounded-lg transition-all flex items-center justify-center"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-transparent border border-white text-white hover:bg-white/15 font-semibold text-xs sm:text-sm px-3 py-2"
                 data-testid="btn-create-listing"
               >
-                <PlusCircle className="h-4 w-4 mr-2" />
-                {t('sellerActions.listVehicle')}
-              </Button>
-              <Button
+                <PlusCircle className="h-4 w-4" />
+                {t('vehiclePage.listVehicle', 'List a vehicle')}
+              </button>
+              <button
                 onClick={() => navigate('/vehicle-auctions/my-listings')}
-                className="bg-transparent border-2 border-white text-white hover:bg-white/20 dark:border-white dark:text-white dark:hover:bg-white/20 font-semibold px-5 h-10 rounded-lg transition-all flex items-center justify-center"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-transparent border border-white text-white hover:bg-white/15 font-semibold text-xs sm:text-sm px-3 py-2"
                 data-testid="btn-my-listings"
               >
-                <Car className="h-4 w-4 mr-2" />
-                {t('sellerActions.myListings')}
-              </Button>
+                <Building2 className="h-4 w-4" />
+                {t('vehiclePage.myListings', 'My listings')}
+              </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Modern Filter Component */}
-        <VehicleFilterModern
-          filters={filters}
-          onFilterChange={handleFilterChange}
-          total={total}
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-        />
+      {/* CATEGORY PILLS */}
+      <VehicleCategoryPills
+        categories={categories}
+        loading={categoriesLoading}
+        selectedCategoryId={categoryId}
+        selectedSubcategoryId={subcategoryId}
+        onChange={handleCategoryChange}
+      />
 
-        {/* Results */}
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[...Array(6)].map((_, i) => (
-              <Card key={i} className="overflow-hidden animate-pulse">
-                <div className="aspect-[16/10] bg-slate-200 dark:bg-slate-800" />
-                <CardContent className="p-4 space-y-3">
-                  <div className="h-6 bg-slate-200 dark:bg-slate-800 rounded" />
-                  <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-2/3" />
-                  <div className="h-8 bg-slate-200 dark:bg-slate-800 rounded w-1/2" />
-                </CardContent>
-              </Card>
+      {/* TOOLBAR + GRID */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        {/* Toolbar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-5" data-testid="vehicle-toolbar">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+              {loading
+                ? t('vehiclePage.loadingResults', 'Loading auctions…')
+                : t('vehiclePage.resultsCount', '{{count}} auctions', { count: total })}
+            </span>
+            {hasFilters && (
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className="text-xs font-semibold text-cyan-600 hover:text-cyan-700 hover:underline"
+                data-testid="vehicle-toolbar-clear-filters"
+              >
+                {t('vehiclePage.clearAll', 'Clear all')}
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Sort */}
+            <label className="relative text-sm">
+              <span className="sr-only">{t('vehiclePage.sortLabel', 'Sort by')}</span>
+              <ArrowDownUp className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+              <select
+                value={sort}
+                onChange={(e) => { setSort(e.target.value); setPage(1); }}
+                className="appearance-none pl-9 pr-9 h-10 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 font-semibold text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                data-testid="vehicle-toolbar-sort"
+              >
+                {SORT_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {t(o.labelKey, o.defaultLabel)}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+            </label>
+            {/* View toggle */}
+            <div className="hidden sm:inline-flex rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden" data-testid="vehicle-toolbar-view-toggle">
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
+                className={`h-10 px-3 inline-flex items-center text-sm font-semibold ${viewMode === 'grid' ? 'bg-[#0B2545] text-white' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300'}`}
+                aria-pressed={viewMode === 'grid'}
+                data-testid="vehicle-view-grid"
+              >
+                <Grid3x3 className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('list')}
+                className={`h-10 px-3 inline-flex items-center text-sm font-semibold ${viewMode === 'list' ? 'bg-[#0B2545] text-white' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300'}`}
+                aria-pressed={viewMode === 'list'}
+                data-testid="vehicle-view-list"
+              >
+                <ListIcon className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Loading skeletons */}
+        {loading && (
+          <div className={`grid gap-5 ${viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`} data-testid="vehicle-grid-loading">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden">
+                <div className="aspect-[16/10] bg-slate-100 dark:bg-slate-800 animate-pulse" />
+                <div className="p-4 space-y-3">
+                  <div className="h-5 w-3/4 bg-slate-100 dark:bg-slate-800 rounded animate-pulse" />
+                  <div className="h-3 w-1/2 bg-slate-100 dark:bg-slate-800 rounded animate-pulse" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded animate-pulse" />
+                    <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded animate-pulse" />
+                  </div>
+                  <div className="flex justify-between items-end pt-2">
+                    <div className="h-7 w-24 bg-slate-100 dark:bg-slate-800 rounded animate-pulse" />
+                    <div className="h-9 w-20 bg-slate-100 dark:bg-slate-800 rounded animate-pulse" />
+                  </div>
+                </div>
+              </div>
             ))}
           </div>
-        ) : vehicles.length === 0 ? (
-          <div className="text-center py-16">
-            <Car className="h-16 w-16 text-slate-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">
-              {t('marketplace.noResults')}
-            </h3>
-            <p className="text-slate-500 mb-6">
-              {t('common.tryAdjustingFilters') || 'Try adjusting your filters or check back later for new listings.'}
-            </p>
-            <Button onClick={clearFilters}>{t('marketplace.clearFilters')}</Button>
-            
-            {/* Seller CTA Card */}
-            <div className="mt-12 max-w-2xl mx-auto">
-              <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-200 dark:border-emerald-800">
-                <CardContent className="p-8">
-                  <div className="flex items-center justify-center gap-2 mb-4">
-                    <Gavel className="h-8 w-8 text-emerald-600" />
-                    <h3 className="text-2xl font-bold text-emerald-800 dark:text-emerald-200">
-                      {t('sellerActions.beTheFirst')}
-                    </h3>
-                  </div>
-                  <p className="text-emerald-700 dark:text-emerald-300 mb-6">
-                    {t('sellerActions.beTheFirstDesc')}
-                  </p>
-                  
-                  {/* Seller Type Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <div className="bg-white dark:bg-slate-800 rounded-lg p-4 text-center">
-                      <User className="h-8 w-8 text-blue-500 mx-auto mb-2" />
-                      <h4 className="font-semibold text-slate-900 dark:text-white">{t('vehicles.privateSeller')}</h4>
-                      <p className="text-xs text-slate-500">{t('vehicles.sellPersonalVehicle') || 'Sell your personal vehicle'}</p>
-                    </div>
-                    <div className="bg-white dark:bg-slate-800 rounded-lg p-4 text-center">
-                      <Building2 className="h-8 w-8 text-green-500 mx-auto mb-2" />
-                      <h4 className="font-semibold text-slate-900 dark:text-white">{t('vehicles.licensedDealer')}</h4>
-                      <p className="text-xs text-slate-500">{t('vehicles.upTo500Vehicles') || 'Up to 500 vehicles/month'}</p>
-                    </div>
-                    <div className="bg-white dark:bg-slate-800 rounded-lg p-4 text-center">
-                      <Gavel className="h-8 w-8 text-purple-500 mx-auto mb-2" />
-                      <h4 className="font-semibold text-slate-900 dark:text-white">{t('vehicles.verifiedAuctioneer')}</h4>
-                      <p className="text-xs text-slate-500">{t('vehicles.professionalAuctionHouse') || 'Professional auction house'}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex flex-col sm:flex-row justify-center gap-3">
-                    <Button
-                      onClick={() => navigate('/vehicle-auctions/seller/register')}
-                      className="bg-emerald-600 hover:bg-emerald-700 gap-2"
-                      size="lg"
-                    >
-                      <Star className="h-5 w-5" />
-                      {t('sellerActions.becomeSeller')}
-                    </Button>
-                    <Button
-                      onClick={() => navigate('/vehicle-auctions/create')}
-                      variant="outline"
-                      className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 gap-2"
-                      size="lg"
-                    >
-                      <PlusCircle className="h-5 w-5" />
-                      {t('sellerActions.listVehicleNow')}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        ) : (
+        )}
+
+        {/* Error */}
+        {!loading && error && (
+          <VehicleEmptyState variant="error" onRetry={fetchVehicles} />
+        )}
+
+        {/* Filtered no results */}
+        {!loading && !error && vehicles.length === 0 && hasFilters && (
+          <VehicleEmptyState variant="filtered-no-results" onClearFilters={clearAllFilters} />
+        )}
+
+        {/* Zero listings (no filters, real empty state) */}
+        {!loading && !error && vehicles.length === 0 && !hasFilters && (
+          <VehicleEmptyState variant="zero-listings" />
+        )}
+
+        {/* Results grid */}
+        {!loading && !error && vehicles.length > 0 && (
           <>
-            <div className={`grid gap-6 ${
-              viewMode === 'grid' 
-                ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' 
-                : 'grid-cols-1'
-            }`}>
-              {vehicles.map((vehicle) => (
-                <VehicleCard
-                  key={vehicle.id}
-                  vehicle={vehicle}
-                  onClick={() => navigate(`/vehicle-auctions/${vehicle.id}`)}
-                />
-              ))}
+            <div
+              className={`grid gap-5 ${viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}
+              data-testid="vehicle-grid"
+            >
+              {vehicles.map((v) => {
+                const cd = formatCountdown(v.end_time, { endedLabel: t('vehicleCard.ended', 'Ended') });
+                return (
+                  <VehicleListingCard
+                    key={v.id}
+                    vehicle={v}
+                    countdown={cd}
+                    onClick={() => navigate(`/vehicle-auctions/${v.id}`)}
+                    onQuickView={(vh) => navigate(`/vehicle-auctions/${vh.id}`)}
+                  />
+                );
+              })}
             </div>
-            
+
             {/* Pagination */}
-            {total > 12 && (
-              <div className="flex justify-center gap-2 mt-8">
-                <Button
-                  variant="outline"
+            {totalPages > 1 && (
+              <div className="mt-8 flex items-center justify-center gap-2" data-testid="vehicle-pagination">
+                <button
+                  type="button"
                   disabled={page === 1}
-                  onClick={() => setPage(p => p - 1)}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="h-10 px-4 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-700 dark:text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-800"
+                  data-testid="vehicle-pagination-prev"
                 >
-                  Previous
-                </Button>
-                <span className="flex items-center px-4 text-slate-600">
-                  Page {page} of {Math.ceil(total / 12)}
+                  {t('vehiclePage.prev', 'Previous')}
+                </button>
+                <span className="text-sm text-slate-600 dark:text-slate-300 px-2" data-testid="vehicle-pagination-status">
+                  {t('vehiclePage.pageOf', 'Page {{page}} of {{pages}}', { page, pages: totalPages })}
                 </span>
-                <Button
-                  variant="outline"
-                  disabled={page >= Math.ceil(total / 12)}
-                  onClick={() => setPage(p => p + 1)}
+                <button
+                  type="button"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  className="h-10 px-4 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-700 dark:text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-800"
+                  data-testid="vehicle-pagination-next"
                 >
-                  Next
-                </Button>
+                  {t('vehiclePage.next', 'Next')}
+                </button>
               </div>
             )}
           </>
         )}
       </div>
+
+      {/* Bilingual legal footer (reused from Phase 2) */}
+      <VehicleLegalFooter />
     </div>
   );
 };

@@ -1496,6 +1496,93 @@
     "discoveryMode": "Discovery Mode",
     "discoveryModeDesc": "Vehicle auctions are currently in preview mode. Browse and discover vehicles while we finalize permits."
   },
+  "vehicleHero": {
+    "eyebrow": "BidVex Vehicle Auctions",
+    "live": "Live across Canada",
+    "title": "Cars, trucks & equipment.",
+    "titleAccent": "Verified. Bilingual. Canadian.",
+    "subtitle": "Provincial-compliant auctions for licensed dealers and qualified buyers. Soft-close protection, transparent fees, and tax-aware checkout from BC to Newfoundland.",
+    "searchPlaceholder": "Search by make, model, VIN, or city…",
+    "searchCta": "Find vehicles",
+    "trust": {
+      "dealers": "Verified dealers",
+      "softClose": "Soft-close protection",
+      "taxAware": "Provincial tax-aware",
+      "bilingual": "EN · FR bilingual"
+    },
+    "stats": {
+      "active": "Active auctions",
+      "ending": "Ending in 24h",
+      "dealers": "Verified dealers",
+      "provinces": "Provinces live",
+      "bids": "Bids in 24h"
+    }
+  },
+  "vehicleCats": {
+    "all": "All categories",
+    "allSubcats": "All subcategories",
+    "refine": "Refine",
+    "scrollLeft": "Scroll left",
+    "scrollRight": "Scroll right"
+  },
+  "vehicleCard": {
+    "promoted": "Featured",
+    "live": "Live",
+    "endingSoon": "Ending soon",
+    "noReserve": "No reserve",
+    "reserveMet": "Reserve met",
+    "titleClean": "Clean title",
+    "titleSalvage": "Salvage",
+    "dealerVerified": "Verified dealer",
+    "running": "Running",
+    "notRunning": "Non-running",
+    "dealer": "Dealer",
+    "private": "Private",
+    "currentBid": "Current bid",
+    "viewCta": "View",
+    "quickView": "Quick view",
+    "ended": "Ended",
+    "bidCount": "{{count}} bids",
+    "bidCount_one": "{{count}} bid"
+  },
+  "vehicleEmpty": {
+    "zeroBadge": "Be among the first listings",
+    "zeroTitle": "No live vehicle auctions yet",
+    "zeroBody": "BidVex Vehicle Auctions are now open to verified Canadian dealers. List your first vehicle and reach buyers from BC to Newfoundland — your auction can launch in minutes.",
+    "registerCta": "Register as a seller",
+    "listCta": "List a vehicle",
+    "verifyLicenseCta": "Verify dealer licence",
+    "filteredTitle": "No vehicles match those filters",
+    "filteredBody": "Try widening your search — clear a filter or two and the available auctions will reappear.",
+    "clearFilters": "Clear filters",
+    "browseAll": "Browse all auctions",
+    "errorTitle": "We couldn’t load the auctions",
+    "errorBody": "Something went wrong while reaching the server. Please try again in a few seconds.",
+    "retry": "Retry"
+  },
+  "vehiclePage": {
+    "sellerCtaTitle": "Want to sell your vehicle?",
+    "sellerCtaBody": "Join our verified seller network — Private, Dealer, or Auctioneer.",
+    "becomeSeller": "Become a seller",
+    "listVehicle": "List a vehicle",
+    "myListings": "My listings",
+    "loadingResults": "Loading auctions…",
+    "resultsCount": "{{count}} auctions",
+    "resultsCount_one": "{{count}} auction",
+    "clearAll": "Clear all",
+    "sortLabel": "Sort by",
+    "sort": {
+      "endingSoon": "Ending soon",
+      "endingLater": "Ending later",
+      "newest": "Newest listings",
+      "priceHigh": "Price: high to low",
+      "priceLow": "Price: low to high",
+      "mileageLow": "Lowest mileage"
+    },
+    "prev": "Previous",
+    "next": "Next",
+    "pageOf": "Page {{page}} of {{pages}}"
+  },
   "home": {
     "storagePromo": {
       "badge": "NEW FEATURE",

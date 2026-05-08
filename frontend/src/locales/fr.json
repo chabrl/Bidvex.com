@@ -1496,6 +1496,93 @@
     "discoveryMode": "Mode découverte",
     "discoveryModeDesc": "Les enchères de véhicules sont actuellement en mode aperçu. Parcourez et découvrez des véhicules pendant que nous finalisons les permis."
   },
+  "vehicleHero": {
+    "eyebrow": "Enchères de véhicules BidVex",
+    "live": "En direct partout au Canada",
+    "title": "Autos, camions et équipement.",
+    "titleAccent": "Vérifiés. Bilingues. Canadiens.",
+    "subtitle": "Enchères conformes aux règles provinciales pour concessionnaires licenciés et acheteurs qualifiés. Protection contre la clôture anticipée, frais transparents et fiscalité provinciale automatisée, de la C.-B. à Terre-Neuve.",
+    "searchPlaceholder": "Rechercher par marque, modèle, NIV ou ville…",
+    "searchCta": "Trouver des véhicules",
+    "trust": {
+      "dealers": "Concessionnaires vérifiés",
+      "softClose": "Clôture anti-sniping",
+      "taxAware": "Fiscalité provinciale",
+      "bilingual": "Bilingue EN · FR"
+    },
+    "stats": {
+      "active": "Enchères actives",
+      "ending": "Se terminent dans 24 h",
+      "dealers": "Concessionnaires vérifiés",
+      "provinces": "Provinces actives",
+      "bids": "Mises sur 24 h"
+    }
+  },
+  "vehicleCats": {
+    "all": "Toutes les catégories",
+    "allSubcats": "Toutes les sous-catégories",
+    "refine": "Affiner",
+    "scrollLeft": "Faire défiler vers la gauche",
+    "scrollRight": "Faire défiler vers la droite"
+  },
+  "vehicleCard": {
+    "promoted": "Vedette",
+    "live": "En direct",
+    "endingSoon": "Bientôt terminé",
+    "noReserve": "Sans prix de réserve",
+    "reserveMet": "Réserve atteinte",
+    "titleClean": "Titre clair",
+    "titleSalvage": "Récupéré",
+    "dealerVerified": "Concessionnaire vérifié",
+    "running": "Roule",
+    "notRunning": "Ne roule pas",
+    "dealer": "Concessionnaire",
+    "private": "Privé",
+    "currentBid": "Mise actuelle",
+    "viewCta": "Voir",
+    "quickView": "Aperçu rapide",
+    "ended": "Terminé",
+    "bidCount": "{{count}} mises",
+    "bidCount_one": "{{count}} mise"
+  },
+  "vehicleEmpty": {
+    "zeroBadge": "Soyez parmi les premières inscriptions",
+    "zeroTitle": "Aucune enchère de véhicule en direct",
+    "zeroBody": "Les enchères de véhicules BidVex sont maintenant ouvertes aux concessionnaires canadiens vérifiés. Inscrivez votre premier véhicule et rejoignez des acheteurs de la C.-B. à Terre-Neuve — votre enchère peut être lancée en quelques minutes.",
+    "registerCta": "S'inscrire comme vendeur",
+    "listCta": "Inscrire un véhicule",
+    "verifyLicenseCta": "Vérifier la licence de concessionnaire",
+    "filteredTitle": "Aucun véhicule ne correspond à ces filtres",
+    "filteredBody": "Essayez d'élargir votre recherche — retirez quelques filtres et les enchères disponibles réapparaîtront.",
+    "clearFilters": "Effacer les filtres",
+    "browseAll": "Parcourir toutes les enchères",
+    "errorTitle": "Impossible de charger les enchères",
+    "errorBody": "Une erreur s'est produite lors de la connexion au serveur. Veuillez réessayer dans quelques secondes.",
+    "retry": "Réessayer"
+  },
+  "vehiclePage": {
+    "sellerCtaTitle": "Vous voulez vendre votre véhicule ?",
+    "sellerCtaBody": "Rejoignez notre réseau de vendeurs vérifiés — Privé, Concessionnaire ou Encanteur.",
+    "becomeSeller": "Devenir vendeur",
+    "listVehicle": "Inscrire un véhicule",
+    "myListings": "Mes inscriptions",
+    "loadingResults": "Chargement des enchères…",
+    "resultsCount": "{{count}} enchères",
+    "resultsCount_one": "{{count}} enchère",
+    "clearAll": "Tout effacer",
+    "sortLabel": "Trier par",
+    "sort": {
+      "endingSoon": "Se termine bientôt",
+      "endingLater": "Se termine plus tard",
+      "newest": "Plus récents",
+      "priceHigh": "Prix : élevé à bas",
+      "priceLow": "Prix : bas à élevé",
+      "mileageLow": "Kilométrage le plus bas"
+    },
+    "prev": "Précédent",
+    "next": "Suivant",
+    "pageOf": "Page {{page}} sur {{pages}}"
+  },
   "home": {
     "storagePromo": {
       "badge": "NOUVELLE FONCTIONNALITÉ",

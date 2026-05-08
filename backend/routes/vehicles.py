@@ -217,6 +217,52 @@ async def get_system_settings():
     return settings
 
 
+# iter202 Phase A — Public stats strip for the new buyer-experience hero.
+@vehicle_router.get("/vehicles/stats")
+async def get_vehicle_stats():
+    """Public — high-level counters surfaced on the Vehicle Auctions hero banner.
+
+    Returns:
+      • `active_listings`      — count of currently-active public auctions
+      • `ending_soon`          — auctions ending within the next 24 hours
+      • `verified_dealers`     — dealers with a verified dealer licence
+      • `provinces_covered`    — distinct provinces with at least one active listing
+      • `total_bids_24h`       — bids placed across all vehicle listings in the last 24h
+    """
+    now = datetime.now(timezone.utc)
+    soon = now + timedelta(hours=24)
+    twenty_four_h_ago = now - timedelta(hours=24)
+    active_query = {
+        "status": VehicleListingStatus.ACTIVE.value,
+        "visibility": VehicleAuctionVisibility.PUBLIC.value,
+    }
+    # Count active listings
+    active_count = await db.vehicle_listings.count_documents(active_query)
+    # Ending soon (next 24h) — accept both ISO strings and datetime values
+    ending_query = {**active_query, "end_time": {"$gte": now.isoformat(), "$lte": soon.isoformat()}}
+    ending_count = await db.vehicle_listings.count_documents(ending_query)
+    # Distinct provinces represented in active listings
+    provinces = await db.vehicle_listings.distinct("location_province", active_query)
+    provinces_covered = len([p for p in (provinces or []) if p])
+    # Verified dealers
+    verified_dealers = await db.users.count_documents({"dealer_license_verified": True})
+    # 24h bid volume — accept ISO string or datetime; tolerate either
+    bids_24h = await db.vehicle_bids.count_documents({
+        "$or": [
+            {"created_at": {"$gte": twenty_four_h_ago.isoformat()}},
+            {"created_at": {"$gte": twenty_four_h_ago}},
+        ]
+    })
+    return {
+        "active_listings": active_count,
+        "ending_soon": ending_count,
+        "verified_dealers": verified_dealers,
+        "provinces_covered": provinces_covered,
+        "total_bids_24h": bids_24h,
+        "as_of": now.isoformat(),
+    }
+
+
 @vehicle_router.get("/vehicles/system/status")
 async def get_vehicle_system_status():
     """
@@ -933,7 +979,11 @@ async def list_vehicles(
     sort_by: str = "end_time",
     sort_order: str = "asc",
     page: int = 1,
-    limit: int = 20
+    limit: int = 20,
+    # iter202 Phase A — taxonomy-aware filter + promoted-first ordering
+    category_id: str = None,
+    subcategory_id: str = None,
+    promoted_first: bool = False
 ):
     """
     List public vehicle auctions
@@ -960,14 +1010,21 @@ async def list_vehicles(
         query["location_province"] = province
     if auction_type:
         query["auction_type"] = auction_type
+    # iter202 Phase A — category taxonomy filter
+    if category_id:
+        query["category_id"] = category_id
+    if subcategory_id:
+        query["subcategory_id"] = subcategory_id
     
     # Sort
     sort_dir = 1 if sort_order == "asc" else -1
     sort_field = sort_by if sort_by in ["end_time", "current_bid", "created_at", "year", "mileage"] else "end_time"
+    # iter202 Phase A — bubble promoted listings to the top when requested
+    sort_spec = [("is_promoted", -1), (sort_field, sort_dir)] if promoted_first else [(sort_field, sort_dir)]
     
     skip = (page - 1) * limit
     
-    cursor = db.vehicle_listings.find(query, {"_id": 0}).sort(sort_field, sort_dir).skip(skip).limit(limit)
+    cursor = db.vehicle_listings.find(query, {"_id": 0}).sort(sort_spec).skip(skip).limit(limit)
     vehicles = await cursor.to_list(length=limit)
     
     total = await db.vehicle_listings.count_documents(query)
