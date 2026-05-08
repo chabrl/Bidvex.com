@@ -39,6 +39,7 @@ import { PricingEstimate } from '../../components/vehicles/PricingBreakdown';
 import MessageSellerModal from '../../components/MessageSellerModal';
 import { MessageSquare, ShieldCheck } from 'lucide-react';
 import VehicleLegalFooter from '../../components/vehicles/VehicleLegalFooter';
+import VehicleBuyerGateModal from '../../components/vehicles/VehicleBuyerGateModal';
 
 // Trust & Legal Components
 import {
@@ -235,12 +236,37 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
       navigate('/auth');
       return;
     }
-    
+
     if (!termsAccepted) {
       setShowTermsModal(true);
       return;
     }
-    
+
+    // iter201 — Phase 3 / 3A — Province-aware buyer gate (skip parts_accessories per CEO #3)
+    const isPartsListing = (vehicle?.category_id || '').toLowerCase() === 'parts_accessories';
+    if (!isPartsListing && !buyerGateCleared) {
+      try {
+        const r = await axios.get(
+          `${API}/vehicles/buyer-verification/me?listing_id=${encodeURIComponent(vehicle.id)}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const gs = r?.data?.gate_state;
+        const sessionDismissed = (() => {
+          try { return sessionStorage.getItem(`bidvex.buyer_gate.dismissed.${r?.data?.province}`) === '1'; } catch (_) { return false; }
+        })();
+        const cleared = gs === 'verified' || gs === 'qc_disclosure_acked' || (gs === 'open' && sessionDismissed) || gs === 'territory_advisory';
+        if (!cleared) {
+          setShowBuyerGateModal(true);
+          return;
+        }
+        setBuyerGateCleared(true);
+      } catch (_) {
+        // Soft-fail: open modal which will fetch the state itself
+        setShowBuyerGateModal(true);
+        return;
+      }
+    }
+
     const amount = parseFloat(bidAmount);
     if (isNaN(amount) || amount < minBid) {
       toast.error(`Minimum bid is ${formatPrice(minBid, vehicle?.currency)}`);
@@ -729,6 +755,9 @@ const VehicleDetailPage = () => {
   const [showPromoModal, setShowPromoModal] = useState(false);
   // iter197 — Message Seller modal (winner-only after unlock fee paid)
   const [showMessageModal, setShowMessageModal] = useState(false);
+  // iter201 — Phase 3 / 3A — Province-aware buyer gate
+  const [showBuyerGateModal, setShowBuyerGateModal] = useState(false);
+  const [buyerGateCleared, setBuyerGateCleared] = useState(false);
 
   const fetchVehicle = useCallback(async () => {
     try {
@@ -1397,6 +1426,19 @@ const VehicleDetailPage = () => {
           sellerId={seller.user_id}
           listingId={vehicle.id}
           listingTitle={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+        />
+      )}
+      {/* iter201 — Phase 3 / 3A — Province-aware buyer gate */}
+      {showBuyerGateModal && vehicle && (
+        <VehicleBuyerGateModal
+          open={showBuyerGateModal}
+          onClose={() => setShowBuyerGateModal(false)}
+          listingId={vehicle.id}
+          onVerified={() => {
+            setBuyerGateCleared(true);
+            // Re-trigger the bid attempt now that gate is cleared
+            setTimeout(() => handleBid(), 200);
+          }}
         />
       )}
       {/* iter201 — Phase 2 — Bilingual legal footer (CEO Part 4) */}

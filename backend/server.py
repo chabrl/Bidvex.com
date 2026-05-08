@@ -480,6 +480,7 @@ try:
         ("routes.watchlist", "watchlist_router", None, False),
         ("routes.tax", "tax_calc_router", None, False),
         ("routes.messages", "messages_router", "set_messages_db", False),
+        ("routes.vehicle_buyer_verification", "buyer_verification_router", "set_buyer_verification_db", True),
         ("routes.tax_reports", "tax_router", "set_tax_db", False),
         ("routes.tax_dashboard", "tax_dashboard_router", "set_tax_dashboard_db", False),
         ("routes.carousel", "carousel_router", "set_carousel_db", False),

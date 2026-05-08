@@ -1,6 +1,103 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter201 — Vehicle Auctions Canadian Legal Compliance Rebuild — Phases 1 & 2 (Feb 8, 2026) ✅
+## Latest: iter201 — Vehicle Auctions Canadian Legal Compliance Rebuild — Phase 3 (Feb 8, 2026) ✅
+
+CEO-driven P0 rebuild — **all 3 phases shipped** in the same session series. **49/49 tests passing** including 8 new Phase 3 tests + 10 verification-checklist runner tests + full Phase 1+2+iter196-198 regression.
+
+### Phase 3 — Buyer Gate + Admin Panel + Compliance Automation ✅
+
+#### 3A — Province-aware Buyer Gate Modal
+- **Backend**: New module `routes/vehicle_buyer_verification.py` with 4 endpoints:
+  - `POST /api/vehicles/buyer-province` — set the buyer's two-letter province code.
+  - `POST /api/vehicles/buyer-verification/submit` — multipart file upload (PDF/JPG/PNG, 10 MB cap) for restricted-province dealer/dealer-rep credentials. Status: `pending_review`.
+  - `POST /api/vehicles/buyer-verification/qc-ack` — Quebec LPC disclosure ack, persisted **per listing** so it shows only once per listing.
+  - `GET  /api/vehicles/buyer-verification/me` — single-call state machine that returns one of `province_required / open / qc_disclosure / qc_disclosure_acked / restricted_gate / pending_review / rejected / verified / territory_advisory`.
+- **Bid-time enforcement** in `POST /api/vehicle-bids`:
+  - `parts_accessories` category exempt (CEO #3).
+  - No province → 403 `province_required`.
+  - Restricted province (ON/NB/NS/PE/NL) without verified credentials for THAT province → 403 `buyer_verification_required` (verification doesn't carry across provinces — fixed bug found in tests).
+  - QC without listing-specific LPC ack → 403 `qc_lpc_ack_required`.
+  - Territories → bid permitted, logged to `audit_logs` for review.
+- **Frontend**: `components/vehicles/VehicleBuyerGateModal.js` (~360 lines) — single component renders the correct UX per backend `gate_state`. Wired into `VehicleDetailPage.handleBid` with auto-retry: if gate clears, the bid is re-submitted automatically.
+- **Persistence rules**:
+  - Open-province "good to go" notice dismissable via `sessionStorage.bidvex.buyer_gate.dismissed.{province}`.
+  - QC LPC ack stored as `vehicle_buyer_verification.qc_lpc_ack[listing_id] = isoformat`.
+  - Province change resets verification (verification is province-bound).
+
+#### 3B — Admin Dealer Verification Tab (4 sub-tabs)
+- **Sub-tab 1 — Pending Applications**: existing iter195 `AdminDealerLicenses` covers this.
+- **Sub-tab 2 — Approved Dealers**: existing approved/rejected filters in `AdminDealerLicenses`.
+- **Sub-tab 3 — Buyer Verifications**: NEW `pages/admin/AdminBuyerVerifications.js`. Lists pending submissions from `users.vehicle_buyer_verification.status = pending_review`. Approve/Reject inline; admin must enter rejection reason. Triggers bilingual `send_buyer_verification_decision_email`.
+- **Sub-tab 4 — Compliance Alerts**: NEW `pages/admin/AdminComplianceAlerts.js`. Aggregates 4 alert types (expired/expiring licences, high fraud-score listings, unreviewed manual_review listings >24 h, territory bids in last 7 days). Auto-refresh button.
+- **New backend endpoints**:
+  - `GET /api/admin/buyer-verifications/pending`
+  - `POST /api/admin/buyer-verifications/{user_id}/decision`
+  - `GET /api/admin/compliance-alerts`
+  - `GET /api/admin/compliance-alerts/count` (lightweight counter for future home-card)
+- **Sidebar navigation**: AdminDashboard's Vehicles tab now exposes `dealer-licenses → buyer-verifications → compliance-alerts → feature-flags → …`.
+
+#### 3C — Expired Dealer Licence Cron
+- New APScheduler job `check_expired_dealer_licences` registered in `services/scheduler.py` (scheduler now reports **35 jobs total**). Daily at **09:00 UTC**.
+- Logic per CEO spec:
+  - Within 30 days of expiry → bilingual warning email via `send_dealer_license_expiring_email` (deduped via `dealer_compliance_log` so we don't email the same dealer multiple times in a 7-day window).
+  - Already expired → un-verify the user (clears both `dealer_license_verified` AND legacy `opc_permit_verified`), suspend ALL of their `vehicle_listings` in active/upcoming/draft state with `suspended_reason: "dealer_license_expired"`, fire `send_seller_license_expired_email`, write `dealer_compliance_log` audit entry.
+- Live verified in scheduler dashboard: `last: — · next: 5/8/2026, 9:00:00 AM · pending`.
+
+#### 3D — Endpoint Rename
+- New: `PUT /api/admin/users/{id}/dealer-license-verify` — primary endpoint, writes BOTH legacy + new fields.
+- Legacy alias: `PUT /api/admin/users/{id}/opc-verify` — calls the new handler and logs `WARNING: DEPRECATED: opc-verify called, use dealer-license-verify`.
+- Both endpoints live-tested via curl with admin JWT.
+
+#### 3E — Verification Checklist Runner
+- `tests/test_iter201_phase3_checklist.py` — 10 automated checks covering every CEO checklist item.
+- `scripts/verify_phase3_checklist.py` — standalone runner the compliance team can execute on demand.
+- Runner output (live): **10/10 pass in 2.75 s**.
+
+### Final Verification — 49/49 PASS
+| Suite | Tests | Status |
+|---|---|---|
+| iter196 messaging gate | 8 | ✅ |
+| iter196 messaging HTTP | 6 | ✅ |
+| iter197 admin counters | 4 + 1 skipped | ✅ |
+| iter198 pilot conversion | 3 | ✅ |
+| iter201 Phase 1 — provinces | 7 | ✅ |
+| iter201 Phase 2 — categories | 6 | ✅ |
+| iter201 Phase 3 — buyer gate | 8 | ✅ |
+| iter201 Phase 3 — checklist | 10 | ✅ |
+| **Total** | **49** | **✅** (1 skipped) |
+
+### Sub-task Status Report (per CEO request)
+| Sub-task | Status |
+|---|---|
+| 3A — Province-aware Buyer Gate Modal | ✅ PASS |
+| 3B — Admin Dealer Verification Tab (4 sub-tabs) | ✅ PASS |
+| 3C — Expired Licence Cron Alerts | ✅ PASS |
+| 3D — Endpoint Rename + Legacy Alias | ✅ PASS |
+| 3E — Verification Checklist Runner | ✅ PASS |
+
+### Files changed (Phase 3)
+- **Backend**:
+  - `routes/vehicle_buyer_verification.py` (NEW — 4 endpoints, state machine)
+  - `routes/vehicles.py` (bid-time gate enforcement)
+  - `routes/admin_ops.py` (dealer-license-verify rename, opc-verify alias, buyer-verification queue, compliance-alerts)
+  - `services/email_notifications.py` (3 new helpers: buyer-decision, dealer-expiring, seller-expired)
+  - `services/scheduler.py` (15th job: `check_expired_dealer_licences`)
+  - `server.py` (register `vehicle_buyer_verification` router)
+  - `tests/test_iter201_phase3_buyer_gate.py` (NEW — 8 tests)
+  - `tests/test_iter201_phase3_checklist.py` (NEW — 10 checklist tests)
+  - `scripts/verify_phase3_checklist.py` (NEW — runner)
+- **Frontend**:
+  - `components/vehicles/VehicleBuyerGateModal.js` (NEW — gate UX)
+  - `pages/admin/AdminBuyerVerifications.js` (NEW)
+  - `pages/admin/AdminComplianceAlerts.js` (NEW)
+  - `pages/AdminDashboard.js` (sidebar nav + render switch)
+  - `pages/vehicles/VehicleDetailPage.js` (gate hook in `handleBid` with auto-retry)
+
+⚠️ **Production note**: All changes are in PREVIEW. Redeploy from Emergent dashboard to push to https://bidvex.com.
+
+---
+
+## Earlier: iter201 — Phases 1 & 2 (Feb 8, 2026) ✅
 
 CEO-driven P0 rebuild of the Vehicle Auctions section under Canadian federal + provincial legislation. Sprint scope was 3 phases — Phases 1 & 2 shipped in this session, Phase 3 (buyer gate + admin queue) is next session.
 

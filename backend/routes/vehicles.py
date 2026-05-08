@@ -1205,7 +1205,66 @@ async def place_vehicle_bid(
                         "message_fr": "Votre permis de concessionnaire a expiré. Veuillez le renouveler avant d'enchérir.",
                     }
                 )
-    
+
+    # iter201 — Phase 3 / 3A — Province-aware buyer gate.
+    # Skip for parts_accessories (CEO constraint #3 — parts are open to everyone).
+    listing_category = (listing.get("category_id") or "").lower()
+    if listing_category != "parts_accessories":
+        from routes.vehicle_buyer_verification import (
+            OPEN_PROVINCES,
+            RESTRICTED_PROVINCES,
+            QC_DISCLOSURE_PROVINCE,
+            TERRITORY_PROVINCES,
+            _get_buyer_province,
+        )
+        buyer_doc = await db.users.find_one(
+            {"id": user["id"]},
+            {"_id": 0, "province": 1, "vehicle_buyer_verification": 1},
+        )
+        province = _get_buyer_province(buyer_doc or {})
+        if not province:
+            raise HTTPException(status_code=403, detail={
+                "code": "province_required",
+                "message_en": "Please set your province in Profile Settings to confirm your eligibility to bid on vehicles.",
+                "message_fr": "Veuillez définir votre province dans les paramètres de profil pour confirmer votre admissibilité aux enchères de véhicules.",
+            })
+
+        bv = (buyer_doc or {}).get("vehicle_buyer_verification") or {}
+
+        if province in RESTRICTED_PROVINCES:
+            # iter201 — Honour verification only if it was issued for the current province.
+            bv_province = (bv.get("province") or "").upper()
+            if not (bv.get("verified") and bv_province == province):
+                state = bv.get("status") or "not_submitted"
+                raise HTTPException(status_code=403, detail={
+                    "code": "buyer_verification_required",
+                    "state": state,
+                    "province": province,
+                    "message_en": "This province restricts vehicle auction purchases to licensed dealers. Please complete buyer verification before bidding.",
+                    "message_fr": "Cette province limite l'achat de véhicules aux enchères aux concessionnaires licenciés. Veuillez compléter la vérification d'acheteur avant d'enchérir.",
+                })
+
+        if province == QC_DISCLOSURE_PROVINCE:
+            qc_acks = bv.get("qc_lpc_ack") or {}
+            if not qc_acks.get(listing.get("id")):
+                raise HTTPException(status_code=403, detail={
+                    "code": "qc_lpc_ack_required",
+                    "listing_id": listing.get("id"),
+                    "province": "QC",
+                    "message_en": "Please acknowledge the Quebec Consumer Protection (LPC) disclosure for this listing before bidding.",
+                    "message_fr": "Veuillez reconnaître la divulgation LPC du Québec pour cette annonce avant d'enchérir.",
+                })
+
+        if province in TERRITORY_PROVINCES:
+            await db.audit_logs.insert_one({
+                "action": "territory_vehicle_bid",
+                "user_id": user["id"],
+                "province": province,
+                "vehicle_id": bid_data.vehicle_id,
+                "amount": bid_data.amount,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            })
+
     # Check auction timing
     now = datetime.now(timezone.utc)
     start_time = listing["start_time"]

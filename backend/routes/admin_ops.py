@@ -1738,20 +1738,26 @@ class OPCVerificationUpdate(BaseModel):
     opc_permit_verified: bool
 
 
-@admin_ops_router.put("/admin/users/{user_id}/opc-verify")
-async def admin_opc_verify(user_id: str, data: OPCVerificationUpdate, current_user: User = Depends(require_admin)):
-    """Admin: Toggle dealer-licence verification for a seller (legacy endpoint name; rebuilt in iter202 Phase 3)."""
+@admin_ops_router.put("/admin/users/{user_id}/dealer-license-verify")
+async def admin_dealer_license_verify(user_id: str, data: OPCVerificationUpdate, current_user: User = Depends(require_admin)):
+    """iter201 — Phase 3 / 3D — Admin: Toggle dealer-licence verification for a seller (province-aware).
+
+    Replaces the legacy `/opc-verify` endpoint. Writes BOTH legacy and new fields
+    so callers reading either path see the same truth.
+    """
     db = get_db()
     user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "email": 1, "name": 1})
     if not user_doc:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # iter201 — Write to BOTH legacy and new fields so callers reading either path see the same truth.
     update_fields = {
         "opc_permit_verified": data.opc_permit_verified,            # LEGACY
         "dealer_license_verified": data.opc_permit_verified,        # NEW
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
+    if data.opc_permit_verified:
+        update_fields["dealer_license_verified_at"] = datetime.now(timezone.utc).isoformat()
+        update_fields["dealer_license_verified_by"] = getattr(current_user, "email", None) or getattr(current_user, "id", None)
     if data.opc_permit_number is not None:
         update_fields["opc_permit_number"] = data.opc_permit_number     # LEGACY
         update_fields["dealer_license_number"] = data.opc_permit_number # NEW
@@ -1759,7 +1765,7 @@ async def admin_opc_verify(user_id: str, data: OPCVerificationUpdate, current_us
     await db.users.update_one({"id": user_id}, {"$set": update_fields})
 
     await db.audit_logs.insert_one({
-        "action": "dealer_license_verification",  # iter201 — renamed
+        "action": "dealer_license_verification",
         "admin_id": current_user.id,
         "target_user_id": user_id,
         "target_email": user_doc.get("email"),
@@ -1772,6 +1778,204 @@ async def admin_opc_verify(user_id: str, data: OPCVerificationUpdate, current_us
         "success": True,
         "message": f"Dealer-licence verification {'enabled' if data.opc_permit_verified else 'disabled'} for {user_doc.get('email', user_id)}",
     }
+
+
+@admin_ops_router.put("/admin/users/{user_id}/opc-verify")
+async def admin_opc_verify(user_id: str, data: OPCVerificationUpdate, current_user: User = Depends(require_admin)):
+    """LEGACY ALIAS — calls /dealer-license-verify. Logs a deprecation warning."""
+    import logging
+    logging.getLogger(__name__).warning(
+        "DEPRECATED: opc-verify called, use dealer-license-verify"
+    )
+    return await admin_dealer_license_verify(user_id, data, current_user)
+
+
+# ============= iter201 Phase 3 / 3B — BUYER VERIFICATION QUEUE =====================
+
+class BuyerVerificationDecision(BaseModel):
+    decision: str  # "approve" | "reject"
+    rejection_reason: Optional[str] = None
+
+
+@admin_ops_router.get("/admin/buyer-verifications/pending")
+async def admin_list_pending_buyer_verifications(current_user: User = Depends(require_admin)):
+    """List buyer-verification submissions in pending_review state (restricted provinces)."""
+    db = get_db()
+    cursor = db.users.find(
+        {"vehicle_buyer_verification.status": "pending_review"},
+        {"_id": 0, "id": 1, "email": 1, "name": 1, "province": 1, "vehicle_buyer_verification": 1},
+    )
+    items = []
+    async for u in cursor:
+        bv = u.get("vehicle_buyer_verification") or {}
+        items.append({
+            "user_id": u.get("id"),
+            "email": u.get("email"),
+            "name": u.get("name"),
+            "province": bv.get("province") or u.get("province"),
+            "type": bv.get("type"),
+            "license_number": bv.get("license_number"),
+            "dealer_business_name": bv.get("dealer_business_name"),
+            "document_path": bv.get("document_path"),
+            "submitted_at": bv.get("submitted_at"),
+        })
+    return {"total": len(items), "items": items}
+
+
+@admin_ops_router.post("/admin/buyer-verifications/{user_id}/decision")
+async def admin_decide_buyer_verification(
+    user_id: str,
+    decision: BuyerVerificationDecision,
+    current_user: User = Depends(require_admin),
+):
+    """Approve or reject a buyer-verification submission."""
+    db = get_db()
+    user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "email": 1, "name": 1, "vehicle_buyer_verification": 1, "preferred_language": 1})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    bv = user_doc.get("vehicle_buyer_verification") or {}
+    if (bv.get("status") or "") != "pending_review":
+        raise HTTPException(status_code=400, detail="Submission is not in pending_review state")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    if decision.decision == "approve":
+        bv.update({
+            "verified": True,
+            "verified_at": now_iso,
+            "verified_by": getattr(current_user, "email", None) or getattr(current_user, "id", None),
+            "status": "approved",
+            "rejection_reason": None,
+        })
+        action = "buyer_verification_approved"
+    elif decision.decision == "reject":
+        if not (decision.rejection_reason or "").strip():
+            raise HTTPException(status_code=400, detail="rejection_reason required for reject")
+        bv.update({
+            "verified": False,
+            "status": "rejected",
+            "rejection_reason": decision.rejection_reason.strip()[:500],
+            "verified_by": getattr(current_user, "email", None) or getattr(current_user, "id", None),
+        })
+        action = "buyer_verification_rejected"
+    else:
+        raise HTTPException(status_code=400, detail="decision must be 'approve' or 'reject'")
+
+    await db.users.update_one({"id": user_id}, {"$set": {"vehicle_buyer_verification": bv, "updated_at": now_iso}})
+    await db.audit_logs.insert_one({
+        "action": action,
+        "admin_id": getattr(current_user, "id", None),
+        "target_user_id": user_id,
+        "target_email": user_doc.get("email"),
+        "rejection_reason": bv.get("rejection_reason"),
+        "timestamp": now_iso,
+    })
+
+    # Fire bilingual email (best-effort)
+    try:
+        from services.email_notifications import send_buyer_verification_decision_email
+        await send_buyer_verification_decision_email(
+            recipient=user_doc,
+            decision=decision.decision,
+            province=bv.get("province"),
+            rejection_reason=bv.get("rejection_reason"),
+        )
+    except Exception:
+        pass
+
+    return {"success": True, "decision": decision.decision, "user_id": user_id}
+
+
+# ============= iter201 Phase 3 / 3B — COMPLIANCE ALERTS PANEL =====================
+
+@admin_ops_router.get("/admin/compliance-alerts")
+async def admin_compliance_alerts(current_user: User = Depends(require_admin)):
+    """Aggregate compliance alerts surfaced to the admin Dealer Verification tab.
+
+    Returns 4 buckets:
+      • expired — licenses expired or expiring within 30 days
+      • high_fraud_score — vehicle listings with fraud_score > 0.6
+      • unreviewed_manual_review — listings stuck in manual_review > 24 h
+      • territory_bids — recent bid attempts from YT/NT/NU
+    """
+    db = get_db()
+    now = datetime.now(timezone.utc)
+    soon = now + timedelta(days=30)
+    yesterday = now - timedelta(hours=24)
+
+    expired = []
+    async for u in db.users.find(
+        {"dealer_license_verified": True, "dealer_license_expiry_date": {"$exists": True, "$ne": None}},
+        {"_id": 0, "id": 1, "email": 1, "name": 1, "dealer_license_province": 1, "dealer_license_expiry_date": 1},
+    ).limit(200):
+        exp = u.get("dealer_license_expiry_date")
+        if isinstance(exp, str):
+            try:
+                exp_dt = datetime.fromisoformat(exp.replace("Z", "+00:00"))
+            except Exception:
+                continue
+        else:
+            exp_dt = exp
+        if exp_dt and exp_dt <= soon:
+            expired.append({
+                "user_id": u["id"],
+                "email": u.get("email"),
+                "name": u.get("name"),
+                "province": u.get("dealer_license_province"),
+                "expiry_date": exp_dt.isoformat(),
+                "expired": exp_dt < now,
+            })
+
+    high_fraud = []
+    async for v in db.vehicle_listings.find(
+        {"fraud_score": {"$gt": 0.6}},
+        {"_id": 0, "id": 1, "title": 1, "fraud_score": 1, "moderation_flags": 1, "seller_id": 1},
+    ).limit(50):
+        high_fraud.append({
+            "vehicle_id": v["id"],
+            "title": v.get("title"),
+            "fraud_score": v.get("fraud_score"),
+            "flags": v.get("moderation_flags") or [],
+            "seller_id": v.get("seller_id"),
+        })
+
+    unreviewed = []
+    async for v in db.vehicle_listings.find(
+        {"status": "manual_review", "created_at": {"$lt": yesterday.isoformat()}},
+        {"_id": 0, "id": 1, "title": 1, "created_at": 1, "seller_id": 1},
+    ).limit(50):
+        unreviewed.append({
+            "vehicle_id": v["id"],
+            "title": v.get("title"),
+            "created_at": v.get("created_at"),
+            "seller_id": v.get("seller_id"),
+        })
+
+    territory_bids = []
+    async for log in db.audit_logs.find(
+        {"action": "territory_vehicle_bid", "timestamp": {"$gte": (now - timedelta(days=7)).isoformat()}},
+        {"_id": 0},
+    ).sort("timestamp", -1).limit(50):
+        territory_bids.append(log)
+
+    return {
+        "expired": expired,
+        "high_fraud_score": high_fraud,
+        "unreviewed_manual_review": unreviewed,
+        "territory_bids": territory_bids,
+        "checked_at": now.isoformat(),
+    }
+
+
+@admin_ops_router.get("/admin/compliance-alerts/count")
+async def admin_compliance_alerts_count(current_user: User = Depends(require_admin)):
+    """Lightweight counter for the Admin Home triage card (iter197 pattern)."""
+    data = await admin_compliance_alerts(current_user)
+    return {"total": (
+        len(data.get("expired") or [])
+        + len(data.get("high_fraud_score") or [])
+        + len(data.get("unreviewed_manual_review") or [])
+    )}
 
 
 # ============= CFIA SOIL DECLARATION CATEGORIES ========================

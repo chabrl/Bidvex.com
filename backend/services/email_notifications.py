@@ -2575,3 +2575,87 @@ async def send_listing_requires_action_email(
         ),
     )
 
+
+async def send_buyer_verification_decision_email(
+    recipient: dict,
+    decision: str,            # "approve" | "reject"
+    province: Optional[str] = None,
+    rejection_reason: Optional[str] = None,
+) -> bool:
+    """iter201 — Phase 3 / 3B — Notify a buyer that their dealer-verification submission was approved or rejected."""
+    if not recipient or not recipient.get("email"):
+        return False
+    province = (province or "your province").upper()
+    if decision == "approve":
+        subject = "✅ Buyer verification approved — BidVex · Vérification approuvée"
+        body_en = f"You are now verified to bid on vehicle auctions in {province}. Welcome aboard."
+        body_fr = f"Vous êtes maintenant autorisé à enchérir sur les enchères de véhicules en {province}. Bienvenue."
+        cta_en, cta_fr = "Browse Vehicles", "Parcourir les véhicules"
+    else:
+        reason = (rejection_reason or "").strip() or "Documents could not be verified."
+        subject = "❌ Buyer verification update — BidVex · Mise à jour de la vérification"
+        body_en = f"Your buyer-verification submission for {province} could not be approved.<br/><strong>Reason:</strong> {reason}<br/><br/>You may resubmit with updated documents at any time."
+        body_fr = f"Votre demande de vérification d'acheteur pour {province} n'a pas pu être approuvée.<br/><strong>Raison :</strong> {reason}<br/><br/>Vous pouvez resoumettre avec des documents mis à jour à tout moment."
+        cta_en, cta_fr = "Resubmit Verification", "Resoumettre la vérification"
+    return await send_email(
+        to_email=recipient["email"],
+        subject=subject,
+        html_content=_storage_panel(
+            "Buyer verification update",
+            "Mise à jour de la vérification d'acheteur",
+            body_en, body_fr,
+            cta_url="https://bidvex.com/profile/verification",
+            cta_en=cta_en,
+            cta_fr=cta_fr,
+        ),
+    )
+
+
+async def send_dealer_license_expiring_email(recipient: dict, days_until_expiry: int) -> bool:
+    """iter201 — Phase 3 / 3C — 30-day warning before dealer licence expires."""
+    if not recipient or not recipient.get("email"):
+        return False
+    return await send_email(
+        to_email=recipient["email"],
+        subject=f"⚠️ Your dealer licence expires in {days_until_expiry} days — BidVex · Licence expire bientôt",
+        html_content=_storage_panel(
+            "Your dealer licence expires soon",
+            "Votre licence de concessionnaire expire bientôt",
+            f"Your provincial dealer licence will expire in <strong>{days_until_expiry} days</strong>. "
+            f"To keep your vehicle listings active, please upload your renewed licence document before the expiry date.",
+            f"Votre licence provinciale de concessionnaire expirera dans <strong>{days_until_expiry} jours</strong>. "
+            f"Pour garder vos annonces actives, veuillez téléverser votre licence renouvelée avant la date d'expiration.",
+            cta_url="https://bidvex.com/seller/dealer-license",
+            cta_en="Upload Renewed Licence",
+            cta_fr="Téléverser la licence renouvelée",
+        ),
+    )
+
+
+async def send_seller_license_expired_email(recipient: dict, suspended_count: int = 0) -> bool:
+    """iter201 — Phase 3 / 3C — Hard expiry: SELLER licence expired, listings suspended.
+
+    Distinct from `send_dealer_license_expired_email` which targets buyers
+    whose iter195 dealer-license-verification record expired.
+    """
+    if not recipient or not recipient.get("email"):
+        return False
+    return await send_email(
+        to_email=recipient["email"],
+        subject="🚫 Your dealer licence has expired — listings suspended · Licence expirée",
+        html_content=_storage_panel(
+            "Your dealer licence has expired",
+            "Votre licence de concessionnaire a expiré",
+            f"Your provincial dealer licence has expired. To comply with provincial regulations, "
+            f"BidVex has suspended <strong>{suspended_count}</strong> of your active vehicle listings. "
+            f"Upload your renewed licence to reactivate them.",
+            f"Votre licence provinciale de concessionnaire a expiré. Conformément aux règlements provinciaux, "
+            f"BidVex a suspendu <strong>{suspended_count}</strong> de vos annonces actives. "
+            f"Téléversez votre licence renouvelée pour les réactiver.",
+            cta_url="https://bidvex.com/seller/dealer-license",
+            cta_en="Upload Renewed Licence",
+            cta_fr="Téléverser la licence renouvelée",
+        ),
+    )
+
+

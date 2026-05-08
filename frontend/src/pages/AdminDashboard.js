@@ -37,6 +37,8 @@ import BrandingLayoutManager from './admin/BrandingLayoutManager';
 import SiteContentManager from './admin/SiteContentManager';
 import VehicleAdminManager from './admin/VehicleAdminManager';
 import AdminDealerLicenses from './admin/AdminDealerLicenses';
+import AdminBuyerVerifications from './admin/AdminBuyerVerifications';
+import AdminComplianceAlerts from './admin/AdminComplianceAlerts';
 import AIGuardDashboard from './admin/AIGuardDashboard';
 import RiskMonitoringDashboard from './admin/RiskMonitoringDashboard';
 import PricingManager from './admin/PricingManager';
@@ -101,6 +103,8 @@ const SECONDARY_TABS = {
   vehicles: [
     { id: 'vehicle-admin', label: 'Vehicle Administration', icon: '🚗', lucideIcon: Car },
     { id: 'dealer-licenses', label: 'Dealer Licenses', icon: '🪪', lucideIcon: ShieldAlert },
+    { id: 'buyer-verifications', label: 'Buyer Verifications', icon: '🛂', lucideIcon: ShieldAlert },
+    { id: 'compliance-alerts', label: 'Compliance Alerts', icon: '🚨', lucideIcon: AlertTriangle },
     { id: 'feature-flags', label: 'Feature Flags', icon: '🚩', lucideIcon: Car },
     { id: 'ai-guard', label: 'AI Guard', icon: '🤖', lucideIcon: Bot },
     { id: 'risk-monitoring', label: 'Risk Monitoring', icon: '🔴', lucideIcon: ShieldAlert },
@@ -391,6 +395,8 @@ const AdminDashboard = () => {
         switch (secondaryTab) {
           case 'vehicle-admin': return <VehicleAdminManager />;
           case 'dealer-licenses': return <AdminDealerLicenses />;
+          case 'buyer-verifications': return <AdminBuyerVerifications />;
+          case 'compliance-alerts': return <AdminComplianceAlerts />;
           case 'feature-flags': return <AdminFeatureFlags />;
           case 'ai-guard': return <AIGuardDashboard />;
           case 'risk-monitoring': return <RiskMonitoringDashboard />;

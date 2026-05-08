@@ -858,7 +858,104 @@ def init_scheduler(database):
         replace_existing=True,
     )
 
-    logger.info("Scheduler initialized with 14 jobs")
+    # Job 15: iter201 Phase 3 / 3C — Daily check of dealer-licence expirations (09:00 UTC)
+    async def check_expired_dealer_licences_job():
+        if db_instance is None:
+            return
+        from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+        from services.email_notifications import (
+            send_dealer_license_expiring_email,
+            send_seller_license_expired_email,
+        )
+        now = _dt.now(_tz.utc)
+        soon = now + _td(days=30)
+        warned = expired_count = suspended_listings = 0
+
+        async for u in db_instance.users.find(
+            {"dealer_license_verified": True, "dealer_license_expiry_date": {"$exists": True, "$ne": None}},
+            {"_id": 0, "id": 1, "email": 1, "name": 1, "preferred_language": 1, "dealer_license_expiry_date": 1},
+        ):
+            exp = u.get("dealer_license_expiry_date")
+            if isinstance(exp, str):
+                try:
+                    exp_dt = _dt.fromisoformat(exp.replace("Z", "+00:00"))
+                except Exception:
+                    continue
+            else:
+                exp_dt = exp
+            if not exp_dt:
+                continue
+
+            if exp_dt < now:
+                # Hard expiry — un-verify, suspend listings, email
+                expired_count += 1
+                await db_instance.users.update_one(
+                    {"id": u["id"]},
+                    {"$set": {
+                        "dealer_license_verified": False,
+                        "opc_permit_verified": False,                  # LEGACY mirror
+                        "dealer_license_expired_at": now.isoformat(),
+                    }},
+                )
+                # Find this user's vehicle_seller record and suspend their active listings
+                seller = await db_instance.vehicle_sellers.find_one({"user_id": u["id"]}, {"_id": 0, "id": 1})
+                count_suspended = 0
+                if seller:
+                    susp = await db_instance.vehicle_listings.update_many(
+                        {"seller_id": seller["id"], "status": {"$in": ["active", "upcoming", "draft"]}},
+                        {"$set": {
+                            "status": "suspended",
+                            "suspended_reason": "dealer_license_expired",
+                            "suspended_at": now.isoformat(),
+                        }},
+                    )
+                    count_suspended = susp.modified_count
+                    suspended_listings += count_suspended
+                await db_instance.dealer_compliance_log.insert_one({
+                    "user_id": u["id"],
+                    "action": "dealer_license_expired_auto_suspend",
+                    "reason": f"Licence expired on {exp_dt.isoformat()}",
+                    "listings_suspended": count_suspended,
+                    "executed_at": now.isoformat(),
+                })
+                try:
+                    await send_seller_license_expired_email(u, suspended_count=count_suspended)
+                except Exception as e:
+                    logger.warning(f"[expired_dealer_licences] email failed for {u.get('email')}: {e}")
+            elif exp_dt <= soon:
+                # 30-day warning — once per dealer per cycle
+                already_warned = await db_instance.dealer_compliance_log.find_one({
+                    "user_id": u["id"],
+                    "action": "dealer_license_expiring_warned",
+                    "executed_at": {"$gte": (now - _td(days=7)).isoformat()},
+                })
+                if already_warned:
+                    continue
+                days_left = max(0, (exp_dt - now).days)
+                try:
+                    await send_dealer_license_expiring_email(u, days_until_expiry=days_left)
+                except Exception as e:
+                    logger.warning(f"[expired_dealer_licences] warning email failed for {u.get('email')}: {e}")
+                await db_instance.dealer_compliance_log.insert_one({
+                    "user_id": u["id"],
+                    "action": "dealer_license_expiring_warned",
+                    "reason": f"{days_left} days until expiry",
+                    "executed_at": now.isoformat(),
+                })
+                warned += 1
+
+        logger.info(f"[expired_dealer_licences] warned={warned} expired={expired_count} suspended_listings={suspended_listings}")
+        return {"warned": warned, "expired": expired_count, "suspended_listings": suspended_listings}
+
+    scheduler.add_job(
+        _tracked("check_expired_dealer_licences", check_expired_dealer_licences_job),
+        CronTrigger(hour=9, minute=0),  # 09:00 UTC daily
+        id="check_expired_dealer_licences",
+        name="iter201 — Check Expired Dealer Licences (daily)",
+        replace_existing=True,
+    )
+
+    logger.info("Scheduler initialized with 15 jobs")
     return scheduler
 
 
