@@ -1499,8 +1499,8 @@
   "home": {
     "storagePromo": {
       "badge": "NOUVELLE FONCTIONNALITÉ",
-      "title": "Enchères d'unités d'entreposage",
-      "description": "Enchérissez sur des casiers abandonnés de facilités canadiennes vérifiées. Aucuns frais acheteur sur les enchères au comptant. Enchères par procuration en temps réel. Protection contre la fermeture anticipée.",
+      "title": "Ventes de Casier Canadien",
+      "description": "Enchérissez sur des casiers d'entreposage abandonnés et vérifiés au Canada. Profitez de ventes sécurisées sans frais de procuration et d'une protection contre la fermeture anticipée.",
       "noBuyerFees": "Sans frais acheteur",
       "canadianFacilities": "Facilités canadiennes",
       "realTimeBidding": "Enchères en temps réel",

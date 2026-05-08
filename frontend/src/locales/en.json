@@ -1499,15 +1499,15 @@
   "home": {
     "storagePromo": {
       "badge": "NEW FEATURE",
-      "title": "Storage Unit Auctions",
-      "description": "Bid on abandoned storage lockers from verified Canadian facilities. No buyer fees on cash auctions. Real-time proxy bidding. Soft-close protection.",
+      "title": "Canadian Storage Locker Auctions",
+      "description": "Bid on verified abandoned storage lockers across Canada. Enjoy secure auctions with no proxy bidding fees and soft-close protection.",
       "noBuyerFees": "No Buyer Fees",
       "canadianFacilities": "Canadian Facilities",
       "realTimeBidding": "Real-Time Bidding",
       "liveNow": "Live Now",
       "facilities": "Facilities",
       "sold": "Sold",
-      "browseStorageBtn": "Browse Storage Auctions →",
+      "browseStorageBtn": "Browse Auctions →",
       "listFacilityBtn": "List Your Facility"
     },
     "liveVehicles": {

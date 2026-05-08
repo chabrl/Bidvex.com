@@ -832,7 +832,7 @@ const StorageAuctionsPromo = ({ navigate }) => {
   }, []);
 
   return (
-    <section className="py-14 bg-sky-50 dark:bg-gradient-to-r dark:from-[#0B2545] dark:to-[#0E2B52] border-t border-sky-100 dark:border-[#0B2545] relative overflow-hidden" data-testid="homepage-storage-promo">
+    <section className="py-14 sm:py-16 bg-sky-50 dark:bg-gradient-to-r dark:from-[#0B2545] dark:to-[#0E2B52] border-t border-sky-100 dark:border-[#0B2545] relative overflow-hidden" data-testid="homepage-storage-promo">
       {/* Subtle particle background (dark mode only) */}
       <div className="absolute inset-0 opacity-0 dark:opacity-30 pointer-events-none">
         <div className="absolute top-4 left-10 w-1.5 h-1.5 bg-[#3FB4CB] rounded-full animate-pulse" />
@@ -841,19 +841,29 @@ const StorageAuctionsPromo = ({ navigate }) => {
         <div className="absolute top-1/2 right-10 w-1 h-1 bg-[#3FB4CB] rounded-full animate-pulse" style={{ animationDelay: '1.5s' }} />
       </div>
 
+      {/* iter199 — Decorative blue "wave" arcs that the 3D unit subtly overlaps */}
+      <svg
+        aria-hidden="true"
+        className="absolute right-0 top-1/2 -translate-y-1/2 w-[60%] max-w-[720px] h-[120%] opacity-40 dark:opacity-25 pointer-events-none"
+        viewBox="0 0 600 600"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <defs>
+          <linearGradient id="storageWaveGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#3FB4CB" stopOpacity="0.55" />
+            <stop offset="100%" stopColor="#0B2545" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d="M-50 320 Q 200 80 600 240 T 1200 200" stroke="url(#storageWaveGrad)" strokeWidth="80" fill="none" />
+        <path d="M-80 420 Q 220 240 600 360 T 1200 320" stroke="url(#storageWaveGrad)" strokeWidth="60" fill="none" opacity="0.65" />
+      </svg>
+
       <div className="container mx-auto px-4 relative">
-        <div className="flex flex-col md:flex-row items-center gap-8">
+        <div className="flex flex-col-reverse md:flex-row items-center gap-8 md:gap-12 lg:gap-20">
 
-          {/* Animated lock visual */}
-          <div className="flex-shrink-0 relative w-32 h-32 flex items-center justify-center">
-            <div className="text-8xl animate-bounce" style={{ animationDuration: '2.2s' }}>
-              🔒
-            </div>
-            <div className="absolute -top-2 -right-2 text-4xl animate-pulse">✨</div>
-          </div>
-
-          {/* Text content */}
-          <div className="flex-1 text-[#0B2545] dark:text-white">
+          {/* Text content (LEFT on desktop, BELOW on mobile) */}
+          <div className="flex-1 text-[#0B2545] dark:text-white w-full max-w-2xl">
             <div
               className="inline-block bg-sky-600 dark:bg-[#3FB4CB] text-white dark:text-[#0B2545] text-xs font-bold px-3 py-1 rounded-full mb-3 uppercase tracking-wider"
               data-testid="homepage-storage-promo-badge"
@@ -861,11 +871,11 @@ const StorageAuctionsPromo = ({ navigate }) => {
               {t('home.storagePromo.badge')}
             </div>
 
-            <h2 className="text-3xl md:text-4xl font-black mb-4 text-[#0B2545] dark:text-white" data-testid="homepage-storage-promo-title">
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-black mb-4 text-[#0B2545] dark:text-white leading-tight" data-testid="homepage-storage-promo-title">
               {t('home.storagePromo.title')}
             </h2>
 
-            <p className="text-gray-700 dark:text-gray-200 mb-6" data-testid="homepage-storage-promo-desc">
+            <p className="text-base md:text-lg text-gray-700 dark:text-gray-200 mb-6 leading-relaxed" data-testid="homepage-storage-promo-desc">
               {t('home.storagePromo.description')}
             </p>
 
@@ -906,8 +916,8 @@ const StorageAuctionsPromo = ({ navigate }) => {
               </div>
             )}
 
-            {/* CTA buttons */}
-            <div className="flex flex-wrap gap-3">
+            {/* CTA buttons — side-by-side on desktop, wrap on mobile */}
+            <div className="flex flex-row flex-wrap gap-3">
               <button
                 type="button"
                 onClick={() => navigate('/storage-auctions')}
@@ -926,6 +936,22 @@ const StorageAuctionsPromo = ({ navigate }) => {
               </button>
             </div>
           </div>
+
+          {/* iter199 — 3D Storage Unit (RIGHT on desktop, ABOVE on mobile via flex-col-reverse) */}
+          <div
+            className="flex-shrink-0 w-full md:w-[42%] lg:w-[44%] xl:w-[46%] flex justify-center md:justify-end items-center pointer-events-none"
+            data-testid="homepage-storage-promo-3d-wrapper"
+          >
+            <img
+              src="/assets/storage-unit-3d.png"
+              alt={t('home.storagePromo.title')}
+              loading="lazy"
+              className="w-full max-w-[420px] sm:max-w-[480px] md:max-w-none md:w-[110%] lg:w-[115%] h-auto drop-shadow-[0_22px_40px_rgba(11,37,69,0.35)] dark:drop-shadow-[0_22px_50px_rgba(63,180,203,0.25)] md:-translate-y-2 transition-transform duration-700 ease-out hover:md:-translate-y-3 select-none"
+              data-testid="homepage-storage-promo-3d-image"
+              draggable={false}
+            />
+          </div>
+
         </div>
       </div>
     </section>
