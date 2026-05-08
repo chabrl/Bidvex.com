@@ -955,7 +955,23 @@ def init_scheduler(database):
         replace_existing=True,
     )
 
-    logger.info("Scheduler initialized with 15 jobs")
+    # Job 16: iter203 P0 — Vehicle Listing Safety Watchdog (every 60 minutes)
+    # Backstop in case the synchronous gate or the AI scanner missed a listing.
+    async def safety_watchdog_job():
+        if db_instance is None:
+            return
+        from services.safety_watchdog import run_safety_watchdog
+        return await run_safety_watchdog(db_instance, triggered_by="scheduler")
+
+    scheduler.add_job(
+        _tracked("safety_watchdog", safety_watchdog_job),
+        IntervalTrigger(minutes=60),
+        id="safety_watchdog",
+        name="iter203 — Vehicle Listing Safety Watchdog (every 60 min)",
+        replace_existing=True,
+    )
+
+    logger.info("Scheduler initialized with 16 jobs")
     return scheduler
 
 

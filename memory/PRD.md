@@ -1,5 +1,58 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter203 — P0 Vehicle Listing Compliance Hardening (Feb 8, 2026) ✅
+
+**Critical user-reported bug**: An individual user listed a car in the general Marketplace and the legacy "AI Scanner" (which only existed as an admin-triggered manual endpoint) failed to catch it. The narrow legacy whitelist (`["vehicle", "vehicles", "vehicle parts", "road_vehicles"]`) missed any seller who picked "Cars", "Auto", "Truck", or any French/disguised category. Three layers of defence shipped:
+
+### Layer 1 — Hard-coded API gate (synchronous, primary)
+- New: `/app/backend/services/vehicle_listing_guard.py`
+  - `is_vehicle_listing(category, title, description)` — robust scoring (category match +5 / strong tokens like VIN +5 / year+brand +5 / brand alone +2 / body style +1; threshold 4)
+  - `enforce_vehicle_dealer_gate(db, user, …)` — raises HTTPException(403) with bilingual error code `vehicle_listing_dealer_required` when violation; always writes `audit_logs` row (action `vehicle_listing_blocked` or `vehicle_listing_allowed_dealer`)
+  - Vocabularies: 60+ category tokens (EN+FR including `voiture`, `camion`, `moto`, `VTT`); 60+ brand tokens (Honda, Toyota, Ford, Tesla, Harley-Davidson, Polaris, Kubota, etc.); strong content tokens (VIN, odometer, mileage, transmission, carfax, …)
+- Wired into `POST /api/listings` BEFORE payment-method validation (clearer error first)
+- Wired into `POST /api/multi-item-listings` for both parent listing AND every lot
+
+### Layer 2 — AI Scanner background task (post-creation, async)
+- New: `/app/backend/services/vehicle_listing_scanner.py` — `scan_listing_for_vehicles(db, listing_id)` calls Gemini 2.5-flash with a vehicle-detection prompt, parses strict JSON, and pauses listings with `status="pending_review"` + `paused_by="ai_scanner"` when a non-dealer is flagged
+- Fail-OPEN: if Gemini errors, listing left as-is; failure recorded in `listing_scans` collection so admin telemetry is intact; the watchdog catches it within 60 min
+- Auto-scheduled as a `BackgroundTasks` task right after `persist_listing()` for both single + multi-item endpoints
+
+### Layer 3 — Safety Watchdog cron (every 60 min, backstop)
+- New: `/app/backend/services/safety_watchdog.py` — `run_safety_watchdog(db)` re-scans every active listing in `listings` and `multi_item_listings` collections; pauses violations to `status="pending_review"` + `paused_reason="vehicle_listing_by_non_dealer"` + `compliance_signals=[…]`; writes per-listing audit log + per-run summary
+- Registered via `services/scheduler.py` as job #16 with `IntervalTrigger(minutes=60)` and `id="safety_watchdog"` — total scheduler jobs now 16
+- Caches dealer-status per seller within a single run for performance
+
+### Cleanup script (one-shot remediation)
+- New: `/app/backend/scripts/cleanup_vehicle_violations.py` — runs `cleanup_existing_violations(db)` (same logic as watchdog with `triggered_by="cleanup_script"`); pretty-prints summary; idempotent
+- Verified: ran successfully on preview DB
+
+### Live API verification (curl + non-dealer test user)
+| Test | Category | Title | Expected | Actual |
+|---|---|---|---|---|
+| 1 | `Cars` | "2018 Honda Civic LX" | 403 | ✅ 403 (signals: `category:cars`, `year:2018+brand:honda`) |
+| 2 | `Vehicles` | "My old vehicle" | 403 | ✅ 403 (signal: `category:vehicles`) |
+| 3 | `Toys & Hobbies` | "2020 Ford F-150 XLT pickup truck" | 403 | ✅ 403 (signal: `year:2020+brand:ford`, `body:pickup`) |
+| 4 | `Electronics` | "MacBook Pro 16-inch" | passes gate | ✅ passes gate (then 402 payment-method) |
+| 5 | `Voiture` (FR) | "2020 Toyota RAV4 hybrid" | 403 | ✅ 403 (signals: `category:voiture`, `year:2020+brand:toyota`) |
+| 6 | `Sports & Outdoors` | "Listing for sale" | passes gate | ✅ passes gate |
+
+Audit log shows 4 `vehicle_listing_blocked` entries with full detection metadata.
+
+### Tests (26 new + 88 total cumulative)
+- New: `/app/backend/tests/test_iter203_compliance_guard.py` — 26 tests covering: 11 pure detection tests (English/French categories, disguised categories with vehicle titles, VIN-in-description, motorcycles, boats, ATVs, false-positive guard for "MacBook Pro 2021"); 4 dealer-status checks (individual / verified dealer / admin / non-existent); 3 enforcement tests (raises 403 for individual / allows dealer / no-op for non-vehicle); 4 watchdog tests (pauses individual vehicle / preserves dealer / handles multi-item lots / cleanup script entry); 3 AI scanner tests (skips not-found, fail-open on AI error, pauses individual + logs-only for dealer); 1 scheduler-registration test
+- Cumulative: **88 passing tests, 0 regressions** (62 pre-existing + 26 new iter203)
+
+### Files of reference
+- `/app/backend/services/vehicle_listing_guard.py` (new — primary gate)
+- `/app/backend/services/vehicle_listing_scanner.py` (new — AI scanner)
+- `/app/backend/services/safety_watchdog.py` (new — watchdog)
+- `/app/backend/scripts/cleanup_vehicle_violations.py` (new — one-shot cleanup)
+- `/app/backend/routes/listings.py` (gate wired into both create endpoints)
+- `/app/backend/services/scheduler.py` (job #16 registered)
+- `/app/backend/tests/test_iter203_compliance_guard.py` (26 new tests)
+
+---
+
 ## Latest: iter202 — Vehicle Auctions Buyer Experience Rebuild (Feb 8, 2026) ✅
 
 CEO Sprint scope: Hero, Category Filter Bar, Sidebar Drawer, Listings Grid, Detail Page redesign, Empty States, Homepage Carousel — all behind the existing `vehicle_auctions_enabled` flag.

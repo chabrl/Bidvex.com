@@ -154,45 +154,27 @@ async def create_listing(
     from services.stripe_customer_service import validate_payment_method_for_listing
     db = get_db()
 
+    # ── iter203 P0 — Hard-coded vehicle/dealer compliance gate (FIRST line of defence) ──
+    # This runs BEFORE payment-method validation so a non-dealer attempting a
+    # vehicle listing receives the clear bilingual 403 immediately, regardless
+    # of card status. The synchronous check is backed up by:
+    #   • an AI scanner background task (right after listing insertion)
+    #   • a 60-minute safety watchdog cron job (services/safety_watchdog.py)
+    # Three layers, no single point of failure.
+    from services.vehicle_listing_guard import enforce_vehicle_dealer_gate
+    await enforce_vehicle_dealer_gate(
+        db,
+        current_user,
+        category=listing_data.category,
+        title=listing_data.title,
+        description=listing_data.description,
+        surface="single_listing",
+    )
+
     # Sticky Card Guard: require valid payment method
     await validate_payment_method_for_listing(db, current_user)
 
     await validate_seller(db, current_user, listing_data.agreement_accepted)
-
-    # iter201 — Vehicle category restriction: licensed dealer required.
-    # LEGACY: opc_permit_verified is silently re-read here for back-compat with pre-iter201 data.
-    if listing_data.category and listing_data.category.lower() in ["vehicle", "vehicles", "vehicle parts", "road_vehicles"]:
-        user_id = getattr(current_user, 'id', None)
-        user_doc = await db.users.find_one(
-            {"id": user_id},
-            {"_id": 0, "seller_type": 1, "opc_permit_verified": 1, "dealer_license_verified": 1, "dealer_license_province": 1}
-        ) or {}
-        seller_type = user_doc.get("seller_type", "individual")
-        # New field wins; fall back to legacy opc_permit_verified
-        dealer_verified = bool(
-            user_doc.get("dealer_license_verified")
-            or user_doc.get("opc_permit_verified")
-        )
-
-        if seller_type == "individual" or not dealer_verified:
-            # Log blocked attempt
-            await db.audit_logs.insert_one({
-                "action": "vehicle_listing_blocked",
-                "user_id": user_id,
-                "category": listing_data.category,
-                "seller_type": seller_type,
-                "dealer_license_verified": dealer_verified,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            })
-            raise HTTPException(
-                status_code=403,
-                detail=(
-                    "Vehicle listings require a verified provincial dealer licence (e.g. OMVIC in ON, AMVIC in AB, VSA in BC, SAAQ in QC). "
-                    "Individual sellers are not permitted to list road vehicles on BidVex. "
-                    "/ Les annonces de véhicules nécessitent une licence de concessionnaire provinciale vérifiée (p. ex. OMVIC en ON, AMVIC en AB, VSA en C.-B., SAAQ au QC). "
-                    "Les vendeurs individuels ne sont pas autorisés à lister des véhicules routiers sur BidVex."
-                )
-            )
 
     client_ip = request.client.host if request else "unknown"
     user_agent = request.headers.get("user-agent", "unknown") if request else "unknown"
@@ -271,6 +253,23 @@ async def create_listing(
     listing_dict["status"] = await resolve_listing_status(db, current_user, settings)
 
     result = await persist_listing(db, listing_dict, agreement_metadata)
+
+    # ── iter203 P0 — AI Scanner background task (secondary defence) ──
+    # Even if the synchronous hard gate above missed something (e.g. an
+    # extremely creative title), the AI scanner re-reads the listing
+    # asynchronously and pauses it to status="pending_review" if it looks
+    # like a vehicle from a non-dealer. Fail-OPEN: if Gemini is down, the
+    # listing is left as-is — the watchdog cron will catch it within 60 min.
+    try:
+        from services.vehicle_listing_scanner import scan_listing_for_vehicles
+        background_tasks.add_task(
+            scan_listing_for_vehicles,
+            db,
+            listing_id=result["id"],
+            collection="listings",
+        )
+    except Exception as e:
+        logger.error(f"[AI_SCANNER] Failed to schedule vehicle scan for {result.get('id')}: {e}")
 
     # Notify admin when a listing needs moderation (non-blocking)
     if listing_dict["status"] == "pending":
@@ -518,6 +517,7 @@ async def delete_listing(listing_id: str, current_user: User = Depends(get_curre
 @listings_router.post("/multi-item-listings")
 async def create_multi_item_listing(
     listing_data: MultiItemListingCreate,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     request: Request = None
 ):
@@ -556,14 +556,30 @@ async def create_multi_item_listing(
 
     await validate_seller(db, current_user, listing_data.agreement_accepted)
 
-    # Category restriction: Only Partner role users can list vehicles in multi-item
-    if listing_data.category and listing_data.category.lower() in ["vehicle", "vehicles"]:
-        user_role = getattr(current_user, 'role', 'starter')
-        if user_role not in ["partner", "admin"]:
-            raise HTTPException(
-                status_code=403,
-                detail="Only Partner-tier accounts can list vehicles. Upgrade your account."
-            )
+    # ── iter203 P0 — Hard-coded vehicle/dealer compliance gate ──
+    # Replaces the legacy narrow "Partner-only" rule. Detects vehicle-shaped
+    # listings via category + title + description AND scans every lot. Non-
+    # dealer sellers receive 403 + bilingual message.
+    from services.vehicle_listing_guard import enforce_vehicle_dealer_gate
+    await enforce_vehicle_dealer_gate(
+        db,
+        current_user,
+        category=listing_data.category,
+        title=listing_data.title,
+        description=listing_data.description,
+        surface="multi_item_listing",
+    )
+    # Each lot must also pass — protects against the parent looking benign
+    # while one of the lots is a hidden vehicle.
+    for lot in (listing_data.lots or []):
+        await enforce_vehicle_dealer_gate(
+            db,
+            current_user,
+            category=listing_data.category,
+            title=getattr(lot, "title", None),
+            description=getattr(lot, "description", None),
+            surface="multi_item_lot",
+        )
 
     client_ip = request.client.host if request else "unknown"
     user_agent = request.headers.get("user-agent", "unknown") if request else "unknown"
@@ -659,6 +675,18 @@ async def create_multi_item_listing(
 
     await db.multi_item_listings.insert_one(listing_dict)
     listing_dict.pop("_id", None)
+
+    # ── iter203 P0 — AI Scanner background task (secondary defence) ──
+    try:
+        from services.vehicle_listing_scanner import scan_listing_for_vehicles
+        background_tasks.add_task(
+            scan_listing_for_vehicles,
+            db,
+            listing_id=listing.id,
+            collection="multi_item_listings",
+        )
+    except Exception as e:
+        logger.error(f"[AI_SCANNER] Failed to schedule vehicle scan for {listing.id}: {e}")
 
     # Background translation — if _en/_fr not already provided
     if not listing_data.title_en or not listing_data.title_fr:

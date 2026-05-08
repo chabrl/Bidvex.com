@@ -21,6 +21,17 @@
 - Email: abc@gmail.com
 - Password: TestBuyer123!
 
+## iter189 Buyer Test Account (used by iter201 phase3 buyer-gate tests + iter203 compliance regression)
+- Email: `iter189buyer@test.com`
+- Password: `TestBuyer123!`
+- Role: `buyer` (individual seller_type — non-dealer)
+- Re-seeded 2026-02-08 — used for iter203 vehicle compliance live API tests
+
+## iter189 Buyer Test Account 2
+- Email: `iter189buyer@bidvex.com`
+- Password: `TestBuyer123!`
+- Notes: Backup buyer for iter201 phase3 buyer-gate tests
+
 
 ## Direct Google OAuth 2.0
 - Google Cloud Project: configured per `/app/backend/.env`
