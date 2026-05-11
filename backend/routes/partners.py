@@ -250,16 +250,59 @@ async def get_partner_status(current_user: User = Depends(get_current_user)):
 
 
 @partners_router.get("/uploads/partner_docs/{filename}")
-async def serve_partner_document(filename: str, current_user: User = Depends(get_current_user)):
-    """Serve uploaded partner documents (auth required)."""
+async def serve_partner_document(
+    filename: str,
+    request: Request,
+    token: Optional[str] = Query(None),
+):
+    """Serve uploaded partner documents.
+
+    Auth modes (in priority order):
+      1. Cookie / Authorization header (normal API caller).
+      2. `?token=<jwt>` query param — required for browsers opening the URL
+         in a new tab (`<a target="_blank">`) because the browser cannot
+         attach the `Authorization` header on a plain navigation.
+
+    Owners (filename prefix `neq_{user_id}` / `cert_{user_id}`) may read
+    their own docs. Admins / super_admins may read any.
+    """
+    from jose import jwt, JWTError, ExpiredSignatureError
+    from deps import jwt_secret, security
+    from fastapi.security import HTTPAuthorizationCredentials
+
     db = get_db()
+
+    # Resolve current user — header/cookie first, then ?token= fallback
+    current_user = None
+    try:
+        # Manually pull HTTPBearer credentials so query-param fallback works
+        creds: Optional[HTTPAuthorizationCredentials] = await security(request)
+        current_user = await get_current_user(request, creds)
+    except HTTPException:
+        current_user = None
+
+    if current_user is None and token:
+        try:
+            payload = jwt.decode(token, jwt_secret, algorithms=["HS256"])
+            user_id = payload.get("sub")
+            if user_id:
+                user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
+                if user_doc:
+                    current_user = User(**user_doc)
+        except (JWTError, ExpiredSignatureError):
+            current_user = None
+
+    if current_user is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
     file_path = Path("uploads/partner_docs") / filename
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
+
     # Only allow the owner or admin to access
-    user_doc = await db.users.find_one({"id": current_user.id})
+    user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
     is_owner = filename.startswith(f"neq_{current_user.id}") or filename.startswith(f"cert_{current_user.id}")
-    if not is_owner and user_doc.get("role") not in ["admin", "super_admin"]:
+    if not is_owner and (user_doc or {}).get("role") not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Access denied")
     return FileResponse(str(file_path))
 

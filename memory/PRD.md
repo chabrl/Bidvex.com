@@ -1,5 +1,53 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter207 — Compliance UX Polish + Admin File Auth Fix + Unsubscribe Guardrail (Feb 8, 2026) ✅
+
+Three P0 fixes reported by the user after iter206 went live:
+
+### Bug 1 — Vehicle Compliance Warning UX (Frontend)
+**Symptom**: When a non-licensed seller attempted to list a vehicle in the Marketplace, the bilingual 403 error rendered as a narrow `top-right` Sonner toast (~356px wide). The long EN/FR explanation + 2 CTAs (`Verify dealer licence`, `Go to Vehicle Auctions`) collapsed into illegible vertical stacks.
+
+**Fix** (`/app/frontend/src/pages/CreateListingPage.js`):
+- Replaced the `toast.error(...)` call with a proper **centered Shadcn `<Dialog>`** (`sm:max-w-lg`, rose-tinted shield icon header).
+- Bilingual title + body flow across the full modal width — no more vertical collapse.
+- Detected-signal chips (e.g. `category:cars`, `year:2020+brand:ford`) rendered inline in a slate-50 box with mono-font for regulator evidence.
+- Two clear CTAs side-by-side at the bottom: outline `Go to Vehicle Auctions` (secondary) + rose `Verify dealer licence` (primary).
+- Test IDs added: `vehicle-compliance-dialog`, `vehicle-compliance-dialog-title`, `vehicle-compliance-dialog-body`, `vehicle-compliance-signals`, `vehicle-compliance-primary-btn`, `vehicle-compliance-secondary-btn`.
+- Live screenshot verified — dialog renders cleanly with full bilingual text + signal chips + both CTAs visible.
+
+### Bug 2 — Admin Partner-Doc File Access "Not authenticated" (Backend + Frontend)
+**Symptom**: Admin clicks the "NEQ Proof" or "Certification" link in Partner Manager → opens in new tab → `{"detail":"Not authenticated"}` 401. Root cause: `<a href target="_blank">` cannot attach the `Authorization: Bearer` header on a plain browser navigation.
+
+**Fix** (`/app/backend/routes/partners.py::serve_partner_document`):
+- Endpoint now accepts auth in this order: cookie / `Authorization` header (primary) → `?token=<jwt>` query param (fallback for browser navigation).
+- Same owner-or-admin permission check applied regardless of auth mode.
+- Invalid query token → 401 (no privilege escalation possible).
+
+**Fix** (`/app/frontend/src/pages/admin/PartnerManager.js`):
+- NEQ Proof link and each Certification link now append `?token=${localStorage.token}` (correctly URL-encoded) so the browser navigation carries the auth.
+
+### Bug 3 — Unsubscribe Link No-Auth Guardrail (Compliance)
+**Confirmed existing behaviour** — no code change needed, but locked in with regression tests:
+- `GET /api/unsubscribe/verify?token=…` and `POST /api/unsubscribe/confirm` use `URLSafeTimedSerializer`-signed tokens (30-day TTL) and have **zero** auth dependencies.
+- Invalid tokens return **400 token_invalid** (NOT 401 Not authenticated) — preserving the CASL/CAN-SPAM "recipients must reach the page without logging in" requirement.
+- 4 new tests in `test_iter207_unsubscribe_no_auth.py` lock the behaviour against future regressions.
+
+### Tests — 8 new, 76 cumulative passing, 0 regressions
+- `tests/test_iter207_partner_doc_token.py` (4 tests): no-auth 401, `?token=` 200, header 200, bad-token 401
+- `tests/test_iter207_unsubscribe_no_auth.py` (4 tests): missing token 400, bad token 400, valid signed token verify-without-auth 200, valid signed token confirm-without-auth 200
+- iter203 (28) + iter204 (5) + iter205 (26) + iter206 (10) + iter207 (8) = **76 passing, 0 regressions**
+
+### Files of reference
+- `/app/frontend/src/pages/CreateListingPage.js` — Dialog markup + state
+- `/app/backend/routes/partners.py` — serve_partner_document (line 252) accepts `?token=`
+- `/app/frontend/src/pages/admin/PartnerManager.js` — appends `?token=` to doc href
+- `/app/backend/tests/test_iter207_partner_doc_token.py` (NEW — 4 tests)
+- `/app/backend/tests/test_iter207_unsubscribe_no_auth.py` (NEW — 4 tests)
+
+⚠️ **All changes are in PREVIEW.** Redeploy from Emergent dashboard to push to https://bidvex.com.
+
+---
+
 ## Latest: iter206 — Approve/Reject Toolbar + Seller Notifications (Feb 8, 2026) ✅
 
 ### A. Pending-Review Moderation Queue (Admin)

@@ -11,8 +11,16 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '../components/ui/dialog';
 import { toast } from 'sonner';
-import { Loader2, Upload, AlertTriangle } from 'lucide-react';
+import { Loader2, Upload, AlertTriangle, ShieldAlert, ExternalLink } from 'lucide-react';
 import LocationSelector from '../components/LocationSelector';
 import CategorySelector from '../components/CategorySelector';
 import InfoTip from '../components/InfoTip';
@@ -88,6 +96,10 @@ const CreateListingPage = () => {
   
   // Final Seller Agreement (Binding Contract)
   const [finalAgreementAccepted, setFinalAgreementAccepted] = useState(false);
+
+  // iter207 — Vehicle compliance warning dialog (replaces narrow top-right toast)
+  const [vehicleComplianceOpen, setVehicleComplianceOpen] = useState(false);
+  const [vehicleComplianceSignals, setVehicleComplianceSignals] = useState([]);
 
   useEffect(() => {
     fetchCategories();
@@ -175,28 +187,11 @@ const CreateListingPage = () => {
       navigate(`/listing/${response.data.id}`);
     } catch (error) {
       console.error('Failed to create listing:', error);
-      // iter203 — Vehicle compliance gate: show clean bilingual toast with action
+      // iter207 — Vehicle compliance gate: open a centered Dialog (toast was too narrow for the bilingual text + 2 CTAs)
       const detail = error?.response?.data?.detail;
       if (detail && typeof detail === 'object' && detail.error === 'vehicle_listing_dealer_required') {
-        const isFr = (i18n.language || 'en').toLowerCase().startsWith('fr');
-        const headline = isFr
-          ? "Annonce de véhicule refusée"
-          : "Vehicle listing not allowed";
-        const body = isFr
-          ? "Les annonces de véhicules sont réservées aux concessionnaires licenciés (OMVIC, AMVIC, VSA, SAAQ, FCAA, etc.). Veuillez basculer vers l'onglet Enchères de véhicules ou faire vérifier votre licence de concessionnaire."
-          : "Vehicle listings are restricted to licensed dealers only (OMVIC, AMVIC, VSA, SAAQ, FCAA, etc.). Please switch to the Vehicle Auctions section or get your dealer licence verified.";
-        toast.error(headline, {
-          description: body,
-          duration: 12000,
-          action: {
-            label: isFr ? 'Vérifier ma licence' : 'Verify dealer licence',
-            onClick: () => navigate('/vehicle-auctions/dealer-license'),
-          },
-          cancel: {
-            label: isFr ? 'Voir les enchères de véhicules' : 'Go to Vehicle Auctions',
-            onClick: () => navigate('/vehicle-auctions'),
-          },
-        });
+        setVehicleComplianceSignals(Array.isArray(detail.signals) ? detail.signals : []);
+        setVehicleComplianceOpen(true);
         return;
       }
       const errorMessage = extractErrorMessage(error);
@@ -763,6 +758,100 @@ const CreateListingPage = () => {
           onCancel={() => navigate('/seller/dashboard')}
         />
       )}
+
+      {/* iter207 — Vehicle compliance warning dialog (replaces collapsed top-right toast) */}
+      <Dialog open={vehicleComplianceOpen} onOpenChange={setVehicleComplianceOpen}>
+        <DialogContent
+          data-testid="vehicle-compliance-dialog"
+          className="sm:max-w-lg border-rose-200"
+        >
+          <DialogHeader>
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-rose-100 mb-2">
+              <ShieldAlert className="h-6 w-6 text-rose-600" />
+            </div>
+            <DialogTitle
+              data-testid="vehicle-compliance-dialog-title"
+              className="text-center text-xl font-semibold text-slate-900"
+            >
+              {(i18n.language || 'en').toLowerCase().startsWith('fr')
+                ? 'Annonce de véhicule refusée'
+                : 'Vehicle listing not allowed'}
+            </DialogTitle>
+            <DialogDescription
+              data-testid="vehicle-compliance-dialog-body"
+              className="text-center text-sm leading-relaxed text-slate-600 pt-2"
+            >
+              {(i18n.language || 'en').toLowerCase().startsWith('fr') ? (
+                <>
+                  Les annonces de véhicules sont réservées aux concessionnaires licenciés.
+                  Veuillez faire vérifier votre licence par votre organisme provincial
+                  (OMVIC, AMVIC, VSA, SAAQ, FCAA, etc.) avant de publier des véhicules,
+                  ou continuez dans la section <strong>Enchères de véhicules</strong>.
+                </>
+              ) : (
+                <>
+                  Vehicle listings are restricted to licensed dealers only.
+                  Please get your provincial dealer licence verified
+                  (OMVIC, AMVIC, VSA, SAAQ, FCAA, etc.) before posting vehicles,
+                  or browse the <strong>Vehicle Auctions</strong> section instead.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          {vehicleComplianceSignals.length > 0 && (
+            <div
+              data-testid="vehicle-compliance-signals"
+              className="mt-2 rounded-md bg-slate-50 border border-slate-200 px-3 py-2"
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
+                {(i18n.language || 'en').toLowerCase().startsWith('fr')
+                  ? 'Signaux détectés'
+                  : 'Detected signals'}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {vehicleComplianceSignals.map((sig, i) => (
+                  <span
+                    key={i}
+                    className="font-mono text-[11px] bg-white border border-slate-200 rounded px-2 py-0.5 text-slate-700"
+                  >
+                    {sig}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="mt-4 flex-col sm:flex-row sm:justify-center gap-2">
+            <Button
+              variant="outline"
+              data-testid="vehicle-compliance-secondary-btn"
+              onClick={() => {
+                setVehicleComplianceOpen(false);
+                navigate('/vehicle-auctions');
+              }}
+              className="w-full sm:w-auto"
+            >
+              <ExternalLink className="mr-2 h-4 w-4" />
+              {(i18n.language || 'en').toLowerCase().startsWith('fr')
+                ? 'Voir les enchères de véhicules'
+                : 'Go to Vehicle Auctions'}
+            </Button>
+            <Button
+              data-testid="vehicle-compliance-primary-btn"
+              onClick={() => {
+                setVehicleComplianceOpen(false);
+                navigate('/vehicle-auctions/dealer-license');
+              }}
+              className="w-full sm:w-auto bg-rose-600 hover:bg-rose-700 text-white"
+            >
+              {(i18n.language || 'en').toLowerCase().startsWith('fr')
+                ? 'Vérifier ma licence de concessionnaire'
+                : 'Verify dealer licence'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

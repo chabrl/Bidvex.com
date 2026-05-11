@@ -270,14 +270,25 @@ const PartnerManager = () => {
               <div className="space-y-2">
                 <Label className="text-xs text-slate-500">Submitted Documents</Label>
                 {selectedApp.partner_neq_document && (
-                  <a href={selectedApp.partner_neq_document} target="_blank" rel="noreferrer"
-                    className="flex items-center gap-2 text-sm text-blue-600 hover:underline">
+                  <a
+                    href={`${selectedApp.partner_neq_document}${selectedApp.partner_neq_document.includes('?') ? '&' : '?'}token=${encodeURIComponent(token || '')}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    data-testid="partner-doc-neq-link"
+                    className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
+                  >
                     <FileText className="w-4 h-4" /> NEQ Proof <ExternalLink className="w-3 h-3" />
                   </a>
                 )}
                 {(selectedApp.partner_certifications || []).map((url, i) => (
-                  <a key={i} href={url} target="_blank" rel="noreferrer"
-                    className="flex items-center gap-2 text-sm text-blue-600 hover:underline">
+                  <a
+                    key={i}
+                    href={`${url}${url.includes('?') ? '&' : '?'}token=${encodeURIComponent(token || '')}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    data-testid={`partner-doc-cert-link-${i}`}
+                    className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
+                  >
                     <Shield className="w-4 h-4" /> Certification {i + 1} <ExternalLink className="w-3 h-3" />
                   </a>
                 ))}
