@@ -213,23 +213,24 @@ async def admin_decide_dealer_license(
             import logging
             logging.getLogger(__name__).warning(f"[iter198] auto-create vehicle_seller failed: {exc}")
 
-    # iter195 — Send transactional email to the buyer
+    # iter195 + iter208 — Send transactional email + write admin_notifications + seller_notifications
     try:
-        target_user = await db.users.find_one({"id": doc["user_id"]}, {"_id": 0, "email": 1, "name": 1})
-        if target_user and target_user.get("email"):
-            from services.email_notifications import (
-                send_dealer_license_approved_email,
-                send_dealer_license_rejected_email,
-            )
+        target_user = await db.users.find_one({"id": doc["user_id"]}, {"_id": 0})
+        if target_user:
+            from services.verification_service import notify_dealer_license_decision
             updated_doc = {**doc, "status": new_status, "rejection_reason": decision.rejection_reason}
-            if decision.decision == "approve":
-                await send_dealer_license_approved_email(target_user, updated_doc)
-            else:
-                await send_dealer_license_rejected_email(target_user, updated_doc, decision.rejection_reason or "")
+            await notify_dealer_license_decision(
+                db,
+                user=target_user,
+                license_doc=updated_doc,
+                decision=decision.decision,
+                admin_id=user["id"],
+                rejection_reason=decision.rejection_reason or "",
+            )
     except Exception as exc:
-        # Email failure must not break the decision endpoint
+        # Notification failure must not break the decision endpoint
         import logging
-        logging.getLogger(__name__).warning(f"[iter195] dealer-license decision email failed: {exc}")
+        logging.getLogger(__name__).warning(f"[iter208] dealer-license decision notifier failed: {exc}")
 
     return {"success": True, "status": new_status}
 

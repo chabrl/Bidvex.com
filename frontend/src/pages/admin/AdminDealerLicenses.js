@@ -268,19 +268,26 @@ const AdminDealerLicenses = () => {
                             </td>
                             <td className="px-3 py-2">
                               <div className="flex flex-wrap gap-1.5">
-                                {it.document_url && (
-                                  <a
-                                    href={it.document_url.startsWith('http') ? it.document_url : `${process.env.REACT_APP_BACKEND_URL}${it.document_url}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    data-testid={`admin-license-view-doc-${it.id}`}
-                                  >
-                                    <Button size="sm" variant="outline">
-                                      <FileText className="h-3.5 w-3.5 mr-1" /> View
-                                      <ExternalLink className="h-3 w-3 ml-1 opacity-60" />
-                                    </Button>
-                                  </a>
-                                )}
+                                {it.document_url && (() => {
+                                  // iter208 — relative path + absolute fallback + ?token= for browser nav
+                                  // Prefix with bare REACT_APP_BACKEND_URL (NOT API_BASE which adds /api)
+                                  const raw = it.document_url;
+                                  const abs = raw.startsWith('http') ? raw : `${process.env.REACT_APP_BACKEND_URL}${raw}`;
+                                  const href = `${abs}${abs.includes('?') ? '&' : '?'}token=${encodeURIComponent(token || '')}`;
+                                  return (
+                                    <a
+                                      href={href}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      data-testid={`admin-license-view-doc-${it.id}`}
+                                    >
+                                      <Button size="sm" variant="outline">
+                                        <FileText className="h-3.5 w-3.5 mr-1" /> View
+                                        <ExternalLink className="h-3 w-3 ml-1 opacity-60" />
+                                      </Button>
+                                    </a>
+                                  );
+                                })()}
                                 {it.status === 'pending' && (
                                   <>
                                     <Button

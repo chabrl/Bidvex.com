@@ -358,16 +358,39 @@ const FinanceDashboard = () => {
                   <div>
                     <span className="text-xs text-slate-500">Documents</span>
                     <div className="space-y-1 mt-1">
-                      {selectedUser.partner_neq_document && (
-                        <a href={selectedUser.partner_neq_document} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-blue-600 hover:underline text-xs">
-                          <FileText className="w-3.5 h-3.5" /> NEQ Proof <ExternalLink className="w-3 h-3" />
-                        </a>
-                      )}
-                      {(selectedUser.partner_certifications || []).map((url, i) => (
-                        <a key={i} href={url} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-blue-600 hover:underline text-xs">
-                          <Shield className="w-3.5 h-3.5" /> Certification {i + 1} <ExternalLink className="w-3 h-3" />
-                        </a>
-                      ))}
+                      {selectedUser.partner_neq_document && (() => {
+                        // iter208 — relative path + ?token=; prefix with bare REACT_APP_BACKEND_URL (NOT API which adds /api)
+                        const raw = selectedUser.partner_neq_document;
+                        const abs = raw.startsWith('http') ? raw : `${process.env.REACT_APP_BACKEND_URL}${raw}`;
+                        const href = `${abs}${abs.includes('?') ? '&' : '?'}token=${encodeURIComponent(token || '')}`;
+                        return (
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noreferrer"
+                            data-testid="partner-doc-neq-link"
+                            className="flex items-center gap-1.5 text-blue-600 hover:underline text-xs"
+                          >
+                            <FileText className="w-3.5 h-3.5" /> NEQ Proof <ExternalLink className="w-3 h-3" />
+                          </a>
+                        );
+                      })()}
+                      {(selectedUser.partner_certifications || []).map((raw, i) => {
+                        const abs = raw.startsWith('http') ? raw : `${process.env.REACT_APP_BACKEND_URL}${raw}`;
+                        const href = `${abs}${abs.includes('?') ? '&' : '?'}token=${encodeURIComponent(token || '')}`;
+                        return (
+                          <a
+                            key={i}
+                            href={href}
+                            target="_blank"
+                            rel="noreferrer"
+                            data-testid={`partner-doc-cert-link-${i}`}
+                            className="flex items-center gap-1.5 text-blue-600 hover:underline text-xs"
+                          >
+                            <Shield className="w-3.5 h-3.5" /> Certification {i + 1} <ExternalLink className="w-3 h-3" />
+                          </a>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>

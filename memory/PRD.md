@@ -1,5 +1,67 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter208 — Doc URL Migration + Bilingual Verification Notifications (Feb 8, 2026) ✅
+
+Three P0/P1 items shipped on top of iter207:
+
+### Bug 1 — Localhost Document Link `ERR_CONNECTION_REFUSED` (P0, Path B same-origin fix)
+**Symptom**: charbel911@gmail.com's partner documents were stored as `http://localhost:8001/api/uploads/...` in MongoDB. Clicking "NEQ Proof" in the Admin panel → `ERR_CONNECTION_REFUSED` in production.
+
+**Root cause**: `routes/partners.py` line 91 read `REACT_APP_BACKEND_URL` from the backend's env at upload time. When that variable was missing/wrong, it defaulted to `http://localhost:8001` and that absolute URL was persisted to MongoDB forever.
+
+**Fix — store ONLY relative paths**:
+- `routes/partners.py` upload now stores `/api/uploads/partner_docs/{filename}` — no hostname. The internal admin-alert email still receives a one-shot absolute URL via `FRONTEND_URL`-or-fallback.
+- One-shot idempotent migration (`scripts/migrate_doc_urls_to_relative.py`) stripped every legacy hostname (`localhost:8001`, `bidvex.com`, `www.bidvex.com`, preview hostnames) from `users.partner_neq_document`, `users.partner_certifications[]`, and `dealer_licenses.document_url`. External URLs (e.g. `example.com`) intentionally left alone for manual audit.
+- Three admin frontends (`PartnerManager.js`, `FinanceDashboard.js`, `AdminDealerLicenses.js`) now build `<a href>` as `${process.env.REACT_APP_BACKEND_URL}${relativePath}?token=${jwt}` — single `/api/`, browser navigation works.
+- **Live verified**: `GET https://…/api/uploads/partner_docs/neq_xxx.pdf?token=<admin>` → HTTP 200 `application/pdf` 136 KB ✓
+
+### Feature 2 — `services/verification_service.py` (NEW, bilingual)
+**Symptom**: Users left in the dark after submitting docs. Existing partner verify/reject emails were EN-only and bypassed the audit trail.
+
+**Fix**:
+- New `services/verification_service.py` consolidates partner + dealer-license decisions into two functions:
+  - `notify_partner_decision(db, *, user, decision, admin_id, rejection_reason, checkout_url)`
+  - `notify_dealer_license_decision(db, *, user, license_doc, decision, admin_id, rejection_reason)`
+- Each function fires THREE side effects (every one wrapped in try/except so SendGrid failures NEVER break the decision endpoint):
+  1. **Bilingual EN/FR email** via SendGrid:
+     - **Approve**: "Your dealer/partner status has been verified. You can now start listing vehicles." / "Votre statut de marchand/partenaire a été vérifié. Vous pouvez maintenant commencer à lister des véhicules."
+     - **Reject** (includes Admin reason): "Your submission was not approved. Reason: [Admin Reason]. Please re-upload your documents." / "Votre soumission n'a pas été approuvée. Raison : [Raison de l'admin]. Veuillez télécharger à nouveau vos documents."
+  2. `admin_notifications` row (kind: `partner_approved` / `partner_rejected` / `dealer_license_approved` / `dealer_license_rejected`, `target_user_id`, `admin_id`, `extra.reason`)
+  3. `seller_notifications` row (bilingual `title_en` + `title_fr` + `body_en` + `body_fr`, visible on the seller dashboard)
+- Wired into `POST /api/admin/partners/{id}/verify`, `/reject`, and `/api/admin/dealer-licenses/{id}/decision`.
+
+### Tests — 12 new, 88 cumulative passing, 0 regressions
+- `tests/test_iter208_verification_notifications.py` (12 tests):
+  - 6 URL normalization unit tests (localhost, bidvex.com, www.bidvex.com, preview hostname, relative passthrough, external preserved, None/empty)
+  - 4 dispatch tests: partner approve, partner reject, dealer-license approve, dealer-license reject — each asserts SendGrid mock called + admin_notifications row + seller_notifications row with the correct bilingual copy
+  - 1 resilience test: SendGrid failure does NOT raise, admin/seller rows still written
+  - 1 invalid-decision test: ensures bad input is a no-op (no partial rows)
+- Cumulative: iter203 (28) + iter204 (5) + iter205 (26) + iter206 (10) + iter207 (8) + iter208 (12) = **88 passing, 0 regressions**
+
+### Live end-to-end verification (preview env, against real admin account)
+- **Approve flow** (POST /api/admin/partners/{id}/verify on a seeded test user) → HTTP 200, Stripe checkout URL returned, admin_notifications + seller_notifications rows materialized, bilingual email dispatched.
+- **Reject flow** with reason "Missing NEQ proof — please re-upload" → HTTP 200, rows materialized, reason embedded in both `body_en` AND `body_fr`, titles read "Action Required" / "Action requise".
+- **File fetch** via migrated relative URL → HTTP 200 + `application/pdf` + 136,656 bytes ✓
+
+### Files of reference
+- `/app/backend/scripts/migrate_doc_urls_to_relative.py` (NEW) — idempotent migration, supports `--dry-run`
+- `/app/backend/services/verification_service.py` (NEW)
+- `/app/backend/routes/partners.py` (upload now relative + abs URL only in admin alert email)
+- `/app/backend/routes/admin.py` (partner verify/reject endpoints now call `notify_partner_decision`)
+- `/app/backend/routes/vehicle_dealer_extras.py` (dealer-license decision endpoint now calls `notify_dealer_license_decision`)
+- `/app/frontend/src/pages/admin/PartnerManager.js` (prepend `REACT_APP_BACKEND_URL`, append `?token=`)
+- `/app/frontend/src/pages/admin/FinanceDashboard.js` (same)
+- `/app/frontend/src/pages/admin/AdminDealerLicenses.js` (same)
+- `/app/backend/tests/test_iter208_verification_notifications.py` (NEW — 12 tests)
+
+⚠️ **All changes are in PREVIEW.** The migration script must also be run once on PRODUCTION after redeploy:
+```bash
+cd /app/backend && python3 -m scripts.migrate_doc_urls_to_relative --dry-run   # verify
+cd /app/backend && python3 -m scripts.migrate_doc_urls_to_relative             # apply
+```
+
+---
+
 ## Latest: iter207 — Compliance UX Polish + Admin File Auth Fix + Unsubscribe Guardrail (Feb 8, 2026) ✅
 
 Three P0 fixes reported by the user after iter206 went live:

@@ -85,10 +85,12 @@ async def apply_for_partner(
         if cert_doc.content_type not in allowed_types:
             raise HTTPException(status_code=400, detail=f"Certification file '{cert_doc.filename}' must be PDF, JPG, PNG, or WebP.")
 
-    # Store files
+    # Store files. URLs are stored as RELATIVE PATHS only — the frontend always
+    # prepends its own REACT_APP_BACKEND_URL (iter208). This permanently kills
+    # the legacy localhost-leak bug where a missing backend env var caused
+    # documents to be stored as http://localhost:8001/...
     upload_dir = Path("uploads/partner_docs")
     upload_dir.mkdir(parents=True, exist_ok=True)
-    base_url = _os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001")
 
     # Save NEQ document
     neq_contents = await neq_document.read()
@@ -98,7 +100,7 @@ async def apply_for_partner(
     neq_filename = f"neq_{current_user.id}_{uuid.uuid4().hex[:8]}.{neq_ext}"
     with open(upload_dir / neq_filename, "wb") as f:
         f.write(neq_contents)
-    neq_url = f"{base_url}/api/uploads/partner_docs/{neq_filename}"
+    neq_url = f"/api/uploads/partner_docs/{neq_filename}"
 
     # Save certification documents
     cert_urls = []
@@ -110,7 +112,7 @@ async def apply_for_partner(
         cert_filename = f"cert_{current_user.id}_{uuid.uuid4().hex[:8]}.{cert_ext}"
         with open(upload_dir / cert_filename, "wb") as f:
             f.write(cert_contents)
-        cert_urls.append(f"{base_url}/api/uploads/partner_docs/{cert_filename}")
+        cert_urls.append(f"/api/uploads/partner_docs/{cert_filename}")
 
     # Update user document
     now = datetime.now(timezone.utc).isoformat()
@@ -185,7 +187,12 @@ async def apply_for_partner(
             sg.client.mail.send.post(request_body=applicant_mail.get())
             
             # 2) Internal alert to partners@bidvex.ca
-            cert_links = "".join([f'<li><a href="{url}">{url.split("/")[-1]}</a></li>' for url in cert_urls])
+            # iter208 — emails need ABSOLUTE URLs (clickable from inbox). DB stores
+            # relative paths; here we materialize a one-shot absolute view URL.
+            _email_base = (_os.environ.get("FRONTEND_URL") or _os.environ.get("REACT_APP_BACKEND_URL") or "https://bidvex.com").rstrip("/")
+            _abs_neq = neq_url if neq_url.startswith("http") else f"{_email_base}{neq_url}"
+            _abs_certs = [u if u.startswith("http") else f"{_email_base}{u}" for u in cert_urls]
+            cert_links = "".join([f'<li><a href="{u}">{u.split("/")[-1]}</a></li>' for u in _abs_certs])
             internal_html = f"""
             <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1e293b;">
               <h2 style="color: #dc2626;">New Partner Application</h2>
@@ -197,10 +204,10 @@ async def apply_for_partner(
               </table>
               <h3 style="margin-top: 16px;">Submitted Documents:</h3>
               <ul>
-                <li><a href="{neq_url}">NEQ Proof</a></li>
+                <li><a href="{_abs_neq}">NEQ Proof</a></li>
                 {cert_links}
               </ul>
-              <p style="margin-top: 16px;"><a href="{base_url}/admin" style="color: #2563eb; font-weight: bold;">Review in Admin Panel</a></p>
+              <p style="margin-top: 16px;"><a href="{_email_base}/admin" style="color: #2563eb; font-weight: bold;">Review in Admin Panel</a></p>
             </div>
             """
             internal_mail = Mail(

@@ -815,61 +815,22 @@ async def verify_partner(
         "details": {"custom_premium_rate": custom_rate, "checkout_url": checkout_url},
         "timestamp": now,
     })
-    
-    # Send Verification + Payment email
-    base_url = os.environ.get("REACT_APP_BACKEND_URL", "https://www.bidvex.com")
-    company = user_doc.get("partner_company_name", "Partner")
-    rate_info = f"{custom_rate*100:.1f}%" if custom_rate else "not yet set — you can configure it per listing"
-    
-    payment_section = ""
-    if checkout_url:
-        payment_section = f"""
-            <h2 style="color:#2563eb;font-size:16px;margin:24px 0 8px;">Complete Your Activation</h2>
-            <p style="font-size:14px;color:#475569;line-height:1.7;">
-              To activate your partner account, please complete the annual platform fee payment of <strong>$100 CAD/year + applicable taxes</strong>.
-              Your account features will be unlocked immediately upon payment.
-            </p>
-            <div style="margin:24px 0;text-align:center;">
-              <a href="{checkout_url}" style="display:inline-block;background:#16a34a;color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">Pay $100 CAD/year &rarr; Activate Now</a>
-            </div>
-            <p style="font-size:12px;color:#94a3b8;text-align:center;">This is a recurring annual subscription. You can cancel anytime from your account settings.</p>
-        """
-    
-    _send_partner_email(
-        to_email=user_doc.get("email"),
-        subject="BidVex Partner Application Approved — Complete Your Payment",
-        html_content=f"""
-        <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;color:#1e293b;">
-          <div style="background:#2563eb;padding:24px 28px;border-radius:12px 12px 0 0;">
-            <h1 style="color:#fff;margin:0;font-size:22px;">Application Approved!</h1>
-            <p style="color:#bfdbfe;margin:6px 0 0;font-size:14px;">{company} has been approved as a BidVex Partner</p>
-          </div>
-          <div style="padding:28px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;">
-            <p>Congratulations! Your application has been reviewed and approved.</p>
-            {payment_section}
-            <h2 style="color:#2563eb;font-size:16px;margin:24px 0 8px;">What You'll Unlock</h2>
-            <ul style="color:#475569;font-size:14px;line-height:1.8;">
-              <li><strong>Verified Auction Firm</strong> badge on all your listings</li>
-              <li><strong>3% platform fee</strong> — the lowest in the industry</li>
-              <li>Direct Stripe Connect payouts to your bank</li>
-              <li>Custom buyer premium rates per auction</li>
-            </ul>
-            <h2 style="color:#2563eb;font-size:16px;margin:24px 0 8px;">Setting Your Premiums</h2>
-            <p style="font-size:14px;color:#475569;line-height:1.7;">
-              When creating a new listing, you'll see a <strong>"Buyer's Premium"</strong> field.
-              You can set any rate — 10%, 15%, 18%, or any custom percentage.
-              If you leave it empty, no buyer premium will be applied.
-              Your current default rate is: <strong>{rate_info}</strong>.
-            </p>
-            <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;" />
-            <p style="color:#94a3b8;font-size:12px;">
-              Questions? Contact us at <a href="mailto:partners@bidvex.ca" style="color:#2563eb;">partners@bidvex.ca</a>
-            </p>
-          </div>
-        </div>
-        """
-    )
-    
+
+    # iter208 — Bilingual email + admin_notifications + seller_notifications via central service
+    try:
+        from services.verification_service import notify_partner_decision
+        # Refresh user doc so company_name + email are current
+        fresh_user = await db.users.find_one({"id": user_id}, {"_id": 0}) or user_doc
+        await notify_partner_decision(
+            db,
+            user=fresh_user,
+            decision="approve",
+            admin_id=current_user.id,
+            checkout_url=checkout_url,
+        )
+    except Exception as e:
+        logger.warning(f"[iter208] partner approval notifier failed for {user_id}: {e}")
+
     return {
         "success": True,
         "message": f"Partner {user_doc.get('email')} verified. Payment link sent via email.",
@@ -908,34 +869,22 @@ async def reject_partner(
         "details": {"reason": reason},
         "timestamp": now,
     })
-    
-    user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "email": 1, "partner_company_name": 1})
-    if user_doc:
-        _send_partner_email(
-            to_email=user_doc.get("email"),
-            subject="BidVex Partner Application — Update",
-            html_content=f"""
-            <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;color:#1e293b;">
-              <div style="background:#475569;padding:24px 28px;border-radius:12px 12px 0 0;">
-                <h1 style="color:#fff;margin:0;font-size:22px;">Application Update</h1>
-              </div>
-              <div style="padding:28px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;">
-                <p>Dear {user_doc.get('partner_company_name', 'Applicant')},</p>
-                <p>Thank you for your interest in the BidVex Partner Network. After reviewing your submitted credentials, we are unable to approve your application at this time.</p>
-                <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px;margin:16px 0;">
-                  <p style="margin:0;font-size:14px;color:#991b1b;"><strong>Reason:</strong> {reason}</p>
-                </div>
-                <p style="font-size:14px;color:#475569;">If you believe this is an error or have additional documentation to submit, please reach out to our team directly.</p>
-                <div style="margin:20px 0;text-align:center;">
-                  <a href="mailto:partners@bidvex.ca" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Contact partners@bidvex.ca</a>
-                </div>
-                <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;" />
-                <p style="color:#94a3b8;font-size:12px;">This is an automated message from BidVex Inc.</p>
-              </div>
-            </div>
-            """
-        )
-    
+
+    # iter208 — Bilingual email + admin_notifications + seller_notifications via central service
+    try:
+        from services.verification_service import notify_partner_decision
+        fresh_user = await db.users.find_one({"id": user_id}, {"_id": 0})
+        if fresh_user:
+            await notify_partner_decision(
+                db,
+                user=fresh_user,
+                decision="reject",
+                admin_id=current_user.id,
+                rejection_reason=reason,
+            )
+    except Exception as e:
+        logger.warning(f"[iter208] partner rejection notifier failed for {user_id}: {e}")
+
     return {"success": True, "message": "Partner application rejected."}
 
 
