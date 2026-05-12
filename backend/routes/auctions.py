@@ -217,7 +217,7 @@ async def process_ended_auctions():
                             # Seller-held platform fee estimate (best-effort, non-blocking)
                             _plat_fee = 0.0
                             try:
-                                from services.pricing_manager import PricingManager
+                                from services.fee_calculator import PricingManager
                                 buyer_user = winner if winner else None
                                 buyer_tier = (buyer_user or {}).get("subscription_tier", "free") if buyer_user else "free"
                                 seller_tier = (seller or {}).get("subscription_tier", "free") if seller else "free"
@@ -246,7 +246,7 @@ async def process_ended_auctions():
                             _commission = 0.0
                             _net_payout = final_price
                             try:
-                                from services.pricing_manager import PricingManager
+                                from services.fee_calculator import PricingManager
                                 seller_tier = (seller or {}).get("subscription_tier", "free") if seller else "free"
                                 buyer_province = "QC"
                                 pr2 = PricingManager.non_vehicle_stripe(final_price, buyer_province, "free", seller_tier)
@@ -276,7 +276,7 @@ async def process_ended_auctions():
                     # Offline Payment Invoice: if seller chose Cash/E-Transfer, create split invoices
                     payment_method = listing.get("payment_method", "stripe")
                     if payment_method in ("cash", "e-transfer"):
-                        from services.pricing_manager import PricingManager
+                        from services.fee_calculator import PricingManager
                         sale_price = listing.get("current_price", 0)
 
                         # Resolve tiers from user profiles

@@ -10,7 +10,7 @@ These 3 proofs are the canonical truth for:
 Tax ALWAYS applies to BidVex fees for ALL seller types.
 There is NO tax-free treatment for individual sellers.
 """
-from services.pricing_manager import PricingManager
+from services.fee_calculator import PricingManager
 
 
 class TestSpecProof1IndividualQC:

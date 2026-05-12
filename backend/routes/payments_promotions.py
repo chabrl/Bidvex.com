@@ -125,7 +125,7 @@ async def promote_listing(
 
     # Full Canadian fee stack — GST + QST on base, then Stripe gross-up
     from decimal import Decimal as _D
-    from services.pricing_manager import gross_up_stripe_fee
+    from services.fee_calculator import gross_up_stripe_fee
     base = _D(str(base_price_cad))
     gst = (base * _D("0.05")).quantize(_D("0.01"))
     qst = (base * _D("0.09975")).quantize(_D("0.01"))

@@ -30,13 +30,13 @@ class TestPricingManagerImports:
     
     def test_pricing_manager_exists(self):
         """PricingManager class should be importable"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         assert PricingManager is not None
         print("✓ PricingManager class exists")
     
     def test_vehicle_auction_method_exists(self):
         """PricingManager.vehicle_auction should exist and return PricingResult"""
-        from services.pricing_manager import PricingManager, PricingResult
+        from services.fee_calculator import PricingManager, PricingResult
         result = PricingManager.vehicle_auction(
             hammer_price=1000.0,
             buyer_province="QC",
@@ -48,7 +48,7 @@ class TestPricingManagerImports:
     
     def test_non_vehicle_stripe_method_exists(self):
         """PricingManager.non_vehicle_stripe should exist and return PricingResult"""
-        from services.pricing_manager import PricingManager, PricingResult
+        from services.fee_calculator import PricingManager, PricingResult
         result = PricingManager.non_vehicle_stripe(
             hammer_price=1000.0,
             buyer_province="QC",
@@ -61,7 +61,7 @@ class TestPricingManagerImports:
     
     def test_non_vehicle_cash_method_exists(self):
         """PricingManager.non_vehicle_cash should exist and return PricingResult"""
-        from services.pricing_manager import PricingManager, PricingResult
+        from services.fee_calculator import PricingManager, PricingResult
         result = PricingManager.non_vehicle_cash(
             hammer_price=500.0,
             buyer_province="AB",
@@ -74,7 +74,7 @@ class TestPricingManagerImports:
     
     def test_flat_purchase_method_exists(self):
         """PricingManager.flat_purchase should exist and return PricingResult"""
-        from services.pricing_manager import PricingManager, PricingResult
+        from services.fee_calculator import PricingManager, PricingResult
         result = PricingManager.flat_purchase(
             base_price=300.0,
             buyer_province="ON",
@@ -90,7 +90,7 @@ class TestTierRates:
     
     def test_standard_tier_rates(self):
         """Standard tier: 5% buyer premium, 4% seller commission"""
-        from services.pricing_manager import BUYER_PREMIUM_RATES, SELLER_COMMISSION_RATES
+        from services.fee_calculator import BUYER_PREMIUM_RATES, SELLER_COMMISSION_RATES
         
         # Standard/free/basic all map to 5%/4%
         assert BUYER_PREMIUM_RATES.get("free") == Decimal("0.05")
@@ -104,7 +104,7 @@ class TestTierRates:
     
     def test_premium_tier_rates(self):
         """Premium tier: 3.5% buyer premium, 2.5% seller commission"""
-        from services.pricing_manager import BUYER_PREMIUM_RATES, SELLER_COMMISSION_RATES
+        from services.fee_calculator import BUYER_PREMIUM_RATES, SELLER_COMMISSION_RATES
         
         assert BUYER_PREMIUM_RATES.get("premium") == Decimal("0.035")
         assert SELLER_COMMISSION_RATES.get("premium") == Decimal("0.025")
@@ -112,7 +112,7 @@ class TestTierRates:
     
     def test_vip_tier_rates(self):
         """VIP tier: 3% buyer premium, 2% seller commission"""
-        from services.pricing_manager import BUYER_PREMIUM_RATES, SELLER_COMMISSION_RATES
+        from services.fee_calculator import BUYER_PREMIUM_RATES, SELLER_COMMISSION_RATES
         
         assert BUYER_PREMIUM_RATES.get("vip") == Decimal("0.03")
         assert BUYER_PREMIUM_RATES.get("vip_elite") == Decimal("0.03")
@@ -123,7 +123,7 @@ class TestTierRates:
     
     def test_partner_tier_rates(self):
         """Partner tier: 0% buyer premium, 3% seller commission"""
-        from services.pricing_manager import BUYER_PREMIUM_RATES, SELLER_COMMISSION_RATES
+        from services.fee_calculator import BUYER_PREMIUM_RATES, SELLER_COMMISSION_RATES
         
         assert BUYER_PREMIUM_RATES.get("partner") == Decimal("0")
         assert SELLER_COMMISSION_RATES.get("partner") == Decimal("0.03")
@@ -212,7 +212,7 @@ class TestVehicleAuctionPricing:
         - Tax (14.975%): $26.03 × 0.14975 = $3.90
         - Total: $25.00 + $1.03 + $3.90 = $29.93
         """
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.vehicle_auction(
             hammer_price=1000.0,
@@ -242,7 +242,7 @@ class TestVehicleAuctionPricing:
     
     def test_vehicle_on_1000_hammer(self):
         """Vehicle ON $1000 hammer - uses HST 13%"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.vehicle_auction(
             hammer_price=1000.0,
@@ -269,7 +269,7 @@ class TestVehicleAuctionPricing:
     
     def test_vehicle_seller_pays_zero(self):
         """Vehicle: seller_invoice is None (seller pays $0)"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.vehicle_auction(
             hammer_price=50000.0,
@@ -305,7 +305,7 @@ class TestNonVehicleStripePricing:
         - Tax on fees: -$6.21
         - Net: $1000 - $40 - $1.46 - $6.21 = $952.33
         """
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.non_vehicle_stripe(
             hammer_price=1000.0,
@@ -353,7 +353,7 @@ class TestNonVehicleCashPricing:
         - Tax (5% GST): $1.04
         - Total: $20 + $0.88 + $1.04 = $21.92
         """
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.non_vehicle_cash(
             hammer_price=500.0,
@@ -396,7 +396,7 @@ class TestSubscriptionPricing:
         - Tax (13% HST): $40.17
         - Total: $300 + $9.00 + $40.17 = $349.17
         """
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.flat_purchase(
             base_price=300.0,
@@ -424,7 +424,7 @@ class TestStripeRecoveryFormula:
     
     def test_stripe_recovery_formula(self):
         """Verify stripe_recovery function matches formula"""
-        from services.pricing_manager import stripe_recovery
+        from services.fee_calculator import stripe_recovery
         
         test_cases = [
             (Decimal("25.00"), 1.03),   # $25 × 0.029 + 0.30 = 1.025 → 1.03
@@ -447,7 +447,7 @@ class TestCodePathImports:
         with open('/app/backend/services/vehicle_invoice.py', 'r') as f:
             content = f.read()
         
-        assert 'from services.pricing_manager import PricingManager' in content or \
+        assert 'from services.fee_calculator import PricingManager' in content or \
                'PricingManager.vehicle_auction' in content, \
                "vehicle_invoice.py should import/use PricingManager"
         print("✓ vehicle_invoice.py imports PricingManager")
@@ -457,7 +457,7 @@ class TestCodePathImports:
         with open('/app/backend/routes/auctions.py', 'r') as f:
             content = f.read()
         
-        assert 'from services.pricing_manager import PricingManager' in content or \
+        assert 'from services.fee_calculator import PricingManager' in content or \
                'PricingManager.non_vehicle_cash' in content, \
                "routes/auctions.py should import/use PricingManager for cash payments"
         print("✓ routes/auctions.py imports PricingManager for Path B")

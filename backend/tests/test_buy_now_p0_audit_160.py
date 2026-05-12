@@ -58,7 +58,7 @@ class TestPricingProofs:
     """4 canonical proofs against PricingManager."""
 
     def test_proof1_non_vehicle_stripe_qc_50_free(self):
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         pr = PricingManager.non_vehicle_stripe(50, 'QC', 'free', 'free')
         # Buyer:  hammer 50 + BP 5%=2.50 + SR(2.50)=0.30+0.0725=>round 0.37 + tax((2.5+0.37)*0.14975)=0.43 => 53.30
         # Seller: 50 - SC 4%=2.00 - SR(2.00)=0.36 - tax((2+0.36)*0.14975)=0.35 => 47.29
@@ -66,7 +66,7 @@ class TestPricingProofs:
         assert pr.seller_invoice.total == 47.29, f"seller expected 47.29 got {pr.seller_invoice.total}"
 
     def test_proof2_non_vehicle_stripe_on_50_free_partner(self):
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         pr = PricingManager.non_vehicle_stripe(50, 'ON', 'free', 'partner')
         # Buyer: hammer 50 + BP(free 5%)=2.50 + SR(2.50)=0.37 + HST 13%*(2.5+0.37)=0.37 => 53.24
         # Seller (partner SC=3%): 50 - 1.50 - SR(1.50)=0.34 - tax 13%*(1.5+0.34)=0.24 => 47.92
@@ -74,7 +74,7 @@ class TestPricingProofs:
         assert pr.seller_invoice.total == 47.92, f"seller expected 47.92 got {pr.seller_invoice.total}"
 
     def test_proof3_vehicle_auction_qc_20000(self):
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         pr = PricingManager.vehicle_auction(20000, 'QC')
         # Platform fee 2.5%=500 + SR(500)=14.80 + tax 14.975%*(500+14.80)=77.0913→77.09 = 591.89
         # Spec accepts ±1c (canonical 591.89 with HALF_UP)
@@ -83,7 +83,7 @@ class TestPricingProofs:
         assert pr.buyer_invoice.tax_type == "GST+QST"
 
     def test_proof4_vehicle_auction_ab_5000(self):
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         pr = PricingManager.vehicle_auction(5000, 'AB')
         # Platform fee 2.5%=125 + SR(125)=3.93 + GST 5%*(125+3.93)=6.45 = 135.38
         assert pr.buyer_invoice.total == 135.38, f"vehicle AB 5000 expected 135.38 got {pr.buyer_invoice.total}"
@@ -129,7 +129,7 @@ class TestVehicleBuyNowEndpoints:
         u = asyncio.get_event_loop().run_until_complete(_getp()) or {}
         province = u.get("province") or "QC"
 
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         expected = PricingManager.vehicle_auction(5000, province).buyer_invoice
 
         r = requests.post(f"{API}/payments/vehicle-buy-now-preview",
@@ -202,7 +202,7 @@ class TestRegularBuyNowEndpoints:
         buyer_tier = admin_doc.get("subscription_tier", "free")
         province = admin_doc.get("province") or "QC"
 
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         # seller_tier='free', not partner (we seeded that way)
         expected = PricingManager.non_vehicle_stripe(50, province, buyer_tier, "free").buyer_invoice
 
@@ -260,7 +260,7 @@ class TestWebhookWiring:
 class TestRegressionSentinel:
     def test_iter139_proof2_updated_value_consistent(self):
         """Sanity: pricing manager $1000 QC free/free buyer_total stays $1059.50."""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         pr = PricingManager.non_vehicle_stripe(1000, 'QC', 'free', 'free')
         assert pr.buyer_invoice.total == 1059.50
 

@@ -209,3 +209,39 @@ async def mark_seller_notification_read(
         query["kind"] = notification_kind
     res = await _db.seller_notifications.update_many(query, {"$set": {"read": True}})
     return {"ok": True, "marked": res.modified_count}
+
+
+
+# iter211 — Pickup-coordination notifications (post-payment winner ↔ seller)
+@dashboard_router.get("/pickup-notifications")
+async def get_pickup_notifications(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """Return pickup-coordination rows for the current user (winner or seller side)."""
+    if not credentials:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=401, detail="Authentication required")
+    current_user = await _get_current_user(credentials)
+    rdb = _db_read if _db_read is not None else _db
+    notifications = await rdb.pickup_notifications.find(
+        {"user_id": current_user.id},
+        {"_id": 0},
+    ).sort("created_at", -1).to_list(50)
+    unread = sum(1 for n in notifications if not n.get("read"))
+    return {"notifications": notifications, "unread": unread}
+
+
+@dashboard_router.post("/pickup-notifications/{notification_id}/mark-read")
+async def mark_pickup_notification_read(
+    notification_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    if not credentials:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=401, detail="Authentication required")
+    current_user = await _get_current_user(credentials)
+    query = {"user_id": current_user.id}
+    if notification_id != "all":
+        query["id"] = notification_id
+    res = await _db.pickup_notifications.update_many(query, {"$set": {"read": True}})
+    return {"ok": True, "marked": res.modified_count}

@@ -473,7 +473,7 @@ async def send_test_draft_invoice_email(
       - category: str ("vehicle", "non_vehicle_stripe", "non_vehicle_cash")
       - base_price: float (for subscription/promo)
     """
-    from services.pricing_manager import PricingManager
+    from services.fee_calculator import PricingManager
     from sendgrid_templates.draft_invoice_template import build_draft_invoice_html
     import os
     from sendgrid import SendGridAPIClient
@@ -538,7 +538,7 @@ async def preview_draft_invoice(
     Generate Draft Invoice HTML preview without sending.
     Same payload as send-test but returns HTML + pricing breakdown.
     """
-    from services.pricing_manager import PricingManager
+    from services.fee_calculator import PricingManager
     from sendgrid_templates.draft_invoice_template import build_draft_invoice_html
 
     hammer_price = float(payload.get("hammer_price", 25000))

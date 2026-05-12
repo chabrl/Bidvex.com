@@ -1,4 +1,5 @@
 import API_BASE from '../../config';
+import ErrorBoundary from '../../components/ErrorBoundary';
 /**
  * Vehicle Detail Page
  * Shows full vehicle details with live bidding panel
@@ -1588,4 +1589,10 @@ const VehicleDetailPage = () => {
   );
 };
 
-export default VehicleDetailPage;
+export default function VehicleDetailPageWithErrorBoundary(props) {
+  return (
+    <ErrorBoundary scope="vehicle-detail">
+      <VehicleDetailPage {...props} />
+    </ErrorBoundary>
+  );
+}

@@ -67,7 +67,7 @@ def calculate_connect_checkout(
     Returns a backward-compatible dict consumed by create_connect_checkout_session
     and build_itemized_line_items.
     """
-    from services.pricing_manager import PricingManager, stripe_recovery as _sr
+    from services.fee_calculator import PricingManager, stripe_recovery as _sr
     from decimal import Decimal
 
     hp = Decimal(str(hammer_price))
@@ -597,7 +597,7 @@ def create_promotion_checkout(
     buyer_province: str = "QC",
 ) -> Dict[str, Any]:
     """Create a Stripe Checkout for listing promotion purchase with jurisdiction-aware tax."""
-    from services.pricing_manager import PricingManager
+    from services.fee_calculator import PricingManager
 
     promo = PROMOTION_TIERS.get(tier)
     if not promo:
@@ -685,7 +685,7 @@ def create_email_credits_checkout(
     buyer_province: str = "QC",
 ) -> Dict[str, Any]:
     """Create a Stripe Checkout for email marketing credits with jurisdiction-aware tax."""
-    from services.pricing_manager import PricingManager
+    from services.fee_calculator import PricingManager
 
     total_cents = calculate_email_credit_cost(quantity)
     per_email = total_cents / quantity if quantity > 0 else 0

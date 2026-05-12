@@ -278,7 +278,7 @@ class TestConnectSplit:
         # Step 4: Verify PricingManager matches
         import sys
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
 
         result = PricingManager.non_vehicle_stripe(50.00, "ON", "free", "free")
         bi = result.buyer_invoice

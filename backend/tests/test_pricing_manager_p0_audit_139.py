@@ -36,7 +36,7 @@ class TestProof1VehicleAuction:
     
     def test_vehicle_auction_qc_1000_buyer_total(self):
         """Vehicle auction QC $1000 should return buyer_total=$29.93"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.vehicle_auction(1000, 'QC')
         
@@ -60,7 +60,7 @@ class TestProof2NonVehicleStripe:
     
     def test_non_vehicle_stripe_qc_1000_buyer_total(self):
         """Non-vehicle Stripe QC $1000 should return buyer_total (SR on BP only)"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.non_vehicle_stripe(1000, 'QC', 'free', 'free')
         
@@ -78,7 +78,7 @@ class TestProof2NonVehicleStripe:
     
     def test_non_vehicle_stripe_qc_1000_seller_total(self):
         """Non-vehicle Stripe QC $1000 should return seller_total=$952.33"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.non_vehicle_stripe(1000, 'QC', 'free', 'free')
         
@@ -101,7 +101,7 @@ class TestProof3FlatPurchase:
     
     def test_flat_purchase_on_300_total(self):
         """Flat purchase ON $300 should return total=$349.17"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.flat_purchase(300, 'ON')
         
@@ -117,7 +117,7 @@ class TestProof3FlatPurchase:
     
     def test_flat_purchase_on_300_tax_label(self):
         """Flat purchase ON $300 should have tax_label='HST (13%)'"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.flat_purchase(300, 'ON')
         
@@ -132,7 +132,7 @@ class TestProof4NonVehicleCash:
     
     def test_non_vehicle_cash_ab_500_buyer_total(self):
         """Non-vehicle Cash AB $500 should return buyer_total=$27.33"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.non_vehicle_cash(500, 'AB', 'free', 'free')
         
@@ -148,7 +148,7 @@ class TestProof4NonVehicleCash:
     
     def test_non_vehicle_cash_ab_500_seller_total(self):
         """Non-vehicle Cash AB $500 should return seller_total=$21.92"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.non_vehicle_cash(500, 'AB', 'free', 'free')
         
@@ -170,7 +170,7 @@ class TestProof5PartnerAuction:
     
     def test_partner_auction_on_2000_buyer_total(self):
         """Partner auction ON $2000 should return buyer_total=$0.00"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.partner_auction(2000, 'ON')
         
@@ -183,7 +183,7 @@ class TestProof5PartnerAuction:
     
     def test_partner_auction_on_2000_seller_total(self):
         """Partner auction ON $2000 should return seller_total=$70.11"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.partner_auction(2000, 'ON')
         
@@ -201,7 +201,7 @@ class TestProof5PartnerAuction:
     
     def test_partner_auction_buyer_invoice_structure(self):
         """Partner auction buyer invoice should have all zero values"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.partner_auction(2000, 'ON')
         bi = result.buyer_invoice
@@ -219,7 +219,7 @@ class TestStripeRecoveryFix:
     
     def test_stripe_recovery_zero_fees(self):
         """stripe_recovery(0) should return $0.00, not $0.30"""
-        from services.pricing_manager import stripe_recovery
+        from services.fee_calculator import stripe_recovery
         from decimal import Decimal
         
         result = stripe_recovery(Decimal("0"))
@@ -229,7 +229,7 @@ class TestStripeRecoveryFix:
     
     def test_stripe_recovery_negative_fees(self):
         """stripe_recovery(-10) should return $0.00"""
-        from services.pricing_manager import stripe_recovery
+        from services.fee_calculator import stripe_recovery
         from decimal import Decimal
         
         result = stripe_recovery(Decimal("-10"))
@@ -239,7 +239,7 @@ class TestStripeRecoveryFix:
     
     def test_stripe_recovery_positive_fees(self):
         """stripe_recovery(100) should return $3.20 (100*0.029 + 0.30)"""
-        from services.pricing_manager import stripe_recovery
+        from services.fee_calculator import stripe_recovery
         from decimal import Decimal
         
         result = stripe_recovery(Decimal("100"))
@@ -261,7 +261,7 @@ class TestConnectPaymentEngineWiring:
         source = inspect.getsource(calculate_connect_checkout)
         
         assert "PricingManager" in source, "calculate_connect_checkout should import PricingManager"
-        assert "from services.pricing_manager import PricingManager" in source, "Should import PricingManager from services.pricing_manager"
+        assert "from services.fee_calculator import PricingManager" in source, "Should import PricingManager from services.pricing_manager"
         print("PASS: calculate_connect_checkout imports PricingManager")
     
     def test_calculate_connect_checkout_vehicle_qc(self):
@@ -375,7 +375,7 @@ class TestTierRates:
     
     def test_standard_tier_rates(self):
         """Standard tier: 5% BP / 4% SC"""
-        from services.pricing_manager import BUYER_PREMIUM_RATES, SELLER_COMMISSION_RATES
+        from services.fee_calculator import BUYER_PREMIUM_RATES, SELLER_COMMISSION_RATES
         
         assert BUYER_PREMIUM_RATES["standard"] == Decimal("0.05"), f"Standard BP should be 5%"
         assert SELLER_COMMISSION_RATES["standard"] == Decimal("0.04"), f"Standard SC should be 4%"
@@ -383,7 +383,7 @@ class TestTierRates:
     
     def test_premium_tier_rates(self):
         """Premium tier: 3.5% BP / 2.5% SC"""
-        from services.pricing_manager import BUYER_PREMIUM_RATES, SELLER_COMMISSION_RATES
+        from services.fee_calculator import BUYER_PREMIUM_RATES, SELLER_COMMISSION_RATES
         
         assert BUYER_PREMIUM_RATES["premium"] == Decimal("0.035"), f"Premium BP should be 3.5%"
         assert SELLER_COMMISSION_RATES["premium"] == Decimal("0.025"), f"Premium SC should be 2.5%"
@@ -391,7 +391,7 @@ class TestTierRates:
     
     def test_vip_tier_rates(self):
         """VIP tier: 3% BP / 2% SC"""
-        from services.pricing_manager import BUYER_PREMIUM_RATES, SELLER_COMMISSION_RATES
+        from services.fee_calculator import BUYER_PREMIUM_RATES, SELLER_COMMISSION_RATES
         
         assert BUYER_PREMIUM_RATES["vip"] == Decimal("0.03"), f"VIP BP should be 3%"
         assert SELLER_COMMISSION_RATES["vip"] == Decimal("0.02"), f"VIP SC should be 2%"
@@ -399,7 +399,7 @@ class TestTierRates:
     
     def test_partner_tier_rates(self):
         """Partner tier: 0% BP / 3% SC"""
-        from services.pricing_manager import BUYER_PREMIUM_RATES, SELLER_COMMISSION_RATES
+        from services.fee_calculator import BUYER_PREMIUM_RATES, SELLER_COMMISSION_RATES
         
         assert BUYER_PREMIUM_RATES["partner"] == Decimal("0"), f"Partner BP should be 0%"
         assert SELLER_COMMISSION_RATES["partner"] == Decimal("0.03"), f"Partner SC should be 3%"
@@ -412,7 +412,7 @@ class TestProvincialTaxRates:
     
     def test_qc_tax_rate(self):
         """QC should have GST+QST (14.975%)"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.vehicle_auction(1000, 'QC')
         
@@ -422,7 +422,7 @@ class TestProvincialTaxRates:
     
     def test_on_tax_rate(self):
         """ON should have HST (13%)"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.vehicle_auction(1000, 'ON')
         
@@ -432,7 +432,7 @@ class TestProvincialTaxRates:
     
     def test_ab_tax_rate(self):
         """AB should have GST (5%)"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.vehicle_auction(1000, 'AB')
         
@@ -442,7 +442,7 @@ class TestProvincialTaxRates:
     
     def test_bc_tax_rate(self):
         """BC should have GST (5%) - NOT GST+PST"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.vehicle_auction(1000, 'BC')
         
@@ -452,7 +452,7 @@ class TestProvincialTaxRates:
     
     def test_ns_tax_rate(self):
         """NS should have HST (15%)"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.vehicle_auction(1000, 'NS')
         

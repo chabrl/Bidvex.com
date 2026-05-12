@@ -202,7 +202,7 @@ async def handle_stripe_webhook(request: Request):
 
             try:
                 if _card_country and _card_country.upper() != "CA":
-                    from services.pricing_manager import gross_up_stripe_fee
+                    from services.fee_calculator import gross_up_stripe_fee
                     from decimal import Decimal as _D
                     estimated_fee = float(pi_meta.get("stripe_fee_estimate", 0) or 0)
                     subtotal = float(pi_meta.get("subtotal", 0) or 0)
@@ -650,7 +650,7 @@ async def _handle_auction_payment_succeeded(db, pi_data: dict, meta: dict):
 
     # Calculate seller payout using PricingManager
     try:
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
 
         hammer_price = float(meta.get("hammer_price", 0)) / 100 if meta.get("hammer_price") else amount / 100
         province = meta.get("province", "ON")
@@ -781,7 +781,7 @@ async def _handle_auction_payment_succeeded(db, pi_data: dict, meta: dict):
             affiliate_id = (buyer_doc or {}).get("referred_by")
 
             if affiliate_id:
-                from services.pricing_manager import PricingManager
+                from services.fee_calculator import PricingManager
                 aff_commission = PricingManager.affiliate_commission(result.bidvex_revenue)
                 aff_commission_cents = int(round(aff_commission * 100))
 
@@ -840,6 +840,25 @@ async def _handle_auction_payment_succeeded(db, pi_data: dict, meta: dict):
 
     except Exception as aff_err:
         logger.error(f"[AffiliatePayout] Error: {aff_err}")
+
+    # ── iter211: Pickup coordination emails (non-vehicle, non-storage only) ──
+    # This handler is only invoked for transaction_type ∈ ("auction_purchase",
+    # "listing_purchase") — vehicles use vehicle_platform_fee and storage uses
+    # its own deposit flow, so we're already scoped correctly. Best-effort:
+    # any failure here must NOT block the payout pipeline.
+    try:
+        buyer_id_for_pickup = meta.get("user_id", "")
+        if buyer_id_for_pickup and seller_id and listing_id:
+            from services.pickup_coordination_service import send_pickup_coordination_emails
+            await send_pickup_coordination_emails(
+                db=db,
+                listing_id=listing_id,
+                buyer_id=buyer_id_for_pickup,
+                seller_id=seller_id,
+                payment_intent_id=pi_id,
+            )
+    except Exception as pickup_err:
+        logger.error(f"[PickupCoordination] Dispatch failed (non-blocking): {pickup_err}")
 
 
 # Feature packs for promoted listings (mirrors /payments/promote-listing)

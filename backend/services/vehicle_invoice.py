@@ -41,7 +41,7 @@ async def generate_vehicle_invoice(
     Buyer pays: 2.5% platform fee + stripe recovery + tax on fees.
     Seller pays: $0. Hammer settled directly buyer↔seller.
     """
-    from services.pricing_manager import PricingManager
+    from services.fee_calculator import PricingManager
 
     now = datetime.now(timezone.utc)
     deadline = now + timedelta(days=PAYMENT_DEADLINE_DAYS)

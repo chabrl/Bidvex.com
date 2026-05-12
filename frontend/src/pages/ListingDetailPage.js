@@ -1,4 +1,5 @@
 import API_BASE from '../config';
+import ErrorBoundary from '../components/ErrorBoundary';
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -1113,4 +1114,10 @@ const ListingDetailPage = () => {
   );
 };
 
-export default ListingDetailPage;
+export default function ListingDetailPageWithErrorBoundary(props) {
+  return (
+    <ErrorBoundary scope="listing-detail">
+      <ListingDetailPage {...props} />
+    </ErrorBoundary>
+  );
+}

@@ -1,4 +1,5 @@
 import API_BASE from '../../config';
+import ErrorBoundary from '../../components/ErrorBoundary';
 import React, { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
 import { useParams, Link } from 'react-router-dom';
@@ -412,4 +413,10 @@ const StorageAuctionDetail = () => {
   );
 };
 
-export default StorageAuctionDetail;
+export default function StorageAuctionDetailWithErrorBoundary(props) {
+  return (
+    <ErrorBoundary scope="storage-auction-detail">
+      <StorageAuctionDetail {...props} />
+    </ErrorBoundary>
+  );
+}

@@ -480,7 +480,7 @@ def calculate_general_payment(
     # alone which rounded to $0.00 for small bids (e.g. $0.03 premium → $0
     # GST / $0 QST) while Stripe showed real tax — that deceived users with
     # a lower displayed total than the Stripe charge.
-    from services.pricing_manager import gross_up_stripe_fee as _gross_up_stripe
+    from services.fee_calculator import gross_up_stripe_fee as _gross_up_stripe
     # First-pass gross-up on hammer + premium
     _sr = _gross_up_stripe(hp + buyer_premium)
     _bp_taxable = buyer_premium + _sr

@@ -29,7 +29,7 @@ if str(BACKEND_DIR) not in sys.path:
 # PricingManager.vehicle_auction
 class TestVehiclePricing:
     def test_vehicle_qc_10000_canonical(self):
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         r = PricingManager.vehicle_auction(10000, "QC")
         assert r.transaction_type == "vehicle"
         assert r.hammer_price == 10000
@@ -51,7 +51,7 @@ class TestVehiclePricing:
         ],
     )
     def test_vehicle_province_tax(self, prov, tax_type, rate):
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         r = PricingManager.vehicle_auction(10000, prov)
         assert r.buyer_invoice.tax_type == tax_type
         assert abs(r.buyer_invoice.tax_rate - rate) < 1e-6, (

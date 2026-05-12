@@ -597,3 +597,491 @@ def calculate_buyer_total(amount: float, tier: str = "free", region: str = "QC",
 def calculate_seller_net(amount: float, tier: str = "free") -> Dict:
     """Quick helper to calculate seller net"""
     return FeeCalculator.calculate_seller_net(Decimal(str(amount)), tier)
+
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# iter211 — Legacy PricingManager (relocated from services/pricing_manager.py)
+# Math is BIT-IDENTICAL to the original module. Only changes:
+#   • internal `_r` → `_pm_round` (to avoid collision with fee_calculator's
+#     existing `_r` which returns float instead of Decimal)
+#   • module-level constants and helpers moved here so callers have a single
+#     import surface
+# All consumers (routes/payments.py, routes/auctions.py, routes/webhooks.py,
+# routes/admin_config.py, routes/subscriptions.py, routes/fees.py,
+# services/vehicle_invoice.py, services/connect_payment_engine.py,
+# services/tax_engine.py, routes/payments_promotions.py) now import from
+# this module. The original services/pricing_manager.py is DELETED in iter211.
+# ══════════════════════════════════════════════════════════════════════════
+
+from dataclasses import field as _pm_field, asdict as _pm_asdict
+from services.vehicle_pricing import calculate_taxes as _pm_calculate_taxes, TaxBreakdown as _PmTaxBreakdown
+
+# ─── PricingManager constants ────────────────────────────────────────────
+STRIPE_PCT = Decimal("0.029")
+STRIPE_FIXED = Decimal("0.30")
+VEHICLE_PLATFORM_FEE_RATE = Decimal("0.025")
+PARTNER_SELLER_COMMISSION_RATE = Decimal("0.03")
+AFFILIATE_COMMISSION_RATE = Decimal("0.10")  # 10% of BidVex platform fee
+
+BUYER_PREMIUM_RATES = {
+    "free": Decimal("0.05"), "basic": Decimal("0.05"), "standard": Decimal("0.05"),
+    "premium": Decimal("0.035"),
+    "vip": Decimal("0.03"), "vip_elite": Decimal("0.03"),
+    "partner": Decimal("0"),
+}
+SELLER_COMMISSION_RATES = {
+    "free": Decimal("0.04"), "basic": Decimal("0.04"), "standard": Decimal("0.04"),
+    "premium": Decimal("0.025"),
+    "vip": Decimal("0.02"), "vip_elite": Decimal("0.02"),
+    "partner": Decimal("0.03"),
+}
+
+STRIPE_DOMESTIC_PCT      = Decimal("0.029")
+STRIPE_INTERNATIONAL_PCT = Decimal("0.039")
+STRIPE_CONVERSION_PCT    = Decimal("0.059")
+
+_PM_CARD_TYPE_RATES: Dict[str, Decimal] = {
+    "domestic":      STRIPE_DOMESTIC_PCT,
+    "international": STRIPE_INTERNATIONAL_PCT,
+    "conversion":    STRIPE_CONVERSION_PCT,
+}
+
+
+def _pm_round(v: Decimal) -> Decimal:
+    """Round Decimal → 2dp Decimal. Public alias `_r` is exported below for
+    routes/fees.py compatibility (original PricingManager export)."""
+    return v.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def _pm_f(v):
+    return float(v) if isinstance(v, Decimal) else v
+
+
+def stripe_recovery(fees_subtotal: Decimal) -> Decimal:
+    """Legacy additive formula — `(fees_subtotal × 0.029) + 0.30`.
+    Under-recovers Stripe's actual cost by ~3%. Kept for back-compat;
+    new code should use `gross_up_stripe_fee`."""
+    if fees_subtotal <= 0:
+        return Decimal("0")
+    return _pm_round(fees_subtotal * STRIPE_PCT + STRIPE_FIXED)
+
+
+def _pm_resolve_stripe_pct(card_type: Optional[str]) -> Decimal:
+    return _PM_CARD_TYPE_RATES.get((card_type or "domestic").lower(), STRIPE_DOMESTIC_PCT)
+
+
+def gross_up_stripe_fee(net_amount: Decimal,
+                        card_type: Optional[str] = None,
+                        pct: Optional[Decimal] = None,
+                        fixed: Decimal = STRIPE_FIXED) -> Decimal:
+    """Exact gross-up — `charge_total = (net + fixed) / (1 - pct)`.
+    Returns the extra to add so net is preserved after Stripe deducts."""
+    if net_amount <= 0:
+        return Decimal("0")
+    effective_pct = pct if pct is not None else _pm_resolve_stripe_pct(card_type)
+    denom = Decimal("1") - effective_pct
+    charge_total = (net_amount + fixed) / denom
+    fee = charge_total - net_amount
+    return _pm_round(fee)
+
+
+def _pm_tier(raw: str) -> str:
+    return (raw or "free").lower().strip()
+
+
+def _pm_tax_label(tb: _PmTaxBreakdown) -> str:
+    t = tb.tax_type
+    if t == "HST":
+        return f"HST ({_pm_f(tb.total_rate * 100):.0f}%)"
+    if t == "GST+QST":
+        return "GST + QST (14.975%)"
+    if t == "GST":
+        return f"GST ({_pm_f(tb.total_rate * 100):.0f}%)"
+    return t
+
+
+# ─── PricingManager result dataclasses ──────────────────────────────────
+
+@dataclass
+class InvoiceLine:
+    description: str
+    amount: float
+    line_type: str  # fee, stripe, tax, hammer, deduction
+    rate: Optional[float] = None
+
+
+@dataclass
+class SideInvoice:
+    """One side of a split invoice (buyer OR seller)."""
+    lines: list = _pm_field(default_factory=list)
+    fees_subtotal: float = 0.0
+    stripe_recovery: float = 0.0
+    tax_amount: float = 0.0
+    tax_rate: float = 0.0
+    tax_type: str = ""
+    tax_label: str = ""
+    total: float = 0.0
+
+    def to_dict(self):
+        d = _pm_asdict(self)
+        d["lines"] = [_pm_asdict(ln) for ln in self.lines]
+        return d
+
+
+@dataclass
+class PricingResult:
+    transaction_type: str  # vehicle, non_vehicle_stripe, non_vehicle_cash, subscription
+    hammer_price: float = 0.0
+    buyer_invoice: SideInvoice = _pm_field(default_factory=SideInvoice)
+    seller_invoice: Optional[SideInvoice] = None
+    buyer_tier: str = "free"
+    seller_tier: str = "free"
+    province: str = ""
+    bidvex_revenue: float = 0.0
+
+    def to_dict(self):
+        d = {
+            "transaction_type": self.transaction_type,
+            "hammer_price": self.hammer_price,
+            "buyer_tier": self.buyer_tier,
+            "seller_tier": self.seller_tier,
+            "province": self.province,
+            "bidvex_revenue": self.bidvex_revenue,
+            "buyer_invoice": self.buyer_invoice.to_dict(),
+        }
+        if self.seller_invoice:
+            d["seller_invoice"] = self.seller_invoice.to_dict()
+        return d
+
+
+# ─── PricingManager class (UNCHANGED MATH) ──────────────────────────────
+
+class PricingManager:
+    """Canonical legacy pricing engine. Math identical to the original
+    services/pricing_manager.py before iter211 relocation. Province-aware
+    (HST/GST+QST/GST) via vehicle_pricing.calculate_taxes()."""
+
+    @staticmethod
+    def vehicle_auction(
+        hammer_price: float,
+        buyer_province: str,
+        buyer_tier: str = "free",
+    ) -> PricingResult:
+        hp = Decimal(str(hammer_price))
+        platform_fee = _pm_round(hp * VEHICLE_PLATFORM_FEE_RATE)
+
+        sr = stripe_recovery(platform_fee)
+        taxable = platform_fee + sr
+        tax = _pm_calculate_taxes(taxable, buyer_province)
+
+        total = _pm_round(platform_fee + sr + tax.total_tax)
+
+        buyer = SideInvoice(
+            lines=[
+                InvoiceLine("Vehicle Platform Fee (2.5%)", _pm_f(platform_fee), "fee", 0.025),
+                InvoiceLine("Stripe Processing Fee", _pm_f(sr), "stripe"),
+                InvoiceLine(f"Tax — {_pm_tax_label(tax)}", _pm_f(tax.total_tax), "tax", _pm_f(tax.total_rate)),
+            ],
+            fees_subtotal=_pm_f(platform_fee),
+            stripe_recovery=_pm_f(sr),
+            tax_amount=_pm_f(tax.total_tax),
+            tax_rate=_pm_f(tax.total_rate),
+            tax_type=tax.tax_type,
+            tax_label=_pm_tax_label(tax),
+            total=_pm_f(total),
+        )
+
+        return PricingResult(
+            transaction_type="vehicle",
+            hammer_price=hammer_price,
+            buyer_invoice=buyer,
+            seller_invoice=None,
+            buyer_tier=buyer_tier,
+            seller_tier="n/a",
+            province=buyer_province.upper(),
+            bidvex_revenue=_pm_f(platform_fee),
+        )
+
+    @staticmethod
+    def non_vehicle_stripe(
+        hammer_price: float,
+        buyer_province: str,
+        buyer_tier: str = "free",
+        seller_tier: str = "free",
+    ) -> PricingResult:
+        hp = Decimal(str(hammer_price))
+        bt = _pm_tier(buyer_tier)
+        st = _pm_tier(seller_tier)
+
+        bp_rate = BUYER_PREMIUM_RATES.get(bt, BUYER_PREMIUM_RATES["free"])
+        sc_rate = SELLER_COMMISSION_RATES.get(st, SELLER_COMMISSION_RATES["free"])
+
+        bp = _pm_round(hp * bp_rate)
+        sc = _pm_round(hp * sc_rate)
+
+        # Bug 6: gross-up Stripe fee so buyer covers EXACT cost (iterate once)
+        b_sr = gross_up_stripe_fee(hp + bp)
+        b_taxable = bp + b_sr
+        b_tax = _pm_calculate_taxes(b_taxable, buyer_province)
+        b_sr = gross_up_stripe_fee(hp + bp + b_tax.total_tax)
+        b_taxable = bp + b_sr
+        b_tax = _pm_calculate_taxes(b_taxable, buyer_province)
+        b_total = _pm_round(hp + bp + b_sr + b_tax.total_tax)
+
+        buyer = SideInvoice(
+            lines=[
+                InvoiceLine("Hammer Price", _pm_f(hp), "hammer"),
+                InvoiceLine(f"Buyer Premium ({_pm_f(bp_rate * 100):.1f}%)", _pm_f(bp), "fee", _pm_f(bp_rate)),
+                InvoiceLine("Stripe Processing Fee", _pm_f(b_sr), "stripe"),
+                InvoiceLine(f"Tax — {_pm_tax_label(b_tax)}", _pm_f(b_tax.total_tax), "tax", _pm_f(b_tax.total_rate)),
+            ],
+            fees_subtotal=_pm_f(bp),
+            stripe_recovery=_pm_f(b_sr),
+            tax_amount=_pm_f(b_tax.total_tax),
+            tax_rate=_pm_f(b_tax.total_rate),
+            tax_type=b_tax.tax_type,
+            tax_label=_pm_tax_label(b_tax),
+            total=_pm_f(b_total),
+        )
+
+        s_sr = stripe_recovery(sc)
+        s_taxable = sc + s_sr
+        s_tax = _pm_calculate_taxes(s_taxable, buyer_province)
+        s_net = _pm_round(hp - sc - s_sr - s_tax.total_tax)
+
+        seller = SideInvoice(
+            lines=[
+                InvoiceLine("Hammer Price (Gross)", _pm_f(hp), "hammer"),
+                InvoiceLine(f"Seller Commission ({_pm_f(sc_rate * 100):.1f}%)", -_pm_f(sc), "deduction", _pm_f(sc_rate)),
+                InvoiceLine("Stripe Transfer Fee", -_pm_f(s_sr), "stripe"),
+                InvoiceLine(f"Tax on Fees — {_pm_tax_label(s_tax)}", -_pm_f(s_tax.total_tax), "tax", _pm_f(s_tax.total_rate)),
+            ],
+            fees_subtotal=_pm_f(sc),
+            stripe_recovery=_pm_f(s_sr),
+            tax_amount=_pm_f(s_tax.total_tax),
+            tax_rate=_pm_f(s_tax.total_rate),
+            tax_type=s_tax.tax_type,
+            tax_label=_pm_tax_label(s_tax),
+            total=_pm_f(s_net),
+        )
+
+        return PricingResult(
+            transaction_type="non_vehicle_stripe",
+            hammer_price=hammer_price,
+            buyer_invoice=buyer,
+            seller_invoice=seller,
+            buyer_tier=bt,
+            seller_tier=st,
+            province=buyer_province.upper(),
+            bidvex_revenue=_pm_f(bp + sc),
+        )
+
+    @staticmethod
+    def non_vehicle_cash(
+        hammer_price: float,
+        buyer_province: str,
+        buyer_tier: str = "free",
+        seller_tier: str = "free",
+    ) -> PricingResult:
+        hp = Decimal(str(hammer_price))
+        bt = _pm_tier(buyer_tier)
+        st = _pm_tier(seller_tier)
+
+        bp_rate = BUYER_PREMIUM_RATES.get(bt, BUYER_PREMIUM_RATES["free"])
+        sc_rate = SELLER_COMMISSION_RATES.get(st, SELLER_COMMISSION_RATES["free"])
+
+        bp = _pm_round(hp * bp_rate)
+        sc = _pm_round(hp * sc_rate)
+
+        b_sr = stripe_recovery(bp)
+        b_taxable = bp + b_sr
+        b_tax = _pm_calculate_taxes(b_taxable, buyer_province)
+        b_total = _pm_round(bp + b_sr + b_tax.total_tax)
+
+        buyer = SideInvoice(
+            lines=[
+                InvoiceLine(f"Buyer Premium ({_pm_f(bp_rate * 100):.1f}%)", _pm_f(bp), "fee", _pm_f(bp_rate)),
+                InvoiceLine("Stripe Processing Fee", _pm_f(b_sr), "stripe"),
+                InvoiceLine(f"Tax — {_pm_tax_label(b_tax)}", _pm_f(b_tax.total_tax), "tax", _pm_f(b_tax.total_rate)),
+            ],
+            fees_subtotal=_pm_f(bp),
+            stripe_recovery=_pm_f(b_sr),
+            tax_amount=_pm_f(b_tax.total_tax),
+            tax_rate=_pm_f(b_tax.total_rate),
+            tax_type=b_tax.tax_type,
+            tax_label=_pm_tax_label(b_tax),
+            total=_pm_f(b_total),
+        )
+
+        s_sr = stripe_recovery(sc)
+        s_taxable = sc + s_sr
+        s_tax = _pm_calculate_taxes(s_taxable, buyer_province)
+        s_total = _pm_round(sc + s_sr + s_tax.total_tax)
+
+        seller = SideInvoice(
+            lines=[
+                InvoiceLine(f"Seller Commission ({_pm_f(sc_rate * 100):.1f}%)", _pm_f(sc), "fee", _pm_f(sc_rate)),
+                InvoiceLine("Stripe Processing Fee", _pm_f(s_sr), "stripe"),
+                InvoiceLine(f"Tax — {_pm_tax_label(s_tax)}", _pm_f(s_tax.total_tax), "tax", _pm_f(s_tax.total_rate)),
+            ],
+            fees_subtotal=_pm_f(sc),
+            stripe_recovery=_pm_f(s_sr),
+            tax_amount=_pm_f(s_tax.total_tax),
+            tax_rate=_pm_f(s_tax.total_rate),
+            tax_type=s_tax.tax_type,
+            tax_label=_pm_tax_label(s_tax),
+            total=_pm_f(s_total),
+        )
+
+        return PricingResult(
+            transaction_type="non_vehicle_cash",
+            hammer_price=hammer_price,
+            buyer_invoice=buyer,
+            seller_invoice=seller,
+            buyer_tier=bt,
+            seller_tier=st,
+            province=buyer_province.upper(),
+            bidvex_revenue=_pm_f(bp + sc),
+        )
+
+    @staticmethod
+    def flat_purchase(
+        base_price: float,
+        buyer_province: str,
+        label: str = "Subscription",
+    ) -> PricingResult:
+        price = Decimal(str(base_price))
+        sr = stripe_recovery(price)
+        taxable = price + sr
+        tax = _pm_calculate_taxes(taxable, buyer_province)
+        total = _pm_round(price + sr + tax.total_tax)
+
+        buyer = SideInvoice(
+            lines=[
+                InvoiceLine(label, _pm_f(price), "fee"),
+                InvoiceLine("Stripe Processing Fee", _pm_f(sr), "stripe"),
+                InvoiceLine(f"Tax — {_pm_tax_label(tax)}", _pm_f(tax.total_tax), "tax", _pm_f(tax.total_rate)),
+            ],
+            fees_subtotal=_pm_f(price),
+            stripe_recovery=_pm_f(sr),
+            tax_amount=_pm_f(tax.total_tax),
+            tax_rate=_pm_f(tax.total_rate),
+            tax_type=tax.tax_type,
+            tax_label=_pm_tax_label(tax),
+            total=_pm_f(total),
+        )
+
+        return PricingResult(
+            transaction_type="flat_purchase",
+            hammer_price=0,
+            buyer_invoice=buyer,
+            seller_invoice=None,
+            province=buyer_province.upper(),
+            bidvex_revenue=_pm_f(price),
+        )
+
+    @staticmethod
+    def partner_auction(
+        hammer_price: float,
+        buyer_province: str,
+        partner_bp_rate: float = 0.0,
+    ) -> PricingResult:
+        hp = Decimal(str(hammer_price))
+        partner_bp_d = Decimal(str(partner_bp_rate or 0))
+        partner_bp = _pm_round(hp * partner_bp_d)
+
+        partner_bp_pct = _pm_f(partner_bp_d * 100)
+        buyer = SideInvoice(
+            lines=[
+                InvoiceLine("Hammer Price", _pm_f(hp), "hammer"),
+                InvoiceLine(
+                    f"Buyer's Premium ({partner_bp_pct:.1f}% — set by auctioneer)",
+                    _pm_f(partner_bp), "fee", _pm_f(partner_bp_d),
+                ),
+                InvoiceLine("BidVex Platform Fee", 0.0, "fee", 0.0),
+            ],
+            fees_subtotal=0.0,
+            stripe_recovery=0.0,
+            tax_amount=0.0,
+            tax_rate=0.0,
+            tax_type="N/A",
+            tax_label="N/A",
+            total=_pm_f(_pm_round(hp + partner_bp)),
+        )
+
+        sc = _pm_round(hp * PARTNER_SELLER_COMMISSION_RATE)
+        sr = stripe_recovery(sc)
+        taxable = sc + sr
+        tax = _pm_calculate_taxes(taxable, buyer_province)
+        s_total = _pm_round(sc + sr + tax.total_tax)
+
+        seller = SideInvoice(
+            lines=[
+                InvoiceLine("Seller Commission (3.0% flat — Partner)", _pm_f(sc), "fee", 0.03),
+                InvoiceLine("Stripe Processing Fee", _pm_f(sr), "stripe"),
+                InvoiceLine(f"Tax — {_pm_tax_label(tax)}", _pm_f(tax.total_tax), "tax", _pm_f(tax.total_rate)),
+            ],
+            fees_subtotal=_pm_f(sc),
+            stripe_recovery=_pm_f(sr),
+            tax_amount=_pm_f(tax.total_tax),
+            tax_rate=_pm_f(tax.total_rate),
+            tax_type=tax.tax_type,
+            tax_label=_pm_tax_label(tax),
+            total=_pm_f(s_total),
+        )
+
+        return PricingResult(
+            transaction_type="partner_auction",
+            hammer_price=hammer_price,
+            buyer_invoice=buyer,
+            seller_invoice=seller,
+            buyer_tier="partner",
+            seller_tier="partner",
+            province=buyer_province.upper(),
+            bidvex_revenue=_pm_f(sc),
+        )
+
+    @staticmethod
+    def calculate_fees(
+        hammer_price: float,
+        seller_type: str,
+        buyer_province: str,
+        buyer_tier: str = "free",
+        seller_tier: str = "free",
+        payment_method: str = "stripe",
+        partner_bp_rate: float = 0.0,
+    ) -> PricingResult:
+        """Dispatcher — routes by seller_type. Identical to legacy module."""
+        st = (seller_type or "individual").lower().strip()
+
+        if st == "partner":
+            return PricingManager.partner_auction(
+                hammer_price=hammer_price,
+                buyer_province=buyer_province,
+                partner_bp_rate=partner_bp_rate,
+            )
+
+        if st not in ("individual", "enterprise"):
+            raise ValueError(f"Unknown seller_type: '{seller_type}'")
+
+        pm = (payment_method or "stripe").lower().strip()
+        if pm in ("cash", "etransfer", "e-transfer"):
+            return PricingManager.non_vehicle_cash(
+                hammer_price=hammer_price,
+                buyer_province=buyer_province,
+                buyer_tier=buyer_tier,
+                seller_tier=seller_tier,
+            )
+        return PricingManager.non_vehicle_stripe(
+            hammer_price=hammer_price,
+            buyer_province=buyer_province,
+            buyer_tier=buyer_tier,
+            seller_tier=seller_tier,
+        )
+
+    @staticmethod
+    def affiliate_commission(bidvex_revenue: float) -> float:
+        """Affiliate payout = 10% of BidVex's platform fee revenue."""
+        rev = Decimal(str(bidvex_revenue))
+        return _pm_f(_pm_round(rev * AFFILIATE_COMMISSION_RATE))

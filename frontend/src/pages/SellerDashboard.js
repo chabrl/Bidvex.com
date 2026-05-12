@@ -1,4 +1,6 @@
 import API_BASE from '../config';
+import ErrorBoundary from '../components/ErrorBoundary';
+import FeaturedCountdownRibbon from '../components/FeaturedCountdownRibbon';
 import { PayoutSummary } from '../components/PayoutSummary'; // iter210 Step 6
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -531,6 +533,16 @@ const SellerDashboard = () => {
                         </Badge>
                       </div>
 
+                      {/* iter211 — Featured countdown ribbon (seller-only, hidden when no active promotion) */}
+                      {listing.status === 'active' && (listing.promoted_until || listing.is_featured) && (
+                        <div className="mb-2" data-testid={`featured-ribbon-${listing.id}`}>
+                          <FeaturedCountdownRibbon
+                            featuredUntil={listing.promoted_until}
+                            tier={listing.promotion_tier}
+                          />
+                        </div>
+                      )}
+
                       {/* iter206 — Surface compliance pause reason directly to the seller */}
                       {listing.status === 'pending_review' && (listing.compliance_signals || listing.paused_reason) && (
                         <div
@@ -814,7 +826,13 @@ const NetPayoutCard = ({ totalSales = 0, subscriptionTier = 'free', taxVerified 
   );
 };
 
-export default SellerDashboard;
+export default function SellerDashboardWithErrorBoundary(props) {
+  return (
+    <ErrorBoundary scope="seller-dashboard">
+      <SellerDashboard {...props} />
+    </ErrorBoundary>
+  );
+}
 
 // ========== Seller Ratings Panel ==========
 const SellerRatingsPanel = ({ userId, token }) => {

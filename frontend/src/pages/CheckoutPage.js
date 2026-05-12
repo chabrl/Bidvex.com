@@ -1,4 +1,5 @@
 import API_BASE from '../config';
+import ErrorBoundary from '../components/ErrorBoundary';
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -688,4 +689,10 @@ const CheckoutPage = () => {
   );
 };
 
-export default CheckoutPage;
+export default function CheckoutPageWithErrorBoundary(props) {
+  return (
+    <ErrorBoundary scope="checkout">
+      <CheckoutPage {...props} />
+    </ErrorBoundary>
+  );
+}

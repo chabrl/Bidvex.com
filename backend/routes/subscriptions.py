@@ -667,7 +667,7 @@ async def create_subscription_checkout(
             # One-time payment with jurisdiction-aware tax (Rule 5 + Rule 6)
             import os
             from decimal import Decimal, ROUND_HALF_UP
-            from services.pricing_manager import PricingManager
+            from services.fee_calculator import PricingManager
 
             # Get buyer's province from profile
             db = get_db()

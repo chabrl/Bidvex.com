@@ -100,7 +100,7 @@ class TestPricingManagerPayout:
         """$50 Standard Sale, Ontario → seller receives exactly $47.33."""
         import sys
         sys.path.insert(0, "/app/backend")
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
 
         result = PricingManager.non_vehicle_stripe(50.00, "ON", "free", "free")
         si = result.seller_invoice
@@ -121,7 +121,7 @@ class TestPricingManagerPayout:
         """$50 Premium Sale, Ontario → seller receives $48.20."""
         import sys
         sys.path.insert(0, "/app/backend")
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
 
         result = PricingManager.non_vehicle_stripe(50.00, "ON", "premium", "premium")
         assert result.seller_invoice.total == 48.20
@@ -131,7 +131,7 @@ class TestPricingManagerPayout:
         """$50 VIP Sale, Ontario → seller receives $48.50."""
         import sys
         sys.path.insert(0, "/app/backend")
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
 
         result = PricingManager.non_vehicle_stripe(50.00, "ON", "vip", "vip")
         assert result.seller_invoice.total == 48.50
@@ -141,7 +141,7 @@ class TestPricingManagerPayout:
         """$50 Partner Sale, Ontario → Partner charged $2.08, BidVex buyer fee $0."""
         import sys
         sys.path.insert(0, "/app/backend")
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
 
         result = PricingManager.partner_auction(50.00, "ON")
         assert result.buyer_invoice.total == 0.00

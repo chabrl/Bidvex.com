@@ -30,7 +30,7 @@ class TestSellerCommissionRatesDict:
     
     def test_seller_commission_rates_free(self):
         """free tier should have 4% seller commission"""
-        from services.pricing_manager import SELLER_COMMISSION_RATES
+        from services.fee_calculator import SELLER_COMMISSION_RATES
         
         assert "free" in SELLER_COMMISSION_RATES, "free key should exist"
         assert SELLER_COMMISSION_RATES["free"] == Decimal("0.04"), f"free SC should be 4%, got {SELLER_COMMISSION_RATES['free']}"
@@ -38,7 +38,7 @@ class TestSellerCommissionRatesDict:
     
     def test_seller_commission_rates_standard(self):
         """standard tier should have 4% seller commission"""
-        from services.pricing_manager import SELLER_COMMISSION_RATES
+        from services.fee_calculator import SELLER_COMMISSION_RATES
         
         assert "standard" in SELLER_COMMISSION_RATES, "standard key should exist"
         assert SELLER_COMMISSION_RATES["standard"] == Decimal("0.04"), f"standard SC should be 4%, got {SELLER_COMMISSION_RATES['standard']}"
@@ -46,7 +46,7 @@ class TestSellerCommissionRatesDict:
     
     def test_seller_commission_rates_premium(self):
         """premium tier should have 2.5% seller commission"""
-        from services.pricing_manager import SELLER_COMMISSION_RATES
+        from services.fee_calculator import SELLER_COMMISSION_RATES
         
         assert "premium" in SELLER_COMMISSION_RATES, "premium key should exist"
         assert SELLER_COMMISSION_RATES["premium"] == Decimal("0.025"), f"premium SC should be 2.5%, got {SELLER_COMMISSION_RATES['premium']}"
@@ -54,7 +54,7 @@ class TestSellerCommissionRatesDict:
     
     def test_seller_commission_rates_vip(self):
         """vip tier should have 2% seller commission"""
-        from services.pricing_manager import SELLER_COMMISSION_RATES
+        from services.fee_calculator import SELLER_COMMISSION_RATES
         
         assert "vip" in SELLER_COMMISSION_RATES, "vip key should exist"
         assert SELLER_COMMISSION_RATES["vip"] == Decimal("0.02"), f"vip SC should be 2%, got {SELLER_COMMISSION_RATES['vip']}"
@@ -62,7 +62,7 @@ class TestSellerCommissionRatesDict:
     
     def test_seller_commission_rates_vip_elite(self):
         """vip_elite tier should have 2% seller commission"""
-        from services.pricing_manager import SELLER_COMMISSION_RATES
+        from services.fee_calculator import SELLER_COMMISSION_RATES
         
         assert "vip_elite" in SELLER_COMMISSION_RATES, "vip_elite key should exist"
         assert SELLER_COMMISSION_RATES["vip_elite"] == Decimal("0.02"), f"vip_elite SC should be 2%, got {SELLER_COMMISSION_RATES['vip_elite']}"
@@ -70,7 +70,7 @@ class TestSellerCommissionRatesDict:
     
     def test_seller_commission_rates_partner(self):
         """partner tier should have 3% seller commission"""
-        from services.pricing_manager import SELLER_COMMISSION_RATES
+        from services.fee_calculator import SELLER_COMMISSION_RATES
         
         assert "partner" in SELLER_COMMISSION_RATES, "partner key should exist"
         assert SELLER_COMMISSION_RATES["partner"] == Decimal("0.03"), f"partner SC should be 3%, got {SELLER_COMMISSION_RATES['partner']}"
@@ -83,7 +83,7 @@ class TestProofA_Standard:
     
     def test_proof_a_buyer_total(self):
         """$50 ON Standard buyer_total should be $54.88"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.non_vehicle_stripe(50, 'ON', 'free', 'free')
         
@@ -100,7 +100,7 @@ class TestProofA_Standard:
     
     def test_proof_a_seller_payout(self):
         """$50 ON Standard seller_payout should be $47.33"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.non_vehicle_stripe(50, 'ON', 'free', 'free')
         
@@ -118,7 +118,7 @@ class TestProofA_Standard:
     
     def test_proof_a_stripe_recovery_on_hammer_plus_bp(self):
         """$50 ON Standard buyer stripe_recovery should be $1.82 (on hammer+BP=$52.50)"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.non_vehicle_stripe(50, 'ON', 'free', 'free')
         
@@ -133,7 +133,7 @@ class TestProofB_Premium:
     
     def test_proof_b_buyer_total(self):
         """$50 ON Premium buyer_total should be $54.01"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.non_vehicle_stripe(50, 'ON', 'premium', 'premium')
         
@@ -150,7 +150,7 @@ class TestProofB_Premium:
     
     def test_proof_b_seller_payout(self):
         """$50 ON Premium seller_payout should be $48.20"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.non_vehicle_stripe(50, 'ON', 'premium', 'premium')
         
@@ -173,7 +173,7 @@ class TestProofC_VIP:
     
     def test_proof_c_buyer_total(self):
         """$50 ON VIP buyer_total should be $53.72"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.non_vehicle_stripe(50, 'ON', 'vip', 'vip')
         
@@ -190,7 +190,7 @@ class TestProofC_VIP:
     
     def test_proof_c_seller_payout(self):
         """$50 ON VIP seller_payout should be $48.50"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.non_vehicle_stripe(50, 'ON', 'vip', 'vip')
         
@@ -213,7 +213,7 @@ class TestProofD_Partner:
     
     def test_proof_d_buyer_total(self):
         """$50 ON Partner buyer_total reflects spec: hammer + partner BP (BidVex fee = $0)."""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
 
         # Spec semantics: buyer.total = hammer + partner_bp (what buyer pays partner).
         # BidVex's portion (`fees_subtotal`) stays $0.
@@ -229,7 +229,7 @@ class TestProofD_Partner:
     
     def test_proof_d_seller_total(self):
         """$50 ON Partner seller_total should be $2.08"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.partner_auction(50, 'ON')
         
@@ -251,7 +251,7 @@ class TestStripeRecoveryFormulas:
     
     def test_non_vehicle_stripe_buyer_sr_on_hammer_plus_bp(self):
         """non_vehicle_stripe buyer stripe_recovery should be on (hammer+BP)"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.non_vehicle_stripe(50, 'ON', 'free', 'free')
         
@@ -264,7 +264,7 @@ class TestStripeRecoveryFormulas:
     
     def test_non_vehicle_cash_buyer_sr_on_bp_only(self):
         """non_vehicle_cash buyer stripe_recovery should be on BP only (not hammer+BP)"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.non_vehicle_cash(50, 'ON', 'free', 'free')
         
@@ -282,7 +282,7 @@ class TestExistingProofsUnchanged:
     
     def test_vehicle_auction_qc_1000_unchanged(self):
         """vehicle_auction(1000, 'QC') should still return buyer_total=$29.93"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.vehicle_auction(1000, 'QC')
         
@@ -291,7 +291,7 @@ class TestExistingProofsUnchanged:
     
     def test_flat_purchase_on_300_unchanged(self):
         """flat_purchase(300, 'ON') should still return total=$349.17"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.flat_purchase(300, 'ON')
         
@@ -300,7 +300,7 @@ class TestExistingProofsUnchanged:
     
     def test_non_vehicle_cash_ab_500_buyer_unchanged(self):
         """non_vehicle_cash(500, 'AB', 'free', 'free') buyer should still be $27.33"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.non_vehicle_cash(500, 'AB', 'free', 'free')
         
@@ -309,7 +309,7 @@ class TestExistingProofsUnchanged:
     
     def test_non_vehicle_cash_ab_500_seller_unchanged(self):
         """non_vehicle_cash(500, 'AB', 'free', 'free') seller should still be $21.92"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.non_vehicle_cash(500, 'AB', 'free', 'free')
         
@@ -319,7 +319,7 @@ class TestExistingProofsUnchanged:
     
     def test_partner_auction_on_2000_buyer_unchanged(self):
         """partner_auction(2000, 'ON', 0%) buyer total = hammer (BidVex fee still $0)"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
 
         # Per spec: buyer.total now reflects hammer + partner_bp (what buyer pays partner).
         # BidVex's portion stays $0 — that is the invariant the spec preserves.
@@ -334,7 +334,7 @@ class TestExistingProofsUnchanged:
     
     def test_partner_auction_on_2000_seller_unchanged(self):
         """partner_auction(2000, 'ON') seller should still be $70.11"""
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.partner_auction(2000, 'ON')
         

@@ -1280,7 +1280,7 @@ async def buy_now_preview(
     seller_is_partner = bool(seller.get("is_partner") and seller.get("platform_fee_paid")) if seller else False
 
     # Canonical pricing — same engine winning-bid checkout uses.
-    from services.pricing_manager import PricingManager
+    from services.fee_calculator import PricingManager
     if seller_is_partner:
         pr = PricingManager.partner_auction(item_total, buyer_province)
     else:
@@ -1375,7 +1375,7 @@ async def buy_now_checkout(
     seller_tier = seller.get("subscription_tier", "free") if seller else "free"
     seller_is_partner = bool(seller.get("is_partner") and seller.get("platform_fee_paid")) if seller else False
 
-    from services.pricing_manager import PricingManager
+    from services.fee_calculator import PricingManager
     if seller_is_partner:
         pr = PricingManager.partner_auction(item_total, buyer_province)
     else:
@@ -1970,7 +1970,7 @@ async def vehicle_buy_now_preview(
     user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
     buyer_province = (user_doc.get("province", "QC") if user_doc else "QC") or "QC"
 
-    from services.pricing_manager import PricingManager
+    from services.fee_calculator import PricingManager
     pr = PricingManager.vehicle_auction(buy_now_price, buyer_province)
     bi = pr.buyer_invoice
 
@@ -2042,7 +2042,7 @@ async def vehicle_buy_now_checkout(
     buyer_province = (user_doc.get("province", "QC") or "QC").upper()
 
     # Canonical pricing
-    from services.pricing_manager import PricingManager
+    from services.fee_calculator import PricingManager
     pr = PricingManager.vehicle_auction(buy_now_price, buyer_province)
     bi = pr.buyer_invoice
     platform_fee_total = round(bi.total, 2)

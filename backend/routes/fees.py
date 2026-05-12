@@ -97,7 +97,7 @@ async def fees_estimate(
     - Uses the same gross-up Stripe formula as the real checkout, so what
       the buyer sees here exactly matches what Stripe will charge.
     """
-    from services.pricing_manager import PricingManager, gross_up_stripe_fee, _r
+    from services.fee_calculator import PricingManager, gross_up_stripe_fee, _r
     from decimal import Decimal as D
 
     # Look up buyer's subscription tier when user_id is supplied. Silent

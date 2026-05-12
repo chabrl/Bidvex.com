@@ -165,7 +165,7 @@ class TestPricingManagerAffiliateCommission:
         # Import and test directly
         import sys
         sys.path.insert(0, '/app/backend')
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.affiliate_commission(4.50)
         
@@ -176,7 +176,7 @@ class TestPricingManagerAffiliateCommission:
         """PricingManager.affiliate_commission(0) should return 0"""
         import sys
         sys.path.insert(0, '/app/backend')
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.affiliate_commission(0)
         
@@ -187,7 +187,7 @@ class TestPricingManagerAffiliateCommission:
         """PricingManager.affiliate_commission(100.00) should return 10.00"""
         import sys
         sys.path.insert(0, '/app/backend')
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.affiliate_commission(100.00)
         
@@ -198,7 +198,7 @@ class TestPricingManagerAffiliateCommission:
         """PricingManager.affiliate_commission(0.50) should return 0.05"""
         import sys
         sys.path.insert(0, '/app/backend')
-        from services.pricing_manager import PricingManager
+        from services.fee_calculator import PricingManager
         
         result = PricingManager.affiliate_commission(0.50)
         
@@ -209,7 +209,7 @@ class TestPricingManagerAffiliateCommission:
         """AFFILIATE_COMMISSION_RATE should be 0.10 (10%)"""
         import sys
         sys.path.insert(0, '/app/backend')
-        from services.pricing_manager import AFFILIATE_COMMISSION_RATE
+        from services.fee_calculator import AFFILIATE_COMMISSION_RATE
         from decimal import Decimal
         
         assert AFFILIATE_COMMISSION_RATE == Decimal("0.10"), f"Expected 0.10, got {AFFILIATE_COMMISSION_RATE}"

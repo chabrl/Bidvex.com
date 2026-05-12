@@ -1,5 +1,63 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter211 — PricingManager Settlement Migration + Error Boundaries + Featured Ribbon + Pickup Coordination (Feb 8, 2026) ✅
+
+User-requested sequential sprint covering 4 P0/P1 items in order. **Zero math drift confirmed via pre/post bit-parity diff (16 identical baseline failures, no new regressions).**
+
+### Step 1 — Settlement Layer Migration (P0) ✅ ⭐ HARD DELETE
+- `services/pricing_manager.py` **DELETED** entirely.
+- Entire legacy module relocated into the bottom half of `services/fee_calculator.py` under section header `# iter211 — Legacy PricingManager (relocated)`. Internal `_r` renamed to `_pm_round` to avoid name collision with fee_calculator's existing `_r` (returns Decimal vs float).
+- All 10 non-test source files migrated to `from services.fee_calculator import ...`:
+  `services/vehicle_invoice.py`, `services/connect_payment_engine.py`, `services/tax_engine.py`,
+  `routes/fees.py`, `routes/admin_config.py`, `routes/payments_promotions.py`,
+  `routes/subscriptions.py`, `routes/auctions.py`, `routes/webhooks.py`, `routes/payments.py`.
+- All 9 legacy test files (`test_pricing_manager_*`, `test_payout_wiring`, `test_stripe_e2e`, `test_seller_type_pricing_165`, `test_buy_now_p0_audit_160`, `test_affiliate_referral_141`, `test_vehicle_payment_opc`) also migrated.
+- New `tests/test_iter211_pricing_manager_relocation.py` (16 tests) locks the bit-parity contract: PricingManager API surface intact, constants identical, legacy QC/ON/AB amounts unchanged, calculate_fee() iter209 spec amounts unchanged, gross_up_stripe_fee & stripe_recovery identical.
+- **Bit-parity verified**: pre-iter211 baseline vs post-iter211 produces the **identical 16-failure set** on a targeted run — no new regressions, no math drift. The failing tests are pre-existing flaky live-HTTP / Stripe-Connect-live tests unrelated to PricingManager.
+
+### Step 2 — React Error Boundaries on Critical Pages (P1) ✅
+- New `frontend/src/components/ErrorBoundary.jsx` — reusable class component with auto EN/FR detection via i18next, `data-testid` per scope, retry + home buttons, dev-mode error detail collapsible.
+- Wired into 5 critical pages via wrapping default export:
+  - `pages/ListingDetailPage.js` (scope: `listing-detail`)
+  - `pages/CheckoutPage.js` (scope: `checkout`)
+  - `pages/vehicles/VehicleDetailPage.js` (scope: `vehicle-detail`)
+  - `pages/storage/StorageAuctionDetail.js` (scope: `storage-auction-detail`)
+  - `pages/SellerDashboard.js` (scope: `seller-dashboard`)
+- Any render-time crash now shows a calm bilingual fallback instead of a blank screen.
+
+### Step 3 — Featured Countdown Ribbon on Promoted Cards (P1) ✅
+- New `frontend/src/components/FeaturedCountdownRibbon.jsx` — gold-gradient pill with sparkle icon, computes time remaining from `promoted_until` (ISO timestamp), refreshes every 60s, hides when expired or unset.
+- Bilingual EN/FR copy: "Featured for X more day(s) · Tier" / "À la une encore X jour(s) · Tier".
+- Mounted in `pages/SellerDashboard.js` inside each active listing card. Visible ONLY to the seller (the dashboard page is gated by auth). Renders `data-testid="featured-ribbon-{listing.id}"` and `data-testid="featured-countdown-label"` for testability.
+
+### Step 4 — Winner ↔ Seller Pickup Coordination (P1) ✅
+- New `services/pickup_coordination_service.py` — bilingual EN/FR emails + in-app `pickup_notifications` rows. Auto-detects `preferred_language` per user.
+- Wired into the `_handle_auction_payment_succeeded` webhook handler at the very end of the payout pipeline. This handler ONLY fires for `transaction_type ∈ {auction_purchase, listing_purchase}` (vehicles use `vehicle_platform_fee`, storage uses its own deposit flow) — so it's correctly scoped to non-vehicle, non-storage auctions only. Best-effort dispatch — any failure is logged but never blocks the payout.
+- **Idempotent** via `payment_intent_id` unique key — duplicate webhook deliveries are a no-op.
+- 2 new dashboard endpoints in `routes/dashboard.py`:
+  - `GET /api/dashboard/pickup-notifications` → user's pickup rows + unread count
+  - `POST /api/dashboard/pickup-notifications/{id}/mark-read` → mark single or all
+- 4 new pytest cases in `tests/test_iter211_pickup_coordination.py` covering: dual dispatch + row insertion, idempotency on duplicate PI, skip-when-missing-email, per-user language routing.
+
+### Test Status
+- **55/55 iter209+iter210+iter211 tests passing in isolation** (16 new iter211 + 39 prior).
+- Targeted PricingManager-related bit-parity diff: **16 baseline failures = 16 post-migration failures, identical set.** Zero new regressions.
+- All lint clean (ruff, eslint).
+
+### Files of reference (iter211)
+- `/app/backend/services/fee_calculator.py` (PricingManager relocation lives at L600+)
+- `/app/backend/services/pickup_coordination_service.py` (NEW)
+- `/app/backend/routes/webhooks.py` (`_handle_auction_payment_succeeded` extended)
+- `/app/backend/routes/dashboard.py` (2 pickup endpoints)
+- `/app/frontend/src/components/ErrorBoundary.jsx` (NEW)
+- `/app/frontend/src/components/FeaturedCountdownRibbon.jsx` (NEW)
+- `/app/backend/tests/test_iter211_pricing_manager_relocation.py` (NEW — 16 tests)
+- `/app/backend/tests/test_iter211_pickup_coordination.py` (NEW — 4 tests)
+
+⚠️ **All changes are in PREVIEW.** Redeploy required for production.
+
+---
+
 ## Latest: iter210 — Webhooks, Resubmit Email Fix, Pricing Engine, Demo Accounts, Mounts, Fee Migration (Feb 8, 2026)
 
 7 steps approved + executed in exact order. All math from iter209 remains FROZEN.
