@@ -1,5 +1,63 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter209 — Resubmission Flow + Payment Infrastructure Rebuild (Feb 8, 2026) ✅
+
+P0 sprint covering 7 steps approved + executed in order. Math frozen after Step 1.
+
+### Step 1 — `calculate_fee()` Single Source of Truth (✅ Frozen)
+- Rewrote `services/fee_calculator.py` with new `calculate_fee()` dispatching by `seller_account_type` (individual / partner / vehicle_dealer / storage_facility). Returns 25-field `FeeResult` dict.
+- Tiers: `standard` (5% BP / 4% comm), `premium` (3.5% / 2.5%), `vip_elite` (3% / 2%). Legacy `free`/`vip` aliased.
+- Partner: 3% of hammer to BidVex; buyer pays partner-set BP rate (NOT buyer tier).
+- Vehicle dealer: 2.5% buyer fee, $0 to seller (annual $100 sub billed separately).
+- Storage facility: $0 buyer / 5% facility commission auto-charged to facility's card.
+- Taxes (QC GST 5% + QST 9.975%) applied to BP and to commission, both quantised to 2dp BEFORE summation so invoice lines reconcile to the cent.
+- Stripe gross-up `(subtotal + 0.30) / (1 - rate) - subtotal` with rates `domestic=2.9% / international=3.9% / conversion=5.9%`. Default `domestic`.
+- **All 5 spec test cases pass with exact amounts**: $107.45 buyer / $95.40 payout (Test 1); $121.06 / $111.55 (Test 2); $0 / $3.86 partner card charge (Test 3); $10,594.99 / $10,000 (Test 4); $0 / $6.23 facility card (Test 5).
+
+### Step 2 — Resubmission Flow (partner + dealer)
+- `services/resubmission_service.py` — shared logic; `flavor="partner"|"dealer"` switches between `users` and `vehicle_sellers` collections.
+- Endpoints: `POST /api/partner/resubmit` (multipart), `POST /api/vehicles/dealer/resubmit` (JSON). Both: 400 if not rejected, 403 max_resubmissions_reached on 4th attempt (bilingual `message_en` + `message_fr`), increments `resubmission_count`, appends to `rejection_history[]`, sends admin email + writes `admin_notifications` row.
+- Frontend `<ResubmitApplicationPanel>` reusable for both flavors. Mounted in `BecomePartnerPage.js` and `vehicles/SellerRegistrationPage.js`. "Please contact support" line PURGED. Pre-fills text fields from the previous submission; file inputs always cleared (security). Post-submit: page state flips client-side to PENDING with bilingual toast — no full reload.
+
+### Step 3 — Partner SetupIntent + Saved Card
+- `routes/partner_card.py` — `GET /api/partner/saved-card`, `POST /api/partner/setup-card`, `POST /api/partner/saved-card/confirm`, `DELETE /api/partner/saved-card`, `POST /api/partner/cash-commission-charge`.
+- Internal `charge_partner_cash_commission(...)` uses `PaymentIntent.create(off_session=True, confirm=True)` against the stored PM. Gracefully handles `CardError → requires_action` (3DS/SCA).
+- **Listing-creation gate** (`POST /api/listings`): partner choosing `payment_method ∈ {cash, e_transfer}` without `partner_stripe_payment_method_id` → HTTP 403 bilingual + `settings_url: /partner/payment-settings`.
+- Frontend `pages/PartnerPaymentSettings.js` — full Stripe `<Elements>` + `<PaymentElement>` integration. Brand/last4/exp display + Remove button.
+
+### Step 4 — Cost Breakdown UI
+- `GET /api/fees/v2/preview` — declarative query params route through `calculate_fee()`. Optional `seller_user_id` auto-resolves account type + tier + partner BP from MongoDB.
+- `components/CostBreakdown.jsx` — 4 display shapes; storage shows "Pay facility directly" message + zero platform fee; partner cash shows "Pay auctioneer directly" message + no Stripe line.
+
+### Step 5 — Payout Summary UI
+- `components/PayoutSummary.jsx` — symmetric seller-side breakdown via the same v2 endpoint. 4 variants: individual / partner / vehicle_dealer (full hammer, $0 commission) / storage_facility (charged to facility card).
+
+### Step 6 — Vehicle Dealer $100/yr Stripe Subscription
+- `services/dealer_subscription_service.py` — idempotent bootstrap of Stripe Product ("BidVex Vehicle Dealer Platform Access") + Price ($200/year CAD recurring) + Coupon `LAUNCH50` (50% off, duration `forever`). IDs cached in `stripe_settings.id=vehicle_dealer_subscription`. **Live verified**: both bootstrap runs returned identical `prod_UV5h2Vyk1ppteO` / `price_1TW5WJBd6Wtvh7hsa1EcLGzj` / `LAUNCH50`.
+- Endpoints: `POST /api/admin/dealer-subscription/bootstrap`, `POST /api/dealer-subscription/start`, `GET /api/dealer-subscription/status`, `GET /api/admin/dealer-subscription/{user_id}/status`.
+- `suspend_dealer_for_failed_payment(...)` hides listings + flags user (called by `invoice.payment_failed` webhook after 7-day grace).
+
+### Step 7 — Testing Agent E2E
+- 29/29 iter209 tests passing (testing agent confirmed 100% — see `/app/test_reports/iteration_199.json`).
+- Frontend visual confirmation captured for partner rejected state, dealer rejected state, post-resubmit PENDING state, and `/partner/payment-settings` Stripe PaymentElement mount.
+
+### Files of reference
+- `/app/backend/services/fee_calculator.py` (lines 1-260 — new calculate_fee + legacy class below)
+- `/app/backend/services/resubmission_service.py`
+- `/app/backend/services/dealer_subscription_service.py`
+- `/app/backend/routes/partner_card.py`
+- `/app/backend/routes/dealer_subscription_routes.py`
+- `/app/backend/routes/fees.py` (GET /fees/v2/preview at top)
+- `/app/frontend/src/components/ResubmitApplicationPanel.jsx`
+- `/app/frontend/src/components/CostBreakdown.jsx`
+- `/app/frontend/src/components/PayoutSummary.jsx`
+- `/app/frontend/src/pages/PartnerPaymentSettings.js`
+- `/app/backend/tests/test_iter209_step{1,2,3,4,6}_*.py` (29 tests)
+
+⚠️ **All changes are in PREVIEW.** Webhook wiring for `invoice.payment_failed` → `suspend_dealer_for_failed_payment` is the only piece left for full production-grade reliability — currently the suspension function exists and is unit-tested but no webhook handler invokes it yet.
+
+---
+
 ## Latest: iter208 — Doc URL Migration + Bilingual Verification Notifications (Feb 8, 2026) ✅
 
 Three P0/P1 items shipped on top of iter207:

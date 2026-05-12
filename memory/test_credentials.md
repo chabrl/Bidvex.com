@@ -33,6 +33,17 @@
 - Notes: Backup buyer for iter201 phase3 buyer-gate tests
 
 
+## iter209 Rejected-partner test account (Step 2 resubmission flow)
+- Email: `iter209-rej-partner@example.com`
+- Password: `Test123!@#`
+- Role: user; partner_verification_status=rejected; partner_company_name="Auctioneer Inc"; partner_neq="1234567890"
+- Notes: re-seed via `scripts/migrate_doc_urls_to_relative.py` not needed; the testing agent provided a re-seed script in `/app/test_reports/iteration_199.json` if the user gets consumed by a real resubmit.
+
+## iter209 Rejected-dealer test account (Step 2 resubmission flow)
+- Email: `iter209-rej-dealer@example.com`
+- Password: `Test123!@#`
+- Role: user; vehicle_sellers.verification_status=rejected; business_name="ABC Motors"; license_number="OMVIC-555"; license_province="ON"
+
 ## Direct Google OAuth 2.0
 - Google Cloud Project: configured per `/app/backend/.env`
   - `GOOGLE_CLIENT_ID=<REDACTED — see /app/backend/.env>`
