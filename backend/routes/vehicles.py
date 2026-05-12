@@ -537,7 +537,46 @@ async def get_my_seller_profile(user: dict = Depends(get_current_user)):
     seller = await db.vehicle_sellers.find_one({"user_id": user["id"]}, {"_id": 0})
     if not seller:
         raise HTTPException(status_code=404, detail="Not registered as vehicle seller")
+    # iter209 — surface resubmission counters to the frontend
+    seller.setdefault("resubmission_count", 0)
+    seller.setdefault("max_resubmissions", 3)
+    seller.setdefault("rejection_history", [])
     return seller
+
+
+@vehicle_router.post("/vehicles/dealer/resubmit")
+async def resubmit_vehicle_dealer_application(
+    payload: VehicleSellerCreate,
+    user: dict = Depends(get_current_user),
+):
+    """iter209 Step 2 — Vehicle dealer application resubmission.
+
+    Rules:
+      - Current vehicle_sellers.verification_status must be 'rejected'
+      - Max 3 attempts (HTTP 403 with bilingual message on 4th)
+      - Text fields pre-fillable; uploads cleared (re-supplied via separate endpoint)
+    """
+    from services.resubmission_service import resubmit_application
+
+    body = {
+        "seller_type": payload.seller_type.value if payload.seller_type else None,
+        "business_name": payload.business_name,
+        "business_address": payload.business_address,
+        "business_phone": payload.business_phone,
+        "license_number": payload.license_number,
+        "license_province": payload.license_province,
+        "tax_id": payload.tax_id,
+        "website": payload.website,
+        "description": payload.description,
+    }
+    result = await resubmit_application(
+        db,
+        flavor="dealer",
+        user_id=user["id"],
+        user_email=user.get("email"),
+        payload=body,
+    )
+    return result
 
 
 @vehicle_router.post("/vehicle-sellers/documents")

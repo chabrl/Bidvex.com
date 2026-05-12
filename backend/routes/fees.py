@@ -14,6 +14,69 @@ logger = logging.getLogger(__name__)
 fees_router = APIRouter(tags=["Fees"])
 
 
+# ─── iter209 Step 4 — Single source of truth for cost-breakdown UI ────────
+
+@fees_router.get("/fees/v2/preview")
+@_limiter.limit("120/minute")
+async def fees_v2_preview(
+    request: Request,
+    hammer_price: float = Query(..., gt=0),
+    auction_type: str = Query("marketplace", description="marketplace | lots | vehicle | storage"),
+    seller_account_type: str = Query("individual", description="individual | partner | vehicle_dealer | storage_facility"),
+    seller_tier: Optional[str] = Query(None, description="standard | premium | vip_elite — only for individual"),
+    buyer_tier: str = Query("standard", description="standard | premium | vip_elite — buyer's own tier"),
+    seller_user_id: Optional[str] = Query(None, description="when given, the seller's account_type + tier + partner_bp_rate are resolved server-side"),
+    partner_bp_rate: Optional[float] = Query(None, ge=0, le=1, description="0..1 (e.g. 0.15 for 15%) — used when seller is partner"),
+    payment_method: str = Query("stripe", description="stripe | cash | e_transfer"),
+    card_type: str = Query("domestic", description="domestic | international | conversion"),
+):
+    """Live cost-breakdown preview using the iter209 `calculate_fee()` single source of truth.
+
+    When `seller_user_id` is provided, the seller's account_type, tier and saved
+    partner BP rate are read from MongoDB, so callers can stay declarative.
+    """
+    from services.fee_calculator import calculate_fee
+
+    # Resolve seller details from MongoDB if user_id was supplied
+    if seller_user_id:
+        try:
+            db = get_db()
+            doc = await db.users.find_one(
+                {"id": seller_user_id},
+                {"_id": 0, "account_type": 1, "subscription_tier": 1, "custom_premium_rate": 1,
+                 "is_partner": 1, "partner_verification_status": 1, "is_vehicle_dealer": 1,
+                 "is_storage_facility": 1},
+            ) or {}
+            if doc.get("is_partner") or doc.get("partner_verification_status") == "verified":
+                seller_account_type = "partner"
+                # Honor explicit partner_bp_rate query param; else seller's saved default
+                if partner_bp_rate is None and doc.get("custom_premium_rate") is not None:
+                    partner_bp_rate = float(doc.get("custom_premium_rate"))
+            elif doc.get("is_vehicle_dealer") or (doc.get("account_type") == "vehicle_dealer"):
+                seller_account_type = "vehicle_dealer"
+            elif doc.get("is_storage_facility") or (doc.get("account_type") == "storage_facility"):
+                seller_account_type = "storage_facility"
+            else:
+                seller_account_type = "individual"
+                if not seller_tier and doc.get("subscription_tier"):
+                    seller_tier = doc.get("subscription_tier")
+        except Exception as exc:
+            logger.warning(f"[iter209] fees v2 seller lookup failed: {exc}")
+
+    fee = calculate_fee(
+        hammer_price=hammer_price,
+        auction_type=auction_type,
+        seller_account_type=seller_account_type,
+        seller_tier=seller_tier,
+        buyer_account_type="individual",
+        buyer_tier=buyer_tier,
+        partner_bp_rate=float(partner_bp_rate) if partner_bp_rate is not None else 0.0,
+        payment_method=payment_method,
+        card_type=card_type,
+    )
+    return fee
+
+
 # ─── Live Fee Estimate (public — for front-end cost breakdown preview) ───
 
 @fees_router.get("/fees/estimate")

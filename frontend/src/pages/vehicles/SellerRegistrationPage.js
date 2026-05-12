@@ -21,6 +21,7 @@ import {
   Shield, Star, Loader2, AlertTriangle, Info, Car, ArrowRight
 } from 'lucide-react';
 import SellerDocumentManager from '../../components/vehicles/SellerDocumentManager';
+import { ResubmitApplicationPanel } from '../../components/ResubmitApplicationPanel';
 import { useTranslation } from 'react-i18next';
 
 const API = API_BASE;
@@ -47,7 +48,7 @@ const SELLER_TYPES = [
 ];
 
 const SellerRegistrationPage = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { token, user } = useAuth();
   const [step, setStep] = useState(1);
@@ -91,6 +92,8 @@ const SellerRegistrationPage = () => {
       }
     };
     
+    // expose for ResubmitApplicationPanel callback
+    window.__refetchVehicleSeller = checkExisting;
     checkExisting();
   }, [token, navigate]);
 
@@ -219,13 +222,37 @@ const SellerRegistrationPage = () => {
               )}
               
               {existingSeller.verification_status === 'rejected' && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <p className="text-red-700">
-                    Your application was rejected. Reason: {existingSeller.rejection_reason || 'Not specified'}
-                  </p>
-                  <p className="text-sm text-red-600 mt-2">
-                    Please contact support for more information.
-                  </p>
+                <div className="space-y-3">
+                  <div
+                    className="bg-red-50 border border-red-200 rounded-lg p-4"
+                    data-testid="dealer-rejection-reason-block"
+                  >
+                    <p className="text-red-700 font-semibold flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      {(i18n.language || 'en').toLowerCase().startsWith('fr')
+                        ? 'Demande refusée'
+                        : 'Application Declined'}
+                    </p>
+                    <p className="text-sm text-red-600 mt-2">
+                      <strong>{(i18n.language || 'en').toLowerCase().startsWith('fr') ? 'Raison' : 'Reason'}:</strong>{' '}
+                      {existingSeller.rejection_reason ||
+                        ((i18n.language || 'en').toLowerCase().startsWith('fr') ? 'Non spécifiée' : 'Not specified')}
+                    </p>
+                  </div>
+                  <ResubmitApplicationPanel
+                    flavor="dealer"
+                    token={token}
+                    rejectionReason={existingSeller.rejection_reason}
+                    resubmissionCount={existingSeller.resubmission_count || 0}
+                    rejectionHistory={existingSeller.rejection_history || []}
+                    prefillData={{
+                      sellerType: existingSeller.seller_type,
+                      businessName: existingSeller.business_name,
+                      licenseNumber: existingSeller.license_number,
+                      licenseProvince: existingSeller.license_province,
+                    }}
+                    onResubmitted={() => { if (typeof window.__refetchVehicleSeller === 'function') window.__refetchVehicleSeller(); }}
+                  />
                 </div>
               )}
               

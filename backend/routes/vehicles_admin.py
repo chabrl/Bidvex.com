@@ -204,6 +204,9 @@ async def reject_seller(
             "$set": {
                 "verification_status": SellerVerificationStatus.REJECTED.value,
                 "rejection_reason": reason,
+                # iter209 — capture who/when for resubmission history audit
+                "rejected_at": datetime.now(timezone.utc),
+                "rejected_by": admin["id"],
                 "updated_at": datetime.now(timezone.utc)
             }
         }

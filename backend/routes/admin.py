@@ -857,6 +857,9 @@ async def reject_partner(
             "is_partner": False,
             "partner_verification_status": "rejected",
             "partner_rejection_reason": reason,
+            # iter209 — capture who/when for resubmission history audit
+            "partner_rejected_at": now,
+            "partner_rejected_by": current_user.id,
             "updated_at": now,
         }}
     )

@@ -1,0 +1,38 @@
+{
+  "summary": "iter209 P0 sprint — full backend + frontend verification. All 4 existing iter209 test suites (steps 1-4) pass (22/22). Added new test_iter209_step6_dealer_subscription.py (7 tests, all pass) covering admin-only bootstrap idempotency, non-admin 403, sub status, and buyer-tier override regression for partner/vehicle_dealer/storage sellers. Frontend Path-B flows verified live: rejected partner sees `What to do next` panel + Resubmit CTA (no contact-support line); dialog pre-fills company='Auctioneer Inc' and NEQ='1234567890' with empty file inputs. Rejected dealer page shows REJECTED badge + Resubmit CTA; dialog pre-fills business='ABC Motors', license='OMVIC-555', province='ON'. /partner/payment-settings mounts (testid partner-payment-settings-page) and Add-a-Card button (partner-add-card-btn) triggers backend SetupIntent creation (Stripe iframe mounts). Frozen math preserved: $107.45 / $95.40 / $121.06 / $111.55 / $3.86 / $10,594.99 / $10,000 / $6.23 all match.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter209_step1_fee_calculator.py",
+    "/app/backend/tests/test_iter209_step2_resubmission.py",
+    "/app/backend/tests/test_iter209_step3_partner_card.py",
+    "/app/backend/tests/test_iter209_step4_fees_v2.py",
+    "/app/backend/tests/test_iter209_step6_dealer_subscription.py",
+    "/app/test_reports/pytest/iter209_steps_1_4.xml",
+    "/app/test_reports/pytest/iter209_steps_2_3.xml",
+    "/app/test_reports/pytest/iter209_step6.xml"
+  ],
+  "action_items": [
+    "Optional: add data-testid attrs on resubmit-dialog form inputs (partner-resubmit-company, partner-resubmit-neq, dealer-resubmit-business-name, dealer-resubmit-license-number, dealer-resubmit-province) — currently inputs work and pre-fill correctly but lack stable testid hooks for automation. Visual verification confirmed values are populated.",
+    "Optional: surface the CostBreakdown / PayoutSummary components in a buyer-facing checkout/listing-detail screen during E2E so headless tests can assert the 4 testid variants without mounting them in isolation. Component files exist with all required testids."
+  ],
+  "critical_code_review_comments": [
+    "Stripe SDK 13.x note from agent-context already respected — code uses stripe.StripeError directly (no stripe.error.* namespace).",
+    "Login endpoint rate-limit (~5/min) requires 15-20s cooldown between login bursts in test runs; already accommodated with time.sleep in test_iter209_step6_dealer_subscription.py.",
+    "Penny-rounding strategy in calculate_fee is correct — taxes are quantised per line BEFORE summation; all 5 spec amounts reconcile to the cent."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter209_step6_dealer_subscription.py (new — 7 tests)"
+  ],
+  "success_rate": { "backend": "100% (29/29)", "frontend": "100% — partner + dealer resubmit flows + payment-settings page verified live" },
+  "test_credentials": "Used admin charbel911@gmail.com, iter209-rej-partner@example.com / Test123!@#, iter209-rej-dealer@example.com / Test123!@#. Test users existed but were not in rejected state — I reseeded both via direct DB update (partner_verification_status='rejected' with rejection reason='Missing NEQ scan'; vehicle_sellers.verification_status='rejected' with reason='License invalid'). Pre-fill values restored to spec defaults.",
+  "seed_data_creation": "Reset iter209-rej-partner partner_verification_status to 'rejected' with partner_company_name='Auctioneer Inc' and partner_neq_number='1234567890'. Reset iter209-rej-dealer vehicle_sellers row to verification_status='rejected', business_name='ABC Motors', license_number='OMVIC-555', license_province='ON'. resubmission_count=0 and rejection_history=[] for both, so reseeding allows full 3-attempt resubmit cycle for follow-up runs.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All iter209 backend acceptance criteria are green (29/29). The 5 spec math test cases pass exactly. Resubmission, partner card gate, fees v2 preview, dealer subscription bootstrap idempotency, and buyer-tier override regressions all verified. Frontend resubmit dialogs render with correct pre-fills (visually validated via screenshots). If retesting, remember the seeded users get consumed after a real resubmit — re-run the reset script in this report's seed_data_creation section to restore them to 'rejected' state. Stripe SetupIntent on /partner/payment-settings only mounts when partner_verification_status='verified' AND is_partner=true; rejected partners correctly receive 403 from setup-card endpoint.",
+  "rca of the issue": "N/A — no bugs found. Initial frontend selector failures were due to missing data-testid on dialog form inputs (cosmetic — values are correctly pre-filled, just not addressable by testid). Recommendation captured as optional action item."
+}

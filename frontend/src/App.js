@@ -70,6 +70,7 @@ const MaintenancePage = lazy(() => import('./pages/MaintenancePage'));
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const BecomePartnerPage = lazy(() => import('./pages/BecomePartnerPage'));
 const PartnerDashboard = lazy(() => import('./pages/PartnerDashboard'));
+const PartnerPaymentSettings = lazy(() => import('./pages/PartnerPaymentSettings'));
 const LegalPage = lazy(() => import('./pages/LegalPage'));
 const PlatformPoliciesPage = lazy(() => import('./pages/PlatformPoliciesPage'));
 const InviteAcceptPage = lazy(() => import('./pages/InviteAcceptPage'));
@@ -388,6 +389,9 @@ const App = () => {
           <Route path="/become-a-partner" element={<BecomePartnerPage />} />
           <Route path="/partner/dashboard" element={
             <ProtectedRoute><PartnerDashboard /></ProtectedRoute>
+          } />
+          <Route path="/partner/payment-settings" element={
+            <ProtectedRoute><PartnerPaymentSettings /></ProtectedRoute>
           } />
           <Route path="/client-marketing" element={
             <ProtectedRoute><ClientEmailMarketing /></ProtectedRoute>

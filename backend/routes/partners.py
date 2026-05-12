@@ -251,6 +251,10 @@ async def get_partner_status(current_user: User = Depends(get_current_user)):
         "verified_at": user_doc.get("partner_verified_at"),
         "rejection_reason": user_doc.get("partner_rejection_reason"),
         "custom_premium_rate": user_doc.get("custom_premium_rate"),
+        # iter209 — resubmission counters surfaced to the frontend
+        "resubmission_count": int(user_doc.get("resubmission_count") or 0),
+        "max_resubmissions": 3,
+        "rejection_history": user_doc.get("rejection_history") or [],
     }
 
 
@@ -314,6 +318,67 @@ async def serve_partner_document(
     return FileResponse(str(file_path))
 
 
+
+
+@partners_router.post("/partner/resubmit")
+async def resubmit_partner_application(
+    company_name: str = Form(...),
+    neq_number: str = Form(...),
+    neq_document: UploadFile = File(...),
+    certification_documents: List[UploadFile] = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    """iter209 Step 2 — Partner application resubmission.
+
+    Rules:
+      - status must currently be 'rejected'
+      - max 3 attempts (returns 403 with bilingual message on 4th)
+      - files always re-uploaded (no pre-fill on documents)
+      - text fields (company_name, neq_number) accepted from FormData
+    """
+    from services.resubmission_service import resubmit_application
+
+    db = get_db()
+
+    # Re-use the upload helper from /partner/apply: save files first, build relative URLs
+    upload_dir = Path("uploads/partner_docs")
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    neq_contents = await neq_document.read()
+    if len(neq_contents) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="NEQ document must be less than 10MB.")
+    neq_ext = neq_document.filename.split('.')[-1] if '.' in neq_document.filename else 'pdf'
+    neq_filename = f"neq_{current_user.id}_{uuid.uuid4().hex[:8]}.{neq_ext}"
+    with open(upload_dir / neq_filename, "wb") as f:
+        f.write(neq_contents)
+    neq_url = f"/api/uploads/partner_docs/{neq_filename}"
+
+    cert_urls: List[str] = []
+    for cert_doc in certification_documents:
+        cert_contents = await cert_doc.read()
+        if len(cert_contents) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail=f"File '{cert_doc.filename}' must be less than 10MB.")
+        cert_ext = cert_doc.filename.split('.')[-1] if '.' in cert_doc.filename else 'pdf'
+        cert_filename = f"cert_{current_user.id}_{uuid.uuid4().hex[:8]}.{cert_ext}"
+        with open(upload_dir / cert_filename, "wb") as f:
+            f.write(cert_contents)
+        cert_urls.append(f"/api/uploads/partner_docs/{cert_filename}")
+
+    payload = {
+        "partner_company_name": (company_name or "").strip(),
+        "partner_neq": (neq_number or "").strip(),
+        "partner_neq_document": neq_url,
+        "partner_certifications": cert_urls,
+    }
+
+    result = await resubmit_application(
+        db,
+        flavor="partner",
+        user_id=current_user.id,
+        user_email=current_user.email,
+        payload=payload,
+    )
+    return result
 
 
 @partners_router.get("/partner/payment-status")

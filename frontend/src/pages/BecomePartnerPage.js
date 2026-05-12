@@ -1,3 +1,4 @@
+import ResubmitApplicationPanel from '../components/ResubmitApplicationPanel';
 import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
@@ -21,7 +22,7 @@ const API = API_BASE;
 const BecomePartnerPage = () => {
   const { user, token } = useAuth();
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [partnerStatus, setPartnerStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -109,8 +110,9 @@ const BecomePartnerPage = () => {
     if (!partnerStatus || partnerStatus.verification_status === 'unverified') return null;
     const config = {
       pending: { icon: Clock, bg: 'bg-amber-50 dark:bg-amber-950/50 border-amber-200 dark:border-amber-700/40', text: 'text-amber-700 dark:text-amber-300', sub: 'text-amber-600 dark:text-slate-400', label: t('partnerPage.statusPendingLabel'), desc: t('partnerPage.statusPendingDesc') },
+      pending_review: { icon: Clock, bg: 'bg-amber-50 dark:bg-amber-950/50 border-amber-200 dark:border-amber-700/40', text: 'text-amber-700 dark:text-amber-300', sub: 'text-amber-600 dark:text-slate-400', label: t('partnerPage.statusPendingLabel'), desc: (i18n.language || 'en').toLowerCase().startsWith('fr') ? "Votre nouvelle demande est en cours d'examen. Nous vous contacterons dans les 24 à 48 heures." : "Your resubmission is under review. We'll contact you within 24–48 hours." },
       verified: { icon: Award, bg: 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-700/40', text: 'text-emerald-700 dark:text-emerald-300', sub: 'text-emerald-600 dark:text-slate-400', label: t('partnerPage.statusVerifiedLabel'), desc: t('partnerPage.statusVerifiedDesc') },
-      rejected: { icon: XCircle, bg: 'bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-700/40', text: 'text-red-700 dark:text-red-300', sub: 'text-red-600 dark:text-slate-400', label: t('partnerPage.statusRejectedLabel'), desc: partnerStatus.rejection_reason || 'Please contact partners@bidvex.ca for details.' },
+      rejected: { icon: XCircle, bg: 'bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-700/40', text: 'text-red-700 dark:text-red-300', sub: 'text-red-600 dark:text-slate-400', label: t('partnerPage.statusRejectedLabel'), desc: partnerStatus.rejection_reason || ((i18n.language || 'en').toLowerCase().startsWith('fr') ? 'Veuillez contacter partners@bidvex.ca pour plus de détails.' : 'Please contact partners@bidvex.ca for details.') },
     }[partnerStatus.verification_status];
     if (!config) return null;
     const Icon = config.icon;
@@ -235,7 +237,20 @@ const BecomePartnerPage = () => {
                 <p className="text-emerald-700 dark:text-emerald-400 font-semibold">{t('partnerPage.verifiedTitle')}</p>
                 <p className="text-slate-500 text-sm">{t('partnerPage.verifiedDesc')}</p>
               </div>
-            ) : partnerStatus?.verification_status === 'pending' ? null : (
+            ) : partnerStatus?.verification_status === 'rejected' ? (
+              <ResubmitApplicationPanel
+                flavor="partner"
+                token={token}
+                rejectionReason={partnerStatus.rejection_reason}
+                resubmissionCount={partnerStatus.resubmission_count || 0}
+                rejectionHistory={partnerStatus.rejection_history || []}
+                prefillData={{
+                  companyName: partnerStatus.company_name,
+                  neqNumber: partnerStatus.neq_number,
+                }}
+                onResubmitted={fetchStatus}
+              />
+            ) : (partnerStatus?.verification_status === 'pending' || partnerStatus?.verification_status === 'pending_review') ? null : (
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">

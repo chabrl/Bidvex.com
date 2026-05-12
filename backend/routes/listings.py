@@ -174,6 +174,20 @@ async def create_listing(
     # Sticky Card Guard: require valid payment method
     await validate_payment_method_for_listing(db, current_user)
 
+    # iter209 Step 3 — Partner offering cash/e-transfer MUST have a saved card on file.
+    # The 3% platform commission is auto-charged to that card when the auction closes.
+    chosen_pm = (listing_data.payment_method or "").strip().lower().replace("-", "_")
+    if chosen_pm in ("cash", "e_transfer", "etransfer"):
+        user_row = await db.users.find_one({"id": current_user.id}, {"_id": 0, "partner_stripe_payment_method_id": 1, "partner_verification_status": 1, "is_partner": 1})
+        is_partner = (user_row or {}).get("is_partner") or (user_row or {}).get("partner_verification_status") == "verified"
+        if is_partner and not (user_row or {}).get("partner_stripe_payment_method_id"):
+            raise HTTPException(status_code=403, detail={
+                "error": "partner_card_required",
+                "message_en": "A card on file is required to offer cash or e-transfer payment. Add your card in Payment Settings.",
+                "message_fr": "Une carte enregistrée est requise pour offrir le paiement en espèces ou par virement. Ajoutez votre carte dans les paramètres de paiement.",
+                "settings_url": "/partner/payment-settings",
+            })
+
     await validate_seller(db, current_user, listing_data.agreement_accepted)
 
     client_ip = request.client.host if request else "unknown"
