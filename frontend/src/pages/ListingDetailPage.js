@@ -36,6 +36,7 @@ import { useTrustStatus, BidBlocker } from '../components/TrustVerification';
 import { SellerReputationCard, SellerReviewsList } from '../components/SellerReputation';
 import { CrossBorderAdvisoryPanel, CrossBorderBidModal } from '../components/legal/LegalComplianceSections';
 import { VehicleFeeBreakdown, SellerContactGate } from '../components/vehicles/VehicleFeeBreakdown';
+import { CostBreakdown } from '../components/CostBreakdown'; // iter210 Step 6
 import Lightbox from 'yet-another-react-lightbox';
 import 'yet-another-react-lightbox/styles.css';
 import InfoTip from '../components/InfoTip';
@@ -674,6 +675,25 @@ const ListingDetailPage = () => {
                         data-testid="bid-amount-input"
                       />
                     </div>
+
+                    {/* iter210 Step 6 — Live cost breakdown for any auction type */}
+                    {bidAmount && parseFloat(bidAmount) > 0 && (
+                      <CostBreakdown
+                        hammerPrice={parseFloat(bidAmount)}
+                        auctionType={listing.category_type || (listing.is_vehicle ? 'vehicle' : 'lots')}
+                        sellerUserId={listing.seller_id}
+                        paymentMethod={(listing.payment_method || 'stripe').replace('-', '_')}
+                        sellerAccountType={
+                          listing.seller_account_type ||
+                          (listing.is_vehicle ? 'vehicle_dealer' :
+                           listing.is_partner_listing ? 'partner' :
+                           listing.is_storage_listing ? 'storage_facility' : 'individual')
+                        }
+                        buyerTier={user?.subscription_tier || 'standard'}
+                        currency={listing.currency || 'CAD'}
+                        className="mt-2"
+                      />
+                    )}
 
                     {/* Spec Feature 1 — Deposit Notice (above bid button) */}
                     {listing.requires_deposit && listing.deposit_amount > 0 ? (

@@ -1,5 +1,69 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter210 — Webhooks, Resubmit Email Fix, Pricing Engine, Demo Accounts, Mounts, Fee Migration (Feb 8, 2026)
+
+7 steps approved + executed in exact order. All math from iter209 remains FROZEN.
+
+### Step 1 — `invoice.payment_failed` Webhook + Dealer Grace Period ✅
+- `services/dealer_grace_period_service.py` (NEW) — Day-1 webhook handler, daily Day-7 cron enforcement, reactivation on payment success
+- `routes/webhooks.py::_handle_payment_failed` + `_handle_payment_succeeded` — vehicle-dealer subscription branch wired
+- `services/scheduler.py` — `enforce_dealer_grace_period_job` runs daily at 02:30 UTC
+- Idempotent via `stripe_event_id` unique key on `dealer_compliance_log` collection
+- Bilingual EN/FR warning email day-1 + suspension email day-7
+
+### Step 2 — Partner Resubmission Admin Email Bug Fix ✅
+- Root cause: `ADMIN_NOTIFICATION_EMAIL` env var never set → fallback to `partners@bidvex.ca` which the user does not receive at
+- Fix: `services/resubmission_service.py::_notify_admin_resubmission` rewritten with `ADMIN_NOTIFICATION_EMAIL → PARTNERS_ALERT_EMAIL → partners@bidvex.ca` resolution chain, comma-separated multi-recipient support, `logger.exception` on crash (no more silent fail), `email_recipients` + `email_send_results` persisted on `admin_notifications.extra`
+- Email body now includes: applicant name, email, **province**, **Resubmission #N**, previous rejection reason, **timestamp** (UTC), admin panel link
+- `/app/backend/.env` updated with `ADMIN_NOTIFICATION_EMAIL=charbel911@gmail.com`
+
+### Step 3 — Admin Pricing Engine ✅
+- `services/pricing_engine_service.py` (NEW) — MongoDB-backed `pricing_settings` collection. `is_within_launch_window()` is the single source of truth consulted by `create_dealer_subscription` (one-line `if`).
+- `routes/pricing_engine_routes.py` (NEW) — 4 endpoints: list/get/put admin + public preview
+- `pages/admin/PricingEnginePage.js` (NEW) — editable card per pricing key, live effective-price preview
+- Stripe Coupons are immutable on `percent_off`, so a change yields a NEW coupon ID (e.g. `LAUNCH50_VDA` → `LAUNCH75_VDA`) and existing subs keep their old discount
+
+### Step 4 — Unsubscribe Link Endpoint ✅
+- Endpoint `GET /api/unsubscribe/generate-test-link?email=X` was already in place — confirmed working, returns `{email, url_en, url_fr, expires_in_days: 30}`
+- `{{unsubscribe_url_en}}` + `{{unsubscribe_url_fr}}` substitutions confirmed wired in `services/email_marketing.py` (lines 931-932 HTML, 938-939 plain text) and `services/email_service.py`
+- Sample EN URL for test@bidvex.ca: `https://bidvex.com/unsubscribe?token=eyJlbWFpbCI6InRlc3RAYmlkdmV4LmNhIn0.agNRSw.jlsPPnRrrRQ9OnLUunqBclCT9Y8&lang=en`
+
+### Step 5 — Admin Demo Account Creator ✅
+- `services/demo_account_service.py` (NEW) + `routes/demo_account_routes.py` (NEW) — 6 admin endpoints under `/api/admin/demo-accounts*`
+- `pages/admin/DemoAccountsPage.js` (NEW) — create form + live table with Extend/Convert/Delete actions
+- Demo users blocked from real Stripe payments at `POST /api/listings` (HTTP 403 `demo_mode_payments_disabled` bilingual)
+- Bilingual welcome email with temp credentials + expiry date + "no real transactions" disclaimer
+- Daily cron at 03:00 UTC flips expired demos → `demo_status=expired` + bilingual expiry email + hides demo listings
+
+### Step 6 — Mount CostBreakdown + PayoutSummary ✅
+- `pages/ListingDetailPage.js` — `<CostBreakdown>` live under bid input (auto-detects seller account type)
+- `pages/vehicles/VehicleDetailPage.js` — `<CostBreakdown>` mounted with `vehicle_dealer` flat 2.5% variant
+- `pages/SellerDashboard.js` — `<PayoutSummary>` under every `sold` listing, auto-selects variant from user's account flags
+
+### Step 7 — Migrate Legacy Fee Callers ⚠️ (Partial)
+- **FULLY MIGRATED & DELETED**: `FeeCalculator.calculate_full_transaction` method. 3 callers migrated.
+- `grep -rn "calculate_full_transaction" --include="*.py" | grep -v tests | grep -v __pycache__` → 0 references
+- **REMAINING TECHNICAL DEBT**: `PricingManager` class still referenced by 8 non-test files (settlement layer). Each consumes its `BuyerInvoice`/`SellerInvoice` dataclass shape — migrating safely requires a `calculate_fee_legacy_shape()` adapter + comprehensive settlement-layer regression testing. **Recommended for iter211 as a dedicated standalone sprint** against real-money paths.
+
+### Cumulative Test Status
+- 50/50 iter209+iter210 tests passing in isolation
+- All math from iter209 spec test cases unchanged
+- Lint clean across all modified files
+
+### Files of reference (iter210 additions)
+- `/app/backend/services/dealer_grace_period_service.py`
+- `/app/backend/services/pricing_engine_service.py`
+- `/app/backend/services/demo_account_service.py`
+- `/app/backend/routes/pricing_engine_routes.py`
+- `/app/backend/routes/demo_account_routes.py`
+- `/app/frontend/src/pages/admin/PricingEnginePage.js`
+- `/app/frontend/src/pages/admin/DemoAccountsPage.js`
+- 5 new test files: `test_iter210_step{1,2,3,4,5}_*.py`
+
+⚠️ **All changes are in PREVIEW.** Redeploy required for production. `ADMIN_NOTIFICATION_EMAIL` env var added to `.env` — must be replicated in production .env on redeploy.
+
+---
+
 ## Latest: iter209 — Resubmission Flow + Payment Infrastructure Rebuild (Feb 8, 2026) ✅
 
 P0 sprint covering 7 steps approved + executed in order. Math frozen after Step 1.

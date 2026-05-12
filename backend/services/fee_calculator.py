@@ -582,31 +582,10 @@ class FeeCalculator:
             "tier": seller_tier
         }
     
-    @staticmethod
-    def calculate_full_transaction(
-        hammer_price: Decimal,
-        buyer_tier: str = "free",
-        seller_tier: str = "free",
-        region: str = "QC",
-        seller_is_business: bool = False
-    ) -> Dict:
-        """
-        Calculate complete transaction breakdown for buyer and seller
-        """
-        buyer_calc = FeeCalculator.calculate_buyer_total(
-            hammer_price, buyer_tier, region, True, seller_is_business
-        )
-        seller_calc = FeeCalculator.calculate_seller_net(
-            hammer_price, seller_tier
-        )
-        
-        return {
-            "hammer_price": float(hammer_price),
-            "buyer": buyer_calc,
-            "seller": seller_calc,
-            "platform_revenue": buyer_calc["buyer_premium"] + seller_calc["seller_commission"],
-            "seller_type": "business" if seller_is_business else "individual"
-        }
+    # iter210 Step 7 — `calculate_full_transaction` deleted (callers migrated
+    # to `calculate_fee()`). The other FeeCalculator helpers are still used by
+    # the public Fee Helpers section and by `calculate_buyer_total` / `calculate_seller_net`
+    # one-shot helpers below — they remain until those are migrated next sprint.
 
 
 # Helper function for quick calculations

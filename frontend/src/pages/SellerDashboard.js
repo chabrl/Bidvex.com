@@ -1,4 +1,5 @@
 import API_BASE from '../config';
+import { PayoutSummary } from '../components/PayoutSummary'; // iter210 Step 6
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -623,6 +624,27 @@ const SellerDashboard = () => {
                             <div className="flex justify-between"><dt className="text-muted-foreground">Email</dt><dd className="font-medium"><a className="text-emerald-700 hover:underline" href={`mailto:${listing.buyer_contact.email}`}>{listing.buyer_contact.email || '—'}</a></dd></div>
                             <div className="flex justify-between"><dt className="text-muted-foreground">Phone</dt><dd className="font-medium">{listing.buyer_contact.phone ? <a className="text-emerald-700 hover:underline" href={`tel:${listing.buyer_contact.phone}`}>{listing.buyer_contact.phone}</a> : '—'}</dd></div>
                           </dl>
+                        </div>
+                      )}
+
+                      {/* iter210 Step 6 — Payout Summary for SOLD listings */}
+                      {listing.status === 'sold' && (listing.current_price || listing.starting_price) && (
+                        <div className="mt-3" data-testid={`payout-summary-${listing.id}`}>
+                          <p className="text-xs uppercase font-semibold text-slate-600 dark:text-slate-300 mb-2">Payout Summary</p>
+                          <PayoutSummary
+                            hammerPrice={listing.current_price || listing.starting_price}
+                            auctionType={listing.category_type || 'lots'}
+                            sellerAccountType={
+                              user?.is_partner ? 'partner' :
+                              user?.is_vehicle_dealer ? 'vehicle_dealer' :
+                              user?.is_storage_facility ? 'storage_facility' : 'individual'
+                            }
+                            sellerUserId={user?.id}
+                            sellerTier={user?.subscription_tier || 'standard'}
+                            partnerBpRate={user?.custom_premium_rate}
+                            paymentMethod={(listing.payment_method || 'stripe').replace('-', '_')}
+                            currency={listing.currency || 'CAD'}
+                          />
                         </div>
                       )}
                     </div>

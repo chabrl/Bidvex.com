@@ -47,6 +47,7 @@ import {
   VehicleAcquisitionCost,
   RelatedVehicles,
 } from '../../components/vehicles/VehicleDetailPieces';
+import { CostBreakdown } from '../../components/CostBreakdown'; // iter210 Step 6
 
 // Trust & Legal Components
 import {
@@ -489,6 +490,20 @@ const BiddingPanel = ({ vehicle, onBidPlaced }) => {
                   vehicleId={vehicle?.id} 
                   bidAmount={parseFloat(bidAmount)}
                   province={vehicle?.location_province}
+                />
+              )}
+              
+              {/* iter210 Step 6 — Live CostBreakdown (vehicle_dealer 2.5% buyer fee) */}
+              {bidAmount && parseFloat(bidAmount) > 0 && (
+                <CostBreakdown
+                  hammerPrice={parseFloat(bidAmount)}
+                  auctionType="vehicle"
+                  sellerAccountType="vehicle_dealer"
+                  sellerUserId={vehicle?.seller_user_id || vehicle?.created_by}
+                  buyerTier={user?.subscription_tier || 'standard'}
+                  paymentMethod="stripe"
+                  currency={vehicle?.currency || 'CAD'}
+                  className="mt-2"
                 />
               )}
               

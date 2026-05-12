@@ -131,7 +131,7 @@ async def handle_stripe_webhook(request: Request):
         elif event_type == "invoice.payment_succeeded":
             await _handle_payment_succeeded(db, data)
         elif event_type == "invoice.payment_failed":
-            await _handle_payment_failed(db, data)
+            await _handle_payment_failed(db, data, event_id=event.get("id"))
         elif event_type == "invoice.paid":
             # For subscription-related invoices, delegate to subscription handler
             if data.get("subscription"):
@@ -521,6 +521,15 @@ async def _handle_payment_succeeded(db, invoice):
     if not user:
         return
     
+    # iter210 — Vehicle dealer annual subscription renewal succeeded → reactivate
+    if subscription_id and user.get("vehicle_dealer_subscription_id") == subscription_id:
+        if user.get("vehicle_dealer_grace_started_at") or user.get("vehicle_dealer_suspended"):
+            try:
+                from services.dealer_grace_period_service import reactivate_dealer_after_payment
+                await reactivate_dealer_after_payment(db, user_id=user["id"])
+            except Exception as exc:
+                logger.warning(f"[iter210] dealer reactivation failed: {exc}")
+    
     # Check if this is a partner subscription renewal payment
     if subscription_id and user.get("partner_subscription_id") == subscription_id:
         if not user.get("platform_fee_paid"):
@@ -554,14 +563,24 @@ async def _handle_payment_succeeded(db, invoice):
     })
 
 
-async def _handle_payment_failed(db, invoice):
-    """Handle failed payment — includes partner soft lock on recurring failure"""
+async def _handle_payment_failed(db, invoice, event_id: str | None = None):
+    """Handle failed payment — includes partner soft lock + iter210 vehicle-dealer grace period."""
     customer_id = invoice.get("customer")
     subscription_id = invoice.get("subscription")
     
     user = await db.users.find_one({"stripe_customer_id": customer_id})
     if not user:
         return
+    
+    # iter210 — Vehicle dealer annual subscription failure → start 7-day grace
+    if subscription_id and user.get("vehicle_dealer_subscription_id") == subscription_id:
+        try:
+            from services.dealer_grace_period_service import handle_dealer_subscription_payment_failed
+            await handle_dealer_subscription_payment_failed(
+                db, event_id=event_id or invoice.get("id"), invoice=invoice, user=user,
+            )
+        except Exception as exc:
+            logger.warning(f"[iter210] dealer grace-period init failed: {exc}")
     
     # Check if this is a partner subscription payment failure
     if subscription_id and user.get("partner_subscription_id") == subscription_id:

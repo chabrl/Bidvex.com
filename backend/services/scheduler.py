@@ -230,7 +230,6 @@ async def daily_summary_job():
     if db_instance is None:
         logger.warning("Database not initialized, skipping daily summary")
         return {"error": "db_not_initialized"}
-    
     async def _run():
         logger.info("Generating daily summary...")
         now = datetime.now(timezone.utc)
@@ -274,6 +273,30 @@ async def daily_summary_job():
         return summary
     
     return await safe_db_operation("daily_summary", _run)
+
+
+async def enforce_dealer_grace_period_job():
+    """iter210 Step 1 — Suspend dealers whose 7-day grace expired without payment."""
+    if db_instance is None:
+        logger.warning("Database not initialized, skipping dealer grace enforcement")
+        return {"error": "db_not_initialized"}
+
+    async def _run():
+        from services.dealer_grace_period_service import enforce_dealer_grace_period
+        return await enforce_dealer_grace_period(db_instance)
+    return await safe_db_operation("enforce_dealer_grace_period", _run)
+
+
+async def check_demo_account_expiry_job():
+    """iter210 Step 5 — Flip expired demo accounts to demo_expired + email + hide listings."""
+    if db_instance is None:
+        logger.warning("Database not initialized, skipping demo expiry check")
+        return {"error": "db_not_initialized"}
+
+    async def _run():
+        from services.demo_account_service import check_demo_account_expiry
+        return await check_demo_account_expiry(db_instance)
+    return await safe_db_operation("check_demo_account_expiry", _run)
 
 
 async def check_subscription_expirations_job():
@@ -707,6 +730,24 @@ def init_scheduler(database):
         CronTrigger(hour=9, minute=0),
         id="settlement_reminders",
         name="Vehicle Settlement Confirmation Reminders",
+        replace_existing=True,
+    )
+
+    # Job 6c (iter210) — Vehicle dealer 7-day grace-period enforcement — daily at 02:30 UTC
+    scheduler.add_job(
+        _tracked("enforce_dealer_grace_period", enforce_dealer_grace_period_job),
+        CronTrigger(hour=2, minute=30),
+        id="enforce_dealer_grace_period",
+        name="Vehicle Dealer Grace Period Enforcement (iter210)",
+        replace_existing=True,
+    )
+
+    # Job 6d (iter210) — Demo-account expiry — daily at 03:00 UTC
+    scheduler.add_job(
+        _tracked("check_demo_account_expiry", check_demo_account_expiry_job),
+        CronTrigger(hour=3, minute=0),
+        id="check_demo_account_expiry",
+        name="Demo Account Expiry (iter210)",
         replace_existing=True,
     )
     

@@ -287,7 +287,7 @@ async def estimate_full_transaction(
 ):
     """Estimate complete transaction costs for both buyer and seller"""
     try:
-        from services.fee_calculator import FeeCalculator
+        from services.fee_calculator import calculate_fee
         db = get_db()
         buyer_tier = "free"
         seller_tier = "free"
@@ -303,14 +303,18 @@ async def estimate_full_transaction(
                 seller_tier = seller.get("subscription_tier", "free")
                 seller_is_business = seller.get("is_tax_registered", False)
 
-        transaction = FeeCalculator.calculate_full_transaction(
-            hammer_price=Decimal(str(hammer_price)),
-            buyer_tier=buyer_tier,
+        # iter210 Step 7 — Route through `calculate_fee()` single source of truth
+        fee = calculate_fee(
+            hammer_price=float(hammer_price),
+            auction_type="lots",
+            seller_account_type="individual",
             seller_tier=seller_tier,
-            region=region,
-            seller_is_business=seller_is_business
+            buyer_account_type="individual",
+            buyer_tier=buyer_tier,
+            payment_method="stripe",
+            card_type="domestic",
         )
-        return {"success": True, **transaction}
+        return {"success": True, **fee}
     except Exception as e:
         logger.error(f"Error estimating transaction: {e}")
         raise HTTPException(status_code=500, detail="Failed to estimate transaction")

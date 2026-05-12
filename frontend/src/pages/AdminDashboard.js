@@ -42,6 +42,8 @@ import AdminComplianceAlerts from './admin/AdminComplianceAlerts';
 import AIGuardDashboard from './admin/AIGuardDashboard';
 import RiskMonitoringDashboard from './admin/RiskMonitoringDashboard';
 import PricingManager from './admin/PricingManager';
+import PricingEnginePage from './admin/PricingEnginePage'; // iter210 Step 3
+import DemoAccountsPage from './admin/DemoAccountsPage'; // iter210 Step 5
 import CouponManager from './admin/CouponManager';
 import AdminEscrowManager from './admin/AdminEscrowManager';
 import SubscriptionAnalytics from './admin/SubscriptionAnalytics';
@@ -116,7 +118,9 @@ const SECONDARY_TABS = {
     { id: 'marketplace-settings', label: 'Marketplace Settings', icon: '⚙️', lucideIcon: Sliders },
     { id: 'subscriptions', label: 'Subscriptions', icon: '💎', lucideIcon: CreditCard },
     { id: 'subscription-analytics', label: 'Subscription Analytics', icon: '📊', lucideIcon: BarChart3 },
-    { id: 'pricing-engine', label: 'Pricing Engine', icon: '💰', lucideIcon: DollarSign },
+    { id: 'pricing-engine', label: 'Pricing Engine (Tiers)', icon: '💰', lucideIcon: DollarSign },
+    { id: 'pricing-engine-v2', label: 'Pricing Engine (Subs)', icon: '💵', lucideIcon: DollarSign },
+    { id: 'demo-accounts', label: 'Demo Accounts', icon: '🎭', lucideIcon: DollarSign },
     { id: 'coupon-codes', label: 'Coupon Codes', icon: '🎟️', lucideIcon: Ticket },
     { id: 'email-marketing', label: 'Email Marketing', icon: '📤', lucideIcon: Send },
     { id: 'marketing-integrations', label: 'Marketing Integrations', icon: '📣', lucideIcon: Send },
@@ -430,6 +434,8 @@ const AdminDashboard = () => {
           case 'subscriptions': return <SubscriptionManager />;
           case 'subscription-analytics': return <SubscriptionAnalytics />;
           case 'pricing-engine': return <PricingManager />;
+          case 'pricing-engine-v2': return <PricingEnginePage />;
+          case 'demo-accounts': return <DemoAccountsPage />;
           case 'coupon-codes': return <CouponManager />;
           case 'email-marketing': return <EmailMarketingManager />;
           case 'marketing-integrations': return <AdminMarketingIntegrations />;

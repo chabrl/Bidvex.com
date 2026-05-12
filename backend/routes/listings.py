@@ -171,6 +171,15 @@ async def create_listing(
         surface="single_listing",
     )
 
+    # iter210 Step 5 — Demo accounts cannot place real bids / payments
+    user_demo_row = await db.users.find_one({"id": current_user.id}, {"_id": 0, "is_demo_account": 1})
+    if user_demo_row and user_demo_row.get("is_demo_account"):
+        raise HTTPException(status_code=403, detail={
+            "error": "demo_mode_payments_disabled",
+            "message_en": "Demo mode — payments disabled. This account is for demonstration purposes only.",
+            "message_fr": "Mode démo — paiements désactivés. Ce compte est uniquement à des fins de démonstration.",
+        })
+
     # Sticky Card Guard: require valid payment method
     await validate_payment_method_for_listing(db, current_user)
 

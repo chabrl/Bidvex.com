@@ -136,35 +136,37 @@ async def create_dealer_subscription(
     user_email: Optional[str] = None,
     user_name: Optional[str] = None,
     payment_method_id: Optional[str] = None,
-    apply_launch_discount: bool = True,
+    apply_launch_discount: Optional[bool] = None,
 ) -> dict:
     """Create a recurring annual subscription for a vehicle dealer.
 
-    If `payment_method_id` is supplied, it is attached as the customer's default
-    PM. Otherwise the caller must collect payment via Stripe Hosted Checkout or
-    a SetupIntent flow before calling this function.
-
-    Returns the subscription dict (id, status, current_period_end, latest_invoice).
+    iter210 Step 3: consults `pricing_engine_service` for the live price/coupon
+    and applies the launch coupon iff `is_within_launch_window` is True.
+    Callers can override `apply_launch_discount` explicitly (used by tests).
     """
-    settings = await _get_or_create_settings(db)
+    # Read live pricing — auto-creates Stripe Product/Price/Coupon on first call
+    from services.pricing_engine_service import update_pricing, is_within_launch_window
+    settings = await update_pricing(db, "vehicle_dealer_annual_fee")
     customer_id = await _ensure_customer(db, user_id, user_email, user_name)
 
     if payment_method_id:
         try:
             stripe.PaymentMethod.attach(payment_method_id, customer=customer_id)
         except stripe.StripeError as e:
-            # Likely already attached — keep going
             logger.warning(f"[iter209] PM attach (sub) no-op: {e}")
         stripe.Customer.modify(customer_id, invoice_settings={"default_payment_method": payment_method_id})
 
     sub_kwargs = {
         "customer": customer_id,
-        "items": [{"price": settings["price_id"]}],
+        "items": [{"price": settings["stripe_price_id"]}],
         "expand": ["latest_invoice.payment_intent"],
         "metadata": {"bidvex_user_id": user_id, "kind": "vehicle_dealer_annual"},
     }
-    if apply_launch_discount:
-        sub_kwargs["discounts"] = [{"coupon": settings["coupon_id"]}]
+    # Should the launch coupon apply? Admin can override per-call (apply_launch_discount=True)
+    if apply_launch_discount is None:
+        apply_launch_discount = is_within_launch_window(settings)
+    if apply_launch_discount and settings.get("stripe_coupon_id"):
+        sub_kwargs["discounts"] = [{"coupon": settings["stripe_coupon_id"]}]
 
     sub = stripe.Subscription.create(**sub_kwargs)
 
@@ -177,7 +179,7 @@ async def create_dealer_subscription(
             if hasattr(sub, "current_period_end") and sub.current_period_end else None
         ),
         "vehicle_dealer_subscription_started_at": datetime.now(timezone.utc),
-        "vehicle_dealer_subscription_price_id": settings["price_id"],
+        "vehicle_dealer_subscription_price_id": settings["stripe_price_id"],
     }
     await db.users.update_one({"id": user_id}, {"$set": update})
 

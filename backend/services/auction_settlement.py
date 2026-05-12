@@ -36,7 +36,7 @@ from services.payment_idempotency import (
     reserve_charge_row,
     rollback_stripe_charge,
 )
-from services.fee_calculator import FeeCalculator
+from services.fee_calculator import calculate_fee
 
 logger = logging.getLogger(__name__)
 
@@ -175,16 +175,19 @@ async def settle_cash_or_etransfer(
     seller = await db.users.find_one({"id": seller_id})
     seller_tier = (seller or {}).get("subscription_tier", "free")
 
-    region = listing.get("region", "QC")
-    breakdown = FeeCalculator.calculate_full_transaction(
-        Decimal(str(hammer_price)),
-        buyer_tier=buyer_tier,
+    # iter210 Step 7 — Single source of truth: calculate_fee()
+    fee = calculate_fee(
+        hammer_price=float(hammer_price),
+        auction_type="lots",
+        seller_account_type="individual",
         seller_tier=seller_tier,
-        region=region,
-        seller_is_business=bool((seller or {}).get("is_tax_registered", False)),
+        buyer_account_type="individual",
+        buyer_tier=buyer_tier,
+        payment_method="stripe",
+        card_type="domestic",
     )
-    buyer_commission = float(breakdown["buyer"]["buyer_premium"]) + float(breakdown["buyer"]["tax"])
-    seller_commission = float(breakdown["seller"]["seller_commission"])
+    buyer_commission = float(fee["buyer_premium"]) + float(fee["buyer_taxes"])
+    seller_commission = float(fee["seller_commission"])
 
     # --- Deposit credit lookup (winner's deposit, if any) ---
     deposit_doc = await db.bidding_deposits.find_one(
@@ -412,17 +415,20 @@ async def settle_stripe_full(
     seller = await db.users.find_one({"id": seller_id})
     buyer_tier = (buyer or {}).get("subscription_tier", "free")
     seller_tier = (seller or {}).get("subscription_tier", "free")
-    region = listing.get("region", "QC")
 
-    breakdown = FeeCalculator.calculate_full_transaction(
-        Decimal(str(hammer_price)),
-        buyer_tier=buyer_tier,
+    # iter210 Step 7 — Single source of truth: calculate_fee()
+    fee = calculate_fee(
+        hammer_price=float(hammer_price),
+        auction_type="lots",
+        seller_account_type="individual",
         seller_tier=seller_tier,
-        region=region,
-        seller_is_business=bool((seller or {}).get("is_tax_registered", False)),
+        buyer_account_type="individual",
+        buyer_tier=buyer_tier,
+        payment_method="stripe",
+        card_type="domestic",
     )
-    buyer_total = float(breakdown["buyer"]["total"])
-    seller_payout = float(breakdown["seller"]["net_payout"])
+    buyer_total = float(fee["buyer_total_charged"])
+    seller_payout = float(fee["seller_payout"])
 
     # Deposit credit
     deposit_doc = await db.bidding_deposits.find_one(

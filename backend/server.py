@@ -512,6 +512,8 @@ try:
         ("routes.down_payments", "down_payments_router", None, False),
         ("routes.partner_card", "partner_card_router", None, False),
         ("routes.dealer_subscription_routes", "dealer_subscription_router", None, False),
+        ("routes.pricing_engine_routes", "pricing_engine_router", None, False),
+        ("routes.demo_account_routes", "demo_accounts_router", None, False),
     ]
 
     for module_path, router_name, db_setter_name, app_level in SELF_CONTAINED_ROUTERS:

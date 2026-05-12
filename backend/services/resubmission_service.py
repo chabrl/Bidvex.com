@@ -207,35 +207,58 @@ async def _notify_admin_resubmission(
     resubmission_count: int,
     province: str | None,
 ) -> None:
-    """Best-effort admin notification — never raises."""
+    """Best-effort admin notification — never raises.
+
+    iter210 Step 2 — Email is sent to ADMIN_NOTIFICATION_EMAIL with a fallback
+    chain so the dispatch never silently disappears. Both flavors (partner +
+    dealer) route through this single function, so any fix lands in one place.
+    """
     title_prefix = "Partner" if flavor == "partner" else "Vehicle Dealer"
-    subject = f"🔄 Application Resubmitted — {applicant_name or applicant_email or applicant_id} ({province or '—'})"
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    subject_en = f"🔄 Application Resubmitted — {applicant_name or applicant_email or applicant_id} ({province or '—'}) · #{resubmission_count}"
+    subject_fr = f"🔄 Demande soumise à nouveau · #{resubmission_count}"
+    subject = f"{subject_en} · {subject_fr}"
+
     body_html = f"""
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;color:#1e293b;">
       <div style="background:#0ea5e9;padding:24px 28px;border-radius:12px 12px 0 0;">
         <h1 style="color:#fff;margin:0;font-size:20px;">{title_prefix} Application Resubmitted</h1>
-        <p style="color:#bae6fd;margin:6px 0 0;font-size:13px;">Attempt #{resubmission_count} of 3</p>
+        <p style="color:#bae6fd;margin:6px 0 0;font-size:13px;">Resubmission #{resubmission_count} of 3</p>
       </div>
       <div style="padding:24px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;font-size:14px;line-height:1.7;">
         <p><strong>Applicant:</strong> {applicant_name or '—'}</p>
         <p><strong>Email:</strong> {applicant_email or '—'}</p>
         <p><strong>Province:</strong> {province or '—'}</p>
+        <p><strong>Resubmission count:</strong> Resubmission #{resubmission_count}</p>
         <p><strong>Previous rejection reason:</strong><br/><em>{previous_reason or '—'}</em></p>
+        <p><strong>Timestamp:</strong> {now}</p>
         <p style="margin-top:18px;">
           <a href="https://bidvex.com/admin" style="display:inline-block;background:#2563eb;color:#fff;padding:10px 22px;border-radius:8px;text-decoration:none;font-weight:600;">Review in Admin Panel</a>
         </p>
       </div>
     </div>
     """
+
+    # iter210 — Build a resolved recipient list. Honor ADMIN_NOTIFICATION_EMAIL
+    # first (the env var the user specified), then PARTNERS_ALERT_EMAIL, then
+    # a hard-coded fallback only as a last-resort.
+    raw_recipient = (
+        os.environ.get("ADMIN_NOTIFICATION_EMAIL")
+        or os.environ.get("PARTNERS_ALERT_EMAIL")
+        or "partners@bidvex.ca"
+    )
+    recipients = [r.strip() for r in raw_recipient.split(",") if r.strip()]
+
+    send_results: list[dict] = []
     try:
         from services.email_notifications import send_email
-        await send_email(
-            to_email=os.environ.get("PARTNERS_ALERT_EMAIL", "partners@bidvex.ca"),
-            subject=subject,
-            html_content=body_html,
-        )
+        for to_email in recipients:
+            res = await send_email(to_email=to_email, subject=subject, html_content=body_html)
+            send_results.append({"to": to_email, "result": res})
+            logger.info(f"[iter210] resubmission admin email dispatched to {to_email}: {res.get('status') if isinstance(res, dict) else res}")
     except Exception as exc:
-        logger.warning(f"[iter209] resubmission admin email failed: {exc}")
+        # NEVER let an email error swallow the resubmission flow
+        logger.exception(f"[iter210] resubmission admin email crashed: {exc}")
 
     try:
         await db.admin_notifications.insert_one({
@@ -245,7 +268,12 @@ async def _notify_admin_resubmission(
             "body": f"Attempt {resubmission_count}/3 · prev: {previous_reason[:120] if previous_reason else '—'}",
             "target_user_id": applicant_id,
             "admin_id": None,
-            "extra": {"resubmission_count": resubmission_count, "province": province},
+            "extra": {
+                "resubmission_count": resubmission_count,
+                "province": province,
+                "email_recipients": recipients,
+                "email_send_results": [{"to": r["to"], "status": (r["result"].get("status") if isinstance(r["result"], dict) else "unknown")} for r in send_results],
+            },
             "resolved": False,
             "created_at": datetime.now(timezone.utc),
         })
