@@ -37,6 +37,11 @@ export function isPushSupported() {
   );
 }
 
+export function getPushPermission() {
+  if (typeof window === 'undefined' || !('Notification' in window)) return 'default';
+  return Notification.permission; // 'granted' | 'denied' | 'default'
+}
+
 export async function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) {
     console.warn('[push] Service Worker API not supported');
@@ -192,6 +197,7 @@ export function showLocalNotification(title, options = {}) {
 
 export default {
   isPushSupported,
+  getPushPermission,
   registerServiceWorker,
   subscribeToPush,
   unsubscribeFromPush,
