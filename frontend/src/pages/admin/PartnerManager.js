@@ -18,8 +18,9 @@ import {
 import { toast } from 'sonner';
 import {
   Building2, CheckCircle, Clock, XCircle, FileText, ExternalLink,
-  Shield, ShieldCheck, DollarSign, Loader2, Search, Eye, AlertTriangle, Mail
+  Shield, ShieldCheck, DollarSign, Loader2, Search, Eye, AlertTriangle, Mail, Banknote
 } from 'lucide-react';
+import ManualSettleSubscriptionModal from '../../components/ManualSettleSubscriptionModal';
 
 const API = API_BASE;
 
@@ -67,8 +68,11 @@ const PartnerManager = () => {
   const [selectedApp, setSelectedApp] = useState(null);
 
   // iter211 — Missing-document modal (raised by useDocumentOpener)
-  const [missingDocModal, setMissingDocModal] = useState(null); // {error_code, owner_email, owner_user_id, owner_status, message_en}
+  const [missingDocModal, setMissingDocModal] = useState(null);
   const [requestingResubmit, setRequestingResubmit] = useState(false);
+
+  // iter211 Task 1 — Manual subscription settle modal
+  const [manualSettleOpen, setManualSettleOpen] = useState(false);
 
   const openDocument = useDocumentOpener(token, setMissingDocModal);
 
@@ -438,6 +442,18 @@ const PartnerManager = () => {
           )}
 
           <DialogFooter className="gap-2">
+            {selectedApp?.partner_verification_status === 'verified' && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setManualSettleOpen(true)}
+                data-testid="partner-manual-settle-btn"
+                className="border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+              >
+                <Banknote className="w-3 h-3 mr-1" />
+                Manual Settle
+              </Button>
+            )}
             {selectedApp?.partner_verification_status === 'pending' && (
               <>
                 <Button
@@ -509,6 +525,17 @@ const PartnerManager = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* iter211 Task 1 — Manual subscription settle */}
+      <ManualSettleSubscriptionModal
+        open={manualSettleOpen}
+        onOpenChange={setManualSettleOpen}
+        targetUserId={selectedApp?.id}
+        targetUserEmail={selectedApp?.email}
+        accountKind="partner"
+        defaultAmount={100}
+        onSettled={() => { setManualSettleOpen(false); fetchApplications?.(); }}
+      />
     </div>
   );
 };

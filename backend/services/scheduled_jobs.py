@@ -581,6 +581,32 @@ async def process_ended_storage_auctions(db):
                     except Exception as e:
                         logger.error(f"[STORAGE_CLOSE] email dispatch failed for {auction_id}: {e}")
 
+                # iter211 Task 2 — Hybrid commission routing for storage facilities.
+                # If the facility opted into manual payouts AND this is a cash/etransfer
+                # auction (the only case where BidVex needs to collect), enqueue the
+                # commission instead of trying to auto-charge their card.
+                if new_status == "sold" and auction.get("payment_method") in ("cash", "etransfer") and pricing:
+                    try:
+                        facility_user = await db.users.find_one(
+                            {"id": facility.get("user_id") or facility.get("id")},
+                            {"_id": 0, "commission_payout_method": 1, "email": 1},
+                        ) or {}
+                        if (facility_user.get("commission_payout_method") or "auto") == "manual":
+                            from services.manual_settlement_service import enqueue_manual_commission
+                            owed = float(pricing["facility_invoice"].get("facility_owes_bidvex", 0) or 0)
+                            if owed > 0:
+                                await enqueue_manual_commission(
+                                    db,
+                                    user_id=facility.get("user_id") or facility.get("id"),
+                                    auction_id=auction_id,
+                                    listing_id=auction_id,
+                                    listing_title=auction.get("unit_label") or auction.get("title") or f"Storage auction {auction_id}",
+                                    commission_amount_cad=owed,
+                                )
+                                logger.info(f"[STORAGE_CLOSE] manual commission enqueued for facility user={facility.get('user_id')} amount=${owed:.2f}")
+                    except Exception as e:
+                        logger.error(f"[STORAGE_CLOSE] manual commission enqueue failed for {auction_id}: {e}")
+
                 # ── Log ──
                 await db.storage_close_logs.insert_one({
                     "auction_id": auction_id,

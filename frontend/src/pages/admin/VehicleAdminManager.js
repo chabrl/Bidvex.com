@@ -32,6 +32,7 @@ import { formatCurrency } from '../../utils/currencyFormatter';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/ui/confirm-dialog';
 import DealerSubscriptionsTab from './DealerSubscriptionsTab';
+import PendingCommissionsTab from './PendingCommissionsTab';
 
 const API = API_BASE;
 
@@ -747,6 +748,10 @@ const VehicleAdminManager = () => {
             <CreditCard className="h-4 w-4" />
             Dealer Subscriptions
           </TabsTrigger>
+          <TabsTrigger value="pending-commissions" className="gap-2 bg-transparent" data-testid="admin-tab-pending-commissions">
+            <DollarSign className="h-4 w-4" />
+            Pending Commissions
+          </TabsTrigger>
           <TabsTrigger value="invoices" className="gap-2 bg-transparent" data-testid="admin-tab-invoices">
             <FileText className="h-4 w-4" />
             Invoices
@@ -945,6 +950,11 @@ const VehicleAdminManager = () => {
         {/* iter211 — Dealer Subscriptions Tab (who paid the $100/yr) */}
         <TabsContent value="dealer-subscriptions" className="mt-6">
           <DealerSubscriptionsTab />
+        </TabsContent>
+
+        {/* iter211 Task 2 — Pending Commissions (manual settlement queue) */}
+        <TabsContent value="pending-commissions" className="mt-6">
+          <PendingCommissionsTab />
         </TabsContent>
 
         {/* Invoices Tab */}

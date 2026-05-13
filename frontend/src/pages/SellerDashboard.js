@@ -3,6 +3,7 @@ import ErrorBoundary from '../components/ErrorBoundary';
 import FeaturedCountdownRibbon from '../components/FeaturedCountdownRibbon';
 import DealerAnnualFeeBanner from '../components/DealerAnnualFeeBanner';
 import DemoModeBanner from '../components/DemoModeBanner';
+import CommissionPayoutMethodCard from '../components/CommissionPayoutMethodCard';
 import { PayoutSummary } from '../components/PayoutSummary'; // iter210 Step 6
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -294,7 +295,11 @@ const SellerDashboard = () => {
 
         {/* Tab Content */}
         {activeTab === 'earnings' ? (
-          <SellerEarningsDashboard />
+          <div className="space-y-6">
+            {/* iter211 Task 2 — Commission payout method toggle (only for eligible accounts) */}
+            <CommissionPayoutMethodCard user={user} />
+            <SellerEarningsDashboard />
+          </div>
         ) : activeTab === 'analytics' ? (
           <SellerAnalyticsDashboard />
         ) : activeTab === 'ratings' ? (

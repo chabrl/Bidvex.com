@@ -78,6 +78,31 @@ async def apply_partner_tags(db, current_user: User, listing_dict: Dict, buyers_
     from models.user_models import resolve_seller_type, SELLER_TYPE_PARTNER
     seller_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0}) or {}
 
+    # iter211 — Manual-commission safety gate: block new listings when a user
+    # has unpaid manual commissions above the threshold. Admins must settle
+    # those rows in the Pending Commissions panel before the user can post again.
+    from services.manual_settlement_service import user_is_blocked_by_outstanding_commission
+    gate = await user_is_blocked_by_outstanding_commission(db, current_user.id)
+    if gate["blocked"]:
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "error": "outstanding_manual_commission",
+                "outstanding_cad": gate["outstanding_cad"],
+                "threshold_cad": gate["threshold_cad"],
+                "message_en": (
+                    f"You have ${gate['outstanding_cad']:.2f} CAD in unpaid manual commissions. "
+                    f"Please contact BidVex (partners@bidvex.ca) to settle the balance "
+                    f"before posting new listings."
+                ),
+                "message_fr": (
+                    f"Vous avez {gate['outstanding_cad']:.2f} $ CAD de commissions manuelles "
+                    f"impayées. Veuillez contacter BidVex (partners@bidvex.ca) pour régler "
+                    f"le solde avant de publier de nouvelles annonces."
+                ),
+            },
+        )
+
     # ── Canonical seller_type (drives pricing engine + UI badge) ──
     seller_type = resolve_seller_type(seller_doc)
     listing_dict["seller_type"] = seller_type

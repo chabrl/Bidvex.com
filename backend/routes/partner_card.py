@@ -220,6 +220,43 @@ async def charge_partner_cash_commission(
     if not user:
         return {"success": False, "error": "user_not_found"}
 
+    # iter211 Task 2 — Hybrid commission routing.
+    # If user opted into manual payment ("e-Transfer / cheque"), DO NOT charge
+    # Stripe — enqueue the commission for admin settlement instead.
+    if (user.get("commission_payout_method") or "auto") == "manual":
+        from services.fee_calculator import calculate_fee
+        from services.manual_settlement_service import enqueue_manual_commission
+        partner_province = (
+            user.get("partner_province")
+            or user.get("business_province")
+            or user.get("province")
+            or "QC"
+        )
+        fee = calculate_fee(
+            hammer_price=hammer_price,
+            auction_type="lots",
+            seller_account_type="partner",
+            partner_bp_rate=partner_bp_rate,
+            payment_method="cash",
+            card_type=card_type,
+            seller_province=partner_province,
+        )
+        total = fee["seller_commission_total"]
+        enq = await enqueue_manual_commission(
+            db,
+            user_id=partner_user_id,
+            auction_id=None,
+            listing_id=listing_id,
+            listing_title=listing_title,
+            commission_amount_cad=float(total),
+        )
+        return {
+            "success": True,
+            "manual_payout": True,
+            "amount_owed": float(total),
+            "pending_commission_id": enq.get("pending_commission_id"),
+        }
+
     pm_id = user.get("partner_stripe_payment_method_id")
     customer_id = user.get("stripe_customer_id")
     if not pm_id or not customer_id:

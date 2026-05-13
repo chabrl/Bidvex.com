@@ -1,5 +1,84 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter211 — Hybrid Manual Settlement Layer (Feb 14, 2026) ✅
+
+Off-Stripe payment infrastructure for annual subscriptions AND per-auction commissions. Supports e-Transfer, cheque, wire, and cash for partners, storage facilities, and vehicle dealers.
+
+### Task 1 — Admin Manual Subscription Settle ✅
+- Backend: `POST /api/admin/manual-settle/subscription` activates a partner / dealer / storage subscription off-Stripe. Sets `dealer/partner/storage_subscription_active=True`, status `active_manual`, manual method+ref, and renewal date (default +365 days).
+- **Zero-Bug Mandate (Task 3)**: Automatically voids any open Stripe Draft/Open invoice for the same subscription to prevent double-charges.
+- **Audit**: Every settle writes a row to the new `admin_financial_ledger` collection with admin_id, payment_method, reference_number, amount, timestamp.
+- **Bilingual receipt email** (EN/FR) sent to the user: "Paid by e-Transfer" / "Payé par virement Interac" (also cheque/wire/cash translated).
+- Admin UI: "Manual Settle" button added to:
+  - `DealerSubscriptionsTab` (each row in the table)
+  - `PartnerManager` review dialog (footer button on verified partners)
+- Reusable `ManualSettleSubscriptionModal.jsx` with method select, ref #, amount, active-until date, notes.
+
+### Task 2 — Hybrid Commission Routing + Safety Gate ✅
+- New `users.commission_payout_method` field: `"auto"` (default) | `"manual"`.
+- User-facing toggle: `CommissionPayoutMethodCard.jsx` in Seller Dashboard → Earnings tab. Eligibility gated to partners/dealers/storage.
+- API: `GET/PUT /api/users/me/commission-payout-method`.
+- **Backend routing**:
+  - `routes/partner_card.py:charge_partner_cash_commission` — if user opted manual, calls `enqueue_manual_commission()` instead of Stripe.
+  - `services/scheduled_jobs.py` storage-auction close — same routing for cash/e-transfer storage auctions.
+- **Admin queue**: New tab `PendingCommissionsTab.jsx` in `VehicleAdminManager` exposes the `pending_commissions` collection with status filter (pending/paid/all), summary cards (pending count, pending total, threshold, total), and a "Mark as Paid" modal.
+- API: `GET /api/admin/pending-commissions`, `POST /api/admin/pending-commissions/{id}/mark-paid`.
+- **Safety gate**: When a user's `outstanding_manual_commission_cad >= MANUAL_COMMISSION_GATE_CAD` (default $500), listing creation returns **HTTP 402 Payment Required** with a bilingual EN/FR error. Hooked into `services/listings_service.py:apply_partner_tags` so it covers all 4 listing-creation surfaces.
+- **Denormalised counter**: `users.outstanding_manual_commission_cad` updated atomically with `$inc` on enqueue/settle so the gate read is O(1).
+
+### Task 3 — Integrity & Bilingual UI ✅
+- Both subscription settle AND commission settle paths void matching Stripe invoices via `stripe.Invoice.void_invoice()` before completing.
+- All receipt emails bilingual via `_send_manual_settlement_email` helper with EN/FR copy for every payment method.
+- Admin financial ledger has separate `kind` values: `manual_subscription_settle` + `manual_commission_settle` so finance teams can filter independently.
+- New endpoint `GET /api/admin/financial-ledger` for the full audit trail.
+
+### Test Status
+- **20/20 new manual-settlement tests passing** (8 unit + 9 static smoke + 3 live HTTP).
+- **160/167 iter211 tests passing** (7 skipped on rate-limit, pre-existing).
+- All iter209 spec amounts unchanged (16/16 locked tests pass).
+- All lint clean.
+- End-to-end verified live: enqueue → admin lists → mark paid → outstanding decremented → ledger row written.
+
+### Files of reference (Feb 14)
+- `/app/backend/services/manual_settlement_service.py` (NEW — core engine)
+- `/app/backend/routes/manual_settlement.py` (NEW — 7 endpoints)
+- `/app/backend/services/listings_service.py` (safety gate inject)
+- `/app/backend/routes/partner_card.py` (auto-vs-manual routing)
+- `/app/backend/services/scheduled_jobs.py` (storage close routing)
+- `/app/frontend/src/components/CommissionPayoutMethodCard.jsx` (NEW)
+- `/app/frontend/src/components/ManualSettleSubscriptionModal.jsx` (NEW)
+- `/app/frontend/src/pages/admin/PendingCommissionsTab.jsx` (NEW)
+- `/app/frontend/src/pages/admin/DealerSubscriptionsTab.jsx` (Manual Settle button added)
+- `/app/frontend/src/pages/admin/PartnerManager.js` (Manual Settle button added)
+- `/app/frontend/src/pages/admin/VehicleAdminManager.js` (new Pending Commissions tab)
+- `/app/frontend/src/pages/SellerDashboard.js` (mounts CommissionPayoutMethodCard)
+- `/app/backend/tests/test_iter211_manual_settlement.py` (NEW — 20 tests)
+
+### Data model additions
+**Collection** `admin_financial_ledger`:
+```
+{id, kind: "manual_subscription_settle"|"manual_commission_settle", user_id, user_email,
+ admin_id, payment_method: "e_transfer"|"cheque"|"wire"|"cash", reference_number,
+ amount_cad, account_kind?, renewal_until?, auction_id?, listing_id?,
+ stripe_invoices_voided: [..], notes, created_at}
+```
+
+**Collection** `pending_commissions`:
+```
+{id, user_id, auction_id, listing_id, listing_title, commission_amount_cad,
+ status: "pending"|"paid"|"voided", stripe_invoice_id?, created_at,
+ settled_at?, settled_by?, payment_method?, reference_number?, notes}
+```
+
+**User fields**:
+- `commission_payout_method: "auto"|"manual"` (default "auto")
+- `outstanding_manual_commission_cad: float` (denormalised)
+- Per account kind: `{dealer|partner|storage}_subscription_active`, `_status`, `_renewal`, `_start`, `_manual_method`, `_manual_reference`, `_is_manual`
+
+⚠️ **Production**: After redeploy, the env var `MANUAL_COMMISSION_GATE_CAD` (default `500`) can be tuned in your deploy config without code changes.
+
+---
+
 ## Latest: iter211 — Partner Document "File not found" Recovery (Feb 13, 2026) ✅
 
 **User-reported P0**: admin panel link to view a partner's business-registration PDF returned `{"detail":"File not found"}` as a raw JSON page. User suspected yesterday's universal-terminology change broke the file paths.

@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
-import { RefreshCw, CheckCircle2, XCircle, AlertTriangle, ExternalLink, Search, CreditCard, Calendar, Building2 } from 'lucide-react';
+import { RefreshCw, CheckCircle2, XCircle, AlertTriangle, ExternalLink, Search, CreditCard, Calendar, Building2, Banknote } from 'lucide-react';
+import ManualSettleSubscriptionModal from '../../components/ManualSettleSubscriptionModal';
 
 const API = API_BASE;
 
@@ -23,6 +24,7 @@ const DealerSubscriptionsTab = () => {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all'); // all | paid | unpaid | suspended
+  const [settling, setSettling] = useState(null);  // {user_id, email}
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -139,13 +141,14 @@ const DealerSubscriptionsTab = () => {
                   <th className="px-4 py-3 font-medium text-slate-600">Paid On</th>
                   <th className="px-4 py-3 font-medium text-slate-600">Renews</th>
                   <th className="px-4 py-3 font-medium text-slate-600">Stripe</th>
+                  <th className="px-4 py-3 font-medium text-slate-600">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">Loading…</td></tr>
+                  <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">Loading…</td></tr>
                 ) : filtered.length === 0 ? (
-                  <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500" data-testid="dealer-subs-empty">No dealers match the current filter.</td></tr>
+                  <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500" data-testid="dealer-subs-empty">No dealers match the current filter.</td></tr>
                 ) : filtered.map(r => (
                   <tr key={r.user_id} className="border-b border-slate-100 hover:bg-slate-50/50" data-testid={`dealer-subs-row-${r.user_id}`}>
                     <td className="px-4 py-3">
@@ -179,6 +182,18 @@ const DealerSubscriptionsTab = () => {
                         <span className="text-xs text-slate-400">—</span>
                       )}
                     </td>
+                    <td className="px-4 py-3">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setSettling({ user_id: r.user_id, email: r.email })}
+                        data-testid={`manual-settle-btn-${r.user_id}`}
+                        className="h-7 text-xs"
+                      >
+                        <Banknote className="w-3 h-3 mr-1" />
+                        Manual Settle
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -190,6 +205,17 @@ const DealerSubscriptionsTab = () => {
       <p className="text-xs text-slate-500">
         Data live-queried from <code>/api/admin/dealer-subscriptions</code>. Updates on next checkout webhook fire.
       </p>
+
+      {/* iter211 — Manual settle modal */}
+      <ManualSettleSubscriptionModal
+        open={!!settling}
+        onOpenChange={(o) => { if (!o) setSettling(null); }}
+        targetUserId={settling?.user_id}
+        targetUserEmail={settling?.email}
+        accountKind="vehicle_dealer"
+        defaultAmount={100}
+        onSettled={() => { setSettling(null); fetchData(); }}
+      />
     </div>
   );
 };
