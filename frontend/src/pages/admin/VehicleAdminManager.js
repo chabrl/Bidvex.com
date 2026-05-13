@@ -26,11 +26,12 @@ import {
   Car, User, Building2, Gavel, CheckCircle, XCircle, Clock,
   Eye, FileText, Shield, AlertTriangle, Search, RefreshCw,
   ChevronDown, ChevronUp, ExternalLink, Calendar, MapPin,
-  DollarSign, Settings2, Percent, Timer, Scale, Award, Mail
+  DollarSign, Settings2, Percent, Timer, Scale, Award, Mail, CreditCard
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/currencyFormatter';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/ui/confirm-dialog';
+import DealerSubscriptionsTab from './DealerSubscriptionsTab';
 
 const API = API_BASE;
 
@@ -742,6 +743,10 @@ const VehicleAdminManager = () => {
             <Settings2 className="h-4 w-4" />
             Auction Rules
           </TabsTrigger>
+          <TabsTrigger value="dealer-subscriptions" className="gap-2 bg-transparent" data-testid="admin-tab-dealer-subs">
+            <CreditCard className="h-4 w-4" />
+            Dealer Subscriptions
+          </TabsTrigger>
           <TabsTrigger value="invoices" className="gap-2 bg-transparent" data-testid="admin-tab-invoices">
             <FileText className="h-4 w-4" />
             Invoices
@@ -935,6 +940,11 @@ const VehicleAdminManager = () => {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        {/* iter211 — Dealer Subscriptions Tab (who paid the $100/yr) */}
+        <TabsContent value="dealer-subscriptions" className="mt-6">
+          <DealerSubscriptionsTab />
         </TabsContent>
 
         {/* Invoices Tab */}

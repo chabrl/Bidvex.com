@@ -116,3 +116,92 @@ async def create_dealer_checkout_session(current_user: User = Depends(get_curren
     )
     return {"checkout_url": session.url, "session_id": session.id}
 
+
+
+
+# ── iter211 follow-up: Admin overview of dealer payment status ───────────
+@dealer_subscription_router.get("/admin/dealer-subscriptions")
+async def list_all_dealer_subscriptions(current_user: User = Depends(get_current_user)):
+    """Returns the full roster of vehicle dealers with their payment status.
+
+    Used by the admin VehicleAdminManager > "Dealer Subscriptions" tab.
+    Output shape per row:
+      {
+        user_id, email, full_name, business_name, license_province,
+        approved_at, subscription_active, subscription_status,
+        subscription_start, subscription_renewal, stripe_customer_id,
+        stripe_subscription_id, is_demo_account
+      }
+    """
+    db = get_db()
+    admin = await db.users.find_one({"id": current_user.id}, {"_id": 0, "role": 1})
+    if not admin or admin.get("role") not in ("admin", "super_admin"):
+        raise HTTPException(status_code=403, detail="admin_required")
+
+    # All approved vehicle dealers (sellers collection is source of truth for approval)
+    sellers = await db.vehicle_sellers.find(
+        {"verification_status": "approved"},
+        {"_id": 0, "user_id": 1, "business_name": 1, "license_province": 1, "approved_at": 1},
+    ).to_list(2000)
+
+    rows = []
+    paid_count = 0
+    unpaid_count = 0
+    suspended_count = 0
+    for s in sellers:
+        u = await db.users.find_one(
+            {"id": s["user_id"]},
+            {"_id": 0,
+             "id": 1, "email": 1, "full_name": 1, "is_vehicle_dealer": 1,
+             "is_demo_account": 1, "vehicle_dealer_suspended": 1,
+             "dealer_subscription_active": 1, "dealer_subscription_status": 1,
+             "dealer_subscription_start": 1, "dealer_subscription_renewal": 1,
+             "dealer_stripe_customer_id": 1, "dealer_stripe_subscription_id": 1},
+        ) or {}
+        if not u:
+            continue
+
+        active = bool(u.get("dealer_subscription_active"))
+        suspended = bool(u.get("vehicle_dealer_suspended"))
+        if active and not suspended:
+            paid_count += 1
+        elif suspended:
+            suspended_count += 1
+        else:
+            unpaid_count += 1
+
+        rows.append({
+            "user_id": u["id"],
+            "email": u.get("email"),
+            "full_name": u.get("full_name"),
+            "business_name": s.get("business_name"),
+            "license_province": s.get("license_province"),
+            "approved_at": s.get("approved_at").isoformat() if hasattr(s.get("approved_at"), "isoformat") else s.get("approved_at"),
+            "is_demo_account": bool(u.get("is_demo_account")),
+            "subscription_active": active,
+            "subscription_status": u.get("dealer_subscription_status") or ("active" if active else "not_paid"),
+            "subscription_suspended": suspended,
+            "subscription_start": u.get("dealer_subscription_start"),
+            "subscription_renewal": u.get("dealer_subscription_renewal"),
+            "stripe_customer_id": u.get("dealer_stripe_customer_id"),
+            "stripe_subscription_id": u.get("dealer_stripe_subscription_id"),
+        })
+
+    # Sort: unpaid first (most urgent), then suspended, then active.
+    def _priority(r):
+        if r["subscription_suspended"]:
+            return 1
+        if not r["subscription_active"]:
+            return 0
+        return 2
+    rows.sort(key=lambda r: (_priority(r), r.get("approved_at") or ""))
+
+    return {
+        "rows": rows,
+        "summary": {
+            "total": len(rows),
+            "paid": paid_count,
+            "unpaid": unpaid_count,
+            "suspended": suspended_count,
+        },
+    }

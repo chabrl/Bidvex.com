@@ -209,6 +209,17 @@ async def admin_decide_dealer_license(
                     "auto_created_from_license": True,  # audit flag
                 }
                 await db.vehicle_sellers.insert_one(seller_doc)
+
+            # iter211-fix — propagate to user document so the dealer dashboard
+            # banner (DealerAnnualFeeBanner) and gating logic can see the flag.
+            await db.users.update_one(
+                {"id": doc["user_id"]},
+                {"$set": {
+                    "is_vehicle_dealer": True,
+                    "vehicle_dealer_approved_at": datetime.now(timezone.utc).isoformat(),
+                    "vehicle_dealer_approved_by": user["id"],
+                }},
+            )
         except Exception as exc:
             import logging
             logging.getLogger(__name__).warning(f"[iter198] auto-create vehicle_seller failed: {exc}")

@@ -174,7 +174,21 @@ async def approve_seller(
             }
         }
     )
-    
+
+    # iter211-fix — propagate approval to the user document so the dealer
+    # dashboard banner (DealerAnnualFeeBanner) and the dealer-subscription
+    # endpoints can see `is_vehicle_dealer=True`. Without this flag the
+    # gold "Pay Annual Fee" CTA never renders and the dealer cannot pay.
+    if seller.get("user_id"):
+        await _db.users.update_one(
+            {"id": seller["user_id"]},
+            {"$set": {
+                "is_vehicle_dealer": True,
+                "vehicle_dealer_approved_at": datetime.now(timezone.utc).isoformat(),
+                "vehicle_dealer_approved_by": admin["id"],
+            }},
+        )
+
     await log_audit(
         "seller", seller_id, "approved", 
         admin["id"], "admin",

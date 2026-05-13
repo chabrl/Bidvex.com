@@ -1,5 +1,39 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter211 hot-fix — Dealer Approval Wiring + Admin Subscriptions View (Feb 10, 2026) ✅
+
+User reported: approved vehicle dealer `alexboul1993@gmail.com` saw no $100/yr annual-fee banner, and the admin panel had no view of who paid.
+
+### Root cause
+`POST /api/vehicle-admin/sellers/{id}/approve` and the parallel license-approval endpoint in `routes/vehicle_dealer_extras.py` both updated only the `vehicle_sellers` / `dealer_licenses` collections — they NEVER set `is_vehicle_dealer: True` on the user document. Without that flag, the `DealerAnnualFeeBanner.jsx` guard (`if (!user?.is_vehicle_dealer) return null;`) silently hid the entire CTA.
+
+### Fixes
+1. `routes/vehicles_admin.py:approve_seller` now updates `users.is_vehicle_dealer = True` + `vehicle_dealer_approved_at` + `vehicle_dealer_approved_by` whenever an admin approves a dealer.
+2. `routes/vehicle_dealer_extras.py:decide_dealer_license_review` does the same on the license-approval path.
+3. **Backfill**: ran a one-shot migration that found 2 approved dealers without the flag (`alexboul1993@gmail.com` and `charbel911@gmail.com`) and set `is_vehicle_dealer: True` on both. The gold "Activate Your Dealer Account" banner now renders for them.
+4. New admin endpoint `GET /api/admin/dealer-subscriptions` — returns roster + summary (`total`, `paid`, `unpaid`, `suspended`) sorted with unpaid-first.
+5. New admin UI tab **"Dealer Subscriptions"** in `VehicleAdminManager.js`:
+   - 4 summary cards (Total / Paid / Unpaid / Suspended)
+   - Filterable table with status badge (Paid/Unpaid/Suspended), province, approved date, paid date, renewal date, Stripe subscription link (opens Stripe Dashboard in new tab)
+   - Search by email/name/business
+   - Demo badge for `is_demo_account` dealers
+
+### Test status
+- 77/77 iter211 tests passing (73 prior + 4 new in `test_iter211_dealer_approval_fix.py`).
+- Live verified: `get_dealer_subscription_status` for `alexboul1993@gmail.com` now returns `is_vehicle_dealer: True, active: False` — the gold pay banner will render.
+
+### Files of reference (Feb 10)
+- `/app/backend/routes/vehicles_admin.py` (approval propagation)
+- `/app/backend/routes/vehicle_dealer_extras.py` (license-approval propagation)
+- `/app/backend/routes/dealer_subscription_routes.py` (NEW admin endpoint)
+- `/app/frontend/src/pages/admin/DealerSubscriptionsTab.jsx` (NEW admin UI)
+- `/app/frontend/src/pages/admin/VehicleAdminManager.js` (tab mounted)
+- `/app/backend/tests/test_iter211_dealer_approval_fix.py` (NEW — 4 tests)
+
+⚠️ **Production note**: This is the preview env. Once redeployed, you'll also want to run the backfill once on production DB for any approved dealers there. I can ship that backfill as a one-line admin endpoint if you want — just say the word.
+
+---
+
 ## Latest: iter211 P0/P2/P3/P4 — Storage Fee Correction, T&C, Dealer Annual Fee, Demo Isolation (Feb 9, 2026) ✅
 
 User-requested 4-part urgent sprint. **All 73 iter211 tests passing, zero regressions verified via pre/post diff.**
