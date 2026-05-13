@@ -148,6 +148,36 @@ const AIAssistant = () => {
 
   useEffect(() => { scrollToBottom(); }, [messages]);
 
+  // iter211 — Self-heal degraded banner. Every 20s while in degraded state,
+  // ping the cheap diagnostic / messages-as-no-op endpoint and clear the
+  // banner if the service is actually responsive. Stops polling when healthy.
+  useEffect(() => {
+    if (!serviceDegraded || !isOpen) return undefined;
+    let cancelled = false;
+    const probe = async () => {
+      try {
+        const ctrl = new AbortController();
+        const tid = setTimeout(() => ctrl.abort(), 6000);
+        const res = await fetch(`${backendUrl}/ai-chat/message`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: ctrl.signal,
+          body: JSON.stringify({ message: 'ping', language: 'en' }),
+        });
+        clearTimeout(tid);
+        if (!cancelled && res.ok) {
+          const data = await res.json().catch(() => null);
+          if (data && data.success !== false) setServiceDegraded(false);
+        }
+      } catch {
+        // still degraded; loop again
+      }
+    };
+    const id = setInterval(probe, 20000);
+    probe(); // immediate first check
+    return () => { cancelled = true; clearInterval(id); };
+  }, [serviceDegraded, isOpen, backendUrl]);
+
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
@@ -156,32 +186,48 @@ const AIAssistant = () => {
     setMessages((prev) => [...prev, { role: 'user', content: userMessage, rich_content: null }]);
     setIsLoading(true);
 
-    try {
+    // iter211 — optimistically clear the degraded banner when the user retries
+    // (a successful reply will re-confirm; a failed one will re-set it).
+    if (serviceDegraded) setServiceDegraded(false);
+
+    const lang = (navigator.language || 'en').startsWith('fr') ? 'fr' : 'en';
+    const buildBody = () => JSON.stringify({
+      message: userMessage,
+      chat_history: messages.slice(-10).map((m) => ({ role: m.role, content: m.content })),
+      language: lang,
+    });
+
+    // iter211 — retry once on transient failure (timeout, 5xx, success:false)
+    // before falling back to the degraded state. Most "Service unavailable"
+    // toasts users complain about are upstream LLM rate-limit blips that
+    // succeed on retry within 1-2 seconds.
+    const tryOnce = async (timeoutMs) => {
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      const lang = (navigator.language || 'en').startsWith('fr') ? 'fr' : 'en';
       const ctrl = new AbortController();
-      const timeoutId = setTimeout(() => ctrl.abort(), 30000); // 30s hard timeout
-      const res = await fetch(`${backendUrl}/ai-chat/message`, {
-        method: 'POST',
-        headers,
-        signal: ctrl.signal,
-        body: JSON.stringify({
-          message: userMessage,
-          chat_history: messages.slice(-10).map((m) => ({ role: m.role, content: m.content })),
-          language: lang,
-        }),
-      });
-      clearTimeout(timeoutId);
-      if (!res.ok) {
-        // Service responded but errored (5xx, 429, etc.) → graceful degraded state
-        throw new Error(`HTTP ${res.status}`);
+      const tid = setTimeout(() => ctrl.abort(), timeoutMs);
+      try {
+        const res = await fetch(`${backendUrl}/ai-chat/message`, {
+          method: 'POST', headers, signal: ctrl.signal, body: buildBody(),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (data && data.success === false) throw new Error(data.error || 'LLM unavailable');
+        return data;
+      } finally {
+        clearTimeout(tid);
       }
-      const data = await res.json();
-      if (data && data.success === false) {
-        // Backend returned 200 but with success:false (LLM unreachable) → degrade
-        throw new Error(data.error || 'LLM unavailable');
+    };
+
+    try {
+      let data;
+      try {
+        data = await tryOnce(20000); // first attempt
+      } catch (firstErr) {
+        // eslint-disable-next-line no-console
+        console.warn('[AIAssistant] first attempt failed, retrying once:', firstErr?.message);
+        await new Promise((r) => setTimeout(r, 800)); // small backoff
+        data = await tryOnce(25000); // second attempt
       }
       setServiceDegraded(false);
       setMessages((prev) => [
@@ -189,6 +235,8 @@ const AIAssistant = () => {
         { role: 'assistant', content: data.message, rich_content: data.rich_content },
       ]);
     } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('[AIAssistant] both attempts failed:', e?.message);
       setServiceDegraded(true);
       setMessages((prev) => [
         ...prev,

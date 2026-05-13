@@ -218,8 +218,38 @@ Remember: You are not just an assistant - you are the Master Concierge, the face
     async def _call_llm(self, messages: list) -> str:
         """
         Call the LLM with a Emergent-proxy-first, native-Gemini-fallback strategy.
+        iter211 — Each provider gets ONE retry with 800ms backoff before falling
+        through to the next provider, since the most common production failure
+        is a transient Gemini rate-limit or 5xx that succeeds on a second try.
         Returns the response text. Raises on total failure.
         """
+        import asyncio
+
+        async def _attempt(params: dict, *, label: str, retries: int = 1):
+            """Try once, retry on transient error."""
+            last_err = None
+            for attempt in range(retries + 1):
+                try:
+                    response = await litellm.acompletion(**params)
+                    return response.choices[0].message.content
+                except Exception as e:  # noqa: BLE001
+                    last_err = e
+                    classification = type(e).__name__
+                    is_transient = any(s in str(e).lower() for s in (
+                        "timeout", "rate limit", "rate_limit", "429",
+                        "503", "502", "504", "overloaded", "internal error",
+                    ))
+                    if attempt < retries and is_transient:
+                        backoff = 0.8 * (2 ** attempt)
+                        logger.warning(
+                            f"[AI_CONCIERGE] {label} attempt {attempt + 1} transient {classification} ({e}); "
+                            f"retrying in {backoff:.1f}s"
+                        )
+                        await asyncio.sleep(backoff)
+                        continue
+                    raise
+            raise last_err  # type: ignore
+
         # Attempt 1: Emergent proxy (preferred — free via EMERGENT_LLM_KEY)
         if self.is_emergent_key and self.api_key:
             try:
@@ -236,26 +266,27 @@ Remember: You are not just an assistant - you are the Master Concierge, the face
                 app_url = os.environ.get("APP_URL") or os.environ.get("REACT_APP_BACKEND_URL", "")
                 if app_url:
                     params["extra_headers"] = {"X-App-ID": app_url}
-                response = await litellm.acompletion(**params)
-                return response.choices[0].message.content
+                return await _attempt(params, label="Emergent proxy")
             except Exception as e:
                 # Log loud enough that Railway shows it
-                logger.error(f"[AI_CONCIERGE] Emergent proxy failed: {type(e).__name__}: {e}. Falling back to direct Gemini API…")
+                logger.error(f"[AI_CONCIERGE] Emergent proxy failed after retry: {type(e).__name__}: {e}. Falling back to direct Gemini API…")
 
         # Attempt 2: Native Gemini API (fallback — requires GEMINI_API_KEY)
         if self.gemini_api_key:
             try:
-                response = await litellm.acompletion(
-                    model=f"gemini/{self.model_name}",
-                    messages=messages,
-                    api_key=self.gemini_api_key,
-                    max_tokens=768,
-                    temperature=0.7,
-                    timeout=25,
+                return await _attempt(
+                    {
+                        "model": f"gemini/{self.model_name}",
+                        "messages": messages,
+                        "api_key": self.gemini_api_key,
+                        "max_tokens": 768,
+                        "temperature": 0.7,
+                        "timeout": 25,
+                    },
+                    label="Direct Gemini",
                 )
-                return response.choices[0].message.content
             except Exception as e:
-                logger.error(f"[AI_CONCIERGE] Direct Gemini API failed: {type(e).__name__}: {e}")
+                logger.error(f"[AI_CONCIERGE] Direct Gemini API failed after retry: {type(e).__name__}: {e}")
                 raise
 
         # No keys available
