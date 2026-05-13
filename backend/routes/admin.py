@@ -702,7 +702,11 @@ async def get_partner_applications(
     current_user = await require_admin(credentials)
     db = get_db()
     
-    query = {"partner_verification_status": {"$in": ["pending", "verified", "rejected"]}}
+    # iter211 status-drift fix — defensively accept BOTH "pending" (current
+    # canonical) AND "pending_review" (legacy value briefly used by the
+    # resubmission service). This makes the admin queue resilient to either
+    # value and unblocks any rows already saved with the legacy enum.
+    query = {"partner_verification_status": {"$in": ["pending", "pending_review", "verified", "rejected"]}}
     if status:
         query["partner_verification_status"] = status
     
@@ -751,7 +755,8 @@ async def verify_partner(
     user_doc = await db.users.find_one({"id": user_id}, {"_id": 0})
     if not user_doc:
         raise HTTPException(status_code=404, detail="User not found")
-    if user_doc.get("partner_verification_status") != "pending":
+    # iter211 — accept both canonical and legacy enums
+    if user_doc.get("partner_verification_status") not in ("pending", "pending_review"):
         raise HTTPException(status_code=400, detail=f"User is not in pending status (current: {user_doc.get('partner_verification_status')})")
     
     now = datetime.now(timezone.utc).isoformat()

@@ -1,126 +1,181 @@
 /**
- * BidVex Push Notification Utilities
- * Self-hosted VAPID Web Push — registers SW and manages subscriptions.
+ * BidVex — Web Push Subscription helpers.
+ *
+ * iter211 rewrite — distinguishes WHY a subscription failed so the UI can show
+ * an accurate error instead of always blaming the browser permission. The
+ * previous version swallowed every error path and returned `false`, which made
+ * the user-facing toast misleading.
+ *
+ * Error codes returned (rejection reasons):
+ *   • "unsupported"          — Service Worker / PushManager not supported
+ *   • "no_vapid_key"         — REACT_APP_VAPID_PUBLIC_KEY missing at build time
+ *   • "permission_denied"    — User clicked "Block" in the browser prompt
+ *   • "permission_default"   — User dismissed the prompt without choosing
+ *   • "subscribe_failed"     — pushManager.subscribe() rejected (push service)
+ *   • "backend_save_failed"  — POST /api/push/subscribe returned non-2xx
+ *   • "network_error"        — fetch() threw (offline / CORS / DNS)
+ *   • "no_service_worker"    — navigator.serviceWorker.ready never resolved
  */
 
-const VAPID_PUBLIC_KEY = process.env.REACT_APP_VAPID_PUBLIC_KEY || '';
+const VAPID_PUBLIC_KEY = process.env.REACT_APP_VAPID_PUBLIC_KEY;
 
-/**
- * Convert VAPID public key (base64url) to Uint8Array for the PushManager.
- */
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const raw = atob(base64);
-  const output = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; ++i) output[i] = raw.charCodeAt(i);
-  return output;
+  const raw = window.atob(base64);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i += 1) out[i] = raw.charCodeAt(i);
+  return out;
 }
 
-/**
- * Register the service worker and return the registration.
- */
+export function isPushSupported() {
+  return (
+    typeof window !== 'undefined' &&
+    'serviceWorker' in navigator &&
+    'PushManager' in window &&
+    'Notification' in window
+  );
+}
+
 export async function registerServiceWorker() {
-  if (!('serviceWorker' in navigator)) return null;
+  if (!('serviceWorker' in navigator)) {
+    console.warn('[push] Service Worker API not supported');
+    return null;
+  }
   try {
-    const reg = await navigator.serviceWorker.register('/sw.js');
+    const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+    // eslint-disable-next-line no-console
+    console.log('[push] Service Worker registered:', reg.scope);
     return reg;
   } catch (err) {
-    console.warn('[Push] SW registration failed:', err);
+    console.error('[push] Service Worker registration failed:', err);
     return null;
   }
 }
 
 /**
- * Check if push is supported and permission status.
+ * Subscribe the current browser to web push.
+ *
+ * @returns {Promise<{ok: true, subscription: PushSubscription} | {ok: false, code: string, detail?: string}>}
  */
-export function getPushPermission() {
-  if (!('Notification' in window)) return 'unsupported';
-  return Notification.permission; // 'default', 'granted', 'denied'
-}
+export async function subscribeToPush() {
+  if (!isPushSupported()) {
+    return { ok: false, code: 'unsupported' };
+  }
+  if (!VAPID_PUBLIC_KEY) {
+    console.error('[push] REACT_APP_VAPID_PUBLIC_KEY is not set at build time');
+    return { ok: false, code: 'no_vapid_key' };
+  }
 
-/**
- * Request push permission and subscribe to VAPID push.
- * Sends subscription to backend for storage.
- * @param {string} token - JWT auth token
- * @returns {boolean} success
- */
-export async function subscribeToPush(token) {
-  if (!('PushManager' in window) || !VAPID_PUBLIC_KEY) return false;
-
+  // Wait up to 6 s for the SW registered at app boot. If it never resolves,
+  // surface a precise error rather than hanging forever.
+  let registration;
   try {
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') return false;
+    registration = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise((_r, rej) => setTimeout(() => rej(new Error('sw_ready_timeout')), 6000)),
+    ]);
+  } catch (err) {
+    console.error('[push] Service worker not ready:', err);
+    return { ok: false, code: 'no_service_worker', detail: String(err?.message || err) };
+  }
 
-    const reg = await navigator.serviceWorker.ready;
-    let sub = await reg.pushManager.getSubscription();
+  // Request notification permission (idempotent if already granted)
+  let permission = Notification.permission;
+  if (permission === 'default') {
+    permission = await Notification.requestPermission();
+  }
+  if (permission === 'denied') {
+    return { ok: false, code: 'permission_denied' };
+  }
+  if (permission !== 'granted') {
+    return { ok: false, code: 'permission_default' };
+  }
 
+  // Create or reuse a PushSubscription
+  let sub;
+  try {
+    sub = await registration.pushManager.getSubscription();
     if (!sub) {
-      sub = await reg.pushManager.subscribe({
+      sub = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
       });
     }
+  } catch (err) {
+    console.error('[push] pushManager.subscribe failed:', err);
+    return { ok: false, code: 'subscribe_failed', detail: String(err?.message || err) };
+  }
 
-    const subJson = sub.toJSON();
-    const apiBase = process.env.REACT_APP_BACKEND_URL || '';
-
-    await fetch(`${apiBase}/api/push/subscribe`, {
+  // Persist on the backend (with credentials). Distinguish:
+  //   • network failure (fetch throws) → network_error
+  //   • backend non-2xx                → backend_save_failed (with detail)
+  const apiBase = process.env.REACT_APP_BACKEND_URL || '';
+  const url = `${apiBase}/api/push/subscribe`;
+  const token = typeof window !== 'undefined' ? window.localStorage.getItem('token') : null;
+  let response;
+  try {
+    response = await fetch(url, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({
-        endpoint: subJson.endpoint,
-        keys: subJson.keys,
+        subscription: sub.toJSON ? sub.toJSON() : sub,
+        user_agent: navigator.userAgent,
       }),
     });
-
-    return true;
   } catch (err) {
-    console.warn('[Push] Subscribe failed:', err);
-    return false;
+    console.error('[push] backend POST threw:', err);
+    return { ok: false, code: 'network_error', detail: String(err?.message || err) };
   }
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    console.error('[push] backend returned', response.status, text);
+    // If save failed, undo the local push subscription so a retry doesn't
+    // silently use a stale subscription the server doesn't know about.
+    try { await sub.unsubscribe(); } catch (_) { /* best-effort */ }
+    return {
+      ok: false,
+      code: 'backend_save_failed',
+      detail: `HTTP ${response.status}${text ? ` — ${text.slice(0, 120)}` : ''}`,
+    };
+  }
+
+  return { ok: true, subscription: sub };
 }
 
-/**
- * Unsubscribe from push notifications.
- * @param {string} token - JWT auth token
- */
-export async function unsubscribeFromPush(token) {
+export async function unsubscribeFromPush() {
+  if (!isPushSupported()) return false;
   try {
     const reg = await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.getSubscription();
     if (!sub) return true;
-
-    const subJson = sub.toJSON();
+    const endpoint = sub.endpoint;
+    await sub.unsubscribe();
     const apiBase = process.env.REACT_APP_BACKEND_URL || '';
-
+    const token = typeof window !== 'undefined' ? window.localStorage.getItem('token') : null;
     await fetch(`${apiBase}/api/push/unsubscribe`, {
       method: 'DELETE',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({
-        endpoint: subJson.endpoint,
-        keys: subJson.keys,
-      }),
-    });
-
-    await sub.unsubscribe();
+      body: JSON.stringify({ endpoint }),
+    }).catch(() => {});
     return true;
   } catch (err) {
-    console.warn('[Push] Unsubscribe failed:', err);
+    console.error('[push] unsubscribe failed:', err);
     return false;
   }
 }
 
-/**
- * Check if the user currently has an active push subscription.
- */
 export async function isPushSubscribed() {
+  if (!isPushSupported()) return false;
   try {
     const reg = await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.getSubscription();
@@ -130,23 +185,14 @@ export async function isPushSubscribed() {
   }
 }
 
-/**
- * Show a local notification (for testing / in-app fallback).
- */
-export async function showLocalNotification(title, body, data = {}) {
-  if (Notification.permission !== 'granted') return;
-  const reg = await navigator.serviceWorker.ready;
-  reg.showNotification(title, {
-    body,
-    icon: '/logo192.png',
-    badge: '/logo192.png',
-    data,
-  });
+export function showLocalNotification(title, options = {}) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  try { new Notification(title, options); } catch (_) { /* noop */ }
 }
 
 export default {
+  isPushSupported,
   registerServiceWorker,
-  getPushPermission,
   subscribeToPush,
   unsubscribeFromPush,
   isPushSubscribed,

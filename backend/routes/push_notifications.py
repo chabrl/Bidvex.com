@@ -3,9 +3,9 @@ BidVex Web Push Notification Service
 Self-hosted VAPID push — no Firebase dependency.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Dict, Any
 from datetime import datetime, timezone
 from deps import get_current_user, User
 from pywebpush import webpush, WebPushException
@@ -81,15 +81,37 @@ class PushPayload(BaseModel):
 # ---------- Routes ----------
 
 @push_router.post("/push/subscribe")
-async def subscribe_push(sub: PushSubscription, current_user: User = Depends(get_current_user)):
+async def subscribe_push(
+    payload: Dict[str, Any] = Body(...),
+    current_user: User = Depends(get_current_user),
+):
+    """iter211 — accept BOTH shapes for forward/back-compat:
+      • {endpoint, keys}                       (raw PushSubscription shape)
+      • {subscription:{endpoint,keys}, user_agent}  (frontend wrapper shape)
+    """
     db = get_db()
+
+    # Unwrap the subscription if it's nested
+    sub_data = payload.get("subscription") if isinstance(payload.get("subscription"), dict) else payload
+    endpoint = sub_data.get("endpoint")
+    keys = sub_data.get("keys")
+    user_agent = payload.get("user_agent") or ""
+
+    if not endpoint or not isinstance(keys, dict) or "p256dh" not in keys or "auth" not in keys:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=422,
+            detail="Invalid push subscription — expected fields: endpoint, keys.p256dh, keys.auth",
+        )
+
     # Upsert subscription for this user+endpoint
     await db.push_subscriptions.update_one(
-        {"user_id": current_user.id, "endpoint": sub.endpoint},
+        {"user_id": current_user.id, "endpoint": endpoint},
         {"$set": {
             "user_id": current_user.id,
-            "endpoint": sub.endpoint,
-            "keys": sub.keys,
+            "endpoint": endpoint,
+            "keys": keys,
+            "user_agent": user_agent,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }},
         upsert=True,

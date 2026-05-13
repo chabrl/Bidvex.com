@@ -37,15 +37,32 @@ const PushNotificationToggle = ({ variant = 'settings' }) => {
         setSubscribed(false);
         toast.success('Notifications disabled');
       } else {
-        const success = await subscribeToPush(token);
-        if (success) {
+        const result = await subscribeToPush(token);
+        if (result?.ok) {
           setSubscribed(true);
           toast.success('Notifications enabled! You\'ll be alerted for outbids and watchlist items.');
         } else {
-          toast.error('Could not enable notifications. Check browser permissions.');
+          // iter211 — precise messaging per failure code (was: always "check browser permissions")
+          const code = result?.code || 'subscribe_failed';
+          const detail = result?.detail ? ` (${result.detail})` : '';
+          const msg = {
+            unsupported: 'Push notifications are not supported in this browser.',
+            no_vapid_key: 'Push notifications are not configured on this site. Please contact support.',
+            permission_denied: 'Browser permission was denied. Allow notifications in your browser settings and try again.',
+            permission_default: 'Browser permission prompt was dismissed. Click "Enable" again to retry.',
+            no_service_worker: 'The service worker is not ready yet. Please reload the page and try again.',
+            subscribe_failed: 'Could not register with the push service. Please try again in a moment.',
+            backend_save_failed: 'Notifications are configured but the server could not save your registration. Please try again.',
+            network_error: 'Could not reach the BidVex server. Check your internet connection and try again.',
+          }[code] || 'Could not enable notifications. Please try again.';
+          toast.error(msg + detail);
+          // eslint-disable-next-line no-console
+          console.error('[push toggle] subscribe failed:', code, detail);
         }
       }
-    } catch {
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[push toggle] unexpected error:', err);
       toast.error('Failed to update notification settings');
     }
     setLoading(false);

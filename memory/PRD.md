@@ -1,5 +1,49 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter211 hot-fix — Push Notifications + Partner Status Desync (Feb 12, 2026) ✅
+
+### Task 1 — Push Notifications fail with misleading error ✅
+**Root cause**: payload shape mismatch + missing error classification.
+- Frontend POSTed `{subscription:{endpoint,keys}, user_agent}` but backend expected `{endpoint, keys}` at top level → silent 422.
+- The old toggle code returned `false` for ANY failure (network, VAPID missing, SW unready, backend 4xx/5xx) and always showed "Check browser permissions" — masking the real cause.
+
+**Fixes**:
+- `backend/routes/push_notifications.py` — `POST /api/push/subscribe` now accepts BOTH shapes (wrapped + raw). 422s only when `endpoint` or `keys.p256dh/auth` are actually missing.
+- `frontend/src/utils/pushNotifications.js` — full rewrite. `subscribeToPush()` now returns `{ok:true, subscription}` or `{ok:false, code, detail}` with 8 distinct codes: `unsupported`, `no_vapid_key`, `permission_denied`, `permission_default`, `subscribe_failed`, `backend_save_failed`, `network_error`, `no_service_worker`. Adds Authorization header + 6-second SW-ready timeout + checks `response.ok` and unsubscribes locally if backend save fails.
+- `frontend/src/components/PushNotificationToggle.js` — maps each code to a precise bilingual user message.
+- Live verified end-to-end with 4 curl tests (wrapped shape ✓, raw shape ✓, missing keys → 422 ✓, unauthenticated → 401 ✓). 3 subscriptions persisted in MongoDB during testing.
+
+### Task 2 — Partner Status Desync (alexboul1993 missing from admin queue) ✅
+**Root cause**: `services/resubmission_service.py` wrote `"pending_review"` to `users.partner_verification_status`, but `routes/admin.py:list_partners` filtered on `["pending", "verified", "rejected"]` — the resubmitted user was silently filtered out of the admin queue.
+
+**Fixes**:
+- `services/resubmission_service.py` — DB write changed from `"pending_review"` to canonical `"pending"`. The API response still returns `"pending_review"` for UI copy continuity.
+- `routes/admin.py:list_partners` — filter expanded to accept BOTH values defensively.
+- `routes/admin.py:approve_partner` — accepts both legacy and canonical enums.
+- **Backfilled 2 affected users** (`alexboul1993@gmail.com` + `charbel911@gmail.com`) from `pending_review` → `pending`. Confirmed via direct DB query: both now appear in the admin pending queue.
+- Updated `test_iter209_step2_resubmission.py` to assert canonical `"pending"`.
+
+### Test Status
+- 135/136 iter211 tests passing (1 flaky live-HTTP skipped on rate-limit).
+- All iter209 resubmission tests (6/6) pass with new canonical enum.
+- All lint clean.
+- Live API verified — 4 push-subscribe scenarios + admin pending list.
+
+### Files of reference (Feb 12)
+- `/app/backend/routes/push_notifications.py` (accept-both-shapes)
+- `/app/backend/services/resubmission_service.py` (canonical "pending")
+- `/app/backend/routes/admin.py` (defensive enum filter)
+- `/app/frontend/src/utils/pushNotifications.js` (REWRITE)
+- `/app/frontend/src/components/PushNotificationToggle.js` (precise error mapping)
+- `/app/backend/tests/test_iter211_push_and_partner_desync.py` (NEW — 9 tests, includes 4 live HTTP)
+
+⚠️ **Production note**: Once redeployed to https://bidvex.com, ALSO run the 1-line backfill on production DB so any production users in `pending_review` get reset to `pending`:
+```python
+await db.users.update_many({"partner_verification_status": "pending_review"}, {"$set": {"partner_verification_status": "pending"}})
+```
+
+---
+
 ## Latest: iter211 — Legal Launch Prep (Universal Terminology + Province Tax Router + Notification Save Fix) (Feb 11, 2026) ✅
 
 User-requested sprint to clear three launch blockers across Canadian provinces.

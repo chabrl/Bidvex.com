@@ -85,8 +85,13 @@ async def _resubmit_partner(db, *, user_id: str, user_email: str | None, payload
     rejection_history.append(history_entry)
 
     # Update payload fields — keep payload optional so partial pre-fills work
+    # NOTE (iter211): write the canonical `"pending"` enum here so the row is
+    # visible in routes/admin.py:list_partners which filters on that exact value.
+    # Previously this wrote "pending_review", which silently hid resubmitted
+    # applications from the admin queue (status-value drift bug). The API still
+    # returns "pending_review" to the frontend for human-friendly copy.
     updates = {
-        "partner_verification_status": "pending_review",
+        "partner_verification_status": "pending",
         "partner_applied_at": now,
         "resubmitted_at": now,
         "resubmission_count": resubmission_count + 1,

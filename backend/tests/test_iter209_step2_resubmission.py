@@ -102,6 +102,7 @@ async def test_partner_resubmit_increments_and_flips_status(db):
             db, flavor="partner", user_id=uid, user_email=f"{uid}@bidvex.test",
             payload={"partner_company_name": "Re-Submitted Co"},
         )
+        # API response keeps the human-friendly "pending_review" copy for UI
         assert result["status"] == "pending_review"
         assert result["resubmission_count"] == 1
         assert "verified" not in result["message_en"].lower()
@@ -109,7 +110,9 @@ async def test_partner_resubmit_increments_and_flips_status(db):
         assert "24" in result["message_fr"]
 
         fresh = await db.users.find_one({"id": uid})
-        assert fresh["partner_verification_status"] == "pending_review"
+        # iter211 fix — DB now stores canonical "pending" enum so the admin
+        # queue (routes/admin.py) picks up resubmitted applications correctly.
+        assert fresh["partner_verification_status"] == "pending"
         assert fresh["resubmission_count"] == 1
         assert fresh["partner_rejection_reason"] is None
         assert len(fresh["rejection_history"]) == 1
