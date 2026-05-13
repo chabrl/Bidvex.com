@@ -1,5 +1,69 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter211 P0/P2/P3/P4 — Storage Fee Correction, T&C, Dealer Annual Fee, Demo Isolation (Feb 9, 2026) ✅
+
+User-requested 4-part urgent sprint. **All 73 iter211 tests passing, zero regressions verified via pre/post diff.**
+
+### Part 1 — P0 Storage Fee Logic Correction ✅ CRITICAL
+- Previous bug: `calculate_fee()` always charged the facility card and never routed by payment_method.
+- Fix in `services/fee_calculator.py` storage_facility branch — now routes by `payment_method`:
+  • **cash / e_transfer / etransfer** → buyer pays facility direct; BidVex auto-charges facility card 5% + GST/QST + Stripe gross-up (= **$6.23** on $100 hammer)
+  • **stripe** → buyer pays HAMMER ONLY via Stripe (no BP, no buyer tax, no buyer gross-up); BidVex deducts 5% + GST/QST from facility payout (**= $94.25** on $100 hammer)
+- In BOTH scenarios: BUYER NEVER pays a BidVex fee on storage.
+- Updated `services/fee_calculator.py` buyer subtotal + Stripe routing + seller_payout logic.
+- Updated `CostBreakdown.jsx` and `PayoutSummary.jsx` storage branches to render two distinct UIs based on `charge_buyer_via_stripe`.
+- Updated `StorageAuctionCreate.js` payment-method picker copy so facility owners pick the correct mode.
+- 32 new tests in `test_iter211_storage_fee_corrections.py` (5a/5b/parameterized hammer prices/buyer-zero invariant).
+- Original Test 5 split into 5a (cash) + 5b (Stripe), `test_iter209_step4_fees_v2.py` also updated.
+
+### Part 2 — T&C Content Updates ✅
+- `pages/storage/StoragePolicies.js` rewritten sections 1, 4, 5 (HowItWorks) and Article 4, Sections 2-3 (StorageTerms + ForFacilities).
+- New "Platform Fees & Payment Methods" section explicitly states "5% commission paid by facility, never by buyer" in EN + FR.
+- StorageAuctionCreate option labels rewritten to match corrected economics.
+
+### Part 3 — Vehicle Dealer Annual Fee Banner ✅
+- New POST `/api/dealer-subscription/create-checkout-session` endpoint — creates hosted Stripe Checkout for $100/yr subscription (LAUNCH50 coupon applied automatically). Demo accounts blocked with `demo_mode_payments_disabled` 403.
+- `routes/webhooks.py` extended to mark `dealer_subscription_active=True` on `checkout.session.completed` for `type=vehicle_dealer_annual_fee`.
+- `services/dealer_subscription_service.py:get_dealer_subscription_status` rewritten to surface `active/suspended/renewal_date`.
+- New `frontend/src/components/DealerAnnualFeeBanner.jsx` — 3 scenarios (pay / active / suspended) with bilingual copy, gradient gold pay-banner, $200→$100 launch-discount badge.
+- Mounted on `SellerDashboard.js` above PilotWelcomeBanner. "Create Listing" button locked + lock icon for dealers without active subscription; tooltip "Pay your annual fee to start listing".
+
+### Part 4 — Demo Account Complete Isolation ✅
+- New `services/demo_filter.py` with 3 helpers: `tag_listing_if_demo`, `public_listing_filter`, `is_demo_user`.
+- Tag injected into all 4 listing-creation sites: `services/listings_service.py`, `routes/listings.py` (multi-item), `routes/vehicles.py`, `routes/storage_auctions.py`.
+- `is_demo: {"$ne": True}` filter added to 6 public list endpoints: marketplace cache builder, marketplace location-search, promoted-listings, storage-auctions list, vehicles list, carousel ending-soon, carousel featured.
+- Bid endpoint (`routes/auctions_bids.py:place_bid`) rejects demo→real and real→demo bids with bilingual error messages. Demo-on-demo bidding still works.
+- New `frontend/src/components/DemoModeBanner.jsx` — amber banner on dashboard for demo users.
+- "🎭 DEMO — Not visible to public" inline badge on demo user's own listing cards in seller dashboard.
+- Dealer-fee checkout 403s if `is_demo_account === True` (prevents real Stripe charges).
+- 21 new tests in `test_iter211_demo_isolation.py` (helper unit tests + static smoke tests proving each call site is wired).
+
+### Test Status
+- **73/73 iter211 tests passing** in isolation.
+- **120/121 iter209+iter210+iter211 passing** (1 flaky live-HTTP 429 rate-limit, pre-existing).
+- Targeted PricingManager/payout pre-vs-post diff: **0 newly failing tests**.
+- All lint clean (ruff, eslint).
+- Live API verified: $100 cash → buyer $0/facility-card $6.23; $100 Stripe → buyer $100/facility-payout $94.25.
+
+### Files of reference (iter211 Feb 9)
+- `/app/backend/services/fee_calculator.py` (storage_facility branch + buyer_subtotal + seller_payout)
+- `/app/backend/services/demo_filter.py` (NEW)
+- `/app/backend/routes/dealer_subscription_routes.py` (NEW Stripe Checkout endpoint)
+- `/app/backend/routes/webhooks.py` (dealer_annual_fee activation)
+- `/app/backend/routes/auctions_bids.py` (bid demo isolation)
+- `/app/backend/routes/marketplace.py`, `routes/carousel.py`, `routes/storage_auctions.py`, `routes/vehicles.py` (public list filters)
+- `/app/frontend/src/components/CostBreakdown.jsx`, `PayoutSummary.jsx` (storage UIs)
+- `/app/frontend/src/components/DealerAnnualFeeBanner.jsx` (NEW)
+- `/app/frontend/src/components/DemoModeBanner.jsx` (NEW)
+- `/app/frontend/src/pages/storage/StoragePolicies.js` (corrected T&C)
+- `/app/frontend/src/pages/SellerDashboard.js` (banners + listing badges + create-listing gate)
+- `/app/backend/tests/test_iter211_storage_fee_corrections.py` (NEW — 32 tests)
+- `/app/backend/tests/test_iter211_demo_isolation.py` (NEW — 21 tests)
+
+⚠️ **All changes are in PREVIEW.** Production redeploy required (https://bidvex.com).
+
+---
+
 ## Latest: iter211 — PricingManager Settlement Migration + Error Boundaries + Featured Ribbon + Pickup Coordination (Feb 8, 2026) ✅
 
 User-requested sequential sprint covering 4 P0/P1 items in order. **Zero math drift confirmed via pre/post bit-parity diff (16 identical baseline failures, no new regressions).**

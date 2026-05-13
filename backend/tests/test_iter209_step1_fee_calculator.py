@@ -157,15 +157,18 @@ def test_spec_case_4_vehicle_dealer_10000():
     assert _approx(fee["buyer_total_charged"], expected_total, tol=0.05)
 
 
-# ─── Test 5: Storage S1 lists, buyer wins at $100 ─────────────────────────
-def test_spec_case_5_storage_facility_100():
+# ─── Test 5a: Storage S1, CASH payment, $100 win ──────────────────────────
+# iter211 P0: storage_facility + payment_method ∈ {cash, e_transfer} → BidVex
+# auto-charges the facility card 5% + GST/QST + Stripe gross-up. Buyer pays
+# the facility directly, BidVex bills the facility separately.
+def test_spec_case_5a_storage_facility_cash_100():
     fee = calculate_fee(
         hammer_price=100.0,
         auction_type="storage",
         seller_account_type="storage_facility",
         buyer_account_type="individual",
         buyer_tier="vip_elite",          # MUST be ignored — buyer pays $0 to BidVex
-        payment_method="stripe",
+        payment_method="cash",
         card_type="domestic",
     )
 
@@ -183,8 +186,56 @@ def test_spec_case_5_storage_facility_100():
     assert _approx(fee["seller_qst"], 0.50)
     assert _approx(fee["seller_commission_total"], 5.75)
 
-    expected_seller_stripe = (5.75 + 0.30) / (1 - 0.029) - 5.75
+    expected_seller_stripe = (5.75 + 0.30) / (1 - 0.029) - 5.75  # ≈ 0.48
     assert _approx(fee["seller_stripe_fee"], expected_seller_stripe, tol=0.02)
+    # Total facility card charge = $6.23 (per spec)
+    assert _approx(fee["seller_commission_total"] + fee["seller_stripe_fee"], 6.23, tol=0.02)
+    assert _approx(fee["bidvex_revenue"], 5.00)
+
+
+# ─── Test 5b: Storage S1, STRIPE payment, $100 win ────────────────────────
+# iter211 P0: storage_facility + payment_method="stripe" → buyer pays hammer
+# ONLY via Stripe (no BP, no buyer fees), facility receives hammer minus
+# (5% + GST + QST) from BidVex. The 5% commission is deducted from payout,
+# NOT separately charged to facility card.
+def test_spec_case_5b_storage_facility_stripe_100():
+    fee = calculate_fee(
+        hammer_price=100.0,
+        auction_type="storage",
+        seller_account_type="storage_facility",
+        buyer_account_type="individual",
+        buyer_tier="vip_elite",          # MUST be ignored — buyer pays only hammer
+        payment_method="stripe",
+        card_type="domestic",
+    )
+
+    # Buyer IS charged via Stripe — but ONLY the hammer (no BP, no tax)
+    assert fee["charge_buyer_via_stripe"] is True
+    assert _approx(fee["buyer_premium"], 0.00)
+    assert _approx(fee["buyer_gst"], 0.00)
+    assert _approx(fee["buyer_qst"], 0.00)
+    assert _approx(fee["buyer_stripe_fee"], 0.00)
+    assert _approx(fee["buyer_subtotal"], 100.00)
+    assert _approx(fee["buyer_total_charged"], 100.00)
+
+    # Facility commission deducted from payout, NOT charged separately
+    assert fee["charge_seller_card_separately"] is False
+    assert _approx(fee["seller_commission"], 5.00)
+    assert _approx(fee["seller_commission_rate"], 0.05)
+    assert _approx(fee["seller_gst"], 0.25)
+    assert _approx(fee["seller_qst"], 0.50)
+    assert _approx(fee["seller_commission_total"], 5.75)
+    # No separate charge to facility card
+    assert _approx(fee["seller_stripe_fee"], 0.00)
+    # Facility payout = hammer - (5% + GST + QST) = 100 - 5.75 = 94.25
+    assert _approx(fee["seller_payout"], 94.25), \
+        f"Facility payout expected $94.25, got ${fee['seller_payout']}"
+    assert _approx(fee["bidvex_revenue"], 5.00)
+
+
+# ─── Legacy alias for the original Test 5 (now reframed as cash 5a) ───────
+# Kept so any other module referencing the old name still passes.
+test_spec_case_5_storage_facility_100 = test_spec_case_5a_storage_facility_cash_100
 
 
 if __name__ == "__main__":

@@ -131,6 +131,11 @@ async def persist_listing(db, listing_dict: Dict, agreement_metadata: Dict) -> D
     listing_dict["agreement_metadata"] = agreement_metadata
     listing_dict["auction_end_date"] = listing_dict["auction_end_date"].isoformat()
     listing_dict["created_at"] = listing_dict["created_at"].isoformat()
+
+    # iter211 P4 — tag demo accounts' listings so public queries can filter them out
+    from services.demo_filter import tag_listing_if_demo
+    await tag_listing_if_demo(db, listing_dict.get("seller_id") or listing_dict.get("user_id"), listing_dict)
+
     await db.listings.insert_one(listing_dict)
     listing_dict.pop("_id", None)
 

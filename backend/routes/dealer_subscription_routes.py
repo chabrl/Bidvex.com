@@ -60,3 +60,59 @@ async def admin_view_dealer_subscription(user_id: str, current_user: User = Depe
         raise HTTPException(status_code=403, detail="admin_required")
     from services.dealer_subscription_service import get_dealer_subscription_status
     return await get_dealer_subscription_status(db, user_id)
+
+
+# ── iter211 P3: hosted Stripe Checkout for dealer annual fee ─────────────
+@dealer_subscription_router.post("/dealer-subscription/create-checkout-session")
+async def create_dealer_checkout_session(current_user: User = Depends(get_current_user)):
+    """Generate a hosted Stripe Checkout Session for the dealer's $100/yr
+    subscription (uses the LAUNCH50 coupon → effective $100). Returns
+    `{checkout_url}` for the frontend to redirect to. Idempotent: if the
+    dealer already has an active subscription, returns `{already_active: true}`.
+    Demo accounts are blocked (iter211 P4 isolation rule)."""
+    import os
+    import stripe
+    from fastapi import HTTPException
+
+    db = get_db()
+    user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0}) or {}
+
+    # iter211 P4 — Demo accounts cannot trigger any real Stripe flow
+    if user_doc.get("is_demo_account") is True:
+        raise HTTPException(status_code=403, detail="demo_mode_payments_disabled")
+
+    # Must be an approved vehicle dealer
+    if not user_doc.get("is_vehicle_dealer"):
+        raise HTTPException(status_code=403, detail="not_a_vehicle_dealer")
+
+    # Idempotency: if already active, surface that
+    if user_doc.get("dealer_subscription_active") is True:
+        return {"already_active": True, "renewal_date": user_doc.get("dealer_subscription_renewal")}
+
+    from services.dealer_subscription_service import _get_or_create_settings, COUPON_ID
+    settings = await _get_or_create_settings(db)
+
+    stripe.api_key = os.environ.get("STRIPE_API_KEY")
+    frontend_url = os.environ.get("FRONTEND_URL", "https://bidvex.com")
+
+    session = stripe.checkout.Session.create(
+        mode="subscription",
+        customer_email=current_user.email,
+        line_items=[{"price": settings["price_id"], "quantity": 1}],
+        discounts=[{"coupon": COUPON_ID}],
+        success_url=f"{frontend_url}/seller-dashboard?dealer_fee=success",
+        cancel_url=f"{frontend_url}/seller-dashboard?dealer_fee=cancelled",
+        metadata={
+            "user_id": current_user.id,
+            "type": "vehicle_dealer_annual_fee",
+        },
+        subscription_data={
+            "metadata": {
+                "user_id": current_user.id,
+                "type": "vehicle_dealer_annual_fee",
+            }
+        },
+        allow_promotion_codes=False,
+    )
+    return {"checkout_url": session.url, "session_id": session.id}
+

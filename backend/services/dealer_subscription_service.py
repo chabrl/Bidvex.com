@@ -197,7 +197,47 @@ async def create_dealer_subscription(
 
 
 async def get_dealer_subscription_status(db, user_id: str) -> dict:
-    """Surface subscription info for the Admin panel."""
+    """Surface subscription info for the Admin panel + Dealer banner.
+
+    iter211: Also surfaces the simpler `dealer_subscription_active` flag set
+    by the Stripe Checkout webhook, used by the seller-dashboard banner to
+    decide whether to show the "Activate Account" prompt.
+    """
+    doc = await db.users.find_one(
+        {"id": user_id},
+        {"_id": 0,
+         "vehicle_dealer_subscription_id": 1,
+         "vehicle_dealer_subscription_status": 1,
+         "vehicle_dealer_subscription_current_period_end": 1,
+         "vehicle_dealer_subscription_started_at": 1,
+         "dealer_subscription_active": 1,
+         "dealer_subscription_status": 1,
+         "dealer_subscription_renewal": 1,
+         "dealer_subscription_start": 1,
+         "dealer_stripe_subscription_id": 1,
+         "vehicle_dealer_suspended": 1,
+         "is_vehicle_dealer": 1,
+         "is_demo_account": 1},
+    ) or {}
+
+    # iter211 — dealer subscription state derived from webhook flag
+    active = bool(doc.get("dealer_subscription_active"))
+    suspended = bool(doc.get("vehicle_dealer_suspended"))
+    return {
+        "is_vehicle_dealer": bool(doc.get("is_vehicle_dealer")),
+        "is_demo_account": bool(doc.get("is_demo_account")),
+        "has_subscription": active or bool(doc.get("vehicle_dealer_subscription_id")),
+        "active": active and not suspended,
+        "suspended": suspended,
+        "status": doc.get("dealer_subscription_status") or doc.get("vehicle_dealer_subscription_status"),
+        "renewal_date": doc.get("dealer_subscription_renewal"),
+        "started_at": doc.get("dealer_subscription_start"),
+        "subscription_id": doc.get("dealer_stripe_subscription_id") or doc.get("vehicle_dealer_subscription_id"),
+    }
+
+
+async def _legacy_get_dealer_subscription_status_stripe(db, user_id: str) -> dict:
+    """Pre-iter211 implementation kept for the Admin panel. Calls live Stripe."""
     doc = await db.users.find_one(
         {"id": user_id},
         {"_id": 0,

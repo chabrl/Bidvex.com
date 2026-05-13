@@ -190,14 +190,27 @@ def calculate_fee(
         notes = "Vehicle dealer: 2.5% buyer fee. Dealer pays $0 per transaction (annual $100 platform fee billed separately)."
 
     # ── Route 3: STORAGE FACILITY seller ─────────────────────────────────
+    # iter211 P0 fix: payment_method routes WHO pays the BidVex fee.
+    #   cash / e_transfer → buyer pays hammer to facility direct; BidVex
+    #     auto-charges facility card 5% + GST/QST + Stripe gross-up.
+    #   stripe           → buyer pays HAMMER ONLY via Stripe (no buyer BP,
+    #     no buyer tax); BidVex deducts 5% + GST/QST from facility payout.
+    # In BOTH scenarios the BUYER NEVER pays a BidVex fee.
     elif seller_type == "storage_facility":
         buyer_premium = Decimal("0")
         buyer_premium_rate = Decimal("0")
         seller_commission_rate = STORAGE_FACILITY_RATE
         seller_commission = hammer * STORAGE_FACILITY_RATE
-        charge_buyer_via_stripe = False  # buyer pays facility directly (cash on site etc.)
-        charge_seller_card_separately = True
-        notes = "Storage facility: buyer pays facility directly. BidVex auto-charges 5% commission to facility card on file."
+        if payment in ("cash", "e_transfer", "etransfer"):
+            charge_buyer_via_stripe = False  # buyer pays facility directly
+            charge_seller_card_separately = True
+            notes = "Storage cash/e-transfer: buyer pays facility direct. BidVex auto-charges 5% + GST/QST + Stripe gross-up to facility card."
+        else:
+            # Stripe payment → buyer pays hammer only via Stripe; facility receives
+            # hammer minus (5% + GST + QST) from BidVex.
+            charge_buyer_via_stripe = True
+            charge_seller_card_separately = False
+            notes = "Storage Stripe: buyer pays hammer via Stripe (no BP, no buyer fees). 5% commission + GST/QST deducted from facility payout."
 
     # ── Route 4: INDIVIDUAL seller ───────────────────────────────────────
     elif seller_type == "individual":
@@ -225,7 +238,15 @@ def calculate_fee(
     buyer_gst = _q(buyer_premium * QC_GST_RATE)
     buyer_qst = _q(buyer_premium * QC_QST_RATE)
     buyer_taxes = buyer_gst + buyer_qst
-    buyer_subtotal = (hammer + buyer_premium + buyer_taxes) if charge_buyer_via_stripe else Decimal("0")
+
+    # iter211 P0 fix: storage_facility on Stripe payment → buyer pays hammer
+    # ONLY (no BP, no buyer tax, no buyer Stripe gross-up). All BidVex revenue
+    # flows from the seller-side commission deduction.
+    is_storage_stripe = (seller_type == "storage_facility" and charge_buyer_via_stripe)
+    if is_storage_stripe:
+        buyer_subtotal = hammer  # exactly hammer
+    else:
+        buyer_subtotal = (hammer + buyer_premium + buyer_taxes) if charge_buyer_via_stripe else Decimal("0")
 
     seller_commission = _q(seller_commission)
     seller_gst = _q(seller_commission * QC_GST_RATE)
@@ -233,7 +254,11 @@ def calculate_fee(
     seller_commission_total = seller_commission + seller_gst + seller_qst
 
     # ── Stripe gross-up routing ──────────────────────────────────────────
-    buyer_stripe_fee = _stripe_gross_up(buyer_subtotal, card_type) if charge_buyer_via_stripe else Decimal("0")
+    # iter211 P0 fix: storage-Stripe → buyer pays exactly hammer, NO gross-up.
+    if is_storage_stripe:
+        buyer_stripe_fee = Decimal("0")
+    else:
+        buyer_stripe_fee = _stripe_gross_up(buyer_subtotal, card_type) if charge_buyer_via_stripe else Decimal("0")
     buyer_total_charged = buyer_subtotal + buyer_stripe_fee
     buyer_stripe_cents = int((buyer_total_charged * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
@@ -248,7 +273,15 @@ def calculate_fee(
     elif seller_type == "vehicle_dealer":
         seller_payout = hammer  # dealer always gets full hammer
     elif seller_type == "storage_facility":
-        seller_payout = Decimal("0")  # buyer pays facility directly outside Stripe
+        # iter211 P0 fix: payment_method determines payout shape.
+        #   cash/e-transfer → buyer paid facility direct, BidVex collects from
+        #     facility card → no BidVex-side payout owed.
+        #   stripe → buyer paid hammer via BidVex Stripe → facility net is
+        #     hammer minus (5% + GST + QST on commission).
+        if is_storage_stripe:
+            seller_payout = hammer - seller_commission_total
+        else:
+            seller_payout = Decimal("0")  # buyer pays facility directly outside Stripe
     elif seller_type == "partner" and charge_seller_card_separately:
         seller_payout = Decimal("0")  # buyer paid partner directly, BidVex only charges commission
     else:

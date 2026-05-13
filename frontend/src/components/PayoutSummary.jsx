@@ -107,22 +107,47 @@ export const PayoutSummary = ({
     );
   }
 
-  // ── Storage facility — auto-charge to facility's card ────────────────
+  // ── Storage facility — iter211 P0: two sub-scenarios by payment method ──
+  //  • cash / e-transfer → BidVex auto-charges facility card 5%+GST+QST+Stripe
+  //  • stripe            → 5%+GST+QST deducted from facility's Stripe payout
   if (accountKind === 'storage_facility') {
+    const isStripe = fee.charge_buyer_via_stripe === true;
     return (
       <div className={wrapperCls} data-testid="payout-summary-storage_facility">
         <Row label={isFr ? 'Enchère gagnante' : 'Winning Bid'} value={fmt(fee.hammer_price, currency)} testid="ps-hammer" />
         <Row label={isFr ? `Commission BidVex (${commPct} %)` : `BidVex Commission (${commPct}%)`} value={`-${fmt(fee.seller_commission, currency)}`} testid="ps-comm" />
         <Row label={isFr ? 'TPS sur commission' : 'GST on Commission'} value={`-${fmt(fee.seller_gst, currency)}`} testid="ps-gst" />
         <Row label={isFr ? 'TVQ sur commission' : 'QST on Commission'} value={`-${fmt(fee.seller_qst, currency)}`} testid="ps-qst" />
-        <Row label={isFr ? 'Traitement Stripe' : 'Stripe Processing'} value={`-${fmt(fee.seller_stripe_fee, currency)}`} testid="ps-stripe" />
-        <Row label={isFr ? 'Montant facturé à votre carte' : 'Charged to Your Card'} value={fmt(fee.seller_commission_total + fee.seller_stripe_fee, currency)} bold testid="ps-charged" />
-        <div className="mt-2 text-[11px] text-amber-700 dark:text-amber-400 flex items-start gap-1.5">
+        {!isStripe && (
+          <Row label={isFr ? 'Traitement Stripe' : 'Stripe Processing'} value={`-${fmt(fee.seller_stripe_fee, currency)}`} testid="ps-stripe" />
+        )}
+        {isStripe ? (
+          <Row
+            label={isFr ? 'Votre paiement net' : 'Your Net Payout'}
+            value={fmt(fee.seller_payout, currency)}
+            bold
+            testid="ps-payout"
+          />
+        ) : (
+          <Row
+            label={isFr ? 'Montant facturé à votre carte' : 'Charged to Your Card'}
+            value={fmt(fee.seller_commission_total + fee.seller_stripe_fee, currency)}
+            bold
+            testid="ps-charged"
+          />
+        )}
+        <div className="mt-2 text-[11px] text-amber-700 dark:text-amber-400 flex items-start gap-1.5" data-testid="ps-storage-msg">
           <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
           <span>
-            {isFr
-              ? "L'acheteur vous paie directement le montant total de l'enchère."
-              : 'The buyer pays you the full winning bid directly.'}
+            {isStripe ? (
+              isFr
+                ? "L'acheteur a payé via Stripe. Vous absorbez la commission de 5 %, déduite directement de votre versement."
+                : 'Buyer paid via Stripe. The 5% commission is absorbed by you and deducted from your Stripe payout.'
+            ) : (
+              isFr
+                ? "L'acheteur vous paie directement le montant total de l'enchère. BidVex facture la commission à votre carte enregistrée."
+                : 'The buyer pays you the full winning bid directly. BidVex charges the commission to your card on file.'
+            )}
           </span>
         </div>
       </div>

@@ -696,6 +696,10 @@ async def create_multi_item_listing(
     listing_dict["agreement_metadata"] = agreement_metadata
     serialise_datetimes(listing_dict)
 
+    # iter211 P4 — tag demo accounts' multi-item listings
+    from services.demo_filter import tag_listing_if_demo
+    await tag_listing_if_demo(db, current_user.id, listing_dict)
+
     await db.multi_item_listings.insert_one(listing_dict)
     listing_dict.pop("_id", None)
 

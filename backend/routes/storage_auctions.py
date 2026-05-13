@@ -190,7 +190,8 @@ async def list_storage_auctions(
     db = get_db()
     now = _now()
 
-    query = {"status": {"$in": ["active", "upcoming"]}}
+    # iter211 P4 — exclude demo facilities' auctions from public list
+    query = {"status": {"$in": ["active", "upcoming"]}, "is_demo": {"$ne": True}}
     if province:
         query["facility_province"] = province.upper()
     if city:
@@ -663,6 +664,10 @@ async def create_storage_auction(
         "created_at": _now().isoformat(),
         "updated_at": _now().isoformat(),
     }
+    # iter211 P4 — tag demo facility's auctions
+    from services.demo_filter import tag_listing_if_demo
+    await tag_listing_if_demo(db, facility.get("user_id") or facility.get("id"), doc)
+
     await db.storage_auctions.insert_one(doc.copy())
     doc.pop("_id", None)
     return doc

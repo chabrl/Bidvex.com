@@ -41,6 +41,7 @@ async def get_ending_soon_listings(limit: int = 12, user_id: Optional[str] = Que
         listings = await db.listings.find(
             {
                 "status": "active",
+                "is_demo": {"$ne": True},  # iter211 P4 — exclude demo listings
                 "auction_end_date": {
                     "$gte": current_time.isoformat(),
                     "$lte": twenty_four_hours_later.isoformat(),
@@ -87,7 +88,7 @@ async def get_featured_listings(limit: int = 12):
     try:
         db = get_db()
         listings = await db.listings.find(
-            {"status": "active", "is_promoted": True},
+            {"status": "active", "is_promoted": True, "is_demo": {"$ne": True}},  # iter211 P4
             {"_id": 0},
         ).sort("created_at", -1).limit(limit).to_list(limit)
 

@@ -90,17 +90,42 @@ def test_v2_preview_case_4_vehicle_dealer():
     assert r["seller_payout"] == 10000.00
 
 
-# Spec test 5 — storage facility @ $100
-def test_v2_preview_case_5_storage_facility():
+# Spec test 5a — storage facility CASH @ $100 (corrected iter211)
+def test_v2_preview_case_5a_storage_facility_cash():
     r = _hit(
         hammer_price=100,
         auction_type="storage",
         seller_account_type="storage_facility",
         buyer_tier="vip_elite",
+        payment_method="cash",
     )
     assert r["buyer_total_charged"] == 0
     assert r["seller_commission_total"] == 5.75
     assert r["charge_buyer_via_stripe"] is False
+    assert r["charge_seller_card_separately"] is True
+
+
+# Spec test 5b — storage facility STRIPE @ $100 (iter211 P0 fix)
+def test_v2_preview_case_5b_storage_facility_stripe():
+    r = _hit(
+        hammer_price=100,
+        auction_type="storage",
+        seller_account_type="storage_facility",
+        buyer_tier="vip_elite",
+        payment_method="stripe",
+    )
+    # Buyer pays hammer only via Stripe
+    assert r["buyer_total_charged"] == 100.0
+    assert r["buyer_premium"] == 0.0
+    assert r["charge_buyer_via_stripe"] is True
+    # Facility absorbs 5% + GST + QST
+    assert r["seller_commission_total"] == 5.75
+    assert r["seller_payout"] == 94.25
+    assert r["charge_seller_card_separately"] is False
+
+
+# Legacy alias — preserved so any external reference still works
+test_v2_preview_case_5_storage_facility = test_v2_preview_case_5a_storage_facility_cash
 
 
 # Bad params → 422

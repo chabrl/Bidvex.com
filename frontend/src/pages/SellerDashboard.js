@@ -1,6 +1,8 @@
 import API_BASE from '../config';
 import ErrorBoundary from '../components/ErrorBoundary';
 import FeaturedCountdownRibbon from '../components/FeaturedCountdownRibbon';
+import DealerAnnualFeeBanner from '../components/DealerAnnualFeeBanner';
+import DemoModeBanner from '../components/DemoModeBanner';
 import { PayoutSummary } from '../components/PayoutSummary'; // iter210 Step 6
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -26,7 +28,7 @@ import InfoTip from '../components/InfoTip';
 const API = API_BASE;
 
 const SellerDashboard = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user, token } = useAuth();
   const { canCreateMultiLot } = useFeatureFlags();
   const navigate = useNavigate();
@@ -37,9 +39,16 @@ const SellerDashboard = () => {
   const [deletionReason, setDeletionReason] = useState('');
   const [deletionSubmitting, setDeletionSubmitting] = useState(false);
   const [showTaxModal, setShowTaxModal] = useState(false);
+  const [dealerSubStatus, setDealerSubStatus] = useState(null);
 
   useEffect(() => {
     fetchDashboard();
+    // iter211 P3 — fetch dealer subscription status to gate listing creation
+    if (user?.is_vehicle_dealer) {
+      axios.get(`${API}/dealer-subscription/status`)
+        .then(r => setDealerSubStatus(r.data))
+        .catch(() => setDealerSubStatus(null));
+    }
   }, []);
 
   const fetchDashboard = async () => {
@@ -105,8 +114,14 @@ const SellerDashboard = () => {
   return (
     <div className="min-h-screen py-4 sm:py-8 px-3 sm:px-4 pb-24 lg:pb-8" data-testid="seller-dashboard">
       <div className="max-w-7xl mx-auto space-y-5 sm:space-y-8">
+        {/* iter211 P4 — Demo mode banner (renders only for is_demo_account users) */}
+        <DemoModeBanner user={user} />
+
         {/* iter197 — Pilot Welcome Banner (auto-hides after 7 days post-approval or on dismiss) */}
         <PilotWelcomeBanner user={user} token={token} />
+
+        {/* iter211 P3 — Vehicle Dealer Annual Fee Banner (only renders if user.is_vehicle_dealer) */}
+        <DealerAnnualFeeBanner user={user} />
 
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
           <div className="w-full sm:w-auto">
@@ -139,14 +154,31 @@ const SellerDashboard = () => {
             </p>
           </div>
           <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-            <Button
-              className="gradient-button text-white border-0 flex-1 sm:flex-initial min-w-0"
-              onClick={() => navigate('/create-listing')}
-              data-testid="create-listing-btn"
-            >
-              <Plus className="mr-1.5 sm:mr-2 h-4 w-4 flex-shrink-0" />
-              <span className="truncate">{t('dashboard.seller.createListing')}</span>
-            </Button>
+            {(() => {
+              // iter211 P3 — Gate "Create Listing" when dealer has no active subscription
+              const isDealerLocked = user?.is_vehicle_dealer
+                && dealerSubStatus !== null
+                && dealerSubStatus?.active !== true;
+              return (
+                <Button
+                  className="gradient-button text-white border-0 flex-1 sm:flex-initial min-w-0"
+                  onClick={() => {
+                    if (isDealerLocked) {
+                      const fr = (i18n.language || 'en').startsWith('fr');
+                      toast.error(fr ? 'Payez vos frais annuels pour commencer' : 'Pay your annual fee to start listing');
+                      return;
+                    }
+                    navigate('/create-listing');
+                  }}
+                  disabled={isDealerLocked}
+                  title={isDealerLocked ? ((i18n.language || 'en').startsWith('fr') ? 'Payez vos frais annuels pour commencer' : 'Pay your annual fee to start listing') : undefined}
+                  data-testid="create-listing-btn"
+                >
+                  {isDealerLocked ? <Lock className="mr-1.5 sm:mr-2 h-4 w-4 flex-shrink-0" /> : <Plus className="mr-1.5 sm:mr-2 h-4 w-4 flex-shrink-0" />}
+                  <span className="truncate">{t('dashboard.seller.createListing')}</span>
+                </Button>
+              );
+            })()}
             {canCreateMultiLot(user) && (
               <Button
                 variant="outline"
@@ -540,6 +572,14 @@ const SellerDashboard = () => {
                             featuredUntil={listing.promoted_until}
                             tier={listing.promotion_tier}
                           />
+                        </div>
+                      )}
+
+                      {/* iter211 P4 — Demo listing badge (seller-only) */}
+                      {listing.is_demo && (
+                        <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-amber-100 border border-amber-300 px-2.5 py-0.5 text-[11px] font-medium text-amber-900" data-testid={`demo-badge-${listing.id}`}>
+                          <span>🎭</span>
+                          <span>{(i18n.language || 'en').startsWith('fr') ? 'DÉMO — Non visible au public' : 'DEMO — Not visible to public'}</span>
                         </div>
                       )}
 

@@ -109,11 +109,11 @@ async def _build_marketplace_items():
     VEHICLE_CATEGORIES = ["vehicles", "vehicle", "car", "auto", "automobile", "truck", "motorcycle"]
     
     auctions = await db.multi_item_listings.find(
-        {"status": {"$in": ["active", "upcoming"]}, "category": {"$nin": VEHICLE_CATEGORIES}}, _MULTI_PROJECTION
+        {"status": {"$in": ["active", "upcoming"]}, "category": {"$nin": VEHICLE_CATEGORIES}, "is_demo": {"$ne": True}}, _MULTI_PROJECTION
     ).sort("auction_end_date", 1).limit(500).to_list(500)
 
     single_listings = await db.listings.find(
-        {"status": "active", "category": {"$nin": VEHICLE_CATEGORIES}}, _LISTING_PROJECTION
+        {"status": "active", "category": {"$nin": VEHICLE_CATEGORIES}, "is_demo": {"$ne": True}}, _LISTING_PROJECTION
     ).sort("auction_end_date", 1).limit(500).to_list(500)
 
     # Batch-fetch seller tax status
@@ -479,7 +479,8 @@ async def track_item_click(item_id: str):
 @marketplace_router.post("/listings/search/location")
 async def search_by_location(params: LocationSearchParams):
     db = get_db()
-    query = {"status": "active"}
+    # iter211 P4 — exclude demo listings from public location search
+    query = {"status": "active", "is_demo": {"$ne": True}}
     
     if params.category:
         query["category"] = params.category
@@ -641,6 +642,7 @@ async def get_promoted_listings(limit: int = 12, tier: Optional[str] = None):
     query = {
         "status": {"$in": ["active", "upcoming"]},
         "is_promoted": True,
+        "is_demo": {"$ne": True},  # iter211 P4 — never show demo listings publicly
         "$or": [
             {"promotion_end": None},
             {"promotion_end": {"$gte": now.isoformat()}}

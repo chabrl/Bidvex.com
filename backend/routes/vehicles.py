@@ -888,6 +888,10 @@ async def create_vehicle_listing(
         "approved_by": None
     }
     
+    # iter211 P4 — tag demo accounts' vehicle listings
+    from services.demo_filter import tag_listing_if_demo
+    await tag_listing_if_demo(db, user["id"], listing)
+
     await db.vehicle_listings.insert_one(listing)
     
     # Update seller monthly count
@@ -1041,7 +1045,8 @@ async def list_vehicles(
     """
     query = {
         "status": VehicleListingStatus.ACTIVE.value,
-        "visibility": VehicleAuctionVisibility.PUBLIC.value
+        "visibility": VehicleAuctionVisibility.PUBLIC.value,
+        "is_demo": {"$ne": True},  # iter211 P4 — exclude demo dealers' vehicles
     }
     
     if make:

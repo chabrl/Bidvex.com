@@ -87,24 +87,35 @@ export const CostBreakdown = ({
   const wrapperCls = `rounded-lg border border-slate-200 dark:border-slate-700/40 bg-white dark:bg-slate-900/40 ${compact ? 'px-3 py-2' : 'p-4'} ${className}`;
   const accountKind = sellerAccountType;
 
-  // ── Storage facility — buyer pays facility directly, no BidVex Stripe ──
+  // ── Storage facility — iter211 P0: buyer ALWAYS pays only hammer ──
+  //  • cash / e-transfer → buyer pays facility directly (no BidVex flow)
+  //  • stripe            → buyer pays hammer via Stripe (no fees, no BP)
   if (accountKind === 'storage_facility') {
+    const isStripe = fee.charge_buyer_via_stripe === true;
     return (
       <div className={wrapperCls} data-testid="cost-breakdown-storage">
         <Row label={isFr ? 'Enchère gagnante' : 'Winning Bid'} value={fmt(fee.hammer_price, currency)} testid="cb-hammer" />
-        <Row label={isFr ? 'Frais de plateforme' : 'Platform Fee'} value="$0.00" mute testid="cb-platform-zero" />
+        <Row label={isFr ? 'Frais de plateforme BidVex' : 'BidVex Platform Fee'} value="$0.00" mute testid="cb-platform-zero" />
         <Row
-          label={isFr ? "Vous payez l'établissement" : 'You Pay Facility'}
+          label={isStripe
+            ? (isFr ? 'Total à payer' : 'Total You Pay')
+            : (isFr ? "Vous payez l'établissement" : 'You Pay the Facility')}
           value={fmt(fee.hammer_price, currency)}
           bold
           testid="cb-total-storage"
         />
-        <div className="mt-2 text-[11px] text-emerald-700 dark:text-emerald-400 flex items-start gap-1.5" data-testid="cb-pay-facility-msg">
+        <div className="mt-2 text-[11px] text-emerald-700 dark:text-emerald-400 flex items-start gap-1.5" data-testid="cb-storage-msg">
           <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
           <span>
-            {isFr
-              ? "💡 Le paiement est effectué directement à l'établissement de stockage."
-              : '💡 Payment is made directly to the storage facility.'}
+            {isStripe ? (
+              isFr
+                ? "💡 L'établissement absorbe les frais de plateforme. Vous payez uniquement le montant de l'enchère."
+                : '💡 The facility absorbs the platform fee. You pay only the winning bid amount.'
+            ) : (
+              isFr
+                ? "💡 Le paiement est effectué directement à l'établissement de stockage (espèces ou virement Interac). Aucun frais BidVex n'est facturé aux acheteurs."
+                : '💡 Payment is made directly to the storage facility (cash or Interac e-Transfer). No BidVex fees charged to buyers on this auction.'
+            )}
           </span>
         </div>
       </div>

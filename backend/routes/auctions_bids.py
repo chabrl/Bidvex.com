@@ -72,6 +72,26 @@ async def place_bid(request: Request, bid_data: BidCreate, current_user: User = 
     if listing["status"] != "active":
         raise HTTPException(status_code=400, detail="Listing is not active")
 
+    # iter211 P4 — Demo-user isolation rules:
+    #   • Demo users can bid on OTHER demo listings (simulated, no Stripe).
+    #   • Demo users CANNOT bid on real listings.
+    #   • Real users CANNOT bid on demo listings (they aren't public anyway).
+    from services.demo_filter import is_demo_user
+    bidder_is_demo = await is_demo_user(db, current_user.id)
+    listing_is_demo = bool(listing.get("is_demo"))
+    if bidder_is_demo and not listing_is_demo:
+        raise HTTPException(status_code=403, detail={
+            "error": "demo_cannot_bid_on_real",
+            "message_en": "Demo accounts cannot bid on real auctions. Contact us to activate your account.",
+            "message_fr": "Les comptes de démonstration ne peuvent pas enchérir sur de vraies ventes. Contactez-nous pour activer votre compte.",
+        })
+    if not bidder_is_demo and listing_is_demo:
+        raise HTTPException(status_code=403, detail={
+            "error": "real_cannot_bid_on_demo",
+            "message_en": "This listing is in demo mode and is not available for bidding.",
+            "message_fr": "Cette annonce est en mode démonstration et n'est pas disponible pour les enchères.",
+        })
+
     # ===== Section branding (Bug 1): derive from category =====
     _cat = (listing.get("category") or "").lower()
     if any(v in _cat for v in ("vehicle", "car", "auto", "truck", "motorcycle", "suv", "van")):

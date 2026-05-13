@@ -145,6 +145,24 @@ async def handle_stripe_webhook(request: Request):
             session_type = _meta_all.get("type", "") or _meta_all.get("transaction_type", "")
             if session_type == "subscription_upgrade":
                 pass  # handled by subscription events above
+            elif session_type == "vehicle_dealer_annual_fee":
+                # iter211 P3 — Activate dealer subscription after checkout success
+                from datetime import timedelta
+                user_id_dealer = _meta_all.get("user_id")
+                if user_id_dealer:
+                    now = datetime.now(timezone.utc)
+                    await db.users.update_one(
+                        {"id": user_id_dealer},
+                        {"$set": {
+                            "dealer_subscription_active": True,
+                            "dealer_subscription_status": "active",
+                            "dealer_subscription_start": now.isoformat(),
+                            "dealer_subscription_renewal": (now + timedelta(days=365)).isoformat(),
+                            "dealer_stripe_subscription_id": data.get("subscription"),
+                            "dealer_stripe_customer_id": data.get("customer"),
+                        }},
+                    )
+                    logger.info(f"[DealerAnnualFee] Activated dealer subscription for user={user_id_dealer}")
             elif session_type == "listing_promotion":
                 await _handle_listing_promotion_paid(db, data)
             elif session_type == "down_payment":
