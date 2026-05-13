@@ -1,5 +1,63 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter211 — Partner Document "File not found" Recovery (Feb 13, 2026) ✅
+
+**User-reported P0**: admin panel link to view a partner's business-registration PDF returned `{"detail":"File not found"}` as a raw JSON page. User suspected yesterday's universal-terminology change broke the file paths.
+
+### Root cause (NOT terminology-change related)
+Yesterday's change touched ONLY:
+- locale string keys (en.json / fr.json)
+- 7 frontend component labels
+- 3 backend email/log strings
+
+It did NOT touch: DB columns (`partner_neq_document`, `partner_certifications`), the upload code, the serving endpoint, or any file paths. Verified by reading the diff.
+
+The actual root cause is **ephemeral pod-local filesystem storage**. Uploaded files live at `/app/backend/uploads/partner_docs/` on the running container's writable layer. Every redeploy or pod restart wipes that directory — but the DB rows pointing to those file paths survive. So after a redeploy, any DB row uploaded BEFORE that redeploy points to a file that no longer exists. This is a pre-existing infrastructure design flaw, surfaced (not caused) by the recent redeploy.
+
+### Fix shipped — immediate + structural
+1. **Serve endpoint hardened** (`routes/partners.py:serve_partner_document`):
+   - Strips legacy URL prefixes (`/api/uploads/...`, `/uploads/...`, etc.) so DB rows that stored absolute paths still resolve
+   - Searches BOTH `Path("uploads/partner_docs")` (relative) and `/app/backend/uploads/partner_docs` (absolute) to survive cwd drift
+   - On missing-file, returns a STRUCTURED 404 with `error_code: "file_missing_on_disk"`, `owner_email`, `owner_user_id`, `owner_status`, bilingual EN/FR messages
+   - Owner lookup uses the filename's `user_id` prefix regex (not full-string match) so it resolves the partner even when the random suffix differs from what's currently in DB
+   - Blocks path-traversal (`..`, `/`, leading `.`)
+
+2. **Admin "Request resubmission" endpoint** (`POST /api/admin/partners/{user_id}/request-resubmission`):
+   - Resets the partner's `partner_verification_status` to `"rejected"` (so the existing Resubmit panel becomes usable)
+   - Wipes `partner_neq_document` and `partner_certifications` so no stale paths remain
+   - Sends a bilingual EN/FR email to the partner with a CTA back to `/become-partner`
+   - Logs an audit row to `admin_logs`
+
+3. **Missing-documents audit endpoint** (`GET /api/admin/partners/missing-documents-audit`):
+   - Walks every partner with stored documents, checks disk existence, returns `{total, affected, healthy, rows: [...]}` so admins can batch-trigger resubmissions
+
+4. **Admin UI overhaul** (`pages/admin/PartnerManager.js`):
+   - Document links converted from plain `<a target="_blank">` (which dumped the JSON in a tab) to `<button>` + `useDocumentOpener()` that fetches the URL with Bearer token, opens the blob on success, or shows a CTA modal on `file_missing_on_disk`
+   - Modal displays: filename, partner email, current status, and a single "Email partner to resubmit" button that calls the new admin endpoint
+
+### Test status
+- **143/147 iter211 tests passing** (4 skipped on rate-limit, pre-existing flaky)
+- **11 new tests** in `test_iter211_partner_doc_recovery.py` (8 static smoke + 3 live HTTP)
+- Lint clean
+
+### Verified live on preview
+- alexboul1993's stored file → returns structured 404 with `owner_email: "alexboul1993@gmail.com"`, `owner_status: "pending"` ✓
+- Audit endpoint reports 1 affected (alexboul) / 1 healthy ✓
+- Path traversal blocked ✓
+- Admin frontend renders modal instead of JSON page (verified via code path test) ✓
+
+### Long-term recommendation (not in scope)
+Local-disk storage is the wrong primitive for partner KYC documents. Should migrate to S3 / GCS / Cloudflare R2 with the file path stored as `s3://bucket/key`. This would eliminate the loss-on-redeploy class of bugs entirely. The current fix gives admins a clean recovery path until that migration happens.
+
+### Files of reference (Feb 13)
+- `/app/backend/routes/partners.py` (serve endpoint hardening + 2 new admin endpoints)
+- `/app/frontend/src/pages/admin/PartnerManager.js` (button-based opener + missing-doc modal)
+- `/app/backend/tests/test_iter211_partner_doc_recovery.py` (NEW — 11 tests)
+
+⚠️ **Production**: After redeploy to https://bidvex.com, use the new audit endpoint to identify any production partners with missing files, then click "Email partner to resubmit" on each.
+
+---
+
 ## Latest: iter211 hot-fix — Push Notifications + Partner Status Desync (Feb 12, 2026) ✅
 
 ### Task 1 — Push Notifications fail with misleading error ✅

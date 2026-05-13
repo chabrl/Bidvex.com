@@ -276,6 +276,15 @@ async def serve_partner_document(
 
     Owners (filename prefix `neq_{user_id}` / `cert_{user_id}`) may read
     their own docs. Admins / super_admins may read any.
+
+    iter211 — `File not found` rewrite:
+      • Returns structured JSON `{error_code, message_en, message_fr, ...}`
+        instead of a flat string so the admin UI can render a useful CTA.
+      • Strips legacy URL prefixes from `filename` defensively so old DB
+        rows that stored absolute paths (`/api/uploads/...`) still work.
+      • Searches BOTH common upload roots (`uploads/partner_docs` relative to
+        backend CWD, and `/app/backend/uploads/partner_docs` absolute) to
+        survive cwd drift across deployments.
     """
     from jose import jwt, JWTError, ExpiredSignatureError
     from deps import jwt_secret, security
@@ -283,10 +292,9 @@ async def serve_partner_document(
 
     db = get_db()
 
-    # Resolve current user — header/cookie first, then ?token= fallback
+    # ── Auth ──────────────────────────────────────────────────────────
     current_user = None
     try:
-        # Manually pull HTTPBearer credentials so query-param fallback works
         creds: Optional[HTTPAuthorizationCredentials] = await security(request)
         current_user = await get_current_user(request, creds)
     except HTTPException:
@@ -306,16 +314,232 @@ async def serve_partner_document(
     if current_user is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
-    file_path = Path("uploads/partner_docs") / filename
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="File not found")
+    # ── Defensive filename normalisation ─────────────────────────────
+    # If the DB row stored an absolute URL prefix (legacy or migrated),
+    # peel it off so `Path(...) / filename` resolves correctly.
+    bare = filename
+    for prefix in ("/api/uploads/partner_docs/", "/uploads/partner_docs/",
+                   "api/uploads/partner_docs/", "uploads/partner_docs/"):
+        if bare.startswith(prefix):
+            bare = bare[len(prefix):]
+    # Block path-traversal attempts post-strip
+    if ".." in bare or "/" in bare or bare.startswith("."):
+        raise HTTPException(status_code=400, detail="Invalid filename")
 
-    # Only allow the owner or admin to access
+    # ── Permission check ────────────────────────────────────────────
     user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
-    is_owner = filename.startswith(f"neq_{current_user.id}") or filename.startswith(f"cert_{current_user.id}")
-    if not is_owner and (user_doc or {}).get("role") not in ["admin", "super_admin"]:
+    is_owner = bare.startswith(f"neq_{current_user.id}") or bare.startswith(f"cert_{current_user.id}")
+    is_admin = (user_doc or {}).get("role") in ["admin", "super_admin"]
+    if not is_owner and not is_admin:
         raise HTTPException(status_code=403, detail="Access denied")
-    return FileResponse(str(file_path))
+
+    # ── Search both upload roots ─────────────────────────────────────
+    candidates = [
+        Path("uploads/partner_docs") / bare,             # relative (uvicorn cwd = /app/backend)
+        Path("/app/backend/uploads/partner_docs") / bare,  # absolute (kube cwd drift)
+    ]
+    found = next((p for p in candidates if p.exists() and p.is_file()), None)
+
+    if found is None:
+        # iter211 — structured error so the admin UI can render a "request
+        # resubmission" CTA instead of a cryptic JSON. The owner field tells
+        # the admin which partner to email.
+        logger.warning(
+            f"[partner_docs] missing file: {bare} requested by user={current_user.id} "
+            f"role={'admin' if is_admin else 'owner'}"
+        )
+        # Try to find the owner so the admin can prompt resubmission
+        owner_email = None
+        owner_id = None
+        owner_status = None
+        # Extract user_id from filename pattern `neq_{user_id}_*` or `cert_{user_id}_*`
+        import re
+        m = re.match(r"^(?:neq|cert)_([0-9a-f-]{8,})", bare)
+        try:
+            if m:
+                owner_doc = await db.users.find_one(
+                    {"id": m.group(1)},
+                    {"_id": 0, "id": 1, "email": 1, "partner_verification_status": 1},
+                )
+                if owner_doc:
+                    owner_email = owner_doc.get("email")
+                    owner_id = owner_doc.get("id")
+                    owner_status = owner_doc.get("partner_verification_status")
+        except Exception:
+            pass
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error_code": "file_missing_on_disk",
+                "filename": bare,
+                "message_en": (
+                    "This document is no longer available on the server. "
+                    "Files uploaded before the most recent redeployment may have been lost. "
+                    "Please ask the partner to resubmit their application."
+                ),
+                "message_fr": (
+                    "Ce document n'est plus disponible sur le serveur. "
+                    "Les fichiers téléversés avant le dernier redéploiement ont peut-être été perdus. "
+                    "Veuillez demander au partenaire de soumettre à nouveau sa candidature."
+                ),
+                "owner_email": owner_email,
+                "owner_user_id": owner_id,
+                "owner_status": owner_status,
+            },
+        )
+
+    return FileResponse(str(found))
+
+
+
+# ── iter211 — Admin "request resubmission" + missing-files audit ─────────
+@partners_router.post("/admin/partners/{user_id}/request-resubmission")
+async def request_partner_resubmission(
+    user_id: str,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+):
+    """Admin-only. Resets a partner's verification status to `rejected` and
+    emails them a bilingual notice asking to resubmit their application.
+
+    Use case: an admin opens a document link in the admin queue and gets the
+    `file_missing_on_disk` 404 (files lost in a redeploy). One click here
+    resets the partner so they can use the existing Resubmit panel to re-upload.
+    """
+    db = get_db()
+    # Authorize admin
+    me = await db.users.find_one({"id": current_user.id}, {"_id": 0, "role": 1})
+    if (me or {}).get("role") not in ("admin", "super_admin"):
+        raise HTTPException(status_code=403, detail="admin_required")
+
+    partner = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not partner:
+        raise HTTPException(status_code=404, detail="partner_not_found")
+
+    now = datetime.now(timezone.utc).isoformat()
+    reason_en = "Your previously submitted documents are no longer available on our server (lost during a system update). Please resubmit your application — it only takes a minute."
+    reason_fr = "Vos documents précédemment soumis ne sont plus disponibles sur notre serveur (perdus lors d'une mise à jour système). Veuillez soumettre à nouveau votre candidature — cela ne prend qu'une minute."
+
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {
+            "partner_verification_status": "rejected",
+            "partner_rejection_reason": reason_en,
+            "partner_rejected_at": now,
+            "partner_rejected_by": current_user.id,
+            "partner_neq_document": None,
+            "partner_certifications": [],
+        }},
+    )
+
+    # Best-effort bilingual email
+    try:
+        from services.email_notifications import send_email
+        frontend_url = _os.environ.get("FRONTEND_URL", "https://bidvex.com")
+        applicant_lang = (partner.get("preferred_language") or "en").lower()
+        is_fr = applicant_lang.startswith("fr")
+        subject = "Action required — please resubmit your BidVex partner application" if not is_fr else "Action requise — soumettez à nouveau votre candidature partenaire BidVex"
+        body = reason_fr if is_fr else reason_en
+        cta = (f"<a href='{frontend_url}/become-partner' style='background:#0f172a;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block;margin-top:12px;'>"
+               f"{'Soumettre à nouveau' if is_fr else 'Resubmit application'}</a>")
+        html = f"<p>{body}</p>{cta}<p style='font-size:12px;color:#64748b;margin-top:18px;'>BidVex · partners@bidvex.ca</p>"
+        send_email(to_email=partner["email"], subject=subject, html_content=html)
+    except Exception as exc:
+        logger.warning(f"[partner-resubmission-req] email failed for {partner.get('email')}: {exc}")
+
+    # Audit
+    try:
+        await db.admin_logs.insert_one({
+            "id": str(uuid.uuid4()),
+            "action": "request_partner_resubmission",
+            "actor_id": current_user.id,
+            "target_user_id": user_id,
+            "reason": "documents_missing_on_disk",
+            "created_at": now,
+        })
+    except Exception:
+        pass
+
+    return {
+        "success": True,
+        "user_id": user_id,
+        "email": partner.get("email"),
+        "new_status": "rejected",
+    }
+
+
+@partners_router.get("/admin/partners/missing-documents-audit")
+async def audit_missing_partner_documents(
+    current_user: User = Depends(get_current_user),
+):
+    """Admin-only. Walks every partner with a stored document path and checks
+    whether the file actually exists on disk. Returns a per-partner report so
+    admins can batch-trigger resubmissions for affected users (e.g. after a
+    redeploy wipes the ephemeral uploads directory)."""
+    db = get_db()
+    me = await db.users.find_one({"id": current_user.id}, {"_id": 0, "role": 1})
+    if (me or {}).get("role") not in ("admin", "super_admin"):
+        raise HTTPException(status_code=403, detail="admin_required")
+
+    def _bare(p):
+        if not p:
+            return None
+        for prefix in ("/api/uploads/partner_docs/", "/uploads/partner_docs/",
+                       "api/uploads/partner_docs/", "uploads/partner_docs/"):
+            if p.startswith(prefix):
+                return p[len(prefix):]
+        return p
+
+    def _exists(bare):
+        if not bare:
+            return False
+        return (Path("uploads/partner_docs") / bare).exists() or \
+               (Path("/app/backend/uploads/partner_docs") / bare).exists()
+
+    cursor = db.users.find(
+        {"$or": [
+            {"partner_neq_document": {"$exists": True, "$ne": None}},
+            {"partner_certifications": {"$exists": True, "$ne": []}},
+        ]},
+        {"_id": 0, "id": 1, "email": 1, "partner_company_name": 1,
+         "partner_verification_status": 1, "partner_neq_document": 1,
+         "partner_certifications": 1, "partner_applied_at": 1},
+    )
+
+    rows = []
+    missing_count = 0
+    healthy_count = 0
+    async for u in cursor:
+        neq_b = _bare(u.get("partner_neq_document"))
+        neq_ok = _exists(neq_b) if neq_b else None
+        cert_files = []
+        for c in (u.get("partner_certifications") or []):
+            b = _bare(c)
+            cert_files.append({"filename": b, "exists": _exists(b) if b else False})
+        partner_missing = (neq_b and not neq_ok) or any(not f["exists"] for f in cert_files)
+        if partner_missing:
+            missing_count += 1
+        else:
+            healthy_count += 1
+        rows.append({
+            "user_id": u["id"],
+            "email": u.get("email"),
+            "company": u.get("partner_company_name"),
+            "status": u.get("partner_verification_status"),
+            "applied_at": (u.get("partner_applied_at").isoformat() if hasattr(u.get("partner_applied_at"), "isoformat") else u.get("partner_applied_at")),
+            "neq_filename": neq_b,
+            "neq_exists": neq_ok,
+            "cert_files": cert_files,
+            "is_affected": partner_missing,
+        })
+
+    return {
+        "total_partners_with_docs": len(rows),
+        "affected": missing_count,
+        "healthy": healthy_count,
+        "rows": rows,
+    }
+
 
 
 

@@ -18,10 +18,42 @@ import {
 import { toast } from 'sonner';
 import {
   Building2, CheckCircle, Clock, XCircle, FileText, ExternalLink,
-  Shield, ShieldCheck, DollarSign, Loader2, Search, Eye
+  Shield, ShieldCheck, DollarSign, Loader2, Search, Eye, AlertTriangle, Mail
 } from 'lucide-react';
 
 const API = API_BASE;
+
+// iter211 — robust document opener that handles the structured 404 (file
+// missing on disk) and renders a CTA modal instead of dumping JSON in a tab.
+const useDocumentOpener = (token, onMissing) => {
+  return async (rawPath) => {
+    try {
+      const abs = rawPath.startsWith('http') ? rawPath : `${process.env.REACT_APP_BACKEND_URL}${rawPath}`;
+      const res = await fetch(abs, { headers: { Authorization: `Bearer ${token || ''}` } });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank', 'noopener');
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        return;
+      }
+      // Structured 404 from iter211?
+      if (res.status === 404) {
+        const data = await res.json().catch(() => ({}));
+        const detail = data?.detail || {};
+        if (detail.error_code === 'file_missing_on_disk') {
+          onMissing(detail);
+          return;
+        }
+      }
+      toast.error(`Failed to open document (HTTP ${res.status})`);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[partner-doc-open]', err);
+      toast.error('Could not load document — network error.');
+    }
+  };
+};
 
 const PartnerManager = () => {
   const { token } = useAuth();
@@ -33,6 +65,33 @@ const PartnerManager = () => {
   // Review dialog
   const [reviewDialog, setReviewDialog] = useState(false);
   const [selectedApp, setSelectedApp] = useState(null);
+
+  // iter211 — Missing-document modal (raised by useDocumentOpener)
+  const [missingDocModal, setMissingDocModal] = useState(null); // {error_code, owner_email, owner_user_id, owner_status, message_en}
+  const [requestingResubmit, setRequestingResubmit] = useState(false);
+
+  const openDocument = useDocumentOpener(token, setMissingDocModal);
+
+  const handleRequestResubmission = async () => {
+    if (!missingDocModal?.owner_user_id) {
+      toast.error('Cannot identify the partner for this document.');
+      return;
+    }
+    setRequestingResubmit(true);
+    try {
+      const r = await axios.post(`${API}/admin/partners/${missingDocModal.owner_user_id}/request-resubmission`);
+      toast.success(`Resubmission email sent to ${r.data?.email || 'partner'}.`);
+      setMissingDocModal(null);
+      // Refresh the list so the new "rejected" status appears
+      window.location.reload();
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[request-resubmission]', err);
+      toast.error('Failed to send resubmission request.');
+    } finally {
+      setRequestingResubmit(false);
+    }
+  };
   const [customRate, setCustomRate] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
@@ -266,42 +325,30 @@ const PartnerManager = () => {
                 </div>
               </div>
 
-              {/* Documents — iter208: handle both absolute and relative ("/api/uploads/...") URLs */}
+              {/* Documents — iter211: structured-404 handling via openDocument() */}
               <div className="space-y-2">
                 <Label className="text-xs text-slate-500">Submitted Documents</Label>
-                {selectedApp.partner_neq_document && (() => {
-                  const raw = selectedApp.partner_neq_document;
-                  // iter208 — stored value is relative `/api/uploads/...`; prefix with bare backend URL (NOT API_BASE which adds /api)
-                  const abs = raw.startsWith('http') ? raw : `${process.env.REACT_APP_BACKEND_URL}${raw}`;
-                  const href = `${abs}${abs.includes('?') ? '&' : '?'}token=${encodeURIComponent(token || '')}`;
-                  return (
-                    <a
-                      href={href}
-                      target="_blank"
-                      rel="noreferrer"
-                      data-testid="partner-doc-neq-link"
-                      className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
-                    >
-                      <FileText className="w-4 h-4" /> Business Registration Document <ExternalLink className="w-3 h-3" />
-                    </a>
-                  );
-                })()}
-                {(selectedApp.partner_certifications || []).map((raw, i) => {
-                  const abs = raw.startsWith('http') ? raw : `${process.env.REACT_APP_BACKEND_URL}${raw}`;
-                  const href = `${abs}${abs.includes('?') ? '&' : '?'}token=${encodeURIComponent(token || '')}`;
-                  return (
-                    <a
-                      key={i}
-                      href={href}
-                      target="_blank"
-                      rel="noreferrer"
-                      data-testid={`partner-doc-cert-link-${i}`}
-                      className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
-                    >
-                      <Shield className="w-4 h-4" /> Certification {i + 1} <ExternalLink className="w-3 h-3" />
-                    </a>
-                  );
-                })}
+                {selectedApp.partner_neq_document && (
+                  <button
+                    type="button"
+                    onClick={() => openDocument(selectedApp.partner_neq_document)}
+                    data-testid="partner-doc-neq-link"
+                    className="flex items-center gap-2 text-sm text-blue-600 hover:underline bg-transparent border-0 p-0 cursor-pointer"
+                  >
+                    <FileText className="w-4 h-4" /> Business Registration Document <ExternalLink className="w-3 h-3" />
+                  </button>
+                )}
+                {(selectedApp.partner_certifications || []).map((raw, i) => (
+                  <button
+                    type="button"
+                    key={i}
+                    onClick={() => openDocument(raw)}
+                    data-testid={`partner-doc-cert-link-${i}`}
+                    className="flex items-center gap-2 text-sm text-blue-600 hover:underline bg-transparent border-0 p-0 cursor-pointer"
+                  >
+                    <Shield className="w-4 h-4" /> Certification {i + 1} <ExternalLink className="w-3 h-3" />
+                  </button>
+                ))}
                 {!selectedApp.partner_neq_document && (!selectedApp.partner_certifications || selectedApp.partner_certifications.length === 0) && (
                   <p className="text-xs text-slate-400 italic">No documents uploaded.</p>
                 )}
@@ -416,6 +463,49 @@ const PartnerManager = () => {
               </>
             )}
             <Button variant="outline" size="sm" onClick={() => setReviewDialog(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* iter211 — Missing document modal (raised when the serve endpoint
+          returns the structured `file_missing_on_disk` 404). */}
+      <Dialog open={!!missingDocModal} onOpenChange={(o) => !o && setMissingDocModal(null)}>
+        <DialogContent className="max-w-lg" data-testid="missing-doc-modal">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-700">
+              <AlertTriangle className="w-5 h-5" />
+              Document not available
+            </DialogTitle>
+            <DialogDescription>
+              The document file is no longer on the server. This usually happens after a system redeployment wiped the temporary file storage.
+            </DialogDescription>
+          </DialogHeader>
+          {missingDocModal && (
+            <div className="space-y-3 text-sm">
+              <p className="text-slate-700">{missingDocModal.message_en}</p>
+              <div className="rounded-md bg-slate-50 border border-slate-200 p-3 text-xs space-y-1">
+                <div><span className="text-slate-500">Filename:</span> <code className="text-slate-700">{missingDocModal.filename}</code></div>
+                {missingDocModal.owner_email && (
+                  <div><span className="text-slate-500">Partner:</span> <strong>{missingDocModal.owner_email}</strong></div>
+                )}
+                {missingDocModal.owner_status && (
+                  <div><span className="text-slate-500">Current status:</span> <Badge className="text-[10px]">{missingDocModal.owner_status}</Badge></div>
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => setMissingDocModal(null)}>Cancel</Button>
+            <Button
+              size="sm"
+              onClick={handleRequestResubmission}
+              disabled={requestingResubmit || !missingDocModal?.owner_user_id}
+              data-testid="request-resubmission-btn"
+              className="bg-rose-600 hover:bg-rose-700 text-white"
+            >
+              {requestingResubmit ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Mail className="w-4 h-4 mr-2" />}
+              Email partner to resubmit
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
