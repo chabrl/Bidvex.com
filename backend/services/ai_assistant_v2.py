@@ -124,7 +124,7 @@ Partners (licensed auctioneers, bankruptcy trustees, liquidators) pay:
 - **Annual Platform Fee:** $100.00 CAD/year flat fee for Partner-level access
 - **Hammer Price Commission:** 3% platform fee on the final hammer price of every item listed
 - **Buyer's Premium:** Partners set their own BP independently - it is NOT subject to the 3% commission
-- Partner accounts require manual verification of business registration (NEQ) before listing
+- Partner accounts require manual verification of federal or provincial business registration before listing
 - All fees are in CAD with GST/QST applied on top
 
 ### 4d. LISTING PROMOTIONS:

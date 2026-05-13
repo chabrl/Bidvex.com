@@ -147,7 +147,7 @@ const TaxVerificationQueue = () => {
                             {user.business_province === 'QC' && (
                               <>
                                 <p className="text-muted-foreground">
-                                  <strong>NEQ:</strong> {user.neq_number || 'Not provided'}
+                                  <strong>Business Reg.:</strong> {user.neq_number || 'Not provided'}
                                 </p>
                                 <p className="text-muted-foreground">
                                   <strong>QST:</strong> {user.qst_number ? user.qst_number.substring(0, 5) + '****' : 'Not provided'}

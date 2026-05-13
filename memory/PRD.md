@@ -1,5 +1,66 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter211 — Legal Launch Prep (Universal Terminology + Province Tax Router + Notification Save Fix) (Feb 11, 2026) ✅
+
+User-requested sprint to clear three launch blockers across Canadian provinces.
+
+### Step 1 — Universal Business Documentation ✅
+Quebec-specific "NEQ Proof Document" / "Numéro d'entreprise du Québec" replaced with **"Federal or Provincial Business Registration Document"** / **"Document d'enregistrement d'entreprise fédéral ou provincial"** across:
+- `frontend/src/locales/en.json` + `fr.json` (8 keys in `becomePartner` + 1 in admin namespace)
+- `frontend/src/pages/admin/PartnerManager.js`, `FinanceDashboard.js`, `TaxVerificationQueue.js`
+- `frontend/src/pages/AuthPage.js`, `BecomePartnerPage.js`, `LegalPage.js`
+- `frontend/src/components/ResubmitApplicationPanel.jsx`
+- `backend/routes/partners.py` (email body), `services/verification_service.py`, `services/ai_assistant_v2.py`
+
+The DB field `partner_neq` is preserved — it's still a valid identifier for QC-incorporated partners. Only the user-facing copy was universalized.
+
+### Step 2 — Canadian Province Tax Router (Partner Flows) ✅
+`services/fee_calculator.py` extended with `_PROVINCE_TAX_REGIME` for all 13 Canadian jurisdictions:
+| Province | Regime | Combined Rate |
+|----------|--------|---------------|
+| QC | GST+QST | 14.975% |
+| ON | HST | 13% |
+| NB, NS, PE, NL | HST | 15% |
+| AB, BC, SK, MB, NT, NU, YT | GST only | 5% |
+
+- New `calculate_partner_taxes(amount, province) → {gst, qst, hst, total, type, combined_rate}` helper.
+- `calculate_fee()` accepts new `seller_province` parameter — used only for partner flow (other flows stay QC-locked to preserve iter209 spec amounts).
+- New `FeeResult` fields: `tax_province`, `tax_type`, `tax_rate`, `buyer_hst`, `seller_hst`.
+- `routes/fees.py:fees_v2_preview` now reads `partner_province` / `business_province` from user doc (or accepts `?seller_province=XX` query param).
+- `routes/partner_card.py:charge_partner_seller_commission_off_session` resolves partner province from saved user data before the real Stripe charge.
+- Live verified: `$10,000 hammer @ 3% comm → ON $339 / AB $315 / QC $344.93` ✓
+- 40 new tests in `test_iter211_partner_province_tax.py` covering all 13 provinces, fee preview, and back-compat (non-partner flows stay QC).
+
+### Step 3 — Notification Settings Auto-Save Fix ✅
+Root cause: 4 `<Switch defaultChecked />` toggles in the Notifications tab had ZERO state binding — every reload reset them.
+
+Fixes:
+- `frontend/src/pages/ProfileSettingsPage.js`: 4 toggles converted to controlled Switches bound to `notificationSettings` state.
+- `useEffect` hydrates state from `user.notification_settings` on mount.
+- Second `useEffect` watches state changes (guarded by `notifSettingsHydrated`) and auto-fires `PUT /api/users/me` with `{notification_settings: {...}}`. Toast feedback (success/fail).
+- `backend/routes/profiles.py`: `notification_settings` added to `allowed_fields`. Validator: must be a dict, keys must be in `{email_summaries, bid_alerts, message_alerts, auction_win_alerts}`, values must be booleans.
+
+### Test Status
+- **127/127 iter211 tests passing** (5 new for notification, 5 new for terminology, 40 new for province tax, 77 prior).
+- All locked iter209 + iter210 spec amounts unchanged (39/39 step1/step4/step5 passing).
+- All lint clean.
+- Live API verified for partner province routing.
+
+### Files of reference (iter211 Feb 11)
+- `/app/backend/services/fee_calculator.py` (province tax router + partner branch)
+- `/app/backend/routes/fees.py` (seller_province query param)
+- `/app/backend/routes/partner_card.py` (settlement layer)
+- `/app/backend/routes/profiles.py` (notification_settings allowed_field + validation)
+- `/app/frontend/src/pages/ProfileSettingsPage.js` (controlled toggles + auto-save)
+- `/app/frontend/src/locales/en.json` + `fr.json` (universal terminology)
+- `/app/backend/tests/test_iter211_partner_province_tax.py` (NEW — 40 tests)
+- `/app/backend/tests/test_iter211_notification_settings.py` (NEW — 5 tests)
+- `/app/backend/tests/test_iter211_universal_business_terminology.py` (NEW — 6 tests)
+
+⚠️ **Production note**: This is preview. Redeploy required to push to https://bidvex.com.
+
+---
+
 ## Latest: iter211 hot-fix — Dealer Approval Wiring + Admin Subscriptions View (Feb 10, 2026) ✅
 
 User reported: approved vehicle dealer `alexboul1993@gmail.com` saw no $100/yr annual-fee banner, and the admin panel had no view of who paid.

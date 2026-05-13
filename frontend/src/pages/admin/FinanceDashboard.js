@@ -309,7 +309,7 @@ const FinanceDashboard = () => {
                           {p.is_partner && <Shield className="w-3.5 h-3.5 text-emerald-500" />}
                         </div>
                         <div className="text-xs text-slate-500 mt-0.5">
-                          {p.email} {p.partner_neq && `| NEQ: ${p.partner_neq}`}
+                          {p.email} {p.partner_neq && `| Business Reg.: ${p.partner_neq}`}
                           {p.custom_premium_rate != null && <span className="text-blue-600 ml-2">BP: {(p.custom_premium_rate * 100).toFixed(1)}%</span>}
                         </div>
                       </div>
@@ -348,7 +348,7 @@ const FinanceDashboard = () => {
               {selectedUser && (
                 <div className="space-y-4 text-sm">
                   <div className="grid grid-cols-2 gap-3">
-                    <div><span className="text-xs text-slate-500">NEQ</span><p className="font-medium">{selectedUser.partner_neq || '-'}</p></div>
+                    <div><span className="text-xs text-slate-500">Business Reg. #</span><p className="font-medium">{selectedUser.partner_neq || '-'}</p></div>
                     <div><span className="text-xs text-slate-500">Status</span>
                       <Badge className="text-xs">{selectedUser.partner_verification_status}</Badge>
                     </div>
@@ -371,7 +371,7 @@ const FinanceDashboard = () => {
                             data-testid="partner-doc-neq-link"
                             className="flex items-center gap-1.5 text-blue-600 hover:underline text-xs"
                           >
-                            <FileText className="w-3.5 h-3.5" /> NEQ Proof <ExternalLink className="w-3 h-3" />
+                            <FileText className="w-3.5 h-3.5" /> Business Registration <ExternalLink className="w-3 h-3" />
                           </a>
                         );
                       })()}

@@ -165,7 +165,7 @@ const LegalPage = ({ documentType = 'both' }) => {
                 <li><strong>Hammer Price Commission:</strong> A <strong>3% platform fee</strong> is charged on the final "hammer price" (winning bid amount) of every item listed by a Partner.</li>
                 <li><strong>Buyer's Premium Flexibility:</strong> Partners retain the full right to set their own Buyer's Premium (BP) independently of the platform fee. The BP is collected by the Partner and is not subject to the 3% commission.</li>
               </ul>
-              <p>Partner accounts are subject to manual verification of business registration (NEQ) before they may list items on the Platform.</p>
+              <p>Partner accounts are subject to manual verification of federal or provincial business registration before they may list items on the Platform.</p>
 
               <h4 className="font-semibold">7.3 Additional Fees</h4>
               <p>A mandatory <strong>Platform Fee of 2.5%</strong> is applied to all completed transactions for vehicles only.</p>
@@ -361,7 +361,7 @@ const LegalPage = ({ documentType = 'both' }) => {
               <ul className="list-disc pl-6 space-y-1">
                 <li><strong>Identity &amp; Verification Data:</strong> Full name, date of birth, and government-issued ID (for identity verification and fraud prevention).</li>
                 <li><strong>Contact Data:</strong> Email address, telephone number, and physical business/residential address.</li>
-                <li><strong>Business Data:</strong> Business name, tax ID numbers (including NEQ), and dealer licenses (where applicable).</li>
+                <li><strong>Business Data:</strong> Business name, tax ID numbers (NEQ, BN, provincial registrations), and dealer licenses (where applicable).</li>
                 <li><strong>Asset Data:</strong> VINs, vehicle/equipment history reports, make, model, year, photos, and related ownership documentation.</li>
                 <li><strong>Financial Data:</strong> Banking details and settlement information for payouts.</li>
               </ul>

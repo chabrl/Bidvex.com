@@ -155,6 +155,7 @@ async def update_user_me(
         "preferred_currency", "subscription_tier", "bio", "bio_fr",
         "privacy_settings", "personalized_recommendations",
         "province", "city", "postal_code",
+        "notification_settings",  # iter211 Step 3 — in-app notification toggles
     ]
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
 
@@ -162,6 +163,18 @@ async def update_user_me(
         raise HTTPException(status_code=400, detail="Bio must be 500 characters or less")
     if "bio_fr" in update_data and update_data["bio_fr"] and len(update_data["bio_fr"]) > 500:
         raise HTTPException(status_code=400, detail="French bio must be 500 characters or less")
+
+    # iter211 Step 3 — validate notification_settings shape
+    if "notification_settings" in update_data:
+        ns = update_data["notification_settings"]
+        if not isinstance(ns, dict):
+            raise HTTPException(status_code=400, detail="notification_settings must be an object")
+        valid_keys = {"email_summaries", "bid_alerts", "message_alerts", "auction_win_alerts"}
+        if not all(k in valid_keys for k in ns.keys()):
+            raise HTTPException(status_code=400, detail=f"Invalid notification_settings key. Allowed: {sorted(valid_keys)}")
+        for k, v in ns.items():
+            if not isinstance(v, bool):
+                raise HTTPException(status_code=400, detail=f"notification_settings.{k} must be a boolean")
 
     if "privacy_settings" in update_data:
         if not isinstance(update_data["privacy_settings"], dict):

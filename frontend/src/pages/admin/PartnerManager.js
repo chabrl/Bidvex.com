@@ -202,7 +202,7 @@ const PartnerManager = () => {
                       </div>
                       <div className="text-xs text-slate-500 mt-1 space-x-3">
                         <span>{app.name} ({app.email})</span>
-                        {app.partner_neq && <span>NEQ: {app.partner_neq}</span>}
+                        {app.partner_neq && <span>Business Reg.: {app.partner_neq}</span>}
                         {app.custom_premium_rate != null && (
                           <span className="text-blue-600">BP: {(app.custom_premium_rate * 100).toFixed(1)}%</span>
                         )}
@@ -251,7 +251,7 @@ const PartnerManager = () => {
                   <p className="font-medium">{selectedApp.partner_company_name || '-'}</p>
                 </div>
                 <div>
-                  <Label className="text-xs text-slate-500">NEQ Number</Label>
+                  <Label className="text-xs text-slate-500">Business Registration #</Label>
                   <p className="font-medium">{selectedApp.partner_neq || '-'}</p>
                 </div>
                 <div>
@@ -282,7 +282,7 @@ const PartnerManager = () => {
                       data-testid="partner-doc-neq-link"
                       className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
                     >
-                      <FileText className="w-4 h-4" /> NEQ Proof <ExternalLink className="w-3 h-3" />
+                      <FileText className="w-4 h-4" /> Business Registration Document <ExternalLink className="w-3 h-3" />
                     </a>
                   );
                 })()}

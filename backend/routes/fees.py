@@ -29,6 +29,7 @@ async def fees_v2_preview(
     partner_bp_rate: Optional[float] = Query(None, ge=0, le=1, description="0..1 (e.g. 0.15 for 15%) — used when seller is partner"),
     payment_method: str = Query("stripe", description="stripe | cash | e_transfer"),
     card_type: str = Query("domestic", description="domestic | international | conversion"),
+    seller_province: Optional[str] = Query(None, description="iter211 Step 2 — partner's registered province (QC|ON|NB|NS|PE|NL|AB|BC|SK|MB|NT|NU|YT). Falls back to seller_user_id lookup or QC."),
 ):
     """Live cost-breakdown preview using the iter209 `calculate_fee()` single source of truth.
 
@@ -45,10 +46,17 @@ async def fees_v2_preview(
                 {"id": seller_user_id},
                 {"_id": 0, "account_type": 1, "subscription_tier": 1, "custom_premium_rate": 1,
                  "is_partner": 1, "partner_verification_status": 1, "is_vehicle_dealer": 1,
-                 "is_storage_facility": 1},
+                 "is_storage_facility": 1, "partner_province": 1, "province": 1,
+                 "business_province": 1},
             ) or {}
             if doc.get("is_partner") or doc.get("partner_verification_status") == "verified":
                 seller_account_type = "partner"
+                # iter211 Step 2 — pick partner's registered province for tax routing,
+                # but ALWAYS prefer the explicit `seller_province` query param if given.
+                if not seller_province:
+                    seller_province = (
+                        doc.get("partner_province") or doc.get("business_province") or doc.get("province") or "QC"
+                    )
                 # Honor explicit partner_bp_rate query param; else seller's saved default
                 if partner_bp_rate is None and doc.get("custom_premium_rate") is not None:
                     partner_bp_rate = float(doc.get("custom_premium_rate"))
@@ -73,6 +81,7 @@ async def fees_v2_preview(
         partner_bp_rate=float(partner_bp_rate) if partner_bp_rate is not None else 0.0,
         payment_method=payment_method,
         card_type=card_type,
+        seller_province=seller_province,
     )
     return fee
 

@@ -64,7 +64,7 @@ async def apply_for_partner(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Submit a partner application with mandatory NEQ proof and professional certifications.
+    Submit a partner application with mandatory federal/provincial business registration and professional certifications.
     Sets partner_verification_status to 'pending'.
     """
     # Check not already partner or pending
@@ -171,7 +171,7 @@ async def apply_for_partner(
               <ul style="color: #475569; font-size: 13px;">
                 <li>Company: <strong>{company_name}</strong></li>
                 <li>NEQ: <strong>{neq_number}</strong></li>
-                <li>Documents: {len(cert_urls)} certification(s) + NEQ proof</li>
+                <li>Documents: {len(cert_urls)} certification(s) + business registration document</li>
               </ul>
               <p style="color: #64748b; font-size: 12px; margin-top: 20px;">
                 Questions? Contact us at <a href="mailto:partners@bidvex.ca" style="color: #2563eb;">partners@bidvex.ca</a>
@@ -204,7 +204,7 @@ async def apply_for_partner(
               </table>
               <h3 style="margin-top: 16px;">Submitted Documents:</h3>
               <ul>
-                <li><a href="{_abs_neq}">NEQ Proof</a></li>
+                <li><a href="{_abs_neq}">Federal or Provincial Business Registration Document</a></li>
                 {cert_links}
               </ul>
               <p style="margin-top: 16px;"><a href="{_email_base}/admin" style="color: #2563eb; font-weight: bold;">Review in Admin Panel</a></p>

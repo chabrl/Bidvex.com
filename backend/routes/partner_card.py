@@ -225,6 +225,14 @@ async def charge_partner_cash_commission(
     if not pm_id or not customer_id:
         return {"success": False, "error": "no_saved_card"}
 
+    # iter211 Step 2 — resolve partner's registered province for tax routing
+    partner_province = (
+        user.get("partner_province")
+        or user.get("business_province")
+        or user.get("province")
+        or "QC"
+    )
+
     fee = calculate_fee(
         hammer_price=hammer_price,
         auction_type="lots",
@@ -232,6 +240,7 @@ async def charge_partner_cash_commission(
         partner_bp_rate=partner_bp_rate,
         payment_method="cash",
         card_type=card_type,
+        seller_province=partner_province,
     )
 
     # Gross-up total in cents (commission + taxes + Stripe gross-up)

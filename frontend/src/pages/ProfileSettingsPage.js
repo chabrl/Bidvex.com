@@ -47,6 +47,16 @@ const ProfileSettingsPage = () => {
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [showAddCard, setShowAddCard] = useState(false);
   const [recommendationsEnabled, setRecommendationsEnabled] = useState(true);
+
+  // iter211 Step 3 — notification settings (auto-saved on change)
+  const [notificationSettings, setNotificationSettings] = useState({
+    email_summaries: true,
+    bid_alerts: true,
+    message_alerts: true,
+    auction_win_alerts: true,
+  });
+  const [notifSettingsSaving, setNotifSettingsSaving] = useState(false);
+  const [notifSettingsHydrated, setNotifSettingsHydrated] = useState(false);
   // Email change flow state
   const [showEmailChange, setShowEmailChange] = useState(false);
   const [newEmail, setNewEmail] = useState('');
@@ -92,9 +102,51 @@ const ProfileSettingsPage = () => {
         preferred_currency: user.preferred_currency || 'CAD',
       });
       setRecommendationsEnabled(user.personalized_recommendations !== false);
+      // iter211 Step 3 — Hydrate notification settings from server (default ON
+      // for every key the user hasn't touched yet).
+      const ns = user.notification_settings || {};
+      setNotificationSettings({
+        email_summaries: ns.email_summaries !== false,
+        bid_alerts: ns.bid_alerts !== false,
+        message_alerts: ns.message_alerts !== false,
+        auction_win_alerts: ns.auction_win_alerts !== false,
+      });
+      setNotifSettingsHydrated(true);
       fetchPaymentMethods();
     }
   }, [user]);
+
+  // iter211 Step 3 — Auto-save notification settings on every toggle change
+  // (with optimistic UI). useEffect fires AFTER user-triggered state changes,
+  // not on initial hydration thanks to the `notifSettingsHydrated` guard.
+  useEffect(() => {
+    if (!notifSettingsHydrated) return;
+    let cancelled = false;
+    setNotifSettingsSaving(true);
+    (async () => {
+      try {
+        await axios.put(`${API}/users/me`, {
+          notification_settings: notificationSettings,
+        });
+        if (!cancelled) {
+          toast.success(t('profile.notifSaved', 'Notification preference saved'));
+        }
+      } catch (err) {
+        if (!cancelled) {
+          // eslint-disable-next-line no-console
+          console.error('notification_settings save failed', err);
+          toast.error(t('profile.notifSaveFailed', 'Failed to save preference'));
+        }
+      } finally {
+        if (!cancelled) setNotifSettingsSaving(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [notificationSettings]); // eslint-disable-line
+
+  const handleToggleNotification = (key) => (checked) => {
+    setNotificationSettings(prev => ({ ...prev, [key]: !!checked }));
+  };
 
   const fetchPaymentMethods = async () => {
     try {
@@ -556,32 +608,59 @@ const ProfileSettingsPage = () => {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
                     <div>
-                      <p className="font-medium text-slate-900 dark:text-white">Email Notifications</p>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">Receive updates via email</p>
+                      <p className="font-medium text-slate-900 dark:text-white">Email Summaries</p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">Receive periodic email summaries (digests)</p>
                     </div>
-                    <Switch defaultChecked className="data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-slate-300 dark:data-[state=unchecked]:bg-slate-600" />
+                    <Switch
+                      checked={notificationSettings.email_summaries}
+                      onCheckedChange={handleToggleNotification('email_summaries')}
+                      disabled={notifSettingsSaving}
+                      data-testid="notif-toggle-email-summaries"
+                      className="data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-slate-300 dark:data-[state=unchecked]:bg-slate-600"
+                    />
                   </div>
                   <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
                     <div>
                       <p className="font-medium text-slate-900 dark:text-white">Bid Notifications</p>
                       <p className="text-sm text-slate-600 dark:text-slate-400">Get notified when someone bids on your items</p>
                     </div>
-                    <Switch defaultChecked className="data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-slate-300 dark:data-[state=unchecked]:bg-slate-600" />
+                    <Switch
+                      checked={notificationSettings.bid_alerts}
+                      onCheckedChange={handleToggleNotification('bid_alerts')}
+                      disabled={notifSettingsSaving}
+                      data-testid="notif-toggle-bid-alerts"
+                      className="data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-slate-300 dark:data-[state=unchecked]:bg-slate-600"
+                    />
                   </div>
                   <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
                     <div>
                       <p className="font-medium text-slate-900 dark:text-white">Message Notifications</p>
                       <p className="text-sm text-slate-600 dark:text-slate-400">Get notified of new messages</p>
                     </div>
-                    <Switch defaultChecked className="data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-slate-300 dark:data-[state=unchecked]:bg-slate-600" />
+                    <Switch
+                      checked={notificationSettings.message_alerts}
+                      onCheckedChange={handleToggleNotification('message_alerts')}
+                      disabled={notifSettingsSaving}
+                      data-testid="notif-toggle-message-alerts"
+                      className="data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-slate-300 dark:data-[state=unchecked]:bg-slate-600"
+                    />
                   </div>
                   <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
                     <div>
                       <p className="font-medium text-slate-900 dark:text-white">Auction Wins</p>
                       <p className="text-sm text-slate-600 dark:text-slate-400">Get notified when you win an auction</p>
                     </div>
-                    <Switch defaultChecked className="data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-slate-300 dark:data-[state=unchecked]:bg-slate-600" />
+                    <Switch
+                      checked={notificationSettings.auction_win_alerts}
+                      onCheckedChange={handleToggleNotification('auction_win_alerts')}
+                      disabled={notifSettingsSaving}
+                      data-testid="notif-toggle-auction-win-alerts"
+                      className="data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-slate-300 dark:data-[state=unchecked]:bg-slate-600"
+                    />
                   </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 px-1">
+                    {notifSettingsSaving ? 'Saving…' : 'Changes save automatically.'}
+                  </p>
                 </div>
 
                 {/* Push Notifications */}

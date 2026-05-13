@@ -320,7 +320,7 @@ const BecomePartnerPage = () => {
                   <p className="text-[10px] text-slate-500 dark:text-slate-500 pt-1">{t('partnerPage.feeFootnote')}</p>
                 </div>
 
-                {/* NEQ Verification Note — full width */}
+                {/* Business Registration Verification Note — full width */}
                 <div
                   className="rounded-lg bg-amber-50 dark:bg-amber-500/5 border border-amber-200 dark:border-amber-500/20 p-3 text-[11px] text-amber-700 dark:text-amber-300 leading-relaxed"
                   data-testid="partner-neq-verification-note"

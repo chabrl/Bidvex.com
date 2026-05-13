@@ -365,7 +365,7 @@ const AuthPage = () => {
                         <strong> $100.00 CAD/year</strong> platform access fee + <strong>3% commission</strong> on the final hammer price per item.
                         You set your own Buyer's Premium independently. All fees are subject to GST/QST.
                       </p>
-                      <p className="text-[10px] text-amber-600 dark:text-amber-400">Partner accounts require manual NEQ (business registration) verification before listing.</p>
+                      <p className="text-[10px] text-amber-600 dark:text-amber-400">Partner accounts require manual verification of your federal or provincial business registration before listing.</p>
                     </div>
                   </>
                 )}

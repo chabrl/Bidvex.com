@@ -77,7 +77,7 @@ export const ResubmitApplicationPanel = ({
     try {
       if (flavor === 'partner') {
         if (!neqFile) {
-          toast.error(isFr ? 'Document NEQ requis' : 'NEQ document required');
+          toast.error(isFr ? "Document d'enregistrement d'entreprise requis" : 'Business registration document required');
           setSubmitting(false);
           return;
         }
@@ -226,7 +226,7 @@ export const ResubmitApplicationPanel = ({
                 />
               </div>
               <div>
-                <Label className="text-xs">{isFr ? 'Numéro NEQ' : 'NEQ number'}</Label>
+                <Label className="text-xs">{isFr ? "Numéro d'enregistrement d'entreprise" : 'Business Registration #'}</Label>
                 <Input
                   value={neqNumber}
                   onChange={e => setNeqNumber(e.target.value)}
@@ -235,7 +235,7 @@ export const ResubmitApplicationPanel = ({
                 />
               </div>
               <div>
-                <Label className="text-xs">{isFr ? 'Document NEQ (PDF)' : 'NEQ document (PDF)'}</Label>
+                <Label className="text-xs">{isFr ? "Document d'enregistrement (PDF)" : 'Business Registration Document (PDF)'}</Label>
                 <Input
                   type="file"
                   accept="application/pdf,image/*"

@@ -121,8 +121,105 @@ class FeeResult:
     # Meta
     notes: str = ""
 
+    # iter211 Step 2 — Tax breakdown (province-aware for partner; QC-locked elsewhere)
+    tax_province: str = ""
+    tax_type: str = ""             # "GST+QST" | "HST" | "GST"
+    tax_rate: float = 0.0          # combined rate for display (e.g. 0.13 for HST-ON)
+    buyer_hst: float = 0.0
+    seller_hst: float = 0.0
+
     def to_dict(self) -> dict:
         return asdict(self)
+
+
+# ─── iter211 Step 2 — Canadian Province Tax Router (partner flows) ─────────
+#
+# Maps each Canadian jurisdiction → its tax regime when BidVex bills/charges
+# a partner. Currently invoked only by the partner branch of calculate_fee().
+# Sources:
+#   • CRA — HST rates by province (ON 13%, NB/NS/PE/NL 15%)
+#   • Revenu Québec — QST 9.975% + federal GST 5%
+#   • Other provinces — GST 5% only (PST is the partner's local obligation)
+#
+# Why partner-only? The other seller flows (individual/storage/vehicle_dealer)
+# have their amounts locked by the iter209 spec and are tested bit-by-bit.
+# Re-routing them on province would break those locked tests. The user's
+# Step 2 request scopes this to "Partner fees" specifically.
+_PROVINCE_TAX_REGIME = {
+    # GST + QST
+    "QC": {"type": "GST+QST", "gst": Decimal("0.05"), "qst": Decimal("0.09975"), "hst": Decimal("0"), "combined": Decimal("0.14975")},
+    # HST 13%
+    "ON": {"type": "HST", "gst": Decimal("0"), "qst": Decimal("0"), "hst": Decimal("0.13"), "combined": Decimal("0.13")},
+    # HST 15%
+    "NB": {"type": "HST", "gst": Decimal("0"), "qst": Decimal("0"), "hst": Decimal("0.15"), "combined": Decimal("0.15")},
+    "NS": {"type": "HST", "gst": Decimal("0"), "qst": Decimal("0"), "hst": Decimal("0.15"), "combined": Decimal("0.15")},
+    "PE": {"type": "HST", "gst": Decimal("0"), "qst": Decimal("0"), "hst": Decimal("0.15"), "combined": Decimal("0.15")},
+    "NL": {"type": "HST", "gst": Decimal("0"), "qst": Decimal("0"), "hst": Decimal("0.15"), "combined": Decimal("0.15")},
+    # GST only (PST handled by partner locally if applicable)
+    "AB": {"type": "GST", "gst": Decimal("0.05"), "qst": Decimal("0"), "hst": Decimal("0"), "combined": Decimal("0.05")},
+    "BC": {"type": "GST", "gst": Decimal("0.05"), "qst": Decimal("0"), "hst": Decimal("0"), "combined": Decimal("0.05")},
+    "SK": {"type": "GST", "gst": Decimal("0.05"), "qst": Decimal("0"), "hst": Decimal("0"), "combined": Decimal("0.05")},
+    "MB": {"type": "GST", "gst": Decimal("0.05"), "qst": Decimal("0"), "hst": Decimal("0"), "combined": Decimal("0.05")},
+    "NT": {"type": "GST", "gst": Decimal("0.05"), "qst": Decimal("0"), "hst": Decimal("0"), "combined": Decimal("0.05")},
+    "NU": {"type": "GST", "gst": Decimal("0.05"), "qst": Decimal("0"), "hst": Decimal("0"), "combined": Decimal("0.05")},
+    "YT": {"type": "GST", "gst": Decimal("0.05"), "qst": Decimal("0"), "hst": Decimal("0"), "combined": Decimal("0.05")},
+}
+PROVINCE_TAX_REGIME = _PROVINCE_TAX_REGIME  # re-exported for callers/tests
+
+
+def _resolve_province(prov: Optional[str], fallback: str = "QC") -> str:
+    """Normalise an input string to a 2-letter Canadian province code.
+    Accepts: 'QC', 'Quebec', 'Québec', 'Ontario' / 'ON', etc.
+    Falls back to `fallback` (default Quebec) for unknown inputs."""
+    if not prov:
+        return fallback
+    p = prov.strip().upper().replace("É", "E")
+    # Already a 2-letter code?
+    if p in _PROVINCE_TAX_REGIME:
+        return p
+    aliases = {
+        "QUEBEC": "QC", "QU EBEC": "QC", "QC.": "QC",
+        "ONTARIO": "ON", "ON.": "ON",
+        "ALBERTA": "AB", "BRITISH COLUMBIA": "BC", "BC.": "BC",
+        "SASKATCHEWAN": "SK", "MANITOBA": "MB",
+        "NEW BRUNSWICK": "NB", "NOVA SCOTIA": "NS",
+        "PRINCE EDWARD ISLAND": "PE", "NEWFOUNDLAND": "NL",
+        "NEWFOUNDLAND AND LABRADOR": "NL",
+        "YUKON": "YT", "NORTHWEST TERRITORIES": "NT", "NUNAVUT": "NU",
+    }
+    return aliases.get(p, fallback)
+
+
+def calculate_partner_taxes(amount: Decimal, province: str) -> Dict[str, Decimal]:
+    """Province-aware tax on a base (CAD) amount for the PARTNER flow.
+
+    Returns:
+      {
+        "province": "QC"|"ON"|...,
+        "type": "GST+QST"|"HST"|"GST",
+        "gst": Decimal,
+        "qst": Decimal,
+        "hst": Decimal,
+        "combined_rate": Decimal,
+        "total": Decimal,
+      }
+    """
+    code = _resolve_province(province)
+    regime = _PROVINCE_TAX_REGIME[code]
+    _D_CENT = Decimal("0.01")
+
+    def q(x: Decimal) -> Decimal:
+        return x.quantize(_D_CENT, rounding=ROUND_HALF_UP)
+
+    return {
+        "province": code,
+        "type": regime["type"],
+        "gst": q(amount * regime["gst"]),
+        "qst": q(amount * regime["qst"]),
+        "hst": q(amount * regime["hst"]),
+        "combined_rate": regime["combined"],
+        "total": q(amount * regime["combined"]),
+    }
 
 
 # ─── PUBLIC API: calculate_fee ─────────────────────────────────────────────
@@ -136,10 +233,15 @@ def calculate_fee(
     partner_bp_rate: float = 0.0,
     payment_method: str = "stripe",
     card_type: str = "domestic",
+    seller_province: Optional[str] = None,
 ) -> dict:
     """Compute the full fee breakdown for a single auction transaction.
 
     See module docstring for routing logic. Returns a plain dict (FeeResult.to_dict()).
+
+    iter211 Step 2: `seller_province` (a 2-letter Canadian code or full name)
+    is used to route PARTNER taxes correctly. Falls back to "QC" for back-compat.
+    Other flows (individual / storage / vehicle_dealer) remain QC-only.
     """
     hammer = Decimal(str(hammer_price))
     if hammer < 0:
@@ -235,9 +337,26 @@ def calculate_fee(
         return x.quantize(_D_CENT, rounding=ROUND_HALF_UP)
 
     buyer_premium = _q(buyer_premium)
-    buyer_gst = _q(buyer_premium * QC_GST_RATE)
-    buyer_qst = _q(buyer_premium * QC_QST_RATE)
-    buyer_taxes = buyer_gst + buyer_qst
+
+    # iter211 Step 2 — partner flows route taxes by partner's province.
+    # Other seller types stay QC-locked (iter209 spec).
+    partner_prov = _resolve_province(seller_province) if seller_type == "partner" else "QC"
+    is_partner = (seller_type == "partner")
+    if is_partner:
+        buyer_tax_bd = calculate_partner_taxes(buyer_premium, partner_prov)
+        buyer_gst = buyer_tax_bd["gst"]
+        buyer_qst = buyer_tax_bd["qst"]
+        buyer_hst = buyer_tax_bd["hst"]
+        buyer_taxes = buyer_tax_bd["total"]
+        tax_type_label = buyer_tax_bd["type"]
+        tax_rate_combined = buyer_tax_bd["combined_rate"]
+    else:
+        buyer_gst = _q(buyer_premium * QC_GST_RATE)
+        buyer_qst = _q(buyer_premium * QC_QST_RATE)
+        buyer_hst = Decimal("0")
+        buyer_taxes = buyer_gst + buyer_qst
+        tax_type_label = "GST+QST"
+        tax_rate_combined = QC_GST_RATE + QC_QST_RATE
 
     # iter211 P0 fix: storage_facility on Stripe payment → buyer pays hammer
     # ONLY (no BP, no buyer tax, no buyer Stripe gross-up). All BidVex revenue
@@ -249,9 +368,17 @@ def calculate_fee(
         buyer_subtotal = (hammer + buyer_premium + buyer_taxes) if charge_buyer_via_stripe else Decimal("0")
 
     seller_commission = _q(seller_commission)
-    seller_gst = _q(seller_commission * QC_GST_RATE)
-    seller_qst = _q(seller_commission * QC_QST_RATE)
-    seller_commission_total = seller_commission + seller_gst + seller_qst
+    # iter211 Step 2 — partner seller commission tax also uses partner's province
+    if is_partner:
+        seller_tax_bd = calculate_partner_taxes(seller_commission, partner_prov)
+        seller_gst = seller_tax_bd["gst"]
+        seller_qst = seller_tax_bd["qst"]
+        seller_hst = seller_tax_bd["hst"]
+    else:
+        seller_gst = _q(seller_commission * QC_GST_RATE)
+        seller_qst = _q(seller_commission * QC_QST_RATE)
+        seller_hst = Decimal("0")
+    seller_commission_total = seller_commission + seller_gst + seller_qst + seller_hst
 
     # ── Stripe gross-up routing ──────────────────────────────────────────
     # iter211 P0 fix: storage-Stripe → buyer pays exactly hammer, NO gross-up.
@@ -314,6 +441,12 @@ def calculate_fee(
         charge_seller_via_stripe=charge_seller_via_stripe,
         charge_seller_card_separately=charge_seller_card_separately,
         notes=notes,
+        # iter211 Step 2 — Canadian Province Tax Router surface
+        tax_province=partner_prov if is_partner else "QC",
+        tax_type=tax_type_label,
+        tax_rate=float(tax_rate_combined),
+        buyer_hst=_r(buyer_hst) if is_partner else 0.0,
+        seller_hst=_r(seller_hst) if is_partner else 0.0,
     )
     return result.to_dict()
 

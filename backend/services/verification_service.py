@@ -207,7 +207,7 @@ async def notify_partner_decision(db, *, user: dict, decision: str,
         f"Partner {user.get('email', user['id'])} {decision_kind}"
     )
     body = (
-        f"Company: {user.get('partner_company_name') or '-'} · NEQ: {user.get('partner_neq') or '-'}"
+        f"Company: {user.get('partner_company_name') or '-'} · Business Reg.: {user.get('partner_neq') or '-'}"
     )
     await _write_admin_notification(
         db,
