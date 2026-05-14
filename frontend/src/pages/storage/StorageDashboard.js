@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import StorageFooterBanner from './StorageFooterBanner';
 import PromoteAuctionModal from './PromoteAuctionModal';
+import StorageVerificationBanner from './StorageVerificationBanner';
 
 const API = API_BASE;
 
@@ -105,6 +106,9 @@ const StorageDashboard = () => {
             </Button>
           </Link>
         </div>
+
+        {/* iter213 — Verification progress banner (hidden once verified) */}
+        <StorageVerificationBanner facility={d.facility} isFr={isFr} />
 
         {/* Stat cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

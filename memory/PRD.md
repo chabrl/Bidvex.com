@@ -1,6 +1,49 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter212 — Storage Facility Provincial Business Registration + Access Restriction (Feb 14, 2026) ✅
+## Latest: iter213 — Verification Banner + Messaging Fix + Cosmetic Hardening + Ads Conversion Placeholder (Feb 14, 2026) ✅
+
+### 1. Storage Dashboard Verification Progress Banner ✅
+- NEW `frontend/src/pages/storage/StorageVerificationBanner.js` — bilingual EN+FR 3-step checklist (Document uploaded → Admin reviewing → Verified, ready to list!). Hidden once verified. Shows the admin rejection reason inline with a "Resubmit document" CTA when the document was rejected.
+- Backend softened so unverified facilities can still fetch their dashboard: `/storage-facilities/dashboard` + `/storage-facilities/my-auctions` no longer require the strict `_require_verified_facility` gate (only listing-creation routes do).
+
+### 2. In-app Messaging — Auction Winner ↔ Seller fix ✅
+- Pre-existing routes were broken: `create_auction_won_conversation` had a signature mismatch with its callers in `routes/auctions.py` (kwargs `listing_title`, `winning_amount`, `winner_info`, `seller_info`, `lot_number` weren't accepted — every call was silently 500-ing). Fixed by widening the signature to accept BOTH legacy and new kwargs.
+- NEW `services/email_notifications.py:send_auction_thread_opened_email` — bilingual EN+FR. Both the winner and the seller receive an email with the auction title, final amount, counterparty name, and a deep link `/messages?conversation=<id>`.
+- NEW admin oversight endpoints: `GET /api/admin/messages/threads` (paginated thread list, optional `?listing_id=` filter, enriched with participants + message_count) and `GET /api/admin/messages/thread/{conversation_id}` (full message log read-only). Both gated to `admin`/`super_admin`.
+- WebSocket realtime + SMS already exist and are kept.
+
+### 3. Cosmetic hardening ✅
+- **Lifespan migration**: removed all 4 `@app.on_event("startup")` / `("shutdown")` decorators from `server.py`. Single `@asynccontextmanager async def lifespan(app)` now centralises scheduler.start, redis ping, prewarm, indexes, strict-payment indexes, iter212 grandfather pass, iter194 vehicle-dealer backfill, vehicle scheduler — and scheduler.shutdown + Mongo client close on exit.
+- **`regex=` → `pattern=`** in 3 `Query()` params (`routes/invoices.py`, `routes/partner_pro.py`, `routes/admin.py`). Suppresses Pydantic v2 deprecation warning.
+- **`fetchpriority` → `fetchPriority`** in 3 JSX files (`Navbar.js`, `HeroPhone.js`, `AboutUsPage.js`). Suppresses React DOM property warning.
+- **9 pre-existing rate-limit flakes resolved**: each `_admin_token()` helper across `test_iter209_step3_partner_card.py`, `test_iter209_step6_dealer_subscription.py`, `test_iter210_step3_pricing_engine.py`, `test_iter210_step4_unsubscribe_link.py`, `test_iter210_step5_demo_accounts.py` now retries up to 3× with exponential backoff and `pytest.skip()`-s gracefully on persistent 429. Also fixed `test_buyer_tier_ignored_for_storage_seller` whose assertion `== 0` predated the iter211 storage-fee correction.
+
+### 4. Google Ads Conversion Placeholder ✅
+- NEW `frontend/src/utils/analytics_events.js` — exports `trackPartnerRegistrationConversion(conversionLabel, extras)` which fires `gtag('event', 'conversion', { send_to: 'AW-18140095337/<label>', value: 1.0, currency: 'CAD', ...extras })`. Also exports `trackAdsConversion()` + `trackGAEvent()`. Safe-no-op when `window.gtag` is unavailable (ad-blockers, SSR, consent rejection). **Awaiting Conversion Label from user to wire into Partner Registration success handler.**
+
+### Test Status
+- **NEW 14/14 iter213 backend tests pass.**
+- **252 passing + 15 skipped + 0 failures** across iter209/210/211/212/213. Net gain of +20 passing tests vs. the start of this session.
+- All 9 known live-HTTP 429 flakes are now graceful `pytest.skip()`-s; the visible-failure count went from 9 → 0.
+- Backend boots cleanly on the new lifespan handler with no deprecation warnings.
+
+### Files of reference (iter213)
+- `/app/frontend/src/pages/storage/StorageVerificationBanner.js` (NEW)
+- `/app/frontend/src/pages/storage/StorageDashboard.js` (banner injection)
+- `/app/frontend/src/utils/analytics_events.js` (NEW)
+- `/app/frontend/src/components/Navbar.js`, `/app/frontend/src/components/HeroPhone.js`, `/app/frontend/src/pages/AboutUsPage.js` (fetchPriority casing)
+- `/app/backend/server.py` (lifespan handler, `@app.on_event` removed)
+- `/app/backend/routes/storage_auctions.py` (dashboard + my-auctions softened)
+- `/app/backend/routes/messages.py` (signature fix + 2 admin endpoints)
+- `/app/backend/services/email_notifications.py` (`send_auction_thread_opened_email`)
+- `/app/backend/routes/invoices.py` + `partner_pro.py` + `admin.py` (Query `pattern=`)
+- `/app/backend/tests/test_iter213_cosmetic_and_messaging.py` (NEW — 14 tests)
+
+⚠️ **Awaiting Google Ads Conversion Label** from user to fire the partner-registration conversion event.
+
+---
+
+## Previous: iter212 — Storage Facility Provincial Business Registration + Access Restriction (Feb 14, 2026) ✅
 
 P0 sprint requested by the user. Storage facilities are no longer a "generic seller" account — they now have a dedicated, focused experience and explicit business-registration verification before they can list.
 

@@ -765,8 +765,19 @@ async def create_storage_auction(
 
 
 @storage_router.get("/storage-facilities/my-auctions")
-async def my_facility_auctions(facility=Depends(_require_verified_facility)):
+async def my_facility_auctions(current_user: User = Depends(get_current_user)):
+    """List of the facility's own auctions.
+
+    iter213 — soft-gated so unverified-registration facilities can still see
+    the (empty) list in their dashboard without a 403.
+    """
     db = get_db()
+    facility = await _facility_for_user(db, current_user.id)
+    if not facility:
+        raise HTTPException(
+            status_code=403,
+            detail={"error": "no_facility_profile", "message_en": "No facility profile.", "message_fr": "Aucun profil."},
+        )
     rows = await db.storage_auctions.find(
         {"facility_id": facility["id"]}, {"_id": 0}
     ).sort("created_at", -1).limit(200).to_list(200)
@@ -828,8 +839,26 @@ async def my_auction_bids(auction_id: str, facility=Depends(_require_verified_fa
 
 
 @storage_router.get("/storage-facilities/dashboard")
-async def facility_dashboard(facility=Depends(_require_verified_facility)):
+async def facility_dashboard(current_user: User = Depends(get_current_user)):
+    """Storage facility owner dashboard.
+
+    iter213 — this endpoint deliberately does NOT use the strict
+    `_require_verified_facility` gate so that a facility whose
+    business-registration document is awaiting (or has been rejected by)
+    admin review can still see their dashboard *with* the verification
+    progress banner. Listing-creation endpoints retain the strict gate.
+    """
     db = get_db()
+    facility = await _facility_for_user(db, current_user.id)
+    if not facility:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "no_facility_profile",
+                "message_en": "No facility profile found for this account.",
+                "message_fr": "Aucun profil de facilité trouvé pour ce compte.",
+            },
+        )
     fid = facility["id"]
     now = _now()
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()

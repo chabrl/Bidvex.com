@@ -100,7 +100,106 @@ except Exception as e:
     logger.warning(f"Stripe unavailable at startup: {e}")
 
 # ─── App ───
-app = FastAPI()
+# iter213 — Modern FastAPI lifespan handler (replaces deprecated on_event hooks).
+# Centralises all startup + shutdown work in one context manager.
+from contextlib import asynccontextmanager  # noqa: E402
+
+
+@asynccontextmanager
+async def lifespan(app):
+    # ── STARTUP ──
+    try:
+        scheduler.start()
+        logger.info("APScheduler started")
+    except Exception as e:
+        logger.warning(f"APScheduler unavailable at startup: {e}")
+
+    # Register lifecycle & geo email automation jobs
+    try:
+        from services.email_automation import register_lifecycle_jobs
+        from services.geo_email_service import register_geo_jobs
+        register_lifecycle_jobs(scheduler, db)
+        register_geo_jobs(scheduler, db)
+    except Exception as e:
+        logger.warning(f"Email automation registration failed (non-fatal): {e}")
+
+    try:
+        from lifecycle import (
+            log_db_status, prewarm_caches, init_cloud_storage,
+            seed_categories, create_database_indexes,
+            check_redis_connection,
+        )
+        await check_redis_connection()
+        await log_db_status(db)
+        await prewarm_caches(db)
+        await init_cloud_storage()
+        await seed_categories(db)
+        await create_database_indexes(db)
+        await create_critical_indexes(db)
+    except Exception as e:
+        logger.warning(f"Core startup helpers failed (non-fatal): {e}")
+
+    # ── New strict-payment-system indexes (Spec global rules 3 + 4) ──
+    try:
+        from services.payment_idempotency import ensure_payment_charges_indexes
+        from services.deposit_refund_queue import ensure_refund_queue_indexes
+        from services.promotion_email_blast import ensure_email_blast_queue_indexes
+        await ensure_payment_charges_indexes(db)
+        await ensure_refund_queue_indexes(db)
+        await ensure_email_blast_queue_indexes(db)
+    except Exception as e:
+        logger.warning(f"Strict payment indexes registration failed (non-fatal): {e}")
+
+    # ── iter212 — Grandfather existing storage facilities ──
+    try:
+        res = await db.storage_facilities.update_many(
+            {"company_registration_verified": {"$exists": False}},
+            {"$set": {"company_registration_verified": True, "company_registration_grandfathered": True}},
+        )
+        if res.modified_count:
+            logger.info(
+                f"[iter212] Grandfathered {res.modified_count} existing storage facilities."
+            )
+        owner_ids = await db.storage_facilities.distinct("owner_user_id")
+        if owner_ids:
+            await db.users.update_many(
+                {"id": {"$in": owner_ids}, "is_storage_facility": {"$ne": True}},
+                {"$set": {"is_storage_facility": True, "account_type": "storage_facility"}},
+            )
+    except Exception as e:
+        logger.warning(f"[iter212] storage-facility grandfather pass failed (non-fatal): {e}")
+
+    # ── iter194 — Vehicle dealer license / unlock-fee backfill ──
+    try:
+        from routes.vehicle_dealer_extras import migrate_existing_vehicle_listings
+        modified = await migrate_existing_vehicle_listings()
+        if modified:
+            logger.info(f"[iter194] backfilled auction_access/run_status on {modified} vehicle listings")
+    except Exception as e:
+        logger.warning(f"[iter194] migration failed: {e}")
+
+    # ── Vehicle auction scheduler ──
+    try:
+        from services.scheduler import start_scheduler as _start_vehicle_scheduler
+        _start_vehicle_scheduler()
+    except Exception as e:
+        logger.warning(f"Failed to start vehicle scheduler (non-fatal): {e}")
+
+    # Hand control to the app
+    yield
+
+    # ── SHUTDOWN ──
+    try:
+        scheduler.shutdown()
+    except Exception as e:
+        logger.warning(f"scheduler shutdown failed: {e}")
+    try:
+        client.close()
+    except Exception as e:
+        logger.warning(f"Mongo client close failed: {e}")
+
+
+app = FastAPI(lifespan=lifespan)
 api_router = APIRouter(prefix="/api")
 
 # ─── Root Health Check (MUST be first — before all middleware) ───
@@ -565,18 +664,10 @@ try:
     api_router.include_router(vehicle_settlement_router)
 
     # iter194 — Vehicle dealer license + 2.5% unlock fee
-    from routes.vehicle_dealer_extras import router as vehicle_dealer_router, migrate_existing_vehicle_listings
+    # iter213: migration is invoked from the `lifespan` handler at the top
+    # of this module; we only mount the router here.
+    from routes.vehicle_dealer_extras import router as vehicle_dealer_router
     api_router.include_router(vehicle_dealer_router)
-
-    # Run one-shot migration to backfill auction_access + run_status on existing listings
-    @app.on_event("startup")
-    async def _vehicle_dealer_migration():
-        try:
-            modified = await migrate_existing_vehicle_listings()
-            if modified:
-                logger.info(f"[iter194] backfilled auction_access/run_status on {modified} vehicle listings")
-        except Exception as e:
-            logger.warning(f"[iter194] migration failed: {e}")
 
     from routes.storage_auctions import storage_router
     api_router.include_router(storage_router)
@@ -593,12 +684,6 @@ try:
     from routes.sitemap import sitemap_router
     app.include_router(sitemap_router, tags=["SEO"])
 
-    @app.on_event("startup")
-    async def start_vehicle_auction_scheduler():
-        try:
-            start_vehicle_scheduler()
-        except Exception as e:
-            logger.error(f"Failed to start vehicle scheduler: {e}")
 except ImportError:
     pass
 
@@ -641,73 +726,9 @@ async def favicon():
     return {"status": "no favicon"}
 
 # ─── Lifecycle Events ───
-from lifecycle import (
-    log_db_status, prewarm_caches, init_cloud_storage,
-    seed_categories, create_database_indexes,
-    check_redis_connection,
-)
-
-@app.on_event("startup")
-async def on_startup():
-    try:
-        scheduler.start()
-        logger.info("APScheduler started")
-    except Exception as e:
-        logger.warning(f"APScheduler unavailable at startup: {e}")
-    
-    # Register lifecycle & geo email automation jobs
-    try:
-        from services.email_automation import register_lifecycle_jobs
-        from services.geo_email_service import register_geo_jobs
-        register_lifecycle_jobs(scheduler, db)
-        register_geo_jobs(scheduler, db)
-    except Exception as e:
-        logger.warning(f"Email automation registration failed (non-fatal): {e}")
-    
-    await check_redis_connection()
-    await log_db_status(db)
-    await prewarm_caches(db)
-    await init_cloud_storage()
-    await seed_categories(db)
-    await create_database_indexes(db)
-    await create_critical_indexes(db)
-
-    # ── New strict-payment-system indexes (Spec global rules 3 + 4) ──
-    try:
-        from services.payment_idempotency import ensure_payment_charges_indexes
-        from services.deposit_refund_queue import ensure_refund_queue_indexes
-        from services.promotion_email_blast import ensure_email_blast_queue_indexes
-        await ensure_payment_charges_indexes(db)
-        await ensure_refund_queue_indexes(db)
-        await ensure_email_blast_queue_indexes(db)
-    except Exception as e:
-        logger.warning(f"Strict payment indexes registration failed (non-fatal): {e}")
-
-    # ── iter212 — Grandfather existing storage facilities (no registration
-    # fields → auto-verified so they keep listing). New facilities must
-    # explicitly carry `company_registration_verified=False` until an admin
-    # approves the document.
-    try:
-        res = await db.storage_facilities.update_many(
-            {"company_registration_verified": {"$exists": False}},
-            {"$set": {"company_registration_verified": True, "company_registration_grandfathered": True}},
-        )
-        if res.modified_count:
-            logger.info(
-                f"[iter212] Grandfathered {res.modified_count} existing storage facilities "
-                f"(set company_registration_verified=True)."
-            )
-        # Also flag the underlying users as storage facilities so the nav
-        # restriction kicks in for them too. Idempotent.
-        owner_ids = await db.storage_facilities.distinct("owner_user_id")
-        if owner_ids:
-            await db.users.update_many(
-                {"id": {"$in": owner_ids}, "is_storage_facility": {"$ne": True}},
-                {"$set": {"is_storage_facility": True, "account_type": "storage_facility"}},
-            )
-    except Exception as e:
-        logger.warning(f"[iter212] storage-facility grandfather pass failed (non-fatal): {e}")
-
+# iter213: startup/shutdown work is now in the `lifespan` context manager
+# at the top of this module. The handler imports its helpers from `lifecycle`
+# (log_db_status, prewarm_caches, init_cloud_storage, etc.).
 
 async def create_critical_indexes(database):
     """Run on every startup — idempotent, safe to re-run.
@@ -730,11 +751,6 @@ async def create_critical_indexes(database):
         except Exception as e:
             logger.warning(f"[critical-index] {coll} {keys}: {e}")
     logger.info(f"✅ Critical database indexes verified ({ok}/{len(critical)} ok)")
-
-@app.on_event("shutdown")
-async def on_shutdown():
-    scheduler.shutdown()
-    client.close()
 
 
 # ─── Static Frontend & SPA Catch-All (MUST be last) ───

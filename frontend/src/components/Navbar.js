@@ -107,7 +107,7 @@ const Navbar = () => {
                 width={233}
                 height={56}
                 className="h-8 sm:h-9 w-auto transform group-hover:scale-105 transition-transform duration-200"
-                fetchpriority="high"
+                fetchPriority="high"
               />
             </Link>
 

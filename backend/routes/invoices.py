@@ -1034,7 +1034,7 @@ async def get_email_logs(
 @invoices_router.post("/invoices/generate/{transaction_id}")
 async def generate_transaction_invoice(
     transaction_id: str,
-    lang: str = Query("en", regex="^(en|fr)$"),
+    lang: str = Query("en", pattern="^(en|fr)$"),
     buyer_province: str = Query("QC", max_length=2),
     current_user: User = Depends(get_current_user),
 ):

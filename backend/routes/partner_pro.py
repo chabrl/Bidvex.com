@@ -312,7 +312,7 @@ async def get_csv_template():
 
 @partner_pro_router.get("/partner-pro/analytics/export")
 async def export_analytics(
-    format: str = Query("csv", regex="^(csv|json)$"),
+    format: str = Query("csv", pattern="^(csv|json)$"),
     period_days: int = Query(30, ge=1, le=365),
     current_user: User = Depends(get_current_user),
 ):

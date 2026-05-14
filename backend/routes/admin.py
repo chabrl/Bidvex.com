@@ -1315,7 +1315,7 @@ def _parse_period(period: str):
 async def get_tax_report(
     period: str = Query(..., description="Period filter: Q1-2026, Q2-2026, or 2026"),
     province: Optional[str] = Query(None, max_length=2, description="Province code filter (e.g. QC, ON, AB)"),
-    format: str = Query("json", regex="^(json|csv)$", description="Response format: json or csv"),
+    format: str = Query("json", pattern="^(json|csv)$", description="Response format: json or csv"),
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
     """

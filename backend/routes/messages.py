@@ -569,18 +569,37 @@ async def serve_message_attachment(filename: str):
 async def create_auction_won_conversation(
     db,
     listing_id: str,
-    seller_id: str,
     winner_id: str,
-    final_price: float,
-    item_title: str
+    seller_id: str,
+    # iter213 — accept BOTH legacy and new caller signatures.
+    # Old internal helpers passed (item_title, final_price); the public
+    # auction-close routes pass (listing_title, winning_amount, winner_info,
+    # seller_info, lot_number). Keep all kwargs optional + map them.
+    item_title: Optional[str] = None,
+    final_price: Optional[float] = None,
+    listing_title: Optional[str] = None,
+    winning_amount: Optional[float] = None,
+    winner_info: Optional[Dict[str, Any]] = None,
+    seller_info: Optional[Dict[str, Any]] = None,
+    lot_number: Optional[int] = None,
 ) -> Optional[str]:
-    """
-    Automatically create a conversation between seller and winning bidder
-    when an auction ends. Called from routes/auctions.py.
+    """Create the post-auction conversation between the winning bidder and
+    the seller. Sends a system handshake message + bilingual EN+FR email
+    to both parties + in-app notification + SMS (best-effort).
 
-    Returns the conversation_id if successful, None otherwise.
+    iter213 — fixed signature mismatch so the function can be called with
+    either the legacy `(item_title, final_price)` kwargs or the newer
+    `(listing_title, winning_amount, winner_info, seller_info, lot_number)`
+    kwargs the auction-close routes use. Also adds bilingual email
+    notifications to both winner and seller with a deep link to the thread.
     """
     from services.sms_notification_service import get_sms_notification_service
+
+    # Normalise the two competing signatures
+    title = listing_title or item_title or "Item"
+    if lot_number:
+        title = f"{title} — Lot #{lot_number}"
+    price = winning_amount if winning_amount is not None else (final_price or 0.0)
 
     try:
         existing = await db.conversations.find_one({
@@ -596,6 +615,9 @@ async def create_auction_won_conversation(
                 "id": conversation_id,
                 "participants": [seller_id, winner_id],
                 "listing_id": listing_id,
+                "listing_title": title,
+                "auction_winner_id": winner_id,
+                "auction_seller_id": seller_id,
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "updated_at": datetime.now(timezone.utc).isoformat(),
                 "last_message": "Auction won! Contact details shared.",
@@ -603,7 +625,15 @@ async def create_auction_won_conversation(
             }
             await db.conversations.insert_one(conversation)
 
-        seller = await db.users.find_one({"id": seller_id}, {"_id": 0})
+        # Resolve seller/winner docs (allow caller to pass them to skip the lookup)
+        if seller_info:
+            seller = seller_info
+        else:
+            seller = await db.users.find_one({"id": seller_id}, {"_id": 0}) or {}
+        if winner_info:
+            winner = winner_info
+        else:
+            winner = await db.users.find_one({"id": winner_id}, {"_id": 0}) or {}
 
         message_id = str(uuid.uuid4())
         system_message = {
@@ -611,15 +641,16 @@ async def create_auction_won_conversation(
             "conversation_id": conversation_id,
             "sender_id": "system",
             "receiver_id": winner_id,
-            "content": f"Congratulations! You have won the auction for {item_title}.",
+            "content": f"Congratulations! You have won the auction for {title}.",
             "message_type": "auction_won",
             "system_data": {
-                "item_title": item_title,
-                "final_price": final_price,
+                "item_title": title,
+                "final_price": price,
                 "listing_id": listing_id,
-                "seller_name": seller.get("name") if seller else "Seller",
-                "seller_email": seller.get("email") if seller else None,
-                "seller_phone": seller.get("phone") if seller else None
+                "seller_name": (seller or {}).get("name") if seller else "Seller",
+                "seller_email": (seller or {}).get("email"),
+                "seller_phone": (seller or {}).get("phone"),
+                "lot_number": lot_number,
             },
             "is_read": False,
             "created_at": datetime.now(timezone.utc).isoformat()
@@ -629,6 +660,28 @@ async def create_auction_won_conversation(
 
         logger.info(f"Created winning handshake conversation for listing {listing_id}")
 
+        # iter213 — Bilingual EN+FR email to both parties
+        try:
+            from services.email_notifications import send_auction_thread_opened_email
+            if (winner or {}).get("email"):
+                await send_auction_thread_opened_email(
+                    recipient=winner, role="winner",
+                    counterparty=seller or {},
+                    listing_title=title, listing_id=listing_id,
+                    conversation_id=conversation_id,
+                    winning_amount=price,
+                )
+            if (seller or {}).get("email"):
+                await send_auction_thread_opened_email(
+                    recipient=seller, role="seller",
+                    counterparty=winner or {},
+                    listing_title=title, listing_id=listing_id,
+                    conversation_id=conversation_id,
+                    winning_amount=price,
+                )
+        except Exception as email_err:
+            logger.warning(f"Auction-thread email send failed (non-fatal): {email_err}")
+
         # WebSocket notification
         if ws_manager:
             try:
@@ -636,8 +689,15 @@ async def create_auction_won_conversation(
                     "type": "AUCTION_WON",
                     "listing_id": listing_id,
                     "conversation_id": conversation_id,
-                    "item_title": item_title,
-                    "final_price": final_price
+                    "item_title": title,
+                    "final_price": price
+                })
+                await ws_manager.send_to_user(seller_id, {
+                    "type": "AUCTION_SOLD",
+                    "listing_id": listing_id,
+                    "conversation_id": conversation_id,
+                    "item_title": title,
+                    "final_price": price
                 })
             except Exception as e:
                 logger.warning(f"Could not send auction won notification: {e}")
@@ -647,14 +707,14 @@ async def create_auction_won_conversation(
             sms_service = get_sms_notification_service(db)
             await sms_service.notify_auction_won(
                 user_id=winner_id,
-                listing_title=item_title,
-                winning_amount=final_price,
+                listing_title=title,
+                winning_amount=price,
                 listing_id=listing_id
             )
             await sms_service.notify_seller_auction_sold(
                 seller_id=seller_id,
-                listing_title=item_title,
-                sold_amount=final_price,
+                listing_title=title,
+                sold_amount=price,
                 listing_id=listing_id
             )
         except Exception as sms_error:
@@ -670,6 +730,64 @@ async def create_auction_won_conversation(
 # ---------------------------------------------------------------------------
 # Admin Endpoints
 # ---------------------------------------------------------------------------
+
+@messages_router.get("/admin/messages/threads")
+async def admin_list_message_threads(
+    limit: int = 50,
+    offset: int = 0,
+    listing_id: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+):
+    """iter213 — Admin oversight: list all message threads (read-only).
+
+    Returns a paginated list of conversation summaries with participant
+    info, last message, last activity, and the linked listing (if any).
+    Supports `?listing_id=<id>` for filtering threads tied to a given auction.
+    """
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    query = {}
+    if listing_id:
+        query["listing_id"] = listing_id
+
+    total = await db.conversations.count_documents(query)
+    cursor = db.conversations.find(query, {"_id": 0}).sort("updated_at", -1).skip(offset).limit(limit)
+    threads = await cursor.to_list(limit)
+
+    # Enrich each thread with participant snapshots + message count
+    out = []
+    for t in threads:
+        participants = t.get("participants", []) or []
+        users_docs = []
+        for uid in participants:
+            doc = await db.users.find_one({"id": uid}, {"_id": 0, "id": 1, "name": 1, "email": 1, "role": 1})
+            if doc:
+                users_docs.append(doc)
+        msg_count = await db.messages.count_documents({"conversation_id": t.get("id")})
+        out.append({
+            **t,
+            "participants_detail": users_docs,
+            "message_count": msg_count,
+        })
+    return {"total": total, "threads": out, "limit": limit, "offset": offset}
+
+
+@messages_router.get("/admin/messages/thread/{conversation_id}")
+async def admin_get_thread_messages(
+    conversation_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """iter213 — Admin oversight: fetch the full message log of one thread."""
+    if getattr(current_user, "role", None) not in ("admin", "super_admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    conv = await db.conversations.find_one({"id": conversation_id}, {"_id": 0})
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    msgs = await db.messages.find({"conversation_id": conversation_id}, {"_id": 0}).sort("created_at", 1).to_list(1000)
+    return {"conversation": conv, "messages": msgs}
+
 
 @messages_router.get("/admin/messages/flagged")
 async def admin_get_flagged_messages(current_user: User = Depends(get_current_user)):

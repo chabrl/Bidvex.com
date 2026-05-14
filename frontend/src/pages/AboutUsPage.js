@@ -109,7 +109,7 @@ const HeroCityImage = ({ label }) => {
       onTouchStart={() => setHovered(h => !h)}
       data-testid="hero-city-image"
     >
-      <img src={CITY_IMG} alt="Canadian City" className="absolute inset-0 w-full h-full object-cover" loading="eager" fetchpriority="high" />
+      <img src={CITY_IMG} alt="Canadian City" className="absolute inset-0 w-full h-full object-cover" loading="eager" fetchPriority="high" />
       {/* Overlay */}
       <div
         className="absolute inset-0 transition-all duration-[400ms]"

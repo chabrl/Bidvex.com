@@ -1955,7 +1955,83 @@ async def send_storage_facility_pending_user_email(facility: dict) -> bool:
     )
 
 
-# iter212 — Provincial Business-Registration verify / reject emails
+# iter213 — Bilingual EN+FR email helper for the post-auction message thread.
+# Fires for both the auction winner and the seller when an auction ends and
+# a conversation is opened in `routes.messages.create_auction_won_conversation`.
+
+async def send_auction_thread_opened_email(
+    *,
+    recipient: dict,
+    role: str,                # 'winner' | 'seller'
+    counterparty: dict,
+    listing_title: str,
+    listing_id: str,
+    conversation_id: str,
+    winning_amount: float,
+) -> bool:
+    """Notify a winner or seller that a new message thread has been opened."""
+    if not recipient or not recipient.get("email"):
+        return False
+    name = recipient.get("name") or recipient.get("first_name") or recipient.get("email")
+    cp_name = (counterparty or {}).get("name") or "Your counterparty"
+    amount_str = f"CA${float(winning_amount or 0):,.2f}"
+    msg_link = f"https://www.bidvex.com/messages?conversation={conversation_id}"
+
+    if role == "winner":
+        subject = f"🎉 You won — message thread opened for {listing_title}"
+        body_en = (
+            f"Hi <strong>{name}</strong>,<br/><br/>"
+            f"Congratulations — you won the auction for <strong>{listing_title}</strong> "
+            f"with a final bid of <strong>{amount_str}</strong>.<br/><br/>"
+            f"A direct message thread has been opened between you and the seller "
+            f"(<strong>{cp_name}</strong>) to coordinate payment and pickup."
+        )
+        body_fr = (
+            f"Bonjour <strong>{name}</strong>,<br/><br/>"
+            f"Félicitations — vous avez remporté l'enchère pour <strong>{listing_title}</strong> "
+            f"avec une mise finale de <strong>{amount_str}</strong>.<br/><br/>"
+            f"Un fil de messages direct a été ouvert entre vous et le vendeur "
+            f"(<strong>{cp_name}</strong>) pour coordonner le paiement et la cueillette."
+        )
+    else:  # seller
+        subject = f"✅ Sold — message thread opened with the winning bidder ({listing_title})"
+        body_en = (
+            f"Hi <strong>{name}</strong>,<br/><br/>"
+            f"Great news — your listing <strong>{listing_title}</strong> has sold for "
+            f"<strong>{amount_str}</strong>.<br/><br/>"
+            f"A direct message thread has been opened between you and the winning bidder "
+            f"(<strong>{cp_name}</strong>) so you can coordinate payment and pickup."
+        )
+        body_fr = (
+            f"Bonjour <strong>{name}</strong>,<br/><br/>"
+            f"Bonne nouvelle — votre annonce <strong>{listing_title}</strong> a été vendue pour "
+            f"<strong>{amount_str}</strong>.<br/><br/>"
+            f"Un fil de messages direct a été ouvert entre vous et l'enchérisseur gagnant "
+            f"(<strong>{cp_name}</strong>) pour coordonner le paiement et la cueillette."
+        )
+
+    html = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;background:#f8fafc;border-radius:12px;">
+      <div style="padding:20px;background:white;border-radius:8px;">
+        <h2 style="color:#1e40af;margin:0 0 12px;">{subject}</h2>
+        <p style="color:#334155;line-height:1.6;">{body_en}</p>
+        <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0;">
+        <p style="color:#334155;line-height:1.6;">{body_fr}</p>
+        <div style="text-align:center;margin-top:20px;">
+          <a href="{msg_link}" style="display:inline-block;padding:12px 28px;background:#2563eb;color:white;text-decoration:none;border-radius:8px;font-weight:600;">
+            Open message thread · Ouvrir le fil
+          </a>
+        </div>
+        <p style="color:#64748b;font-size:11px;text-align:center;margin-top:24px;">
+          BidVex — Listing #{listing_id[:8]}
+        </p>
+      </div>
+    </div>
+    """
+    return await send_email(to_email=recipient["email"], subject=subject, html_content=html)
+
+
+
 async def send_storage_facility_registration_verified_email(facility: dict) -> bool:
     if not facility or not facility.get("email"):
         return False

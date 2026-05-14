@@ -38,7 +38,7 @@ const HeroPhone = () => {
           alt={fr ? "Application mobile BidVex" : "BidVex mobile app"}
           className="hero-phone-image"
           loading="eager"
-          fetchpriority="high"
+          fetchPriority="high"
           draggable={false}
         />
       </div>
