@@ -1,0 +1,36 @@
+{
+  "summary": "iter212 — Storage facility provincial business-registration + access restriction. Executed the full new pytest suite (20/20 PASS in 13.47s) plus live HTTP smoke + UI rendering check. All backend behaviour verified end-to-end: registration trio fields persist, admin verify/reject helpers persist + dispatch bilingual emails, _require_verified_facility correctly distinguishes grandfathered (missing field) from explicit-False, /api/uploads/storage_facilities/{filename} returns structured 404 with file_missing_on_disk + bilingual EN/FR messages, and the admin listing exposes the new column with the grandfather flag set on the 1 existing facility. /storage-auctions/register-facility renders cleanly (3-step indicator, bilingual FR/EN UI, no Compiled-with-problems overlay) after auth.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter212_storage_facility_registration.py",
+    "/app/test_reports/pytest/iter212_results.xml"
+  ],
+  "action_items": [
+    "Optional polish: AuthContext does not appear to restore the session from a localStorage token alone (only the just-after-login flow keeps you signed in). This made deeper UI testing (admin → Facilities → Pending Registration tab, nav-restriction checks, silent redirect from /seller/dashboard → /storage-dashboard, and the bid-blocked toast on non-storage listings) impossible via the testing-agent shortcut. The feature code paths are in place; suggest a manual smoke from the main agent if regression coverage is needed beyond pytest."
+  ],
+  "critical_code_review_comments": [
+    "FastAPI on_event('startup'/'shutdown') usage in server.py is deprecated — please migrate to lifespan handlers in a future iter (cosmetic, non-blocking; surfaced as warnings in pytest).",
+    "Two Query() params still use deprecated regex= kwarg (admin.py L1318, partner_pro.py L315) — switch to pattern= to silence Pydantic v2 deprecation warnings.",
+    "Console errors visible in browser: 'Invalid DOM property fetchpriority' (should be fetchPriority) and a duplicate Meta Pixel ID 825987810565038 — cosmetic, not blocking iter212 but worth fixing in a follow-up.",
+    "/auth route is correct path (App.js); login route /login returns the SPA 404 page when accessed directly — consider redirecting /login → /auth for friendliness."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (20/20 new iter212 tests pass, live curl validates structured 404 + admin listing + auth gate)",
+    "frontend": "Partially verified — registration form Step 1 renders cleanly in EN+FR with 3-step indicator and no Compiled-with-problems overlay; admin Facilities tab + nav restriction + silent redirects + bid toast were NOT exercised in the UI due to AuthContext session-restoration limitation (token in localStorage alone redirected to /auth on /admin and on subsequent visits to /storage-auctions/register-facility)."
+  },
+  "test_credentials": "Admin charbel911@gmail.com / Anderosli123!@# — works for backend login. iter189buyer@test.com / TestBuyer123! returned 401 on the preview env at the time of testing (already flagged in /app/memory/test_credentials.md for legacy buyer account).",
+  "seed_data_creation": "None — used the existing 'Bidvex Inc.' facility (id 4946e55e-9349-4e45-bea7-0e5bd08673e4) that the iter212 startup migration grandfathered.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend coverage for iter212 is complete and green (see /app/backend/tests/test_iter212_storage_facility_registration.py). If you need to exercise the admin Pending Registration tab, the nav restriction for is_storage_facility=true users, or the bid-blocked toast, do a full UI login through /auth (do NOT rely on injecting token into localStorage; AuthContext drops you back to /auth on hard reload). To create a storage-facility user, either complete /storage-auctions/register-facility through the UI as a non-facility user or run the MongoDB update described in the review_request: db.users.updateMany({id: '<owner-uuid>'}, {$set: {is_storage_facility: true, account_type: 'storage_facility'}}).",
+  "rca of the issue": "N/A — no regressions found. The only friction was testing infrastructure: the SPA's AuthContext re-hydration appears to revalidate something beyond localStorage token (likely an /api/auth/me round-trip with an additional cookie/header), so a bare localStorage.setItem('token', ...) is not enough to bypass /auth on routes guarded by ProtectedRoute on a cold navigation. The first-mount render works because the SPA is still on the original auth boundary that ran post-login."
+}

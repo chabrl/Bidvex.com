@@ -26,6 +26,18 @@ UNIT_TYPES = ["indoor", "outdoor", "climate_controlled", "drive_up"]
 PAYMENT_METHODS = ["stripe", "cash", "etransfer"]
 AUCTION_STATUSES = ["upcoming", "active", "ended", "sold", "cancelled"]
 
+# iter212 — Allowed registration types per Canadian jurisdiction.
+# Federal (CRA BN) is universally available as an alternative for every province.
+REGISTRATION_TYPES = [
+    "federal_bn",         # CRA Business Number (9 digit + RC0001)
+    "qc_neq",             # Quebec — Numéro d'entreprise du Québec (10 digits)
+    "on_ocn",             # Ontario Corporation Number (8-10 digits)
+    "bc_registry",        # BC Registry number (7+ digits)
+    "ab_corporate",       # Alberta Corporate Access Number (10 digits)
+    "provincial_other",   # SK / MB / NS / NB / NL / PE — free text
+    "territorial_other",  # NT / NU / YT — free text
+]
+
 
 class StorageFacilityRegister(BaseModel):
     """Public registration form payload."""
@@ -43,6 +55,10 @@ class StorageFacilityRegister(BaseModel):
     business_registration_number: Optional[str] = None
     opc_permit_number: Optional[str] = None
     accepted_terms: bool
+    # iter212 — Provincial Business Registration (REQUIRED for new facilities)
+    company_registration_type: Optional[str] = None          # one of REGISTRATION_TYPES
+    company_registration_number: Optional[str] = None        # the actual ID typed by the user
+    company_registration_document_url: Optional[str] = None  # /api/uploads/storage_facilities/{id}/{filename}
 
 
 class StorageAuctionCreate(BaseModel):

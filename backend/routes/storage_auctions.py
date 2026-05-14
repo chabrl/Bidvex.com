@@ -39,17 +39,22 @@ import re
 import shutil
 import uuid
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 from typing import List, Optional
 
 from fastapi import (
     APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, BackgroundTasks, Request
 )
+from fastapi.responses import FileResponse
 
-from deps import User, get_current_user, get_db
+from deps import User, get_current_user, get_db, jwt_secret, security
+from fastapi.security import HTTPAuthorizationCredentials
+from jose import jwt, JWTError, ExpiredSignatureError
 from rate_limit import limiter as _limiter
 from models.storage_auction import (
     StorageFacilityRegister, StorageAuctionCreate, StorageBidPayload, StorageDepositRequest,
     UNIT_SIZES, UNIT_TYPES, PAYMENT_METHODS, AUCTION_STATUSES, CANADIAN_PROVINCES,
+    REGISTRATION_TYPES,
 )
 from services.storage_pricing import calculate_storage_pricing
 from services.storage_auction_service import place_bid as _place_bid_proxy
@@ -68,6 +73,15 @@ UPLOAD_ROOT = "/app/uploads/storage-auctions"
 ALLOWED_PHOTO_MIME = {"image/png", "image/jpeg", "image/jpg", "image/webp"}
 MAX_PHOTO_BYTES = 8 * 1024 * 1024  # 8 MB per photo
 MAX_PHOTOS_PER_AUCTION = 10
+
+# iter212 — Storage Facility Business-Registration documents
+FACILITY_DOC_ROOT_REL = Path("uploads/storage_facilities")           # relative to backend CWD
+FACILITY_DOC_ROOT_ABS = Path("/app/backend/uploads/storage_facilities")  # absolute fallback
+ALLOWED_FACILITY_DOC_MIME = {
+    "application/pdf",
+    "image/png", "image/jpeg", "image/jpg", "image/webp",
+}
+MAX_FACILITY_DOC_BYTES = 10 * 1024 * 1024  # 10 MB
 
 
 # ─────────────────────────────────────────────────────────────
@@ -96,6 +110,28 @@ async def _require_verified_facility(current_user: User = Depends(get_current_us
                 "error": "facility_not_verified",
                 "message_en": "Your facility account is not yet verified by BidVex.",
                 "message_fr": "Votre compte de facilité n'est pas encore vérifié par BidVex.",
+            },
+        )
+    # iter212 — Provincial Business Registration must also be verified.
+    # Existing facilities are grandfathered: the absence of this field in the
+    # doc (legacy data) is treated as already-verified so we don't lock them
+    # out retroactively. Only NEW facilities that registered after iter212
+    # get the explicit `False` → blocked behaviour.
+    reg_verified = fac.get("company_registration_verified")
+    if reg_verified is False:  # explicit False — set on registration after iter212
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "company_registration_not_verified",
+                "message_en": (
+                    "Your business-registration document is awaiting admin review. "
+                    "You'll be able to list units once it is verified."
+                ),
+                "message_fr": (
+                    "Votre document d'enregistrement d'entreprise est en attente d'examen "
+                    "par l'administrateur. Vous pourrez lister des unités une fois qu'il sera vérifié."
+                ),
+                "settings_url": "/storage-auctions/register-facility",
             },
         )
     return fac
@@ -530,6 +566,38 @@ async def register_facility(
         # Don't block registration on Stripe outage — admin can re-issue link later
 
     fac_id = str(uuid.uuid4())
+    # iter212 — Provincial Business Registration validation (new facilities only)
+    reg_type = (payload.company_registration_type or "").strip().lower() or None
+    reg_num = (payload.company_registration_number or "").strip() or None
+    reg_doc = (payload.company_registration_document_url or "").strip() or None
+    if reg_type and reg_type not in REGISTRATION_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_registration_type",
+                "message_en": f"Registration type must be one of {REGISTRATION_TYPES}.",
+                "message_fr": f"Le type d'enregistrement doit être l'un de {REGISTRATION_TYPES}.",
+            },
+        )
+    # New facility registrations require the trio: type + number + document.
+    # (Existing facilities lacking these fields are grandfathered — they keep
+    #  `company_registration_verified=True` set by the migration script.)
+    if not (reg_type and reg_num and reg_doc):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "registration_required",
+                "message_en": (
+                    "Business registration is now required. Please pick a registration type, "
+                    "enter the registration number, and upload a proof-of-registration document."
+                ),
+                "message_fr": (
+                    "L'enregistrement d'entreprise est maintenant obligatoire. Veuillez choisir un type, "
+                    "saisir le numéro d'enregistrement et téléverser un document de preuve."
+                ),
+            },
+        )
+
     doc = {
         "id": fac_id,
         "owner_user_id": current_user.id,
@@ -546,6 +614,14 @@ async def register_facility(
         "referral_source": payload.referral_source,
         "business_registration_number": payload.business_registration_number,
         "opc_permit_number": payload.opc_permit_number,
+        # iter212 — Provincial registration fields
+        "company_registration_type": reg_type,
+        "company_registration_number": reg_num,
+        "company_registration_document_url": reg_doc,
+        "company_registration_verified": False,   # admin must verify
+        "company_registration_verified_at": None,
+        "company_registration_verified_by": None,
+        "company_registration_rejection_reason": None,
         "verified": False,
         "status": "pending_verification",
         "seller_tier": "storage_facility",  # always 5% commission
@@ -557,6 +633,21 @@ async def register_facility(
         "updated_at": _now().isoformat(),
     }
     await db.storage_facilities.insert_one(doc.copy())
+
+    # iter212 — flag the user as a storage facility so frontend nav/dashboard
+    # gating works immediately after registration. The `verified` flag stays
+    # False until an admin approves the documents.
+    try:
+        await db.users.update_one(
+            {"id": current_user.id},
+            {"$set": {
+                "is_storage_facility": True,
+                "account_type": "storage_facility",
+                "storage_facility_id": fac_id,
+            }},
+        )
+    except Exception as e:
+        logger.error(f"[STORAGE] user-flag update failed for {current_user.id}: {e}")
 
     # Notify admin (non-blocking)
     try:
@@ -802,6 +893,198 @@ async def upload_facility_photo(
     return {"url": public_url, "filename": file.filename, "bytes": len(payload)}
 
 
+# ─────────────────────────────────────────────────────────────
+# iter212 — Storage Facility Business-Registration upload + serve
+# ─────────────────────────────────────────────────────────────
+
+@storage_router.post("/storage-facilities/upload-registration-doc")
+async def upload_facility_registration_doc(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    """Upload (or replace) a facility's business-registration proof document.
+
+    Auth: any authenticated user (the doc is namespaced under their user_id;
+    only the owner or an admin can read it back).
+
+    Returns: `{url}` where `url` is `/api/uploads/storage_facilities/{filename}`.
+    The frontend stores that URL in the registration payload as
+    `company_registration_document_url`.
+    """
+    if file.content_type not in ALLOWED_FACILITY_DOC_MIME:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_mime",
+                "message_en": "Document must be PDF, JPEG, PNG, or WebP.",
+                "message_fr": "Le document doit être au format PDF, JPEG, PNG ou WebP.",
+            },
+        )
+    payload = await file.read()
+    if not payload:
+        raise HTTPException(status_code=400, detail="Empty file")
+    if len(payload) > MAX_FACILITY_DOC_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail={
+                "error": "file_too_large",
+                "message_en": "Document exceeds the 10 MB size limit.",
+                "message_fr": "Le document dépasse la limite de 10 Mo.",
+            },
+        )
+
+    # Preserve extension; strip everything else
+    ext = ""
+    original = (file.filename or "doc").lower()
+    for candidate in (".pdf", ".png", ".jpg", ".jpeg", ".webp"):
+        if original.endswith(candidate):
+            ext = candidate
+            break
+    if not ext:
+        # Fall back to MIME → ext
+        ext = {
+            "application/pdf": ".pdf",
+            "image/png": ".png",
+            "image/jpeg": ".jpg",
+            "image/jpg": ".jpg",
+            "image/webp": ".webp",
+        }.get(file.content_type, ".bin")
+
+    fname = f"reg_{current_user.id}_{uuid.uuid4().hex[:8]}{ext}"
+    # Persist to both candidate roots so cwd drift doesn't matter — but we
+    # actually only need ONE write; the serve endpoint will search both.
+    FACILITY_DOC_ROOT_ABS.mkdir(parents=True, exist_ok=True)
+    target = FACILITY_DOC_ROOT_ABS / fname
+    with open(target, "wb") as f:
+        f.write(payload)
+
+    rel_url = f"/api/uploads/storage_facilities/{fname}"
+    return {
+        "url": rel_url,
+        "filename": fname,
+        "bytes": len(payload),
+        "mime": file.content_type,
+    }
+
+
+@storage_router.get("/uploads/storage_facilities/{filename}")
+async def serve_facility_registration_doc(
+    filename: str,
+    request: Request,
+    token: Optional[str] = Query(None),
+):
+    """Serve a facility's uploaded business-registration document.
+
+    Auth modes (priority order):
+      1. Cookie / Authorization header (normal API caller).
+      2. `?token=<jwt>` query param — required when an admin opens the URL
+         in a new tab.
+
+    Owner (filename prefix `reg_{user_id}_*`) may read their own doc.
+    Admins / super_admins may read any doc.
+
+    Mirrors the iter211 partner-doc structured-404 recovery pattern so the
+    admin UI can render a "Request resubmission" CTA when files are missing
+    after a pod redeploy.
+    """
+    db = get_db()
+
+    # ── Auth ───────────────────────────────────────────────────────
+    current_user = None
+    try:
+        creds: Optional[HTTPAuthorizationCredentials] = await security(request)
+        current_user = await get_current_user(request, creds)
+    except HTTPException:
+        current_user = None
+
+    if current_user is None and token:
+        try:
+            payload = jwt.decode(token, jwt_secret, algorithms=["HS256"])
+            user_id = payload.get("sub")
+            if user_id:
+                user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
+                if user_doc:
+                    current_user = User(**user_doc)
+        except (JWTError, ExpiredSignatureError):
+            current_user = None
+
+    if current_user is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    # ── Defensive filename normalisation (peel legacy prefixes) ────
+    bare = filename
+    for prefix in (
+        "/api/uploads/storage_facilities/", "/uploads/storage_facilities/",
+        "api/uploads/storage_facilities/", "uploads/storage_facilities/",
+    ):
+        if bare.startswith(prefix):
+            bare = bare[len(prefix):]
+    if ".." in bare or "/" in bare or bare.startswith("."):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    # ── Permission check ──────────────────────────────────────────
+    user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0, "role": 1})
+    is_owner = bare.startswith(f"reg_{current_user.id}_") or bare.startswith(f"reg_{current_user.id}.")
+    is_admin = (user_doc or {}).get("role") in {"admin", "super_admin"}
+    if not is_owner and not is_admin:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # ── Search both upload roots ──────────────────────────────────
+    candidates = [
+        FACILITY_DOC_ROOT_REL / bare,
+        FACILITY_DOC_ROOT_ABS / bare,
+    ]
+    found = next((p for p in candidates if p.exists() and p.is_file()), None)
+    if found is None:
+        logger.warning(
+            f"[facility_docs] missing file: {bare} requested by user={current_user.id} "
+            f"role={'admin' if is_admin else 'owner'}"
+        )
+        owner_email = None
+        owner_id = None
+        owner_status = None
+        m = re.match(r"^reg_([0-9a-f-]{8,})", bare)
+        try:
+            if m:
+                owner_doc = await db.users.find_one(
+                    {"id": m.group(1)},
+                    {"_id": 0, "id": 1, "email": 1},
+                )
+                if owner_doc:
+                    owner_email = owner_doc.get("email")
+                    owner_id = owner_doc.get("id")
+                fac_doc = await db.storage_facilities.find_one(
+                    {"owner_user_id": m.group(1)},
+                    {"_id": 0, "status": 1, "company_registration_verified": 1},
+                )
+                if fac_doc:
+                    owner_status = fac_doc.get("status")
+        except Exception:
+            pass
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error_code": "file_missing_on_disk",
+                "filename": bare,
+                "message_en": (
+                    "This document is no longer available on the server. "
+                    "Files uploaded before the most recent redeployment may have been lost. "
+                    "Please ask the facility to re-upload their registration proof."
+                ),
+                "message_fr": (
+                    "Ce document n'est plus disponible sur le serveur. "
+                    "Les fichiers téléversés avant le dernier redéploiement ont peut-être été perdus. "
+                    "Veuillez demander à la facilité de téléverser à nouveau sa preuve d'enregistrement."
+                ),
+                "owner_email": owner_email,
+                "owner_user_id": owner_id,
+                "owner_status": owner_status,
+            },
+        )
+
+    return FileResponse(str(found))
+
+
 @storage_router.get("/storage-auctions/photo/{facility_id}/{photo_name}")
 async def serve_facility_photo(facility_id: str, photo_name: str):
     """Public photo serve."""
@@ -836,7 +1119,18 @@ async def admin_verify_facility(
         raise HTTPException(status_code=404, detail="Facility not found")
     await db.storage_facilities.update_one(
         {"id": facility_id},
-        {"$set": {"verified": True, "status": "verified", "verified_at": _now().isoformat(), "verified_by": current_user.id}},
+        {"$set": {
+            "verified": True, "status": "verified",
+            "verified_at": _now().isoformat(), "verified_by": current_user.id,
+            # iter212 — flipping the global verify also marks the registration
+            # as verified so admins don't have to click twice when both arrive
+            # together. If they want to verify only the registration without
+            # promoting the facility yet, use /verify-registration below.
+            "company_registration_verified": True,
+            "company_registration_verified_at": _now().isoformat(),
+            "company_registration_verified_by": current_user.id,
+            "company_registration_rejection_reason": None,
+        }},
     )
     try:
         from services.email_notifications import send_storage_facility_approved_email
@@ -844,6 +1138,89 @@ async def admin_verify_facility(
     except Exception as e:
         logger.error(f"[STORAGE] approve email failed: {e}")
     return {"success": True, "facility_id": facility_id, "status": "verified"}
+
+
+# ─────────────────────────────────────────────────────────────
+# iter212 — Admin verify / reject the BUSINESS REGISTRATION (separate from
+# the global facility verify above). These are surfaced as dedicated
+# Verify/Reject buttons in the Admin storage-facilities table.
+# ─────────────────────────────────────────────────────────────
+
+@storage_router.post("/admin/storage-facilities/{facility_id}/verify-registration")
+async def admin_verify_facility_registration(
+    facility_id: str,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(_require_admin),
+):
+    """Mark only the company-registration document as verified.
+
+    Does NOT auto-promote the facility's overall `status`. Use the legacy
+    /verify endpoint to flip both at once.
+    """
+    db = get_db()
+    fac = await db.storage_facilities.find_one({"id": facility_id}, {"_id": 0})
+    if not fac:
+        raise HTTPException(status_code=404, detail="Facility not found")
+    await db.storage_facilities.update_one(
+        {"id": facility_id},
+        {"$set": {
+            "company_registration_verified": True,
+            "company_registration_verified_at": _now().isoformat(),
+            "company_registration_verified_by": current_user.id,
+            "company_registration_rejection_reason": None,
+        }},
+    )
+    # Best-effort bilingual email notice
+    try:
+        from services.email_notifications import send_storage_facility_registration_verified_email
+        background_tasks.add_task(send_storage_facility_registration_verified_email, fac)
+    except Exception as e:
+        logger.warning(f"[STORAGE] verify-registration email failed: {e}")
+    return {"success": True, "facility_id": facility_id, "company_registration_verified": True}
+
+
+@storage_router.post("/admin/storage-facilities/{facility_id}/reject-registration")
+async def admin_reject_facility_registration(
+    facility_id: str,
+    payload: dict,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(_require_admin),
+):
+    """Reject the company-registration document with a specific reason.
+
+    The reason is emailed to the facility along with a deep link back to the
+    registration form so they can resubmit a corrected document.
+    """
+    db = get_db()
+    reason = (payload or {}).get("reason") or ""
+    reason = reason.strip()
+    if not reason:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "reason_required",
+                "message_en": "A rejection reason is required so the facility knows what to fix.",
+                "message_fr": "Un motif de rejet est requis pour que la facilité sache quoi corriger.",
+            },
+        )
+    fac = await db.storage_facilities.find_one({"id": facility_id}, {"_id": 0})
+    if not fac:
+        raise HTTPException(status_code=404, detail="Facility not found")
+    await db.storage_facilities.update_one(
+        {"id": facility_id},
+        {"$set": {
+            "company_registration_verified": False,
+            "company_registration_rejection_reason": reason,
+            "company_registration_rejected_at": _now().isoformat(),
+            "company_registration_rejected_by": current_user.id,
+        }},
+    )
+    try:
+        from services.email_notifications import send_storage_facility_registration_rejected_email
+        background_tasks.add_task(send_storage_facility_registration_rejected_email, fac, reason)
+    except Exception as e:
+        logger.warning(f"[STORAGE] reject-registration email failed: {e}")
+    return {"success": True, "facility_id": facility_id, "company_registration_verified": False, "reason": reason}
 
 
 @storage_router.get("/admin/storage-auctions")

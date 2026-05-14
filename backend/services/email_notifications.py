@@ -1955,6 +1955,62 @@ async def send_storage_facility_pending_user_email(facility: dict) -> bool:
     )
 
 
+# iter212 — Provincial Business-Registration verify / reject emails
+async def send_storage_facility_registration_verified_email(facility: dict) -> bool:
+    if not facility or not facility.get("email"):
+        return False
+    body_en = (
+        f"Good news, <strong>{facility.get('company_name','')}</strong>! "
+        f"Your business-registration document has been verified by BidVex. "
+        f"As soon as your overall facility status is approved, you'll be able to list storage units."
+    )
+    body_fr = (
+        f"Bonne nouvelle, <strong>{facility.get('company_name','')}</strong>! "
+        f"Votre document d'enregistrement d'entreprise a été vérifié par BidVex. "
+        f"Dès que le statut global de votre facilité sera approuvé, vous pourrez lister des unités."
+    )
+    return await send_email(
+        to_email=facility["email"],
+        subject="✅ Business registration verified — BidVex Storage Auctions",
+        html_content=_storage_panel(
+            "Registration verified", "Enregistrement vérifié",
+            body_en, body_fr,
+            cta_url="https://www.bidvex.com/storage-dashboard",
+            cta_en="Open dashboard", cta_fr="Ouvrir le tableau de bord",
+        ),
+    )
+
+
+async def send_storage_facility_registration_rejected_email(facility: dict, reason: str) -> bool:
+    if not facility or not facility.get("email"):
+        return False
+    safe_reason = (reason or "").strip() or "Document did not meet our verification requirements."
+    body_en = (
+        f"Hi <strong>{facility.get('company_name','')}</strong>,<br/><br/>"
+        f"Your business-registration document was <strong>not accepted</strong> by our verification team.<br/><br/>"
+        f"<strong>Reason from BidVex:</strong> {safe_reason}<br/><br/>"
+        f"Please return to your registration page, upload a corrected document, "
+        f"and resubmit. We'll review the new document within 1–2 business days."
+    )
+    body_fr = (
+        f"Bonjour <strong>{facility.get('company_name','')}</strong>,<br/><br/>"
+        f"Votre document d'enregistrement d'entreprise <strong>n'a pas été accepté</strong> par notre équipe de vérification.<br/><br/>"
+        f"<strong>Motif de BidVex :</strong> {safe_reason}<br/><br/>"
+        f"Veuillez retourner à votre page d'inscription, téléverser un document corrigé "
+        f"et le soumettre à nouveau. Nous examinerons le nouveau document sous 1 à 2 jours ouvrables."
+    )
+    return await send_email(
+        to_email=facility["email"],
+        subject="⚠️ Action required — Business registration not accepted",
+        html_content=_storage_panel(
+            "Registration not accepted", "Enregistrement non accepté",
+            body_en, body_fr,
+            cta_url="https://www.bidvex.com/storage-auctions/register-facility?resubmit=1",
+            cta_en="Resubmit document", cta_fr="Soumettre à nouveau",
+        ),
+    )
+
+
 # ─────────────────────────────────────────────────────────────
 # iter175 — Vehicle deposit auto-captured (bilingual EN+FR per Bill 96)
 # ─────────────────────────────────────────────────────────────

@@ -683,6 +683,31 @@ async def on_startup():
     except Exception as e:
         logger.warning(f"Strict payment indexes registration failed (non-fatal): {e}")
 
+    # ── iter212 — Grandfather existing storage facilities (no registration
+    # fields → auto-verified so they keep listing). New facilities must
+    # explicitly carry `company_registration_verified=False` until an admin
+    # approves the document.
+    try:
+        res = await db.storage_facilities.update_many(
+            {"company_registration_verified": {"$exists": False}},
+            {"$set": {"company_registration_verified": True, "company_registration_grandfathered": True}},
+        )
+        if res.modified_count:
+            logger.info(
+                f"[iter212] Grandfathered {res.modified_count} existing storage facilities "
+                f"(set company_registration_verified=True)."
+            )
+        # Also flag the underlying users as storage facilities so the nav
+        # restriction kicks in for them too. Idempotent.
+        owner_ids = await db.storage_facilities.distinct("owner_user_id")
+        if owner_ids:
+            await db.users.update_many(
+                {"id": {"$in": owner_ids}, "is_storage_facility": {"$ne": True}},
+                {"$set": {"is_storage_facility": True, "account_type": "storage_facility"}},
+            )
+    except Exception as e:
+        logger.warning(f"[iter212] storage-facility grandfather pass failed (non-fatal): {e}")
+
 
 async def create_critical_indexes(database):
     """Run on every startup — idempotent, safe to re-run.

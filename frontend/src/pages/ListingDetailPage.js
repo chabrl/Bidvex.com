@@ -191,7 +191,20 @@ const ListingDetailPage = () => {
       navigate('/auth', { state: { from: { pathname: `/listing/${id}` } } });
       return;
     }
-    
+
+    // iter212 — Storage Facility users may browse but may not bid on non-storage
+    // listings. Show a single inline toast only on click (no banner while browsing).
+    const isStorageFacility = !!(user && (user.account_type === 'storage_facility' || user.is_storage_facility === true) && user.role !== 'admin' && user.role !== 'superadmin');
+    if (isStorageFacility) {
+      toast.error(
+        i18n.language === 'fr'
+          ? 'Les facilités d\'entreposage ne peuvent enchérir que sur les enchères d\'unités d\'entreposage.'
+          : 'Storage facilities can only bid on storage-unit auctions.',
+        { duration: 6000 }
+      );
+      return;
+    }
+
     // Check trust verification status
     if (!canBid) {
       toast.error(

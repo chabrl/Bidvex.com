@@ -188,6 +188,24 @@ const PhoneVerificationRoute = ({ children }) => {
   return children;
 };
 
+// iter212 — Routes that don't apply to storage-facility-only users.
+// Silently redirects them to their storage dashboard (no error banner).
+// Admins on facility accounts still pass through.
+const BlockForStorageFacility = ({ children, redirectTo = '/storage-dashboard' }) => {
+  const { user, loading } = useAuth();
+  if (loading) return <PageLoader />;
+  const isStorageOnly = !!(
+    user
+    && (user.account_type === 'storage_facility' || user.is_storage_facility === true)
+    && user.role !== 'admin'
+    && user.role !== 'superadmin'
+  );
+  if (isStorageOnly) {
+    return <Navigate to={redirectTo} replace />;
+  }
+  return children;
+};
+
 // Convenience redirect: /dashboard → role-aware dashboard
 const DashboardRedirect = () => {
   const { user, loading } = useAuth();
@@ -197,6 +215,10 @@ const DashboardRedirect = () => {
   if (!user) return <Navigate to="/auth" state={{ from: location }} replace />;
   if (user.role === 'admin' || user.role === 'super_admin') {
     return <Navigate to="/admin" replace />;
+  }
+  // iter212 — Storage Facility users get the focused storage dashboard
+  if (user.account_type === 'storage_facility' || user.is_storage_facility === true) {
+    return <Navigate to="/storage-dashboard" replace />;
   }
   if (user.role === 'seller' || user.account_type === 'business') {
     return <Navigate to="/seller/dashboard" replace />;
@@ -343,17 +365,29 @@ const App = () => {
           } />
           <Route path="/seller/:sellerId" element={<SellerProfilePage />} />
           <Route path="/seller/dashboard" element={
-            <ProtectedRoute><SellerDashboard /></ProtectedRoute>
+            <ProtectedRoute>
+              <BlockForStorageFacility>
+                <SellerDashboard />
+              </BlockForStorageFacility>
+            </ProtectedRoute>
           } />
           <Route path="/buyer/dashboard" element={
-            <ProtectedRoute><BuyerDashboard /></ProtectedRoute>
+            <ProtectedRoute>
+              <BlockForStorageFacility>
+                <BuyerDashboard />
+              </BlockForStorageFacility>
+            </ProtectedRoute>
           } />
           {/* Convenience aliases — /dashboard, /seller-dashboard, /buyer-dashboard */}
           <Route path="/dashboard" element={<DashboardRedirect />} />
           <Route path="/seller-dashboard" element={<Navigate to="/seller/dashboard" replace />} />
           <Route path="/buyer-dashboard" element={<Navigate to="/buyer/dashboard" replace />} />
           <Route path="/create-listing" element={
-            <ProtectedRoute><CreateListingPage /></ProtectedRoute>
+            <ProtectedRoute>
+              <BlockForStorageFacility redirectTo="/storage-auctions/create">
+                <CreateListingPage />
+              </BlockForStorageFacility>
+            </ProtectedRoute>
           } />
           <Route path="/payment/success" element={
             <ProtectedRoute><PaymentSuccessPage /></ProtectedRoute>
@@ -365,13 +399,21 @@ const App = () => {
           <Route path="/profile/settings" element={<Navigate to="/settings" replace />} />
           <Route path="/profile/verification" element={<Navigate to="/settings" replace />} />
           <Route path="/affiliate" element={
-            <ProtectedRoute><AffiliateDashboard /></ProtectedRoute>
+            <ProtectedRoute>
+              <BlockForStorageFacility>
+                <AffiliateDashboard />
+              </BlockForStorageFacility>
+            </ProtectedRoute>
           } />
           <Route path="/messages" element={
             <ProtectedRoute><MessagesPage /></ProtectedRoute>
           } />
           <Route path="/create-multi-item-listing" element={
-            <ProtectedRoute><CreateMultiItemListing /></ProtectedRoute>
+            <ProtectedRoute>
+              <BlockForStorageFacility redirectTo="/storage-auctions/create">
+                <CreateMultiItemListing />
+              </BlockForStorageFacility>
+            </ProtectedRoute>
           } />
           <Route path="/admin" element={
             <ProtectedRoute><AdminDashboard /></ProtectedRoute>
@@ -386,12 +428,24 @@ const App = () => {
           <Route path="/legal" element={<LegalPage />} />
           <Route path="/policies" element={<PlatformPoliciesPage />} />
           <Route path="/invite/:token" element={<InviteAcceptPage />} />
-          <Route path="/become-a-partner" element={<BecomePartnerPage />} />
+          <Route path="/become-a-partner" element={
+            <BlockForStorageFacility>
+              <BecomePartnerPage />
+            </BlockForStorageFacility>
+          } />
           <Route path="/partner/dashboard" element={
-            <ProtectedRoute><PartnerDashboard /></ProtectedRoute>
+            <ProtectedRoute>
+              <BlockForStorageFacility>
+                <PartnerDashboard />
+              </BlockForStorageFacility>
+            </ProtectedRoute>
           } />
           <Route path="/partner/payment-settings" element={
-            <ProtectedRoute><PartnerPaymentSettings /></ProtectedRoute>
+            <ProtectedRoute>
+              <BlockForStorageFacility>
+                <PartnerPaymentSettings />
+              </BlockForStorageFacility>
+            </ProtectedRoute>
           } />
           <Route path="/client-marketing" element={
             <ProtectedRoute><ClientEmailMarketing /></ProtectedRoute>
@@ -411,10 +465,18 @@ const App = () => {
           <Route path="/encheres-de-vehicules" element={<VehicleAuctionsRoute />} />
           <Route path="/vehicle-auctions/:id" element={<VehicleDetailPage />} />
           <Route path="/vehicle-auctions/create" element={
-            <ProtectedRoute><CreateVehicleListingPage /></ProtectedRoute>
+            <ProtectedRoute>
+              <BlockForStorageFacility redirectTo="/storage-auctions/create">
+                <CreateVehicleListingPage />
+              </BlockForStorageFacility>
+            </ProtectedRoute>
           } />
           <Route path="/vehicle-auctions/dealer-license" element={
-            <ProtectedRoute><DealerLicenseVerificationPage /></ProtectedRoute>
+            <ProtectedRoute>
+              <BlockForStorageFacility>
+                <DealerLicenseVerificationPage />
+              </BlockForStorageFacility>
+            </ProtectedRoute>
           } />
           <Route path="/vehicle-auctions/:id/unlock" element={
             <ProtectedRoute><VehicleUnlockPage /></ProtectedRoute>

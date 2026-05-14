@@ -56,16 +56,32 @@ const Navbar = () => {
 
   const isActive = (path) => location.pathname === path;
 
+  // iter212 — Storage Facility users see a focused, distraction-free nav.
+  // Hide Marketplace, Lots, Vehicles, and the global "Sell" button; expose
+  // only Storage Auctions + their dashboard. Admin role override stays so
+  // admins on facility accounts can still access everything.
+  const isStorageFacilityOnly = !!(
+    user
+    && (user.account_type === 'storage_facility' || user.is_storage_facility === true)
+    && user.role !== 'admin'
+    && user.role !== 'superadmin'
+  );
+
   // iter176 — surface "SOON · BIENTÔT" badge when the feature flag is off
   const { enabled: vehicleEnabled } = useFeatureFlag('vehicle_auctions_enabled');
   const showVehicleComingSoon = vehicleEnabled === false;
 
-  const navLinks = [
-    { path: '/marketplace', label: t('nav.marketplace'), icon: ShoppingBag },
-    { path: '/lots', label: t('nav.lotsAuction'), icon: Gavel },
-    { path: '/storage-auctions', label: t('nav.storageAuctions', 'Storage Auctions'), icon: Lock },
-    { path: '/vehicle-auctions', label: t('vehicles.vehicleAuctions'), icon: Car, comingSoon: showVehicleComingSoon },
-  ];
+  const navLinks = isStorageFacilityOnly
+    ? [
+        { path: '/storage-auctions', label: t('nav.storageAuctions', 'Storage Auctions'), icon: Lock },
+        { path: '/storage-dashboard', label: t('nav.storageDashboard', 'Storage Dashboard'), icon: LayoutDashboard },
+      ]
+    : [
+        { path: '/marketplace', label: t('nav.marketplace'), icon: ShoppingBag },
+        { path: '/lots', label: t('nav.lotsAuction'), icon: Gavel },
+        { path: '/storage-auctions', label: t('nav.storageAuctions', 'Storage Auctions'), icon: Lock },
+        { path: '/vehicle-auctions', label: t('vehicles.vehicleAuctions'), icon: Car, comingSoon: showVehicleComingSoon },
+      ];
 
   return (
     <>
@@ -124,7 +140,7 @@ const Navbar = () => {
                   </Button>
                 </Link>
               ))}
-              {user && (
+              {user && !isStorageFacilityOnly && (
                 <Button 
                   variant="ghost" 
                   size="sm"
@@ -232,10 +248,12 @@ const Navbar = () => {
                     </div>
                     {/* Always-available shortcuts (Messages, Theme, Sell) — also accessible from main navbar at certain breakpoints */}
                     <div className="py-1 border-b border-border">
-                      <DropdownMenuItem onClick={() => { setSellModalOpen(true); }} className="cursor-pointer lg:hidden" data-testid="dropdown-sell-link">
-                        <DollarSign className="mr-3 h-4 w-4 text-muted-foreground" />
-                        {t('nav.sell')}
-                      </DropdownMenuItem>
+                      {!isStorageFacilityOnly && (
+                        <DropdownMenuItem onClick={() => { setSellModalOpen(true); }} className="cursor-pointer lg:hidden" data-testid="dropdown-sell-link">
+                          <DollarSign className="mr-3 h-4 w-4 text-muted-foreground" />
+                          {t('nav.sell')}
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem onClick={() => navigate('/messages')} className="cursor-pointer">
                         <MessageCircle className="mr-3 h-4 w-4 text-muted-foreground" />
                         Messages
@@ -246,14 +264,22 @@ const Navbar = () => {
                       </DropdownMenuItem>
                     </div>
                     <div className="py-2">
-                      <DropdownMenuItem onClick={() => navigate('/seller/dashboard')} data-testid="seller-dashboard-link" className="cursor-pointer">
+                      <DropdownMenuItem
+                        onClick={() => navigate(isStorageFacilityOnly ? '/storage-dashboard' : '/seller/dashboard')}
+                        data-testid="seller-dashboard-link"
+                        className="cursor-pointer"
+                      >
                         <LayoutDashboard className="mr-3 h-4 w-4 text-muted-foreground" />
-                        {t('nav.sellerDashboard')}
+                        {isStorageFacilityOnly
+                          ? t('nav.storageDashboard', 'Storage Dashboard')
+                          : t('nav.sellerDashboard')}
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => navigate('/buyer/dashboard')} data-testid="buyer-dashboard-link" className="cursor-pointer">
-                        <ShoppingBag className="mr-3 h-4 w-4 text-muted-foreground" />
-                        {t('nav.buyerDashboard')}
-                      </DropdownMenuItem>
+                      {!isStorageFacilityOnly && (
+                        <DropdownMenuItem onClick={() => navigate('/buyer/dashboard')} data-testid="buyer-dashboard-link" className="cursor-pointer">
+                          <ShoppingBag className="mr-3 h-4 w-4 text-muted-foreground" />
+                          {t('nav.buyerDashboard')}
+                        </DropdownMenuItem>
+                      )}
                     </div>
                     {(user.is_partner || user.role === 'admin' || user.role === 'superadmin') && (
                       <>
@@ -279,14 +305,18 @@ const Navbar = () => {
                         <User className="mr-3 h-4 w-4 text-muted-foreground" />
                         {t('admin.settings')}
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => navigate('/affiliate')} data-testid="affiliate-link" className="cursor-pointer">
-                        <DollarSign className="mr-3 h-4 w-4 text-muted-foreground" />
-                        {t('nav.affiliateDashboard')}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => navigate('/become-a-partner')} data-testid="become-partner-link" className="cursor-pointer">
-                        <Building2 className="mr-3 h-4 w-4 text-muted-foreground" />
-                        Become a Partner
-                      </DropdownMenuItem>
+                      {!isStorageFacilityOnly && (
+                        <>
+                          <DropdownMenuItem onClick={() => navigate('/affiliate')} data-testid="affiliate-link" className="cursor-pointer">
+                            <DollarSign className="mr-3 h-4 w-4 text-muted-foreground" />
+                            {t('nav.affiliateDashboard')}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => navigate('/become-a-partner')} data-testid="become-partner-link" className="cursor-pointer">
+                            <Building2 className="mr-3 h-4 w-4 text-muted-foreground" />
+                            Become a Partner
+                          </DropdownMenuItem>
+                        </>
+                      )}
                     </div>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleLogout} data-testid="logout-btn" className="cursor-pointer text-destructive focus:text-destructive">
@@ -340,13 +370,14 @@ const Navbar = () => {
                   <span className="truncate">{link.label}</span>
                 </Link>
               ))}
-              {user && (
+              {user && !isStorageFacilityOnly && (
                 <button 
                   onClick={() => {
                     setSellModalOpen(true);
                     setMobileMenuOpen(false);
                   }}
                   className="flex items-center gap-3 px-4 py-3 rounded-xl text-foreground hover:bg-accent w-full text-left min-h-[44px]"
+                  data-testid="nav-mobile-sell-btn"
                 >
                   <DollarSign className="w-5 h-5 shrink-0" />
                   <span>{t('nav.sell')}</span>

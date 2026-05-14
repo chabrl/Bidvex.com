@@ -1,5 +1,5 @@
 import API_BASE from '../../config';
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
@@ -11,11 +11,170 @@ import { Label } from '../../components/ui/label';
 import { Checkbox } from '../../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { toast } from 'sonner';
-import { ShieldCheck, Loader2, ArrowLeft, ArrowRight, ExternalLink } from 'lucide-react';
+import { ShieldCheck, Loader2, ArrowLeft, ArrowRight, ExternalLink, Upload, FileCheck2, X } from 'lucide-react';
 import StorageFooterBanner from './StorageFooterBanner';
 
 const API = API_BASE;
 const PROVINCES = ['AB', 'BC', 'MB', 'NB', 'NL', 'NS', 'ON', 'PE', 'QC', 'SK', 'NT', 'NU', 'YT'];
+
+// iter212 — Provincial business-registration type catalogue.
+// Each province maps to an ordered list of acceptable registration types. The
+// Federal CRA Business Number is universally available as an alternative.
+const FEDERAL_OPTION = {
+  value: 'federal_bn',
+  label_en: 'Federal — CRA Business Number (BN)',
+  label_fr: 'Fédéral — Numéro d\'entreprise (NE) ARC',
+  placeholder_en: 'e.g. 123456789RC0001',
+  placeholder_fr: 'ex. 123456789RC0001',
+  pattern: /^\d{9}(RC\d{4})?$/i,
+  hint_en: '9 digits, optionally followed by RC0001.',
+  hint_fr: '9 chiffres, suivis facultativement de RC0001.',
+};
+
+const REGISTRATION_BY_PROVINCE = {
+  QC: [
+    {
+      value: 'qc_neq',
+      label_en: 'Quebec — NEQ (Numéro d\'entreprise du Québec)',
+      label_fr: 'Québec — NEQ (Numéro d\'entreprise du Québec)',
+      placeholder_en: '10 digits (e.g. 1234567890)',
+      placeholder_fr: '10 chiffres (ex. 1234567890)',
+      pattern: /^\d{10}$/,
+      hint_en: 'Exactly 10 digits.',
+      hint_fr: 'Exactement 10 chiffres.',
+    },
+    FEDERAL_OPTION,
+  ],
+  ON: [
+    {
+      value: 'on_ocn',
+      label_en: 'Ontario — OCN (Ontario Corporation Number)',
+      label_fr: 'Ontario — OCN (Numéro de société de l\'Ontario)',
+      placeholder_en: '7–10 digits (e.g. 0012345678)',
+      placeholder_fr: '7 à 10 chiffres (ex. 0012345678)',
+      pattern: /^\d{7,10}$/,
+      hint_en: 'Between 7 and 10 digits.',
+      hint_fr: 'Entre 7 et 10 chiffres.',
+    },
+    FEDERAL_OPTION,
+  ],
+  BC: [
+    {
+      value: 'bc_registry',
+      label_en: 'British Columbia — BC Registry incorporation number',
+      label_fr: 'Colombie-Britannique — Numéro d\'enregistrement BC',
+      placeholder_en: '7 digits (e.g. BC1234567)',
+      placeholder_fr: '7 chiffres (ex. BC1234567)',
+      pattern: /^(BC)?\d{7,8}$/i,
+      hint_en: '7–8 digits, optionally prefixed BC.',
+      hint_fr: '7 à 8 chiffres, préfixe BC facultatif.',
+    },
+    FEDERAL_OPTION,
+  ],
+  AB: [
+    {
+      value: 'ab_corporate',
+      label_en: 'Alberta — Corporate Access Number',
+      label_fr: 'Alberta — Numéro d\'accès corporatif',
+      placeholder_en: '10 digits',
+      placeholder_fr: '10 chiffres',
+      pattern: /^\d{10}$/,
+      hint_en: '10 digits.',
+      hint_fr: '10 chiffres.',
+    },
+    FEDERAL_OPTION,
+  ],
+  SK: [{
+    value: 'provincial_other',
+    label_en: 'Saskatchewan — Provincial Business Registration #',
+    label_fr: 'Saskatchewan — Numéro d\'enregistrement provincial',
+    placeholder_en: 'Your provincial registration number',
+    placeholder_fr: 'Votre numéro d\'enregistrement provincial',
+    pattern: /^.{3,}$/,
+    hint_en: 'Free-form provincial registration ID.',
+    hint_fr: 'Identifiant provincial libre.',
+  }, FEDERAL_OPTION],
+  MB: [{
+    value: 'provincial_other',
+    label_en: 'Manitoba — Provincial Business Registration #',
+    label_fr: 'Manitoba — Numéro d\'enregistrement provincial',
+    placeholder_en: 'Your provincial registration number',
+    placeholder_fr: 'Votre numéro d\'enregistrement provincial',
+    pattern: /^.{3,}$/,
+    hint_en: 'Free-form provincial registration ID.',
+    hint_fr: 'Identifiant provincial libre.',
+  }, FEDERAL_OPTION],
+  NS: [{
+    value: 'provincial_other',
+    label_en: 'Nova Scotia — Provincial Business Registration #',
+    label_fr: 'Nouvelle-Écosse — Numéro d\'enregistrement provincial',
+    placeholder_en: 'Your provincial registration number',
+    placeholder_fr: 'Votre numéro d\'enregistrement provincial',
+    pattern: /^.{3,}$/,
+    hint_en: 'Free-form provincial registration ID.',
+    hint_fr: 'Identifiant provincial libre.',
+  }, FEDERAL_OPTION],
+  NB: [{
+    value: 'provincial_other',
+    label_en: 'New Brunswick — Provincial Business Registration #',
+    label_fr: 'Nouveau-Brunswick — Numéro d\'enregistrement provincial',
+    placeholder_en: 'Your provincial registration number',
+    placeholder_fr: 'Votre numéro d\'enregistrement provincial',
+    pattern: /^.{3,}$/,
+    hint_en: 'Free-form provincial registration ID.',
+    hint_fr: 'Identifiant provincial libre.',
+  }, FEDERAL_OPTION],
+  NL: [{
+    value: 'provincial_other',
+    label_en: 'Newfoundland & Labrador — Provincial Business Registration #',
+    label_fr: 'Terre-Neuve-et-Labrador — Numéro d\'enregistrement provincial',
+    placeholder_en: 'Your provincial registration number',
+    placeholder_fr: 'Votre numéro d\'enregistrement provincial',
+    pattern: /^.{3,}$/,
+    hint_en: 'Free-form provincial registration ID.',
+    hint_fr: 'Identifiant provincial libre.',
+  }, FEDERAL_OPTION],
+  PE: [{
+    value: 'provincial_other',
+    label_en: 'Prince Edward Island — Provincial Business Registration #',
+    label_fr: 'Île-du-Prince-Édouard — Numéro d\'enregistrement provincial',
+    placeholder_en: 'Your provincial registration number',
+    placeholder_fr: 'Votre numéro d\'enregistrement provincial',
+    pattern: /^.{3,}$/,
+    hint_en: 'Free-form provincial registration ID.',
+    hint_fr: 'Identifiant provincial libre.',
+  }, FEDERAL_OPTION],
+  NT: [{
+    value: 'territorial_other',
+    label_en: 'Northwest Territories — Territorial Business Registration #',
+    label_fr: 'Territoires du Nord-Ouest — Numéro d\'enregistrement territorial',
+    placeholder_en: 'Your territorial registration number',
+    placeholder_fr: 'Votre numéro d\'enregistrement territorial',
+    pattern: /^.{3,}$/,
+    hint_en: 'Free-form territorial registration ID.',
+    hint_fr: 'Identifiant territorial libre.',
+  }, FEDERAL_OPTION],
+  NU: [{
+    value: 'territorial_other',
+    label_en: 'Nunavut — Territorial Business Registration #',
+    label_fr: 'Nunavut — Numéro d\'enregistrement territorial',
+    placeholder_en: 'Your territorial registration number',
+    placeholder_fr: 'Votre numéro d\'enregistrement territorial',
+    pattern: /^.{3,}$/,
+    hint_en: 'Free-form territorial registration ID.',
+    hint_fr: 'Identifiant territorial libre.',
+  }, FEDERAL_OPTION],
+  YT: [{
+    value: 'territorial_other',
+    label_en: 'Yukon — Territorial Business Registration #',
+    label_fr: 'Yukon — Numéro d\'enregistrement territorial',
+    placeholder_en: 'Your territorial registration number',
+    placeholder_fr: 'Votre numéro d\'enregistrement territorial',
+    pattern: /^.{3,}$/,
+    hint_en: 'Free-form territorial registration ID.',
+    hint_fr: 'Identifiant territorial libre.',
+  }, FEDERAL_OPTION],
+};
 
 const StorageFacilityRegister = () => {
   const { t, i18n } = useTranslation();
@@ -30,11 +189,34 @@ const StorageFacilityRegister = () => {
     postal_code: '', units_available: 0, referral_source: '',
     business_registration_number: '', opc_permit_number: '',
     accepted_terms: false,
+    // iter212 — Provincial Business Registration (REQUIRED)
+    company_registration_type: 'qc_neq',
+    company_registration_number: '',
+    company_registration_document_url: '',
+    company_registration_document_name: '',
   });
   const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState(null);
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  // iter212 — derive registration-type options from the selected province
+  const regOptions = useMemo(
+    () => REGISTRATION_BY_PROVINCE[form.province] || [FEDERAL_OPTION],
+    [form.province],
+  );
+  const activeReg = useMemo(
+    () => regOptions.find(o => o.value === form.company_registration_type) || regOptions[0],
+    [regOptions, form.company_registration_type],
+  );
+
+  // Keep `company_registration_type` valid whenever the province changes
+  React.useEffect(() => {
+    if (!regOptions.some(o => o.value === form.company_registration_type)) {
+      set('company_registration_type', regOptions[0].value);
+    }
+  }, [form.province, regOptions, form.company_registration_type]);
 
   const validateStep1 = () => {
     if (!form.company_name || form.company_name.length < 2) {
@@ -54,6 +236,66 @@ const StorageFacilityRegister = () => {
       return false;
     }
     return true;
+  };
+
+  // iter212 — Step 2 validation: registration type + number + document
+  const validateStep2 = () => {
+    if (!form.company_registration_type) {
+      toast.error(isFr ? 'Veuillez choisir un type d\'enregistrement.' : 'Please choose a registration type.');
+      return false;
+    }
+    const num = (form.company_registration_number || '').trim();
+    if (!num) {
+      toast.error(isFr ? 'Le numéro d\'enregistrement est obligatoire.' : 'Registration number is required.');
+      return false;
+    }
+    if (activeReg?.pattern && !activeReg.pattern.test(num)) {
+      toast.error(isFr ? `Format invalide : ${activeReg.hint_fr}` : `Invalid format: ${activeReg.hint_en}`);
+      return false;
+    }
+    if (!form.company_registration_document_url) {
+      toast.error(isFr
+        ? 'Veuillez téléverser un document de preuve d\'enregistrement.'
+        : 'Please upload a proof-of-registration document.');
+      return false;
+    }
+    return true;
+  };
+
+  // iter212 — Document upload (multipart) → returns relative URL
+  const handleDocUpload = async (file) => {
+    if (!file) return;
+    if (!token) {
+      toast.error(isFr ? 'Veuillez vous connecter d\'abord.' : 'Please sign in first.');
+      return;
+    }
+    // 10 MB hard cap mirrored on backend
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error(isFr ? 'Fichier > 10 Mo.' : 'File exceeds 10 MB.');
+      return;
+    }
+    const allowed = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!allowed.includes(file.type)) {
+      toast.error(isFr ? 'Type de fichier invalide (PDF, JPG, PNG ou WebP).' : 'Invalid file type (PDF, JPG, PNG, or WebP).');
+      return;
+    }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await axios.post(`${API}/storage-facilities/upload-registration-doc`, fd, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
+      });
+      set('company_registration_document_url', res.data.url);
+      set('company_registration_document_name', res.data.filename);
+      toast.success(isFr ? 'Document téléversé.' : 'Document uploaded.');
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      const msg = (typeof detail === 'object' && detail) ? (isFr ? detail.message_fr : detail.message_en) : detail;
+      toast.error(msg || (isFr ? 'Échec du téléversement.' : 'Upload failed.'));
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -238,30 +480,130 @@ const StorageFacilityRegister = () => {
             </div>
           )}
 
-          {/* ── STEP 2: Business Credentials ── */}
+          {/* ── STEP 2: Provincial Business Registration ── */}
           {step === 2 && (
             <div className="space-y-4" data-testid="step-2-content">
               <h3 className="font-bold text-lg">
-                {t('storage.facilityRegister.step2BusinessCredentials')}
+                {isFr ? 'Étape 2 : Enregistrement d\'entreprise' : 'Step 2: Business Registration'}
               </h3>
               <p className="text-xs text-muted-foreground">
-                {t('storage.facilityRegister.optionalButRecommendedHelpsSpeedUpVerifi')}
+                {isFr
+                  ? 'Conformément aux exigences provinciales et fédérales, BidVex doit vérifier votre enregistrement d\'entreprise. Ces informations sont obligatoires.'
+                  : 'In compliance with provincial and federal requirements, BidVex must verify your business registration. These fields are mandatory.'}
               </p>
 
               <div>
                 <Label>
-                  {t('storage.facilityRegister.businessRegistrationNumber')}
-                  {form.province === 'QC' && (
-                    <span className="ml-1 text-xs text-muted-foreground">({t('storage.facilityRegister.neqForQc')})</span>
-                  )}
+                  {isFr ? 'Type d\'enregistrement' : 'Registration type'} *
                 </Label>
-                <Input
-                  value={form.business_registration_number}
-                  onChange={e => set('business_registration_number', e.target.value)}
-                  data-testid="reg-business-number"
-                />
+                <Select
+                  value={form.company_registration_type}
+                  onValueChange={v => {
+                    set('company_registration_type', v);
+                    set('company_registration_number', '');
+                  }}
+                >
+                  <SelectTrigger data-testid="reg-type-select">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {regOptions.map(opt => (
+                      <SelectItem
+                        key={opt.value}
+                        value={opt.value}
+                        data-testid={`reg-type-option-${opt.value}`}
+                      >
+                        {isFr ? opt.label_fr : opt.label_en}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {isFr
+                    ? `Options pour ${form.province}. Le numéro fédéral (NE ARC) est toujours accepté.`
+                    : `Options for ${form.province}. The Federal CRA Business Number is always accepted.`}
+                </p>
               </div>
 
+              <div>
+                <Label>
+                  {isFr ? 'Numéro d\'enregistrement' : 'Registration number'} *
+                </Label>
+                <Input
+                  value={form.company_registration_number}
+                  onChange={e => set('company_registration_number', e.target.value)}
+                  placeholder={isFr ? activeReg?.placeholder_fr : activeReg?.placeholder_en}
+                  data-testid="reg-number-input"
+                />
+                {activeReg?.hint_en && (
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    {isFr ? activeReg.hint_fr : activeReg.hint_en}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <Label>
+                  {isFr ? 'Document de preuve d\'enregistrement' : 'Proof-of-registration document'} *
+                </Label>
+                <p className="text-[10px] text-muted-foreground mb-1.5">
+                  {isFr
+                    ? 'PDF, JPG, PNG ou WebP — 10 Mo max. Téléversez votre certificat d\'enregistrement officiel.'
+                    : 'PDF, JPG, PNG, or WebP — 10 MB max. Upload your official registration certificate.'}
+                </p>
+
+                {form.company_registration_document_url ? (
+                  <div
+                    className="flex items-center justify-between rounded-lg border border-emerald-300 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-800 p-2.5"
+                    data-testid="reg-doc-uploaded"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileCheck2 className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                      <span className="text-xs truncate">{form.company_registration_document_name || 'document'}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        set('company_registration_document_url', '');
+                        set('company_registration_document_name', '');
+                      }}
+                      className="text-rose-600 hover:text-rose-800 text-xs flex items-center gap-1"
+                      data-testid="reg-doc-remove-btn"
+                    >
+                      <X className="h-3 w-3" />
+                      {isFr ? 'Retirer' : 'Remove'}
+                    </button>
+                  </div>
+                ) : (
+                  <label
+                    htmlFor="reg-doc-file-input"
+                    className={`flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-700 p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors ${uploading ? 'opacity-60 pointer-events-none' : ''}`}
+                    data-testid="reg-doc-upload-label"
+                  >
+                    {uploading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Upload className="h-4 w-4" />
+                    )}
+                    <span className="text-sm">
+                      {uploading
+                        ? (isFr ? 'Téléversement…' : 'Uploading…')
+                        : (isFr ? 'Cliquer pour téléverser' : 'Click to upload')}
+                    </span>
+                    <input
+                      id="reg-doc-file-input"
+                      type="file"
+                      className="hidden"
+                      accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp"
+                      onChange={e => handleDocUpload(e.target.files?.[0])}
+                      data-testid="reg-doc-file-input"
+                      disabled={uploading}
+                    />
+                  </label>
+                )}
+              </div>
+
+              {/* Legacy optional fields kept for QC operators (OPC permit) */}
               {form.province === 'QC' && (
                 <div>
                   <Label>{t('storage.facilityRegister.opcPermitNumberQuebec')}</Label>
@@ -287,7 +629,7 @@ const StorageFacilityRegister = () => {
                 </Button>
                 <Button
                   type="button"
-                  onClick={() => setStep(3)}
+                  onClick={() => { if (validateStep2()) setStep(3); }}
                   className="bg-blue-600 hover:bg-blue-700 text-white"
                   data-testid="step-2-next-btn"
                 >
