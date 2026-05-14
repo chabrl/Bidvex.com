@@ -4,6 +4,7 @@
 - Email: charbel911@gmail.com
 - Password: Anderosli123!@#
 - Role: Admin (full access)
+- Note (iter212, 2026-05-14): Auto-flagged `is_storage_facility=True` + `account_type=storage_facility` because they own the legacy "Bidvex Inc." storage facility. The `role=admin` override keeps the navbar/route restrictions disabled for them.
 
 ## Test buyer (for vehicle-settlement dispute tests)
 - Email: p0bugtest@example.com

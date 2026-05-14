@@ -1,5 +1,65 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter212 — Storage Facility Provincial Business Registration + Access Restriction (Feb 14, 2026) ✅
+
+P0 sprint requested by the user. Storage facilities are no longer a "generic seller" account — they now have a dedicated, focused experience and explicit business-registration verification before they can list.
+
+### Step 1 — Backend: Provincial Business Registration on register endpoint ✅
+- `models/storage_auction.py` — `StorageFacilityRegister` extended with `company_registration_type`, `company_registration_number`, `company_registration_document_url`. New `REGISTRATION_TYPES` enum (`federal_bn`, `qc_neq`, `on_ocn`, `bc_registry`, `ab_corporate`, `provincial_other`, `territorial_other`).
+- `routes/storage_auctions.py` — `POST /api/storage-facilities/register` now requires the trio (type + number + document URL) and rejects bad payloads with bilingual EN+FR HTTP 400. Persists all new fields + `company_registration_verified=False`, and flips the underlying user's `is_storage_facility=True` + `account_type=storage_facility` + `storage_facility_id` so the frontend nav restriction kicks in immediately.
+
+### Step 2 — Backend: Document upload + serve with structured-404 recovery ✅
+- `POST /api/storage-facilities/upload-registration-doc` — multipart, accepts PDF/JPG/PNG/WebP up to 10 MB, returns `/api/uploads/storage_facilities/{filename}`.
+- `GET /api/uploads/storage_facilities/{filename}` — Bearer auth OR `?token=` for new-tab navigation; owner-or-admin perms; blocks path traversal; structured 404 with `error_code: "file_missing_on_disk"` + bilingual EN+FR + owner email lookup, mirroring the iter211 partner-doc recovery pattern.
+
+### Step 3 — Backend: Admin verify / reject registration ✅
+- `POST /api/admin/storage-facilities/{id}/verify-registration` — flips `company_registration_verified=True` + dispatches bilingual approval email.
+- `POST /api/admin/storage-facilities/{id}/reject-registration` — requires a reason (HTTP 400 if missing); persists `company_registration_rejection_reason`; dispatches a bilingual rejection email containing the **exact admin reason** + a deep link to `/storage-auctions/register-facility?resubmit=1` for resubmission.
+- Existing `/verify` now also bumps the registration to verified to avoid double-clicks.
+
+### Step 4 — Backend: Listing gate ✅
+- `_require_verified_facility` extended: explicit `company_registration_verified===False` blocks listing creation with HTTP 403 + bilingual error. Missing field (legacy data) is treated as verified so existing facilities aren't locked out.
+
+### Step 5 — Backend: Grandfather migration on startup ✅
+- `server.py` `on_startup` — idempotent pass that sets `company_registration_verified=True` + `company_registration_grandfathered=True` on every existing `storage_facilities` row without the field, AND flags the owning user with `is_storage_facility=True` + `account_type=storage_facility`. Verified live: 1 existing facility ("Bidvex Inc.") grandfathered.
+
+### Step 6 — Frontend: Dynamic provincial registration UI ✅
+- `pages/storage/StorageFacilityRegister.js` — Step 2 rebuilt. Province → Registration Type dropdown adapts per jurisdiction (QC: NEQ 10 digits; ON: OCN 7-10 digits; BC: BC Registry 7-8 digits; AB: 10 digits; SK/MB/NS/NB/NL/PE: free-text; NT/NU/YT: free-text). **Federal CRA BN** is universally available as an alternative. Each option carries bilingual placeholders, regex pattern, and hint text. File upload component (PDF/JPG/PNG/WebP ≤ 10 MB) with progress, success, and remove states.
+
+### Step 7 — Frontend: Admin Pending Registration UI ✅
+- `pages/admin/AdminFacilities.js` — rebuilt. Status tabs: Pending Registration / Verified / Rejected / All with a live count badge. Per-row registration column (number + type label + grandfathered badge). View-document button uses Bearer-token blob opener with `file_missing_on_disk` recovery modal (iter211 pattern). Verify and Reject buttons. Rejection modal asks for a required reason that gets emailed verbatim to the facility.
+
+### Step 8 — Frontend: Strict navigation isolation ✅
+- `components/Navbar.js` — `isStorageFacilityOnly` flag (account_type=storage_facility OR is_storage_facility=true AND role!=admin). Storage facility users see ONLY Storage Auctions + Storage Dashboard. The global Sell button, Marketplace/Lots/Vehicles, Affiliate, Become a Partner, Buyer Dashboard are all hidden from the dropdown and mobile menu.
+- `App.js` — new `BlockForStorageFacility` route wrapper. Silently redirects /seller/dashboard, /buyer/dashboard, /create-listing, /create-multi-item-listing, /vehicle-auctions/create, /vehicle-auctions/dealer-license, /partner/dashboard, /partner/payment-settings, /affiliate, /become-a-partner to /storage-dashboard (or to /storage-auctions/create for creation flows). **No error toast / no banner** — silent redirect per user spec.
+- `DashboardRedirect` updated so `/dashboard` routes storage facility users straight to `/storage-dashboard`.
+- `pages/ListingDetailPage.js` — `handlePlaceBid` silently no-ops for browsing storage facility users. A single bilingual toast appears ONLY when they click the Place Bid button. No banner appears while merely browsing the listing.
+
+### Step 9 — Bilingual emails (Bill 96) ✅
+- `services/email_notifications.py` — two new helpers: `send_storage_facility_registration_verified_email` and `send_storage_facility_registration_rejected_email`. Both bilingual EN+FR. The rejected email includes the exact admin reason and a resubmit deep link.
+
+### Test Status
+- **20/20 new iter212 backend tests pass** (model extension, endpoint mounting, gate behaviour, validation, admin endpoints, bilingual emails, 4 live HTTP smoke + auth + path-traversal block).
+- **232 prior iter209/iter210/iter211 tests still green.** The 9 failing tests are all PRE-EXISTING flaky live-HTTP 429-rate-limit tests, unrelated.
+- All lint clean (ruff, eslint).
+- Live verified on preview env: `GET /api/uploads/storage_facilities/reg_…_deadbeef.pdf` → 404 with `file_missing_on_disk` + bilingual EN+FR ✓. `/api/admin/storage-facilities` exposes `company_registration_verified` + `company_registration_grandfathered` + new column ✓. Grandfather migration ran on startup (1 facility flagged) ✓.
+
+### Files of reference (iter212)
+- `/app/backend/models/storage_auction.py` (REGISTRATION_TYPES + StorageFacilityRegister extended fields)
+- `/app/backend/routes/storage_auctions.py` (gate, register, upload, serve, verify-registration, reject-registration)
+- `/app/backend/services/email_notifications.py` (NEW bilingual email helpers)
+- `/app/backend/server.py` (startup grandfather migration)
+- `/app/frontend/src/pages/storage/StorageFacilityRegister.js` (province-aware registration UI)
+- `/app/frontend/src/components/Navbar.js` (nav isolation)
+- `/app/frontend/src/App.js` (BlockForStorageFacility wrapper + DashboardRedirect)
+- `/app/frontend/src/pages/admin/AdminFacilities.js` (rebuilt Pending Registration UI)
+- `/app/frontend/src/pages/ListingDetailPage.js` (silent bid-click guard)
+- `/app/backend/tests/test_iter212_storage_facility_registration.py` (NEW — 20 tests)
+
+⚠️ **Production**: After redeploy to https://bidvex.com, the same startup migration will run automatically (idempotent). No manual DB ops required.
+
+---
+
 ## Latest: iter211 — Hybrid Manual Settlement Layer (Feb 14, 2026) ✅
 
 Off-Stripe payment infrastructure for annual subscriptions AND per-auction commissions. Supports e-Transfer, cheque, wire, and cash for partners, storage facilities, and vehicle dealers.
