@@ -169,6 +169,78 @@ const EnhancedUserManager = () => {
   };
 
   const [deleteUserModal, setDeleteUserModal] = useState({ open: false, user: null });
+
+  // iter214 P2 — Notify + Request-Documents modals
+  const [notifyModal, setNotifyModal] = useState({ open: false, user: null });
+  const [notifyForm, setNotifyForm] = useState({
+    notification_type: 'general', subject: '', body_en: '', body_fr: '',
+    send_via: 'both',
+  });
+  const [notifyBusy, setNotifyBusy] = useState(false);
+
+  const [docReqModal, setDocReqModal] = useState({ open: false, user: null });
+  const [docReqForm, setDocReqForm] = useState({
+    document_types: [], deadline: '', message: '',
+  });
+  const [docReqBusy, setDocReqBusy] = useState(false);
+
+  const submitNotify = async () => {
+    if (!notifyModal.user) return;
+    if (!notifyForm.subject.trim() || !notifyForm.body_en.trim()) {
+      toast.error('Subject and English body are required');
+      return;
+    }
+    setNotifyBusy(true);
+    try {
+      await axios.post(`${API}/admin/users/${notifyModal.user.id}/send-notification`, notifyForm, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      toast.success('Notification sent · Notification envoyée');
+      setNotifyModal({ open: false, user: null });
+      setNotifyForm({ notification_type: 'general', subject: '', body_en: '', body_fr: '', send_via: 'both' });
+    } catch (e) {
+      toast.error(e?.response?.data?.detail?.message_en || e?.response?.data?.detail || 'Send failed');
+    } finally {
+      setNotifyBusy(false);
+    }
+  };
+
+  const submitDocReq = async () => {
+    if (!docReqModal.user) return;
+    if (docReqForm.document_types.length === 0 || !docReqForm.deadline) {
+      toast.error('Pick at least one document type and a deadline');
+      return;
+    }
+    setDocReqBusy(true);
+    try {
+      await axios.post(`${API}/admin/users/${docReqModal.user.id}/request-documents`, docReqForm, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      toast.success('Document request sent · Demande envoyée');
+      setDocReqModal({ open: false, user: null });
+      setDocReqForm({ document_types: [], deadline: '', message: '' });
+    } catch (e) {
+      toast.error(e?.response?.data?.detail?.message_en || e?.response?.data?.detail || 'Request failed');
+    } finally {
+      setDocReqBusy(false);
+    }
+  };
+
+  const toggleDocType = (t) => setDocReqForm((p) => ({
+    ...p,
+    document_types: p.document_types.includes(t)
+      ? p.document_types.filter((x) => x !== t)
+      : [...p.document_types, t],
+  }));
+
+  const DOC_TYPES = [
+    { v: 'government_id',         l: 'Government-issued ID' },
+    { v: 'business_registration', l: 'Business registration certificate' },
+    { v: 'dealer_licence',        l: 'Dealer licence' },
+    { v: 'neq_proof',             l: 'NEQ proof' },
+    { v: 'insurance_certificate', l: 'Insurance certificate' },
+    { v: 'other',                 l: 'Other document' },
+  ];
   const [deleting, setDeleting] = useState(false);
 
   const handleDeleteUser = async () => {
@@ -535,6 +607,27 @@ const EnhancedUserManager = () => {
                     <Ban className="h-3.5 w-3.5 mr-1" />
                     {user.status === 'suspended' ? 'Suspended' : 'Suspend'}
                   </Button>
+                  {/* iter214 P2 — Send Notification + Request Documents */}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setNotifyModal({ open: true, user })}
+                    title="Send notification (email + in-app)"
+                    data-testid={`notify-user-${user.id}`}
+                  >
+                    <Mail className="h-3.5 w-3.5 mr-1" />
+                    Notify
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setDocReqModal({ open: true, user })}
+                    title="Request documents"
+                    data-testid={`request-docs-user-${user.id}`}
+                  >
+                    <AlertTriangle className="h-3.5 w-3.5 mr-1" />
+                    Request Docs
+                  </Button>
                   <Button 
                     size="sm" 
                     variant="destructive"
@@ -603,6 +696,141 @@ const EnhancedUserManager = () => {
           </Card>
         </div>
       )}
+
+      {/* iter214 P2 — Send Notification Dialog */}
+      <Dialog open={notifyModal.open} onOpenChange={(o) => !o && setNotifyModal({ open: false, user: null })}>
+        <DialogContent data-testid="notify-modal">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5 text-blue-600" /> Send Notification
+            </DialogTitle>
+            <DialogDescription>
+              {notifyModal.user && (<span>To: <strong>{notifyModal.user.email}</strong></span>)}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Notification type</Label>
+              <Select
+                value={notifyForm.notification_type}
+                onValueChange={(v) => setNotifyForm((p) => ({ ...p, notification_type: v }))}
+              >
+                <SelectTrigger data-testid="notify-type"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="upload_required">📁 Upload Required</SelectItem>
+                  <SelectItem value="invoice">📄 Invoice / Statement</SelectItem>
+                  <SelectItem value="warning">⚠️ Account Warning</SelectItem>
+                  <SelectItem value="approval">✅ Approval Confirmation</SelectItem>
+                  <SelectItem value="rejection">❌ Rejection Notice</SelectItem>
+                  <SelectItem value="general">📢 General Message</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Subject *</Label>
+              <Input
+                value={notifyForm.subject}
+                onChange={(e) => setNotifyForm((p) => ({ ...p, subject: e.target.value }))}
+                data-testid="notify-subject"
+              />
+            </div>
+            <div>
+              <Label>Body (English) *</Label>
+              <textarea
+                rows={4} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={notifyForm.body_en}
+                onChange={(e) => setNotifyForm((p) => ({ ...p, body_en: e.target.value }))}
+                data-testid="notify-body-en"
+              />
+            </div>
+            <div>
+              <Label>Body (French) <span className="text-xs text-muted-foreground">(optional — auto-falls-back to EN)</span></Label>
+              <textarea
+                rows={4} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={notifyForm.body_fr}
+                onChange={(e) => setNotifyForm((p) => ({ ...p, body_fr: e.target.value }))}
+                data-testid="notify-body-fr"
+              />
+            </div>
+            <div>
+              <Label>Send via</Label>
+              <Select
+                value={notifyForm.send_via}
+                onValueChange={(v) => setNotifyForm((p) => ({ ...p, send_via: v }))}
+              >
+                <SelectTrigger data-testid="notify-channel"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="email">Email only</SelectItem>
+                  <SelectItem value="in_app">In-app only</SelectItem>
+                  <SelectItem value="both">Both</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNotifyModal({ open: false, user: null })}>Cancel</Button>
+            <Button onClick={submitNotify} disabled={notifyBusy} data-testid="notify-submit">
+              {notifyBusy ? 'Sending…' : 'Send'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* iter214 P2 — Request Documents Dialog */}
+      <Dialog open={docReqModal.open} onOpenChange={(o) => !o && setDocReqModal({ open: false, user: null })}>
+        <DialogContent data-testid="doc-req-modal">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600" /> Request Documents
+            </DialogTitle>
+            <DialogDescription>
+              {docReqModal.user && (<span>From: <strong>{docReqModal.user.email}</strong></span>)}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Document type(s)</Label>
+              <div className="space-y-2 mt-1">
+                {DOC_TYPES.map((d) => (
+                  <label key={d.v} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={docReqForm.document_types.includes(d.v)}
+                      onChange={() => toggleDocType(d.v)}
+                      data-testid={`doc-type-${d.v}`}
+                    />
+                    <span>{d.l}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label>Deadline *</Label>
+              <Input
+                type="date"
+                value={docReqForm.deadline}
+                onChange={(e) => setDocReqForm((p) => ({ ...p, deadline: e.target.value }))}
+                data-testid="doc-deadline"
+              />
+            </div>
+            <div>
+              <Label>Custom message (optional)</Label>
+              <textarea
+                rows={3} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={docReqForm.message}
+                onChange={(e) => setDocReqForm((p) => ({ ...p, message: e.target.value }))}
+                data-testid="doc-message"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDocReqModal({ open: false, user: null })}>Cancel</Button>
+            <Button onClick={submitDocReq} disabled={docReqBusy} data-testid="doc-req-submit">
+              {docReqBusy ? 'Sending…' : 'Send Request'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Create User Dialog - Fully Responsive */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>

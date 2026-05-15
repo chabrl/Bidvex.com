@@ -680,6 +680,14 @@ try:
     from routes.bidder_deposits import bidder_deposits_router
     api_router.include_router(bidder_deposits_router)
 
+    # iter214 P2 — Admin user-action endpoints (send notification, request docs)
+    from routes.admin_user_actions import router as admin_user_actions_router
+    api_router.include_router(admin_user_actions_router)
+
+    # iter214 P1 — Individual-seller pickup-code system
+    from routes.transaction_pickup_code import router as pickup_code_router
+    api_router.include_router(pickup_code_router)
+
     # SEO: Dynamic sitemap.xml + robots.txt (app-level, not /api)
     from routes.sitemap import sitemap_router
     app.include_router(sitemap_router, tags=["SEO"])

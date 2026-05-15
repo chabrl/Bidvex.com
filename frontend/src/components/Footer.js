@@ -152,6 +152,13 @@ const Footer = () => {
           <span className="text-gray-600">|</span>
           {renderLink('terms_of_service', 'Terms of Service', '/terms-of-service')}
           <span className="text-gray-600">|</span>
+          {/* iter214 P5 — Prohibited items public page */}
+          {renderLink(
+            'prohibited_items',
+            language === 'fr' ? 'Articles interdits' : 'Prohibited Items',
+            language === 'fr' ? '/articles-interdits' : '/prohibited-items',
+          )}
+          <span className="text-gray-600">|</span>
           {renderLink('support', 'Contact Support', 'mailto:support@bidvex.com')}
           <span className="text-gray-600">|</span>
           <button

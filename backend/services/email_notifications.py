@@ -1955,7 +1955,111 @@ async def send_storage_facility_pending_user_email(facility: dict) -> bool:
     )
 
 
-# iter213 — Bilingual EN+FR email helper for the post-auction message thread.
+# iter214 P1 — Dedicated pickup-code email for individual-seller cash/etransfer
+# transactions. Bilingual EN+FR. Contains the BVX-XXXXXXXX code in a prominent
+# box plus the seller's contact info so the buyer knows where to pay.
+
+async def send_buyer_pickup_code_email(
+    *, buyer: dict, seller: dict, listing_title: str, hammer_price: float,
+    pickup_code: str, payment_method: str, transaction_id: str,
+) -> bool:
+    if not buyer or not buyer.get("email") or not pickup_code:
+        return False
+    method_label_en = "Interac e-Transfer" if payment_method == "etransfer" else "Cash"
+    method_label_fr = "Virement Interac" if payment_method == "etransfer" else "Comptant"
+    seller_name = (seller or {}).get("name") or "the seller"
+    seller_contact = (seller or {}).get("email") or (seller or {}).get("phone") or "—"
+    html = f"""
+    <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;padding:20px;background:#f8fafc;">
+      <div style="background:white;padding:24px;border-radius:12px;border:1px solid #e2e8f0;">
+        <h2 style="color:#1e40af;margin:0 0 8px;">🎉 Congratulations — you won an auction!</h2>
+        <p style="color:#475569;margin:0 0 12px;">Item: <strong>{listing_title}</strong> · Final bid: <strong>CA${hammer_price:,.2f}</strong></p>
+        <p style="color:#475569;margin:0 0 16px;">Payment method: <strong>{method_label_en}</strong> — pay <strong>{seller_name}</strong> directly ({seller_contact}).</p>
+
+        <div style="background:#fffbeb;border:2px solid #f59e0b;border-radius:12px;padding:18px;text-align:center;margin:16px 0;">
+          <p style="margin:0;color:#92400e;text-transform:uppercase;font-size:11px;letter-spacing:0.05em;font-weight:bold;">🔑 Pickup Code / Code de collecte</p>
+          <p style="margin:8px 0 4px;font-size:28px;font-weight:bold;color:#1e3a8a;letter-spacing:0.15em;font-family:'Courier New',monospace;">{pickup_code}</p>
+          <p style="margin:0;color:#92400e;font-size:11px;">Transaction #{transaction_id[:8]}</p>
+        </div>
+
+        <p style="color:#334155;line-height:1.6;font-size:13px;">
+          <strong>EN:</strong> Share this code with the seller <strong>ONLY after</strong> you have completed your payment.
+          The seller must enter this code on BidVex to confirm receipt of payment and release your funds.
+          Do <strong>NOT</strong> share before payment.
+        </p>
+        <hr style="border:none;border-top:1px solid #e2e8f0;margin:14px 0;">
+        <p style="color:#334155;line-height:1.6;font-size:13px;">
+          <strong>FR :</strong> Partagez ce code avec le vendeur <strong>UNIQUEMENT après</strong> avoir effectué votre paiement.
+          Le vendeur doit saisir ce code sur BidVex pour confirmer la réception du paiement et libérer les fonds.
+          <strong>NE PARTAGEZ PAS</strong> ce code avant le paiement.
+        </p>
+
+        <p style="color:#94a3b8;font-size:11px;text-align:center;margin-top:24px;">
+          BidVex Inc. · GST# 706766367RT0001 · QST# 1233530880TQ0001 · All amounts in CAD<br>
+          ({method_label_fr} — Montants en CAD)
+        </p>
+      </div>
+    </div>
+    """
+    return await send_email(
+        to_email=buyer["email"],
+        subject=f"🔑 Your pickup code · Votre code de collecte — {pickup_code}",
+        html_content=html,
+    )
+
+
+async def send_seller_pickup_instructions_email(
+    *, seller: dict, listing_title: str, hammer_price: float,
+    payment_method: str, transaction_id: str,
+) -> bool:
+    if not seller or not seller.get("email"):
+        return False
+    method_label_en = "Interac e-Transfer" if payment_method == "etransfer" else "Cash"
+    method_label_fr = "Virement Interac" if payment_method == "etransfer" else "Comptant"
+    html = f"""
+    <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;padding:20px;background:#f8fafc;">
+      <div style="background:white;padding:24px;border-radius:12px;border:1px solid #e2e8f0;">
+        <h2 style="color:#16a34a;margin:0 0 8px;">✅ Your item has sold!</h2>
+        <p style="color:#475569;margin:0 0 12px;">Item: <strong>{listing_title}</strong> · Sold for: <strong>CA${hammer_price:,.2f}</strong></p>
+        <p style="color:#475569;margin:0 0 16px;">Payment method chosen by the buyer: <strong>{method_label_en}</strong>.</p>
+
+        <div style="background:#ecfdf5;border:2px solid #16a34a;border-radius:12px;padding:18px;margin:16px 0;">
+          <p style="margin:0 0 8px;color:#166534;text-transform:uppercase;font-size:11px;letter-spacing:0.05em;font-weight:bold;">🔑 How to release your funds / Libération des fonds</p>
+          <p style="color:#334155;line-height:1.6;font-size:13px;margin:0 0 10px;">
+            <strong>EN:</strong> Once you have received payment from the buyer, ask them for their <strong>Pickup Code</strong>
+            (format <code>BVX-XXXXXXXX</code>) and enter it at
+            <a href="https://www.bidvex.com/confirm-payment">bidvex.com/confirm-payment</a>.
+            This confirms payment received and completes the transaction on BidVex.
+            Your funds will be marked as settled.
+          </p>
+          <p style="color:#334155;line-height:1.6;font-size:13px;margin:0;">
+            <strong>FR :</strong> Une fois le paiement reçu, demandez le <strong>Code de collecte</strong> à l'acheteur
+            et saisissez-le sur
+            <a href="https://www.bidvex.com/confirmer-paiement">bidvex.com/confirmer-paiement</a>.
+            Cela confirme la réception et complète la transaction.
+          </p>
+        </div>
+
+        <p style="color:#92400e;font-size:12px;background:#fef3c7;padding:12px;border-radius:6px;">
+          ⚠️ The BidVex commission will be charged to your card on file within 24 hours of pickup-code confirmation.<br>
+          La commission BidVex sera prélevée sur votre carte enregistrée dans les 24 heures.
+        </p>
+
+        <p style="color:#94a3b8;font-size:11px;text-align:center;margin-top:24px;">
+          BidVex Inc. · GST# 706766367RT0001 · QST# 1233530880TQ0001 · Tx #{transaction_id[:8]}<br>
+          ({method_label_fr})
+        </p>
+      </div>
+    </div>
+    """
+    return await send_email(
+        to_email=seller["email"],
+        subject="✅ Item sold — pickup-code instructions · Article vendu — Instructions",
+        html_content=html,
+    )
+
+
+
 # Fires for both the auction winner and the seller when an auction ends and
 # a conversation is opened in `routes.messages.create_auction_won_conversation`.
 

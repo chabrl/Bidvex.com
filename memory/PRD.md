@@ -1,6 +1,67 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter213 — Verification Banner + Messaging Fix + Cosmetic Hardening + Ads Conversion Placeholder (Feb 14, 2026) ✅
+## Latest: iter214 — Production-Critical Multi-System Fix (Feb 14, 2026) ✅
+
+### ✅ Part 1 — Individual Seller Pickup-Code System (Cash + e-Transfer)
+- NEW `routes/transaction_pickup_code.py`:
+  - `POST /api/transactions/confirm-pickup-code` — seller enters `BVX-XXXXXXXX` code; validates format, ownership (seller-only), idempotency (409 if already confirmed). On success: marks `payment_confirmed=true`, auto-enqueues 5 % commission charge via the iter211 manual-settlement queue, fires bilingual confirmation emails to both parties.
+  - `GET /api/transactions/{id}/pickup-code` — buyer retrieves their code.
+  - `ensure_pickup_code_on_transaction()` helper — idempotent, only fires for `payment_method in {cash, etransfer}`.
+- Auction-close hook in `routes/auctions.py` now detects **individual seller × cash/etransfer** auctions and:
+  - Creates a `transactions` row if missing.
+  - Generates a unique `BVX-XXXXXXXX` pickup code (8 uppercase alphanumerics, same format as iter172 storage codes).
+  - Sends **bilingual EN+FR** dedicated emails: `send_buyer_pickup_code_email` (prominent code box, payment instructions, seller contact) + `send_seller_pickup_instructions_email` ("How to release funds" workflow). Both include real GST# 706766367RT0001 / QST# 1233530880TQ0001.
+- Updated `backend/.env` with real platform tax IDs.
+
+### ✅ Part 2 — Admin User Management Actions
+- NEW `routes/admin_user_actions.py` mounted at `/api/admin/users/{user_id}`:
+  - `POST /send-notification` — bilingual EN+FR email + in-app notification with 6 types (`upload_required`, `invoice`, `warning`, `approval`, `rejection`, `general`). Logs every action to `admin_actions` collection.
+  - `POST /request-documents` — sends bilingual document request with checklist (Government ID, Business registration, Dealer licence, NEQ proof, Insurance, Other) + deadline. Persists to `user_document_requests` for the **Documents Overdue** badge logic.
+  - `GET /document-requests` — admin view of pending requests with `is_overdue` flag.
+- `EnhancedUserManager.js` extended with **Notify** + **Request Docs** buttons in every user row, both backed by full modals with form validation.
+
+### ✅ Part 3 — Global Site-Wide Dealer-Fee Banner
+- NEW `components/GlobalDealerFeeBanner.jsx` mounted **above** `<Navbar />` in `App.js`. Position `sticky top-0 z-[9999]`, undismissable, full-width, bg-amber-700. Bilingual EN+FR copy ("🔒 Annual Platform Fee Required" / "Frais annuels de plateforme requis"). Hidden when `has_active_subscription === true` or for demo accounts. "Pay Now — $100/yr" button redirects to Stripe Checkout.
+
+### ✅ Part 4 — AI Concierge Multi-Channel Notification
+- `components/AIAssistant.js` overhauled:
+  - **< 800 ms acknowledgment**: bilingual ack message ("🔍 Searching for the best answer…") inserted into chat the instant the user hits send.
+  - **15 s "still processing"**: same message is upgraded to the longer ("⏳ Our AI is processing your request…") if no response within 15 s.
+  - **Multi-channel notification on AI reply**: AudioContext chime (only when tab hidden), browser `Notification` API (perm requested on chat-open, not page-load), `toast.success`, `navigator.vibrate([200,100,200])` (mobile), document.title swap to "💬 New reply — BidVex" when tab in background, plus an unread badge on the FAB.
+
+### ✅ Part 5 — Expanded Moderation + Prohibited-Items Page
+- NEW `services/listing_moderation_scanner.py` — general-purpose Gemini moderation. 20 canonical `violation_codes` (PROHIBITED_DRUG_ILLEGAL, …, ACADEMIC_FRAUD). Canada-anchored prompt referencing Criminal Code, Controlled Drugs and Substances Act, Firearms Act, CITES, PCPA. Returns `{verdict, violation_codes[], confidence, reasons_en, reasons_fr, recommended_action}`. **Fails OPEN** when LLM unavailable: marks listing `pending_review`, never auto-approves, never crashes.
+- Auto-wired into `routes/listings.py` create + edit + multi-item create flows (parallel to the existing vehicle scanner).
+- NEW `pages/ProhibitedItemsPage.js` — public bilingual EN+FR page covering 10 categories. Routed at `/prohibited-items` and `/articles-interdits`. Linked from the Footer.
+
+### Test Status
+- **25/25 new iter214 backend tests pass** (helpers, endpoint mounts, banner mount-order, AI-UX scaffolding, moderation fail-safe, prohibited-items routes, live HTTP auth gates).
+- **275 passed + 17 skipped + 0 failed** across iter209/210/211/212/213/214 — net +43 tests vs. start of session. Zero visible failures.
+- Backend boots cleanly on the iter213 lifespan handler. Frontend compiles with one upstream-only warning.
+- Lint: ruff + eslint all green on every touched file.
+
+### Files of reference (iter214)
+- `/app/backend/routes/transaction_pickup_code.py` (NEW)
+- `/app/backend/routes/admin_user_actions.py` (NEW)
+- `/app/backend/routes/auctions.py` (auction-close hook for pickup-code generation)
+- `/app/backend/services/listing_moderation_scanner.py` (NEW)
+- `/app/backend/services/email_notifications.py` (3 new bilingual templates: buyer pickup, seller instructions, auction-thread opened)
+- `/app/backend/routes/listings.py` (moderation scan wiring)
+- `/app/backend/server.py` (router registration)
+- `/app/backend/.env` (real GST/QST numbers)
+- `/app/frontend/src/components/GlobalDealerFeeBanner.jsx` (NEW)
+- `/app/frontend/src/components/AIAssistant.js` (multi-channel notification)
+- `/app/frontend/src/pages/admin/EnhancedUserManager.js` (Notify + RequestDocs modals)
+- `/app/frontend/src/pages/ProhibitedItemsPage.js` (NEW)
+- `/app/frontend/src/App.js` (banner mount + prohibited routes)
+- `/app/frontend/src/components/Footer.js` (prohibited link)
+- `/app/backend/tests/test_iter214_production_critical.py` (NEW — 25 tests)
+
+⚠️ **Production push required**: changes are in PREVIEW. Deploy via "Save to Github" → Emergent redeploy to push to https://bidvex.com.
+
+---
+
+## Previous: iter213 — Verification Banner + Messaging Fix + Cosmetic Hardening (Feb 14, 2026) ✅
 
 ### 1. Storage Dashboard Verification Progress Banner ✅
 - NEW `frontend/src/pages/storage/StorageVerificationBanner.js` — bilingual EN+FR 3-step checklist (Document uploaded → Admin reviewing → Verified, ready to list!). Hidden once verified. Shows the admin rejection reason inline with a "Resubmit document" CTA when the document was rejected.

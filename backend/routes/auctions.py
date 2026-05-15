@@ -152,6 +152,82 @@ async def process_ended_auctions():
                 except Exception as settle_err:
                     logger.exception(f"[auction-settle] failed for {listing_id}: {settle_err}")
 
+            # iter214 P1 — Generate pickup code for cash / e-transfer
+            # transactions from INDIVIDUAL sellers (not partners / dealers /
+            # storage facilities, which manage payments themselves).
+            try:
+                seller_doc = await db.users.find_one(
+                    {"id": seller_id},
+                    {"_id": 0, "account_type": 1, "is_licensed_partner": 1, "is_vehicle_dealer": 1, "is_storage_facility": 1},
+                ) or {}
+                is_individual_seller = not (
+                    seller_doc.get("is_licensed_partner")
+                    or seller_doc.get("is_vehicle_dealer")
+                    or seller_doc.get("is_storage_facility")
+                    or (seller_doc.get("account_type") in {"partner", "vehicle_dealer", "storage_facility"})
+                )
+                pay_method = (listing.get("payment_method") or "").lower()
+                if is_individual_seller and pay_method in {"cash", "etransfer", "interac_e_transfer", "interac"}:
+                    pm = "cash" if pay_method == "cash" else "etransfer"
+                    from routes.transaction_pickup_code import ensure_pickup_code_on_transaction
+                    # Find or create the matching transaction record
+                    txn = await db.transactions.find_one(
+                        {"$or": [{"listing_id": listing_id}, {"auction_id": listing_id}]},
+                        {"_id": 0},
+                    )
+                    if not txn:
+                        import uuid as _u
+                        txn_id = str(_u.uuid4())
+                        await db.transactions.insert_one({
+                            "id": txn_id,
+                            "auction_id": listing_id,
+                            "listing_id": listing_id,
+                            "listing_title": listing.get("title", "Item"),
+                            "buyer_id": winner_id,
+                            "seller_id": seller_id,
+                            "hammer_price": float(listing.get("current_price") or 0),
+                            "payment_method": pm,
+                            "payment_confirmed": False,
+                            "created_at": datetime.now(timezone.utc).isoformat(),
+                        })
+                        txn_for_code = {"id": txn_id}
+                    else:
+                        txn_for_code = txn
+                    code = await ensure_pickup_code_on_transaction(
+                        db, txn_for_code["id"],
+                        payment_method=pm, seller_id=seller_id, listing_id=listing_id,
+                    )
+                    if code:
+                        logger.info(f"[pickup-code] generated {code} for txn {txn_for_code['id']}")
+                        # iter214 P1 — Dispatch dedicated bilingual pickup-code emails
+                        try:
+                            buyer_doc = await db.users.find_one({"id": winner_id}, {"_id": 0}) or {}
+                            seller_full = await db.users.find_one({"id": seller_id}, {"_id": 0}) or {}
+                            from services.email_notifications import (
+                                send_buyer_pickup_code_email,
+                                send_seller_pickup_instructions_email,
+                            )
+                            await send_buyer_pickup_code_email(
+                                buyer=buyer_doc,
+                                seller=seller_full,
+                                listing_title=listing.get("title", "Item"),
+                                hammer_price=float(listing.get("current_price") or 0),
+                                pickup_code=code,
+                                payment_method=pm,
+                                transaction_id=txn_for_code["id"],
+                            )
+                            await send_seller_pickup_instructions_email(
+                                seller=seller_full,
+                                listing_title=listing.get("title", "Item"),
+                                hammer_price=float(listing.get("current_price") or 0),
+                                payment_method=pm,
+                                transaction_id=txn_for_code["id"],
+                            )
+                        except Exception as email_err:
+                            logger.warning(f"[pickup-code] email send failed: {email_err}")
+            except Exception as pkup_err:
+                logger.warning(f"[pickup-code] generation failed for listing {listing_id}: {pkup_err}")
+
             if winner_id and seller_id:
                 try:
                     winner = await db.users.find_one({"id": winner_id}, {"_id": 0, "name": 1, "email": 1, "phone": 1})

@@ -5,6 +5,7 @@ import { Input } from './ui/input';
 import { X, MessageCircle, Send, ShieldCheck, CreditCard, Package, HelpCircle, Mail, GripVertical } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 // Mobile bottom-nav height + safe gap. MobileBottomNav.js renders 64px nav
 // content + iPhone safe-area-inset-bottom (≈34px on iPhones with home indicator,
@@ -178,29 +179,147 @@ const AIAssistant = () => {
     return () => { cancelled = true; clearInterval(id); };
   }, [serviceDegraded, isOpen, backendUrl]);
 
+  const [unreadBadge, setUnreadBadge] = useState(0);
+  const originalTitleRef = useRef(typeof document !== 'undefined' ? document.title : 'BidVex');
+  const acknowledgmentIdRef = useRef(0);
+
+  // iter214 P4 — Request browser-notification permission when chat opens
+  // (NOT on page load, per UX spec).
+  useEffect(() => {
+    if (!isOpen) return;
+    if (typeof Notification === 'undefined') return;
+    if (Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => undefined);
+    }
+  }, [isOpen]);
+
+  // iter214 P4 — When the user opens the chat, clear unread badge + restore tab title.
+  useEffect(() => {
+    if (isOpen) {
+      setUnreadBadge(0);
+      if (typeof document !== 'undefined') document.title = originalTitleRef.current;
+    }
+  }, [isOpen]);
+
+  // iter214 P4 — Multi-channel notification when an AI response arrives.
+  // Fires only when the user is NOT actively focused on the chat window.
+  const fireResponseNotification = useCallback((preview, isFr) => {
+    try {
+      // 1) Sound (only when tab not focused — respect quiet browsing)
+      if (typeof document !== 'undefined' && document.hidden) {
+        try {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) {
+            const ctx = new AudioCtx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.frequency.value = 880; // soft chime A5
+            gain.gain.value = 0.05;
+            osc.connect(gain).connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.25);
+            setTimeout(() => ctx.close().catch(() => undefined), 400);
+          }
+        } catch { /* sound failed silently */ }
+      }
+
+      // 2) Browser notification
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        try {
+          const n = new Notification(isFr ? 'BidVex IA a répondu' : 'BidVex AI replied', {
+            body: (preview || '').slice(0, 60) + (preview && preview.length > 60 ? '…' : ''),
+            icon: '/logo192.png',
+            tag: 'bidvex-ai-response',
+          });
+          n.onclick = () => {
+            window.focus();
+            setIsOpen(true);
+            n.close();
+          };
+        } catch { /* notification denied */ }
+      }
+
+      // 3) In-app toast — Sonner provider is already mounted globally.
+      // Show only when chat is closed; when open the user already sees the
+      // assistant bubble appear in-line.
+      if (!isOpen) {
+        try {
+          toast.success(
+            isFr ? '💬 Le concierge IA a répondu à votre question' : '💬 AI Concierge replied to your question',
+            { duration: 5000 },
+          );
+        } catch { /* sonner not mounted */ }
+      }
+      window.dispatchEvent(new CustomEvent('bidvex:ai-reply', { detail: { preview, isFr } }));
+
+      // 4) Vibration (mobile)
+      if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+        try { navigator.vibrate([200, 100, 200]); } catch { /* unsupported */ }
+      }
+
+      // 5) Tab title change when user on another tab
+      if (typeof document !== 'undefined' && document.hidden) {
+        document.title = isFr ? '💬 Nouvelle réponse — BidVex' : '💬 New reply — BidVex';
+        // Restore when user comes back
+        const restore = () => {
+          if (!document.hidden) {
+            document.title = originalTitleRef.current;
+            document.removeEventListener('visibilitychange', restore);
+          }
+        };
+        document.addEventListener('visibilitychange', restore);
+      }
+
+      // 6) Chat-icon badge (only when chat closed)
+      if (!isOpen) setUnreadBadge((c) => c + 1);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn('[AIAssistant] notification fire failed:', err);
+    }
+  }, [isOpen]);
+
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
     const userMessage = input;
+    const lang = (navigator.language || 'en').startsWith('fr') ? 'fr' : 'en';
+    const isFr = lang === 'fr';
     setInput('');
     setMessages((prev) => [...prev, { role: 'user', content: userMessage, rich_content: null }]);
     setIsLoading(true);
 
+    // iter214 P4 — IMMEDIATE acknowledgment (< 800 ms). This is a pure UI state
+    // change — no backend call. Tagged with `ack: true` so we can replace it
+    // when the real response arrives.
+    const ackId = ++acknowledgmentIdRef.current;
+    const ackContent = isFr
+      ? '🔍 Je recherche la meilleure réponse pour vous… Je vous notifierai dès que je réponds.'
+      : '🔍 Searching for the best answer for you… I\'ll notify you as soon as I respond.';
+    setMessages((prev) => [
+      ...prev,
+      { role: 'assistant', content: ackContent, rich_content: null, ack: true, ackId },
+    ]);
+
+    // After 15 s of no response, upgrade the ack to the "still processing" copy.
+    const stillProcessingTimer = setTimeout(() => {
+      const longCopy = isFr
+        ? "⏳ Notre IA traite votre demande. Cela peut prendre un moment pour les questions complexes. Nous vous notifierons dès que nous aurons une réponse — vous pouvez naviguer sur la plateforme en attendant."
+        : "⏳ Our AI is processing your request. This may take a moment for complex questions. We'll notify you the second we have an answer — feel free to browse the platform while you wait.";
+      setMessages((prev) => prev.map((m) =>
+        m.ack && m.ackId === ackId ? { ...m, content: longCopy } : m
+      ));
+    }, 15000);
+
     // iter211 — optimistically clear the degraded banner when the user retries
-    // (a successful reply will re-confirm; a failed one will re-set it).
     if (serviceDegraded) setServiceDegraded(false);
 
-    const lang = (navigator.language || 'en').startsWith('fr') ? 'fr' : 'en';
     const buildBody = () => JSON.stringify({
       message: userMessage,
       chat_history: messages.slice(-10).map((m) => ({ role: m.role, content: m.content })),
       language: lang,
     });
 
-    // iter211 — retry once on transient failure (timeout, 5xx, success:false)
-    // before falling back to the degraded state. Most "Service unavailable"
-    // toasts users complain about are upstream LLM rate-limit blips that
-    // succeed on retry within 1-2 seconds.
+    // iter211 — retry once on transient failure
     const tryOnce = async (timeoutMs) => {
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -222,35 +341,46 @@ const AIAssistant = () => {
     try {
       let data;
       try {
-        data = await tryOnce(20000); // first attempt
+        data = await tryOnce(20000);
       } catch (firstErr) {
         // eslint-disable-next-line no-console
         console.warn('[AIAssistant] first attempt failed, retrying once:', firstErr?.message);
-        await new Promise((r) => setTimeout(r, 800)); // small backoff
-        data = await tryOnce(25000); // second attempt
+        await new Promise((r) => setTimeout(r, 800));
+        data = await tryOnce(25000);
       }
+      clearTimeout(stillProcessingTimer);
       setServiceDegraded(false);
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: data.message, rich_content: data.rich_content },
-      ]);
+      // Replace the ack message with the real response (so we don't keep two)
+      setMessages((prev) => {
+        const out = prev.filter((m) => !(m.ack && m.ackId === ackId));
+        return [
+          ...out,
+          { role: 'assistant', content: data.message, rich_content: data.rich_content },
+        ];
+      });
+      // Fire multi-channel notification
+      fireResponseNotification(data.message, isFr);
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error('[AIAssistant] both attempts failed:', e?.message);
+      clearTimeout(stillProcessingTimer);
       setServiceDegraded(true);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: 'Service temporarily unavailable. Please retry in a moment, or email support@bidvex.com for immediate help.\n\nService temporairement indisponible. Veuillez réessayer dans un instant ou écrire à support@bidvex.com pour de l\'aide immédiate.',
-          rich_content: {
-            has_rich_content: true,
-            action_buttons: [
-              { text: 'Email Support / Contacter le support', action: 'email', url: 'support@bidvex.com', icon: 'mail', style: 'primary' },
-            ],
+      setMessages((prev) => {
+        const out = prev.filter((m) => !(m.ack && m.ackId === ackId));
+        return [
+          ...out,
+          {
+            role: 'assistant',
+            content: 'Service temporarily unavailable. Please retry in a moment, or email support@bidvex.com for immediate help.\n\nService temporairement indisponible. Veuillez réessayer dans un instant ou écrire à support@bidvex.com pour de l\'aide immédiate.',
+            rich_content: {
+              has_rich_content: true,
+              action_buttons: [
+                { text: 'Email Support / Contacter le support', action: 'email', url: 'support@bidvex.com', icon: 'mail', style: 'primary' },
+              ],
+            },
           },
-        },
-      ]);
+        ];
+      });
     } finally {
       setIsLoading(false);
     }
@@ -307,6 +437,15 @@ const AIAssistant = () => {
         >
           <MessageCircle className="h-7 w-7 pointer-events-none" />
           <GripVertical className="absolute -top-1 -right-1 h-3 w-3 text-white/60 pointer-events-none" aria-hidden="true" />
+          {/* iter214 P4 — Unread-badge on FAB when AI replied while chat is closed */}
+          {unreadBadge > 0 && (
+            <span
+              className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-lg pointer-events-none"
+              data-testid="ai-assistant-unread-badge"
+            >
+              {unreadBadge > 9 ? '9+' : unreadBadge}
+            </span>
+          )}
         </Button>
       )}
 

@@ -12,6 +12,7 @@ import { HelmetProvider } from 'react-helmet-async';
 
 // Shell components — kept eager (always visible on every page)
 import Navbar from './components/Navbar';
+import GlobalDealerFeeBanner from './components/GlobalDealerFeeBanner';
 import Footer from './components/Footer';
 import TrendyAnnouncementBar from './components/TrendyAnnouncementBar';
 import MobileBottomNav from './components/MobileBottomNav';
@@ -83,6 +84,7 @@ const AboutUsPage = lazy(() => import('./pages/AboutUsPage'));
 const UnsubscribePage = lazy(() => import('./pages/UnsubscribePage'));
 const EmailPreferencesPage = lazy(() => import('./pages/EmailPreferencesPage'));
 const ResubscribePage = lazy(() => import('./pages/ResubscribePage'));
+const ProhibitedItemsPage = lazy(() => import('./pages/ProhibitedItemsPage'));
 
 // Vehicle Auction Module
 const VehicleAuctionsRoute = lazy(() => import('./pages/vehicles/VehicleAuctionsRoute'));
@@ -330,6 +332,8 @@ const App = () => {
             <CookieConsentBanner />
             <MaintenanceGuard>
         <div className="App min-h-screen bg-gradient-to-br from-blue-50 via-white to-teal-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+          {/* iter214 P3 — Sticky site-wide dealer-fee banner (above the navbar) */}
+          <GlobalDealerFeeBanner />
           <TrendyAnnouncementBar />
           <Navbar />
           <Suspense fallback={<PageLoader />}>
@@ -426,6 +430,9 @@ const App = () => {
           <Route path="/terms-of-service" element={<TermsOfServicePage />} />
           <Route path="/terms" element={<Navigate to="/terms-of-service" replace />} />
           <Route path="/legal" element={<LegalPage />} />
+          {/* iter214 P5 — Bilingual prohibited-items page */}
+          <Route path="/prohibited-items" element={<ProhibitedItemsPage />} />
+          <Route path="/articles-interdits" element={<ProhibitedItemsPage />} />
           <Route path="/policies" element={<PlatformPoliciesPage />} />
           <Route path="/invite/:token" element={<InviteAcceptPage />} />
           <Route path="/become-a-partner" element={

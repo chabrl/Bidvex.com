@@ -294,6 +294,20 @@ async def create_listing(
     except Exception as e:
         logger.error(f"[AI_SCANNER] Failed to schedule vehicle scan for {result.get('id')}: {e}")
 
+    # iter214 P5 — General-purpose moderation scan (prohibited items) running
+    # in parallel to the vehicle scanner. Fail-OPEN — if Gemini is unavailable
+    # the listing is left as-is.
+    try:
+        from services.listing_moderation_scanner import scan_listing_for_violations
+        background_tasks.add_task(
+            scan_listing_for_violations,
+            db,
+            listing_id=result["id"],
+            collection="listings",
+        )
+    except Exception as e:
+        logger.error(f"[AI_MODERATION] Failed to schedule moderation scan for {result.get('id')}: {e}")
+
     # Notify admin when a listing needs moderation (non-blocking)
     if listing_dict["status"] == "pending":
         try:
@@ -714,6 +728,18 @@ async def create_multi_item_listing(
         )
     except Exception as e:
         logger.error(f"[AI_SCANNER] Failed to schedule vehicle scan for {listing.id}: {e}")
+
+    # iter214 P5 — General moderation scan (prohibited items)
+    try:
+        from services.listing_moderation_scanner import scan_listing_for_violations
+        background_tasks.add_task(
+            scan_listing_for_violations,
+            db,
+            listing_id=listing.id,
+            collection="multi_item_listings",
+        )
+    except Exception as e:
+        logger.error(f"[AI_MODERATION] Failed to schedule moderation scan for {listing.id}: {e}")
 
     # Background translation — if _en/_fr not already provided
     if not listing_data.title_en or not listing_data.title_fr:
