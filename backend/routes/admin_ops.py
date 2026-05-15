@@ -543,11 +543,40 @@ async def admin_set_affiliate_status(user_id: str, data: Dict[str, bool], curren
 
 @admin_ops_router.get("/admin/users/filter")
 async def admin_filter_users(account_type: str = None, current_user: User = Depends(require_admin)):
+    """iter215 — Filterable by the 6 buckets the admin Users tab uses:
+
+        all              → every user
+        personal | individual → account_type=personal (without partner/dealer/facility flags)
+        business              → account_type=business
+        partner               → is_licensed_partner=True
+        vehicle_dealer        → is_vehicle_dealer=True
+        storage_facility      → is_storage_facility=True
+        demo                  → is_demo_account=True
+    """
     db = get_db()
     query = {}
-    if account_type:
-        query["account_type"] = account_type
-    
+    if account_type and account_type not in ("", "all"):
+        bucket = account_type.lower()
+        if bucket in ("individual",):
+            query = {
+                "account_type": "personal",
+                "is_licensed_partner": {"$ne": True},
+                "is_vehicle_dealer": {"$ne": True},
+                "is_storage_facility": {"$ne": True},
+                "is_demo_account": {"$ne": True},
+            }
+        elif bucket == "partner":
+            query["is_licensed_partner"] = True
+        elif bucket == "vehicle_dealer":
+            query["is_vehicle_dealer"] = True
+        elif bucket == "storage_facility":
+            query["is_storage_facility"] = True
+        elif bucket == "demo":
+            query["is_demo_account"] = True
+        else:
+            # Legacy: passthrough on `account_type` (personal | business)
+            query["account_type"] = account_type
+
     users = await db.users.find(query, {"_id": 0, "password": 0}).to_list(200)
     return users
 

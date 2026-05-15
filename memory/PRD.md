@@ -1,6 +1,44 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter214 — Production-Critical Multi-System Fix (Feb 14, 2026) ✅
+## Latest: iter215 — Banner Auto-Refresh + Full Admin User Management (Feb 14, 2026) ✅
+
+### 🐛 Bug fix — Dealer banner not disappearing after admin "Manual Settle"
+- **Root cause**: `GlobalDealerFeeBanner.jsx` (added in iter214) was reading `status?.has_active_subscription` — a field that **does not exist** on the `/api/dealer-subscription/status` response. The actual flags are `active`, `has_subscription`, and `dealer_subscription_active`. So the banner showed for everyone.
+- **Fix**:
+  - Banner now reads `status?.active === true || status?.dealer_subscription_active === true` (kept backwards-compat with the bogus field).
+  - Added **tab-focus + visibilitychange refresh** and **60 s polling** so the banner disappears the instant the admin flips the status (no hard refresh needed).
+
+### ✅ Admin Panel Users Tab — Spec 2A–2E (full pass)
+Previously only had Verify / Suspend / Delete / Notify / Request-Docs. iter215 adds every other action the user expected:
+
+- **6-bucket filter row**: All Users · Individual · Partner · Vehicle Dealer · Storage Facility · Demo (each rendered as a button with `data-testid`).
+- **Backend filter rewrite** (`routes/admin_ops.py`): `/api/admin/users/filter?account_type=<bucket>` now handles all 6 buckets — Individual maps to `account_type=personal` AND all special flags False; Partner/Vehicle Dealer/Storage Facility/Demo each map to their respective `is_*` flag.
+- **More-Actions dropdown** on every row (kebab icon) with 6 new actions:
+  - ✏️ **Edit Profile** → modal editing name/email/phone/company/province. Backend `PATCH /api/admin/users/{id}/profile` with email uniqueness check.
+  - 🔑 **Reset Password** → sends a one-tap password-reset email. Backend `POST /reset-password` calls existing `password_reset_service` and falls back to a self-issued tokenised reset link.
+  - 👑 **Change Tier** → modal selecting Standard / Premium / VIP Elite. Backend `POST /change-tier` validates against the canonical 3-value set.
+  - 🎭 **Convert to Demo** → toggles `is_demo_account` (idempotent). Backend `POST /convert-to-demo`.
+  - 💳 **View Transactions** → modal listing the user's last 50 buyer/seller transactions. Backend `GET /transactions`.
+  - 💰 **View Subscription Status** → modal with per-role panels (Vehicle Dealer / Partner / Storage Facility / Buyer Tier). Backend `GET /subscription-status`.
+- All new actions are logged to `admin_actions` (audit collection from iter214).
+
+### Test Status
+- **16/16 new iter215 backend tests pass** (banner status-field fix, focus refresh + polling, 5 filter buttons, 6 dropdown items, 4 modals, 6 mounted endpoints, change-tier validation, convert-demo toggle, subscription snapshot).
+- **291 passed + 17 skipped + 0 failed** across iter209/210/211/212/213/214/215 — net +59 tests since session start of this iteration.
+- Backend live + healthy. Frontend compiles with one upstream warning.
+
+### Files of reference (iter215)
+- `/app/frontend/src/components/GlobalDealerFeeBanner.jsx` (status field fix + focus refresh + 60 s polling)
+- `/app/frontend/src/pages/admin/EnhancedUserManager.js` (6 filter buttons + More-Actions dropdown + 4 new modals)
+- `/app/backend/routes/admin_user_actions.py` (6 new endpoints: profile / reset-password / change-tier / convert-to-demo / transactions / subscription-status)
+- `/app/backend/routes/admin_ops.py` (filter buckets)
+- `/app/backend/tests/test_iter215_admin_user_management.py` (NEW — 16 tests)
+
+⚠️ **Production push required**: changes are in PREVIEW. The banner bug will only disappear from https://bidvex.com after you click **Save to GitHub** → trigger Emergent redeploy.
+
+---
+
+## Previous: iter214 — Production-Critical Multi-System Fix (Feb 14, 2026) ✅
 
 ### ✅ Part 1 — Individual Seller Pickup-Code System (Cash + e-Transfer)
 - NEW `routes/transaction_pickup_code.py`:

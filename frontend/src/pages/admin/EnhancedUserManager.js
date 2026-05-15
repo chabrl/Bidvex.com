@@ -27,8 +27,13 @@ import { toast } from 'sonner';
 import { 
   Users, CheckCircle, MessageCircleOff, Search, UserPlus, 
   Copy, Check, Eye, EyeOff, Building2, User, Shield, Mail,
-  Phone, AlertTriangle, X, Ban, Trash2, MapPin
+  Phone, AlertTriangle, X, Ban, Trash2, MapPin, MoreVertical,
+  Key, Edit, Crown, Theater, CreditCard, Receipt,
 } from 'lucide-react';
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
+  DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel,
+} from '../../components/ui/dropdown-menu';
 
 const API = API_BASE;
 
@@ -241,6 +246,136 @@ const EnhancedUserManager = () => {
     { v: 'insurance_certificate', l: 'Insurance certificate' },
     { v: 'other',                 l: 'Other document' },
   ];
+
+  // iter215 — Edit Profile / Change Tier / View Txns / View Subscription modals
+  const [editProfileModal, setEditProfileModal] = useState({ open: false, user: null });
+  const [editForm, setEditForm] = useState({});
+  const [editBusy, setEditBusy] = useState(false);
+
+  const [changeTierModal, setChangeTierModal] = useState({ open: false, user: null });
+  const [newTier, setNewTier] = useState('standard');
+  const [tierBusy, setTierBusy] = useState(false);
+
+  const [viewTxnModal, setViewTxnModal] = useState({ open: false, user: null });
+  const [txnRows, setTxnRows] = useState([]);
+  const [txnLoading, setTxnLoading] = useState(false);
+
+  const [viewSubModal, setViewSubModal] = useState({ open: false, user: null });
+  const [subStatus, setSubStatus] = useState(null);
+  const [subLoading, setSubLoading] = useState(false);
+
+  const openEditProfile = (u) => {
+    setEditForm({
+      name: u.name || '', email: u.email || '', phone: u.phone || '',
+      company_name: u.company_name || '', province: u.province || '',
+    });
+    setEditProfileModal({ open: true, user: u });
+  };
+
+  const submitEditProfile = async () => {
+    if (!editProfileModal.user) return;
+    setEditBusy(true);
+    try {
+      await axios.patch(
+        `${API}/admin/users/${editProfileModal.user.id}/profile`,
+        editForm,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      toast.success('Profile updated');
+      setEditProfileModal({ open: false, user: null });
+      fetchData();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail?.message_en || e?.response?.data?.detail?.message || 'Update failed');
+    } finally {
+      setEditBusy(false);
+    }
+  };
+
+  const handleResetPassword = async (u) => {
+    if (!window.confirm(`Send password reset email to ${u.email}?`)) return;
+    try {
+      await axios.post(
+        `${API}/admin/users/${u.id}/reset-password`, {},
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      toast.success(`Reset email sent to ${u.email}`);
+    } catch (e) {
+      toast.error('Reset failed');
+    }
+  };
+
+  const openChangeTier = (u) => {
+    setNewTier(u.buyer_tier || 'standard');
+    setChangeTierModal({ open: true, user: u });
+  };
+
+  const submitChangeTier = async () => {
+    if (!changeTierModal.user) return;
+    setTierBusy(true);
+    try {
+      await axios.post(
+        `${API}/admin/users/${changeTierModal.user.id}/change-tier`,
+        { tier: newTier },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      toast.success(`Tier set to ${newTier}`);
+      setChangeTierModal({ open: false, user: null });
+      fetchData();
+    } catch (e) {
+      toast.error('Tier change failed');
+    } finally {
+      setTierBusy(false);
+    }
+  };
+
+  const handleConvertDemo = async (u) => {
+    const action = u.is_demo_account ? 'remove the demo flag from' : 'convert to a demo account';
+    if (!window.confirm(`${action} ${u.email}?`)) return;
+    try {
+      const r = await axios.post(
+        `${API}/admin/users/${u.id}/convert-to-demo`, {},
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      toast.success(r.data.is_demo_account ? 'User is now a Demo account' : 'Demo flag removed');
+      fetchData();
+    } catch (e) {
+      toast.error('Update failed');
+    }
+  };
+
+  const openViewTransactions = async (u) => {
+    setViewTxnModal({ open: true, user: u });
+    setTxnLoading(true);
+    setTxnRows([]);
+    try {
+      const r = await axios.get(
+        `${API}/admin/users/${u.id}/transactions?limit=50`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      setTxnRows(r.data?.transactions || []);
+    } catch (e) {
+      toast.error('Failed to load transactions');
+    } finally {
+      setTxnLoading(false);
+    }
+  };
+
+  const openViewSubscription = async (u) => {
+    setViewSubModal({ open: true, user: u });
+    setSubLoading(true);
+    setSubStatus(null);
+    try {
+      const r = await axios.get(
+        `${API}/admin/users/${u.id}/subscription-status`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      setSubStatus(r.data);
+    } catch (e) {
+      toast.error('Failed to load subscription status');
+    } finally {
+      setSubLoading(false);
+    }
+  };
   const [deleting, setDeleting] = useState(false);
 
   const handleDeleteUser = async () => {
@@ -448,29 +583,58 @@ const EnhancedUserManager = () => {
 
       {/* Filter Buttons - Responsive */}
       <div className="flex flex-wrap gap-2">
-        <Button 
+        <Button
           size="sm"
-          variant={filter === 'all' ? 'default' : 'outline'} 
-          onClick={() => setFilter('all')} 
+          variant={filter === 'all' ? 'default' : 'outline'}
+          onClick={() => setFilter('all')}
           className={`${filter === 'all' ? 'gradient-button text-white border-0' : ''} text-xs sm:text-sm`}
         >
           All Users
         </Button>
         <Button 
           size="sm"
-          variant={filter === 'personal' ? 'default' : 'outline'} 
-          onClick={() => setFilter('personal')} 
-          className={`${filter === 'personal' ? 'gradient-button text-white border-0' : ''} text-xs sm:text-sm`}
+          variant={filter === 'individual' ? 'default' : 'outline'} 
+          onClick={() => setFilter('individual')} 
+          className={`${filter === 'individual' ? 'gradient-button text-white border-0' : ''} text-xs sm:text-sm`}
+          data-testid="filter-individual"
         >
           Individual
         </Button>
         <Button 
           size="sm"
-          variant={filter === 'business' ? 'default' : 'outline'} 
-          onClick={() => setFilter('business')} 
-          className={`${filter === 'business' ? 'gradient-button text-white border-0' : ''} text-xs sm:text-sm`}
+          variant={filter === 'partner' ? 'default' : 'outline'} 
+          onClick={() => setFilter('partner')} 
+          className={`${filter === 'partner' ? 'gradient-button text-white border-0' : ''} text-xs sm:text-sm`}
+          data-testid="filter-partner"
         >
-          Business
+          Partner
+        </Button>
+        <Button 
+          size="sm"
+          variant={filter === 'vehicle_dealer' ? 'default' : 'outline'} 
+          onClick={() => setFilter('vehicle_dealer')} 
+          className={`${filter === 'vehicle_dealer' ? 'gradient-button text-white border-0' : ''} text-xs sm:text-sm`}
+          data-testid="filter-vehicle-dealer"
+        >
+          Vehicle Dealer
+        </Button>
+        <Button 
+          size="sm"
+          variant={filter === 'storage_facility' ? 'default' : 'outline'} 
+          onClick={() => setFilter('storage_facility')} 
+          className={`${filter === 'storage_facility' ? 'gradient-button text-white border-0' : ''} text-xs sm:text-sm`}
+          data-testid="filter-storage-facility"
+        >
+          Storage Facility
+        </Button>
+        <Button 
+          size="sm"
+          variant={filter === 'demo' ? 'default' : 'outline'} 
+          onClick={() => setFilter('demo')} 
+          className={`${filter === 'demo' ? 'gradient-button text-white border-0' : ''} text-xs sm:text-sm`}
+          data-testid="filter-demo"
+        >
+          Demo
         </Button>
       </div>
 
@@ -638,6 +802,38 @@ const EnhancedUserManager = () => {
                     <Trash2 className="h-3.5 w-3.5 mr-1" />
                     Delete
                   </Button>
+                  {/* iter215 — More-Actions dropdown (Edit / Reset Password / Tier / Demo / Txns / Subscription) */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="sm" variant="outline" data-testid={`more-actions-${user.id}`} title="More actions">
+                        <MoreVertical className="h-3.5 w-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuLabel className="text-xs">User actions</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => openEditProfile(user)} data-testid={`edit-profile-${user.id}`}>
+                        <Edit className="h-3.5 w-3.5 mr-2" /> Edit Profile
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleResetPassword(user)} data-testid={`reset-password-${user.id}`}>
+                        <Key className="h-3.5 w-3.5 mr-2" /> Reset Password
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => openChangeTier(user)} data-testid={`change-tier-${user.id}`}>
+                        <Crown className="h-3.5 w-3.5 mr-2" /> Change Tier
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleConvertDemo(user)} data-testid={`convert-demo-${user.id}`}>
+                        <Theater className="h-3.5 w-3.5 mr-2" />
+                        {user.is_demo_account ? 'Remove Demo Flag' : 'Convert to Demo'}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => openViewTransactions(user)} data-testid={`view-txns-${user.id}`}>
+                        <Receipt className="h-3.5 w-3.5 mr-2" /> View Transactions
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => openViewSubscription(user)} data-testid={`view-sub-${user.id}`}>
+                        <CreditCard className="h-3.5 w-3.5 mr-2" /> View Subscription Status
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             ))}
@@ -696,6 +892,177 @@ const EnhancedUserManager = () => {
           </Card>
         </div>
       )}
+
+      {/* iter215 — Edit Profile Modal */}
+      <Dialog open={editProfileModal.open} onOpenChange={(o) => !o && setEditProfileModal({ open: false, user: null })}>
+        <DialogContent data-testid="edit-profile-modal">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="h-5 w-5 text-blue-600" /> Edit User Profile
+            </DialogTitle>
+            <DialogDescription>
+              {editProfileModal.user && (<span>ID: <strong className="font-mono">{editProfileModal.user.id?.slice(0, 12)}</strong></span>)}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {['name', 'email', 'phone', 'company_name', 'province'].map((field) => (
+              <div key={field}>
+                <Label className="capitalize">{field.replace('_', ' ')}</Label>
+                <Input
+                  value={editForm[field] || ''}
+                  onChange={(e) => setEditForm((p) => ({ ...p, [field]: e.target.value }))}
+                  data-testid={`edit-field-${field}`}
+                />
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditProfileModal({ open: false, user: null })}>Cancel</Button>
+            <Button onClick={submitEditProfile} disabled={editBusy} data-testid="edit-profile-submit">
+              {editBusy ? 'Saving…' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* iter215 — Change Buyer Tier Modal */}
+      <Dialog open={changeTierModal.open} onOpenChange={(o) => !o && setChangeTierModal({ open: false, user: null })}>
+        <DialogContent data-testid="change-tier-modal">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Crown className="h-5 w-5 text-amber-600" /> Change Buyer Tier
+            </DialogTitle>
+            <DialogDescription>
+              {changeTierModal.user && (<span>For <strong>{changeTierModal.user.email}</strong></span>)}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Label>New tier</Label>
+            <Select value={newTier} onValueChange={setNewTier}>
+              <SelectTrigger data-testid="new-tier-select"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="standard">Standard</SelectItem>
+                <SelectItem value="premium">Premium</SelectItem>
+                <SelectItem value="vip_elite">VIP Elite</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Current: <strong>{changeTierModal.user?.buyer_tier || 'standard'}</strong>
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setChangeTierModal({ open: false, user: null })}>Cancel</Button>
+            <Button onClick={submitChangeTier} disabled={tierBusy} data-testid="change-tier-submit">
+              {tierBusy ? 'Updating…' : 'Apply'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* iter215 — View Transactions Modal */}
+      <Dialog open={viewTxnModal.open} onOpenChange={(o) => !o && setViewTxnModal({ open: false, user: null })}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto" data-testid="view-txn-modal">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Receipt className="h-5 w-5 text-emerald-600" /> Transactions
+            </DialogTitle>
+            <DialogDescription>
+              {viewTxnModal.user && (<span>For <strong>{viewTxnModal.user.email}</strong></span>)}
+            </DialogDescription>
+          </DialogHeader>
+          {txnLoading ? (
+            <p className="text-sm text-muted-foreground py-6 text-center">Loading…</p>
+          ) : txnRows.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-6 text-center">No transactions</p>
+          ) : (
+            <table className="w-full text-xs" data-testid="txn-table">
+              <thead className="text-[10px] uppercase text-muted-foreground border-b">
+                <tr>
+                  <th className="text-left p-1">ID</th>
+                  <th className="text-left p-1">Listing</th>
+                  <th className="text-left p-1">Side</th>
+                  <th className="text-right p-1">Amount</th>
+                  <th className="text-left p-1">Method</th>
+                  <th className="text-left p-1">Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {txnRows.map((t) => (
+                  <tr key={t.id} className="border-b">
+                    <td className="p-1 font-mono">{(t.id || '').slice(0, 8)}</td>
+                    <td className="p-1 truncate max-w-[180px]">{t.listing_title || t.listing_id}</td>
+                    <td className="p-1">{viewTxnModal.user?.id === t.buyer_id ? 'Buyer' : 'Seller'}</td>
+                    <td className="p-1 text-right">CA${(t.hammer_price || t.amount || 0).toLocaleString()}</td>
+                    <td className="p-1">{t.payment_method || '—'}</td>
+                    <td className="p-1">{(t.created_at || '').slice(0, 10)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* iter215 — View Subscription Status Modal */}
+      <Dialog open={viewSubModal.open} onOpenChange={(o) => !o && setViewSubModal({ open: false, user: null })}>
+        <DialogContent data-testid="view-sub-modal">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-violet-600" /> Subscription Status
+            </DialogTitle>
+            <DialogDescription>
+              {viewSubModal.user && (<span>For <strong>{viewSubModal.user.email}</strong></span>)}
+            </DialogDescription>
+          </DialogHeader>
+          {subLoading ? (
+            <p className="text-sm text-muted-foreground py-6 text-center">Loading…</p>
+          ) : !subStatus ? (
+            <p className="text-sm text-muted-foreground py-6 text-center">No subscription data</p>
+          ) : (
+            <div className="space-y-3 text-sm">
+              {subStatus.is_vehicle_dealer && (
+                <div className="rounded-md border border-slate-200 dark:border-slate-700 p-3">
+                  <h4 className="font-semibold mb-1.5">🚗 Vehicle Dealer</h4>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>Status: <strong>{subStatus.dealer_subscription_status || (subStatus.dealer_subscription_active ? 'active' : 'unpaid')}</strong></div>
+                    <div>Active: <strong>{subStatus.dealer_subscription_active ? 'Yes ✓' : 'No ✗'}</strong></div>
+                    <div>Start: {subStatus.dealer_subscription_start?.slice(0, 10) || '—'}</div>
+                    <div>Renews: {subStatus.dealer_subscription_renewal?.slice(0, 10) || '—'}</div>
+                    <div>Method: {subStatus.dealer_subscription_manual_method || 'auto'}</div>
+                    <div>Ref: {subStatus.dealer_subscription_manual_reference || '—'}</div>
+                    <div>Suspended: <strong>{subStatus.vehicle_dealer_suspended ? 'Yes' : 'No'}</strong></div>
+                  </div>
+                </div>
+              )}
+              {subStatus.is_licensed_partner && (
+                <div className="rounded-md border border-slate-200 dark:border-slate-700 p-3">
+                  <h4 className="font-semibold mb-1.5">🏅 Partner</h4>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>Status: <strong>{subStatus.partner_subscription_status || (subStatus.partner_subscription_active ? 'active' : 'unpaid')}</strong></div>
+                    <div>Active: <strong>{subStatus.partner_subscription_active ? 'Yes ✓' : 'No ✗'}</strong></div>
+                    <div>Start: {subStatus.partner_subscription_start?.slice(0, 10) || '—'}</div>
+                    <div>Renews: {subStatus.partner_subscription_renewal?.slice(0, 10) || '—'}</div>
+                  </div>
+                </div>
+              )}
+              {subStatus.is_storage_facility && (
+                <div className="rounded-md border border-slate-200 dark:border-slate-700 p-3">
+                  <h4 className="font-semibold mb-1.5">📦 Storage Facility</h4>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>Status: <strong>{subStatus.storage_subscription_status || 'free tier'}</strong></div>
+                    <div>Active: <strong>{subStatus.storage_subscription_active ? 'Yes ✓' : 'N/A'}</strong></div>
+                    <div>Renews: {subStatus.storage_subscription_renewal?.slice(0, 10) || '—'}</div>
+                  </div>
+                </div>
+              )}
+              <div className="rounded-md border border-slate-200 dark:border-slate-700 p-3">
+                <h4 className="font-semibold mb-1.5">👑 Buyer Tier</h4>
+                <p className="text-xs">{subStatus.buyer_tier || 'standard'}</p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* iter214 P2 — Send Notification Dialog */}
       <Dialog open={notifyModal.open} onOpenChange={(o) => !o && setNotifyModal({ open: false, user: null })}>

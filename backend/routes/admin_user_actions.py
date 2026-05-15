@@ -310,3 +310,236 @@ async def admin_list_user_document_requests(
         is_overdue = (r.get("status") == "pending") and (r.get("deadline", "") < today)
         out.append({**r, "is_overdue": is_overdue})
     return {"requests": out, "overdue_count": sum(1 for r in out if r["is_overdue"])}
+
+
+# ───────────────────────────────────────────────────────────────────────
+# iter215 — Additional admin actions (Edit Profile, Reset Password,
+# Change Tier, Convert to Demo, View Transactions, View Subscription)
+# ───────────────────────────────────────────────────────────────────────
+
+class EditProfilePayload(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    company_name: Optional[str] = None
+    province: Optional[str] = None
+    account_type: Optional[str] = None  # personal | business | partner | vehicle_dealer | storage_facility
+
+
+@router.patch("/{user_id}/profile")
+async def admin_edit_user_profile(
+    user_id: str,
+    payload: EditProfilePayload,
+    current_user: User = Depends(_require_admin),
+):
+    """Admin edits a user's basic profile data. Email change is allowed but
+    enforces uniqueness."""
+    db = get_db()
+    user_doc = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    update = {k: v for k, v in payload.model_dump(exclude_none=True).items() if v != ""}
+    if not update:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    # Email uniqueness
+    if update.get("email") and update["email"] != user_doc.get("email"):
+        existing = await db.users.find_one({"email": update["email"]}, {"_id": 0, "id": 1})
+        if existing and existing.get("id") != user_id:
+            raise HTTPException(status_code=409, detail={"error": "email_taken", "message": "Email already in use"})
+
+    update["updated_at"] = datetime.now(timezone.utc).isoformat()
+    update["updated_by_admin"] = current_user.id
+    await db.users.update_one({"id": user_id}, {"$set": update})
+    await _record_admin_action(
+        db, admin_id=current_user.id, admin_email=current_user.email,
+        action="edit_profile", target_user_id=user_id, content=update,
+    )
+    return {"success": True, "updated_fields": list(update.keys())}
+
+
+@router.post("/{user_id}/reset-password")
+async def admin_reset_password(
+    user_id: str,
+    current_user: User = Depends(_require_admin),
+):
+    """Send a password-reset email to the user. Re-uses the public
+    `/api/auth/forgot-password` flow so the user gets a single tokenised link."""
+    db = get_db()
+    user_doc = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user_doc or not user_doc.get("email"):
+        raise HTTPException(status_code=404, detail="User not found or no email on file")
+
+    sent = False
+    try:
+        # Try to call the existing password-reset service
+        from services import password_reset_service as prs  # type: ignore
+        if hasattr(prs, "send_password_reset_email"):
+            await prs.send_password_reset_email(db, user_doc["email"])
+            sent = True
+    except Exception as e:
+        logger.warning(f"[admin_reset_password] dedicated service unavailable: {e}")
+
+    # Fallback: generate a one-time reset token + send a SendGrid email
+    if not sent:
+        try:
+            import secrets
+            token = secrets.token_urlsafe(32)
+            await db.password_reset_tokens.insert_one({
+                "id": str(uuid.uuid4()),
+                "user_id": user_id,
+                "token": token,
+                "expires_at": datetime.now(timezone.utc).isoformat(),
+                "issued_by_admin": current_user.id,
+            })
+            from services.email_notifications import send_email
+            url = f"https://www.bidvex.com/reset-password?token={token}"
+            html = f"""
+            <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;background:#f8fafc;border-radius:12px;">
+              <div style="padding:20px;background:white;border-radius:8px;">
+                <h2 style="color:#1e40af;margin:0 0 12px;">Reset your BidVex password</h2>
+                <p>An administrator has issued a password reset for your account.</p>
+                <div style="text-align:center;margin:20px 0;">
+                  <a href="{url}" style="display:inline-block;padding:12px 28px;background:#2563eb;color:white;text-decoration:none;border-radius:8px;font-weight:600;">
+                    Reset password · Réinitialiser
+                  </a>
+                </div>
+                <p style="color:#64748b;font-size:11px;text-align:center;">
+                  If you did not expect this email, contact support@bidvex.com.
+                </p>
+              </div>
+            </div>
+            """
+            await send_email(
+                to_email=user_doc["email"],
+                subject="Reset your BidVex password · Réinitialiser votre mot de passe",
+                html_content=html,
+            )
+            sent = True
+        except Exception as e:
+            logger.error(f"[admin_reset_password] fallback email failed: {e}")
+
+    await _record_admin_action(
+        db, admin_id=current_user.id, admin_email=current_user.email,
+        action="reset_password", target_user_id=user_id, content={"email_sent": sent},
+    )
+    return {"success": sent, "email_sent": sent}
+
+
+class ChangeTierPayload(BaseModel):
+    tier: str  # standard | premium | vip_elite
+
+
+_VALID_TIERS = {"standard", "premium", "vip_elite"}
+
+
+@router.post("/{user_id}/change-tier")
+async def admin_change_buyer_tier(
+    user_id: str,
+    payload: ChangeTierPayload,
+    current_user: User = Depends(_require_admin),
+):
+    """Change an individual user's buyer tier."""
+    if payload.tier not in _VALID_TIERS:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_tier",
+                "message_en": f"Tier must be one of {sorted(_VALID_TIERS)}",
+                "message_fr": f"Le niveau doit être l'un de {sorted(_VALID_TIERS)}",
+            },
+        )
+    db = get_db()
+    user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "buyer_tier": 1, "email": 1})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    prev = user_doc.get("buyer_tier") or "standard"
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {
+            "buyer_tier": payload.tier,
+            "buyer_tier_updated_at": datetime.now(timezone.utc).isoformat(),
+            "buyer_tier_updated_by": current_user.id,
+        }},
+    )
+    await _record_admin_action(
+        db, admin_id=current_user.id, admin_email=current_user.email,
+        action="change_tier", target_user_id=user_id,
+        content={"from": prev, "to": payload.tier},
+    )
+    return {"success": True, "from": prev, "to": payload.tier}
+
+
+@router.post("/{user_id}/convert-to-demo")
+async def admin_convert_to_demo(
+    user_id: str,
+    current_user: User = Depends(_require_admin),
+):
+    """Flip is_demo_account on a user (and back). Idempotent."""
+    db = get_db()
+    user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "is_demo_account": 1})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    new_value = not bool(user_doc.get("is_demo_account"))
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {
+            "is_demo_account": new_value,
+            "demo_toggled_at": datetime.now(timezone.utc).isoformat(),
+            "demo_toggled_by": current_user.id,
+        }},
+    )
+    await _record_admin_action(
+        db, admin_id=current_user.id, admin_email=current_user.email,
+        action="convert_to_demo", target_user_id=user_id,
+        content={"is_demo_account": new_value},
+    )
+    return {"success": True, "is_demo_account": new_value}
+
+
+@router.get("/{user_id}/transactions")
+async def admin_user_transactions(
+    user_id: str,
+    limit: int = 50,
+    current_user: User = Depends(_require_admin),
+):
+    """List transactions (buyer + seller side) for the user."""
+    db = get_db()
+    rows = await db.transactions.find(
+        {"$or": [{"buyer_id": user_id}, {"seller_id": user_id}]},
+        {"_id": 0},
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    return {"total": len(rows), "transactions": rows}
+
+
+@router.get("/{user_id}/subscription-status")
+async def admin_user_subscription_status(
+    user_id: str,
+    current_user: User = Depends(_require_admin),
+):
+    """Compose a snapshot of the user's subscription flags for the admin
+    "View Subscription Status" modal. Works for dealer, partner, and
+    storage-facility accounts."""
+    db = get_db()
+    user_doc = await db.users.find_one({"id": user_id}, {
+        "_id": 0,
+        # Dealer
+        "dealer_subscription_active": 1, "dealer_subscription_status": 1,
+        "dealer_subscription_renewal": 1, "dealer_subscription_start": 1,
+        "dealer_subscription_manual_method": 1, "dealer_subscription_manual_reference": 1,
+        "vehicle_dealer_suspended": 1,
+        # Partner
+        "partner_subscription_active": 1, "partner_subscription_status": 1,
+        "partner_subscription_renewal": 1, "partner_subscription_start": 1,
+        # Storage facility
+        "storage_subscription_active": 1, "storage_subscription_status": 1,
+        "storage_subscription_renewal": 1,
+        # Account flags
+        "is_vehicle_dealer": 1, "is_licensed_partner": 1, "is_storage_facility": 1,
+        "buyer_tier": 1, "account_type": 1,
+    }) or {}
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user_doc
+

@@ -46,6 +46,25 @@ const GlobalDealerFeeBanner = () => {
 
   useEffect(() => { fetchStatus(); }, [fetchStatus]);
 
+  // iter215 — Re-fetch on every tab-focus so the moment the admin settles
+  // the subscription, the next user interaction makes the banner vanish.
+  useEffect(() => {
+    if (!user?.is_vehicle_dealer || !token) return undefined;
+    const onVisible = () => {
+      if (!document.hidden) fetchStatus();
+    };
+    const onFocus = () => fetchStatus();
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onFocus);
+    // Lightweight 60 s polling as a safety net
+    const poll = setInterval(() => fetchStatus(), 60_000);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onFocus);
+      clearInterval(poll);
+    };
+  }, [user?.is_vehicle_dealer, token, fetchStatus]);
+
   // Refresh on Stripe-checkout redirect (?dealer_fee=success)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -55,8 +74,16 @@ const GlobalDealerFeeBanner = () => {
   if (loading) return null;
   if (!user?.is_vehicle_dealer) return null;
   if (status?.is_demo_account) return null;
-  // Banner ONLY shows when there is NO active subscription.
-  if (status?.has_active_subscription) return null;
+  // iter215 — `/dealer-subscription/status` returns `{active, has_subscription, suspended, ...}`,
+  // NOT `has_active_subscription`. The banner only hides when the dealer has
+  // an active, non-suspended subscription. (Previous iter214 code read a
+  // non-existent field, which is why the banner stayed visible after admin
+  // manual-settle marked the subscription Paid.)
+  const hasActive =
+    status?.active === true ||
+    status?.has_active_subscription === true ||
+    status?.dealer_subscription_active === true;
+  if (hasActive) return null;
 
   const handlePay = async () => {
     try {
