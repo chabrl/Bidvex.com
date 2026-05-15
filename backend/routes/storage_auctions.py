@@ -702,6 +702,17 @@ async def create_storage_auction(
                 "message_fr": "Vous devez définir un montant de dépôt lorsqu'un dépôt est requis.",
             },
         )
+    # iter216 P1 — Mandatory legal-notice confirmation
+    if not payload.accepted_legal_notice:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "legal_notice_required",
+                "message_en": "You must confirm the legal-notification process before publishing this auction.",
+                "message_fr": "Vous devez confirmer le processus de notification légale avant de publier cette enchère.",
+            },
+        )
+
 
     db = get_db()
     auction_id = str(uuid.uuid4())
@@ -752,6 +763,10 @@ async def create_storage_auction(
         # Currency (Spec Global Rule 1)
         "currency": (payload.currency or "CAD").upper(),
         "cleanup_deadline": cleanup_deadline.isoformat(),
+        # iter216 P1 — Buyer's Premium captured at listing time
+        "buyer_premium_pct": float(payload.buyer_premium_pct or 0.0),
+        "accepted_legal_notice": bool(payload.accepted_legal_notice),
+        "accepted_legal_notice_at": _now().isoformat() if payload.accepted_legal_notice else None,
         "created_at": _now().isoformat(),
         "updated_at": _now().isoformat(),
     }

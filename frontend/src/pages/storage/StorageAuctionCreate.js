@@ -39,6 +39,12 @@ const StorageAuctionCreate = () => {
     cleanup_deadline_hours: 72,
     // ── Payment method (single) ──
     payment_method: 'stripe',
+    // ── iter216 P1 — Buyer's Premium (optional). Default 0% means the
+    // facility absorbs the full BidVex 5% commission. Setting BP passes
+    // some/all of that to the buyer.
+    buyer_premium_pct: 0,
+    // ── iter216 P1 — Legal-notice confirmation (mandatory before publish) ──
+    accepted_legal_notice: false,
     // ── Currency (Spec Global Rule 1) ──
     currency: 'CAD',
     // ── Optional participation deposit ──
@@ -83,6 +89,19 @@ const StorageAuctionCreate = () => {
       toast.error(t('storage.create.setADepositAmount0'));
       return;
     }
+    // iter216 P1 — Mandatory legal-notice + photo minimum
+    if (!form.accepted_legal_notice) {
+      toast.error(isFr
+        ? 'Veuillez confirmer le processus de notification légale.'
+        : 'Please confirm the legal-notification process.');
+      return;
+    }
+    if (!form.photos || form.photos.length < 1) {
+      toast.error(isFr
+        ? 'Veuillez téléverser au moins 1 photo de l\'unité.'
+        : 'Please upload at least 1 photo of the unit.');
+      return;
+    }
     setSubmitting(true);
     try {
       const payload = {
@@ -98,6 +117,8 @@ const StorageAuctionCreate = () => {
         currency: (form.currency || 'CAD').toUpperCase(),
         start_time: new Date(form.start_time).toISOString(),
         end_time: new Date(form.end_time).toISOString(),
+        // iter216 P1 — Buyer's Premium (0–20 % range enforced on input)
+        buyer_premium_pct: parseFloat(form.buyer_premium_pct) || 0,
       };
       const res = await axios.post(`${API}/storage-facilities/auctions`, payload, {
         headers: { Authorization: `Bearer ${token}` },
@@ -354,6 +375,55 @@ const StorageAuctionCreate = () => {
                   )}
                 </div>
               </div>
+            </div>
+
+            {/* iter216 P1 — Buyer's Premium (BP) */}
+            <div className="rounded-lg border-2 border-blue-200 dark:border-blue-900 bg-blue-50/40 dark:bg-blue-950/20 p-4 space-y-2" data-testid="bp-section">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <Label className="text-sm font-semibold">
+                  {isFr ? "Prime de l'acheteur (PA / BP)" : "Buyer's Premium (BP)"}
+                </Label>
+                <span className="text-xs text-muted-foreground">
+                  {isFr ? 'Optionnel — défaut 0 %' : 'Optional — default 0%'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min="0"
+                  max="20"
+                  step="0.5"
+                  className="max-w-[100px]"
+                  value={form.buyer_premium_pct}
+                  onChange={e => set('buyer_premium_pct', Math.max(0, Math.min(20, parseFloat(e.target.value) || 0)))}
+                  data-testid="bp-input"
+                />
+                <span className="text-sm font-medium">%</span>
+                <span className="text-xs text-muted-foreground">
+                  {isFr ? "ajouté au prix marteau" : "added on top of the winning bid"}
+                </span>
+              </div>
+              <p className="text-[11px] text-blue-800 dark:text-blue-300 leading-relaxed">
+                ℹ️ {isFr
+                  ? "BidVex facture à votre établissement 5 % de commission. Vous pouvez transférer une partie ou la totalité de ces frais à l'acheteur via la Prime de l'acheteur. Exemple : fixez 5 % de PA pour atteindre l'équilibre."
+                  : "BidVex charges your facility 5% commission. You may pass some or all of this to the buyer via Buyer's Premium. Example: set 5% BP to break even."}
+              </p>
+            </div>
+
+            {/* iter216 P1 — Mandatory legal-notice confirmation */}
+            <div className="rounded-lg border-2 border-amber-300 dark:border-amber-900 bg-amber-50/60 dark:bg-amber-950/30 p-4">
+              <label className="flex items-start gap-2 cursor-pointer">
+                <Checkbox
+                  checked={form.accepted_legal_notice}
+                  onCheckedChange={v => set('accepted_legal_notice', v === true)}
+                  className="mt-0.5"
+                  data-testid="legal-notice-checkbox"
+                />
+                <span className="text-xs leading-relaxed text-amber-900 dark:text-amber-200">
+                  <strong>EN:</strong> I confirm this unit has gone through the required legal-notification process and its contents may be auctioned under the relevant provincial law.<br/><br/>
+                  <strong>FR :</strong> Je confirme que cette unité a fait l'objet du processus de notification légale requis et que son contenu peut être mis aux enchères en vertu de la loi provinciale applicable.
+                </span>
+              </label>
             </div>
 
             <Button type="submit" disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 text-white" data-testid="create-auction-submit">

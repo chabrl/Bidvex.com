@@ -177,7 +177,67 @@ async def manual_settle_subscription(
     if account_kind == "vehicle_dealer":
         set_payload["vehicle_dealer_suspended"] = False
 
+    # iter216 — Backwards-compat field aliases. Each account-type dashboard
+    # historically read a different field name; the manual-settle code path
+    # only flipped the new normalised `*_subscription_active` field, so the
+    # dashboards stayed showing "Annual Payment Required" until someone
+    # noticed (Alex Boulanger). Write the legacy aliases too:
+    if account_kind == "partner":
+        set_payload["platform_fee_paid"] = True
+        set_payload["partner_fee_paid_at"] = now.isoformat()
+        set_payload["partner_payment_method"] = pm
+        set_payload["partner_payment_reference"] = reference_number.strip()
+        set_payload["partner_payment_amount"] = float(amount_cad)
+        set_payload["partner_payment_confirmed_by"] = admin_user_id
+        set_payload["partner_subscription_paid_at"] = now.isoformat()
+        set_payload["partner_subscription_renewal_date"] = renewal_iso
+    elif account_kind == "vehicle_dealer":
+        set_payload["dealer_subscription_paid_at"] = now.isoformat()
+        set_payload["dealer_subscription_renewal_date"] = renewal_iso
+        set_payload["dealer_payment_method"] = pm
+        set_payload["dealer_payment_reference"] = reference_number.strip()
+        set_payload["dealer_payment_amount"] = float(amount_cad)
+        set_payload["dealer_payment_confirmed_by"] = admin_user_id
+    elif account_kind == "storage_facility":
+        set_payload["storage_subscription_paid_at"] = now.isoformat()
+        set_payload["storage_subscription_renewal_date"] = renewal_iso
+        set_payload["storage_payment_method"] = pm
+        set_payload["storage_payment_reference"] = reference_number.strip()
+        set_payload["storage_payment_amount"] = float(amount_cad)
+        set_payload["storage_payment_confirmed_by"] = admin_user_id
+
     await db.users.update_one({"id": target_user_id}, {"$set": set_payload})
+
+    # iter216 — Persist a normalised payment record so the new
+    # `payments` collection is the single source of truth for reporting.
+    try:
+        import uuid as _u
+        await db.payments.insert_one({
+            "id": str(_u.uuid4()),
+            "user_id": target_user_id,
+            "payment_type": "annual_subscription",
+            "account_type": account_kind,
+            "amount_cad": float(amount_cad),
+            "method": pm,
+            "reference_number": reference_number.strip(),
+            "confirmed_by": admin_user_id,
+            "confirmed_at": now.isoformat(),
+            "notes": notes,
+            "renewal_until": renewal_iso,
+        })
+    except Exception as e:
+        logger.warning(f"[manual-settle] payments insert failed (non-fatal): {e}")
+
+    # iter216 — Send bilingual confirmation email to the user
+    try:
+        from services.email_notifications import send_manual_subscription_active_email
+        await send_manual_subscription_active_email(
+            user=user, account_kind=account_kind,
+            amount_cad=float(amount_cad), method=pm,
+            renewal_until=renewal_iso, reference=reference_number.strip(),
+        )
+    except Exception as e:
+        logger.warning(f"[manual-settle] confirmation email failed: {e}")
 
     # Void any open Stripe subscription invoices to avoid double-charge
     sub_id = user.get("dealer_stripe_subscription_id") or user.get("vehicle_dealer_subscription_id")

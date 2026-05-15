@@ -706,6 +706,49 @@ async def create_partner_billing_portal(current_user: User = Depends(get_current
 
 
 
+# iter216 — Lightweight status endpoint for the partner annual-fee banner
+# polling. Kept separate from the heavy /dashboard endpoint so the frontend
+# can poll every 60 s without re-running the full aggregation.
+
+@partners_router.get("/partner/subscription/status")
+async def get_partner_subscription_status(current_user: User = Depends(get_current_user)):
+    """Returns the partner's annual-subscription status.
+
+    Mirrors the same active-detection logic the dashboard uses so the banner
+    polling never disagrees with the dashboard. Returns 200 even when the
+    user is not a partner — `active` is just False in that case.
+    """
+    db = get_db()
+    user_doc = await db.users.find_one({"id": current_user.id}, {
+        "_id": 0, "platform_fee_paid": 1,
+        "partner_subscription_active": 1,
+        "partner_subscription_paid_at": 1,
+        "partner_subscription_renewal_date": 1,
+        "partner_payment_method": 1,
+        "partner_fee_paid_at": 1,
+    }) or {}
+    active = bool(
+        user_doc.get("platform_fee_paid")
+        or user_doc.get("partner_subscription_active")
+    )
+    renewal = user_doc.get("partner_subscription_renewal_date")
+    days_left = None
+    if renewal:
+        try:
+            renewal_dt = datetime.fromisoformat(renewal.replace("Z", "+00:00"))
+            days_left = max(0, (renewal_dt - datetime.now(timezone.utc)).days)
+        except Exception:
+            days_left = None
+    return {
+        "active": active,
+        "renewal_date": renewal,
+        "payment_method": user_doc.get("partner_payment_method"),
+        "paid_at": user_doc.get("partner_subscription_paid_at") or user_doc.get("partner_fee_paid_at"),
+        "days_until_renewal": days_left,
+    }
+
+
+
 @partners_router.get("/partner/dashboard")
 async def get_partner_dashboard(current_user: User = Depends(get_current_user)):
     """Get aggregated dashboard data for partner accounts. Admins can also access."""
@@ -767,11 +810,36 @@ async def get_partner_dashboard(current_user: User = Depends(get_current_user)):
             "email": user_doc.get("email"),
             "verified_at": user_doc.get("partner_verified_at"),
             "custom_premium_rate": user_doc.get("custom_premium_rate"),
-            "platform_fee_paid": user_doc.get("platform_fee_paid", False),
-            "partner_fee_paid_at": user_doc.get("partner_fee_paid_at"),
+            # iter216 — `platform_fee_paid` is the legacy paid-via-Stripe flag.
+            # `partner_subscription_active` is the modern unified flag set by the
+            # admin "Manual Settle" action (for e-Transfer / cash / cheque).
+            # Either is sufficient to show "Active" on the dashboard.
+            "platform_fee_paid": bool(
+                user_doc.get("platform_fee_paid")
+                or user_doc.get("partner_subscription_active")
+            ),
+            "partner_fee_paid_at": user_doc.get("partner_fee_paid_at") or user_doc.get("partner_subscription_paid_at"),
+            "partner_subscription_active": bool(user_doc.get("partner_subscription_active")),
+            "partner_subscription_renewal_date": user_doc.get("partner_subscription_renewal_date"),
+            "partner_payment_method": user_doc.get("partner_payment_method"),
             "stripe_connect_status": user_doc.get("stripe_connect_status"),
         },
-        "subscription": subscription_info,
+        "subscription": subscription_info or (
+            # iter216 — Synthesise a subscription block when admin manual-settled
+            # so the partner dashboard's `subscription?.status === 'active'` check
+            # still resolves to `active`.
+            {
+                "status": "active",
+                "current_period_end": user_doc.get("partner_subscription_renewal_date"),
+                "current_period_start": user_doc.get("partner_subscription_paid_at"),
+                "cancel_at_period_end": False,
+                "plan_amount": 100,
+                "plan_currency": "cad",
+                "plan_interval": "year",
+                "manual_settled": True,
+                "payment_method": user_doc.get("partner_payment_method"),
+            } if user_doc.get("partner_subscription_active") else None
+        ),
         "stats": {
             "active_listings": active_listings + active_multi,
             "total_listings": total_listings + total_multi,

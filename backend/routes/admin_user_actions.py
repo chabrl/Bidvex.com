@@ -543,3 +543,89 @@ async def admin_user_subscription_status(
         raise HTTPException(status_code=404, detail="User not found")
     return user_doc
 
+
+# ───────────────────────────────────────────────────────────────────────
+# iter216 P3 — Admin visibility + control over the 6-email onboarding journey
+# ───────────────────────────────────────────────────────────────────────
+
+
+@router.get("/{user_id}/email-journey")
+async def admin_get_user_email_journey(
+    user_id: str,
+    current_user: User = Depends(_require_admin),
+):
+    """Returns the full journey doc for the admin user-detail panel."""
+    db = get_db()
+    j = await db.user_email_journey.find_one({"user_id": user_id}, {"_id": 0})
+    if not j:
+        return {"journey": None, "status": "not_enrolled"}
+    return {"journey": j, "status": "enrolled" if j.get("journey_active") else "completed"}
+
+
+@router.post("/{user_id}/email-journey/trigger/{email_number}")
+async def admin_trigger_journey_email(
+    user_id: str,
+    email_number: int,
+    current_user: User = Depends(_require_admin),
+):
+    """Admin manually fires one of the 6 emails NOW (re-sends if already
+    sent — useful for support cases)."""
+    db = get_db()
+    user_doc = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    if email_number not in {1, 2, 3, 4, 5, 6}:
+        raise HTTPException(status_code=400, detail="email_number must be 1–6")
+    from services.email_journey import dispatch_journey_email
+    ok = await dispatch_journey_email(db, user_doc, email_number=email_number)
+    await _record_admin_action(
+        db, admin_id=current_user.id, admin_email=current_user.email,
+        action="journey_manual_trigger", target_user_id=user_id,
+        content={"email_number": email_number, "success": ok},
+    )
+    return {"success": ok, "email_number": email_number}
+
+
+@router.post("/{user_id}/email-journey/cancel")
+async def admin_cancel_journey(
+    user_id: str,
+    current_user: User = Depends(_require_admin),
+):
+    """Cancel the remaining journey emails for a user."""
+    db = get_db()
+    res = await db.user_email_journey.update_one(
+        {"user_id": user_id},
+        {"$set": {
+            "journey_active": False,
+            "journey_cancelled_at": datetime.now(timezone.utc).isoformat(),
+            "journey_cancelled_by": current_user.id,
+        }},
+    )
+    await _record_admin_action(
+        db, admin_id=current_user.id, admin_email=current_user.email,
+        action="journey_cancel", target_user_id=user_id,
+        content={"matched": res.matched_count},
+    )
+    return {"success": True, "matched": res.matched_count}
+
+
+@router.post("/{user_id}/email-journey/reset")
+async def admin_reset_journey(
+    user_id: str,
+    current_user: User = Depends(_require_admin),
+):
+    """Delete the existing journey + re-enrol from Email 1."""
+    db = get_db()
+    await db.user_email_journey.delete_one({"user_id": user_id})
+    user_doc = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    from services.email_journey import schedule_journey_for_user
+    journey_id = await schedule_journey_for_user(db, user_doc)
+    await _record_admin_action(
+        db, admin_id=current_user.id, admin_email=current_user.email,
+        action="journey_reset", target_user_id=user_id,
+        content={"new_journey_id": journey_id},
+    )
+    return {"success": True, "journey_id": journey_id}
+

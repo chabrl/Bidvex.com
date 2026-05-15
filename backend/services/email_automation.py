@@ -390,6 +390,15 @@ def register_lifecycle_jobs(scheduler, db: AsyncIOMotorDatabase):
     scheduler.add_job(_run_subscription_expiry, "cron", hour=9, minute=30, id="lifecycle_subscription", replace_existing=True)
     scheduler.add_job(_run_abandoned_bid, "cron", hour=10, minute=0, id="lifecycle_abandoned_bid", replace_existing=True)
 
+    # iter216 P3 — Process every user's 6-email journey daily at 09:45 UTC.
+    def _run_journey_cron():
+        from services.email_journey import process_due_journey_emails
+        asyncio.get_event_loop().create_task(process_due_journey_emails(db))
+    scheduler.add_job(
+        _run_journey_cron, "cron", hour=9, minute=45,
+        id="lifecycle_journey", replace_existing=True,
+    )
+
     def _run_stripe_audit():
         from services.stripe_customer_service import audit_stripe_customers
         asyncio.get_event_loop().create_task(audit_stripe_customers(db))

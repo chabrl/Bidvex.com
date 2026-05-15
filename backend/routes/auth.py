@@ -328,6 +328,15 @@ async def register(user_data: UserCreate, request: Request, background_tasks: Ba
         logger.info(f"[SIGNUP_EMAILS] Scheduled welcome + admin notify for {normalized_email} (provider=email)")
     except Exception as e:
         logger.error(f"[SIGNUP_EMAILS] Failed to schedule signup emails for {normalized_email}: {e}")
+
+    # iter216 P3 — Enrol every new user in the 6-email onboarding journey.
+    # Email 1 (Welcome) fires immediately; 2–6 are scheduled in the
+    # `user_email_journey` collection and dispatched by the daily cron.
+    try:
+        from services.email_journey import schedule_journey_for_user
+        background_tasks.add_task(schedule_journey_for_user, db, user_doc)
+    except Exception as e:
+        logger.error(f"[JOURNEY] Failed to enrol {normalized_email}: {e}")
     
     # Audit log for currency
     await db.currency_audit_logs.insert_one({
@@ -1274,6 +1283,13 @@ async def google_oauth_callback(request: Request, background_tasks: BackgroundTa
             logger.info(f"[SIGNUP_EMAILS] Scheduled welcome + admin notify for {google_email} (provider=google)")
         except Exception as e:
             logger.error(f"[SIGNUP_EMAILS] Failed to schedule Google signup emails for {google_email}: {e}")
+
+        # iter216 P3 — Enrol Google-OAuth signups in the 6-email journey too.
+        try:
+            from services.email_journey import schedule_journey_for_user
+            background_tasks.add_task(schedule_journey_for_user, db, user)
+        except Exception as e:
+            logger.error(f"[JOURNEY] Failed to enrol Google user {google_email}: {e}")
     else:
         # Update existing user with latest Google data + login timestamp
         await db.users.update_one(

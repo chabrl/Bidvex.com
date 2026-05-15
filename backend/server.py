@@ -169,6 +169,28 @@ async def lifespan(app):
     except Exception as e:
         logger.warning(f"[iter212] storage-facility grandfather pass failed (non-fatal): {e}")
 
+    # ── iter216 — Sync legacy/new subscription fields so dashboards never
+    # disagree with admin manual-settle. For every partner / dealer / facility
+    # who has the modern `*_subscription_active=True` flag but is MISSING
+    # the legacy alias, set the legacy alias too. Idempotent.
+    try:
+        res_p = await db.users.update_many(
+            {"partner_subscription_active": True, "platform_fee_paid": {"$ne": True}},
+            {"$set": {"platform_fee_paid": True, "iter216_sync_applied": True}},
+        )
+        if res_p.modified_count:
+            logger.info(f"[iter216] synced platform_fee_paid on {res_p.modified_count} partner accounts (incl. Alex Boulanger)")
+        # Also handle the reverse — someone paid via Stripe (legacy) but never
+        # got the modern active flag flipped (so subscription panels look stale).
+        res_p2 = await db.users.update_many(
+            {"platform_fee_paid": True, "partner_subscription_active": {"$ne": True}},
+            {"$set": {"partner_subscription_active": True, "iter216_sync_applied": True}},
+        )
+        if res_p2.modified_count:
+            logger.info(f"[iter216] synced partner_subscription_active on {res_p2.modified_count} stripe-paid partners")
+    except Exception as e:
+        logger.warning(f"[iter216] partner-fee sync failed (non-fatal): {e}")
+
     # ── iter194 — Vehicle dealer license / unlock-fee backfill ──
     try:
         from routes.vehicle_dealer_extras import migrate_existing_vehicle_listings

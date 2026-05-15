@@ -1,6 +1,69 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter215 — Banner Auto-Refresh + Full Admin User Management (Feb 14, 2026) ✅
+## Latest: iter216 — Production Emergency (Alex Boulanger + Storage BP + 6-Email Journey) (Feb 14, 2026) ✅
+
+### 🐛 Issue 2 — Partner subscription field mismatch (Alex Boulanger)
+- **Root cause**: `manual_settlement_service.manual_settle_subscription_payment` wrote ONLY the modern `partner_subscription_active=True`. The partner dashboard read `partner.platform_fee_paid` AND `subscription?.status === 'active'`. Two different fields → dashboard never saw the activation → banner stayed visible.
+- **Fix**:
+  - `manual_settle_subscription_payment` now also writes legacy alias `platform_fee_paid=True` for partners (and `dealer_*` / `storage_*` aliases for the other types). Persists a record in the `payments` collection.
+  - `/api/partner/dashboard` accepts EITHER field as proof of active status + synthesises a `subscription` block when admin manual-settled.
+  - NEW `/api/partner/subscription/status` endpoint for lightweight polling.
+  - Partner dashboard polls every 60 s + refreshes on tab-focus (same pattern as iter215 dealer banner).
+  - **Startup migration** in `server.py` syncs every partner where the modern flag is True but legacy is False (and vice-versa). Verified in preview: 1 partner account fixed (Alex Boulanger will be auto-fixed on next production redeploy).
+- NEW bilingual EN+FR `send_manual_subscription_active_email` fired the moment admin manual-settles (covers partner / dealer / facility) with amount, method, renewal date.
+
+### ✅ Issue 1 — Storage Auction creation form: BP field + legal-notice gate
+- **Finding**: `/storage-auctions/create` route + dashboard "Create New Auction" button were **already present**. The actual missing pieces were:
+  - Buyer's Premium % field (0–20 range, default 0)
+  - Mandatory legal-notice confirmation checkbox
+- **Fix**:
+  - Added `buyer_premium_pct: float = Field(0.0, ge=0.0, le=20.0)` + `accepted_legal_notice: bool` to `StorageAuctionCreate` model.
+  - Frontend Step renders the BP section with bilingual hint ("Set 5% BP to break even") + the legal-notice checkbox.
+  - Backend rejects publish with HTTP 422 + bilingual error if `accepted_legal_notice` is false.
+  - Form requires ≥1 photo before submit.
+
+### ✅ Issue 3 — 6-email automated onboarding journey
+- NEW `services/email_journey.py`:
+  - 6 bilingual EN+FR Gmail-compatible templates (table-based inline styles, Arial fallback, white background, BidVex brand blue #2563eb).
+  - `schedule_journey_for_user(db, user)` — fires Email 1 immediately + writes 5 future emails into `user_email_journey` collection.
+  - `dispatch_journey_email(db, user, email_number)` — single-email sender with skip rules for demo / unsubscribed / suspended.
+  - `process_due_journey_emails(db)` — daily cron at **09:45 UTC** (registered alongside the existing onboarding cron in `email_automation.py`).
+  - Day 30 email is **conditional on zero activity** (`_user_is_engaged` checks `bids`, `listings`, `transactions` collections).
+- Wired into BOTH register endpoints (email/password + Google OAuth) via FastAPI `BackgroundTasks` so registration response time is unaffected.
+- NEW admin endpoints for journey visibility + manual control:
+  - `GET /api/admin/users/{id}/email-journey` — full journey snapshot
+  - `POST /api/admin/users/{id}/email-journey/trigger/{n}` — manually fire email N
+  - `POST /api/admin/users/{id}/email-journey/cancel` — stop remaining
+  - `POST /api/admin/users/{id}/email-journey/reset` — wipe + re-enrol from Email 1
+- Each Sunday/registration triggers a fresh 30-day arc.
+
+### Test Status
+- **22/22 new iter216 backend tests pass** (BP model + form, partner sync, status endpoint, startup migration, polling, journey schedule, 6 builders, skip logic, registration enrolment, admin endpoints, journey cron).
+- **Full sweep: 315 passed + 13 skipped** across iter209/210/211/212/213/214/215/216. 2 transient 429 flakes resolved on retry. Net +24 tests since session start.
+- Backend lifespan healthy. Frontend compiles clean.
+
+### Files of reference (iter216)
+- `/app/backend/services/manual_settlement_service.py` (legacy-field aliases for partner / dealer / facility)
+- `/app/backend/routes/partners.py` (dashboard active-detection + new status endpoint)
+- `/app/backend/services/email_notifications.py` (`send_manual_subscription_active_email`)
+- `/app/backend/server.py` (startup migration syncs `platform_fee_paid` ↔ `partner_subscription_active`)
+- `/app/backend/models/storage_auction.py` (`buyer_premium_pct`, `accepted_legal_notice`)
+- `/app/backend/routes/storage_auctions.py` (legal-notice enforcement + BP persistence)
+- `/app/backend/services/email_journey.py` (NEW — 6 builders, schedule + dispatch + cron)
+- `/app/backend/services/email_automation.py` (registered `lifecycle_journey` cron)
+- `/app/backend/routes/admin_user_actions.py` (4 new journey endpoints)
+- `/app/backend/routes/auth.py` (enrol on email + Google registration)
+- `/app/frontend/src/pages/PartnerDashboard.js` (60 s polling + visibilitychange)
+- `/app/frontend/src/pages/storage/StorageAuctionCreate.js` (BP + legal-notice UI)
+- `/app/backend/tests/test_iter216_production_emergency.py` (NEW — 22 tests)
+
+⚠️ **Production push required**: changes are in PREVIEW. Once deployed:
+- Alex Boulanger's banner will disappear automatically (startup migration).
+- New users will receive the welcome email + the 6-email journey arc.
+
+---
+
+## Previous: iter215 — Banner Auto-Refresh + Full Admin User Management (Feb 14, 2026) ✅
 
 ### 🐛 Bug fix — Dealer banner not disappearing after admin "Manual Settle"
 - **Root cause**: `GlobalDealerFeeBanner.jsx` (added in iter214) was reading `status?.has_active_subscription` — a field that **does not exist** on the `/api/dealer-subscription/status` response. The actual flags are `active`, `has_subscription`, and `dealer_subscription_active`. So the banner showed for everyone.

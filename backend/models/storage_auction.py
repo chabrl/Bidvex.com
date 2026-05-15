@@ -94,6 +94,14 @@ class StorageAuctionCreate(BaseModel):
     # ── CURRENCY (Spec Global Rule 1) ──
     currency: str = Field(default="CAD")  # "CAD" | "USD"
 
+    # ── iter216 P1 — Optional Buyer's Premium (0–20 %) charged on top of the
+    # hammer price. Default 0 means the facility absorbs the BidVex 5%
+    # commission entirely. Setting BP passes some/all to the buyer.
+    buyer_premium_pct: float = Field(default=0.0, ge=0.0, le=20.0)
+
+    # ── iter216 P1 — Legal-notice confirmation (required before publish) ──
+    accepted_legal_notice: bool = False
+
     @field_validator("payment_method")
     @classmethod
     def _vm(cls, v):

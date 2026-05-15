@@ -2063,6 +2063,79 @@ async def send_seller_pickup_instructions_email(
 # Fires for both the auction winner and the seller when an auction ends and
 # a conversation is opened in `routes.messages.create_auction_won_conversation`.
 
+# iter216 — Bilingual EN+FR "subscription active" email sent the moment an
+# admin manual-settles an annual fee (partner / vehicle dealer / storage).
+
+async def send_manual_subscription_active_email(
+    *, user: dict, account_kind: str, amount_cad: float,
+    method: str, renewal_until: str, reference: str = "",
+) -> bool:
+    if not user or not user.get("email"):
+        return False
+    name = user.get("name") or user.get("email")
+    kind_label_en = {
+        "partner": "Partner",
+        "vehicle_dealer": "Vehicle Dealer",
+        "storage_facility": "Storage Facility",
+    }.get(account_kind, "Annual Subscription")
+    kind_label_fr = {
+        "partner": "Partenaire",
+        "vehicle_dealer": "Concessionnaire de véhicules",
+        "storage_facility": "Facilité d'entreposage",
+    }.get(account_kind, "Abonnement annuel")
+    method_label_en = {
+        "e_transfer": "Interac e-Transfer",
+        "cash": "Cash",
+        "cheque": "Cheque",
+        "wire": "Wire / Bank Transfer",
+    }.get(method, method.replace("_", " ").title())
+    method_label_fr = {
+        "e_transfer": "Virement Interac",
+        "cash": "Comptant",
+        "cheque": "Chèque",
+        "wire": "Virement bancaire",
+    }.get(method, method.replace("_", " ").title())
+    renewal_short = (renewal_until or "")[:10]
+    ref_html = f"<p style='margin:6px 0;font-size:12px;color:#64748b;'>Reference / Référence: <code>{reference}</code></p>" if reference else ""
+    html = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;background:#f8fafc;">
+      <div style="padding:24px;background:white;border-radius:12px;border:1px solid #e2e8f0;">
+        <h2 style="color:#16a34a;margin:0 0 10px;">✅ Your annual subscription is active</h2>
+        <p style="color:#334155;line-height:1.6;">Hi <strong>{name}</strong>,</p>
+        <p style="color:#334155;line-height:1.6;">Your <strong>BidVex {kind_label_en}</strong> annual subscription payment has been confirmed by our team.</p>
+        <div style="background:#ecfdf5;border:1px solid #16a34a;border-radius:8px;padding:14px;margin:12px 0;">
+          <p style="margin:4px 0;"><strong>Amount paid:</strong> CA${amount_cad:,.2f}</p>
+          <p style="margin:4px 0;"><strong>Method:</strong> {method_label_en}</p>
+          <p style="margin:4px 0;"><strong>Active until:</strong> {renewal_short}</p>
+          {ref_html}
+        </div>
+        <p style="color:#334155;line-height:1.6;">All features are now unlocked on your dashboard.</p>
+
+        <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0;">
+
+        <h2 style="color:#16a34a;margin:0 0 10px;">✅ Votre abonnement annuel est actif</h2>
+        <p style="color:#334155;line-height:1.6;">Bonjour <strong>{name}</strong>,</p>
+        <p style="color:#334155;line-height:1.6;">Votre paiement d'abonnement annuel BidVex <strong>{kind_label_fr}</strong> a été confirmé par notre équipe.</p>
+        <div style="background:#ecfdf5;border:1px solid #16a34a;border-radius:8px;padding:14px;margin:12px 0;">
+          <p style="margin:4px 0;"><strong>Montant payé :</strong> {amount_cad:,.2f} $ CAD</p>
+          <p style="margin:4px 0;"><strong>Méthode :</strong> {method_label_fr}</p>
+          <p style="margin:4px 0;"><strong>Actif jusqu'au :</strong> {renewal_short}</p>
+        </div>
+        <p style="color:#334155;line-height:1.6;">Toutes les fonctionnalités sont maintenant débloquées sur votre tableau de bord.</p>
+
+        <p style="color:#94a3b8;font-size:11px;text-align:center;margin-top:24px;">
+          BidVex Inc. · GST# 706766367RT0001 · QST# 1233530880TQ0001 · All amounts in CAD
+        </p>
+      </div>
+    </div>
+    """
+    return await send_email(
+        to_email=user["email"],
+        subject="✅ Your annual subscription is active · Votre abonnement annuel est actif — BidVex",
+        html_content=html,
+    )
+
+
 async def send_auction_thread_opened_email(
     *,
     recipient: dict,

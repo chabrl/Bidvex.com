@@ -60,6 +60,23 @@ export default function PartnerDashboard() {
     fetchDashboard();
   }, [user, navigate, fetchDashboard]);
 
+  // iter216 — Refresh subscription status on tab focus + every 60 s so the
+  // "Annual Payment Required" banner disappears the moment admin manual-
+  // settles, without a hard refresh. Same pattern as iter215 dealer banner.
+  useEffect(() => {
+    if (!user?.is_partner && user?.role !== 'admin' && user?.role !== 'superadmin') return undefined;
+    const onVisible = () => { if (!document.hidden) fetchDashboard(); };
+    const onFocus = () => fetchDashboard();
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onFocus);
+    const poll = setInterval(() => fetchDashboard(), 60_000);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onFocus);
+      clearInterval(poll);
+    };
+  }, [user, fetchDashboard]);
+
   useEffect(() => {
     const status = searchParams.get('partner_payment');
     const sessionId = searchParams.get('session_id');
