@@ -11,6 +11,7 @@ import {
   List as ListIcon, Star, Sparkles, Eye, Building2
 } from 'lucide-react';
 import Countdown from 'react-countdown';
+import SafeImage from '../components/SafeImage';
 import WishlistHeartButton from '../components/WishlistHeartButton';
 import MarketplaceSidebar from '../components/MarketplaceSidebar';
 import { VerifiedBadge } from '../components/VerifiedBadge';
@@ -106,7 +107,7 @@ const LotsMarketplacePage = () => {
         <Link to={`/lots/${listing.id}`} className="block relative">
           <div className="aspect-[4/3] overflow-hidden bg-slate-100 dark:bg-slate-800">
             {imageUrl ? (
-              <img src={imageUrl} alt={getLocalized(listing, "title")} width={400} height={300} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+              <SafeImage src={imageUrl} alt={getLocalized(listing, "title")} width={400} height={300} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <Package className="h-16 w-16" style={{ color: '#94a3b8' }} />

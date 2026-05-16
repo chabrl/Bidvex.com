@@ -1,5 +1,6 @@
 import API_BASE from '../config';
 import ErrorBoundary from '../components/ErrorBoundary';
+import SafeImage from '../components/SafeImage';
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -392,10 +393,11 @@ const ListingDetailPage = () => {
               }}
             >
               {listing.images && listing.images.length > 0 ? (
-                <img
+                <SafeImage
                   src={listing.images[0]}
                   alt={getLocalized(listing, 'title')}
                   className="w-full h-full object-cover"
+                  data-testid="listing-detail-primary-image"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-accent/10">
@@ -415,7 +417,7 @@ const ListingDetailPage = () => {
                       setLightboxOpen(true);
                     }}
                   >
-                    <img src={img} alt={`${getLocalized(listing, 'title')} ${idx + 2}`} className="w-full h-full object-cover" />
+                    <SafeImage src={img} alt={`${getLocalized(listing, 'title')} ${idx + 2}`} className="w-full h-full object-cover" />
                   </div>
                 ))}
               </div>

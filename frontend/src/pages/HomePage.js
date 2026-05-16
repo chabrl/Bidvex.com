@@ -9,6 +9,7 @@ import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import HeroPhone from '../components/HeroPhone';
 import RecentlySoldTicker from '../components/RecentlySoldTicker';
+import SafeImage from '../components/SafeImage';
 import { 
   ArrowRight, Gavel, TrendingUp, Shield, Users, Award, Flame, 
   Search, Trophy, CreditCard, Sparkles, Clock, CheckCircle2,
@@ -413,7 +414,7 @@ const LiveAuctionCard = ({ item, index, isVisible, navigate }) => {
     >
       <div className="relative h-40 sm:h-48 overflow-hidden bg-slate-100 dark:bg-slate-700">
         {item.images?.[0] ? (
-          <img src={item.images[0]} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+          <SafeImage src={item.images[0]} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-600">
             <span className="text-5xl">📦</span>
@@ -507,7 +508,7 @@ const HotItemsSection = ({ items, navigate }) => {
             >
               <div className="relative h-44 sm:h-52 overflow-hidden">
                 {item.images?.[0] ? (
-                  <img src={item.images[0]} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 hover:scale-110" />
+                  <SafeImage src={item.images[0]} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 hover:scale-110" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 dark:from-blue-900 dark:to-slate-900">
                     <Package className="h-16 w-16 text-slate-300 dark:text-slate-600" />
@@ -595,7 +596,7 @@ const FeaturedSection = ({ items, navigate }) => {
               onClick={() => navigate(getItemDetailPath(item))}            >
               <div className="relative aspect-square overflow-hidden bg-slate-100 dark:bg-slate-700">
                 {item.images?.[0] ? (
-                  <img src={item.images[0]} alt={item.title} className="w-full h-full object-cover" />
+                  <SafeImage src={item.images[0]} alt={item.title} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-600">
                     <span className="text-4xl">📦</span>
@@ -647,7 +648,7 @@ const NewListingsSection = ({ items, navigate }) => {
               onClick={() => navigate(getItemDetailPath(item))}            >
               <div className="relative aspect-square overflow-hidden bg-slate-100 dark:bg-slate-700">
                 {item.images?.[0] ? (
-                  <img src={item.images[0]} alt={item.title} className="w-full h-full object-cover" />
+                  <SafeImage src={item.images[0]} alt={item.title} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-600">
                     <span className="text-3xl">📦</span>
@@ -1016,7 +1017,7 @@ const HomepageLiveVehicles = ({ navigate }) => {
               >
                 <div className="h-36 bg-slate-700 overflow-hidden">
                   {v.photos?.[0] && (
-                    <img src={v.photos[0]} alt="" loading="lazy" className="w-full h-full object-cover" />
+                    <SafeImage src={v.photos[0]} alt="" loading="lazy" className="w-full h-full object-cover" />
                   )}
                 </div>
                 <div className="p-3">
@@ -1084,7 +1085,7 @@ const HomepageLiveStorage = ({ navigate }) => {
               >
                 <div className="h-36 bg-sky-100 dark:bg-slate-700 overflow-hidden flex items-center justify-center text-4xl">
                   {a.photos?.[0] ? (
-                    <img src={a.photos[0]} alt="" loading="lazy" className="w-full h-full object-cover" />
+                    <SafeImage src={a.photos[0]} alt="" loading="lazy" className="w-full h-full object-cover" />
                   ) : '🔒'}
                 </div>
                 <div className="p-3">

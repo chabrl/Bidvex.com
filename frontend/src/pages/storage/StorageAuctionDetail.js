@@ -1,6 +1,7 @@
 import API_BASE from '../../config';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import React, { useEffect, useState, useCallback } from 'react';
+import SafeImage from '../../components/SafeImage';
 import axios from 'axios';
 import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -158,7 +159,7 @@ const StorageAuctionDetail = () => {
             <Card className="overflow-hidden">
               <div className="relative bg-slate-200 dark:bg-slate-800 h-80 flex items-center justify-center">
                 {photos.length > 0 ? (
-                  <img src={photos[activePhoto]} alt={`Unit ${auction.unit_number}`} className="w-full h-full object-contain" />
+                  <SafeImage src={photos[activePhoto]} alt={`Unit ${auction.unit_number}`} className="w-full h-full object-contain" />
                 ) : (
                   <span className="text-7xl opacity-50">🔒</span>
                 )}
@@ -171,7 +172,7 @@ const StorageAuctionDetail = () => {
                       onClick={() => setActivePhoto(i)}
                       className={`w-16 h-16 rounded-md overflow-hidden border-2 shrink-0 ${i === activePhoto ? 'border-blue-600' : 'border-transparent'}`}
                     >
-                      <img src={p} alt="" className="w-full h-full object-cover" />
+                      <SafeImage src={p} alt="" className="w-full h-full object-cover" />
                     </button>
                   ))}
                 </div>

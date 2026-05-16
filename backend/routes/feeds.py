@@ -1,24 +1,33 @@
 """
 Phase 5 — Public Meta product catalog feed.
 
-  GET /api/feeds/facebook-local        — JSON feed for Meta ingestion
+  GET /api/feeds/facebook-local        — CSV feed (default) for Meta ingestion
+  GET /api/feeds/facebook-local?format=json  — JSON feed for admin + tests
   GET /api/feeds/facebook-local/meta   — health/monitoring snapshot
 
-Both endpoints are PUBLIC (no auth) so Meta's server-side fetcher can
-read them. The first endpoint also serves `Access-Control-Allow-Origin: *`
-so the same catalog can power third-party retargeting if needed.
+The CSV path is what Meta Business Manager points at. Meta's parser is RFC
+4180 strict (CRLF line endings, double-quoted strings, escaped embedded
+quotes, UTF-8 with no BOM).
 
-The feed mapper itself lives in `services/meta_feed_mapper.py`; the cache
-layer lives in `services/feed_cache.py`. This module is just the wiring.
+The JSON path is what the Admin Feeds dashboard + the pytest regression
+suite consume — it returns the SAME catalog data shaped as
+`{"data": [...], "seed_padded": bool, "count": int}`.
+
+Both endpoints are PUBLIC (no auth) so Meta's server-side fetcher can read
+them. The CSV path also serves `Access-Control-Allow-Origin: *` so the same
+catalog can power third-party retargeting if needed.
 """
 from __future__ import annotations
 
+import csv
+import io
 import logging
 import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Query, Request, Response, HTTPException, Depends
+from fastapi.responses import PlainTextResponse
 
 from deps import get_db, require_admin
 from services import feed_cache
@@ -182,6 +191,54 @@ async def _build_feed_items(
     return items, exclusions
 
 
+# ── Meta-compliant CSV column order ──────────────────────────────────
+# Exact order locked by user spec. Header row is unquoted column names;
+# every data cell is double-quoted (RFC 4180). CRLF line endings, UTF-8
+# without BOM.
+_CSV_COLUMNS: List[str] = [
+    "id", "title", "description", "availability", "condition",
+    "price", "link", "image_link", "brand", "latitude", "longitude",
+    "neighborhood", "city", "region", "country", "postal_code",
+    "additional_image_link", "google_product_category",
+    "sale_price", "custom_label_0", "custom_label_1",
+    "custom_label_2", "custom_label_3",
+]
+
+
+def _items_to_csv(items: List[Dict[str, Any]]) -> str:
+    """Serialize feed items to a Meta-compliant CSV string.
+
+    * Header row: unquoted column names in `_CSV_COLUMNS` order.
+    * All data cells: double-quoted (`csv.QUOTE_ALL`).
+    * Embedded quotes / commas escaped per RFC 4180.
+    * Line endings: CRLF (`\\r\\n`).
+    * Encoding: UTF-8 without BOM (handled by FastAPI's text Response).
+    * Missing optional fields: rendered as empty string "" (not null).
+    """
+    buf = io.StringIO()
+    # Header row — explicitly unquoted, written manually so the
+    # column-name row stays plain `id,title,...` (Meta convention).
+    buf.write(",".join(_CSV_COLUMNS))
+    buf.write("\r\n")
+
+    writer = csv.writer(
+        buf,
+        delimiter=",",
+        quotechar='"',
+        quoting=csv.QUOTE_ALL,
+        lineterminator="\r\n",
+    )
+    for item in items:
+        row = []
+        for col in _CSV_COLUMNS:
+            v = item.get(col, "")
+            if v is None:
+                v = ""
+            row.append(str(v))
+        writer.writerow(row)
+    return buf.getvalue()
+
+
 # ── Public feed endpoint ─────────────────────────────────────────────
 @router.get("/facebook-local")
 async def get_facebook_local_feed(
@@ -192,24 +249,58 @@ async def get_facebook_local_feed(
     province: Optional[str] = None,
     category: Optional[str] = None,
     type: Optional[str] = Query(None, description="marketplace|lots|vehicle|storage"),
-) -> Dict[str, Any]:
-    """Public JSON catalog feed for Meta Dynamic & Local Inventory Ads.
-    No authentication required (Meta's crawler cannot authenticate)."""
+    format: str = Query("csv", description="csv (default, Meta-compliant) | json"),
+):
+    """Public catalog feed for Meta Dynamic & Local Inventory Ads.
+
+    Default response: **CSV** (Meta's preferred ingestion format — RFC 4180
+    quoted, CRLF line endings, UTF-8 without BOM, `text/csv; charset=utf-8`).
+
+    `?format=json` returns the legacy JSON shape used by the Admin Feeds
+    dashboard and the pytest regression suite — shape:
+    `{"data": [...], "seed_padded": bool, "count": int}`.
+
+    No authentication required — Meta's crawler cannot authenticate.
+    """
     _check_rate_limit(request.client.host if request.client else "anon")
+
+    fmt = (format or "csv").lower().strip()
+    if fmt not in ("csv", "json"):
+        raise HTTPException(status_code=400, detail="format must be 'csv' or 'json'")
 
     key = make_cache_key(province, category, type, limit, offset)
 
     async def _builder():
         return await _build_feed_items(province, category, type, limit, offset)
 
-    data, was_hit, _exclusions = await feed_cache.get_or_build(key, _builder)
+    data, was_hit, exclusions = await feed_cache.get_or_build(key, _builder)
+    seed_padded = bool(exclusions.get("seed_items_padded", 0))
 
-    # Required headers for Meta's crawler / open catalog access
+    # Shared headers (Meta crawler + CORS + cache)
     response.headers["Cache-Control"] = "public, max-age=900"
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["X-Feed-Cache"] = "HIT" if was_hit else "MISS"
 
-    return {"data": data}
+    if fmt == "json":
+        return {
+            "data":        data,
+            "count":       len(data),
+            "seed_padded": seed_padded,
+        }
+
+    # CSV path — Meta-compliant text/csv response.
+    csv_body = _items_to_csv(data)
+    return PlainTextResponse(
+        content=csv_body,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Cache-Control":               "public, max-age=900",
+            "Access-Control-Allow-Origin": "*",
+            "X-Feed-Cache":                "HIT" if was_hit else "MISS",
+            "X-Seed-Padded":               "true" if seed_padded else "false",
+            "Content-Disposition":         'attachment; filename="bidvex-catalog.csv"',
+        },
+    )
 
 
 # ── Feed metadata / health endpoint ──────────────────────────────────

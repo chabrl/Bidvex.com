@@ -7,6 +7,7 @@ import ErrorBoundary from '../../components/ErrorBoundary';
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import SafeImage from '../../components/SafeImage';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
@@ -128,7 +129,7 @@ const ImageGallery = ({ media = [] }) => {
     <div className="space-y-4">
       {/* Main Image */}
       <div className="relative aspect-[16/10] bg-slate-100 dark:bg-slate-800 rounded-xl overflow-hidden">
-        <img
+        <SafeImage
           src={photos[currentIndex]?.url}
           alt={`Vehicle photo ${currentIndex + 1}`}
           className="w-full h-full object-cover"
@@ -178,7 +179,7 @@ const ImageGallery = ({ media = [] }) => {
                 : 'border-transparent hover:border-slate-300'
             }`}
           >
-            <img src={photo.url} alt="" className="w-full h-full object-cover" />
+            <SafeImage src={photo.url} alt="" className="w-full h-full object-cover" />
           </button>
         ))}
       </div>

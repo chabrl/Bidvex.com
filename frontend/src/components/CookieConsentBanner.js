@@ -62,6 +62,16 @@ const CookieConsentBanner = () => {
     }
   };
 
+  const _revokePixel = () => {
+    // Phase 5 Hotfix — CASL-compliant withdrawal. Immediately revokes
+    // Meta Pixel tracking and clears any queued events.
+    try {
+      import('../utils/metaPixel').then(({ revokeConsent }) => revokeConsent());
+    } catch (e) {
+      // silent
+    }
+  };
+
   const handleAcceptAll = () => {
     acceptAll();
     setVisible(false);
@@ -70,11 +80,13 @@ const CookieConsentBanner = () => {
   const handleRefuseAll = () => {
     refuseAll();
     setVisible(false);
+    _revokePixel();
   };
   const handleSave = () => {
     saveCustom(prefs);
     setVisible(false);
     if (prefs?.analytics) _notifyPixel();
+    else _revokePixel();
   };
 
   return (

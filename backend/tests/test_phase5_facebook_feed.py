@@ -7,6 +7,7 @@ coverage. Pure mapper tests rely only on the in-memory data structure
 defined inside the test module.
 """
 import asyncio
+import io
 import os
 import inspect
 import pathlib
@@ -45,7 +46,7 @@ class TestContentIdFormat:
         assert _content_id("vehicle", "uuid-1") == "BIDVEX-VEH-uuid-1"
 
     def test_id_format_storage(self):
-        assert _content_id("storage", "S-42") == "BIDVEX-STG-S-42"
+        assert _content_id("storage", "S-42") == "BIDVEX-STO-S-42"
 
     def test_id_unknown_type_defaults_to_mkt(self):
         assert _content_id("unknown", "id1").startswith("BIDVEX-MKT-")
@@ -523,14 +524,14 @@ def api_base():
 
 class TestFeedEndpoint:
     def test_feed_returns_200_unauthenticated(self, api_base):
-        r = requests.get(f"{api_base}/api/feeds/facebook-local", timeout=15)
+        r = requests.get(f"{api_base}/api/feeds/facebook-local?format=json", timeout=15)
         assert r.status_code == 200
         body = r.json()
         assert "data" in body
         assert isinstance(body["data"], list)
 
     def test_feed_response_has_correct_content_type(self, api_base):
-        r = requests.get(f"{api_base}/api/feeds/facebook-local", timeout=15)
+        r = requests.get(f"{api_base}/api/feeds/facebook-local?format=json", timeout=15)
         assert r.headers["content-type"].startswith("application/json")
         # CORS for Meta's crawler
         assert r.headers.get("access-control-allow-origin") == "*"
@@ -539,7 +540,7 @@ class TestFeedEndpoint:
         # Hit localhost directly so we bypass the Cloudflare edge cache that
         # rewrites Cache-Control on the public URL. We're asserting the
         # backend's route-level header, not the CDN's.
-        r = requests.get("http://localhost:8001/api/feeds/facebook-local", timeout=15)
+        r = requests.get("http://localhost:8001/api/feeds/facebook-local?format=json", timeout=15)
         cc = r.headers.get("cache-control", "")
         assert "max-age=900" in cc
         assert "public" in cc
@@ -558,25 +559,27 @@ class TestFeedEndpoint:
             assert ex_key in body["exclusion_reasons"]
 
     def test_feed_respects_limit_parameter(self, api_base):
-        r = requests.get(f"{api_base}/api/feeds/facebook-local?limit=2", timeout=15)
+        r = requests.get(f"{api_base}/api/feeds/facebook-local?format=json&limit=2", timeout=15)
         assert r.status_code == 200
         assert len(r.json()["data"]) <= 2
 
     def test_feed_respects_province_filter(self, api_base):
         # Cross-province isolation: AB should not return QC listings.
-        r = requests.get(f"{api_base}/api/feeds/facebook-local?province=AB", timeout=15)
+        r = requests.get(f"{api_base}/api/feeds/facebook-local?format=json&province=AB", timeout=15)
         assert r.status_code == 200
         for it in r.json()["data"]:
             assert it["region"] != "QC"
 
     def test_feed_handles_empty_catalog_gracefully(self, api_base):
         # Filter by a province with no listings at all (NU)
-        r = requests.get(f"{api_base}/api/feeds/facebook-local?province=NU", timeout=15)
+        r = requests.get(f"{api_base}/api/feeds/facebook-local?format=json&province=NU", timeout=15)
         assert r.status_code == 200
-        assert r.json() == {"data": []}
+        body = r.json()
+        assert body["data"] == []
+        assert body["seed_padded"] is False
 
     def test_feed_is_unauthenticated_public(self, api_base):
-        r = requests.get(f"{api_base}/api/feeds/facebook-local", timeout=15)
+        r = requests.get(f"{api_base}/api/feeds/facebook-local?format=json", timeout=15)
         assert r.status_code == 200, "Public feed must not require auth"
 
     def test_feed_refresh_requires_admin(self, api_base):
@@ -586,22 +589,32 @@ class TestFeedEndpoint:
     def test_feed_padded_to_minimum_five_items(self, api_base):
         """Meta Commerce Manager refuses catalogs with fewer than 5 products.
         The UNFILTERED feed must always include >=5 items (real + seed pad)."""
-        r = requests.get(f"{api_base}/api/feeds/facebook-local", timeout=15)
+        r = requests.get(f"{api_base}/api/feeds/facebook-local?format=json", timeout=15)
         assert r.status_code == 200
         items = r.json()["data"]
         assert len(items) >= 5, f"expected >=5 items, got {len(items)}"
 
+    def test_json_response_exposes_seed_padded_flag(self, api_base):
+        """Admin tools need to know whether the feed was padded so the
+        dashboard can surface a 'Add more listings' warning."""
+        r = requests.get(f"{api_base}/api/feeds/facebook-local?format=json", timeout=15)
+        body = r.json()
+        assert "seed_padded" in body
+        assert "count" in body
+        assert isinstance(body["seed_padded"], bool)
+        assert body["count"] == len(body["data"])
+
     def test_padded_seed_items_carry_test_seed_label(self, api_base):
         """Every BIDVEX-SEED-* item in the unfiltered feed must have
         custom_label_3='test_seed' so production ads can exclude them."""
-        r = requests.get(f"{api_base}/api/feeds/facebook-local", timeout=15)
+        r = requests.get(f"{api_base}/api/feeds/facebook-local?format=json", timeout=15)
         assert r.status_code == 200
         for it in r.json()["data"]:
             if it["id"].startswith("BIDVEX-SEED-"):
                 assert it["custom_label_3"] == "test_seed"
 
     def test_seed_items_use_branded_placeholder_in_live_feed(self, api_base):
-        r = requests.get(f"{api_base}/api/feeds/facebook-local", timeout=15)
+        r = requests.get(f"{api_base}/api/feeds/facebook-local?format=json", timeout=15)
         for it in r.json()["data"]:
             if it["id"].startswith("BIDVEX-SEED-"):
                 assert it["image_link"].endswith("/placeholder-ad.jpg")
@@ -610,7 +623,7 @@ class TestFeedEndpoint:
     def test_seed_items_not_returned_for_filtered_queries(self, api_base):
         """Province/category-filtered queries must NOT include padded seeds —
         only the unfiltered catalog gets padded."""
-        r = requests.get(f"{api_base}/api/feeds/facebook-local?province=AB", timeout=15)
+        r = requests.get(f"{api_base}/api/feeds/facebook-local?format=json&province=AB", timeout=15)
         for it in r.json()["data"]:
             assert not it["id"].startswith("BIDVEX-SEED-"), \
                 "filtered feeds must never include test_seed items"
@@ -628,6 +641,106 @@ class TestFeedEndpoint:
         body = r.json()
         assert body["excluded_listings"] >= 0
 
+    # ── 4D-2 — CSV format (Meta Commerce Manager default) ────────────
+    def test_csv_is_default_format(self, api_base):
+        """Hitting the bare URL must return CSV (Meta's preferred format)."""
+        r = requests.get(f"{api_base}/api/feeds/facebook-local", timeout=15)
+        assert r.status_code == 200
+        ct = r.headers.get("content-type", "")
+        assert ct.startswith("text/csv"), f"expected text/csv default, got {ct}"
+        assert "charset=utf-8" in ct.lower()
+
+    def test_csv_has_attachment_disposition(self, api_base):
+        r = requests.get("http://localhost:8001/api/feeds/facebook-local", timeout=15)
+        cd = r.headers.get("content-disposition", "")
+        assert "attachment" in cd.lower()
+        assert "bidvex-catalog.csv" in cd
+
+    def test_csv_uses_crlf_line_endings(self, api_base):
+        """Meta's parser requires CRLF (RFC 4180) — \\r\\n separator."""
+        r = requests.get(f"{api_base}/api/feeds/facebook-local", timeout=15)
+        body = r.content  # bytes
+        assert b"\r\n" in body, "CSV must use CRLF line endings"
+
+    def test_csv_has_no_bom(self, api_base):
+        """UTF-8 BOM (0xEF 0xBB 0xBF) confuses Meta's parser."""
+        r = requests.get(f"{api_base}/api/feeds/facebook-local", timeout=15)
+        assert not r.content.startswith(b"\xef\xbb\xbf")
+
+    def test_csv_header_columns_exact_order(self, api_base):
+        """Header row must match the Meta-compliant column order exactly."""
+        r = requests.get(f"{api_base}/api/feeds/facebook-local", timeout=15)
+        first_line = r.text.split("\r\n", 1)[0]
+        expected = (
+            "id,title,description,availability,condition,"
+            "price,link,image_link,brand,latitude,longitude,"
+            "neighborhood,city,region,country,postal_code,"
+            "additional_image_link,google_product_category,"
+            "sale_price,custom_label_0,custom_label_1,"
+            "custom_label_2,custom_label_3"
+        )
+        assert first_line == expected, f"header mismatch:\n{first_line}\n--vs--\n{expected}"
+
+    def test_csv_data_rows_are_double_quoted(self, api_base):
+        """Every data cell must be wrapped in double quotes (RFC 4180 QUOTE_ALL)."""
+        r = requests.get(f"{api_base}/api/feeds/facebook-local", timeout=15)
+        rows = r.text.split("\r\n")
+        assert len(rows) >= 2, "expected at least header + 1 data row"
+        data_row = rows[1]
+        # First cell must start with a quote
+        assert data_row.startswith('"'), "data rows must be double-quoted"
+        # Should contain "," (quote, comma, quote) between cells
+        assert '","' in data_row
+
+    def test_csv_returns_at_least_five_rows_unfiltered(self, api_base):
+        """Meta Commerce Manager rejects feeds with < 5 products."""
+        r = requests.get(f"{api_base}/api/feeds/facebook-local", timeout=15)
+        rows = [ln for ln in r.text.split("\r\n") if ln.strip()]
+        # 1 header + 5+ data rows
+        assert len(rows) >= 6, f"expected >=5 data rows + header, got {len(rows)}"
+
+    def test_csv_contains_seed_rows_in_unfiltered_feed(self, api_base):
+        r = requests.get(f"{api_base}/api/feeds/facebook-local", timeout=15)
+        assert "BIDVEX-SEED-" in r.text
+
+    def test_csv_no_seed_rows_in_filtered_feed(self, api_base):
+        r = requests.get(f"{api_base}/api/feeds/facebook-local?province=NU", timeout=15)
+        # NU has 0 real listings; with filtering, no seeds either — only header.
+        assert "BIDVEX-SEED-" not in r.text
+
+    def test_csv_format_rejects_invalid_value(self, api_base):
+        r = requests.get(f"{api_base}/api/feeds/facebook-local?format=xml", timeout=15)
+        assert r.status_code == 400
+
+    def test_csv_seed_link_is_bidvex_root(self, api_base):
+        r = requests.get(f"{api_base}/api/feeds/facebook-local", timeout=15)
+        # Seed `link` field must be plain bidvex.com per spec — seeds have
+        # no real listing page.
+        # Find at least one BIDVEX-SEED row and check its `link` cell.
+        for line in r.text.split("\r\n"):
+            if "BIDVEX-SEED-001" in line:
+                assert '"https://bidvex.com"' in line, "seed link should be plain bidvex.com"
+                return
+        # If padding didn't kick in (>=5 real items), skip.
+        pytest.skip("no seeds in feed — catalog has >=5 real items")
+
+    def test_csv_handles_embedded_quotes_per_rfc4180(self, api_base):
+        """If a listing title contains a literal quote, the CSV must escape
+        it as a doubled quote ("") inside the cell — RFC 4180."""
+        # We can only validate this if a real listing happens to have a quote.
+        # The mapper writes via csv.writer with QUOTE_ALL — Python's stdlib
+        # csv module is RFC 4180 compliant by default, so this is a smoke
+        # test that the response parses cleanly back through csv.reader.
+        import csv as _csv
+        r = requests.get(f"{api_base}/api/feeds/facebook-local", timeout=15)
+        reader = _csv.reader(io.StringIO(r.text))
+        rows = list(reader)
+        assert len(rows) >= 2
+        # Every row must have the same column count as the header.
+        header_len = len(rows[0])
+        for i, row in enumerate(rows[1:], 1):
+            assert len(row) == header_len, f"row {i} column count mismatch ({len(row)} vs {header_len})"
+
 
 # ────────────────────────────────────────────────────────────────────────
 # 4E — Frontend pixel wrapper (source-level + integration)
@@ -640,8 +753,24 @@ class TestFrontendPixel:
         # Required exports
         for sym in ("initMetaPixel", "trackEvent", "trackCustomEvent",
                     "trackViewContent", "trackAddToWishlist", "trackPurchase",
-                    "trackSearch", "buildContentId", "notifyConsentGranted"):
+                    "trackSearch", "buildContentId", "notifyConsentGranted",
+                    "revokeConsent"):
             assert sym in src, f"missing {sym}"
+
+    def test_pixel_storage_prefix_is_sto(self):
+        """content_ids must match backend: storage → STO (not STG)."""
+        src = pathlib.Path("/app/frontend/src/utils/metaPixel.js").read_text(encoding="utf-8")
+        assert "storage: 'STO'" in src
+        assert "storage: 'STG'" not in src
+
+    def test_pixel_uses_canonical_consent_key(self):
+        src = pathlib.Path("/app/frontend/src/utils/metaPixel.js").read_text(encoding="utf-8")
+        assert "bidvex_analytics_consent" in src
+
+    def test_pixel_revoke_calls_fbq_consent_revoke(self):
+        """CASL withdrawal MUST emit fbq('consent', 'revoke') immediately."""
+        src = pathlib.Path("/app/frontend/src/utils/metaPixel.js").read_text(encoding="utf-8")
+        assert "fbq('consent', 'revoke')" in src or 'fbq("consent", "revoke")' in src
 
     def test_pixel_id_format_matches_backend(self):
         src = pathlib.Path("/app/frontend/src/utils/metaPixel.js").read_text(encoding="utf-8")
@@ -666,6 +795,49 @@ class TestFrontendPixel:
         assert "<noscript>" in html
         # Inline script that called fbq() at page load is gone
         assert "fbq('init'," not in html and 'fbq("init",' not in html
+
+
+# ────────────────────────────────────────────────────────────────────────
+# 4E-2 — Frontend SafeImage component (Phase 5 Hotfix)
+# ────────────────────────────────────────────────────────────────────────
+class TestSafeImageComponent:
+    def test_safe_image_component_exists(self):
+        p = pathlib.Path("/app/frontend/src/components/SafeImage.jsx")
+        assert p.exists()
+
+    def test_safe_image_detects_base64_data_urls(self):
+        src = pathlib.Path("/app/frontend/src/components/SafeImage.jsx").read_text(encoding="utf-8")
+        assert "startsWith('data:')" in src
+
+    def test_safe_image_uses_branded_placeholder(self):
+        src = pathlib.Path("/app/frontend/src/components/SafeImage.jsx").read_text(encoding="utf-8")
+        assert "bidvex.com/assets/placeholder-ad.jpg" in src
+
+    def test_safe_image_handles_on_error(self):
+        src = pathlib.Path("/app/frontend/src/components/SafeImage.jsx").read_text(encoding="utf-8")
+        assert "handleError" in src or "onError" in src
+
+    def test_listing_detail_uses_safe_image(self):
+        src = pathlib.Path("/app/frontend/src/pages/ListingDetailPage.js").read_text(encoding="utf-8")
+        assert "SafeImage" in src
+        assert "import SafeImage" in src
+
+    def test_multi_item_detail_uses_safe_image(self):
+        src = pathlib.Path("/app/frontend/src/pages/MultiItemListingDetailPage.js").read_text(encoding="utf-8")
+        assert "SafeImage" in src
+
+    def test_marketplace_card_uses_safe_image(self):
+        src = pathlib.Path("/app/frontend/src/components/FlattenedMarketplace.js").read_text(encoding="utf-8")
+        assert "SafeImage" in src
+
+    def test_lots_marketplace_uses_safe_image(self):
+        src = pathlib.Path("/app/frontend/src/pages/LotsMarketplacePage.js").read_text(encoding="utf-8")
+        assert "SafeImage" in src
+
+    def test_homepage_uses_safe_image(self):
+        src = pathlib.Path("/app/frontend/src/pages/HomePage.js").read_text(encoding="utf-8")
+        assert "SafeImage" in src
+
 
 
 # ────────────────────────────────────────────────────────────────────────

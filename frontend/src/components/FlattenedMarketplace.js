@@ -12,6 +12,7 @@ import { Input } from './ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Separator } from './ui/separator';
 import BidConfirmationDialog from './BidConfirmationDialog';
+import SafeImage from './SafeImage';
 import FilterBar from './FilterBar/FilterBar';
 import { 
   Clock, 
@@ -406,7 +407,7 @@ const FlattenedMarketplace = ({
               {/* Item Preview */}
               <div className="flex gap-4 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
                 {selectedItem.images?.[0] && (
-                  <img 
+                  <SafeImage 
                     src={selectedItem.images[0]} 
                     alt={selectedItem.title}
                     width={80}
@@ -605,7 +606,7 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
       >
         <div className="relative h-52 bg-slate-100 dark:bg-slate-800 overflow-hidden">
           {item.images?.[0] ? (
-            <img
+            <SafeImage
               src={item.images[0]}
               alt={getLocalized(item, 'title')}
               width={400}

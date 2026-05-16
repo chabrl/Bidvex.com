@@ -1,5 +1,6 @@
 import API_BASE from '../config';
 import React, { useState, useEffect, useRef } from 'react';
+import SafeImage from '../components/SafeImage';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
@@ -1200,7 +1201,7 @@ const MultiItemListingDetailPage = () => {
                                 className="aspect-square rounded-lg overflow-hidden bg-gray-100 cursor-pointer hover:opacity-80 transition-opacity"
                                 onClick={() => openLightbox(lot.images, idx)}
                               >
-                                <img 
+                                <SafeImage 
                                   src={img} 
                                   alt={`${getLocalized(lot, 'title')} - ${idx + 1}`}
                                   className="w-full h-full object-cover"

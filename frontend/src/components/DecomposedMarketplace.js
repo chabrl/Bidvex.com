@@ -6,6 +6,7 @@ import { Badge } from './ui/badge';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import BuyNowButton from './BuyNowButton';
+import SafeImage from './SafeImage';
 import { SellerAccountBadge } from './PrivateSaleBadge';
 import { 
   Clock, 
@@ -229,7 +230,7 @@ const DecomposedMarketplace = () => {
               >
                 <div className="relative h-48 bg-gray-100">
                   {item.images && item.images[0] ? (
-                    <img
+                    <SafeImage
                       src={item.images[0]}
                       alt={item.title}
                       className="w-full h-full object-cover"

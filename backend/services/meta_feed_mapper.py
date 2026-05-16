@@ -56,7 +56,7 @@ TYPE_PREFIX = {
     "marketplace": "MKT",
     "lots":        "LOT",
     "vehicle":     "VEH",
-    "storage":     "STG",
+    "storage":     "STO",
 }
 
 
@@ -537,7 +537,7 @@ def build_seed_items(needed: int) -> List[Dict[str, Any]]:
             "availability":    "in stock",
             "condition":       "used",
             "price":           "1.00 CAD",
-            "link":            f"{BIDVEX_BASE_URL}/lots",
+            "link":            BIDVEX_BASE_URL,
             "image_link":      BIDVEX_PLACEHOLDER_IMAGE,
             "brand":           "BidVex Marketplace",
             # Location

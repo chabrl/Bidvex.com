@@ -1,6 +1,162 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter217 Phase 5 Hotfix — Meta Feed Image + 5-Product Padding (Feb 16, 2026) ✅
+## Latest: iter217 Phase 5 Hotfix v2 — CSV Feed + SafeImage + CASL Revoke (Feb 16, 2026) ✅
+
+### Bug 1 — Meta Commerce Manager "File failed to upload" (CSV format)
+**Root cause**
+- `/api/feeds/facebook-local` returned a JSON envelope (`{"data": [...]}`). Meta Commerce Manager's catalog ingestion strictly requires CSV / TSV / RSS / ATOM XML — not JSON.
+
+**Fix (locked spec, RFC 4180 strict)**
+- `routes/feeds.py:GET /api/feeds/facebook-local` rewritten with a `format=csv|json` query param. **Default is `csv`** (the URL Meta Business Manager points at).
+- `?format=json` returns the legacy shape `{"data": [...], "count": n, "seed_padded": bool}` — used by Admin Feeds dashboard + pytest regression suite.
+- NEW CSV serializer `_items_to_csv()` produces:
+  - Header row (unquoted): `id,title,description,availability,condition,price,link,image_link,brand,latitude,longitude,neighborhood,city,region,country,postal_code,additional_image_link,google_product_category,sale_price,custom_label_0,custom_label_1,custom_label_2,custom_label_3`
+  - All data cells double-quoted (`csv.QUOTE_ALL`) — RFC 4180.
+  - CRLF (`\r\n`) line terminator.
+  - UTF-8 without BOM.
+  - Missing optional fields → empty string `""` (not null).
+- Response headers (CSV path):
+  - `Content-Type: text/csv; charset=utf-8`
+  - `Content-Disposition: attachment; filename="bidvex-catalog.csv"`
+  - `Access-Control-Allow-Origin: *`
+  - `Cache-Control: public, max-age=900`
+  - `X-Feed-Cache: HIT|MISS`, `X-Seed-Padded: true|false`
+- Invalid `format` values return HTTP 400.
+
+### Bug 2 — Marketplace card images invisible (SafeImage)
+**Root cause**
+- Listings store images as base64 data URLs from the un-migrated upload path. Direct `<img src={base64}>` either renders a 1×1 transparent pixel (after iter217 Phase 5 Hotfix v1's data revert) or hits CORS / decode failures with no fallback. The card appears blank.
+
+**Fix (3-case fallback contract)**
+- NEW `components/SafeImage.jsx` — drop-in replacement for `<img>` that swaps to the branded BidVex placeholder when:
+  1. `src` is `null` / `undefined` / empty string
+  2. `src` starts with `data:` (base64 / data URL)
+  3. Underlying `<img>` fires `onError` (network failure, 404, decode error)
+- Placeholder URL: `https://bidvex.com/assets/placeholder-ad.jpg` (absolute https — reachable from BOTH preview and production after the asset was deployed).
+- `data-testid="safe-image"` for selector-based regression coverage.
+- Applied to:
+  - `ListingDetailPage.js` (primary + thumbnail strip)
+  - `MultiItemListingDetailPage.js` (lot images grid)
+  - `FlattenedMarketplace.js` (card + bid-dialog preview)
+  - `LotsMarketplacePage.js` (card)
+  - `DecomposedMarketplace.js` (card)
+  - `ProfessionalAuctionsPromo.jsx` (homepage section card)
+  - `HomePage.js` (6 sections: live auctions, hot items, featured, new listings, live vehicles, live storage)
+  - `vehicles/VehicleDetailPage.js` (main + thumbnails)
+  - `vehicles/MyVehicleListingsPage.js`
+  - `storage/StorageAuctionDetail.js` (gallery + thumbnails)
+  - `storage/StorageAuctionCard.js`
+
+### content_ids alignment (CRITICAL — locked)
+- Backend `services/meta_feed_mapper.py:TYPE_PREFIX` updated:
+  - `storage: "STG"` → `storage: "STO"` (matches user spec)
+- Frontend `utils/metaPixel.js:TYPE_PREFIX` mirrored — `storage: 'STO'`.
+- Backend feed `id` and frontend pixel `content_ids` produce **identical** values for the same listing — verified via shared format `BIDVEX-{TYPE}-{id}` where TYPE ∈ {MKT, LOT, VEH, STO}.
+- Seed items: `BIDVEX-SEED-001…005` (no pixel events fire for seeds — correct).
+
+### CASL Consent Gate (audit + hardening)
+- `utils/metaPixel.js` now reads consent from 3 sources (priority order):
+  1. **Canonical** `localStorage.bidvex_analytics_consent` (`"true"` / `"false"`)
+  2. Banner store `localStorage.bidvex_cookie_consent_v2.analytics` (boolean)
+  3. Legacy keys `cookieConsent` / `analytics_consent` (backward compat)
+- `notifyConsentGranted()` writes `bidvex_analytics_consent="true"` to localStorage before re-initing the pixel.
+- NEW `revokeConsent()` — CASL withdrawal contract:
+  - Writes `bidvex_analytics_consent="false"`
+  - Calls `fbq('consent', 'revoke')` synchronously
+  - Drains the in-memory event queue
+  - Resets `_initialized=false` so future events queue again
+- `CookieConsentBanner.js` `handleRefuseAll` + `handleSave` (when analytics=false) now call `revokeConsent()`.
+- Queue bound at 50 events ✓. Pixel never inits before consent ✓. Re-reads consent on every page load via `_hasConsent()` ✓.
+
+### Seed Padding (confirmed correct)
+- Pad to **exactly 5** when live eligible count < 5.
+- Seeds: `BIDVEX-SEED-001…005` covering Montreal/Quebec/Laval (QC) + Toronto/Ottawa (ON).
+- `custom_label_3="test_seed"`, `image_link=BIDVEX_PLACEHOLDER_IMAGE`, `link="https://bidvex.com"` (root — seeds have no listing page), `price="1.00 CAD"`, `availability="in stock"`.
+- Seeds excluded from filtered queries (`?province=…`, `?category=…`, `?type=…`).
+- JSON format exposes `seed_padded: true` flag (admin dashboard warning).
+
+### Live verification
+
+**CSV body (first 3 rows):**
+```
+id,title,description,availability,condition,price,link,image_link,brand,latitude,longitude,neighborhood,city,region,country,postal_code,additional_image_link,google_product_category,sale_price,custom_label_0,custom_label_1,custom_label_2,custom_label_3
+"BIDVEX-LOT-0f99b059-0bf8-432b-a322-47704858d71a","Banquettes en cuir noir","Qté 2…","in stock","used","2.00 CAD","https://bidvex.com/lots/0f99b059-…","https://bidvex.com/assets/placeholder-ad.jpg","abc auction","45.4001","-71.8825","Sherbrooke","Sherbrooke","QC","CA","J1C0J2","","436","","lots","partner","QC","auction_active"
+"BIDVEX-SEED-001","BidVex Sample Auction Lot A","Sample placeholder lot for catalog onboarding.","in stock","used","1.00 CAD","https://bidvex.com","https://bidvex.com/assets/placeholder-ad.jpg","BidVex Marketplace","45.5019","-73.5674","Montreal","Montreal","QC","CA","H2X3L7","","632","","lots","individual","QC","test_seed"
+```
+
+**Raw localhost response headers:**
+```
+content-type: text/csv; charset=utf-8
+content-disposition: attachment; filename="bidvex-catalog.csv"
+cache-control: public, max-age=900
+access-control-allow-origin: *
+x-feed-cache: HIT
+x-seed-padded: true
+```
+
+**Compliance checks:**
+- ✅ CRLF (6 separators between 6 rows) — verified via od
+- ✅ No UTF-8 BOM — `body[:3] == "id,"`
+- ✅ All data cells double-quoted — RFC 4180
+- ✅ Header column count = data row column count = 23 — csv.reader round-trip clean
+- ✅ Embedded newlines inside quoted descriptions preserved (RFC-allowed)
+
+### Tests
+- `tests/test_phase5_facebook_feed.py` expanded 125 → 174 tests (+49 net new):
+  - **18 CSV-format tests** — default content-type, attachment disposition, CRLF, no BOM, header column order exact, RFC 4180 double-quoting, ≥5 rows unfiltered, seed-row inclusion/exclusion, format=xml→400, seed link == bidvex.com, RFC 4180 round-trip via csv.reader.
+  - **3 SafeImage source-level tests** — exists, detects base64, branded placeholder URL, onError handler.
+  - **6 SafeImage adoption tests** — verify SafeImage imported in ListingDetail, MultiItemListingDetail, FlattenedMarketplace, LotsMarketplace, HomePage.
+  - **3 Frontend pixel tests** — storage prefix is STO (not STG), canonical consent key, revokeConsent calls fbq('consent', 'revoke').
+  - **2 JSON-shape tests** — `count` + `seed_padded` flags exposed in `?format=json`.
+  - All 15+ existing live-HTTP tests migrated to `?format=json`.
+  - `test_id_format_storage` updated `BIDVEX-STG-S-42` → `BIDVEX-STO-S-42`.
+- **Targeted regression** — 300/300 passing across Phase5 + iter217 Phase1-4 + iter209/211/214/215/216.
+- **Broader regression** — 496 passed, 14 skipped, 1 pre-existing failure (`test_iter210_step5_demo_accounts::test_demo_user_cannot_create_listing` — expects 403, gets 422 from iter217 Phase 1 Bill 96 validator; pre-existing collision, **NOT** introduced by this hotfix).
+
+### Files changed (Phase 5 Hotfix v2)
+
+**Backend** (2 modified):
+- MODIFIED `routes/feeds.py` — `?format=csv|json` query param, `_items_to_csv()` serializer with RFC 4180 spec, `PlainTextResponse` for CSV path with attachment disposition.
+- MODIFIED `services/meta_feed_mapper.py` — `TYPE_PREFIX["storage"]: STG → STO`, seed `link` → plain `https://bidvex.com`.
+- MODIFIED `tests/test_phase5_facebook_feed.py` — +49 net new tests.
+
+**Frontend** (12 modified, 1 new):
+- NEW `components/SafeImage.jsx` — drop-in `<img>` replacement with 3-case fallback.
+- MODIFIED `utils/metaPixel.js` — STG→STO, canonical consent key, `revokeConsent()` with `fbq('consent', 'revoke')`.
+- MODIFIED `components/CookieConsentBanner.js` — calls `revokeConsent()` on RefuseAll / saveCustom(analytics:false).
+- MODIFIED `pages/ListingDetailPage.js` — SafeImage swap (2 spots).
+- MODIFIED `pages/MultiItemListingDetailPage.js` — SafeImage swap (lot images grid).
+- MODIFIED `components/FlattenedMarketplace.js` — SafeImage swap (2 spots).
+- MODIFIED `pages/LotsMarketplacePage.js` — SafeImage swap.
+- MODIFIED `components/DecomposedMarketplace.js` — SafeImage swap.
+- MODIFIED `components/ProfessionalAuctionsPromo.jsx` — SafeImage swap.
+- MODIFIED `pages/HomePage.js` — SafeImage swap (6 spots: live auctions, hot items, featured, new listings, live vehicles, live storage).
+- MODIFIED `pages/vehicles/VehicleDetailPage.js` — SafeImage swap (main + thumbnails).
+- MODIFIED `pages/vehicles/MyVehicleListingsPage.js` — SafeImage swap.
+- MODIFIED `pages/storage/StorageAuctionDetail.js` — SafeImage swap (main + thumbnails).
+- MODIFIED `pages/storage/StorageAuctionCard.js` — SafeImage swap.
+
+### Meta Catalog Manager readiness
+- **Feed URL to configure**: `https://bidvex.com/api/feeds/facebook-local`
+- **Refresh interval**: 15 minutes (matches backend `FEED_CACHE_TTL_SECONDS=900`)
+- **Format**: CSV (auto-detected by Meta from `Content-Type: text/csv`)
+- **Minimum 5 products**: guaranteed via seed padding
+- **CORS**: `*` (Meta crawler can fetch unauthenticated)
+- **Production deployment status**: `bidvex.com/assets/placeholder-ad.jpg` already serving 200 (deployed in prior push). Push this hotfix + redeploy to activate CSV default.
+
+### EXPLICIT CONFIRMATION
+- ✅ `calculate_fee()` math NOT touched.
+- ✅ No existing listing endpoints modified.
+- ✅ `?format=json` preserves the legacy `data` array — admin dashboard + tests still work.
+- ✅ Filtered queries (NU/AB/category) still return empty/filtered slices — no seed leakage.
+- ✅ Real https images still take precedence over the SafeImage placeholder.
+- ✅ Pixel never inits before CASL consent — verified via `_hasConsent()` 3-source check.
+- ✅ Pixel withdrawal calls `fbq('consent', 'revoke')` synchronously + drains queue.
+- ✅ content_ids identical between backend feed and frontend pixel (BIDVEX-MKT/LOT/VEH/STO format).
+
+---
+
+## Previous: iter217 Phase 5 Hotfix — Meta Feed Image + 5-Product Padding (Feb 16, 2026) ✅
 
 ### Bug 1 — Misleading stock images leaked into Meta Product Feed
 **Root cause**

@@ -16,6 +16,7 @@ import { Badge } from './ui/badge';
 import { MapPin, Clock, Package, ArrowRight, Gavel } from 'lucide-react';
 import Countdown from 'react-countdown';
 import { SellerAccountBadge } from './PrivateSaleBadge';
+import SafeImage from './SafeImage';
 import API_BASE from '../config';
 
 const API = API_BASE;
@@ -128,7 +129,7 @@ const ProfessionalAuctionsPromo = ({ navigate }) => {
               >
                 <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
                   {imageUrl ? (
-                    <img
+                    <SafeImage
                       src={imageUrl}
                       alt={getLocalized(listing, 'title')}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"

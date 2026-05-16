@@ -15,6 +15,11 @@
  */
 
 const PIXEL_ID = process.env.REACT_APP_META_PIXEL_ID;
+// Canonical CASL consent key (Phase 5 Hotfix). The CookieConsentBanner
+// writes 'true' here when analytics is accepted, 'false' on refusal /
+// revocation. We also fall back to legacy keys for backward compatibility.
+const CONSENT_KEY_CANONICAL = 'bidvex_analytics_consent';
+const CONSENT_KEY_BANNER_STORE = 'bidvex_cookie_consent_v2';
 const CONSENT_KEY_PRIMARY = 'cookieConsent';
 const CONSENT_KEY_ANALYTICS = 'analytics_consent';
 
@@ -28,7 +33,7 @@ const TYPE_PREFIX = {
   lots: 'LOT',
   multi_lot: 'LOT',
   vehicle: 'VEH',
-  storage: 'STG',
+  storage: 'STO',
 };
 
 /**
@@ -44,6 +49,20 @@ export const buildContentId = (listingType, listingId) => {
 const _hasConsent = () => {
   if (typeof window === 'undefined') return false;
   try {
+    // 1. Canonical CASL key — single source of truth going forward.
+    const canonical = window.localStorage.getItem(CONSENT_KEY_CANONICAL);
+    if (canonical === 'true') return true;
+    if (canonical === 'false') return false;
+    // 2. Banner store — read analytics flag out of the persisted JSON.
+    const bannerRaw = window.localStorage.getItem(CONSENT_KEY_BANNER_STORE);
+    if (bannerRaw) {
+      try {
+        const parsed = JSON.parse(bannerRaw);
+        if (parsed && parsed.analytics === true) return true;
+        if (parsed && parsed.analytics === false) return false;
+      } catch (e) { /* fall through */ }
+    }
+    // 3. Legacy keys — kept for backward compatibility with older sessions.
     const v1 = window.localStorage.getItem(CONSENT_KEY_PRIMARY);
     const v2 = window.localStorage.getItem(CONSENT_KEY_ANALYTICS);
     return (
@@ -120,8 +139,32 @@ export const initMetaPixel = () => {
 
 /** Call from the cookie banner after the user accepts analytics. */
 export const notifyConsentGranted = () => {
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.setItem(CONSENT_KEY_CANONICAL, 'true');
+    } catch (e) { /* silent */ }
+  }
   _initAttempted = false; // allow re-attempt
   initMetaPixel();
+};
+
+/**
+ * CASL-compliant consent revocation. Call from the cookie banner / settings
+ * page when the user withdraws analytics consent. Fires fbq('consent',
+ * 'revoke') immediately (Meta will stop processing events from this user),
+ * persists the revocation in localStorage, and drains the in-memory queue.
+ */
+export const revokeConsent = () => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(CONSENT_KEY_CANONICAL, 'false');
+  } catch (e) { /* silent */ }
+  try {
+    if (window.fbq) window.fbq('consent', 'revoke');
+  } catch (e) { /* silent — pixel must never throw */ }
+  // Drop any queued (un-flushed) events so they can never fire.
+  _queue.length = 0;
+  _initialized = false;
 };
 
 const _enqueue = (name, params, custom = false) => {

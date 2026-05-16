@@ -1,4 +1,5 @@
 import React from 'react';
+import SafeImage from '../../components/SafeImage';
 import { Link } from 'react-router-dom';
 import { Badge } from '../../components/ui/badge';
 import { Gavel, MapPin, Layers, Clock } from 'lucide-react';
@@ -43,7 +44,7 @@ const StorageAuctionCard = ({ auction }) => {
     >
       <div className="relative h-44 overflow-hidden bg-slate-200 dark:bg-slate-700">
         {photo ? (
-          <img
+          <SafeImage
             src={photo}
             alt={`Unit ${auction.unit_number}`}
             loading="lazy"

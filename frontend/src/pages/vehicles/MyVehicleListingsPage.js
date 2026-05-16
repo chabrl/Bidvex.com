@@ -5,6 +5,7 @@ import API_BASE from '../../config';
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import SafeImage from '../../components/SafeImage';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
@@ -68,7 +69,7 @@ const VehicleListingCard = ({ listing, onView, onEdit }) => {
         {/* Image */}
         <div className="w-48 h-36 bg-slate-100 flex-shrink-0">
           {mainImage ? (
-            <img src={mainImage} alt="" className="w-full h-full object-cover" />
+            <SafeImage src={mainImage} alt="" className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <Car className="h-12 w-12 text-slate-300" />
