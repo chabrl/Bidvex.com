@@ -38,6 +38,7 @@ const PaymentSuccessPage = lazy(() => import('./pages/PaymentSuccessPage'));
 const ProfileSettingsPage = lazy(() => import('./pages/ProfileSettingsPage'));
 const AffiliateDashboard = lazy(() => import('./pages/AffiliateDashboard'));
 const MessagesPage = lazy(() => import('./pages/MessagesPage'));
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 const CreateMultiItemListing = lazy(() => import('./pages/CreateMultiItemListing'));
 const LotsMarketplacePage = lazy(() => import('./pages/LotsMarketplacePage'));
 const MultiItemListingDetailPage = lazy(() => import('./pages/MultiItemListingDetailPage'));
@@ -411,6 +412,10 @@ const App = () => {
           } />
           <Route path="/messages" element={
             <ProtectedRoute><MessagesPage /></ProtectedRoute>
+          } />
+          {/* iter217 Phase 4 — Dedicated notifications page */}
+          <Route path="/notifications" element={
+            <ProtectedRoute><NotificationsPage /></ProtectedRoute>
           } />
           <Route path="/create-multi-item-listing" element={
             <ProtectedRoute>

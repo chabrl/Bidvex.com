@@ -258,10 +258,19 @@ const NotificationCenter = () => {
         }
         break;
       default:
-        // Fallback — if a listing_id or auction_id is present anywhere on the
-        // notification payload, navigate to it; otherwise stay put.
-        if (data.listing_id) navigate(`/listing/${data.listing_id}`);
-        else if (data.auction_id) navigate(`/lots/${data.auction_id}`);
+        // iter217 Phase 4 — guaranteed navigation: try listing/auction first,
+        // then dump the user on the dedicated /notifications page (NEVER do nothing).
+        if (data.listing_id) {
+          navigate(`/listing/${data.listing_id}`);
+        } else if (data.auction_id || data.multi_item_listing_id) {
+          navigate(`/lots/${data.auction_id || data.multi_item_listing_id}`);
+        } else if (data.transaction_id) {
+          navigate(`/invoice/${data.transaction_id}`);
+        } else if (data.target_user_id) {
+          navigate(`/profile/${data.target_user_id}`);
+        } else {
+          navigate('/notifications');
+        }
         break;
     }
   };

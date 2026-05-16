@@ -72,16 +72,37 @@ const ProfessionalAuctionsPromo = ({ navigate }) => {
       style={{ background: 'linear-gradient(180deg, #f8fafc 0%, #eff6ff 100%)' }}
     >
       <div className="container mx-auto px-4">
-        <div className="mb-8 max-w-3xl">
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3" style={{ color: '#0f172a' }}>
-            🔨 {t('home.proAuctions.title', 'Professional Auctions — Lots & Liquidations')}
-          </h2>
-          <p className="text-sm sm:text-base" style={{ color: '#475569', lineHeight: 1.6 }}>
-            {t(
-              'home.proAuctions.subtitle',
-              'Licensed auctioneers, liquidators and professional dealers — verified by BidVex.'
-            )}
-          </p>
+        <div className="mb-8 max-w-3xl flex items-start gap-3">
+          {/* iter217 Phase 4 — Inline SVG auction gavel (replaces 🔨 emoji) */}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            width="32"
+            height="32"
+            fill="none"
+            stroke="#2563eb"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            className="flex-shrink-0 mt-1"
+            data-testid="pro-auctions-gavel-icon"
+          >
+            <path d="M15 2l-8 8 3 3 8-8-3-3z" />
+            <path d="M9 10l-6 6 2 2 6-6-2-2z" />
+            <line x1="14" y1="14" x2="20" y2="20" />
+          </svg>
+          <div>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3" style={{ color: '#0f172a' }}>
+              {t('home.proAuctions.title', 'Professional Auctions — Lots & Liquidations')}
+            </h2>
+            <p className="text-sm sm:text-base" style={{ color: '#475569', lineHeight: 1.6 }}>
+              {t(
+                'home.proAuctions.subtitle',
+                'Licensed auctioneers, liquidators and professional dealers — verified by BidVex.'
+              )}
+            </p>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -151,7 +172,15 @@ const ProfessionalAuctionsPromo = ({ navigate }) => {
 
                 <CardContent className="p-3.5">
                   {listing.seller_partner_company_name && (
-                    <p className="text-xs uppercase tracking-wide mb-1" style={{ color: '#475569', fontWeight: 600 }}>
+                    <p
+                      className="text-xs uppercase tracking-wide mb-1"
+                      style={{
+                        color: '#475569',
+                        fontWeight: 600,
+                        textTransform: 'capitalize', // iter217 Phase 4 — Title-Case the company name
+                        letterSpacing: '0.02em',
+                      }}
+                    >
                       {listing.seller_partner_company_name}
                     </p>
                   )}
@@ -180,15 +209,16 @@ const ProfessionalAuctionsPromo = ({ navigate }) => {
                 </CardContent>
 
                 <CardFooter className="p-3.5 pt-0">
+                  {/* iter217 Phase 4 — Blue solid CTA, full width */}
                   <Button
-                    variant="ghost"
                     size="sm"
-                    className="w-full text-xs font-medium"
-                    style={{ color: '#1d4ed8' }}
+                    className="w-full text-xs font-semibold text-white"
+                    style={{ background: '#2563eb', borderRadius: 8 }}
                     onClick={(e) => {
                       e.stopPropagation();
                       navigate(`/lots/${listing.id}`);
                     }}
+                    data-testid="pro-auction-browse-lots-btn"
                   >
                     {t('home.proAuctions.browseLots', 'Browse Lots')} <ArrowRight className="h-3 w-3 ml-1" />
                   </Button>
@@ -196,6 +226,37 @@ const ProfessionalAuctionsPromo = ({ navigate }) => {
               </Card>
             );
           })}
+
+          {/* iter217 Phase 4 — Ghost "More coming soon" placeholders so 1 card
+              doesn't stretch into a giant empty row. Render up to 3 ghosts so
+              the row is always 4-up on desktop. */}
+          {listings.length < 4 &&
+            Array.from({ length: Math.min(4 - listings.length, 3) }).map((_, idx) => (
+              <Card
+                key={`ghost-${idx}`}
+                data-testid="pro-auction-ghost-card"
+                className="overflow-hidden border-dashed border-2"
+                style={{
+                  borderColor: '#cbd5e1',
+                  background: 'rgba(248,250,252,0.6)',
+                }}
+              >
+                <div className="aspect-[4/3] flex items-center justify-center">
+                  <Gavel className="h-12 w-12" style={{ color: '#cbd5e1' }} />
+                </div>
+                <CardContent className="p-3.5 text-center">
+                  <p className="text-xs font-medium" style={{ color: '#64748b' }}>
+                    {t('home.proAuctions.moreSoon', 'More coming soon')}
+                  </p>
+                  <p className="text-[11px] mt-1" style={{ color: '#94a3b8' }}>
+                    {t(
+                      'home.proAuctions.beFirst',
+                      'Are you an auctioneer? Be the first to list.'
+                    )}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
         </div>
 
         {/* iter217 — Apply-as-partner footer strip */}

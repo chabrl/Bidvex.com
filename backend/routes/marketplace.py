@@ -112,17 +112,23 @@ _LISTING_PROJECTION = {
     # Seller-type pricing/badge/geo-sort fields (iteration 165 spec)
     "seller_type": 1, "partner_bp_rate": 1,
     "seller_province": 1, "seller_city": 1,
+    # iter217 Phase 4 — BP fields needed for partner card display
+    "buyer_premium_rate": 1, "premium_percentage": 1,
+    "custom_buyer_premium_rate": 1, "buyers_premium_percent": 1,
 }
 _MULTI_PROJECTION = {
     "_id": 0, "id": 1, "title": 1, "description": 1, "category": 1,
     "lots": 1, "auction_end_date": 1, "auction_start_date": 1,
     "status": 1, "seller_id": 1, "is_promoted": 1, "promotion_tier": 1,
-    "is_featured": 1, "is_partner_listing": 1, "region": 1, "country": 1,
+    "is_featured": 1, "is_partner_listing": 1, "city": 1, "region": 1, "country": 1,
     "created_at": 1,
     "title_en": 1, "title_fr": 1, "description_en": 1, "description_fr": 1,
     # Seller-type pricing/badge/geo-sort fields (iteration 165 spec)
     "seller_type": 1, "partner_bp_rate": 1,
     "seller_province": 1, "seller_city": 1,
+    # iter217 Phase 4 — BP fields needed for partner card display
+    "buyer_premium_rate": 1, "premium_percentage": 1,
+    "custom_buyer_premium_rate": 1, "buyers_premium_percent": 1,
 }
 
 
@@ -149,18 +155,67 @@ async def _build_marketplace_items():
         {"status": "active", "category": {"$nin": VEHICLE_CATEGORIES}, "is_demo": {"$ne": True}}, _LISTING_PROJECTION
     ).sort("auction_end_date", 1).limit(500).to_list(500)
 
-    # Batch-fetch seller tax status
+    # iter217 Phase 4 — Batch-fetch FULL seller record so we can compute
+    # `seller_account_type` (Partner / Vehicle Dealer / Storage / Individual)
+    # for the cached marketplace items. The previous version only fetched
+    # `is_tax_registered` → all partner listings rendered as "Vente privée".
     all_seller_ids = list(set(
         [a.get("seller_id") for a in auctions if a.get("seller_id")] +
         [sl.get("seller_id") for sl in single_listings if sl.get("seller_id")]
     ))
+    sellers_full = {}
     sellers = {}
     if all_seller_ids:
         seller_docs = await db.users.find(
             {"id": {"$in": all_seller_ids}},
-            {"_id": 0, "id": 1, "is_tax_registered": 1}
+            {
+                "_id": 0,
+                "id": 1,
+                "is_tax_registered": 1,
+                "is_partner": 1,
+                "partner_verification_status": 1,
+                "partner_company_name": 1,
+                "partner_buyer_premium_pct": 1,
+                "is_vehicle_dealer": 1,
+                "is_storage_facility": 1,
+                "account_type": 1,
+                "platform_fee_paid": 1,
+                "partner_subscription_active": 1,
+            }
         ).to_list(len(all_seller_ids))
+        sellers_full = {s["id"]: s for s in seller_docs}
         sellers = {s["id"]: s.get("is_tax_registered", False) for s in seller_docs}
+
+    from services.listing_seller_enrichment import (
+        resolve_seller_account_type, _coerce_rate_to_fraction,
+    )
+
+    def _enrich_seller_fields(target_doc, source_listing, context="general"):
+        """Mutates target_doc to include seller_* enrichment fields."""
+        seller = sellers_full.get(source_listing.get("seller_id"), {})
+        acct = resolve_seller_account_type(seller, context)
+        target_doc["seller_account_type"] = acct
+        target_doc["seller_is_partner"] = acct == "partner"
+        target_doc["seller_is_vehicle_dealer"] = acct == "vehicle_dealer"
+        target_doc["seller_is_storage_facility"] = acct == "storage_facility"
+        target_doc["seller_is_business"] = bool(
+            seller.get("is_tax_registered")
+            or acct in ("partner", "vehicle_dealer", "storage_facility")
+        )
+        target_doc["seller_partner_company_name"] = (
+            seller.get("partner_company_name") if acct == "partner" else None
+        )
+        # Canonical buyer's premium rate (fraction)
+        rate = (
+            _coerce_rate_to_fraction(source_listing.get("buyer_premium_rate"))
+            or _coerce_rate_to_fraction(source_listing.get("custom_buyer_premium_rate"))
+            or _coerce_rate_to_fraction(source_listing.get("premium_percentage"))
+            or _coerce_rate_to_fraction(source_listing.get("buyers_premium_percent"))
+            or _coerce_rate_to_fraction(source_listing.get("partner_bp_rate"))
+        )
+        if rate is None and acct == "partner":
+            rate = _coerce_rate_to_fraction(seller.get("partner_buyer_premium_pct"))
+        target_doc["buyer_premium_rate"] = rate
 
     items = []
 
@@ -180,7 +235,7 @@ async def _build_marketplace_items():
             elif isinstance(lot_end_time, str):
                 lot_end_time = datetime.fromisoformat(lot_end_time)
 
-            items.append({
+            item_doc = {
                 "id": f"{auction['id']}_lot{lot['lot_number']}",
                 "auction_id": auction["id"],
                 "lot_number": lot["lot_number"],
@@ -214,6 +269,7 @@ async def _build_marketplace_items():
                 "partner_bp_rate": auction.get("partner_bp_rate"),
                 "seller_province": auction.get("seller_province") or auction.get("region"),
                 "seller_city": auction.get("seller_city") or auction.get("city"),
+                "city": auction.get("city"),
                 "region": auction.get("region"),
                 "country": auction.get("country"),
                 "created_at": auction.get("created_at"),
@@ -224,11 +280,15 @@ async def _build_marketplace_items():
                 "description_fr": lot.get("description_fr") or auction.get("description_fr"),
                 "parent_auction_title_en": auction.get("title_en"),
                 "parent_auction_title_fr": auction.get("title_fr"),
-            })
+            }
+            # iter217 Phase 4 — surface seller_account_type + canonical BP.
+            # The lot inherits the parent auction's BP fields via `auction`.
+            _enrich_seller_fields(item_doc, auction, "general")
+            items.append(item_doc)
 
     for listing in single_listings:
         current_price = listing.get("current_price", listing.get("starting_price", 0))
-        items.append({
+        single_doc = {
             "id": listing["id"],
             "auction_id": None,
             "lot_number": None,
@@ -273,7 +333,10 @@ async def _build_marketplace_items():
             "description_fr": listing.get("description_fr"),
             "parent_auction_title_en": None,
             "parent_auction_title_fr": None,
-        })
+        }
+        # iter217 Phase 4 — surface seller_account_type + canonical BP.
+        _enrich_seller_fields(single_doc, listing, "general")
+        items.append(single_doc)
 
     # ── High-Velocity Sort ──
     # Primary: ending soonest first (active items ahead of ended)
@@ -356,6 +419,9 @@ async def get_marketplace_items(
     province: Optional[str] = None,
     no_taxes: Optional[str] = None,
     tax_status: Optional[str] = None,        # "partner" | "standard"
+    private_sales_only: Optional[str] = None,  # iter217 Phase 4
+    partner_only: Optional[str] = None,        # iter217 Phase 4
+    lots_auction_only: Optional[str] = None,   # iter217 Phase 4 — items from multi-lot auctions
     buyer_province: Optional[str] = None,    # for "nearby_first" geo-sort
     sort: str = "nearby_first",
     limit: int = 20,
@@ -433,14 +499,26 @@ async def get_marketplace_items(
         norm_prov = _normalize_region(province)
         items = [i for i in items if _normalize_region(i.get("region") or i.get("province")) == norm_prov]
     if no_taxes and no_taxes.lower() == 'true':
-        items = [i for i in items if not i.get("seller_is_business") and not i.get("seller_is_tax_registered")]
+        # iter217 Phase 4 — "No Taxes" pill = TRUE private sales only.
+        items = [i for i in items if i.get("seller_account_type") == "individual"]
+
+    # iter217 Phase 4 — Private sales pill
+    if private_sales_only and str(private_sales_only).lower() == 'true':
+        items = [i for i in items if i.get("seller_account_type") == "individual"]
+
+    # iter217 Phase 4 — Partner Auctions pill
+    if partner_only and str(partner_only).lower() == 'true':
+        items = [i for i in items if i.get("seller_account_type") == "partner"]
+
+    # iter217 Phase 4 — Lot Auction pill (only items that come from multi-lot auctions)
+    if lots_auction_only and str(lots_auction_only).lower() == 'true':
+        items = [i for i in items if i.get("auction_id")]
 
     # ── Tax Status filter (partner vs standard listings) ──
     if tax_status == "partner":
-        items = [i for i in items if (i.get("seller_type") == "partner") or i.get("is_partner_listing")]
+        items = [i for i in items if i.get("seller_account_type") == "partner"]
     elif tax_status == "standard":
-        items = [i for i in items if (i.get("seller_type") in ("individual", "enterprise"))
-                 and not i.get("is_partner_listing")]
+        items = [i for i in items if i.get("seller_account_type") in ("individual", "vehicle_dealer")]
 
     # Re-sort if not default (cache is already sorted by ending_soon)
     if sort == "nearby_first":

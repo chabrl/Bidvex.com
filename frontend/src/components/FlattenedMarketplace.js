@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '../utils/currencyFormatter';
+import { SellerAccountBadge } from './PrivateSaleBadge';
 import CurrencyBadge from './CurrencyBadge';
 import { getLocalized } from '../utils/localization';
 import { useCategories } from '../hooks/useCategories';
@@ -300,6 +301,10 @@ const FlattenedMarketplace = ({
         <div className="mb-4">
           <FilterBar
             onFilterChange={(newFilters) => {
+              // iter217 Phase 4 — Forward ALL FilterBar fields, including
+              // province + pill filters. Previously only 6 fields were
+              // forwarded, so the top-bar dropdowns visually changed but
+              // the grid never re-filtered.
               setFilters(prev => ({
                 ...prev,
                 search: newFilters.search,
@@ -308,6 +313,11 @@ const FlattenedMarketplace = ({
                 sort: newFilters.sort,
                 private_sales_only: newFilters.private_sales_only,
                 zero_fee_only: newFilters.zero_fee_only,
+                province: newFilters.province,
+                partner_only: newFilters.partner_only,
+                lots_auction: newFilters.lots_auction,
+                no_taxes: newFilters.no_taxes,
+                tax_status: newFilters.tax_status,
               }));
             }}
             pageContext="marketplace"
@@ -566,7 +576,15 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
     return null;
   };
 
-  const isPrivateSale = !item.seller_is_business;
+  // iter217 Phase 4 — Read seller_account_type set by the bulk enrichment.
+  // Fallback path supports old cached payloads that don't have the new fields yet.
+  const acctType = item.seller_account_type
+    || (item.seller_is_partner ? 'partner'
+      : item.seller_is_vehicle_dealer ? 'vehicle_dealer'
+      : item.seller_is_storage_facility ? 'storage_facility'
+      : (item.seller_is_business ? 'business' : 'individual'));
+  const isPrivateSale = acctType === 'individual';
+  const isPartner = acctType === 'partner';
   // Smart routing: vehicles -> /vehicle-auctions/:id, lots -> /lots/:id, default -> /listing/:id
   const getDetailLink = (item) => {
     const cat = (item.category || '').toLowerCase();
@@ -608,32 +626,16 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
                 WINNER / GAGNANT
               </Badge>
             )}
-            {isPrivateSale ? (
-              <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 shadow-lg text-xs">
-                <User className="h-3 w-3 mr-1" />
-                {t('marketplace.privateSale')}
-              </Badge>
-            ) : (
+            {/* iter217 Phase 4 — Single source of truth for seller-type badge */}
+            <SellerAccountBadge
+              accountType={acctType === 'business' ? 'individual' : acctType}
+              companyName={item.seller_partner_company_name}
+              variant="compact"
+            />
+            {acctType === 'business' && (
               <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-xs">
                 <ShieldCheck className="h-3 w-3 mr-1" />
                 {t('marketplace.business')}
-              </Badge>
-            )}
-            {/* Verified Partner Badge */}
-            {/* Partner Auction Badge — applies the spec's seller_type === "partner" rule. */}
-            {(item.seller_type === 'partner' || item.is_partner_listing) && (
-              <Badge
-                className="border text-[11px] font-bold tracking-wide px-2.5 py-0.5"
-                style={{
-                  background: 'rgba(33, 134, 198, 0.15)',
-                  borderColor: '#2186C6',
-                  color: '#2186C6',
-                  letterSpacing: '0.5px',
-                }}
-                data-testid="partner-auction-badge"
-              >
-                <ShieldCheck className="h-3 w-3 mr-1" />
-                {isFrench ? 'Enchère partenaire' : 'Partner Auction'}
               </Badge>
             )}
             {/* Multi-Lot Badge */}
@@ -726,11 +728,22 @@ const ItemCard = ({ item, onQuickBid, trackClick, isComparing, onToggleCompare, 
           </div>
         )}
 
-        {/* Tax Savings Banner (Private Sale) */}
+        {/* iter217 Phase 4 — Tax Savings Banner only for true Private Sales */}
         {isPrivateSale && (
           <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-3 py-1.5 text-xs">
             <span className="font-medium text-green-700 dark:text-green-400">
               {t('marketplace.noTaxOnItem')}
+            </span>
+          </div>
+        )}
+        {/* iter217 Phase 4 — Buyer's Premium hint on partner cards */}
+        {isPartner && typeof item.buyer_premium_rate === 'number' && (
+          <div className="rounded-lg px-3 py-1.5 text-xs" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
+            <span className="font-medium" style={{ color: '#1d4ed8' }}>
+              {t('marketplace.partnerBpHint', {
+                pct: (item.buyer_premium_rate * 100).toFixed(1).replace(/\.0$/, ''),
+                defaultValue: "Buyer's Premium: {{pct}}% — GST/QST applicable",
+              })}
             </span>
           </div>
         )}

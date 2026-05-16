@@ -315,41 +315,41 @@ const MarketplaceSidebar = ({ onFiltersChange, className = '' }) => {
               </div>
             </div>
 
-            {/* Location — sticky header, flows below categories naturally */}
-            <div>
-              <div className="sticky top-0 z-10 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 border-b border-slate-50 dark:border-slate-800/50">
-                <MapPin className="w-3.5 h-3.5" /> {t('filters.location', 'Location')}
+            {/* iter217 Phase 4 — Location section hidden when no data; the
+                top-bar Province dropdown remains the primary location filter. */}
+            {filterData?.locations && filterData.locations.length > 0 && (
+              <div>
+                <div className="sticky top-0 z-10 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 border-b border-slate-50 dark:border-slate-800/50">
+                  <MapPin className="w-3.5 h-3.5" /> {t('filters.location', 'Location')}
+                </div>
+                <div className="px-3 pb-2 space-y-1">
+                  {filterData.locations.map(loc => (
+                    <div key={loc.region}>
+                      <label className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 text-xs font-medium transition-colors" data-testid={`filter-region-${loc.region}`}>
+                        <input type="checkbox" checked={selectedRegions.includes(loc.region)}
+                          onChange={() => toggleFilter(selectedRegions, setSelectedRegions, loc.region)}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5" />
+                        <span className="flex-1 text-slate-700 dark:text-slate-300">{loc.region}</span>
+                        <span className="text-[10px] text-slate-400 tabular-nums">({loc.count})</span>
+                      </label>
+                      {selectedRegions.includes(loc.region) && loc.cities?.length > 0 && (
+                        <div className="ml-5 space-y-0.5">
+                          {loc.cities.map(city => (
+                            <label key={city.name} className="flex items-center gap-2 px-2 py-1 rounded cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 text-[11px] transition-colors" data-testid={`filter-city-${city.name}`}>
+                              <input type="checkbox" checked={selectedCities.includes(city.name)}
+                                onChange={() => toggleFilter(selectedCities, setSelectedCities, city.name)}
+                                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3 w-3" />
+                              <span className="flex-1 text-slate-500 dark:text-slate-400">{city.name}</span>
+                              <span className="text-[10px] text-slate-400">({city.count})</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="px-3 pb-2 space-y-1">
-                {(filterData?.locations || []).map(loc => (
-                  <div key={loc.region}>
-                    <label className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 text-xs font-medium transition-colors" data-testid={`filter-region-${loc.region}`}>
-                      <input type="checkbox" checked={selectedRegions.includes(loc.region)}
-                        onChange={() => toggleFilter(selectedRegions, setSelectedRegions, loc.region)}
-                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5" />
-                      <span className="flex-1 text-slate-700 dark:text-slate-300">{loc.region}</span>
-                      <span className="text-[10px] text-slate-400 tabular-nums">({loc.count})</span>
-                    </label>
-                    {selectedRegions.includes(loc.region) && loc.cities?.length > 0 && (
-                      <div className="ml-5 space-y-0.5">
-                        {loc.cities.map(city => (
-                          <label key={city.name} className="flex items-center gap-2 px-2 py-1 rounded cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 text-[11px] transition-colors" data-testid={`filter-city-${city.name}`}>
-                            <input type="checkbox" checked={selectedCities.includes(city.name)}
-                              onChange={() => toggleFilter(selectedCities, setSelectedCities, city.name)}
-                              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3 w-3" />
-                            <span className="flex-1 text-slate-500 dark:text-slate-400">{city.name}</span>
-                            <span className="text-[10px] text-slate-400">({city.count})</span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {(!filterData?.locations || filterData.locations.length === 0) && (
-                  <p className="text-[11px] text-slate-400 px-2 py-1">{t('filters.noLocations', 'No locations yet')}</p>
-                )}
-              </div>
-            </div>
+            )}
 
           </div>
         </div>

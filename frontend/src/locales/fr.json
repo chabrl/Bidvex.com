@@ -180,6 +180,7 @@
     "business": "Entreprise",
     "verifiedPartner": "Partenaire vérifié",
     "noTaxOnItem": "Économisez ~15 % – Aucune taxe sur le prix de l'article !",
+    "partnerBpHint": "Prime d'acheteur : {{pct}} % — TPS/TVQ applicables",
     "noTaxOnHammer": "Vente privée – Aucune taxe sur le prix d'adjudication !",
     "loadMore": "Charger plus d'articles",
     "noItemsFound": "Aucun article trouvé",
@@ -1154,6 +1155,15 @@
   "storageCreate": {
     "legalNoticeConfirm": "Je confirme que cette unité a fait l'objet du processus de notification légale requis et que son contenu peut être mis aux enchères en vertu de la loi provinciale applicable."
   },
+  "notifications": {
+    "title": "Notifications",
+    "subtitle": "{{unread}} non lues sur {{total}} au total",
+    "markAllRead": "Tout marquer comme lu",
+    "clearAll": "Tout effacer",
+    "empty": "Aucune notification pour le moment",
+    "new": "Nouveau",
+    "noTitle": "(sans titre)"
+  },
   "paymentTrust": {
     "heading": "Pourquoi nous demandons un mode de paiement",
     "body": "L'ajout d'une carte ne signifie PAS que nous allons vous facturer. Votre carte est utilisée uniquement pour :",
@@ -1775,6 +1785,8 @@
       "subtitle": "Commissaires-priseurs licenciés, liquidateurs et marchands professionnels — vérifiés par BidVex.",
       "totalStarting": "Valeur de départ totale",
       "browseLots": "Parcourir les lots",
+      "moreSoon": "Bientôt disponible",
+      "beFirst": "Êtes-vous commissaire-priseur ? Soyez le premier à publier.",
       "applyCopy": "Êtes-vous un commissaire-priseur ou liquidateur licencié ?",
       "applyBtn": "Postuler comme partenaire"
     },

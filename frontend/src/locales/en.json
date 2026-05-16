@@ -180,6 +180,7 @@
     "business": "Business",
     "verifiedPartner": "Verified Partner",
     "noTaxOnItem": "Save ~15% - No tax on item price!",
+    "partnerBpHint": "Buyer's Premium: {{pct}}% — GST/QST applicable",
     "noTaxOnHammer": "Private Sale - No tax on hammer price!",
     "loadMore": "Load More Items",
     "noItemsFound": "No items found",
@@ -1154,6 +1155,15 @@
   "storageCreate": {
     "legalNoticeConfirm": "I confirm this unit has gone through the required legal-notification process and its contents may be auctioned under the relevant provincial law."
   },
+  "notifications": {
+    "title": "Notifications",
+    "subtitle": "{{unread}} unread of {{total}} total",
+    "markAllRead": "Mark all as read",
+    "clearAll": "Clear all",
+    "empty": "No notifications yet",
+    "new": "New",
+    "noTitle": "(no title)"
+  },
   "paymentTrust": {
     "heading": "Why we ask for a payment method",
     "body": "Adding a card does NOT mean we will charge you. Your card is used solely to:",
@@ -1775,6 +1785,8 @@
       "subtitle": "Licensed auctioneers, liquidators and professional dealers — verified by BidVex.",
       "totalStarting": "Total starting value",
       "browseLots": "Browse Lots",
+      "moreSoon": "More coming soon",
+      "beFirst": "Are you an auctioneer? Be the first to list.",
       "applyCopy": "Are you a licensed auctioneer or liquidator?",
       "applyBtn": "Apply as Partner"
     },

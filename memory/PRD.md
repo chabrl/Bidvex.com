@@ -1,5 +1,114 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter217 Phase 4 — Production Filter / Badge / Notification Regressions (Feb 16, 2026) ✅
+
+### Bug 1 — Filters broken on all 4 auction pages
+**Root cause confirmed**
+- `FlattenedMarketplace.js:onFilterChange` only forwarded 6 fields (search, category, condition, sort, private_sales_only, zero_fee_only). The province dropdown + 4 pill filters (Private Sales / 0% Buyer Fee / Lots Auction / No Taxes) **selected visually but their values were silently dropped before reaching `mergedFilters`** → API never received them.
+- `useMarketplaceItems` hook did not map `province` to the query string either. Even if FlattenedMarketplace had forwarded it, the backend wouldn't have seen it.
+- `_build_marketplace_items()` only fetched `is_tax_registered` from the seller doc — `seller_account_type` was never on cached items. The `tax_status="partner"` filter relied on a legacy `seller_type` field that wasn't being populated.
+- `MarketplaceSidebar.js` rendered a "No locations yet" empty placeholder when `filterData.locations` was empty.
+
+**Fix (permanent)**
+- `FlattenedMarketplace.js:onFilterChange` now forwards **all 11** FilterBar fields including `province`, `partner_only`, `lots_auction`, `no_taxes`, `tax_status`.
+- `useMarketplaceItems` maps `province`, `private_sales_only`, `partner_only`, `lots_auction` → `lots_auction_only`, `no_taxes` to the URL.
+- Backend `get_marketplace_items()` accepts `private_sales_only`, `partner_only`, `lots_auction_only` — all filter on the enriched `seller_account_type`. Existing `tax_status="partner"`/`"standard"` filters rewritten to use `seller_account_type` (not the unreliable `seller_type` / `is_partner_listing` legacy combo).
+- `_build_marketplace_items()` REWRITTEN to fetch the FULL seller doc (`is_partner`, `partner_verification_status`, `is_vehicle_dealer`, `is_storage_facility`, `partner_company_name`, etc.) and call `resolve_seller_account_type()` + `_coerce_rate_to_fraction()` per item. Every cached item now carries `seller_account_type`, `seller_partner_company_name`, `buyer_premium_rate`.
+- `MarketplaceSidebar.js` — the entire Location section is now wrapped in `{filterData?.locations && filterData.locations.length > 0 && (...)}`. The "No locations yet" placeholder is **deleted entirely** — top-bar Province dropdown remains the primary location filter.
+
+**Why permanent**: backend now has typed `seller_account_type` enrichment that runs at cache-build time AND at every GET. Frontend forwards all 11 filter fields explicitly. Adding a new filter requires a single edit in 3 known places (FilterBar emit → FlattenedMarketplace onChange → useMarketplaceItems URL). The previous bug pattern was "frontend has UI but value gets lost mid-pipeline" — that's eliminated by source-level tests asserting every field is forwarded.
+
+**Live verification**
+```
+$ curl /api/marketplace/items?province=QC          → 1 item (Alex)
+$ curl /api/marketplace/items?province=Quebec      → 1 item (normalizer)
+$ curl /api/marketplace/items?province=AB          → 0 items
+$ curl /api/marketplace/items?province=Alberta     → 0 items
+$ curl /api/marketplace/items?partner_only=true    → 1 item
+$ curl /api/marketplace/items?private_sales_only=true → 0 items
+$ curl /api/marketplace/items?lots_auction_only=true → 1 item
+$ curl /api/marketplace/items?no_taxes=true        → 0 items (Alex is partner)
+```
+
+### Bug 2 — Marketplace card showed "Vente privée" on a partner listing
+**Root cause confirmed**
+- `/api/listings` (single-item list) had bulk enrichment added in Phase 2. **But the actual marketplace page calls `/api/marketplace/items`** (a different cached endpoint). The cache builder only fetched `is_tax_registered` per seller → no `seller_account_type` field on cached items.
+- `FlattenedMarketplace.js` card logic was `isPrivateSale = !item.seller_is_business`. For Alex Boulanger (partner, `is_tax_registered=false`), `seller_is_business=false` → `isPrivateSale=true` → green "Vente privée" badge + "Économisez ~15%" text.
+
+**Fix (permanent)**
+- Backend cache builder rewritten (see Bug 1 above) — every cached item now carries `seller_account_type`.
+- `FlattenedMarketplace.js` card logic rewritten:
+  - `acctType = item.seller_account_type || (derive from boolean flags)` — partner / vehicle_dealer / storage_facility / business / individual.
+  - `isPrivateSale = acctType === 'individual'` (TRUE private sale only — not "anyone without GST registration").
+  - Top-left badge uses `<SellerAccountBadge>` — same component family as listing detail + LotsMarketplacePage.
+  - The "Save ~15% - No tax on item price!" banner is gated on `isPrivateSale` (only individual sellers see it).
+  - Added a Partner-specific BP hint banner: "Buyer's Premium: 5% — GST/QST applicable" (bilingual).
+- The previous custom Partner Auction badge in FlattenedMarketplace was DELETED (was based on the unreliable `seller_type === "partner" || is_partner_listing` combo). The unified `SellerAccountBadge` is now the single source of truth across the entire app.
+
+**Why permanent**: there are now ZERO call sites where a card derives seller type from `is_tax_registered` or `seller_is_business`. All cards (detail page, /lots cards, /marketplace cards, homepage Pro Auctions cards) read `seller_account_type` from a single bulk-enriched backend field. Tests assert this contract.
+
+**Live verification**: marketplace screenshot now shows "Partner Auction" blue badge on Alex's card; "Save 15%" banner gone; no "Vente privée" badge.
+
+### Bug 3 — Homepage Pro Auctions emoji + card layout
+**Fix**
+- 🔨 emoji REPLACED with inline SVG auction gavel (`viewBox="0 0 24 24"`, stroke `#2563eb`, data-testid `pro-auctions-gavel-icon`).
+- Ghost "More coming soon" cards render when fewer than 4 real cards exist — keeps the grid balanced (no giant empty space). data-testid `pro-auction-ghost-card`.
+- Company name `<p>` got `textTransform: 'capitalize'` → "abc auction" → "Abc Auction". data-testid `pro-auction-browse-lots-btn`.
+- "Browse Lots →" is now a SOLID blue CTA (`background: #2563eb`, `borderRadius: 8`, full-width on card bottom) — not a ghost text link.
+
+**Live verification** (screenshot): 1 real card + 3 ghost "More coming soon" placeholders, Title-Case company name, blue solid CTA button.
+
+### Bug 4 — Notifications routing
+**Root cause confirmed**
+- 24 notifications in the live DB had `action_url: null` (created before Phase 2 schema fix). NotificationCenter's switch was expanded in Phase 2 but old generic types (`warning`, `info`, `general`) without `data.listing_id` fell into the `default: break;` branch = nothing.
+
+**Fix (Part A — backfill)**
+- One-off script ran against MongoDB: walked every notification with `action_url=null`, mapped each by `type + data` to a sensible URL:
+  - `outbid` + `data.listing_id` → `/listings/{id}`
+  - `auction_won` + `data.transaction_id` → `/my-purchases/{id}`
+  - `pickup_code_ready` + `data.transaction_id` → `/my-pickup-code/{id}`
+  - `admin_*` → `/settings?tab=documents`
+  - `warning`/`info`/`general` → `/notifications` (the new page)
+- **Updated 24 notifications**. Logged via script output.
+
+**Fix (Part B — guaranteed navigation handler)**
+- `NotificationCenter.js` switch `default:` branch now navigates to the BEST URL it can derive (`data.listing_id`, `data.auction_id`, `data.transaction_id`, `data.target_user_id`) and ALWAYS falls back to `/notifications` — never `break;`. **It is now impossible for a notification click to do nothing.**
+
+**Fix (Part C — /notifications page)**
+- NEW `pages/NotificationsPage.jsx` (route `/notifications`) — full list with per-row icons by type, unread highlight (`border-l-4` + `#eff6ff` bg), "Mark all as read" + "Clear all" toolbar, bilingual EN/FR.
+- Each row click marks as read via `POST /notifications/{id}/read` then navigates via the SAME guaranteed-fallback logic.
+
+**Why permanent**: 3 layers of defense — backend backfill, frontend type switch, frontend universal fallback. Old notifications, new notifications, and unknown future types all route correctly. A regression test (`test_notification_center_default_falls_back_to_notifications_page`) source-asserts the guaranteed `/notifications` fallback exists.
+
+### Tests
+- NEW `tests/test_iter217_phase4_filters_and_routing.py` — 18 tests covering filter param wiring, cache enrichment helpers, Pro-Auctions SVG/ghost cards/blue CTA, NotificationCenter default-branch fallback, /notifications page exists, marketplace card uses SellerAccountBadge.
+- **Full regression**: **270 passed**, 1 warning, 0 failed across iter209/211–217 (Phase 1+2+3+4). Was 252 before Phase 4 — +18 new tests.
+
+### Files changed (Phase 4)
+**Backend** (2 modified, 1 new test file):
+- MODIFIED `routes/marketplace.py` — rewrote `_build_marketplace_items` for full seller enrichment + `_LISTING_PROJECTION`/`_MULTI_PROJECTION` extended with BP fields + 3 new query params (`private_sales_only`, `partner_only`, `lots_auction_only`) + `tax_status`/`no_taxes` filters now use `seller_account_type`.
+- ONE-OFF SCRIPT: backfilled `action_url` on 24 existing notifications.
+- NEW `tests/test_iter217_phase4_filters_and_routing.py` (18 tests).
+
+**Frontend** (5 modified, 1 new):
+- NEW `pages/NotificationsPage.jsx`
+- MODIFIED `components/FlattenedMarketplace.js` — forwards all 11 filter fields, swaps custom badges for SellerAccountBadge, gates "Save 15%" banner on `isPrivateSale`, adds partner BP hint banner.
+- MODIFIED `components/MarketplaceSidebar.js` — Location section conditional on data, "No locations yet" placeholder deleted.
+- MODIFIED `components/ProfessionalAuctionsPromo.jsx` — SVG gavel, ghost cards, blue CTA, capitalize company.
+- MODIFIED `components/NotificationCenter.js` — guaranteed-navigation default branch.
+- MODIFIED `hooks/useMarketplaceItems.js` — maps new filter params.
+- MODIFIED `App.js` — `/notifications` route.
+- MODIFIED `locales/en.json` + `locales/fr.json` — +9 keys (notifications namespace, partnerBpHint, moreSoon/beFirst).
+
+### EXPLICIT CONFIRMATION
+- ✅ `calculate_fee()` math NOT modified in Phase 1 / 2 / 3 / 4.
+- ✅ Phase 1 (Partner badge / Bill 96) intact — Alex's listing detail still shows Partner Auction badge.
+- ✅ Phase 2 (Watchlist / business badges / location filters / notifications / payment trust) intact.
+- ✅ Phase 3 (Partner dashboard CTAs / homepage Pro Auctions section / admin moderation / compliance alerts / send-notification / documents overdue badge) intact.
+- ✅ 270/270 tests pass.
+
+---
+
 ## Latest: iter217 Phase 3 — Partner Routes / Homepage / Admin Fixes (Feb 15, 2026) ✅
 
 ### Fix 1 — Partner Dashboard "Create Listing" routed to wrong page
