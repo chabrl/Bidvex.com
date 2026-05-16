@@ -11,6 +11,7 @@ import { Input } from '../components/ui/input';
 import { Switch } from '../components/ui/switch';
 import { toast } from 'sonner';
 import EnhancedUserManager from './admin/EnhancedUserManager';
+import AdminFeedsPage from './admin/AdminFeedsPage';
 import LotsModeration from './admin/LotsModeration';
 import ListingsModeration from './admin/ListingsModeration';
 import DisputedSettlements from './admin/DisputedSettlements';
@@ -157,6 +158,8 @@ const SECONDARY_TABS = {
 const MARKETING_TABS = [
   { id: 'promotions', label: 'Promotions', icon: '🎯', lucideIcon: Megaphone },
   { id: 'affiliates', label: 'Affiliates', icon: '🤝', lucideIcon: Users },
+  // iter217 Phase 5 — Meta Ad Feeds
+  { id: 'ad-feeds', label: 'Ad Feeds', icon: '📡', lucideIcon: Megaphone },
 ];
 
 // ========== FINANCIAL & SAFETY (Cross-Cutting) ==========
@@ -393,6 +396,8 @@ const AdminDashboard = () => {
     if (secondaryTab === 'affiliates') return <AffiliateManager />;
     if (secondaryTab === 'currency-appeals') return <CurrencyAppealsManager />;
     if (secondaryTab === 'messaging') return <MessagingOversight />;
+    // iter217 Phase 5 — Meta Ad Feeds health dashboard
+    if (secondaryTab === 'ad-feeds') return <AdminFeedsPage />;
 
     // Primary tab specific content
     switch (primaryTab) {

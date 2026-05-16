@@ -285,6 +285,11 @@ const App = () => {
   const { user, processGoogleSession } = useAuth();
   const [sessionProcessing, setSessionProcessing] = useState(false);
 
+  // Phase 5 — Boot Meta Pixel (CASL-gated by consent inside the helper)
+  useEffect(() => {
+    import('./utils/metaPixel').then(({ initMetaPixel }) => initMetaPixel());
+  }, []);
+
   useEffect(() => {
     const checkForSession = async () => {
       const hash = window.location.hash;

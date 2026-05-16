@@ -98,6 +98,16 @@ const FilterBar = ({ onFilterChange, pageContext = "marketplace" }) => {
 
   useEffect(() => {
     onFilterChange?.(filters);
+    // Phase 5 — Meta Pixel Search event (only when a real search is happening)
+    if (filters.search || filters.province || filters.category) {
+      import('../../utils/metaPixel').then(({ trackSearch }) => {
+        trackSearch({
+          searchString: filters.search,
+          category: filters.category,
+          province: filters.province,
+        });
+      }).catch(() => {});
+    }
   }, [filters]);
 
   const toggle = (key) => setFilters((prev) => ({ ...prev, [key]: !prev[key] }));

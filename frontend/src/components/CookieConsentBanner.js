@@ -53,9 +53,19 @@ const CookieConsentBanner = () => {
 
   const cats = S.categories || {};
 
+  const _notifyPixel = () => {
+    // Phase 5 — Boot Meta Pixel once analytics consent is granted (CASL-compliant)
+    try {
+      import('../utils/metaPixel').then(({ notifyConsentGranted }) => notifyConsentGranted());
+    } catch (e) {
+      // silent
+    }
+  };
+
   const handleAcceptAll = () => {
     acceptAll();
     setVisible(false);
+    _notifyPixel();
   };
   const handleRefuseAll = () => {
     refuseAll();
@@ -64,6 +74,7 @@ const CookieConsentBanner = () => {
   const handleSave = () => {
     saveCustom(prefs);
     setVisible(false);
+    if (prefs?.analytics) _notifyPixel();
   };
 
   return (

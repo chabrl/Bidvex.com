@@ -196,6 +196,25 @@ const MultiItemListingDetailPage = () => {
         // Auto-select first lot for bid history display
         setSelectedLot(response.data.lots[0]);
       }
+
+      // Phase 5 — Meta Pixel ViewContent (multi-lot auction)
+      const _lots = response.data.lots || [];
+      const _highest = _lots.reduce(
+        (m, l) => Math.max(m, l.current_price || l.starting_price || 0),
+        0,
+      );
+      import('../utils/metaPixel').then(({ trackViewContent }) => {
+        trackViewContent({
+          id: response.data.id,
+          listing_type: 'lots',
+          title: response.data.title,
+          category: response.data.category,
+          current_bid: _highest,
+          city: response.data.city,
+          region: response.data.region || response.data.province,
+        });
+      }).catch(() => {});
+
       // Fetch seller info for tax status badge
       if (response.data.seller_id) {
         try {

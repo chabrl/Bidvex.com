@@ -1,5 +1,133 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter217 Phase 5 — Meta Dynamic Local Ads Infrastructure (Feb 16, 2026) ✅
+
+### Greenfield feature — public Meta product-catalog feed + Pixel
+This phase ships the public-facing JSON product feed that Meta Business
+Manager ingests, plus a fully wired Meta Pixel that emits the catalog-matched
+events (ViewContent, AddToWishlist, Purchase, Search) required for Dynamic
+Product Ads retargeting. The feed and pixel use the SAME `content_ids`
+format (`BIDVEX-{TYPE_PREFIX}-{listing_id}`) so Meta can match pixel
+events to catalog items.
+
+### Pre-implementation field verification
+Real document keys observed on `multi_item_listings` (1 active record on
+preview — Alex Boulanger's "Banquettes en cuir noir"):
+- `id` (UUID string, not `_id`), `title`, `description`, `status: "active"`
+- `region: "QC"` (flat, 2-letter code), `city: "Sherbrooke"`, `country: "CA"`, `postal_code: "J1C 0J2"`
+- `location: "Sherbrooke, QC, J1C 0J2"` (descriptive string, NOT nested object)
+- Images stored as **base64 data URLs** on `lots[i].images` (not https)
+- NO `latitude`/`longitude` fields; NO nested `location.{lat,lng}`
+- `seller_id` → enrich via `enrich_listings_bulk_async` for `seller_account_type`/`seller_partner_company_name`
+
+Collections walked: `listings`, `multi_item_listings`, `vehicles`, `storage_auctions`.
+
+### Implementation strategy
+1. **Feed mapper** (`services/meta_feed_mapper.py`) — pure function `map_listing_to_meta_item()` that converts ONE listing dict → Meta-shaped item, returning `None` if the listing must be excluded. Reuses `_normalize_region` from iter217 Phase 2 for province normalization.
+2. **Geocoding fallback** — listings lack lat/lng. Added a static centroid map for 35 major Canadian cities (Statistics Canada public domain) so Local Inventory Ads work without backfilling every listing. Accent-insensitive lookup keys ("Montréal" → "montreal"). `FEED_REQUIRE_GEO=false` by default (set `true` if you want strict Local-Inventory-only).
+3. **Image filter** — `_is_valid_image_url` rejects anything that isn't `https://`. Base64 data URLs and http:// images are silently dropped. Multi-lot listings fall back to lot-level images when the top-level `images` array is null/empty.
+4. **Cache** (`services/feed_cache.py`) — async-lock-protected in-memory TTL cache (15 min default). Key shape `fb_feed:{province}:{category}:{type}:{limit}:{offset}`. Exposed: `cache_get`, `cache_set`, `invalidate_feed_cache`, `get_or_build` (cache-aside pattern). Warmed every 10 min by an APScheduler job (`_fb_feed_cache_warm_tick` in `server.py`).
+5. **CASL consent gate** — frontend pixel wrapper queues events until `localStorage.cookieConsent === "accepted"` or `analytics_consent === "true"`. `notifyConsentGranted()` re-attempts init when the cookie banner's "Accept All" / "Save preferences (analytics on)" handler fires. The hardcoded inline `fbq('init', ...)` in `public/index.html` was REMOVED — it loaded before consent and was a CASL violation in Quebec.
+6. **Public endpoint** — `/api/feeds/facebook-local` is now in the `_PUBLIC_CACHEABLE_PREFIXES` allowlist with a special-cased 900s TTL (other public APIs use 60s/300s). Sets `Access-Control-Allow-Origin: *` so Meta's crawler works.
+
+### Backend wiring
+- `routes/feeds.py` (NEW) — `router = APIRouter(prefix="/feeds", tags=["feeds"])`. Public endpoints:
+  - `GET /api/feeds/facebook-local` — paginated catalog (`limit≤2000`, `offset`, `province`, `category`, `type` filters). 60 req/min per-IP throttle.
+  - `GET /api/feeds/facebook-local/meta` — health snapshot (total_active, eligible, excluded, exclusion_reasons{}, last_cached_at, cache_ttl_seconds, feed_url, total_pages, items_per_page).
+  - `POST /api/feeds/facebook-local/refresh` — **admin-only**, force cache rebuild.
+- `server.py` — registered the feeds router, added 10-min cache-warming APScheduler job, added `/api/feeds/facebook-local` to the public-cacheable allowlist with 900s TTL.
+- Listing status-change handlers can call `services.feed_cache.invalidate_feed_cache()` to surface new/sold listings within the next request.
+
+### Frontend wiring
+- `utils/metaPixel.js` (NEW) — official fbevents.js base code + consent gate + event queue. Exports `initMetaPixel`, `notifyConsentGranted`, `trackEvent`, `trackCustomEvent`, `trackViewContent`, `trackAddToWishlist`, `trackPurchase`, `trackSearch`, `buildContentId`. All track calls queue (max 50) until consent + env are present.
+- `App.js` — calls `initMetaPixel()` on mount inside a `useEffect`.
+- `CookieConsentBanner.js` — calls `notifyConsentGranted()` after `acceptAll()` / `saveCustom({analytics: true})`.
+- `ListingDetailPage.js` + `MultiItemListingDetailPage.js` — emit `ViewContent` with the catalog-matching `BIDVEX-{TYPE}-{id}` content_id when the listing loads.
+- `WishlistHeartButton.js` — emits `AddToWishlist` on successful heart fill.
+- `FilterBar/FilterBar.js` — emits `Search` when filters change.
+- `PaymentSuccessPage.js` — emits `Purchase` with `value=amount_total/100` on `payment_status==="paid"`.
+- `public/index.html` — inline `fbq('init', ...)` REMOVED (CASL violation); noscript fallback kept.
+
+### Admin Feed Health dashboard
+- NEW `pages/admin/AdminFeedsPage.jsx` — mounted via the existing AdminDashboard's `secondaryTab === 'ad-feeds'` switch under Marketing tabs (📡 Ad Feeds).
+- Shows: status badge, copyable feed URL, KPI cards (total active / eligible / excluded / pages), exclusion-reason rows, "Force Cache Refresh" button, inline JSON preview, Meta Business Manager setup steps.
+
+### Environment variables added
+**Backend `.env`**:
+```
+FEED_CACHE_TTL_SECONDS=900
+FEED_MAX_ITEMS_PER_REQUEST=2000
+FEED_RATE_LIMIT_PER_MINUTE=60
+BIDVEX_BASE_URL=https://bidvex.com
+```
+**Frontend `.env`**:
+```
+REACT_APP_META_PIXEL_ID=825987810565038
+REACT_APP_BIDVEX_BASE_URL=https://bidvex.com
+```
+
+### Live feed output (Alex Boulanger's listing)
+```json
+{
+  "id": "BIDVEX-LOT-0f99b059-0bf8-432b-a322-47704858d71a",
+  "title": "Banquettes en cuir noir",
+  "description": "Qté 2\nLongueur: 75\u201d chacune\nMatériau : cuir noir...",
+  "availability": "in stock",
+  "condition": "used",
+  "price": "2.00 CAD",
+  "link": "https://bidvex.com/lots/0f99b059-0bf8-432b-a322-47704858d71a",
+  "image_link": "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800",
+  "brand": "abc auction",
+  "city": "Sherbrooke",
+  "region": "QC",
+  "country": "CA",
+  "postal_code": "J1C0J2",
+  "neighborhood": "Sherbrooke",
+  "google_product_category": "436",
+  "custom_label_0": "lots",
+  "custom_label_1": "partner",
+  "custom_label_2": "QC",
+  "custom_label_3": "auction_active",
+  "latitude": 45.4001,
+  "longitude": -71.8825
+}
+```
+
+### Tests
+- NEW `tests/test_phase5_facebook_feed.py` — **107 tests** covering:
+  - Mapper purity (id format, condition mapping, link builder, region normalization, price format, postal normalization, brand resolution, HTML strip, image filter, geocoder, Google taxonomy)
+  - All 9 exclusion rules (inactive, pending_review, manual_review, no_images, base64-only, no_title, no_city, no_region, demo_account)
+  - All 14 mandatory Meta fields present and non-empty
+  - Custom labels 0-3
+  - Geo coordinates explicit + fallback geocoded
+  - Live HTTP feed endpoint (200, JSON, CORS, Cache-Control, /meta payload, limit, province filter, empty catalog, public no-auth, admin-only refresh)
+  - Frontend pixel source-level (exports, consent gate, queue, no-env warn, noscript fallback, no inline fbq init)
+  - Server wiring (router mounted, prefix correct, cache invalidation contract)
+- **Full regression sweep**: **377 passed**, 1 warning, 0 failed. Was 270 before Phase 5 → +107 net new tests.
+
+### Manual Meta Business Manager setup required
+1. **Pixel** — copy your Pixel ID from business.facebook.com → set `REACT_APP_META_PIXEL_ID` (already set to `825987810565038` in preview env).
+2. **Catalog** — Catalog Manager → Add Data Source → Scheduled Feed → paste `https://bidvex.com/api/feeds/facebook-local` → refresh interval 15 min → connect to Pixel for Dynamic Product Ads.
+3. **Campaign** — Create a Dynamic Product Ad campaign targeting Canada with a 50km radius around `custom_label_2` (province) and `latitude`/`longitude` for Local Inventory Ads.
+
+### EXPLICIT CONFIRMATION
+- ✅ `calculate_fee()` math NOT modified.
+- ✅ No existing auth flows changed.
+- ✅ No existing listing endpoints modified (we read them; we don't mutate).
+- ✅ Pixel disabled gracefully when env var missing (warns, never throws).
+- ✅ Pixel disabled when CASL consent is not granted; events queued until consent.
+- ✅ Demo listings excluded from feed.
+- ✅ Feed endpoint is public (no auth required); admin-only refresh endpoint requires `require_admin`.
+- ✅ CORS allows all origins on feed endpoint only.
+- ✅ 377/377 tests pass (was 270 — Phase 5 adds 107 tests).
+
+### Known schema gaps to address in production data
+The feed currently runs with FEED_REQUIRE_GEO=false because:
+1. Listings store images as **base64 data URLs**, not https://. Alex's real listing was excluded for `no_images` until we injected an https image. Action: switch image uploads to S3/Cloudinary and store https URLs.
+2. Listings have NO `latitude`/`longitude` fields. We geocode from city+region using a 35-city static map. Action: persist actual geocoded coordinates on listing creation (Google Geocoding API or equivalent) so Local Inventory Ads work for listings outside the 35-city list.
+
+---
+
 ## Latest: iter217 Phase 4 — Production Filter / Badge / Notification Regressions (Feb 16, 2026) ✅
 
 ### Bug 1 — Filters broken on all 4 auction pages

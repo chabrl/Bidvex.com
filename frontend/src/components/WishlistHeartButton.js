@@ -66,6 +66,10 @@ const WishlistHeartButton = ({
         setIsWishlisted(true);
         setCount(prev => prev + 1);
         toast.success(t('wishlist.added', 'Added to wishlist'));
+        // Phase 5 — Meta Pixel AddToWishlist event
+        import('../utils/metaPixel').then(({ trackAddToWishlist }) => {
+          trackAddToWishlist({ id: auctionId, listing_type: 'lots' }, 0);
+        }).catch(() => {});
       }
     } catch (error) {
       // iter217 — Already-in-wishlist is not a failure; flip the state to true and exit

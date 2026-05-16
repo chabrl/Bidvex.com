@@ -120,7 +120,21 @@ const ListingDetailPage = () => {
       }
       
       setListing(data);
-      
+
+      // Phase 5 — Meta Pixel ViewContent
+      import('../utils/metaPixel').then(({ trackViewContent }) => {
+        trackViewContent({
+          id: data.id,
+          listing_type: 'marketplace',
+          title: data.title,
+          category: data.category,
+          current_bid: data.current_bid ?? data.current_price,
+          starting_bid: data.starting_bid ?? data.starting_price,
+          city: data.city,
+          region: data.region || data.province,
+        });
+      }).catch(() => {});
+
       const sellerResponse = await axios.get(`${API}/users/${data.seller_id}`);
       setSeller(sellerResponse.data);
     } catch (error) {

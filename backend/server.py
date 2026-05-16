@@ -293,6 +293,11 @@ async def response_time_middleware(request: Request, call_next):
     elif path.endswith(".html") or path == "/":
         response.headers["Cache-Control"] = "no-cache"
     # Tier 4: Public API routes — short CDN cache (5 min edge, 60s browser)
+    elif path.startswith("/api/feeds/facebook-local"):
+        # iter217 Phase 5 — Meta product feed: 15 min cache for Meta's crawler.
+        response.headers["Cache-Control"] = "public, max-age=900"
+        response.headers["CDN-Cache-Control"] = "public, max-age=900"
+        response.headers["Access-Control-Allow-Origin"] = "*"
     elif path.startswith("/api/") and _is_public_cacheable_api(path, request.method):
         response.headers["Cache-Control"] = "public, max-age=60, s-maxage=300"
         response.headers["CDN-Cache-Control"] = "public, max-age=300"
@@ -327,6 +332,8 @@ _PUBLIC_CACHEABLE_PREFIXES = (
     "/api/listings/active",
     "/api/community/questions",
     "/api/health",
+    # iter217 Phase 5 — Meta product feed (must be public-cacheable for Meta's crawler)
+    "/api/feeds/facebook-local",
 )
 
 
@@ -515,6 +522,27 @@ scheduler.add_job(
     _dealer_license_expiry_tick,
     trigger=IntervalTrigger(hours=6), id='dealer_license_expiry', replace_existing=True)
 
+# ─── Phase 5 — Meta product feed cache warming (every 10 min) ───
+async def _fb_feed_cache_warm_tick():
+    """Pre-builds the unfiltered feed so Meta's crawler always hits warm cache.
+    The 30s crawler timeout makes cold MongoDB reads risky on a busy catalog."""
+    import time as _t
+    started = _t.time()
+    from routes.feeds import _build_feed_items, FEED_MAX_ITEMS_PER_REQUEST
+    from services.feed_cache import cache_set, make_cache_key, invalidate_feed_cache
+
+    invalidate_feed_cache()
+    items, exclusions = await _build_feed_items(None, None, None, FEED_MAX_ITEMS_PER_REQUEST, 0)
+    cache_set(make_cache_key(None, None, None, FEED_MAX_ITEMS_PER_REQUEST, 0), items, exclusions)
+    logger.info(
+        "FB feed cache warmed: %d items, took %.2fs",
+        len(items), _t.time() - started,
+    )
+
+scheduler.add_job(
+    lambda: safe_run("fb_feed_cache_warm", _fb_feed_cache_warm_tick()),
+    trigger=IntervalTrigger(minutes=10), id='fb_feed_cache_warm', replace_existing=True)
+
 # ─── Health Endpoints ───
 @api_router.get("/")
 async def root():
@@ -636,6 +664,8 @@ try:
         ("routes.manual_settlement", "manual_settlement_router", None, False),
         ("routes.pricing_engine_routes", "pricing_engine_router", None, False),
         ("routes.demo_account_routes", "demo_accounts_router", None, False),
+        # iter217 Phase 5 — public Meta product catalog feed
+        ("routes.feeds", "router", None, False),
     ]
 
     for module_path, router_name, db_setter_name, app_level in SELF_CONTAINED_ROUTERS:

@@ -53,6 +53,18 @@ const PaymentSuccessPage = () => {
             origin: { y: 0.6 },
             colors: ['#F05A4F', '#30C7B5', '#FFD700']
           });
+          // Phase 5 — Meta Pixel Purchase event
+          try {
+            const meta = data.metadata || {};
+            const listingId = meta.listing_id || meta.multi_item_listing_id || meta.auction_id;
+            const listingType = meta.listing_type || (meta.multi_item_listing_id ? 'lots' : 'marketplace');
+            const totalCharged = (data.amount_total || 0) / 100;
+            if (listingId) {
+              import('../utils/metaPixel').then(({ trackPurchase }) => {
+                trackPurchase({ listingId, listingType, totalCharged });
+              }).catch(() => {});
+            }
+          } catch (e) { /* silent */ }
           return;
         } else if (data.status === 'expired') {
           setStatus('expired');
