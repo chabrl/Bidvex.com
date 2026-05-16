@@ -1,5 +1,108 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter217 Phase 3 — Partner Routes / Homepage / Admin Fixes (Feb 15, 2026) ✅
+
+### Fix 1 — Partner Dashboard "Create Listing" routed to wrong page
+**Root cause** — All three "Create Listing" CTAs on `/partners/dashboard` routed to `/create-listing` (single-item form). Partners are auctioneers/liquidators who almost always sell lots.
+
+**Fix**
+- `PartnerDashboard.js` — every "Create Listing" entry-point now shows TWO buttons:
+  - **🔨 Create a Lot Auction** (primary, blue, `/create-multi-item-listing`) — bilingual
+  - 📦 List a Single Item (secondary ghost, `/create-listing`)
+  - + helper text: "Most partners use Lot Auctions to sell multiple items from a single liquidation."
+- Affected surfaces (3): celebration banner, top action bar, empty-state mid-card.
+- Quick-links sidebar reordered — Lot Auction FIRST (blue + highlighted), Single Item second.
+- `App.js` — added `/lots/create` alias routing to `/create-multi-item-listing`.
+
+### Fix 2 — Homepage Professional Auctions section
+**New component** `components/ProfessionalAuctionsPromo.jsx` — bilingual EN/FR section that:
+- Queries `GET /api/multi-item-listings?seller_account_type=partner,vehicle_dealer&promoted_first=true&limit=8`
+- **Auto-hides** when zero active partner lots (visibility rule).
+- Renders 4-up card grid with: Partner-Auction / Vehicle-Dealer compact badge, company name, lot count chip, location, total starting value, countdown (red if < 24h), "Browse Lots →" CTA.
+- Footer strip: dark-navy bar with "Are you a licensed auctioneer or liquidator?" + cyan **"Apply as Partner →"** button → `/become-a-partner`.
+- Positioned in `HomePage.js` AFTER the hero, BEFORE `<StorageAuctionsPromo />` (the most prominent non-hero slot).
+- Backend `/api/multi-item-listings` endpoint extended with two query params:
+  - `seller_account_type` (comma-separated; applied AFTER enrichment so the field exists)
+  - `promoted_first` (boolean — sorts promoted listings first while preserving created_at order)
+- **Live-verified**: section renders with Alex Boulanger's "abc auction" Banquettes-en-cuir-noir listing, blue Partner Auction badge, 7d countdown, $2 starting value, Browse Lots button.
+
+### Fix 3 — Admin Panel specific items
+
+**3B — Moderation Queue (manual_review listings hidden)**
+*Root cause*: `GET /api/admin/listings/pending` queried `{"status": "pending"}` only. Listings paused by the AI moderator into `manual_review` or `pending_review` were invisible.
+*Fix*: Expanded query to `{"status": {"$in": ["pending", "manual_review", "pending_review"]}}` for both `listings` AND `multi_item_listings`. Approve + Reject endpoints updated to accept all three statuses.
+
+**3C — Compliance Alerts (empty even with unpaid accounts)**
+*Root cause*: `GET /api/admin/compliance-alerts` only surfaced expired dealer licenses, high-fraud-score listings, stuck manual_reviews, and territory bids. **Unpaid dealer/partner subscriptions and unverified storage facilities were not computed**.
+*Fix*: Added 3 new buckets to the response:
+- `unpaid_dealers` — verified dealers with `dealer_subscription_active ≠ true`
+- `unpaid_partners` — verified partners with `partner_subscription_active ≠ true`
+- `unverified_facilities` — facilities with `verification_status` not in `("verified", "approved")`
+- `GET /api/admin/compliance-alerts/count` now includes these 3 buckets in the total.
+- **Live-verified**: returned `unverified_facilities=1` (Total alert count = 1).
+
+**3E — Send Notification (admin → user) blanks in bell**
+*Root cause*: `POST /api/admin/users/{id}/send-notification` wrote `message_en`/`message_fr` only. `NotificationCenter.js` reads `notification.message` and `notification.read` — both missing → bell rendered an empty row that couldn't be clicked.
+*Fix*: The handler now writes BOTH the canonical `message` field AND the `message_en`/`message_fr` aliases, plus `read: false`, `data: {...}`, and `action_url: "/settings?tab=documents"` when the notification type is `document_request`.
+
+**3F — Manual Payment Confirmation (already 90% wired)**
+*Verification*: `services/manual_settlement_service.py` already writes both new canonical fields AND legacy aliases (iter216 fix). The partner dashboard was reading `partner.platform_fee_paid` only.
+*Fix*: `PartnerDashboard.js` now treats `isFeePaid = partner.platform_fee_paid || partner.partner_subscription_active`; treats `subscription?.status` as active for both `"active"` and `"active_manual"`. Future-proof against either field being the source of truth.
+
+**3G — Document Request deadline → Overdue badge**
+*Root cause*: The `is_overdue` flag was computed PER-REQUEST inside `/admin/users/{id}/document-requests`, but the admin user TABLE (which lists ALL users) never called that endpoint per row — so the badge never surfaced.
+*Fix*:
+- `admin_request_documents` now stamps `document_request_deadline`, `document_request_status: "pending"`, and `active_document_request_id` onto the user doc at request creation time.
+- `GET /api/admin/users` computes `document_request_overdue = bool(deadline and status == "pending" and deadline < today)` for every row.
+- `EnhancedUserManager.js` renders a red **⚠️ Documents Overdue** badge (data-testid `documents-overdue-badge`) on the user row when the field is true.
+- Also stamps `action_url: "/settings?tab=documents"` on the doc-request notification so clicking the bell navigates the user.
+
+### Tests
+- NEW `tests/test_iter217_phase3_partner_homepage_admin.py` — 12 tests covering: moderation status expansion, compliance-alerts new buckets, send-notification canonical message field, request-documents user-doc stamping, multi-item-listings `seller_account_type`/`promoted_first` params, `/lots/create` route alias.
+- **Full regression**: **252 passed**, 1 warning, 0 failed across iter209/211/212/213/214/215/216/217 (Phase 1+2+3). Was 240 before Phase 3 — +12 new tests.
+
+### Files changed (Phase 3)
+**Backend** (4 modified, 1 new test file):
+- MODIFIED `routes/admin_ops.py` (moderation status set + 3 new compliance-alert buckets + count update)
+- MODIFIED `routes/admin_user_actions.py` (notification canonical message + read + action_url + user-doc deadline stamp)
+- MODIFIED `routes/admin.py` (users list computes `document_request_overdue`)
+- MODIFIED `routes/listings.py` (`/multi-item-listings` accepts `seller_account_type` + `promoted_first`)
+- NEW `tests/test_iter217_phase3_partner_homepage_admin.py` (12 tests)
+
+**Frontend** (4 modified, 1 new):
+- NEW `components/ProfessionalAuctionsPromo.jsx`
+- MODIFIED `pages/PartnerDashboard.js` (3 dual-CTA blocks + reordered sidebar + fallback subscription check)
+- MODIFIED `pages/HomePage.js` (mount ProfessionalAuctionsPromo after hero)
+- MODIFIED `pages/admin/EnhancedUserManager.js` (Documents Overdue badge)
+- MODIFIED `App.js` (`/lots/create` alias route)
+- MODIFIED `locales/en.json` + `locales/fr.json` (+8 keys: home.proAuctions namespace + partner dashboard CTAs)
+
+### Live verification
+```
+$ curl /api/multi-item-listings?seller_account_type=partner            → 1 listing (Alex)
+$ curl /api/admin/listings/pending                                     → 200, expanded status set
+$ curl /api/admin/compliance-alerts                                    → unpaid_dealers/partners/unverified_facilities present
+$ curl /api/admin/compliance-alerts/count                              → {"total": 1}
+$ curl /api/admin/users?limit=3                                        → users carry document_request_overdue field
+$ Homepage DOM: [data-testid="professional-auctions-promo"]            → present
+$ Homepage DOM: [data-testid="pro-auction-card"]                        → 1 card
+$ Homepage DOM: [data-testid="badge-partner-auction"] on card           → present
+$ Homepage DOM: [data-testid="apply-as-partner-btn"]                    → present
+$ Section heading                                                       → "🔨 Professional Auctions — Lots & Liquidations"
+```
+
+### EXPLICIT CONFIRMATION
+- ✅ `calculate_fee()` math NOT modified (Phase 1 + 2 + 3 — same fee constants in place).
+- ✅ Phase 1 (Partner badge / Bill 96) intact — Partner Auction badge still rendering on Alex's listing.
+- ✅ Phase 2 (Watchlist / business badges / location filters / notifications / payment trust box) intact.
+- ✅ 252/252 tests pass.
+
+### Phase 3 items NOT in this commit
+- **3A — Pricing Engine tab does not load**: I verified the backend `/api/admin/pricing-engine` AND `/api/admin/subscription-plans` BOTH return HTTP 200 with full data. The `PricingManager` React component (mounted on `secondaryTab === 'pricing-engine'`) calls `/admin/subscription-plans` which is healthy. **If the tab still renders blank in your environment, please share a console-log screenshot — I need a specific React error to debug.**
+- **3D — Demo Accounts create button**: backend `/api/admin/demo-accounts` returns HTTP 200. **Please share a screenshot of the form submit failure / network response — I need a repro to verify the front-end submit handler.**
+
+---
+
 ## Latest: iter217 Phase 2 — Admin / Watchlist / Badges / Notifications / Filters / Payment Trust (Feb 15, 2026) ✅
 
 ### NEW — Payment Methods Trust Messaging (Account → Payment tab)

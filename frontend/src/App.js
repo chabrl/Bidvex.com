@@ -419,6 +419,8 @@ const App = () => {
               </BlockForStorageFacility>
             </ProtectedRoute>
           } />
+          {/* iter217 — Partner-friendly alias for the lot auction creator */}
+          <Route path="/lots/create" element={<Navigate to="/create-multi-item-listing" replace />} />
           <Route path="/admin" element={
             <ProtectedRoute><AdminDashboard /></ProtectedRoute>
           } />

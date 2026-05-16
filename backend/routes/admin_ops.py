@@ -652,13 +652,17 @@ async def _find_pending_listing(db, listing_id: str):
 
 @admin_ops_router.get("/admin/listings/pending")
 async def admin_get_pending_listings(current_user: User = Depends(require_admin)):
-    """Return all pending single-item + multi-item listings, newest first."""
+    """Return all pending single-item + multi-item listings, newest first.
+
+    iter217 Phase 3 — expanded to include `manual_review` and `pending_review`
+    statuses (AI-moderator outputs). Frontend can filter the combined list."""
     db = get_db()
+    PENDING_STATUSES = ["pending", "manual_review", "pending_review"]
     pending_single = await db.listings.find(
-        {"status": "pending"}, {"_id": 0}
+        {"status": {"$in": PENDING_STATUSES}}, {"_id": 0}
     ).sort("created_at", -1).to_list(200)
     pending_multi = await db.multi_item_listings.find(
-        {"status": "pending"}, {"_id": 0}
+        {"status": {"$in": PENDING_STATUSES}}, {"_id": 0}
     ).sort("created_at", -1).to_list(200)
 
     # Tag each with its listing_type for the UI router/buttons
@@ -708,7 +712,8 @@ async def admin_approve_listing(
     listing, kind = await _find_pending_listing(db, listing_id)
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
-    if listing.get("status") != "pending":
+    # iter217 Phase 3 — accept the full pending-status set (pending / manual_review / pending_review)
+    if listing.get("status") not in ("pending", "manual_review", "pending_review"):
         raise HTTPException(status_code=400, detail=f"Listing is not pending (current status: {listing.get('status')})")
 
     coll = db.listings if kind == "single" else db.multi_item_listings
@@ -777,7 +782,8 @@ async def admin_reject_listing(
     listing, kind = await _find_pending_listing(db, listing_id)
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
-    if listing.get("status") != "pending":
+    # iter217 Phase 3 — accept the full pending-status set (pending / manual_review / pending_review)
+    if listing.get("status") not in ("pending", "manual_review", "pending_review"):
         raise HTTPException(status_code=400, detail=f"Listing is not pending (current status: {listing.get('status')})")
 
     coll = db.listings if kind == "single" else db.multi_item_listings
@@ -2035,6 +2041,57 @@ async def admin_compliance_alerts(current_user: User = Depends(require_admin)):
                 "created_at": doc.get("created_at"),
             })
 
+    # iter217 Phase 3 — Unpaid annual-fee subscriptions (dealers + partners)
+    # Surfaces accounts that have completed admin verification but whose
+    # annual subscription is not active (or has lapsed).
+    unpaid_dealers = []
+    async for u in db.users.find(
+        {"is_vehicle_dealer": True, "dealer_verification_status": {"$in": ["verified", "approved"]},
+         "$or": [{"dealer_subscription_active": {"$ne": True}}, {"dealer_subscription_active": {"$exists": False}}]},
+        {"_id": 0, "id": 1, "email": 1, "name": 1, "company_name": 1,
+         "dealer_license_province": 1, "dealer_subscription_active": 1,
+         "dealer_subscription_renewal_date": 1},
+    ).limit(100):
+        unpaid_dealers.append({
+            "user_id": u["id"],
+            "email": u.get("email"),
+            "name": u.get("name") or u.get("company_name") or "",
+            "province": u.get("dealer_license_province"),
+            "renewal_date": u.get("dealer_subscription_renewal_date"),
+            "alert_type": "dealer_subscription_unpaid",
+        })
+
+    unpaid_partners = []
+    async for u in db.users.find(
+        {"is_partner": True, "partner_verification_status": {"$in": ["verified", "approved"]},
+         "$or": [{"partner_subscription_active": {"$ne": True}}, {"partner_subscription_active": {"$exists": False}}]},
+        {"_id": 0, "id": 1, "email": 1, "name": 1, "partner_company_name": 1,
+         "partner_subscription_active": 1, "partner_subscription_renewal_date": 1},
+    ).limit(100):
+        unpaid_partners.append({
+            "user_id": u["id"],
+            "email": u.get("email"),
+            "name": u.get("name") or u.get("partner_company_name") or "",
+            "renewal_date": u.get("partner_subscription_renewal_date"),
+            "alert_type": "partner_subscription_unpaid",
+        })
+
+    # iter217 Phase 3 — Storage facilities with unverified registration
+    unverified_facilities = []
+    async for f in db.storage_facilities.find(
+        {"verification_status": {"$nin": ["verified", "approved"]}},
+        {"_id": 0, "id": 1, "facility_name": 1, "owner_id": 1, "owner_email": 1,
+         "verification_status": 1, "created_at": 1},
+    ).limit(100):
+        unverified_facilities.append({
+            "facility_id": f.get("id"),
+            "name": f.get("facility_name"),
+            "owner_email": f.get("owner_email"),
+            "status": f.get("verification_status"),
+            "created_at": f.get("created_at"),
+            "alert_type": "storage_facility_unverified",
+        })
+
     return {
         "expired": expired,
         "high_fraud_score": high_fraud,
@@ -2042,6 +2099,10 @@ async def admin_compliance_alerts(current_user: User = Depends(require_admin)):
         "territory_bids": territory_bids,
         # iter206
         "pending_review_queue": pending_review_queue,
+        # iter217 Phase 3
+        "unpaid_dealers": unpaid_dealers,
+        "unpaid_partners": unpaid_partners,
+        "unverified_facilities": unverified_facilities,
         "checked_at": now.isoformat(),
     }
 
@@ -2193,6 +2254,9 @@ async def admin_compliance_alerts_count(current_user: User = Depends(require_adm
         + len(data.get("high_fraud_score") or [])
         + len(data.get("unreviewed_manual_review") or [])
         + len(data.get("pending_review_queue") or [])  # iter206
+        + len(data.get("unpaid_dealers") or [])  # iter217 Phase 3
+        + len(data.get("unpaid_partners") or [])
+        + len(data.get("unverified_facilities") or [])
     )}
 
 

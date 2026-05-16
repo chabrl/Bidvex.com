@@ -1390,6 +1390,9 @@
     "accountActivated": "Account Activated!",
     "accountActivatedDesc": "Your annual partner fee has been processed successfully. All partner features are now unlocked — you can create listings, manage auctions, and access your full dashboard.",
     "createFirstListing": "Create Your First Listing",
+    "createLotAuction": "Create a Lot Auction",
+    "listSingleItem": "List a Single Item",
+    "createHelper": "Most partners use Lot Auctions to sell multiple items from a single liquidation.",
     "dismiss": "Dismiss",
     "verified": "Verified",
     "createListing": "Create Listing",
@@ -1767,6 +1770,14 @@
     "vehicleAuctions": "Vehicle Auctions"
   },
   "home": {
+    "proAuctions": {
+      "title": "Professional Auctions — Lots & Liquidations",
+      "subtitle": "Licensed auctioneers, liquidators and professional dealers — verified by BidVex.",
+      "totalStarting": "Total starting value",
+      "browseLots": "Browse Lots",
+      "applyCopy": "Are you a licensed auctioneer or liquidator?",
+      "applyBtn": "Apply as Partner"
+    },
     "storagePromo": {
       "badge": "NEW FEATURE",
       "title": "Canadian Storage Locker Auctions",

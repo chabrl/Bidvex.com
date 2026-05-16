@@ -801,9 +801,11 @@ async def get_multi_item_listings(
     seller_id: Optional[str] = None,
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
+    seller_account_type: Optional[str] = None,  # iter217 — partner / vehicle_dealer / storage_facility / individual
+    promoted_first: bool = False,
 ):
     db = get_read_db()
-    has_filters = any([category, region, city, currency, search, seller_id, min_price, max_price])
+    has_filters = any([category, region, city, currency, search, seller_id, min_price, max_price, seller_account_type, promoted_first])
 
     # Use cache for default (unfiltered) requests
     now = _time.time()
@@ -872,6 +874,19 @@ async def get_multi_item_listings(
     # iter217 — Bulk seller enrichment for badge display on cards.
     from services.listing_seller_enrichment import enrich_listings_bulk_async
     await enrich_listings_bulk_async(db, listings)
+
+    # iter217 Phase 3 — seller_account_type filter (applied AFTER enrichment
+    # because account-type is computed at GET time from the seller's User doc).
+    if seller_account_type:
+        wanted = [s.strip() for s in seller_account_type.split(",") if s.strip()]
+        listings = [l for l in listings if l.get("seller_account_type") in wanted]
+
+    # iter217 Phase 3 — promoted listings first (then preserve created_at desc).
+    if promoted_first:
+        listings.sort(key=lambda l: (
+            0 if l.get("is_promoted") else 1,
+            -(l.get("promotion_tier_weight") or 0),
+        ))
 
     logger.info(f"[multi-item] Processed, returning {len(listings)} listings")
 

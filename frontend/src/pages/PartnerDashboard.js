@@ -136,8 +136,11 @@ export default function PartnerDashboard() {
   if (!dashboard) return null;
 
   const { partner, subscription, stats } = dashboard;
-  const isFeePaid = partner.platform_fee_paid;
-  const isActive = isFeePaid && subscription?.status === 'active';
+  // iter217 Phase 3 — Read either the legacy `platform_fee_paid` OR the
+  // canonical `partner_subscription_active`. Manual-settle writes both,
+  // but rely on either for full back-compat.
+  const isFeePaid = !!(partner.platform_fee_paid || partner.partner_subscription_active);
+  const isActive = isFeePaid && (subscription?.status === 'active' || subscription?.status === 'active_manual');
 
   const handleDownloadInvoice = async () => {
     setInvoiceLoading(true);
@@ -218,14 +221,23 @@ export default function PartnerDashboard() {
                 <p className="text-sm text-emerald-700 mt-1">
                   {t('partnerDashboard.accountActivatedDesc')}
                 </p>
-                <div className="flex items-center gap-3 mt-4">
+                <div className="flex items-center gap-3 mt-4 flex-wrap">
                   <Button 
-                    onClick={() => navigate('/create-listing')}
+                    onClick={() => navigate('/create-multi-item-listing')}
                     className="bg-emerald-600 hover:bg-emerald-700 text-white"
                     size="sm"
-                    data-testid="celebration-create-listing-btn"
+                    data-testid="celebration-create-lot-auction-btn"
                   >
-                    <Plus className="h-4 w-4 mr-1.5" /> {t('partnerDashboard.createFirstListing')}
+                    🔨 {t('partnerDashboard.createLotAuction', 'Create a Lot Auction')}
+                  </Button>
+                  <Button 
+                    onClick={() => navigate('/create-listing')}
+                    variant="outline"
+                    size="sm"
+                    className="border-emerald-300 text-emerald-700"
+                    data-testid="celebration-create-single-listing-btn"
+                  >
+                    📦 {t('partnerDashboard.listSingleItem', 'List a Single Item')}
                   </Button>
                   <Button 
                     onClick={() => setShowCelebration(false)}
@@ -236,6 +248,9 @@ export default function PartnerDashboard() {
                     {t('partnerDashboard.dismiss')}
                   </Button>
                 </div>
+                <p className="text-xs text-emerald-700/80 mt-3">
+                  {t('partnerDashboard.createHelper', 'Most partners use Lot Auctions to sell multiple items from a single liquidation.')}
+                </p>
               </div>
             </div>
           </div>
@@ -265,15 +280,30 @@ export default function PartnerDashboard() {
             </p>
           </div>
           {isFeePaid && (
-            <Button
-              onClick={() => navigate('/create-listing')}
-              className="bg-blue-600 hover:bg-blue-700"
-              data-testid="create-listing-btn"
-            >
-              <Plus className="h-4 w-4 mr-1.5" /> {t('partnerDashboard.createListing')}
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                onClick={() => navigate('/create-multi-item-listing')}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                data-testid="create-lot-auction-btn"
+              >
+                🔨 {t('partnerDashboard.createLotAuction', 'Create a Lot Auction')}
+              </Button>
+              <Button
+                onClick={() => navigate('/create-listing')}
+                variant="outline"
+                className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                data-testid="create-single-listing-btn"
+              >
+                📦 {t('partnerDashboard.listSingleItem', 'List a Single Item')}
+              </Button>
+            </div>
           )}
         </div>
+        {isFeePaid && (
+          <p className="text-xs text-slate-500 dark:text-slate-400 -mt-6 mb-6">
+            {t('partnerDashboard.createHelper', 'Most partners use Lot Auctions to sell multiple items from a single liquidation.')}
+          </p>
+        )}
 
         {/* ─── SaaS Stats Grid (from /api/partner/stats) ─── */}
         {partnerStats && (
@@ -504,9 +534,14 @@ export default function PartnerDashboard() {
                     <Package className="h-10 w-10 text-slate-300 mx-auto mb-3" />
                     <p className="text-sm text-slate-500">{t('partnerDashboard.noListingsYet')}</p>
                     {isFeePaid && (
-                      <Button onClick={() => navigate('/create-listing')} variant="link" className="mt-2 text-blue-600">
-                        {t('partnerDashboard.createFirstLink')} <ArrowRight className="h-3 w-3 ml-1" />
-                      </Button>
+                      <div className="flex items-center justify-center gap-2 mt-3 flex-wrap">
+                        <Button onClick={() => navigate('/create-multi-item-listing')} className="bg-blue-600 hover:bg-blue-700 text-white" size="sm" data-testid="empty-create-lot-btn">
+                          🔨 {t('partnerDashboard.createLotAuction', 'Create a Lot Auction')}
+                        </Button>
+                        <Button onClick={() => navigate('/create-listing')} variant="outline" size="sm" data-testid="empty-create-single-btn">
+                          📦 {t('partnerDashboard.listSingleItem', 'List a Single Item')}
+                        </Button>
+                      </div>
                     )}
                   </div>
                 ) : (
@@ -635,6 +670,25 @@ export default function PartnerDashboard() {
             {/* Quick Links */}
             <Card className="border-slate-200 dark:border-slate-800 shadow-sm">
               <CardContent className="pt-5 space-y-2">
+                {/* iter217 — Lot Auction FIRST, highlighted as the primary partner workflow */}
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start text-sm font-semibold text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                  onClick={() => navigate('/create-multi-item-listing')}
+                  disabled={!isFeePaid}
+                  data-testid="link-create-multi"
+                >
+                  <Gavel className="h-4 w-4 mr-2 text-blue-600" /> {t('partnerDashboard.createLotAuction', 'Create a Lot Auction')}
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start text-sm"
+                  onClick={() => navigate('/create-listing')}
+                  disabled={!isFeePaid}
+                  data-testid="link-create-single"
+                >
+                  <Package className="h-4 w-4 mr-2 text-slate-500" /> {t('partnerDashboard.listSingleItem', 'List a Single Item')}
+                </Button>
                 <Button
                   variant="ghost"
                   className="w-full justify-start text-sm"
@@ -650,15 +704,6 @@ export default function PartnerDashboard() {
                   data-testid="link-settings"
                 >
                   <Settings className="h-4 w-4 mr-2 text-slate-500" /> {t('partnerDashboard.accountSettings')}
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start text-sm"
-                  onClick={() => navigate('/create-multi-item-listing')}
-                  disabled={!isFeePaid}
-                  data-testid="link-create-multi"
-                >
-                  <Gavel className="h-4 w-4 mr-2 text-slate-500" /> {t('partnerDashboard.createMultiLot')}
                 </Button>
               </CardContent>
             </Card>

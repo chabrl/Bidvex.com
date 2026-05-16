@@ -113,15 +113,26 @@ async def admin_send_notification(
     # ── In-app notification ──
     if payload.send_via in {"in_app", "both"}:
         in_app_id = str(uuid.uuid4())
+        # iter217 Phase 3 — Write BOTH `message` (the canonical field read by
+        # NotificationCenter) and `message_en`/`message_fr` (for templating).
+        # The legacy admin path only wrote *_en/_fr, so the bell rendered
+        # blank message lines.
         await db.notifications.insert_one({
             "id": in_app_id,
             "user_id": user_id,
             "type": f"admin_{payload.notification_type}",
             "title": payload.subject,
+            "message": payload.body_en,
             "message_en": payload.body_en,
             "message_fr": payload.body_fr or payload.body_en,
+            "data": {
+                "attached_transaction_id": payload.attached_transaction_id,
+            },
             "attached_transaction_id": payload.attached_transaction_id,
+            "action_url": "/settings?tab=documents" if payload.notification_type == "document_request" else None,
+            "action_type": "navigate" if payload.notification_type == "document_request" else None,
             "is_read": False,
+            "read": False,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "created_by_admin": current_user.id,
         })
@@ -227,23 +238,40 @@ async def admin_request_documents(
         "created_at": datetime.now(timezone.utc).isoformat(),
     })
 
+    # iter217 Phase 3 — Stamp the active deadline onto the user doc so the
+    # admin user list can compute the Overdue badge in one query.
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {
+            "active_document_request_id": req_id,
+            "document_request_deadline": payload.deadline,
+            "document_request_status": "pending",
+        }},
+    )
+
     # ── In-app notification ──
     titles = [_DOC_TYPE_LABELS[t][0] for t in payload.document_types]
     titles_fr = [_DOC_TYPE_LABELS[t][1] for t in payload.document_types]
+    body_en = (
+        f"Please upload: {', '.join(titles)}. Deadline: {payload.deadline}.\n\n"
+        f"{payload.message or ''}"
+    ).strip()
+    body_fr = (
+        f"Veuillez téléverser : {', '.join(titles_fr)}. Date limite : {payload.deadline}.\n\n"
+        f"{payload.message or ''}"
+    ).strip()
     await db.notifications.insert_one({
         "id": str(uuid.uuid4()),
         "user_id": user_id,
         "type": "admin_document_request",
         "title": "Action Required — Document Upload Needed",
-        "message_en": (
-            f"Please upload: {', '.join(titles)}. Deadline: {payload.deadline}.\n\n"
-            f"{payload.message or ''}"
-        ).strip(),
-        "message_fr": (
-            f"Veuillez téléverser : {', '.join(titles_fr)}. Date limite : {payload.deadline}.\n\n"
-            f"{payload.message or ''}"
-        ).strip(),
+        "message": body_en,
+        "message_en": body_en,
+        "message_fr": body_fr,
         "is_read": False,
+        "read": False,
+        "action_url": "/settings?tab=documents",
+        "action_type": "navigate",
         "doc_request_id": req_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "created_by_admin": current_user.id,

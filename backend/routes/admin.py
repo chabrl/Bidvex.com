@@ -133,6 +133,16 @@ async def list_users(
     )
     total = await db.users.count_documents(query)
 
+    # iter217 Phase 3 — Compute "Documents Overdue" flag for each user so the
+    # admin table can show the ⚠️ Overdue badge inline.
+    today_iso = datetime.now(timezone.utc).date().isoformat()
+    for u in users:
+        deadline = u.get("document_request_deadline")
+        status = u.get("document_request_status")
+        u["document_request_overdue"] = bool(
+            deadline and status == "pending" and str(deadline) < today_iso
+        )
+
     return {
         "users": users,
         "total": total,

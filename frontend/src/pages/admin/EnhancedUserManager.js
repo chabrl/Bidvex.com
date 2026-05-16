@@ -738,6 +738,17 @@ const EnhancedUserManager = () => {
                     {user.password_reset_required && (
                       <Badge variant="destructive" className="text-xs">Reset Required</Badge>
                     )}
+                    {/* iter217 Phase 3 — Documents Overdue indicator */}
+                    {user.document_request_overdue && (
+                      <Badge
+                        className="text-xs gap-1"
+                        style={{ background: '#dc2626', color: 'white' }}
+                        data-testid="documents-overdue-badge"
+                        title={user.document_request_deadline}
+                      >
+                        ⚠️ Documents Overdue
+                      </Badge>
+                    )}
                   </div>
                 </div>
                 

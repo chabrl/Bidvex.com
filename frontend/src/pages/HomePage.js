@@ -23,6 +23,7 @@ import useMarketplaceSync from '../hooks/useMarketplaceSync';
 // Position constraint: AFTER StorageAuctionsPromo, BEFORE HotItemsSection (Tendances).
 // Visibility constraint: hidden when feature flag OFF or zero active listings.
 import HomepageVehicleCarousel from '../components/vehicles/HomepageVehicleCarousel';
+import ProfessionalAuctionsPromo from '../components/ProfessionalAuctionsPromo';
 
 // Smart routing: vehicles go to /vehicle-auctions/:id, everything else to /listing/:id
 const getItemDetailPath = (item) => {
@@ -288,6 +289,9 @@ const HomePage = () => {
       {isSectionVisible('ending_soon') && (
         <LiveAuctionsSection items={endingSoon} navigate={navigate} />
       )}
+
+      {/* iter217 Phase 3 — Professional Auctions section (after hero, before Storage Auctions) */}
+      <ProfessionalAuctionsPromo navigate={navigate} />
 
       {/* ========== STORAGE AUCTIONS PROMO (iter171 — always bilingual) ========== */}
       <StorageAuctionsPromo navigate={navigate} />

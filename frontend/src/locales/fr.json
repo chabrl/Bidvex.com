@@ -1390,6 +1390,9 @@
     "accountActivated": "Compte activé !",
     "accountActivatedDesc": "Vos frais annuels de partenaire ont été traités avec succès. Toutes les fonctionnalités partenaires sont déverrouillées — vous pouvez créer des annonces, gérer des enchères et accéder à votre tableau de bord complet.",
     "createFirstListing": "Créer votre première annonce",
+    "createLotAuction": "Créer une vente aux enchères par lots",
+    "listSingleItem": "Lister un article individuel",
+    "createHelper": "La plupart des partenaires utilisent les ventes par lots pour vendre plusieurs articles d'une même liquidation.",
     "dismiss": "Fermer",
     "verified": "Vérifié",
     "createListing": "Créer une annonce",
@@ -1767,6 +1770,14 @@
     "vehicleAuctions": "Enchères de véhicules"
   },
   "home": {
+    "proAuctions": {
+      "title": "Enchères professionnelles — Lots & liquidations",
+      "subtitle": "Commissaires-priseurs licenciés, liquidateurs et marchands professionnels — vérifiés par BidVex.",
+      "totalStarting": "Valeur de départ totale",
+      "browseLots": "Parcourir les lots",
+      "applyCopy": "Êtes-vous un commissaire-priseur ou liquidateur licencié ?",
+      "applyBtn": "Postuler comme partenaire"
+    },
     "storagePromo": {
       "badge": "NOUVELLE FONCTIONNALITÉ",
       "title": "Ventes de Casier Canadien",
