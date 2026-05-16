@@ -1,6 +1,98 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter217 Phase 5 — Meta Dynamic Local Ads Infrastructure (Feb 16, 2026) ✅
+## Latest: iter217 Phase 5 Hotfix — Meta Feed Image + 5-Product Padding (Feb 16, 2026) ✅
+
+### Bug 1 — Misleading stock images leaked into Meta Product Feed
+**Root cause**
+- Alex Boulanger's live listing (`0f99b059…`) stored images as **base64 data URLs**. The previous Phase 5 agent worked around the "no_images" exclusion by **hard-injecting an Unsplash stock URL** directly into the lot's `images` array in MongoDB. That stock photo then surfaced as the real-looking image in the public Meta catalog — misleading anyone clicking the ad.
+- The feed mapper itself had no fallback: any listing with only base64 images was silently dropped (`no_images` exclusion), so the workaround was to fake an https URL.
+
+**Fix (production-clean)**
+- NEW `BIDVEX_PLACEHOLDER_IMAGE` constant = `{BIDVEX_BASE_URL}/assets/placeholder-ad.jpg` (branded BidVex JPG, 1200×1200, ~41KB).
+- NEW asset file `/app/frontend/public/assets/placeholder-ad.jpg` — solid `#2563eb` brand blue with "BIDVEX / Auction Listing" wordmark + subtle gradient. Auto-served via CRA static hosting on both preview AND production (`bidvex.com/assets/placeholder-ad.jpg`).
+- NEW `_has_any_image()` helper in `services/meta_feed_mapper.py` — detects whether a listing has ANY image data at all (base64 / non-https / valid).
+- `map_listing_to_meta_item()` rewritten to: (a) prefer real https images, (b) fall back to the branded placeholder when the listing has SOME image data but no valid https, (c) only exclude (`no_images`) when the listing has literally zero images of any kind.
+- New `exclusion_counter["placeholder_used"]` counter for admin visibility.
+- Alex's injected Unsplash URL **reverted in DB** — replaced with a 1×1 base64 placeholder so the new mapper branch generates the branded image.
+
+**Live verification**: Alex's listing now serves `image_link: "https://bidvex.com/assets/placeholder-ad.jpg"` instead of the misleading Unsplash photo.
+
+### Bug 2 — Meta Commerce Manager rejects feeds with < 5 products
+**Root cause**
+- Meta Commerce Manager refuses to ingest a catalog with fewer than 5 unique products. The live BidVex catalog only has 1 eligible listing — blocked from activation.
+
+**Fix**
+- NEW `build_seed_items(needed)` factory in `services/meta_feed_mapper.py` — returns up to 5 deterministic seed items shaped exactly like real catalog items.
+- Seeds cover **QC + ON anchor cities** (Montreal, Toronto, Quebec City, Ottawa, Laval) so geographic ad delivery has at least one valid (city, region) tuple per province.
+- All seeds carry `custom_label_3: "test_seed"` so production campaigns can exclude them with one filter.
+- All seeds satisfy the 14 Meta-mandatory fields (id, title, description, availability, condition, price, link, image_link, brand, city, region, country, postal_code, neighborhood) + latitude/longitude.
+- `routes/feeds.py:_build_feed_items()` pads the **unfiltered** feed to `META_MIN_CATALOG_ITEMS = 5` AFTER real items are mapped. **Filtered queries (`?province=…` / `?category=…` / `?type=…`) are NEVER padded** — so segment queries (NU, AB, etc.) still return the true empty slice.
+- `/api/feeds/facebook-local/meta` exposes new fields `feed_total_items`, `seed_items_padded` and a fixed `excluded_listings = max(0, total_active − feed_real)` formula (the old formula could return negative numbers once seeds were in the eligible count).
+- `AdminFeedsPage.jsx` shows 2 new health rows: "Branded placeholder served" + "Seed items padded". `isHealthy` now requires `feed_total_items ≥ 5`.
+
+### Live feed output (post-fix)
+```json
+{
+  "data": [
+    { "id": "BIDVEX-LOT-0f99b059-…", "image_link": "https://bidvex.com/assets/placeholder-ad.jpg", "custom_label_3": "auction_active" },
+    { "id": "BIDVEX-SEED-001", "city": "Montreal", "region": "QC", "custom_label_3": "test_seed" },
+    { "id": "BIDVEX-SEED-002", "city": "Toronto", "region": "ON", "custom_label_3": "test_seed" },
+    { "id": "BIDVEX-SEED-003", "city": "Quebec", "region": "QC", "custom_label_3": "test_seed" },
+    { "id": "BIDVEX-SEED-004", "city": "Ottawa", "region": "ON", "custom_label_3": "test_seed" }
+  ]
+}
+```
+
+### Health snapshot
+```json
+{
+  "total_active_listings": 1,
+  "feed_eligible_listings": 1,
+  "feed_total_items": 5,
+  "seed_items_padded": 4,
+  "excluded_listings": 0,
+  "exclusion_reasons": { "placeholder_used": 1, "seed_items_padded": 4, ... }
+}
+```
+
+### Tests
+- `tests/test_phase5_facebook_feed.py` expanded from 107 → 125 tests:
+  - REPLACED `test_excludes_base64_only_images` with `test_base64_only_images_use_branded_placeholder` + `test_base64_in_lots_uses_branded_placeholder` + `test_real_https_image_preferred_over_placeholder`.
+  - NEW `TestSeedItems` class — 9 tests (count, mandatory fields, test_seed label, branded image, deterministic ids, QC+ON coverage, pool size cap).
+  - NEW `TestFeedEndpoint` live HTTP tests — 6 tests (padded to 5, seeds carry test_seed label, seeds use placeholder image, filtered queries excluded from padding, /meta reports seed_items_padded, excluded_listings never negative).
+- **Targeted regression**: 189 passed across `test_phase5_facebook_feed.py` (125) + iter217 Phase1/2/3/4 (64). Baseline iter209/211/214/215/216 fee+admin suites: 86 passed. **No regressions in any iter-prefixed test file touching feed, fee, or marketplace code.**
+
+### Production deployment note
+The placeholder asset `/app/frontend/public/assets/placeholder-ad.jpg` is hosted at:
+- Preview: `https://prod-verify-2.preview.emergentagent.com/assets/placeholder-ad.jpg` ✅ 200 OK
+- Production (after deploy): `https://bidvex.com/assets/placeholder-ad.jpg`
+
+`BIDVEX_BASE_URL` env var (`https://bidvex.com`) controls the URL used in the feed. **No env changes required** — the existing config already points production-ward.
+
+### EXPLICIT CONFIRMATION
+- ✅ `calculate_fee()` math NOT touched.
+- ✅ No existing listing endpoints modified.
+- ✅ NU/AB province filters still return empty `{"data": []}` (no seed leakage into segment queries).
+- ✅ Real https images still take precedence over the placeholder.
+- ✅ Admin `/refresh` endpoint still works and surfaces accurate counts.
+- ✅ All 9 original exclusion rules intact (`no_images` still triggers when listing has zero images of any kind).
+
+### Files changed (Phase 5 Hotfix)
+**Backend** (2 modified):
+- MODIFIED `services/meta_feed_mapper.py` — `BIDVEX_PLACEHOLDER_IMAGE` const, `_has_any_image()` helper, placeholder fallback in `map_listing_to_meta_item()`, `build_seed_items()` factory, `META_MIN_CATALOG_ITEMS` const.
+- MODIFIED `routes/feeds.py` — `_build_feed_items()` pads to 5 when unfiltered; `/meta` endpoint returns fixed `excluded_listings`, new `feed_total_items` and `seed_items_padded` fields.
+- MODIFIED `tests/test_phase5_facebook_feed.py` — +18 net new tests (125 total).
+
+**Frontend** (2 modified, 1 new):
+- NEW `public/assets/placeholder-ad.jpg` — branded BidVex placeholder (1200×1200 JPG, ~41KB).
+- MODIFIED `pages/admin/AdminFeedsPage.jsx` — 2 new StatRows (placeholder_used + seed_items_padded), `isHealthy` checks `feed_total_items ≥ 5`.
+
+**Data** (1 record):
+- Reverted Alex Boulanger's listing `0f99b059…` — replaced agent-injected Unsplash URL with a tiny base64 placeholder so the new mapper logic surfaces the branded BidVex image.
+
+---
+
+## Previous: iter217 Phase 5 — Meta Dynamic Local Ads Infrastructure (Feb 16, 2026) ✅
 
 ### Greenfield feature — public Meta product-catalog feed + Pixel
 This phase ships the public-facing JSON product feed that Meta Business

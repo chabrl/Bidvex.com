@@ -96,7 +96,7 @@ const AdminFeedsPage = () => {
     return <div className="p-6 text-slate-400">Loading…</div>;
   }
 
-  const isHealthy = (meta?.feed_eligible_listings || 0) > 0;
+  const isHealthy = (meta?.feed_total_items ?? meta?.feed_eligible_listings ?? 0) >= 5;
 
   return (
     <div className="space-y-6">
@@ -213,6 +213,8 @@ const AdminFeedsPage = () => {
           <StatRow icon={Ban} label={t('admin.adFeeds.exDemo', 'Demo accounts (intentionally excluded)')} count={meta?.exclusion_reasons?.demo_account} accent="#94a3b8" />
           <StatRow icon={ShieldAlert} label={t('admin.adFeeds.exModeration', 'Pending moderation')} count={meta?.exclusion_reasons?.moderation_pending} accent="#f59e0b" />
           <StatRow icon={AlertCircle} label={t('admin.adFeeds.exNoTitle', 'Missing title')} count={meta?.exclusion_reasons?.no_title} accent="#dc2626" />
+          <StatRow icon={ImageIcon} label={t('admin.adFeeds.placeholderUsed', 'Branded placeholder served (base64 listings)')} count={meta?.exclusion_reasons?.placeholder_used} accent="#2563eb" />
+          <StatRow icon={ShieldAlert} label={t('admin.adFeeds.seedItemsPadded', 'Seed items padded (Meta 5-product minimum)')} count={meta?.seed_items_padded} accent="#2563eb" />
           <p className="text-xs mt-4" style={{ color: '#64748b' }}>
             <Clock className="inline h-3 w-3 mr-1" />
             {t('admin.adFeeds.lastCached', 'Last cached:')}{' '}

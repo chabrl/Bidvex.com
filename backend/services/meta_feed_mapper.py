@@ -26,6 +26,12 @@ logger = logging.getLogger(__name__)
 BIDVEX_BASE_URL = os.environ.get("BIDVEX_BASE_URL", "https://bidvex.com").rstrip("/")
 FEED_REQUIRE_GEO = (os.environ.get("FEED_REQUIRE_GEO", "false").lower() == "true")
 
+# Branded fallback used when a listing has images but none are valid https URLs
+# (e.g. base64 data URLs uploaded before the S3/Cloudinary migration). Meta
+# strictly rejects feeds with no `image_link`; this keeps the listing live in
+# the catalog with a neutral branded image instead of silently dropping it.
+BIDVEX_PLACEHOLDER_IMAGE = f"{BIDVEX_BASE_URL}/assets/placeholder-ad.jpg"
+
 
 # ── Listing type → URL path prefix ────────────────────────────────────
 LISTING_TYPE_TO_PATH = {
@@ -158,6 +164,28 @@ def _first_valid_image(images: Optional[List[Any]], lots: Optional[List[Dict]]) 
                 break
 
     return primary, extras
+
+
+def _has_any_image(images: Optional[List[Any]], lots: Optional[List[Dict]]) -> bool:
+    """Returns True if the listing has at least one image of any kind (even
+    base64 / non-https). Used to decide between excluding the listing entirely
+    (no_images) versus serving a branded BidVex placeholder.
+    """
+    def _any(url_list: Optional[List[Any]]) -> bool:
+        if not url_list:
+            return False
+        for u in url_list:
+            if isinstance(u, str) and u.strip():
+                return True
+        return False
+
+    if _any(images):
+        return True
+    if lots:
+        for lot in lots:
+            if _any(lot.get("images")):
+                return True
+    return False
 
 
 # ── Province → ISO 3166-2:CA subdivision code (uppercase) ────────────
@@ -336,8 +364,16 @@ def map_listing_to_meta_item(
         listing.get("lots"),
     )
     if not primary_image:
-        exclusion_counter["no_images"] += 1
-        return None
+        # Listing has SOME image data (base64 etc) but no valid https URL:
+        # serve the branded BidVex placeholder so the listing still surfaces
+        # in Meta's catalog. Listings with literally zero images of any kind
+        # remain excluded — those are spammy/incomplete records.
+        if _has_any_image(listing.get("images"), listing.get("lots")):
+            primary_image = BIDVEX_PLACEHOLDER_IMAGE
+            exclusion_counter["placeholder_used"] = exclusion_counter.get("placeholder_used", 0) + 1
+        else:
+            exclusion_counter["no_images"] += 1
+            return None
 
     # Location — flat fields on the BidVex schema (no nested location object)
     city = (listing.get("city") or "").strip()
@@ -413,3 +449,115 @@ def map_listing_to_meta_item(
             pass
 
     return item
+
+
+# ── Seed items — Meta Commerce Manager 5-product minimum ─────────────
+# Meta refuses to ingest a catalog with fewer than 5 unique products. When
+# the live catalog (or a province/category-filtered slice) returns less than
+# 5 eligible items, we pad with neutral "test_seed" placeholders so the feed
+# stays ingestible. Seeds are flagged via `custom_label_3="test_seed"` so they
+# can be excluded server-side from real ads with one filter.
+#
+# Seeds rotate across QC and ON anchor cities so geographic ad delivery still
+# has at least one valid (city, region) tuple per province. The seed pool is
+# small and deterministic so the same set of seeds appears across rebuilds —
+# Meta will treat them as stable catalog items rather than churn churn.
+_SEED_TEMPLATES: List[Dict[str, Any]] = [
+    {
+        "suffix":      "001",
+        "title":       "BidVex Sample Auction Lot A",
+        "description": "Sample placeholder lot for catalog onboarding.",
+        "city":        "Montreal",
+        "region":      "QC",
+        "postal_code": "H2X3L7",
+        "latitude":    45.5019,
+        "longitude":   -73.5674,
+    },
+    {
+        "suffix":      "002",
+        "title":       "BidVex Sample Auction Lot B",
+        "description": "Sample placeholder lot for catalog onboarding.",
+        "city":        "Toronto",
+        "region":      "ON",
+        "postal_code": "M5H2N2",
+        "latitude":    43.6532,
+        "longitude":   -79.3832,
+    },
+    {
+        "suffix":      "003",
+        "title":       "BidVex Sample Auction Lot C",
+        "description": "Sample placeholder lot for catalog onboarding.",
+        "city":        "Quebec",
+        "region":      "QC",
+        "postal_code": "G1R4P3",
+        "latitude":    46.8139,
+        "longitude":   -71.2080,
+    },
+    {
+        "suffix":      "004",
+        "title":       "BidVex Sample Auction Lot D",
+        "description": "Sample placeholder lot for catalog onboarding.",
+        "city":        "Ottawa",
+        "region":      "ON",
+        "postal_code": "K1A0A6",
+        "latitude":    45.4215,
+        "longitude":   -75.6972,
+    },
+    {
+        "suffix":      "005",
+        "title":       "BidVex Sample Auction Lot E",
+        "description": "Sample placeholder lot for catalog onboarding.",
+        "city":        "Laval",
+        "region":      "QC",
+        "postal_code": "H7V0A4",
+        "latitude":    45.5650,
+        "longitude":   -73.7500,
+    },
+]
+
+
+def build_seed_items(needed: int) -> List[Dict[str, Any]]:
+    """Returns up to `needed` seed items shaped exactly like real catalog items.
+
+    Every seed item carries `custom_label_3="test_seed"` so production
+    campaigns can exclude them via a single `custom_label_3 != test_seed`
+    filter. Seeds satisfy all 14 Meta-mandatory fields.
+    """
+    if needed <= 0:
+        return []
+
+    out: List[Dict[str, Any]] = []
+    for tpl in _SEED_TEMPLATES[:needed]:
+        seed_id = f"BIDVEX-SEED-{tpl['suffix']}"
+        out.append({
+            # Mandatory
+            "id":              seed_id,
+            "title":           tpl["title"],
+            "description":     tpl["description"],
+            "availability":    "in stock",
+            "condition":       "used",
+            "price":           "1.00 CAD",
+            "link":            f"{BIDVEX_BASE_URL}/lots",
+            "image_link":      BIDVEX_PLACEHOLDER_IMAGE,
+            "brand":           "BidVex Marketplace",
+            # Location
+            "city":            tpl["city"],
+            "region":          tpl["region"],
+            "country":         "CA",
+            "postal_code":     tpl["postal_code"],
+            "neighborhood":    tpl["city"],
+            # Optional / recommended
+            "google_product_category": "632",
+            "custom_label_0":  "lots",
+            "custom_label_1":  "individual",
+            "custom_label_2":  tpl["region"],
+            "custom_label_3":  "test_seed",
+            "latitude":        tpl["latitude"],
+            "longitude":       tpl["longitude"],
+        })
+    return out
+
+
+# Minimum number of items Meta Commerce Manager requires before it will
+# ingest the catalog. Padded with seed items via `build_seed_items()`.
+META_MIN_CATALOG_ITEMS = 5

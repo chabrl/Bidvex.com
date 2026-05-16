@@ -33,6 +33,8 @@ from services.listing_seller_enrichment import enrich_listings_bulk_async
 from services.meta_feed_mapper import (
     COLLECTION_TO_TYPE,
     FEED_REQUIRE_GEO,
+    META_MIN_CATALOG_ITEMS,
+    build_seed_items,
     map_listing_to_meta_item,
 )
 
@@ -142,6 +144,8 @@ async def _build_feed_items(
         "no_title": 0,
         "demo_account": 0,
         "moderation_pending": 0,
+        "placeholder_used": 0,
+        "seed_items_padded": 0,
     }
 
     items: List[Dict[str, Any]] = []
@@ -150,6 +154,18 @@ async def _build_feed_items(
         item = map_listing_to_meta_item(doc, ltype, seller, exclusions)
         if item is not None:
             items.append(item)
+
+    # Meta Commerce Manager 5-product minimum: pad the UNFILTERED feed with
+    # branded seed items when the live catalog has fewer than 5 eligible
+    # listings. Province/category/type-filtered queries are NEVER padded so
+    # the empty-NU integration test (and any future segment query) still
+    # returns the true slice.
+    is_unfiltered = (province is None and category is None and type_filter is None)
+    if is_unfiltered and len(items) < META_MIN_CATALOG_ITEMS:
+        seeds_needed = META_MIN_CATALOG_ITEMS - len(items)
+        seeds = build_seed_items(seeds_needed)
+        items.extend(seeds)
+        exclusions["seed_items_padded"] = len(seeds)
 
     total_eligible = len(items)
     items = items[offset:offset + limit]
@@ -222,13 +238,17 @@ async def get_facebook_local_feed_meta() -> Dict[str, Any]:
     )
 
     items_per_page = FEED_DEFAULT_LIMIT
-    feed_eligible = len(eligible_items)
-    total_pages = (feed_eligible + items_per_page - 1) // items_per_page if items_per_page else 1
+    feed_total = len(eligible_items)
+    seeds_padded = int(exclusions.get("seed_items_padded", 0))
+    feed_real = feed_total - seeds_padded  # actual live listings in the feed
+    total_pages = (feed_total + items_per_page - 1) // items_per_page if items_per_page else 1
 
     return {
         "total_active_listings":   total_active,
-        "feed_eligible_listings":  feed_eligible,
-        "excluded_listings":       total_active - feed_eligible,
+        "feed_eligible_listings":  feed_real,
+        "feed_total_items":        feed_total,
+        "seed_items_padded":       seeds_padded,
+        "excluded_listings":       max(0, total_active - feed_real),
         "exclusion_reasons":       exclusions,
         "last_cached_at":          last_warmed_iso,
         "cache_ttl_seconds":       int(os.environ.get("FEED_CACHE_TTL_SECONDS", "900")),

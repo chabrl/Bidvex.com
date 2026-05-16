@@ -250,6 +250,7 @@ def _fresh_exclusion_counter():
         "no_title": 0,
         "demo_account": 0,
         "moderation_pending": 0,
+        "placeholder_used": 0,
     }
 
 
@@ -297,11 +298,41 @@ class TestMapperExclusions:
         assert map_listing_to_meta_item(_good_listing(images=[]), "marketplace", {}, c) is None
         assert c["no_images"] == 1
 
-    def test_excludes_base64_only_images(self):
+    def test_base64_only_images_use_branded_placeholder(self):
+        """Listings with base64-only images are no longer excluded — they
+        receive the BidVex branded placeholder URL so they remain ingestible
+        by Meta. This is the iter217 Phase 5 bug-fix contract."""
+        from services.meta_feed_mapper import BIDVEX_PLACEHOLDER_IMAGE
         c = _fresh_exclusion_counter()
-        assert map_listing_to_meta_item(
-            _good_listing(images=["data:image/jpeg;base64,xxx"]), "marketplace", {}, c) is None
-        assert c["no_images"] == 1
+        item = map_listing_to_meta_item(
+            _good_listing(images=["data:image/jpeg;base64,xxx"]), "marketplace", {}, c)
+        assert item is not None, "base64-only listing must surface with placeholder"
+        assert item["image_link"] == BIDVEX_PLACEHOLDER_IMAGE
+        assert c.get("placeholder_used", 0) == 1
+        assert c["no_images"] == 0
+
+    def test_base64_in_lots_uses_branded_placeholder(self):
+        """Multi-item listings with base64 lot images also fall back to the
+        branded placeholder rather than being excluded."""
+        from services.meta_feed_mapper import BIDVEX_PLACEHOLDER_IMAGE
+        c = _fresh_exclusion_counter()
+        item = map_listing_to_meta_item(
+            _good_listing(images=[], lots=[{"images": ["data:image/png;base64,xxx"]}]),
+            "lots", {}, c)
+        assert item is not None
+        assert item["image_link"] == BIDVEX_PLACEHOLDER_IMAGE
+
+    def test_real_https_image_preferred_over_placeholder(self):
+        """When at least one valid https image exists, the placeholder must
+        NOT be used — real listing photos always win."""
+        from services.meta_feed_mapper import BIDVEX_PLACEHOLDER_IMAGE
+        c = _fresh_exclusion_counter()
+        item = map_listing_to_meta_item(
+            _good_listing(images=["data:image/jpeg;base64,xxx", "https://real.example.com/a.jpg"]),
+            "marketplace", {}, c)
+        assert item is not None
+        assert item["image_link"] == "https://real.example.com/a.jpg"
+        assert item["image_link"] != BIDVEX_PLACEHOLDER_IMAGE
 
     def test_excludes_no_title(self):
         c = _fresh_exclusion_counter()
@@ -410,6 +441,67 @@ class TestGeoCoordinates:
 
 
 # ────────────────────────────────────────────────────────────────────────
+# 4C-2 — Seed items (Meta Commerce Manager 5-product minimum padding)
+# ────────────────────────────────────────────────────────────────────────
+class TestSeedItems:
+    def test_build_seed_items_returns_requested_count(self):
+        from services.meta_feed_mapper import build_seed_items
+        seeds = build_seed_items(3)
+        assert len(seeds) == 3
+
+    def test_build_seed_items_returns_empty_when_needed_is_zero(self):
+        from services.meta_feed_mapper import build_seed_items
+        assert build_seed_items(0) == []
+        assert build_seed_items(-1) == []
+
+    def test_seed_items_have_all_mandatory_meta_fields(self):
+        from services.meta_feed_mapper import build_seed_items
+        for seed in build_seed_items(5):
+            for f in MANDATORY_FIELDS:
+                assert f in seed and seed[f] not in ("", None), f"seed missing {f}"
+
+    def test_seed_items_carry_test_seed_label(self):
+        """custom_label_3 must be 'test_seed' so production campaigns can
+        exclude these placeholders with a single filter."""
+        from services.meta_feed_mapper import build_seed_items
+        for seed in build_seed_items(5):
+            assert seed["custom_label_3"] == "test_seed"
+
+    def test_seed_items_use_branded_placeholder_image(self):
+        from services.meta_feed_mapper import build_seed_items, BIDVEX_PLACEHOLDER_IMAGE
+        for seed in build_seed_items(5):
+            assert seed["image_link"] == BIDVEX_PLACEHOLDER_IMAGE
+
+    def test_seed_ids_have_consistent_prefix(self):
+        from services.meta_feed_mapper import build_seed_items
+        for seed in build_seed_items(5):
+            assert seed["id"].startswith("BIDVEX-SEED-")
+
+    def test_seed_items_cover_qc_and_on(self):
+        from services.meta_feed_mapper import build_seed_items
+        regions = {s["region"] for s in build_seed_items(5)}
+        assert "QC" in regions
+        assert "ON" in regions
+
+    def test_seed_items_are_deterministic(self):
+        from services.meta_feed_mapper import build_seed_items
+        a = build_seed_items(5)
+        b = build_seed_items(5)
+        assert [s["id"] for s in a] == [s["id"] for s in b]
+
+    def test_seed_items_capped_at_pool_size(self):
+        from services.meta_feed_mapper import build_seed_items
+        # Pool size is META_MIN_CATALOG_ITEMS == 5
+        seeds = build_seed_items(100)
+        assert len(seeds) <= 5
+
+    def test_meta_min_catalog_items_is_five(self):
+        from services.meta_feed_mapper import META_MIN_CATALOG_ITEMS
+        assert META_MIN_CATALOG_ITEMS == 5
+
+
+
+# ────────────────────────────────────────────────────────────────────────
 # 4D — Live HTTP endpoint integration (real backend, no TestClient lifespan)
 # ────────────────────────────────────────────────────────────────────────
 import requests
@@ -490,6 +582,51 @@ class TestFeedEndpoint:
     def test_feed_refresh_requires_admin(self, api_base):
         r = requests.post(f"{api_base}/api/feeds/facebook-local/refresh", timeout=15)
         assert r.status_code in (401, 403)
+
+    def test_feed_padded_to_minimum_five_items(self, api_base):
+        """Meta Commerce Manager refuses catalogs with fewer than 5 products.
+        The UNFILTERED feed must always include >=5 items (real + seed pad)."""
+        r = requests.get(f"{api_base}/api/feeds/facebook-local", timeout=15)
+        assert r.status_code == 200
+        items = r.json()["data"]
+        assert len(items) >= 5, f"expected >=5 items, got {len(items)}"
+
+    def test_padded_seed_items_carry_test_seed_label(self, api_base):
+        """Every BIDVEX-SEED-* item in the unfiltered feed must have
+        custom_label_3='test_seed' so production ads can exclude them."""
+        r = requests.get(f"{api_base}/api/feeds/facebook-local", timeout=15)
+        assert r.status_code == 200
+        for it in r.json()["data"]:
+            if it["id"].startswith("BIDVEX-SEED-"):
+                assert it["custom_label_3"] == "test_seed"
+
+    def test_seed_items_use_branded_placeholder_in_live_feed(self, api_base):
+        r = requests.get(f"{api_base}/api/feeds/facebook-local", timeout=15)
+        for it in r.json()["data"]:
+            if it["id"].startswith("BIDVEX-SEED-"):
+                assert it["image_link"].endswith("/placeholder-ad.jpg")
+                assert it["image_link"].startswith("https://")
+
+    def test_seed_items_not_returned_for_filtered_queries(self, api_base):
+        """Province/category-filtered queries must NOT include padded seeds —
+        only the unfiltered catalog gets padded."""
+        r = requests.get(f"{api_base}/api/feeds/facebook-local?province=AB", timeout=15)
+        for it in r.json()["data"]:
+            assert not it["id"].startswith("BIDVEX-SEED-"), \
+                "filtered feeds must never include test_seed items"
+
+    def test_meta_endpoint_reports_seed_padding(self, api_base):
+        r = requests.get(f"{api_base}/api/feeds/facebook-local/meta", timeout=15)
+        body = r.json()
+        assert "seed_items_padded" in body
+        assert "feed_total_items" in body
+        assert body["feed_total_items"] >= 5
+
+    def test_meta_excluded_listings_is_never_negative(self, api_base):
+        """Old bug: seeds in feed_eligible made excluded_listings negative."""
+        r = requests.get(f"{api_base}/api/feeds/facebook-local/meta", timeout=15)
+        body = r.json()
+        assert body["excluded_listings"] >= 0
 
 
 # ────────────────────────────────────────────────────────────────────────
