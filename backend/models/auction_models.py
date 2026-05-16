@@ -109,6 +109,14 @@ class Listing(BaseModel):
     partner_bp_rate: Optional[float] = None  # only set for partner sellers
     seller_province: Optional[str] = None    # for geo-sort ("nearby first")
     seller_city: Optional[str] = None
+    # iter217 — seller-account enrichment (computed at GET time, drives badges + tax label)
+    seller_account_type: Optional[str] = None  # "partner" | "vehicle_dealer" | "storage_facility" | "individual"
+    seller_is_partner: bool = False
+    seller_is_vehicle_dealer: bool = False
+    seller_is_storage_facility: bool = False
+    seller_is_business: bool = False
+    seller_partner_company_name: Optional[str] = None
+    buyer_premium_rate: Optional[float] = None  # canonical, fraction (0.15 = 15%)
 
 
 # ========== BIDS ==========
@@ -287,3 +295,11 @@ class MultiItemListing(BaseModel):
     title_fr: Optional[str] = None
     description_en: Optional[str] = None
     description_fr: Optional[str] = None
+    # iter217 — seller-account enrichment (computed at GET time, drives badges + tax label)
+    seller_account_type: Optional[str] = None  # "partner" | "vehicle_dealer" | "storage_facility" | "individual"
+    seller_is_partner: bool = False
+    seller_is_vehicle_dealer: bool = False
+    seller_is_storage_facility: bool = False
+    seller_is_business: bool = False
+    seller_partner_company_name: Optional[str] = None
+    buyer_premium_rate: Optional[float] = None  # canonical, fraction (0.05 = 5%)

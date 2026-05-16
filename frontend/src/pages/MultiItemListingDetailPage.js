@@ -32,7 +32,7 @@ import ShareButton from '../components/ShareButton';
 import MessageSellerModal from '../components/MessageSellerModal';
 import BidErrorGuide from '../components/BidErrorGuide';
 import VerificationRequiredModal from '../components/VerificationRequiredModal';
-import PrivateSaleBadge, { BusinessSellerBadge } from '../components/PrivateSaleBadge';
+import PrivateSaleBadge, { BusinessSellerBadge, SellerAccountBadge } from '../components/PrivateSaleBadge';
 import PublicBidHistory from '../components/PublicBidHistory';
 import ListingPromotionModal from '../components/ListingPromotionModal';
 import { HighStakesIndicator, HighStakesTimer, getHighStakesCardStyles, isHighStakes } from '../components/HighStakesBidCard';
@@ -389,8 +389,8 @@ const MultiItemListingDetailPage = () => {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="h-16 w-16 mx-auto text-red-500 mb-4" />
-          <h2 className="text-2xl font-bold mb-2">Listing Not Found</h2>
-          <Button onClick={() => navigate('/lots')}>Back to Lots Marketplace</Button>
+          <h2 className="text-2xl font-bold mb-2">{t('listingDetail.notFoundTitle', 'Listing Not Found')}</h2>
+          <Button onClick={() => navigate('/lots')}>{t('listingDetail.backToLots', 'Back to Lots Marketplace')}</Button>
         </div>
       </div>
     );
@@ -443,7 +443,7 @@ const MultiItemListingDetailPage = () => {
               className="mb-4"
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Lots Marketplace
+              {t('listingDetail.backToLots', 'Back to Lots Marketplace')}
             </Button>
 
             {/* Header Card */}
@@ -459,13 +459,17 @@ const MultiItemListingDetailPage = () => {
                           className={`${isPreviewMode ? "bg-amber-500 text-white font-bold" : auctionEnded ? "bg-slate-500 text-white font-bold" : "bg-blue-600 text-white font-bold"} auction-status-badge`}
                           style={{ color: '#ffffff', fontWeight: 700 }}
                         >
-                          {isPreviewMode ? 'Coming Soon' : auctionEnded ? 'Auction Ended' : 'Active Auction'}
+                          {isPreviewMode
+                            ? t('listingDetail.comingSoon', 'Coming Soon')
+                            : auctionEnded
+                              ? t('listingDetail.auctionEnded', 'Auction Ended')
+                              : t('listingDetail.activeAuction', 'Active Auction')}
                         </Badge>
                         <Badge 
                           variant="outline" 
                           className="lots-count-badge font-bold text-slate-800 dark:text-slate-100 border-slate-400 dark:border-slate-500 bg-slate-100 dark:bg-slate-700"
                         >
-                          {listing.total_lots} Lots
+                          {t('listingDetail.lotsCount', { count: listing.total_lots, defaultValue_one: '{{count}} Lot', defaultValue: '{{count}} Lots' })}
                         </Badge>
                       </div>
                       {user && (
@@ -480,20 +484,31 @@ const MultiItemListingDetailPage = () => {
                     <CardTitle className="text-3xl mb-4 text-slate-900 dark:text-white" style={{ fontWeight: 700 }}>{getLocalized(listing, 'title')}</CardTitle>
                     <p className="mb-4 text-slate-600 dark:text-slate-300">{getLocalized(listing, 'description')}</p>
 
-                    {/* Private Sale / Business Seller Badge */}
-                    {sellerInfo && !sellerInfo.is_tax_registered && (
-                      <PrivateSaleBadge className="mb-4" />
-                    )}
-                    {sellerInfo && sellerInfo.is_tax_registered && (
-                      <BusinessSellerBadge variant="default" className="mb-4" />
-                    )}
+                    {/* iter217 — Seller-type badge (Partner / Dealer / Storage / Private Sale) */}
+                    {(() => {
+                      const acctType = listing?.seller_account_type
+                        || (listing?.seller_is_partner ? 'partner'
+                          : listing?.seller_is_vehicle_dealer ? 'vehicle_dealer'
+                          : listing?.seller_is_storage_facility ? 'storage_facility'
+                          : (sellerInfo?.is_tax_registered ? 'business' : 'individual'));
+                      if (acctType === 'business') {
+                        return <BusinessSellerBadge variant="default" className="mb-4" />;
+                      }
+                      return (
+                        <SellerAccountBadge
+                          accountType={acctType}
+                          companyName={listing?.seller_partner_company_name}
+                          className="mb-4"
+                        />
+                      );
+                    })()}
 
                     {/* Auctioneer Info Section with Seller Tier Badge */}
                     {listing.seller_id && (
                       <div className="mb-6">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
-                            <p className="text-sm text-muted-foreground">Hosted by</p>
+                            <p className="text-sm text-muted-foreground">{t('listingDetail.hostedBy', 'Hosted by')}</p>
                             {sellerInfo?.subscription_tier && (
                               <SellerTierBadge tier={sellerInfo.subscription_tier} size="small" />
                             )}
@@ -504,7 +519,7 @@ const MultiItemListingDetailPage = () => {
                               onClick={() => setMessageModalOpen(true)}
                               className="gap-2"
                             >
-                              📨 Message Seller
+                              📨 {t('listingDetail.messageSeller', 'Message Seller')}
                             </Button>
                           )}
                         </div>
@@ -531,7 +546,7 @@ const MultiItemListingDetailPage = () => {
                           className="block text-center text-sm font-medium text-cyan-600 dark:text-cyan-400 hover:underline mt-3"
                           data-testid="view-all-reviews-link"
                         >
-                          View all reviews &rarr;
+                          {t('listingDetail.viewAllReviews', 'View all reviews')} &rarr;
                         </Link>
 
                         {/* iter189 Feature 2 — Lots Promote Button (owner-only, unpromoted only) */}
@@ -1074,10 +1089,10 @@ const MultiItemListingDetailPage = () => {
                         <span style={{ color: '#374151' }}>
                           {!auctionEnded ? (
                             <>
-                              Ends in: <Countdown date={new Date(listing.auction_end_date)} />
+                              {t('listingDetail.endsIn', 'Ends in:')} <Countdown date={new Date(listing.auction_end_date)} />
                             </>
                           ) : (
-                            'Auction Ended'
+                            t('listingDetail.auctionEnded', 'Auction Ended')
                           )}
                         </span>
                       </div>
@@ -1089,15 +1104,15 @@ const MultiItemListingDetailPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-lg" style={{ backgroundColor: '#f1f5f9' }}>
                   <div className="text-center">
                     <p className="text-2xl font-bold" style={{ color: '#2563eb' }}>{listing.total_lots}</p>
-                    <p className="text-sm" style={{ color: '#6b7280' }}>Total Lots</p>
+                    <p className="text-sm" style={{ color: '#6b7280' }}>{t('listingDetail.totalLots', 'Total Lots')}</p>
                   </div>
                   <div className="text-center">
                     <p className="text-2xl font-bold" style={{ color: '#2563eb' }}>{formatCurrency(totalStartingValue)}</p>
-                    <p className="text-sm" style={{ color: '#6b7280' }}>Total Starting Value</p>
+                    <p className="text-sm" style={{ color: '#6b7280' }}>{t('listingDetail.totalStartingValue', 'Total Starting Value')}</p>
                   </div>
                   <div className="text-center">
                     <p className="text-2xl font-bold" style={{ color: '#16a34a' }}>{formatCurrency(totalCurrentValue)}</p>
-                    <p className="text-sm" style={{ color: '#6b7280' }}>Current Total Value</p>
+                    <p className="text-sm" style={{ color: '#6b7280' }}>{t('listingDetail.currentTotalValue', 'Current Total Value')}</p>
                   </div>
                 </div>
               </CardContent>
@@ -1105,7 +1120,7 @@ const MultiItemListingDetailPage = () => {
 
             {/* View Mode Toggle */}
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold" style={{ color: '#1a1a1a' }}>Available Lots</h2>
+              <h2 className="text-2xl font-bold" style={{ color: '#1a1a1a' }}>{t('listingDetail.availableLots', 'Available Lots')}</h2>
               <div className="flex gap-2">
                 <Button
                   variant={viewMode === 'grid' ? 'default' : 'outline'}
@@ -1223,11 +1238,11 @@ const MultiItemListingDetailPage = () => {
                         {/* Simplified Price Display - Clean & Professional */}
                         <div className="grid grid-cols-2 gap-4 mb-4">
                           <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                            <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Opening Bid</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">{t('listingDetail.openingBid', 'Opening Bid')}</p>
                             <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{formatCurrency(lot.starting_price)}</p>
                           </div>
                           <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                            <p className="text-xs text-green-700 dark:text-green-400 uppercase tracking-wide mb-1">Current Bid</p>
+                            <p className="text-xs text-green-700 dark:text-green-400 uppercase tracking-wide mb-1">{t('listingDetail.currentBid', 'Current Bid')}</p>
                             <p className="text-xl font-bold text-green-600 dark:text-green-400">{formatCurrency(lot.current_price)}</p>
                           </div>
                         </div>
@@ -1239,69 +1254,94 @@ const MultiItemListingDetailPage = () => {
                               <div className="flex items-center gap-2">
                                 <DollarSign className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                                 <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                                  View Fee Breakdown
+                                  {t('listingDetail.viewFeeBreakdown', 'View Fee Breakdown')}
                                 </span>
                               </div>
-                              <span className="text-xs text-slate-500 dark:text-slate-400">Click to expand</span>
+                              <span className="text-xs text-slate-500 dark:text-slate-400">{t('listingDetail.clickToExpand', 'Click to expand')}</span>
                             </div>
                           </summary>
                           
                           <div className="mt-2 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border space-y-3">
-                            {/* Tax Status */}
+                            {/* Tax Status — iter217: account-type aware */}
                             <div className="flex items-center justify-between py-2 border-b border-slate-200 dark:border-slate-700">
-                              <span className="text-sm text-slate-700 dark:text-slate-300">Tax Status:</span>
-                              <span className="font-semibold text-slate-900 dark:text-slate-100">
-                                {listing.seller_is_business ? '✓ Taxable (GST/QST)' : '✗ Tax-Free (Private Sale)'}
+                              <span className="text-sm text-slate-700 dark:text-slate-300">{t('listingDetail.feeTaxStatus', 'Tax Status:')}</span>
+                              <span className="font-semibold text-slate-900 dark:text-slate-100 text-right">
+                                {(() => {
+                                  const acct = listing?.seller_account_type;
+                                  if (acct === 'vehicle_dealer') return t('listingDetail.feeTaxableLineDealer', 'Taxable (GST/QST or HST on full price)');
+                                  if (acct === 'partner' || acct === 'storage_facility' || listing?.seller_is_business) {
+                                    return t('listingDetail.feeTaxableLine', "Taxable (GST/QST on Buyer's Premium)");
+                                  }
+                                  return t('listingDetail.feeTaxFreeLine', 'Tax-Free (Private Sale)');
+                                })()}
                               </span>
                             </div>
-                            
-                            {/* Buyer's Premium */}
+
+                            {/* Buyer's Premium — iter217: partner BP wins over buyer tier */}
                             {(() => {
-                              const premium = getBuyerPremiumText(
-                                user?.subscription_tier || 'free',
-                                listing?.custom_buyer_premium_rate
-                              );
+                              const acct = listing?.seller_account_type;
+                              const listingBpFrac = (typeof listing?.buyer_premium_rate === 'number')
+                                ? listing.buyer_premium_rate
+                                : null;
+                              let ratePct = null;
+                              let hint = null;
+                              if (acct === 'partner' && listingBpFrac !== null) {
+                                ratePct = listingBpFrac * 100;
+                                hint = t('listingDetail.feeBuyerPremiumPartnerHint', 'Set by the auction host (Partner)');
+                              } else if (acct === 'vehicle_dealer') {
+                                ratePct = 2.5;
+                                hint = t('listingDetail.feeBuyerPremiumDealerHint', 'Vehicle Dealer — fixed 2.5% buyer fee');
+                              } else if (acct === 'storage_facility') {
+                                ratePct = listingBpFrac !== null ? listingBpFrac * 100 : 0;
+                                hint = t('listingDetail.feeBuyerPremiumStorageHint', 'Set by the facility — buyer never pays BidVex fees on storage auctions');
+                              } else {
+                                const premium = getBuyerPremiumText(
+                                  user?.subscription_tier || 'free',
+                                  listing?.custom_buyer_premium_rate
+                                );
+                                ratePct = premium.rate;
+                                hint = premium.text;
+                              }
                               return (
                                 <div className="flex items-center justify-between py-2 border-b border-slate-200 dark:border-slate-700">
                                   <span className="text-sm text-slate-700 dark:text-slate-300">
-                                    {t('marketplace.conditionsGenerales', 'Buyer\'s Premium')}:
+                                    {t('listingDetail.feeBuyerPremiumLabel', "Buyer's Premium:")}
                                   </span>
-                                  <div className="text-right">
-                                    <span className="font-bold text-blue-700 dark:text-blue-300">{premium.rate}%</span>
-                                    <p className="text-xs text-green-600 dark:text-green-400">(3.5% Premium, 3% VIP)</p>
+                                  <div className="text-right max-w-[60%]">
+                                    <span className="font-bold text-blue-700 dark:text-blue-300" data-testid="fee-buyer-premium-rate">{ratePct}%</span>
+                                    {hint && <p className="text-xs text-slate-500 dark:text-slate-400">{hint}</p>}
                                   </div>
                                 </div>
                               );
                             })()}
-                            
+
                             {/* Estimated Total */}
                             {(() => {
-                              const premium = getBuyerPremiumText(
-                                user?.subscription_tier || 'free',
-                                listing?.custom_buyer_premium_rate
-                              );
-                              const multiplier = 1 + (premium.rate / 100);
+                              const acct = listing?.seller_account_type;
+                              const listingBpFrac = (typeof listing?.buyer_premium_rate === 'number') ? listing.buyer_premium_rate : null;
+                              let ratePct;
+                              if (acct === 'partner' && listingBpFrac !== null) ratePct = listingBpFrac * 100;
+                              else if (acct === 'vehicle_dealer') ratePct = 2.5;
+                              else if (acct === 'storage_facility') ratePct = listingBpFrac !== null ? listingBpFrac * 100 : 0;
+                              else {
+                                const premium = getBuyerPremiumText(
+                                  user?.subscription_tier || 'free',
+                                  listing?.custom_buyer_premium_rate
+                                );
+                                ratePct = premium.rate;
+                              }
+                              const multiplier = 1 + (ratePct / 100);
                               return (
                                 <div className="flex items-center justify-between py-2 bg-blue-100 dark:bg-blue-900/30 -mx-4 px-4 rounded">
                                   <span className="text-sm font-semibold text-blue-900 dark:text-blue-100">
-                                    {t('auction.estimatedTotal', 'Est. Total Out-of-Pocket')}:
+                                    {t('listingDetail.feeEstimatedTotal', 'Est. Total Out-of-Pocket:')}
                                   </span>
-                                  <span className="text-lg font-bold text-blue-700 dark:text-blue-300">
+                                  <span className="text-lg font-bold text-blue-700 dark:text-blue-300" data-testid="fee-estimated-total">
                                     {formatCurrency(lot.current_price * multiplier)}
                                   </span>
                                 </div>
                               );
                             })()}
-                            
-                            <p className="text-xs text-slate-500 dark:text-slate-400 italic">
-                              {(() => {
-                                const premium = getBuyerPremiumText(
-                                  user?.subscription_tier || 'free',
-                                  listing?.custom_buyer_premium_rate
-                                );
-                                return premium.text;
-                              })()}
-                            </p>
                           </div>
                         </details>
 
@@ -1433,45 +1473,42 @@ const MultiItemListingDetailPage = () => {
 
                         {!isPreviewMode && !auctionEnded && (
                           <div className="space-y-3 mt-4">
-                            {/* iter189 Bug 7 — Deposit notice on Lots auction (Spec Feature 1) */}
+                            {/* iter217 — Deposit notice (i18n-conditional rendering, no raw EN:/FR:) */}
                             {listing.requires_deposit && listing.deposit_amount > 0 ? (
                               <div className="p-3 bg-amber-50 border border-amber-300 rounded-md text-xs leading-relaxed" data-testid="multi-bid-deposit-required-notice">
-                                <p className="font-semibold text-amber-900 mb-1">⚠️ Deposit required · Dépôt requis</p>
+                                <p className="font-semibold text-amber-900 mb-1">⚠️ {t('listingDetail.depositRequired', 'Deposit required')}</p>
                                 <p className="text-amber-800">
-                                  <strong>EN:</strong> A deposit of{' '}
-                                  <strong>
-                                    {listing.deposit_type === 'percentage'
-                                      ? `${listing.deposit_amount}% of the lot's starting bid`
-                                      : `$${Number(listing.deposit_amount).toFixed(2)} ${listing.currency || 'CAD'}`}
-                                  </strong>{' '}
-                                  is required to bid on this auction. It is charged to your card immediately on your first bid; refunded automatically if you do not win; credited toward your total if you win.
-                                </p>
-                                <p className="text-amber-800 mt-1">
-                                  <strong>FR:</strong> Un dépôt de{' '}
-                                  <strong>
-                                    {listing.deposit_type === 'percentage'
-                                      ? `${listing.deposit_amount}% du prix de départ`
-                                      : `${Number(listing.deposit_amount).toFixed(2)} $ ${listing.currency || 'CAD'}`}
-                                  </strong>{' '}
-                                  est requis pour enchérir. Il est débité immédiatement lors de votre première mise, remboursé si vous ne gagnez pas, crédité si vous gagnez.
+                                  {t('listingDetail.depositRequiredFull', {
+                                    amount: listing.deposit_type === 'percentage'
+                                      ? t('listingDetail.depositOfPercentage', { pct: listing.deposit_amount })
+                                      : t('listingDetail.depositOfFixed', { amount: Number(listing.deposit_amount).toFixed(2), currency: listing.currency || 'CAD' }),
+                                    defaultValue: 'A deposit of {{amount}} is required to bid on this auction. It is charged to your card immediately on your first bid; refunded automatically if you do not win; credited toward your total if you win.',
+                                  })}
                                 </p>
                               </div>
                             ) : (
                               <div className="text-xs text-slate-500 px-1" data-testid="multi-bid-no-deposit-notice">
-                                No deposit is required to bid on this auction · Aucun dépôt requis.
+                                {t('listingDetail.noDepositRequired', 'No deposit is required to bid on this auction.')}
                               </div>
                             )}
                             {/* Payment method notice */}
                             {(listing.payment_method === 'cash' || listing.payment_method === 'e-transfer') ? (
                               <div className="p-3 bg-purple-50 border border-purple-200 rounded-md text-xs leading-relaxed" data-testid="multi-bid-cash-payment-notice">
                                 <p className="text-purple-900">
-                                  <strong>EN:</strong> This seller collects payment via {listing.payment_method === 'cash' ? 'Cash' : 'E-Transfer'} directly. BidVex will only charge your saved card our buyer commission fee in <strong>{listing.currency || 'CAD'}</strong>.
+                                  {t('listingDetail.paymentMethodCashCopy', {
+                                    method: listing.payment_method === 'cash' ? t('listingDetail.paymentMethodCash', 'Cash') : t('listingDetail.paymentMethodETransfer', 'E-Transfer'),
+                                    currency: listing.currency || 'CAD',
+                                    defaultValue: 'This seller collects payment via {{method}} directly. BidVex will only charge your saved card our buyer commission fee in {{currency}}.',
+                                  })}
                                 </p>
                               </div>
                             ) : (
                               <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-xs leading-relaxed" data-testid="multi-bid-stripe-payment-notice">
                                 <p className="text-blue-900">
-                                  <strong>EN:</strong> This seller uses BidVex Stripe checkout. Any deposit you already paid will be deducted from your winning total in <strong>{listing.currency || 'CAD'}</strong>.
+                                  {t('listingDetail.paymentMethodStripeCopy', {
+                                    currency: listing.currency || 'CAD',
+                                    defaultValue: 'This seller uses BidVex Stripe checkout. Any deposit you already paid will be deducted from your winning total in {{currency}}.',
+                                  })}
                                 </p>
                               </div>
                             )}
@@ -1480,8 +1517,10 @@ const MultiItemListingDetailPage = () => {
                             <div className="flex items-center gap-2 text-xs text-muted-foreground bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-md">
                               <Info className="h-3 w-3" />
                               <span>
-                                Minimum increment: {formatCurrency(getMinimumIncrement(lot.current_price))} 
-                                {incrementInfo && ` (${incrementInfo.increment_option === 'tiered' ? 'Tiered' : 'Simplified'} schedule)`}
+                                {t('listingDetail.minimumIncrement', { amount: formatCurrency(getMinimumIncrement(lot.current_price)), defaultValue: 'Minimum increment: {{amount}}' })}
+                                {incrementInfo && ` (${incrementInfo.increment_option === 'tiered'
+                                  ? t('listingDetail.tieredSchedule', 'Tiered schedule')
+                                  : t('listingDetail.simplifiedSchedule', 'Simplified schedule')})`}
                               </span>
                             </div>
 
@@ -1578,7 +1617,7 @@ const MultiItemListingDetailPage = () => {
             <div className="sticky top-4">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Lot Index</CardTitle>
+                  <CardTitle className="text-lg">{t('listingDetail.lotIndex', 'Lot Index')}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {listing.lots.map((lot) => (

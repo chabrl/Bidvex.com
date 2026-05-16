@@ -683,6 +683,18 @@ async def create_vehicle_listing(
             status_code=403,
             detail="Vehicle listing is currently disabled. Vehicle auctions are pending permit approval. Please check back later."
         )
+
+    # iter217 — Quebec Bill 96 compliance — French title required for QC listings
+    from services.qc_bilingual_validator import assert_qc_bilingual_titles
+    assert_qc_bilingual_titles(
+        title=getattr(listing_data, "title", None),
+        title_fr=getattr(listing_data, "title_fr", None),
+        description=getattr(listing_data, "description", None),
+        description_fr=getattr(listing_data, "description_fr", None),
+        region=getattr(listing_data, "province", None) or getattr(listing_data, "region", None),
+        city=getattr(listing_data, "city", None),
+        content_language=getattr(listing_data, "content_language", None),
+    )
     
     # Check seller limits
     current_month = datetime.now(timezone.utc).strftime("%Y-%m")

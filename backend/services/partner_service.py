@@ -16,16 +16,23 @@ PRO_TIERS = {"partner_pro", "vip", "vip_elite"}
 
 def is_verified_firm(user: Dict[str, Any]) -> bool:
     """
-    A firm is verified when ALL of the following are true:
+    A firm is verified when:
       1. is_partner == True
-      2. platform_fee_paid == True (annual fee settled via Stripe)
-      3. partner_verification_status == "approved"
+      2. partner_verification_status is one of: "approved", "verified"
+         (canonical platform value is "verified"; "approved" kept for back-compat)
+      3. annual fee settled — accepted via EITHER `platform_fee_paid=True`
+         (legacy) OR `partner_subscription_active=True` (iter216 canonical).
     """
-    return (
-        user.get("is_partner", False)
-        and user.get("platform_fee_paid", False)
-        and user.get("partner_verification_status") == "approved"
+    if not user.get("is_partner", False):
+        return False
+    status = user.get("partner_verification_status")
+    if status not in ("approved", "verified"):
+        return False
+    fee_settled = (
+        user.get("platform_fee_paid", False)
+        or user.get("partner_subscription_active", False)
     )
+    return bool(fee_settled)
 
 
 def get_partner_tier(user: Dict[str, Any]) -> str:
@@ -42,13 +49,16 @@ def get_badge_type(user: Dict[str, Any]) -> Optional[str]:
     """
     Determine the badge to display next to a seller's name.
     Returns None if no badge qualifies.
+
+    Canonical statuses across BidVex: "verified" (current) / "approved" (legacy alias).
     """
     if is_verified_firm(user):
         tier = get_partner_tier(user)
         if tier == "vip":
             return "verified_vip"
         return "verified_firm"
-    if user.get("is_partner") and user.get("partner_verification_status") == "approved":
+    status = user.get("partner_verification_status")
+    if user.get("is_partner") and status in ("approved", "verified"):
         return "approved_partner"
     return None
 

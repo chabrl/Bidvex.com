@@ -420,8 +420,7 @@ const StorageAuctionCreate = () => {
                   data-testid="legal-notice-checkbox"
                 />
                 <span className="text-xs leading-relaxed text-amber-900 dark:text-amber-200">
-                  <strong>EN:</strong> I confirm this unit has gone through the required legal-notification process and its contents may be auctioned under the relevant provincial law.<br/><br/>
-                  <strong>FR :</strong> Je confirme que cette unité a fait l'objet du processus de notification légale requis et que son contenu peut être mis aux enchères en vertu de la loi provinciale applicable.
+                  {t('storageCreate.legalNoticeConfirm', 'I confirm this unit has gone through the required legal-notification process and its contents may be auctioned under the relevant provincial law.')}
                 </span>
               </label>
             </div>

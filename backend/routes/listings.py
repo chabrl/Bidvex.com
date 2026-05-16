@@ -154,6 +154,18 @@ async def create_listing(
     from services.stripe_customer_service import validate_payment_method_for_listing
     db = get_db()
 
+    # iter217 — Quebec Bill 96 compliance — French title required for QC listings
+    from services.qc_bilingual_validator import assert_qc_bilingual_titles
+    assert_qc_bilingual_titles(
+        title=listing_data.title,
+        title_fr=listing_data.title_fr,
+        description=listing_data.description,
+        description_fr=listing_data.description_fr,
+        region=listing_data.region,
+        city=listing_data.city,
+        content_language=listing_data.content_language,
+    )
+
     # ── iter203 P0 — Hard-coded vehicle/dealer compliance gate (FIRST line of defence) ──
     # This runs BEFORE payment-method validation so a non-dealer attempting a
     # vehicle listing receives the clear bilingual 403 immediately, regardless
@@ -496,6 +508,10 @@ async def get_listing(listing_id: str):
         listing_doc["created_at"] = datetime.fromisoformat(listing_doc["created_at"])
     if isinstance(listing_doc.get("auction_end_date"), str):
         listing_doc["auction_end_date"] = datetime.fromisoformat(listing_doc["auction_end_date"])
+    # iter217 — enrich with seller-account flags so the frontend can render
+    # the correct badge + canonical buyer's premium rate.
+    from services.listing_seller_enrichment import enrich_listing_async
+    listing_doc = await enrich_listing_async(get_db(), listing_doc)
     result = Listing(**listing_doc)
     _listing_cache[listing_id] = {"data": result, "ts": now}
     return result
@@ -565,6 +581,18 @@ async def create_multi_item_listing(
     )
     from services.stripe_customer_service import validate_payment_method_for_listing
     db = get_db()
+
+    # iter217 — Quebec Bill 96 compliance — French title required for QC listings
+    from services.qc_bilingual_validator import assert_qc_bilingual_titles
+    assert_qc_bilingual_titles(
+        title=getattr(listing_data, "title", None),
+        title_fr=getattr(listing_data, "title_fr", None),
+        description=getattr(listing_data, "description", None),
+        description_fr=getattr(listing_data, "description_fr", None),
+        region=getattr(listing_data, "region", None),
+        city=getattr(listing_data, "city", None),
+        content_language=getattr(listing_data, "content_language", None),
+    )
 
     # ── Deposit field validation (Spec Feature 1) — runs BEFORE sticky-card guard
     # so negative-path tests can reach 400 with bilingual error before 402-no-card.
@@ -840,6 +868,11 @@ async def get_multi_item_listing(listing_id: str):
     if isinstance(listing.get("created_at"), str):
         from services.listings_service import parse_listing_dates
         parse_listing_dates(listing)
+
+    # iter217 — enrich with seller-account flags so the frontend can render
+    # the correct badge + canonical buyer's premium rate.
+    from services.listing_seller_enrichment import enrich_listing_async
+    listing = await enrich_listing_async(db, listing)
 
     return MultiItemListing(**listing)
 

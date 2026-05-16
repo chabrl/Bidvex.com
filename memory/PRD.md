@@ -1,5 +1,98 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter217 Phase 1 — Partner Auction Badge + Bill 96 Listing Forms (Feb 15, 2026) ✅
+
+### Bug 1+3 (REVENUE) — Partner auction was showing as "Private Sale"
+**Root cause (verified against Alex Boulanger's actual MongoDB doc — listing `0f99b059-0bf8-432b-a322-47704858d71a`)**
+1. `services/partner_service.py:is_verified_firm()` checked `partner_verification_status == "approved"` but the canonical platform value is `"verified"`. Alex (verified partner) thus received `badge_type=null` — verified-firm/partner badge never rendered anywhere.
+2. The multi-item listing GET endpoint never enriched the listing dict with seller-type flags. The frontend had to guess from `sellerInfo.is_tax_registered` (which was `false` on Alex) → defaulted to "Private Sale".
+3. `MultiItemListingDetailPage.js` fee breakdown read `listing.custom_buyer_premium_rate` (always null on Alex's listing) and fell back to the buyer's subscription tier — silently displayed "(3.5% Premium, 3% VIP)" generic copy.
+4. Alex's listing had `premium_percentage: 5.0` and `commission_rate: 4.0` but no `buyer_premium_rate`, no `seller_account_type`, no `is_partner_listing` flag, no `seller_is_business` — so the frontend had nothing partner-shaped to read.
+
+**Fix (calculate_fee() math NOT touched — display layer + enrichment only)**
+- `services/partner_service.py` — `is_verified_firm` + `get_badge_type` now accept BOTH `"verified"` (canonical) and `"approved"` (legacy alias). Active fee is detected via EITHER `platform_fee_paid` (legacy) OR `partner_subscription_active` (iter216 canonical).
+- NEW `services/listing_seller_enrichment.py` — `enrich_listing_async(db, listing, listing_context)` mutates the listing dict at GET time with `seller_account_type`, `seller_is_partner`, `seller_is_vehicle_dealer`, `seller_is_storage_facility`, `seller_is_business`, `seller_partner_company_name`, and the canonical `buyer_premium_rate` (fraction, derived from `premium_percentage`/`custom_buyer_premium_rate`/`buyers_premium_percent`/`partner_bp_rate`/seller's `partner_buyer_premium_pct`).
+- Context-aware classification — Alex (BOTH `is_partner=verified` AND `is_vehicle_dealer=true`) correctly classifies as **partner** on a Lots auction, dealer on a vehicle auction, facility on a storage auction.
+- `models/auction_models.py` — `Listing` + `MultiItemListing` extended with the new seller_* fields.
+- `routes/listings.py` — `GET /api/listings/{id}` + `GET /api/multi-item-listings/{id}` now call `enrich_listing_async` before serialization.
+- `frontend/src/components/PrivateSaleBadge.js` — REWRITTEN with `useTranslation`. Adds bilingual `PartnerAuctionBadge`, `VehicleDealerBadge`, `StorageFacilityBadge`, and a `SellerAccountBadge` switcher that renders the right badge by `accountType`.
+- `MultiItemListingDetailPage.js` — replaces hardcoded `!is_tax_registered` Private-Sale block with `<SellerAccountBadge accountType={listing.seller_account_type} companyName={...} />`. Fee breakdown rewritten to: (a) read partner BP from `listing.buyer_premium_rate`, (b) show dealer 2.5% fixed fee, (c) show $0 BP for storage with a bilingual hint that "buyer never pays BidVex fees on storage", (d) fall back to buyer-tier copy ONLY for individual sellers. The hard-coded "(3.5% Premium, 3% VIP)" leak is **deleted**.
+- `ListingDetailPage.js` — same `SellerAccountBadge` swap; `PartnerBadge` (the small fetched chip) now hidden when the main Partner Auction badge is already rendered.
+
+### Bug 2+5 (LEGAL — Bill 96 / Charter of the French Language)
+**EN:/FR: prefix audit — every "<strong>EN:</strong>" blob in Phase 1 scope is GONE**
+| Component | Before | After |
+|---|---|---|
+| `MultiItemListingDetailPage.js` deposit notice | `<strong>EN:</strong>` + `<strong>FR:</strong>` both rendered as raw text | `t('listingDetail.depositRequiredFull', { amount, ... })` — i18n-conditional |
+| `MultiItemListingDetailPage.js` payment cash notice | EN-only block (no FR existed) | `t('listingDetail.paymentMethodCashCopy')` with bilingual interpolation |
+| `MultiItemListingDetailPage.js` payment stripe notice | EN-only block | `t('listingDetail.paymentMethodStripeCopy')` |
+| `ListingDetailPage.js` deposit notice | Same dual-rendered blob | `t('listingDetail.depositRequiredFull')` |
+| `ListingDetailPage.js` payment cash notice | EN-only block | `t('listingDetail.paymentMethodCashCopy')` |
+| `ListingDetailPage.js` payment stripe notice | EN-only block | `t('listingDetail.paymentMethodStripeCopy')` |
+| `StorageAuctionCreate.js` legal-notice confirmation | `<strong>EN:</strong>` + `<strong>FR :</strong>` rendered together | `t('storageCreate.legalNoticeConfirm')` |
+
+**Additional hardcoded English on `MultiItemListingDetailPage.js` now wrapped in t()**
+"Listing Not Found", "Back to Lots Marketplace" (x2), "Hosted by", "Message Seller", "View all reviews", "Total Lots", "Total Starting Value", "Current Total Value", "Available Lots", "Lot Index", "Opening Bid", "Current Bid", "View Fee Breakdown", "Click to expand", "Tax Status:", "Ends in:", "Coming Soon", "Active Auction", "Auction Ended", "{n} Lots" plural.
+
+**Additional hardcoded English on `ListingDetailPage.js` now wrapped in t()**
+"Live Updates Active", "Reconnecting…", "Updated {time}", "Auction Ended", "Boost Your Listing" (heading + body), "Sign in to place a bid", "Seller Information".
+
+**Bilingual keys added** — 4 new namespaces in BOTH `en.json` and `fr.json`:
+- `sellerBadge.*` (15 keys covering Private / Business / Partner / Dealer / Storage variants)
+- `listingDetail.*` (≈45 keys — all of the above plus fee-breakdown copy)
+- `listingForm.*` (3 keys — QC Bill 96 error messages)
+- `storageCreate.legalNoticeConfirm`
+
+### QC Bill 96 — backend hard-gate for French titles
+- NEW `services/qc_bilingual_validator.py:assert_qc_bilingual_titles()` — raises HTTP 422 with `error: "qc_french_title_required"` and bilingual EN/FR copy when a QC seller publishes a listing without a French title (or French description for a QC EN listing).
+- Wired into all 4 listing-create endpoints: `routes/listings.py:create_listing`, `routes/listings.py:create_multi_item_listing`, `routes/vehicles.py:create_vehicle_listing`, `routes/storage_auctions.py:create_storage_auction`.
+- Detection: `region/province == "QC"` OR (when blank) a known Quebec city list.
+
+### Tests
+- NEW `tests/test_iter217_partner_badge_and_bill96.py` — 21 tests (badge status alias, context-aware classification, listing enrichment, BP fraction coercion, QC region/city detection, 422 error shape for QC FR-title/description, non-QC bypass, FR-source bypass).
+- **Full regression**: 227 passed, 1 warning, 0 failed across iter209/211/212/213/214/215/216/217. The fee math is bit-identical to iter209 (locked by `test_iter209_step1_fee_calculator.py` + `test_iter211_pricing_manager_relocation.py` baselines).
+
+### Verified live on preview (Alex Boulanger's listing)
+```
+GET /api/multi-item-listings/0f99b059-0bf8-432b-a322-47704858d71a
+→ seller_account_type: "partner"
+   seller_is_partner: true
+   seller_is_business: true
+   seller_partner_company_name: "abc auction"
+   buyer_premium_rate: 0.05
+   premium_percentage: 5.0
+```
+Frontend DOM smoke test:
+- `[data-testid="badge-partner-auction"]` → present (heading: "Enchère Partenaire" with company name "abc auction")
+- `[data-testid="badge-private-sale"]` → ABSENT
+- Body text "(3.5% Premium, 3% VIP)" → ABSENT
+- Body text "EN:" → ABSENT
+- Body text "FR:" → ABSENT
+
+### Explicit confirmation
+- `calculate_fee()` math was NOT modified.
+- No new fee logic was created — only the call site (now reads `buyer_premium_rate` from enrichment) and the display layer were fixed.
+- The 3% BidVex commission is nowhere in the buyer-facing UI — it remains a backend-only deduction from partner payouts.
+
+### Files of reference (iter217 Phase 1)
+- `/app/backend/services/partner_service.py` (status alias + fee-paid detection)
+- `/app/backend/services/listing_seller_enrichment.py` (NEW — context-aware classifier + BP coercion)
+- `/app/backend/services/qc_bilingual_validator.py` (NEW — Bill 96 hard-gate)
+- `/app/backend/models/auction_models.py` (seller_* enrichment fields)
+- `/app/backend/routes/listings.py` (GET enrichment + create-time QC validator)
+- `/app/backend/routes/vehicles.py` (create-time QC validator)
+- `/app/backend/routes/storage_auctions.py` (create-time QC validator)
+- `/app/frontend/src/components/PrivateSaleBadge.js` (REWRITTEN — bilingual, 4 badge types)
+- `/app/frontend/src/pages/MultiItemListingDetailPage.js` (badge swap, fee logic, EN/FR blob fixes)
+- `/app/frontend/src/pages/ListingDetailPage.js` (badge swap, EN/FR blob fixes)
+- `/app/frontend/src/pages/storage/StorageAuctionCreate.js` (EN/FR legal-notice fix)
+- `/app/frontend/src/locales/en.json` + `fr.json` (4 new namespaces, ≈65 new keys total)
+- `/app/backend/tests/test_iter217_partner_badge_and_bill96.py` (NEW — 21 tests)
+
+⚠️ Production push required: changes are in PREVIEW. Phase 2 (Admin Panel) + Phase 3 (Watchlist / Badges on cards / Notifications / Location filters) + Phase 4 (Homepage Pro Auctions section) still pending user smoke-test approval of Phase 1.
+
+---
+
 ## Latest: iter216 — Production Emergency (Alex Boulanger + Storage BP + 6-Email Journey) (Feb 14, 2026) ✅
 
 ### 🐛 Issue 2 — Partner subscription field mismatch (Alex Boulanger)

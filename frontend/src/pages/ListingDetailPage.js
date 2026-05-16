@@ -27,7 +27,7 @@ import RateSellerModal from '../components/RateSellerModal';
 import AuctioneerInfo from '../components/AuctioneerInfo';
 import BidConfirmationDialog from '../components/BidConfirmationDialog';
 import PriceBreakdown from '../components/PriceBreakdown';
-import PrivateSaleBadge, { BusinessSellerBadge } from '../components/PrivateSaleBadge';
+import PrivateSaleBadge, { BusinessSellerBadge, SellerAccountBadge } from '../components/PrivateSaleBadge';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import PartnerBadge from '../components/PartnerBadge';
 import SecurityDepositBanner from '../components/SecurityDepositBanner';
@@ -440,18 +440,27 @@ const ListingDetailPage = () => {
                 </div>
               </div>
 
-              {/* Private Sale Badge - Show for individual sellers */}
-              {seller && !seller.is_tax_registered && (
-                <PrivateSaleBadge className="mb-4" />
-              )}
-              
-              {/* Business Seller Badge - Show for registered businesses */}
-              {seller && seller.is_tax_registered && (
-                <BusinessSellerBadge variant="default" className="mb-4" />
-              )}
+              {/* iter217 — Seller-type badge (Partner / Dealer / Storage / Private Sale) */}
+              {(() => {
+                const acctType = listing?.seller_account_type
+                  || (listing?.seller_is_partner ? 'partner'
+                    : listing?.seller_is_vehicle_dealer ? 'vehicle_dealer'
+                    : listing?.seller_is_storage_facility ? 'storage_facility'
+                    : (seller?.is_tax_registered ? 'business' : 'individual'));
+                if (acctType === 'business') {
+                  return <BusinessSellerBadge variant="default" className="mb-4" />;
+                }
+                return (
+                  <SellerAccountBadge
+                    accountType={acctType}
+                    companyName={listing?.seller_partner_company_name}
+                    className="mb-4"
+                  />
+                );
+              })()}
 
-              {/* Verified Auction Firm Badge — fetched from API */}
-              {listing?.seller_id && (
+              {/* Verified Auction Firm Badge — fetched from API (compact, sits below the main badge) */}
+              {listing?.seller_id && !listing?.seller_is_partner && (
                 <div className="mb-4"><PartnerBadge sellerId={listing.seller_id} size="md" /></div>
               )}
 
@@ -487,18 +496,18 @@ const ListingDetailPage = () => {
                     {isConnected ? (
                       <>
                         <Wifi className="h-4 w-4 text-green-500" />
-                        <span className="text-xs text-green-600 font-medium">Live Updates Active</span>
+                        <span className="text-xs text-green-600 font-medium">{t('listingDetail.liveUpdatesActive', 'Live Updates Active')}</span>
                       </>
                     ) : (
                       <>
                         <WifiOff className="h-4 w-4 text-orange-500 animate-pulse" />
-                        <span className="text-xs text-orange-600 font-medium">Reconnecting...</span>
+                        <span className="text-xs text-orange-600 font-medium">{t('listingDetail.reconnecting', 'Reconnecting…')}</span>
                       </>
                     )}
                   </div>
                   {lastUpdate && (
                     <span className="text-xs text-muted-foreground">
-                      Updated {new Date(lastUpdate).toLocaleTimeString()}
+                      {t('listingDetail.updatedAt', { time: new Date(lastUpdate).toLocaleTimeString(), defaultValue: 'Updated {{time}}' })}
                     </span>
                   )}
                 </div>
@@ -584,7 +593,7 @@ const ListingDetailPage = () => {
                 )}
 
                 {isAuctionEnded && (
-                  <Badge variant="destructive" className="text-sm">Auction Ended</Badge>
+                  <Badge variant="destructive" className="text-sm">{t('listingDetail.auctionEnded', 'Auction Ended')}</Badge>
                 )}
               </div>
             </div>
@@ -594,9 +603,9 @@ const ListingDetailPage = () => {
                 <CardContent className="p-6">
                   <div className="flex items-start gap-4">
                     <div className="flex-1">
-                      <h3 className="font-semibold text-lg mb-2">Boost Your Listing</h3>
+                      <h3 className="font-semibold text-lg mb-2">{t('listingDetail.boostYourListing', 'Boost Your Listing')}</h3>
                       <p className="text-sm text-muted-foreground mb-4">
-                        Increase visibility and reach more potential buyers with promoted placement
+                        {t('listingDetail.boostYourListingBody', 'Increase visibility and reach more potential buyers with promoted placement')}
                       </p>
                       <Button 
                         className="gradient-button text-white border-0"
@@ -709,58 +718,52 @@ const ListingDetailPage = () => {
                       />
                     )}
 
-                    {/* Spec Feature 1 — Deposit Notice (above bid button) */}
+                    {/* iter217 — Deposit Notice (i18n-conditional, no raw EN:/FR:) */}
                     {listing.requires_deposit && listing.deposit_amount > 0 ? (
                       <div className="p-3 bg-amber-50 border border-amber-300 rounded-md text-xs leading-relaxed" data-testid="bid-deposit-required-notice">
-                        <p className="font-semibold text-amber-900 mb-1">⚠️ Deposit required · Dépôt requis</p>
+                        <p className="font-semibold text-amber-900 mb-1">⚠️ {t('listingDetail.depositRequired', 'Deposit required')}</p>
                         <p className="text-amber-800">
-                          <strong>EN:</strong> This auction requires a deposit of{' '}
-                          <strong>
-                            {listing.deposit_type === 'percentage'
-                              ? `${listing.deposit_amount}% of starting bid`
-                              : `$${Number(listing.deposit_amount).toFixed(2)} ${listing.currency || 'CAD'}`}
-                          </strong>.
-                          This amount will be charged to your card immediately when you place your first bid.
-                          If you do not win, your deposit will be refunded automatically as soon as the auction ends.
-                          If you win, your deposit will be applied toward your total — you will not be charged twice.
-                        </p>
-                        <p className="text-amber-800 mt-1">
-                          <strong>FR:</strong> Cette enchère exige un dépôt de{' '}
-                          <strong>
-                            {listing.deposit_type === 'percentage'
-                              ? `${listing.deposit_amount}% du prix de départ`
-                              : `${Number(listing.deposit_amount).toFixed(2)} $ ${listing.currency || 'CAD'}`}
-                          </strong>.
-                          Ce montant sera débité immédiatement lors de votre première mise.
-                          Si vous ne gagnez pas, votre dépôt sera remboursé automatiquement dès la fin de l'enchère.
-                          Si vous gagnez, il sera crédité à votre total — vous ne serez jamais débité deux fois.
+                          {t('listingDetail.depositRequiredFull', {
+                            amount: listing.deposit_type === 'percentage'
+                              ? t('listingDetail.depositOfPercentage', { pct: listing.deposit_amount })
+                              : t('listingDetail.depositOfFixed', { amount: Number(listing.deposit_amount).toFixed(2), currency: listing.currency || 'CAD' }),
+                            defaultValue: 'A deposit of {{amount}} is required to bid on this auction. It is charged to your card immediately on your first bid; refunded automatically if you do not win; credited toward your total if you win.',
+                          })}
                         </p>
                       </div>
                     ) : (
                       <div className="text-xs text-slate-500 px-1" data-testid="bid-no-deposit-notice">
-                        No deposit is required to bid on this item · Aucun dépôt requis pour enchérir.
+                        {t('listingDetail.noDepositRequired', 'No deposit is required to bid on this auction.')}
                       </div>
                     )}
 
-                    {/* Spec Feature 3 — Payment-method specific buyer notice */}
+                    {/* iter217 — Payment-method specific buyer notice (i18n-conditional) */}
                     {(listing.payment_method === 'cash' || listing.payment_method === 'e-transfer') ? (
                       <div className="p-3 bg-purple-50 border border-purple-200 rounded-md text-xs leading-relaxed" data-testid="bid-cash-payment-notice">
-                        <p className="font-semibold text-purple-900 mb-1">Payment method · Mode de paiement: {listing.payment_method === 'cash' ? 'Cash' : 'E-Transfer / Virement Interac'}</p>
+                        <p className="font-semibold text-purple-900 mb-1">
+                          {t('listingDetail.paymentMethodCashLabel', {
+                            method: listing.payment_method === 'cash' ? t('listingDetail.paymentMethodCash', 'Cash') : t('listingDetail.paymentMethodETransfer', 'E-Transfer'),
+                            defaultValue: 'Payment method: {{method}}',
+                          })}
+                        </p>
                         <p className="text-purple-800">
-                          <strong>EN:</strong> This seller collects payment via {listing.payment_method === 'cash' ? 'Cash' : 'E-Transfer'} directly.
-                          BidVex will only charge your saved card our buyer commission fee
-                          (% of the winning bid in <strong>{listing.currency || 'CAD'}</strong>).
-                          You will arrange payment of the item price directly with the seller after winning.
-                          Any deposit you already paid will be applied toward this commission fee.
+                          {t('listingDetail.paymentMethodCashCopy', {
+                            method: listing.payment_method === 'cash' ? t('listingDetail.paymentMethodCash', 'Cash') : t('listingDetail.paymentMethodETransfer', 'E-Transfer'),
+                            currency: listing.currency || 'CAD',
+                            defaultValue: 'This seller collects payment via {{method}} directly. BidVex will only charge your saved card our buyer commission fee in {{currency}}.',
+                          })}
                         </p>
                       </div>
                     ) : (
                       <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-xs leading-relaxed" data-testid="bid-stripe-payment-notice">
-                        <p className="font-semibold text-blue-900 mb-1">Payment method · Mode de paiement: Stripe (BidVex)</p>
+                        <p className="font-semibold text-blue-900 mb-1">
+                          {t('listingDetail.paymentMethodStripeLabel', 'Payment method: Stripe (BidVex)')}
+                        </p>
                         <p className="text-blue-800">
-                          <strong>EN:</strong> This seller uses BidVex Stripe checkout.
-                          If you win, your card will be charged the full winning bid amount plus BidVex's buyer commission fee in <strong>{listing.currency || 'CAD'}</strong>.
-                          Any deposit you already paid will be deducted from your total — you will not be charged twice.
+                          {t('listingDetail.paymentMethodStripeCopy', {
+                            currency: listing.currency || 'CAD',
+                            defaultValue: 'This seller uses BidVex Stripe checkout. Any deposit you already paid will be deducted from your winning total in {{currency}}.',
+                          })}
                         </p>
                       </div>
                     )}
@@ -876,7 +879,7 @@ const ListingDetailPage = () => {
             {!user && (
               <Card className="glassmorphism">
                 <CardContent className="p-6">
-                  <p className="text-center mb-4">Sign in to place a bid</p>
+                  <p className="text-center mb-4">{t('listingDetail.signInToPlaceBid', 'Sign in to place a bid')}</p>
                   <Button className="w-full gradient-button text-white border-0" onClick={() => navigate('/auth')}>
                     Sign In
                   </Button>
@@ -926,7 +929,7 @@ const ListingDetailPage = () => {
               <Card className="glassmorphism">
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">Seller Information</CardTitle>
+                    <CardTitle className="text-lg">{t('listingDetail.sellerInformation', 'Seller Information')}</CardTitle>
                     {user && user.id !== listing.seller_id && (
                       <Button
                         size="sm"

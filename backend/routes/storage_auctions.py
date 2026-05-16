@@ -713,6 +713,20 @@ async def create_storage_auction(
             },
         )
 
+    # iter217 — Quebec Bill 96 compliance — French description required for QC facilities.
+    # Storage auctions have description_en/description_fr (no title field), so we
+    # validate the description side only.
+    from services.qc_bilingual_validator import assert_qc_bilingual_titles
+    assert_qc_bilingual_titles(
+        title=payload.description_en or "",
+        title_fr=payload.description_fr,
+        description=payload.description_en,
+        description_fr=payload.description_fr,
+        region=facility.get("province"),
+        city=facility.get("city"),
+        content_language="en",
+    )
+
 
     db = get_db()
     auction_id = str(uuid.uuid4())
