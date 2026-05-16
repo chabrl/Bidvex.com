@@ -21,6 +21,7 @@ import UserTierGrid from '../components/UserTierGrid';
 import PartnerLicenseCard from '../components/PartnerLicenseCard';
 import SubscriptionManagement from '../components/SubscriptionManagement';
 import PersonalizedSavingsCalculator from '../components/PersonalizedSavingsCalculator';
+import PaymentTrustBox from '../components/PaymentTrustBox';
 import { useTranslation } from 'react-i18next';
 
 const API = API_BASE;
@@ -310,6 +311,7 @@ const ProfileSettingsPage = () => {
                       size="sm"
                       onClick={() => window.location.href = '/verify-phone'}
                       className="border-[#06B6D4] text-[#06B6D4] hover:bg-[#06B6D4]/10"
+                      data-testid="verify-phone-btn"
                     >
                       <Phone className="h-4 w-4 mr-2" />
                       {t('profile.verifyPhone') || 'Verify Phone'}
@@ -327,6 +329,16 @@ const ProfileSettingsPage = () => {
                     </Button>
                   )}
                 </div>
+              )}
+              {/* iter217 — Phone-verify explainer */}
+              {!user?.phone_verified && (
+                <p
+                  className="text-[11px] mt-2 leading-relaxed"
+                  style={{ color: '#94a3b8' }}
+                  data-testid="phone-verify-explain"
+                >
+                  {t('paymentTrust.phoneExplain', 'We send a one-time code to confirm your number. This helps prevent fake accounts.')}
+                </p>
               )}
           </div>
 
@@ -529,55 +541,70 @@ const ProfileSettingsPage = () => {
           <TabsContent value="payment">
             <div className="rounded-2xl bg-white/70 dark:bg-slate-800/50 backdrop-blur-xl border border-slate-200/80 dark:border-slate-700/60 shadow-sm">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5 text-blue-500" />Payment Methods</CardTitle>
+                <CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5 text-blue-500" />{t('profile.paymentMethods', 'Payment Methods')}</CardTitle>
                 <CardDescription>{t("profile.managePaymentMethods")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* iter217 — Trust messaging above the Add Payment Method block */}
+                <PaymentTrustBox />
+
                 {paymentMethods.length > 0 ? (
                   <div className="space-y-3">
                     {paymentMethods.map((method) => (
-                      <div key={method.id} className="flex items-center justify-between p-4 border rounded-lg" data-testid={`payment-method-${method.id}`}>
-                        <div className="flex items-center gap-4">
-                          <CreditCard className="h-8 w-8 text-muted-foreground" />
-                          <div>
-                            <p className="font-medium capitalize">{method.card_brand} •••• {method.last4}</p>
-                            <p className="text-sm text-muted-foreground">
-                              Expires {method.exp_month}/{method.exp_year}
-                              {method.is_verified && <span className="ml-2 text-green-600">✓ Verified</span>}
-                            </p>
+                      <div key={method.id} className="p-4 border rounded-lg" data-testid={`payment-method-${method.id}`}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <CreditCard className="h-8 w-8 text-muted-foreground" />
+                            <div>
+                              <p className="font-medium capitalize">{method.card_brand} •••• {method.last4}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {method.exp_month}/{method.exp_year}
+                                {method.is_verified && <span className="ml-2 text-green-600">✓ {t('common.verified', 'Verified')}</span>}
+                              </p>
+                              {method.created_at && (
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  {t('paymentTrust.savedAddedOn', { date: new Date(method.created_at).toLocaleDateString(), defaultValue: 'Added on {{date}}' })}
+                                </p>
+                              )}
+                            </div>
                           </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeletePaymentMethod(method.id)}
+                            data-testid={`delete-payment-method-${method.id}`}
+                            className="text-slate-500 hover:text-red-600 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            {t('paymentTrust.removeCardBtn', 'Remove Card')}
+                          </Button>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeletePaymentMethod(method.id)}
-                          data-testid={`delete-payment-method-${method.id}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-3 pl-12">
+                          {t('paymentTrust.savedCardExplain', 'This card is used for bid security verification only. You will be notified before any charge.')}
+                        </p>
                       </div>
                     ))}
                   </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <CreditCard className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                    <p className="text-muted-foreground mb-4">No payment methods added</p>
-                  </div>
-                )}
+                ) : null}
 
-                <Button
-                  onClick={() => setShowAddCard(true)}
-                  className="w-full"
-                  variant="outline"
-                  data-testid="add-payment-method-btn"
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Payment Method
-                </Button>
+                {!showAddCard && (
+                  <Button
+                    onClick={() => setShowAddCard(true)}
+                    className="w-full"
+                    variant="outline"
+                    data-testid="add-payment-method-btn"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    {t('profile.addPaymentMethod', 'Add Payment Method')}
+                  </Button>
+                )}
 
                 {showAddCard && (
                   <Card className="border-2 border-primary">
                     <CardContent className="pt-6">
+                      <p className="text-xs font-medium mb-2" style={{ color: '#475569' }}>
+                        {t('paymentTrust.addFormLabel', 'Enter your card details — you will not be charged now.')}
+                      </p>
                       <Elements stripe={stripePromise}>
                         <AddCardForm 
                           onSuccess={async () => {
@@ -591,6 +618,9 @@ const ProfileSettingsPage = () => {
                           onCancel={() => setShowAddCard(false)}
                         />
                       </Elements>
+                      <p className="text-[11px] mt-3 leading-relaxed" style={{ color: '#94a3b8' }}>
+                        {t('paymentTrust.addFormDisclaimer', 'By saving, you agree to our Terms of Service. Your card will only be charged when you win and confirm a purchase.')}
+                      </p>
                     </CardContent>
                   </Card>
                 )}
@@ -995,6 +1025,7 @@ const AddCardForm = ({ onSuccess, onCancel }) => {
   const stripe = useStripe();
   const elements = useElements();
   const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -1013,13 +1044,13 @@ const AddCardForm = ({ onSuccess, onCancel }) => {
         await axios.post(`${API}/payments/payment-methods`, {
           payment_method_id: paymentMethod.id,
         });
-        toast.success('Payment method added successfully!');
+        toast.success(t('paymentTrust.cardAddedSuccess', 'Payment method added successfully!'));
         onSuccess();
       }
     } catch (error) {
       const detail = error?.response?.data?.detail || error?.message || 'Unknown error';
       console.error('Add payment method failed:', detail, error);
-      toast.error(`Failed to add payment method: ${detail}`);
+      toast.error(`${t('paymentTrust.cardAddFailed', 'Failed to add payment method')}: ${detail}`);
     } finally {
       setLoading(false);
     }
@@ -1046,11 +1077,13 @@ const AddCardForm = ({ onSuccess, onCancel }) => {
         />
       </div>
       <div className="flex gap-2">
-        <Button type="submit" disabled={!stripe || loading} className="flex-1">
-          {loading ? 'Adding...' : 'Add Card'}
+        <Button type="submit" disabled={!stripe || loading} className="flex-1" data-testid="save-card-securely-btn">
+          {loading
+            ? t('paymentTrust.savingCard', 'Saving…')
+            : <>{t('paymentTrust.saveCardBtn', 'Save Card Securely')} <span aria-hidden>→</span></>}
         </Button>
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          {t('common.cancel', 'Cancel')}
         </Button>
       </div>
     </form>

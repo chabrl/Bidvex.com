@@ -27,6 +27,39 @@ logger = logging.getLogger(__name__)
 
 marketplace_router = APIRouter(tags=["Marketplace"])
 
+# iter217 Bug 10 — Province / city normalization for location filters.
+# Frontend may send the full name ("Quebec"), the abbreviation ("QC"),
+# or a localised variant; data may be stored either way.
+_PROVINCE_ALIASES = {
+    "qc": "qc", "quebec": "qc", "québec": "qc",
+    "on": "on", "ontario": "on",
+    "bc": "bc", "british columbia": "bc", "colombie-britannique": "bc",
+    "ab": "ab", "alberta": "ab",
+    "mb": "mb", "manitoba": "mb",
+    "sk": "sk", "saskatchewan": "sk",
+    "ns": "ns", "nova scotia": "ns", "nouvelle-écosse": "ns",
+    "nb": "nb", "new brunswick": "nb", "nouveau-brunswick": "nb",
+    "nl": "nl", "newfoundland and labrador": "nl", "newfoundland": "nl", "terre-neuve-et-labrador": "nl",
+    "pe": "pe", "prince edward island": "pe", "île-du-prince-édouard": "pe",
+    "yt": "yt", "yukon": "yt",
+    "nt": "nt", "northwest territories": "nt", "territoires du nord-ouest": "nt",
+    "nu": "nu", "nunavut": "nu",
+}
+
+
+def _normalize_region(v):
+    if not v:
+        return ""
+    key = str(v).strip().lower()
+    return _PROVINCE_ALIASES.get(key, key)
+
+
+def _normalize_city(v):
+    if not v:
+        return ""
+    return str(v).strip().lower().replace("é", "e").replace("è", "e").replace("ê", "e")
+
+
 _db = None
 _db_read = None
 
@@ -372,7 +405,9 @@ async def get_marketplace_items(
         if regions:
             region_list.extend([r.strip() for r in regions.split(",") if r.strip()])
         if region_list:
-            items = [i for i in items if i.get("region") in region_list]
+            # iter217 — case-insensitive + trim; also accept synonyms ("Quebec"/"QC").
+            norm_set = {_normalize_region(r) for r in region_list if r}
+            items = [i for i in items if _normalize_region(i.get("region") or i.get("province")) in norm_set]
     if city or cities:
         city_list = []
         if city:
@@ -380,7 +415,9 @@ async def get_marketplace_items(
         if cities:
             city_list.extend([c.strip() for c in cities.split(",") if c.strip()])
         if city_list:
-            items = [i for i in items if i.get("city") in city_list]
+            norm_cities = {_normalize_city(c) for c in city_list if c}
+            items = [i for i in items if _normalize_city(i.get("city")) in norm_cities
+                     or any(_normalize_city(c) in _normalize_city(i.get("location") or "") for c in city_list)]
     if seller_id:
         seller_ids = [s.strip() for s in seller_id.split(",") if s.strip()]
         items = [i for i in items if i.get("seller_id") in seller_ids]
@@ -393,7 +430,8 @@ async def get_marketplace_items(
     if condition:
         items = [i for i in items if i.get("condition") == condition]
     if province:
-        items = [i for i in items if i.get("region") == province or i.get("province") == province]
+        norm_prov = _normalize_region(province)
+        items = [i for i in items if _normalize_region(i.get("region") or i.get("province")) == norm_prov]
     if no_taxes and no_taxes.lower() == 'true':
         items = [i for i in items if not i.get("seller_is_business") and not i.get("seller_is_tax_registered")]
 

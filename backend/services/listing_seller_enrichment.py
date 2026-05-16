@@ -128,12 +128,55 @@ def enrich_listing_with_seller(
     return listing
 
 
+async def enrich_listings_bulk_async(
+    db,
+    listings,
+    listing_context: str = "general",
+):
+    """iter217 — Bulk enrich a list of listing dicts in ONE round-trip to MongoDB.
+
+    Walks all unique seller_ids, batch-loads their User docs, then applies
+    `enrich_listing_with_seller` to each listing. Same field shape as the
+    single-doc helper.
+    """
+    if not listings:
+        return listings
+    seller_ids = {l.get("seller_id") for l in listings if l and l.get("seller_id")}
+    sellers_by_id = {}
+    if seller_ids:
+        cursor = db.users.find(
+            {"id": {"$in": list(seller_ids)}},
+            {
+                "_id": 0,
+                "id": 1,
+                "is_partner": 1,
+                "partner_verification_status": 1,
+                "partner_company_name": 1,
+                "partner_buyer_premium_pct": 1,
+                "is_vehicle_dealer": 1,
+                "is_storage_facility": 1,
+                "is_tax_registered": 1,
+                "account_type": 1,
+                "subscription_tier": 1,
+                "platform_fee_paid": 1,
+                "partner_subscription_active": 1,
+            },
+        )
+        async for s in cursor:
+            sellers_by_id[s["id"]] = s
+    for listing in listings:
+        seller = sellers_by_id.get(listing.get("seller_id"), {})
+        enrich_listing_with_seller(listing, seller, listing_context)
+    return listings
+
+
+
 async def enrich_listing_async(
     db,
     listing: Dict[str, Any],
     listing_context: str = "general",
 ) -> Dict[str, Any]:
-    """Convenience wrapper: fetch the seller doc from MongoDB and enrich."""
+    """Convenience wrapper: fetch the seller doc from MongoDB and enrich one listing."""
     if not listing:
         return listing
     seller_id = listing.get("seller_id")

@@ -1154,6 +1154,25 @@
   "storageCreate": {
     "legalNoticeConfirm": "I confirm this unit has gone through the required legal-notification process and its contents may be auctioned under the relevant provincial law."
   },
+  "paymentTrust": {
+    "heading": "Why we ask for a payment method",
+    "body": "Adding a card does NOT mean we will charge you. Your card is used solely to:",
+    "reason1": "Verify you are a real person",
+    "reason2": "Protect our community from fraud & scams",
+    "reason3": "Enable secure bidding when you win",
+    "reason4": "Process payment only if you win an auction and confirm your purchase",
+    "footer": "You will NEVER be charged without your explicit confirmation. You can remove your card at any time.",
+    "stripeBadge": "Secured by Stripe — PCI DSS compliant",
+    "stripeSubcopy": "BidVex never stores your full card number.",
+    "addFormLabel": "Enter your card details — you will not be charged now.",
+    "saveCardBtn": "Save Card Securely",
+    "savingCard": "Saving…",
+    "addFormDisclaimer": "By saving, you agree to our Terms of Service. Your card will only be charged when you win and confirm a purchase.",
+    "savedCardExplain": "This card is used for bid security verification only. You will be notified before any charge.",
+    "savedAddedOn": "Added on {{date}}",
+    "removeCardBtn": "Remove Card",
+    "phoneExplain": "We send a one-time code to confirm your number. This helps prevent fake accounts."
+  },
   "lotsMarketplace": {
     "title": "Lots Marketplace",
     "subtitle": "Browse multi-item auction lots",

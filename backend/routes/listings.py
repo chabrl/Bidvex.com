@@ -488,6 +488,13 @@ async def get_listings(
             listing["created_at"] = datetime.fromisoformat(listing["created_at"])
         if isinstance(listing.get("auction_end_date"), str):
             listing["auction_end_date"] = datetime.fromisoformat(listing["auction_end_date"])
+
+    # iter217 — Bulk seller enrichment so listing cards can render Partner /
+    # Dealer / Storage / Private-Sale badges. Lot-synthesised items inherit
+    # their parent auction's seller_id so this works for them too.
+    from services.listing_seller_enrichment import enrich_listings_bulk_async
+    await enrich_listings_bulk_async(db, listings)
+
     return [Listing(**listing) for listing in listings]
 
 
@@ -812,10 +819,26 @@ async def get_multi_item_listings(
 
     if category:
         query["category"] = category
+    # iter217 Bug 10 — Case-insensitive region match using a regex (works
+    # for cached docs that stored "QC" while the UI sends "Quebec" or vice versa).
     if region:
-        query["region"] = region
+        from routes.marketplace import _normalize_region, _PROVINCE_ALIASES
+        norm = _normalize_region(region)
+        synonyms = sorted({k for k, v in _PROVINCE_ALIASES.items() if v == norm} | {norm}) if norm else [region]
+        query["$or"] = [
+            {"region": {"$in": [s for s in synonyms] + [s.upper() for s in synonyms]}},
+            {"province": {"$in": [s for s in synonyms] + [s.upper() for s in synonyms]}},
+        ]
     if city:
-        query["city"] = city
+        from routes.marketplace import _normalize_city as _nc
+        # Use a case-insensitive regex on `city` AND `location` so partial match works.
+        try:
+            from re import escape as _re_escape
+            cre = {"$regex": _re_escape(city), "$options": "i"}
+            query["$and"] = (query.get("$and") or []) + [{"$or": [{"city": cre}, {"location": cre}]}]
+            _ = _nc(city)  # avoid unused import
+        except Exception:
+            query["city"] = city
     if currency:
         query["currency"] = currency
 
@@ -845,6 +868,10 @@ async def get_multi_item_listings(
     for listing in listings:
         from services.listings_service import parse_listing_dates
         parse_listing_dates(listing)
+
+    # iter217 — Bulk seller enrichment for badge display on cards.
+    from services.listing_seller_enrichment import enrich_listings_bulk_async
+    await enrich_listings_bulk_async(db, listings)
 
     logger.info(f"[multi-item] Processed, returning {len(listings)} listings")
 

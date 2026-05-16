@@ -1154,6 +1154,25 @@
   "storageCreate": {
     "legalNoticeConfirm": "Je confirme que cette unité a fait l'objet du processus de notification légale requis et que son contenu peut être mis aux enchères en vertu de la loi provinciale applicable."
   },
+  "paymentTrust": {
+    "heading": "Pourquoi nous demandons un mode de paiement",
+    "body": "L'ajout d'une carte ne signifie PAS que nous allons vous facturer. Votre carte est utilisée uniquement pour :",
+    "reason1": "Vérifier que vous êtes une vraie personne",
+    "reason2": "Protéger notre communauté contre la fraude et les arnaques",
+    "reason3": "Permettre des enchères sécurisées si vous remportez une vente",
+    "reason4": "Traiter le paiement uniquement si vous gagnez et confirmez votre achat",
+    "footer": "Vous ne serez JAMAIS facturé sans votre confirmation explicite. Vous pouvez retirer votre carte à tout moment.",
+    "stripeBadge": "Sécurisé par Stripe — Conforme PCI DSS",
+    "stripeSubcopy": "BidVex ne stocke jamais votre numéro de carte complet.",
+    "addFormLabel": "Saisissez les détails de votre carte — vous ne serez pas facturé maintenant.",
+    "saveCardBtn": "Enregistrer la carte en toute sécurité",
+    "savingCard": "Enregistrement…",
+    "addFormDisclaimer": "En enregistrant, vous acceptez nos Conditions d'utilisation. Votre carte ne sera débitée que lorsque vous remporterez et confirmerez un achat.",
+    "savedCardExplain": "Cette carte est utilisée uniquement pour la vérification de sécurité des enchères. Vous serez notifié avant tout débit.",
+    "savedAddedOn": "Ajoutée le {{date}}",
+    "removeCardBtn": "Retirer la carte",
+    "phoneExplain": "Nous envoyons un code unique pour confirmer votre numéro. Cela aide à prévenir les faux comptes."
+  },
   "lotsMarketplace": {
     "title": "Marché des lots",
     "subtitle": "Parcourez les enchères multi-articles",

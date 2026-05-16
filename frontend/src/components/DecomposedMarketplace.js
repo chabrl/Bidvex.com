@@ -6,6 +6,7 @@ import { Badge } from './ui/badge';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import BuyNowButton from './BuyNowButton';
+import { SellerAccountBadge } from './PrivateSaleBadge';
 import { 
   Clock, 
   Gavel, 
@@ -208,15 +209,18 @@ const DecomposedMarketplace = () => {
                 </div>
               )}
 
-              {/* Private Sale Badge - for individual sellers */}
-              {!item.seller_is_business && (
-                <div className="absolute top-2 left-2 z-10">
-                  <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 text-xs">
-                    <User className="h-3 w-3 mr-1" />
-                    Private Sale
-                  </Badge>
-                </div>
-              )}
+              {/* iter217 — Seller-account badge (Partner / Dealer / Storage / Private) */}
+              <div className="absolute top-2 left-2 z-10">
+                <SellerAccountBadge
+                  accountType={item.seller_account_type
+                    || (item.seller_is_partner ? 'partner'
+                      : item.seller_is_vehicle_dealer ? 'vehicle_dealer'
+                      : item.seller_is_storage_facility ? 'storage_facility'
+                      : (item.seller_is_business ? 'business' : 'individual'))}
+                  companyName={item.seller_partner_company_name}
+                  variant="compact"
+                />
+              </div>
 
               {/* Image */}
               <Link

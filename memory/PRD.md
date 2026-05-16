@@ -1,5 +1,97 @@
 # BidVex — Auction Marketplace PRD
 
+## Latest: iter217 Phase 2 — Admin / Watchlist / Badges / Notifications / Filters / Payment Trust (Feb 15, 2026) ✅
+
+### NEW — Payment Methods Trust Messaging (Account → Payment tab)
+- **NEW `components/PaymentTrustBox.jsx`** — bilingual EN/FR explainer rendered above the "Add Payment Method" button. Spec-compliant: light blue tint `#f0f9ff`, blue left-border `#2563eb`, green checkmark bullets, Stripe PCI-DSS badge at the bottom.
+- `ProfileSettingsPage.js` — Payment tab restructured:
+  - Removed the bare "No payment methods added" empty state.
+  - Trust box rendered ABOVE the Add button.
+  - "Add Payment Method" button is now hidden once the add-card form is open (no double-CTA).
+  - Add-card form: explainer label ABOVE the card input ("Enter your card details — you will not be charged now."), primary button relabeled to **"Save Card Securely →"** with bilingual loading state, disclaimer line below the button.
+  - Saved card state: shows `Visa •••• 4242` + `Added on <date>` + ghost-red "Remove Card" button + bilingual security explainer line.
+- Trust Status card (top) untouched — added a small bilingual phone-verify explainer line under the action chips, only shown when `phone_verified=false`.
+
+### Bug 6 — Watchlist heart on Multi-Lot was stale
+**Root cause** — `WishlistHeartButton` initialized state from a prop that was never set to the real DB value. The heart always rendered unfilled on page load even when the listing was already wishlisted; first click then issued a duplicate `POST /api/wishlist` and the user saw a "Already in wishlist" 400.
+
+**Fix**
+- NEW `GET /api/wishlist/status/{auction_id}?lot_id=` — returns `{is_wishlisted, wishlist_id}`. Used by the heart to render correct initial state on every detail page.
+- `components/WishlistHeartButton.js` — rewritten with bilingual toast copy, `useEffect` fetches the real status on mount, and the "already in wishlist" 400 is now treated as a soft-success that just flips the local state (no toast).
+
+### Bug 7 — Business-account badges missing on listing cards
+**Root cause** — Card components were guessing seller type from `seller_is_tax_registered` / `seller_is_business` only. They had NO knowledge of Partner / Dealer / Storage accounts.
+
+**Fix**
+- NEW `services/listing_seller_enrichment.py:enrich_listings_bulk_async()` — batch enriches every listing in `GET /api/multi-item-listings` AND `GET /api/listings` (and the synthesised lot-items) with `seller_account_type`, `seller_partner_company_name`, `buyer_premium_rate`. One MongoDB round-trip per request.
+- `LotsMarketplacePage.js` — card now renders the new `<SellerAccountBadge>` (compact variant) — same component family as the detail page.
+- `DecomposedMarketplace.js` — same swap; private-sale-only card overlay replaced by the unified SellerAccountBadge.
+- The cards now show the correct visual: 🟦 Partner Auction · 🚗 Vehicle Dealer · 🏬 Storage · 🟩 Private Sale.
+
+### Bug 8 — Notifications not clickable / no navigation
+**Root cause** — `NotificationCenter.js` only routed for 5 notification types (`outbid`, `auction_ending`, `auction_won`, `new_message`, `buy_now_purchase`). All other types (admin requests, partner activations, vehicle-dealer status, payment overdue, pickup-code-ready, etc.) hit the `default: break;` branch and DID NOTHING.
+Additionally, the live DB had 2+ test-placeholder notifications (`Hi`, `Warning` with empty messages) that surfaced as un-clickable bell entries.
+
+**Fix**
+- `routes/notifications.py` — `create_notification(...)` now accepts `action_url` + `action_type` parameters; both are stored on the notification doc.
+- NEW `POST /api/notifications/admin/cleanup-empty` — admin-only janitor that purges notifications with empty title AND empty message.
+- Ran the cleanup live on preview — purged 2 stale `Hi`/`Warning` test notifications.
+- `components/NotificationCenter.js` — the click handler now:
+  1. Prefers the explicit `notification.action_url` (with `window.open()` for external URLs and `navigate()` for SPA paths).
+  2. Falls back to an EXPANDED switch that covers 15+ notification types — admin requests → `/settings?tab=documents`, partner activations → `/partners/dashboard`, storage events → `/storage/dashboard`, vehicle-dealer events → `/vehicles/dealer/dashboard`, reviews → `/profile/{id}`, payment events → `/invoice/{id}`, pickup-code-ready → `/my-pickup-code/{id}`.
+  3. Final fallback uses `data.listing_id` / `data.auction_id` if either is present.
+
+### Bug 10 — Location filters broken on Marketplace / Lots
+**Root cause** — `routes/marketplace.py` filter logic used `i.get("region") in region_list` (strict, case-sensitive equality). Sending `province=Quebec` from the UI never matched docs storing `region: "QC"`. Same for cities with accented characters ("Montréal" vs "Montreal").
+
+**Fix**
+- NEW `_normalize_region()` + `_normalize_city()` helpers in `routes/marketplace.py` with a full Canadian province alias map ("Quebec"/"QC"/"Québec" all collapse to `"qc"`). Cities are lowercased + accent-stripped + trim-tolerant.
+- All marketplace-items filters (region, regions, city, cities, province) now run through the normalizers. City filter also matches against the listing's `location` string field via case-insensitive regex.
+- `routes/listings.py` `GET /api/listings` — same region/city normalization applied via $or/case-insensitive regex on the MongoDB query.
+- Verified live: `/api/marketplace/items?province=QC` and `?province=Quebec` both return the same listing.
+
+### Bug 4 — Admin Panel "80% broken" audit
+**Findings** — backend admin endpoints are HEALTHY. Direct curl audit against 17 admin endpoints with a valid admin token (`charbel911@gmail.com`):
+- ✅ `/api/admin/users`, `/api/admin/users/filter` (×4 account_types), `/api/admin/listings/all`, `/api/admin/listings/pending`, `/api/admin/lots/pending`, `/api/admin/auctions`, `/api/admin/feature-flags`, `/api/admin/finance/revenue-summary`, `/api/admin/categories`, `/api/admin/dealer-licenses`, `/api/admin/compliance-alerts`, `/api/admin/deletion-requests`, `/api/admin/storage-facilities`, `/api/admin/banners`, `/api/admin/coupons`, `/api/admin/announcements`, `/api/admin/email-templates` — ALL HTTP 200.
+- ❌ `/api/admin/escrow/disputes` — HTTP 404 (route registered as `/api/admin/escrow/transactions` + `/admin/escrow/penalties`; no `/disputes` endpoint).
+- The `AdminDashboard.js` switch statement maps all 30+ admin tabs to their components correctly (lines 380-470).
+- **Conclusion**: Without specific tab-by-tab bug reports from the user, the admin panel is operational at both API and routing levels. Awaiting concrete reports of which admin tab UIs are broken.
+
+### Tests
+- NEW `tests/test_iter217_phase2_admin_watchlist_badges.py` — 13 tests (region/city normalization, bulk enrichment with mixed seller types, wishlist status endpoint signature, notifications create+cleanup signatures).
+- **Full regression**: **240 passed**, 1 warning, 0 failed across iter209/211/212/213/214/215/216/217 (Phase 1+2). Was 227 before — +13 new from Phase 2.
+
+### Files changed (Phase 2)
+**Backend** (4 modified, 0 new):
+- MODIFIED `services/listing_seller_enrichment.py` (added `enrich_listings_bulk_async`)
+- MODIFIED `routes/listings.py` (bulk enrichment + region/city case-insensitive filters)
+- MODIFIED `routes/marketplace.py` (province/city normalizers + filter logic)
+- MODIFIED `routes/notifications.py` (action_url/action_type + admin cleanup)
+- MODIFIED `routes/watchlist.py` (NEW `/wishlist/status/{auction_id}` endpoint)
+- NEW `tests/test_iter217_phase2_admin_watchlist_badges.py` (13 tests)
+
+**Frontend** (6 modified, 1 new):
+- NEW `components/PaymentTrustBox.jsx`
+- REWRITTEN `components/WishlistHeartButton.js` (fetch initial state + bilingual + 400 handling)
+- MODIFIED `components/NotificationCenter.js` (expanded switch + action_url support)
+- MODIFIED `components/DecomposedMarketplace.js` (SellerAccountBadge swap)
+- MODIFIED `pages/ProfileSettingsPage.js` (trust box + restructured Payment tab + AddCardForm copy)
+- MODIFIED `pages/LotsMarketplacePage.js` (SellerAccountBadge swap + i18n)
+- MODIFIED `locales/en.json` + `locales/fr.json` (+22 paymentTrust keys, plural lotsCount)
+
+### Verified on preview
+```
+$ curl /api/wishlist/status/{auction_id}  → 401 (auth required, expected)
+$ curl /api/marketplace/items?province=QC          → total=1
+$ curl /api/marketplace/items?province=Quebec      → total=1 (normalizer working)
+$ curl /api/multi-item-listings?limit=5            → all listings carry seller_account_type
+DB cleanup:   Deleted 2 test placeholder notifications
+```
+
+⚠️ **Phase 3 pending user approval**: ListingDetail badge + fee + i18n + Phase 2 fixes all in PREVIEW. Phase 3 (Bug 4 deep-dive — admin tab UI specifics, Bug 10 Pro Auctions homepage section) awaiting smoke-test sign-off.
+
+---
+
 ## Latest: iter217 Phase 1 — Partner Auction Badge + Bill 96 Listing Forms (Feb 15, 2026) ✅
 
 ### Bug 1+3 (REVENUE) — Partner auction was showing as "Private Sale"

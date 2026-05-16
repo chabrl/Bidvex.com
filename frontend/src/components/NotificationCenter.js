@@ -173,18 +173,34 @@ const NotificationCenter = () => {
     // Navigate based on notification type
     const data = notification.data || {};
     setIsOpen(false);
-    
+
+    // iter217 Bug 8 — Universal navigation: prefer the explicit action_url
+    // set by the backend; fall back to type-based routing.
+    const explicitUrl = notification.action_url;
+    if (explicitUrl && typeof explicitUrl === 'string' && explicitUrl.length > 0) {
+      if (/^https?:\/\//i.test(explicitUrl)) {
+        window.open(explicitUrl, '_blank', 'noopener,noreferrer');
+      } else {
+        navigate(explicitUrl);
+      }
+      return;
+    }
+
     switch (notification.type) {
       case 'outbid':
       case 'auction_ending':
       case 'auction_won':
+      case 'auction_lost':
+      case 'auction_ended_no_bids':
+      case 'auction_sold':
         if (data.listing_id) {
           navigate(`/listing/${data.listing_id}`);
-        } else if (data.auction_id) {
-          navigate(`/multi-item-listing/${data.auction_id}`);
+        } else if (data.multi_item_listing_id || data.auction_id) {
+          navigate(`/lots/${data.multi_item_listing_id || data.auction_id}`);
         }
         break;
       case 'new_message':
+      case 'message_received':
         if (data.conversation_id) {
           navigate(`/messages?conversation=${data.conversation_id}`);
         } else {
@@ -195,11 +211,57 @@ const NotificationCenter = () => {
         if (data.conversation_id) {
           navigate(`/messages?conversation=${data.conversation_id}`);
         } else if (data.auction_id) {
-          navigate(`/multi-item-listing/${data.auction_id}`);
+          navigate(`/lots/${data.auction_id}`);
+        }
+        break;
+      case 'admin_rejection':
+      case 'admin_document_request':
+      case 'admin_general':
+      case 'admin_notification':
+      case 'document_request':
+        // Direct to settings → documents tab where users can re-upload / respond.
+        navigate('/settings?tab=documents');
+        break;
+      case 'partner_activated':
+      case 'partner_approved':
+        navigate('/partners/dashboard');
+        break;
+      case 'storage_facility_verified':
+      case 'storage_facility_rejected':
+        navigate('/storage/dashboard');
+        break;
+      case 'vehicle_dealer_approved':
+      case 'vehicle_dealer_rejected':
+        navigate('/vehicles/dealer/dashboard');
+        break;
+      case 'new_review':
+        if (data.target_user_id) {
+          navigate(`/profile/${data.target_user_id}`);
+        } else {
+          navigate('/settings?tab=reviews');
+        }
+        break;
+      case 'payment_overdue':
+      case 'invoice_issued':
+      case 'invoice_paid':
+        if (data.transaction_id || data.invoice_id) {
+          navigate(`/invoice/${data.transaction_id || data.invoice_id}`);
+        } else {
+          navigate('/orders');
+        }
+        break;
+      case 'pickup_code_ready':
+        if (data.transaction_id) {
+          navigate(`/my-pickup-code/${data.transaction_id}`);
+        } else {
+          navigate('/orders');
         }
         break;
       default:
-        // No navigation for system notifications
+        // Fallback — if a listing_id or auction_id is present anywhere on the
+        // notification payload, navigate to it; otherwise stay put.
+        if (data.listing_id) navigate(`/listing/${data.listing_id}`);
+        else if (data.auction_id) navigate(`/lots/${data.auction_id}`);
         break;
     }
   };

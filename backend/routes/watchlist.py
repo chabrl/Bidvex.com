@@ -320,3 +320,20 @@ async def get_user_wishlist(current_user: User = Depends(get_current_user)):
     except Exception as e:
         logger.error(f"Error fetching wishlist: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch wishlist")
+
+
+@watchlist_router.get("/wishlist/status/{auction_id}")
+async def get_wishlist_status(
+    auction_id: str,
+    lot_id: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+):
+    """iter217 — Returns whether the current user has THIS specific
+    auction (and optionally lot) saved. Lets the heart icon render the
+    correct initial filled/unfilled state on every detail page."""
+    db = get_db()
+    query = {"user_id": current_user.id, "auction_id": auction_id}
+    if lot_id:
+        query["lot_id"] = lot_id
+    item = await db.wishlist.find_one(query, {"_id": 0})
+    return {"is_wishlisted": bool(item), "wishlist_id": item.get("id") if item else None}

@@ -18,6 +18,7 @@ import { formatCurrency, formatListingPrice } from '../utils/currencyFormatter';
 import { getLocalized } from '../utils/localization';
 import { SellerRatingInline } from '../components/SellerReputation';
 import { LoadingTimeout } from '../components/LoadingTimeout';
+import { SellerAccountBadge } from '../components/PrivateSaleBadge';
 
 import FilterBar from '../components/FilterBar/FilterBar';
 
@@ -85,7 +86,14 @@ const LotsMarketplacePage = () => {
   }, [listings]);
 
   const renderListingCard = (listing) => {
-    const isPrivateSale = !listing.seller_is_tax_registered;
+    // iter217 — Read from the enriched seller_account_type (set by the backend GET).
+    // Fallback path supports old cached payloads that don't have the new fields yet.
+    const acctType = listing.seller_account_type
+      || (listing.seller_is_partner ? 'partner'
+        : listing.seller_is_vehicle_dealer ? 'vehicle_dealer'
+        : listing.seller_is_storage_facility ? 'storage_facility'
+        : (listing.seller_is_business || listing.seller_is_tax_registered ? 'business' : 'individual'));
+    const isPrivateSale = acctType === 'individual';
     const firstLot = listing.lots?.[0];
     const imageUrl = firstLot?.images?.[0] || listing.lots?.find(l => l.images?.length > 0)?.images?.[0];
 
@@ -109,19 +117,23 @@ const LotsMarketplacePage = () => {
             {listing.is_verified_firm && <VerifiedBadge />}
             {listing.is_featured && (
               <Badge className="bg-orange-500 text-white border-0 shadow-lg">
-                <Star className="h-3 w-3 mr-1 fill-white" /> FEATURED
+                <Star className="h-3 w-3 mr-1 fill-white" /> {t('marketplace.featured', 'FEATURED')}
               </Badge>
             )}
-            {isPrivateSale ? (
-              <Badge className="bg-green-500 text-white border-0 shadow-lg">Private Sale</Badge>
-            ) : (
+            {/* iter217 — seller-account badge (Partner / Dealer / Storage / Private) */}
+            <SellerAccountBadge
+              accountType={acctType === 'business' ? 'individual' : acctType}
+              companyName={listing.seller_partner_company_name}
+              variant="compact"
+            />
+            {acctType === 'business' && (
               <Badge className="bg-blue-600 text-white border-0 shadow-lg">
-                <Building2 className="h-3 w-3 mr-1" /> Business
+                <Building2 className="h-3 w-3 mr-1" /> {t('sellerBadge.businessSeller', 'Business Seller')}
               </Badge>
             )}
           </div>
           <Badge className="absolute top-3 right-3 bg-slate-900/80 text-white border-0" style={{ color: '#ffffff' }}>
-            <Package className="h-3 w-3 mr-1" /> {listing.total_lots} Lots
+            <Package className="h-3 w-3 mr-1" /> {t('listingDetail.lotsCount', { count: listing.total_lots, defaultValue: '{{count}} Lots' })}
           </Badge>
           <div className="absolute bottom-3 left-3 bg-slate-900/80 backdrop-blur text-white px-3 py-1.5 rounded-full text-sm flex items-center gap-2">
             <Clock className="h-3.5 w-3.5" style={{ color: '#fbbf24' }} />
@@ -150,7 +162,7 @@ const LotsMarketplacePage = () => {
           </div>
           {isPrivateSale && (
             <div className="rounded-lg px-3 py-2 text-xs mb-3" style={{ backgroundColor: '#dcfce7', border: '1px solid #86efac' }}>
-              <span style={{ color: '#15803d', fontWeight: 500 }}>Save ~15% - No tax on item price!</span>
+              <span style={{ color: '#15803d', fontWeight: 500 }}>{t('sellerBadge.privateSaveTax', 'Save ~15% on Taxes!')}</span>
             </div>
           )}
           <div className="flex items-center justify-between">
@@ -167,7 +179,7 @@ const LotsMarketplacePage = () => {
         <CardFooter className="p-4 pt-0 flex gap-2">
           <Link to={`/lots/${listing.id}`} className="flex-1">
             <Button className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 text-white hover:from-blue-700 hover:to-cyan-600">
-              <Eye className="h-4 w-4 mr-2" /> View Auction
+              <Eye className="h-4 w-4 mr-2" /> {t('marketplace.viewAuction', 'View Auction')}
             </Button>
           </Link>
         </CardFooter>
