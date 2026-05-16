@@ -219,3 +219,59 @@ class TestQuebecBill96Validator:
             description="Propre", description_fr=None,
             region="QC", content_language="fr",
         )
+
+    # ── Phase 5 Hotfix v2 — Heuristic relaxation tests ────────────────
+    def test_french_accent_in_title_waives_title_fr_requirement(self):
+        """Title with French accent (é) should be accepted on QC listing
+        even when content_language='en' and title_fr is missing."""
+        from services.qc_bilingual_validator import _looks_french
+        assert _looks_french("Vélos de montagne") is True
+        # Validator must NOT raise.
+        assert_qc_bilingual_titles(
+            title="Vélos de montagne usagés", title_fr=None,
+            description=None, description_fr=None,
+            region="QC", content_language="en",
+        )
+
+    def test_french_stopwords_in_title_waives_title_fr_requirement(self):
+        """Title with 'en' + 'cuir' + 'noir' should auto-detect as French
+        — covers the production case 'Banquettes en cuir noir'."""
+        from services.qc_bilingual_validator import _looks_french
+        assert _looks_french("Banquettes en cuir noir") is True
+        assert_qc_bilingual_titles(
+            title="Banquettes en cuir noir", title_fr=None,
+            description=None, description_fr=None,
+            region="QC", content_language="en",
+        )
+
+    def test_english_only_title_still_requires_title_fr(self):
+        """Relaxation must NOT introduce false positives — pure English
+        titles in QC still require a French copy."""
+        from services.qc_bilingual_validator import _looks_french
+        assert _looks_french("Pool table") is False
+        assert _looks_french("Leather couch") is False
+        assert _looks_french("Black car") is False
+        with pytest.raises(HTTPException) as exc:
+            assert_qc_bilingual_titles(
+                title="Black leather couch", title_fr=None,
+                description=None, description_fr=None,
+                region="QC", city="Montreal", content_language="en",
+            )
+        assert exc.value.status_code == 422
+
+    def test_french_description_waives_description_fr_requirement(self):
+        """When both title and description are detectably French, the
+        validator should accept them with no _fr fields supplied."""
+        assert_qc_bilingual_titles(
+            title="Lot d'outils usagés", title_fr=None,
+            description="Lot de 50 outils en parfaite condition.",
+            description_fr=None,
+            region="QC", content_language="en",
+        )
+
+    def test_looks_french_handles_none_and_empty(self):
+        from services.qc_bilingual_validator import _looks_french
+        assert _looks_french(None) is False
+        assert _looks_french("") is False
+        assert _looks_french("   ") is False
+        assert _looks_french(123) is False  # non-string input

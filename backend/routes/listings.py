@@ -154,6 +154,18 @@ async def create_listing(
     from services.stripe_customer_service import validate_payment_method_for_listing
     db = get_db()
 
+    # iter210 Step 5 — Demo accounts cannot place real bids / payments.
+    # Hoisted ABOVE the Bill 96 validator (Phase 5 Hotfix v2) so demo users
+    # get a clear 403 regardless of whether their payload is bilingual —
+    # account status takes precedence over content validation.
+    user_demo_row = await db.users.find_one({"id": current_user.id}, {"_id": 0, "is_demo_account": 1})
+    if user_demo_row and user_demo_row.get("is_demo_account"):
+        raise HTTPException(status_code=403, detail={
+            "error": "demo_mode_payments_disabled",
+            "message_en": "Demo mode — payments disabled. This account is for demonstration purposes only.",
+            "message_fr": "Mode démo — paiements désactivés. Ce compte est uniquement à des fins de démonstration.",
+        })
+
     # iter217 — Quebec Bill 96 compliance — French title required for QC listings
     from services.qc_bilingual_validator import assert_qc_bilingual_titles
     assert_qc_bilingual_titles(
@@ -182,15 +194,6 @@ async def create_listing(
         description=listing_data.description,
         surface="single_listing",
     )
-
-    # iter210 Step 5 — Demo accounts cannot place real bids / payments
-    user_demo_row = await db.users.find_one({"id": current_user.id}, {"_id": 0, "is_demo_account": 1})
-    if user_demo_row and user_demo_row.get("is_demo_account"):
-        raise HTTPException(status_code=403, detail={
-            "error": "demo_mode_payments_disabled",
-            "message_en": "Demo mode — payments disabled. This account is for demonstration purposes only.",
-            "message_fr": "Mode démo — paiements désactivés. Ce compte est uniquement à des fins de démonstration.",
-        })
 
     # Sticky Card Guard: require valid payment method
     await validate_payment_method_for_listing(db, current_user)
@@ -588,6 +591,17 @@ async def create_multi_item_listing(
     )
     from services.stripe_customer_service import validate_payment_method_for_listing
     db = get_db()
+
+    # iter210 Step 5 — Demo accounts cannot place real bids / payments.
+    # Hoisted ABOVE the Bill 96 validator (Phase 5 Hotfix v2) so demo users
+    # get a clear 403 regardless of payload language.
+    user_demo_row = await db.users.find_one({"id": current_user.id}, {"_id": 0, "is_demo_account": 1})
+    if user_demo_row and user_demo_row.get("is_demo_account"):
+        raise HTTPException(status_code=403, detail={
+            "error": "demo_mode_payments_disabled",
+            "message_en": "Demo mode — payments disabled. This account is for demonstration purposes only.",
+            "message_fr": "Mode démo — paiements désactivés. Ce compte est uniquement à des fins de démonstration.",
+        })
 
     # iter217 — Quebec Bill 96 compliance — French title required for QC listings
     from services.qc_bilingual_validator import assert_qc_bilingual_titles
