@@ -869,3 +869,96 @@ class TestCacheService:
         cleared = invalidate_feed_cache()
         assert cleared >= 2
         assert get_cache_size() == 0
+
+
+
+# ────────────────────────────────────────────────────────────────────────
+# 4G — Phase 5 Hotfix v4: S3 service + SafeImage threshold + endpoint wiring
+# ────────────────────────────────────────────────────────────────────────
+class TestS3Service:
+    def test_s3_service_module_imports(self):
+        from services import s3_service
+        # Public API surface
+        assert hasattr(s3_service, "upload_image_to_s3")
+        assert hasattr(s3_service, "upload_base64_to_s3")
+        assert hasattr(s3_service, "delete_s3_image")
+        assert hasattr(s3_service, "is_marketplace_s3_url")
+        assert hasattr(s3_service, "is_base64_image")
+
+    def test_s3_bucket_config_is_marketplace_bucket(self):
+        from services.s3_service import S3_BUCKET, S3_BASE_URL, S3_REGION
+        assert S3_BUCKET == "bidvex-marketplace-images"
+        assert S3_REGION == "us-east-2"
+        assert "bidvex-marketplace-images.s3.us-east-2" in S3_BASE_URL
+        assert S3_BASE_URL.startswith("https://")
+
+    def test_is_marketplace_s3_url_recognizes_own_bucket(self):
+        from services.s3_service import is_marketplace_s3_url
+        assert is_marketplace_s3_url("https://bidvex-marketplace-images.s3.us-east-2.amazonaws.com/listings/foo/00-abc.jpg") is True
+        assert is_marketplace_s3_url("https://other-bucket.s3.amazonaws.com/foo.jpg") is False
+        assert is_marketplace_s3_url("data:image/jpeg;base64,xxx") is False
+        assert is_marketplace_s3_url(None) is False
+        assert is_marketplace_s3_url("") is False
+
+    def test_is_base64_image_detects_data_urls(self):
+        from services.s3_service import is_base64_image
+        assert is_base64_image("data:image/jpeg;base64,/9j/4AAQ" + "a" * 100) is True
+        assert is_base64_image("https://example.com/foo.jpg") is False
+        assert is_base64_image(None) is False
+
+    def test_build_key_strips_path_traversal(self):
+        from services.s3_service import _build_key, _safe_listing_id
+        # Path traversal attempts must be neutralized
+        key = _build_key("../etc/passwd", 0)
+        assert ".." not in key
+        assert "/" in key  # the listings/{id}/{name} structure
+        assert _safe_listing_id("../../etc") == "etc"
+
+    def test_endpoint_constant_limit(self):
+        from routes.listings import LISTING_IMAGES_MAX
+        assert LISTING_IMAGES_MAX == 15
+
+    def test_upload_endpoint_registered(self):
+        from server import app
+        paths = [route.path for route in app.routes]
+        assert "/api/listings/{listing_id}/images" in paths
+
+
+class TestSafeImageThreshold:
+    """The new threshold-based base64 rule from Phase 5 Hotfix v4."""
+
+    def test_safe_image_exposes_threshold_constant(self):
+        src = pathlib.Path("/app/frontend/src/components/SafeImage.jsx").read_text(encoding="utf-8")
+        assert "BASE64_MIN_RENDERABLE_LENGTH" in src
+        assert "5000" in src
+
+    def test_safe_image_short_base64_swapped(self):
+        """Tiny base64 (< threshold) MUST still be swapped to placeholder.
+        This is verified via source-level inspection — the JS implementation
+        gates on `trimmed.length >= BASE64_MIN_RENDERABLE_LENGTH`."""
+        src = pathlib.Path("/app/frontend/src/components/SafeImage.jsx").read_text(encoding="utf-8")
+        assert "trimmed.length >= BASE64_MIN_RENDERABLE_LENGTH" in src
+
+    def test_safe_image_placeholder_url_unchanged(self):
+        src = pathlib.Path("/app/frontend/src/components/SafeImage.jsx").read_text(encoding="utf-8")
+        assert "https://bidvex.com/assets/placeholder-ad.jpg" in src
+
+
+class TestMigrationScript:
+    def test_migration_script_exists(self):
+        p = pathlib.Path("/app/backend/scripts/migrate_base64_images_to_s3.py")
+        assert p.exists()
+
+    def test_migration_supports_all_listing_collections(self):
+        from scripts.migrate_base64_images_to_s3 import ADAPTERS
+        assert set(ADAPTERS.keys()) >= {
+            "listings", "multi_item_listings", "vehicle_listings", "storage_auctions",
+        }
+
+    def test_migration_needs_migration_skips_https(self):
+        from scripts.migrate_base64_images_to_s3 import _needs_migration
+        assert _needs_migration("https://bidvex.com/foo.jpg") is False
+        assert _needs_migration("http://localhost/foo.jpg") is False
+        assert _needs_migration("") is False
+        assert _needs_migration(None) is False
+        assert _needs_migration("data:image/jpeg;base64," + "A" * 1500) is True

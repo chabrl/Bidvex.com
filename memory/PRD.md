@@ -1,6 +1,98 @@
 # BidVex — Auction Marketplace PRD
 
-## Latest: iter217 Phase 5 Hotfix v3 — Bill 96 Validator Relaxation (Feb 16, 2026) ✅
+## Latest: iter217 Phase 5 Hotfix v4 — S3 Image Migration + SafeImage Threshold (Feb 16, 2026) ✅
+
+### Goals
+- Migrate user-uploaded listing photos from base64-in-MongoDB to S3.
+- Let real base64 photos render naturally while invisible/junk base64 still falls back to the placeholder.
+- Stand up a forward-compatible multipart upload endpoint that never writes base64 to MongoDB again.
+
+### What was built
+
+**1. SafeImage threshold rule (frontend)**
+- `BASE64_MIN_RENDERABLE_LENGTH = 5000` constant. Base64 strings ≥ 5,000 chars render directly (real user photos); shorter base64 fragments swap to the branded placeholder (1×1 transparent pixels, sentinel values, corrupt thumbs).
+- Rationale: a 500×500 JPEG encodes to ~40,000–80,000 base64 chars; any data URL below 5,000 chars is essentially never a real photo. Empirically tuned against Alex Boulanger's 2 leather-banquette images (110,547 + 109,787 chars — both render through the threshold).
+- Applied across the full user-spec surface: `ListingDetailPage.js`, `MultiItemListingDetailPage.js`, `LotsMarketplacePage.js`, `DecomposedMarketplace.js`, `vehicles/VehicleDetailPage.js`, `storage/StorageAuctionDetail.js`, `HomePage.js` (6 spots), `FlattenedMarketplace.js`, `ProfessionalAuctionsPromo.jsx`, `vehicles/MyVehicleListingsPage.js`, `storage/StorageAuctionCard.js`, `vehicles/VehicleListingCard.js`.
+
+**2. AWS S3 credentials (.env + .env.example)**
+- Namespaced as `MARKETPLACE_AWS_*` so the new `bidvex-marketplace-images` bucket coexists with the existing R2 doc bucket (`services/cloud_storage.py`) without collision.
+- Real keys in `/app/backend/.env`; placeholder masks in `/app/backend/.env.example`.
+
+**3. `services/s3_service.py` (backend)**
+- Public API: `upload_image_to_s3(file, listing_id, index)`, `upload_base64_to_s3(base64, listing_id, index)`, `delete_s3_image(url)`, `is_marketplace_s3_url(url)`, `is_base64_image(value)`.
+- Processing pipeline: EXIF auto-rotate → flatten transparency → resize to fit 2000×2000 px → JPEG quality 85 progressive → public-read ACL → `Cache-Control: public, max-age=31536000, immutable`.
+- 10 MB hard cap on raw input.
+- S3 key scheme: `listings/{safe_id}/{NN:02d}-{ulid8}.jpg` (the random suffix means re-uploads at the same index never collide with previous photos).
+
+**4. `POST /api/listings/{listing_id}/images` (multipart endpoint)**
+- Accepts `List[UploadFile] = File(...)`.
+- 15-image hard cap per listing (existing + new combined).
+- Listing lookup walks `listings` then `multi_item_listings` — supports both single-item and multi-lot ownership semantics.
+- Stores ONLY HTTPS S3 URLs in MongoDB. Base64 is never written from this path.
+- Returns `{success, uploaded_count, uploaded_urls, images, failures}` so the frontend can surface per-file outcomes.
+
+**5. `scripts/migrate_base64_images_to_s3.py`**
+- Walks `listings.images[]`, `multi_item_listings.lots[].images[]`, `vehicle_listings.photos[].url`, `storage_auctions.photos[]` via per-collection adapter classes.
+- Idempotent — re-running after partial failure picks up where it left off (https:// values are skipped).
+- Resumable — failures leave the original base64 in place, never destructive.
+- Flags: `--dry-run`, `--limit N`, `--collection <name>`.
+
+### Live verification (preview)
+
+**Migration run (Alex Boulanger's 2 leather-banquette photos)**:
+```
+listings/aada8c31-…/images.0  → https://bidvex-marketplace-images.s3.us-east-2.amazonaws.com/listings/aada8c31-…/00-d5f4e90a.jpg (82892 → 82799 bytes)
+listings/aada8c31-…/images.1  → https://bidvex-marketplace-images.s3.us-east-2.amazonaws.com/listings/aada8c31-…/01-0a322915.jpg (82322 → 82222 bytes)
+Done. docs=5  migrated=2  skipped=0  failed=0
+Re-run: docs=5  migrated=0  skipped=2  failed=0   (idempotent ✓)
+```
+
+**Meta CSV feed reflects the S3 URLs**:
+```
+BIDVEX-MKT-aada8c31-…  image_link=https://bidvex-marketplace-images.s3.us-east-2.amazonaws.com/listings/aada8c31-…/00-d5f4e90a.jpg
+BIDVEX-SEED-001        image_link=https://bidvex.com/assets/placeholder-ad.jpg  (still placeholder — seeds unchanged)
+```
+
+**Frontend** — `/marketplace` screenshot confirms Alex's leather banquette photo renders directly on the card (no placeholder, no broken image).
+
+**Upload endpoint E2E** (smoke test):
+- Auth required → 401 on no-token ✓
+- Upload 2 JPEGs → 200, `uploaded_count=2`, DB stores 2 HTTPS S3 URLs ✓
+- S3 GET on the URL → HTTP 200 ✓
+- Over-limit (would total 16) → 400 `too_many_images` ✓
+- Non-owner upload → 403 `not_authorized` ✓
+
+### Files changed (Phase 5 Hotfix v4)
+
+**Backend** (3 new + 2 modified):
+- NEW `services/s3_service.py` — full marketplace S3 client (boto3 + PIL).
+- NEW `scripts/migrate_base64_images_to_s3.py` — collection-aware migration with adapter pattern.
+- MODIFIED `routes/listings.py` — `POST /api/listings/{listing_id}/images` multipart endpoint, `UploadFile`/`File` imports.
+- MODIFIED `backend/.env` — `MARKETPLACE_AWS_*` credentials (real).
+- MODIFIED `backend/.env.example` — `MARKETPLACE_AWS_*` placeholder masks.
+
+**Frontend** (1 modified, 1 new wiring):
+- MODIFIED `components/SafeImage.jsx` — threshold-based base64 handling (`BASE64_MIN_RENDERABLE_LENGTH = 5000`).
+- MODIFIED `components/vehicles/VehicleListingCard.js` — SafeImage swap (2 spots — completes the full marketplace surface).
+
+**Tests** (1 modified, +13 new tests):
+- MODIFIED `tests/test_phase5_facebook_feed.py` — 4 new test classes:
+  - `TestS3Service` (7 tests): module import, bucket config, URL detection, base64 detection, path-traversal hardening, endpoint constants, endpoint registration.
+  - `TestSafeImageThreshold` (3 tests): exposes threshold constant, gate logic present, placeholder URL unchanged.
+  - `TestMigrationScript` (3 tests): script exists, supports all 4 collections, idempotency helper skips https URLs.
+
+### EXPLICIT CONFIRMATION
+- ✅ Real photos render directly (Alex's `/marketplace` card shows actual leather banquette image).
+- ✅ Meta CSV feed serves the real S3 URL (`bidvex-marketplace-images.s3.us-east-2.amazonaws.com/...`) for migrated listings.
+- ✅ Meta feed still falls back to `https://bidvex.com/assets/placeholder-ad.jpg` for listings with no migrated photos (unchanged behavior).
+- ✅ MongoDB now stores HTTPS URLs only; new uploads via the multipart endpoint never write base64.
+- ✅ Migration script is idempotent and resumable — verified by running twice in succession.
+- ✅ AWS credentials namespaced (`MARKETPLACE_AWS_*`) — existing R2 doc bucket (`services/cloud_storage.py`) untouched.
+- ✅ 328/328 targeted tests passing across Phase 5 + iter217 Phase1-4 + iter209-216.
+
+---
+
+## Previous: iter217 Phase 5 Hotfix v3 — Bill 96 Validator Relaxation (Feb 16, 2026) ✅
 
 ### Bug — Bill 96 validator blocking legitimate Quebec listings
 **Root cause** (3-part)

@@ -22,6 +22,7 @@ import {
   Eye, ChevronRight, Flame, Crown,
 } from 'lucide-react';
 import PartnerBadge from '../PartnerBadge';
+import SafeImage from '../SafeImage';
 import { formatListingPrice } from '../../utils/currencyFormatter';
 
 const PROVINCE_LABEL = {
@@ -85,7 +86,7 @@ const VehicleListingCard = ({ vehicle, countdown, onClick, onQuickView, compact 
           aria-label={cardTitle}
         >
           {mainImage && !imgError ? (
-            <img
+            <SafeImage
               src={mainImage}
               alt={cardTitle}
               width="480"
@@ -165,7 +166,7 @@ const VehicleListingCard = ({ vehicle, countdown, onClick, onQuickView, compact 
         data-testid={`vehicle-card-image-${vehicle.id}`}
       >
         {mainImage && !imgError ? (
-          <img
+          <SafeImage
             src={mainImage}
             alt={cardTitle}
             width="640"

@@ -4,7 +4,7 @@ Handles all listing CRUD operations for both single-item and multi-item auctions
 including terms management and deletion requests.
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Request, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, Request, BackgroundTasks, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone, timedelta
@@ -573,6 +573,106 @@ async def delete_listing(listing_id: str, current_user: User = Depends(get_curre
         raise HTTPException(status_code=403, detail="Not authorized")
     await db.listings.delete_one({"id": listing_id})
     return {"message": "Listing deleted successfully"}
+
+
+# ── Phase 5 Hotfix v4 — S3 multipart image upload ─────────────────────
+# Replaces the legacy base64-in-MongoDB pattern. Accepts up to 15 files
+# per request, processes them through `services/s3_service.py` (resize +
+# compress + JPEG re-encode), and appends the resulting public HTTPS URLs
+# to the listing's `images` array. Never writes raw base64 to the DB.
+LISTING_IMAGES_MAX = 15
+
+
+@listings_router.post("/listings/{listing_id}/images")
+async def upload_listing_images(
+    listing_id: str,
+    files: List[UploadFile] = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    """Upload one or more listing photos to S3.
+
+    Body: multipart/form-data with one or more `files` parts.
+    Validation:
+      • Listing must exist and belong to current_user.
+      • At most 15 images allowed (existing + new).
+      • Each file is processed (resize/compress) and uploaded to S3.
+      • Returns the updated `images` array (HTTPS URLs only).
+    """
+    db = get_db()
+
+    if not files or len(files) == 0:
+        raise HTTPException(status_code=400, detail={
+            "error": "no_files",
+            "message_en": "No files were provided.",
+            "message_fr": "Aucun fichier fourni.",
+        })
+
+    # Try `listings` first, then `multi_item_listings` so the endpoint
+    # works for both single and multi-lot listings owned by the user.
+    listing = await db.listings.find_one({"id": listing_id}, {"_id": 0})
+    collection = "listings"
+    if not listing:
+        listing = await db.multi_item_listings.find_one({"id": listing_id}, {"_id": 0})
+        collection = "multi_item_listings"
+    if not listing:
+        raise HTTPException(status_code=404, detail={
+            "error": "listing_not_found",
+            "message_en": "Listing not found.",
+            "message_fr": "Annonce introuvable.",
+        })
+
+    if listing.get("seller_id") != current_user.id:
+        raise HTTPException(status_code=403, detail={
+            "error": "not_authorized",
+            "message_en": "You are not authorized to upload images to this listing.",
+            "message_fr": "Vous n'êtes pas autorisé à téléverser des images pour cette annonce.",
+        })
+
+    existing_images = list(listing.get("images") or [])
+    total_after = len(existing_images) + len(files)
+    if total_after > LISTING_IMAGES_MAX:
+        raise HTTPException(status_code=400, detail={
+            "error": "too_many_images",
+            "message_en": f"At most {LISTING_IMAGES_MAX} images per listing — current {len(existing_images)}, attempted to add {len(files)}.",
+            "message_fr": f"Maximum {LISTING_IMAGES_MAX} images par annonce — actuellement {len(existing_images)}, tentative d'ajout {len(files)}.",
+        })
+
+    from services.s3_service import upload_image_to_s3
+
+    uploaded_urls: List[str] = []
+    failures: List[Dict[str, Any]] = []
+    for idx, file in enumerate(files, start=len(existing_images)):
+        if file.content_type and not file.content_type.startswith("image/"):
+            failures.append({"filename": file.filename, "reason": "not_an_image"})
+            continue
+        try:
+            url = await upload_image_to_s3(file, listing_id, idx)
+            uploaded_urls.append(url)
+        except ValueError as e:
+            failures.append({"filename": file.filename, "reason": str(e)})
+        except Exception as e:
+            logger.error("S3 upload failed for %s: %s", file.filename, e)
+            failures.append({"filename": file.filename, "reason": "upload_failed"})
+
+    if not uploaded_urls:
+        raise HTTPException(status_code=400, detail={
+            "error": "all_uploads_failed",
+            "failures": failures,
+        })
+
+    new_images = existing_images + uploaded_urls
+    await db[collection].update_one(
+        {"id": listing_id},
+        {"$set": {"images": new_images}},
+    )
+
+    return {
+        "success":         True,
+        "uploaded_count":  len(uploaded_urls),
+        "uploaded_urls":   uploaded_urls,
+        "images":          new_images,
+        "failures":        failures,
+    }
 
 
 # ========== MULTI-ITEM LISTINGS ==========
